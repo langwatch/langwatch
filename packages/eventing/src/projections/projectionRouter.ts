@@ -42,6 +42,7 @@ import type {
 } from "../subscribers/subscriber.types.ts";
 import { toError } from "../utils/errors.ts";
 import { EventUtils } from "../utils/event.utils.ts";
+import { appliedTokenOf } from "./appliedToken.ts";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition, FoldStateRead } from "./foldProjection.types.ts";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor.ts";
@@ -1071,7 +1072,10 @@ export class ProjectionRouter<
       aggregateId: String(missed.aggregateId),
       occurredAtMs: missed.occurredAt,
     });
-    if (!history.some((event) => event.id === missed.id)) {
+    // By applied token: the log keeps one event per idempotency key, so a missed event whose
+    // key another id holds is accounted for by that copy, and waiting for its own id never ends.
+    const missedToken = appliedTokenOf(missed);
+    if (!history.some((event) => appliedTokenOf(event) === missedToken)) {
       throw new Error(`The log does not yet hold missed event ${missed.id}; retrying the rebuild`);
     }
     let latest: StoredProjection<State> | null = null;

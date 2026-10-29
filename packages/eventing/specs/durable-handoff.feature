@@ -46,6 +46,13 @@ Feature: Durable hand-off from an append to its lanes
     Then the row holds every event and the newest cursor
 
   @unit
+  Scenario: A state projection that missed a re-send under a held key rebuilds from the log's copy
+    Given a state projection that applied an event under an idempotency key
+    And it missed a re-send of that key under another id
+    When the event log keeps only the first copy of the key
+    Then the rebuild applies the log's copy instead of retrying until its retries run out
+
+  @unit
   Scenario: The rebuild job runs in the aggregate's own ordered lane
     Given a fold's queued lanes
     When a rebuild is requested for one aggregate

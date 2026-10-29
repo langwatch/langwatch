@@ -339,6 +339,51 @@ describe("durable hand-off", () => {
     });
   });
 
+  describe("given a state projection that missed a re-send the log collapsed into an earlier copy", () => {
+    /** @scenario "A state projection that missed a re-send under a held key rebuilds from the log's copy" */
+    it("rebuilds from the copy the log kept instead of waiting for the re-send's id", async () => {
+      const handoffStore = InMemoryProcessStore.createForTesting();
+      const held: { row?: StoredProjection<{ count: number }> } = {};
+      const projection: StateProjectionDefinition<{ count: number }, Event> = {
+        name: "counterRow",
+        version: "2026-09-29",
+        eventTypes: [],
+        init: () => ({ count: 0 }),
+        apply: (state) => ({ count: state.count + 1 }),
+        store: {
+          get: async () =>
+            held.row ? { kind: "folded", projection: held.row } : { kind: "empty" },
+          store: async (stored) => {
+            held.row = stored;
+          },
+        },
+      };
+      const failingOnce = vi.spyOn(projection.store, "store");
+      const { service, eventStore, drain } = serviceWith({
+        handoffStore,
+        stateProjections: [sealStateProjection(projection)],
+      });
+
+      const first = { ...appendedAt(1_000), idempotencyKey: "bootstrap" };
+      await service.storeEvents([first], { tenantId });
+      failingOnce.mockRejectedValueOnce(new Error("postgres refused"));
+      const resend = { ...appendedAt(2_000), idempotencyKey: "bootstrap" };
+      await service.storeEvents([resend], { tenantId });
+      // The event log is a ReplacingMergeTree on the key: once merged it reads one copy.
+      const getEvents = eventStore.getEvents.bind(eventStore);
+      vi.spyOn(eventStore, "getEvents").mockImplementation(async (input) =>
+        (await getEvents(input)).filter((event) => event.id !== resend.id),
+      );
+
+      const redriven = await drain(Date.now());
+
+      expect(redriven.dispatched).toHaveLength(1);
+      expect(failingOnce).toHaveBeenCalledTimes(3);
+      expect(held.row?.state.count).toBe(1);
+      expect(held.row?.cursor.eventId).toBe(first.id);
+    });
+  });
+
   describe("given a global map projection on a registry that is not routing", () => {
     /** @scenario "A global lane missed while the registry is closed is re-driven once it routes" */
     it("re-drives the global lane once the registry routes", async () => {
