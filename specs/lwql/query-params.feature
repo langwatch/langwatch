@@ -12,11 +12,10 @@ Feature: Every query door takes the same parameters and says what it ran with
   # `projects`. The answer returns them as `params`.
   # What is not a parameter: the row policy, the share windows and the redaction of captured
   # content come from the credential and its grants, never from the request.
-  # PROPOSAL pending the owner's yes (sent 2026-10-29). Flip points: QP05 and QP06 if he prefers a
-  # filter the server always applies, and QP03b, which has two answers: (i) a key for an
-  # organization or a team reads every project it can read, echoed (written here), or (ii) such a
-  # key must name a project and is refused with a 422 "name a project". Every other scenario
-  # holds either way.
+  # Decided by the owner (2026-10-29): no hidden filter, so QP05 and QP06 stand ("why have a hidden
+  # filter?"). QP03b: a key for an organization, a team or a person reads every project it can
+  # read, echoed in params.projects. An organization key has no current project, and a 422 would
+  # break existing scripts.
   # Evidence: the repo marks proof with `# Evidence:` lines under a scenario (dashboards-v2.feature);
   # each scenario here ends with one.
 
@@ -44,7 +43,7 @@ Feature: Every query door takes the same parameters and says what it ran with
       # Evidence: three answers quoted
 
     @unit @integration
-    Scenario: QP03b FLIP POINT An organization, team or personal key reads every project it can read, and params lists them
+    Scenario: QP03b An organization, team or personal key reads every project it can read, and params lists them
       Given an organization key that reads projects "A" and "B" and not "C"
       When it runs a statement with no projects
       Then it reads "A" and "B" and params.projects is ["A", "B"], in the order of the project ids sorted ascending

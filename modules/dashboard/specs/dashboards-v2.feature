@@ -1894,10 +1894,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # The editor labels them "sources" and "project". A query is kept to its sources only where
   # its SQL reads {dashboard_context_sources}; SQL that does not read it counts every origin and
   # says so. Who may read what is not a parameter: the row policy, the share windows and the
-  # redaction come from the viewer's grants. PROPOSAL pending the owner's yes (sent 2026-10-29).
-  # Flip points if he prefers the always-applied filter: AC190, AC193, AC194, AC195, AC200f,
-  # AC200h, AC200l, AC201b, AC204, AC204b and, in specs/lwql/query-params.feature, QP05 and QP06;
-  # their earlier text is in git at c5743d82. If he prefers the origin helper stay: AC202e.
+  # redaction come from the viewer's grants. Decided by the owner (2026-10-29): no hidden filter
+  # ("why have a hidden filter?", "Everything should be a param, and the query should take it
+  # into account"). AC190, AC193, AC194, AC195, AC200f, AC200h, AC200l, AC200m, AC201b, AC204
+  # and AC204b stand as written; the earlier text is in git at c5743d82.
   # The helper (decided): a `Source` column the LWQL views expose, computed at read time from
   # `Origin` (lwql-view-catalog.rules.ts sourceColumns); no ClickHouse migration. It reads: a missing, empty or NULL origin reads "application", an origin outside the eight
   # listed reads "other", a listed origin reads as itself. A view keyed by TraceId is reached
