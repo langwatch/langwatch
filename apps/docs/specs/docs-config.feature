@@ -64,6 +64,28 @@ Feature: docs.json stays the single source of truth for both documentation sites
     Then the tag loads as on any production page
 
   @unit
+  Scenario: Ask the reader for cookie consent on the docs, sharing the marketing site's choice
+    Given docs.json names a Google Tag Manager container
+    And the reader has not accepted or declined cookies on langwatch.ai
+    When a production page loads
+    Then a cookie notice asks them to accept or decline
+    When they accept
+    Then the notice goes, the choice is stored where the marketing site keeps it, and the tag loads
+    When they decline instead
+    Then the notice goes, the choice is stored, and no tag loads
+    And a reader who already chose on either site, a page with no container, or a local host shows no notice
+
+  @unit
+  Scenario: Show the live GitHub star count, refreshed from the build's and kept for an hour
+    Given the page shows the star count GitHub reported at build time
+    When the page is idle and this browser has no count from the last hour
+    Then it asks GitHub once, shows the live count and keeps it in the browser with the time it was read
+    And an older kept count shows at once while the fresh one loads
+    When this browser read the count within the hour
+    Then the page shows that count without asking GitHub
+    And if GitHub does not answer with a count, the page keeps the count it has
+
+  @unit
   Scenario: Refuse arbitrary code from the tag manager
     Given docs.json names a Google Tag Manager container
     When the container loads

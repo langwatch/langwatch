@@ -2352,10 +2352,10 @@ body {
   }
 }
 
-/* While the next page loads, the current article steps back; a fast load never shows it. */
+/* While a slow page loads, the current article steps back a little; a load under 300ms never shows it. */
 #content[data-docs-leaving] {
-  opacity: 0.45;
-  transition: opacity 180ms ease 80ms;
+  opacity: 0.85;
+  transition: opacity 180ms ease 300ms;
 }
 
 /* The heading a # link lands on: one orange shimmer across it, then back to normal. */
@@ -2389,7 +2389,15 @@ body {
   }
 }
 
-/* Theme toggle: a sun that pulls in its rays and takes a bite to become the moon. */
+/* The theme menu ticks only the stored choice, which the island marks when the menu opens. */
+.docs-theme-check {
+  visibility: hidden;
+}
+[aria-checked="true"] > .docs-theme-check {
+  visibility: visible;
+}
+
+/* Theme button: a sun that pulls in its rays and takes a bite to become the moon. */
 .docs-theme-toggle {
   display: inline-flex;
   align-items: center;

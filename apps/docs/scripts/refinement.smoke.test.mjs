@@ -386,3 +386,35 @@ await it("shows each page action on an icon chip with the copy shortcut", async 
     },
   });
 });
+
+/** @scenario "Trace the way to the current page through the navigation tree" */
+await it("colours every group above the current page, and no other", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      try {
+        await page.goto(base + "integration/python/tutorials/capturing-mapping-input-output");
+        const tree = page.locator('.docs-left-rail nav[aria-label="Page navigation"]');
+        const current = tree.locator('[aria-current="page"]');
+        const accent = await current.evaluate((node) => getComputedStyle(node).color);
+        const groups = await tree.evaluate((root) =>
+          [...root.querySelectorAll("li:has(> [data-docs-panel]) > a")].map((link) => ({
+            title: link.textContent.trim(),
+            holds: Boolean(
+              link.parentElement.querySelector('[data-docs-panel] [aria-current="page"]'),
+            ),
+            color: getComputedStyle(link).color,
+          })),
+        );
+        const trail = groups.filter((group) => group.holds);
+        assert.ok(trail.length >= 2, `expected nested groups, got ${JSON.stringify(trail)}`);
+        for (const group of trail) assert.equal(group.color, accent, group.title);
+        for (const group of groups.filter((entry) => !entry.holds))
+          assert.notEqual(group.color, accent, group.title);
+      } finally {
+        await page.close();
+      }
+    },
+  });
+});

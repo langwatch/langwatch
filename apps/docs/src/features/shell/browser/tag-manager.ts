@@ -7,7 +7,7 @@ const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
 const AD_PIXEL_HOST = "langwatch.ai";
 
 /* The marketing site's cookie banner writes the reader's choice here, on the same origin. */
-const CONSENT_STORAGE_KEY = "lw-cookie-consent";
+export const CONSENT_STORAGE_KEY = "lw-cookie-consent";
 
 /*
  * Set by the page before the container loads, so publishing cannot widen it: no Custom HTML and
@@ -16,7 +16,7 @@ const CONSENT_STORAGE_KEY = "lw-cookie-consent";
  */
 export const TAG_RESTRICTIONS = { "gtm.blocklist": ["html", "customScripts"] } as const;
 
-type TagWindow = Window & { dataLayer?: unknown[] };
+export type TagWindow = Window & { dataLayer?: unknown[] };
 
 /** Whether the reader accepted cookies; unknown, declined or unreadable storage is a no. */
 export function analyticsConsented({ win }: { win: Pick<Window, "localStorage"> }) {

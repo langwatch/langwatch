@@ -9,6 +9,7 @@ import { SearchTemplates } from "../../search/ui.ts";
 import { AgentLauncher } from "./agent-launcher.tsx";
 import { SiteAnnouncement } from "./announcement.tsx";
 import { SiteBanner } from "./banner.tsx";
+import { CookieNotice } from "./cookie-notice.tsx";
 import { GithubLink } from "./github-link.tsx";
 import { Header, HEADER_HEIGHT, type PageKind } from "./header.tsx";
 import { PageFooter } from "./page-footer.tsx";
@@ -230,6 +231,7 @@ export function DocsShell({
       <SiteFooter />
       <MobileNav githubLink={<GithubLink site={site} />} site={site} />
       <SearchTemplates />
+      <CookieNotice />
     </Box>
   );
 }

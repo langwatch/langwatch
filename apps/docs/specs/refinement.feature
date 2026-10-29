@@ -233,3 +233,10 @@ Feature: Actionable documentation and restrained reading surfaces
     Then the panel captions it with at most two lines of its description
     And a quieter line below names the media type and whether the example is declared or generated from the schema
     And the full description stays under Responses in the reference
+
+  @e2e
+  Scenario: Trace the way to the current page through the navigation tree
+    Given a page nested several groups deep in the navigation
+    When the reader opens it
+    Then every group above it shows its title in the accent colour, its guide line tinted
+    And groups that do not hold the page keep their usual colour

@@ -200,7 +200,7 @@ Feature: Static documentation with progressive interaction
     When a reader opens the page menu or presses the theme button
     Then page actions have readable titles and descriptions
     And copying a page confirms success
-    And the theme button switches between light and dark and the page remembers the choice
+    And the theme button offers System, Light and Dark, and the page remembers the choice
 
   @e2e
   Scenario: Start with a coding agent
@@ -371,3 +371,12 @@ Feature: Static documentation with progressive interaction
     When a page's skill prompt has a heading named like one of the page's own sections
     Then the page's section keeps the plain anchor its links point at
     And the prompt's heading takes a numbered anchor
+
+  @integration
+  Scenario: Choose the light, dark or system theme
+    When a reader opens the theme menu
+    Then it offers System, Light and Dark, with the stored choice ticked and System when there is none
+    When they choose Light or Dark
+    Then the page takes that theme and keeps it on every visit
+    When they choose System
+    Then the page follows the operating system's colour scheme, and keeps following it when it switches
