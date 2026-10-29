@@ -2331,8 +2331,8 @@ model DashboardsV2 {
   /// The owning project's organization, stamped when the board is first set to
   /// ORGANIZATION; null before.
   organizationId  String?
-  /// The trace origins every widget leaves out, a JSON list of strings; null keeps the
-  /// board's default (Langy's out, none in a personal project). dashboards-v2 AC200.
+  /// Deprecated: unused since each widget query names its own sources (dashboards-v2 AC200,
+  /// 2026-10-28); dropped in a later migration, once no serving release reads it.
   excludedOrigins Json?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @default(now()) @updatedAt

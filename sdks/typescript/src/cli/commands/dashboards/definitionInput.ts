@@ -15,6 +15,49 @@ export interface DefinitionFlags {
 /** Thrown for input the CLI can refuse before any request is made. */
 export class WidgetInputError extends Error {}
 
+type TraceSource = NonNullable<DashboardWidgetQueryInput["sources"]>[number];
+
+/**
+ * The trace origins a widget query can count, checked against the platform's published enum;
+ * the server checks them again. "other" is every origin not listed before it.
+ */
+export const TRACE_SOURCES = [
+  "application",
+  "simulation",
+  "evaluation",
+  "sample",
+  "coding_agent",
+  "ai_tool",
+  "gateway",
+  "workflow",
+  "playground",
+  "langy",
+  "other",
+] as const satisfies readonly TraceSource[];
+
+const isTraceSource = (value: string): value is TraceSource =>
+  (TRACE_SOURCES as readonly string[]).includes(value);
+
+/**
+ * `--sources application,langy`: the origins every query of the widget counts, or undefined
+ * when the flag is absent, so each query keeps what it stores.
+ */
+export const resolveSources = (flag: string | undefined): TraceSource[] | undefined => {
+  if (flag === undefined) return undefined;
+  const picked = flag
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  const unknown = picked.filter((part) => !isTraceSource(part));
+  if (picked.length === 0 || unknown.length > 0) {
+    const named = unknown.length > 0 ? `unknown source "${unknown[0]}"; ` : "";
+    throw new WidgetInputError(
+      `--sources: ${named}pass a comma list of ${TRACE_SOURCES.join(", ")}`,
+    );
+  }
+  return picked.filter(isTraceSource);
+};
+
 /**
  * Resolves definition flags to { code, queries }, refusing partial
  * definitions (both source and queries required together).

@@ -8528,7 +8528,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The trace origins every widget leaves out, a JSON list of strings; null keeps the\nboard's default (Langy's out, none in a personal project). dashboards-v2 AC200."
+          "documentation": "Deprecated: unused since each widget query names its own sources (dashboards-v2 AC200,\n2026-10-28); dropped in a later migration, once no serving release reads it."
         },
         {
           "name": "createdAt",

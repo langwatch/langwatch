@@ -10,6 +10,7 @@ import {
   SESSION_REDACTION_SUMMARY,
 } from "../internal/generated/redaction/sessionReport";
 import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
+import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
@@ -2215,7 +2216,14 @@ function registerDashboardCommands(program: Command): void {
       .option("--description <description>", "What the widget shows")
       .option("--code <code>", "The widget's React source")
       .option("--code-file <path>", "Read the widget's React source from a file")
-      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }");
+      .option(
+        "--queries-file <path>",
+        "JSON file: an array of { name, sql, parameters?, sources? }",
+      )
+      .option(
+        "--sources <list>",
+        `Comma list of the trace origins every query counts: ${TRACE_SOURCES.join(", ")}`,
+      );
 
   emitsResult(
     format(

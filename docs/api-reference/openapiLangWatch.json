@@ -29981,6 +29981,33 @@
                                         ],
                                         "additionalProperties": false
                                       }
+                                    },
+                                    "sources": {
+                                      "anyOf": [
+                                        {
+                                          "maxItems": 11,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "application",
+                                              "simulation",
+                                              "evaluation",
+                                              "sample",
+                                              "coding_agent",
+                                              "ai_tool",
+                                              "gateway",
+                                              "workflow",
+                                              "playground",
+                                              "langy",
+                                              "other"
+                                            ]
+                                          }
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -30569,6 +30596,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -31141,6 +31195,33 @@
                               "type"
                             ]
                           }
+                        },
+                        "sources": {
+                          "anyOf": [
+                            {
+                              "maxItems": 11,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "application",
+                                  "simulation",
+                                  "evaluation",
+                                  "sample",
+                                  "coding_agent",
+                                  "ai_tool",
+                                  "gateway",
+                                  "workflow",
+                                  "playground",
+                                  "langy",
+                                  "other"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -31312,6 +31393,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -31984,6 +32092,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -32647,6 +32782,33 @@
                               "type"
                             ]
                           }
+                        },
+                        "sources": {
+                          "anyOf": [
+                            {
+                              "maxItems": 11,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "application",
+                                  "simulation",
+                                  "evaluation",
+                                  "sample",
+                                  "coding_agent",
+                                  "ai_tool",
+                                  "gateway",
+                                  "workflow",
+                                  "playground",
+                                  "langy",
+                                  "other"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -33275,6 +33437,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -33924,22 +34113,6 @@
                               "ORGANIZATION"
                             ]
                           },
-                          "excludedOrigins": {
-                            "anyOf": [
-                              {
-                                "maxItems": 20,
-                                "type": "array",
-                                "items": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 64
-                                }
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
                           "createdById": {
                             "type": [
                               "string",
@@ -33966,7 +34139,6 @@
                           "name",
                           "description",
                           "scope",
-                          "excludedOrigins",
                           "createdById",
                           "createdAt",
                           "updatedAt",
@@ -34367,22 +34539,6 @@
                         "ORGANIZATION"
                       ]
                     },
-                    "excludedOrigins": {
-                      "anyOf": [
-                        {
-                          "maxItems": 20,
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
-                          }
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -34404,7 +34560,6 @@
                     "name",
                     "description",
                     "scope",
-                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -34819,22 +34974,6 @@
                         "ORGANIZATION"
                       ]
                     },
-                    "excludedOrigins": {
-                      "anyOf": [
-                        {
-                          "maxItems": 20,
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
-                          }
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -34856,7 +34995,6 @@
                     "name",
                     "description",
                     "scope",
-                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -35342,22 +35480,6 @@
                         "ORGANIZATION"
                       ]
                     },
-                    "excludedOrigins": {
-                      "anyOf": [
-                        {
-                          "maxItems": 20,
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
-                          }
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -35379,7 +35501,6 @@
                     "name",
                     "description",
                     "scope",
-                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -35801,7 +35922,7 @@
             }
           }
         },
-        "description": "Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).",
+        "description": "Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.",
         "summary": "Update a dashboard",
         "tags": [
           "Dashboards"
@@ -35848,22 +35969,6 @@
                       {
                         "type": "string",
                         "maxLength": 2000
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "excludedOrigins": {
-                    "anyOf": [
-                      {
-                        "maxItems": 20,
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 64
-                        }
                       },
                       {
                         "type": "null"
@@ -36437,6 +36542,33 @@
                                         ],
                                         "additionalProperties": false
                                       }
+                                    },
+                                    "sources": {
+                                      "anyOf": [
+                                        {
+                                          "maxItems": 11,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "application",
+                                              "simulation",
+                                              "evaluation",
+                                              "sample",
+                                              "coding_agent",
+                                              "ai_tool",
+                                              "gateway",
+                                              "workflow",
+                                              "playground",
+                                              "langy",
+                                              "other"
+                                            ]
+                                          }
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -37107,6 +37239,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -37657,7 +37816,7 @@
             }
           }
         },
-        "description": "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
+        "description": "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a query that names none counts `[\"application\"]`.",
         "summary": "Create a widget on a dashboard",
         "tags": [
           "Dashboards"
@@ -37761,6 +37920,33 @@
                               "type"
                             ]
                           }
+                        },
+                        "sources": {
+                          "anyOf": [
+                            {
+                              "maxItems": 11,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "application",
+                                  "simulation",
+                                  "evaluation",
+                                  "sample",
+                                  "coding_agent",
+                                  "ai_tool",
+                                  "gateway",
+                                  "workflow",
+                                  "playground",
+                                  "langy",
+                                  "other"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -37932,6 +38118,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -38604,6 +38817,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -39154,7 +39394,7 @@
             }
           }
         },
-        "description": "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
+        "description": "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value; a query sent without `sources` keeps the sources stored under its name, and `sources: null` clears them. A body with none of these fields is refused.",
         "summary": "Update a widget on a dashboard",
         "tags": [
           "Dashboards"
@@ -39267,6 +39507,33 @@
                               "type"
                             ]
                           }
+                        },
+                        "sources": {
+                          "anyOf": [
+                            {
+                              "maxItems": 11,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "application",
+                                  "simulation",
+                                  "evaluation",
+                                  "sample",
+                                  "coding_agent",
+                                  "ai_tool",
+                                  "gateway",
+                                  "workflow",
+                                  "playground",
+                                  "langy",
+                                  "other"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -39851,22 +40118,6 @@
                               "ORGANIZATION"
                             ]
                           },
-                          "excludedOrigins": {
-                            "anyOf": [
-                              {
-                                "maxItems": 20,
-                                "type": "array",
-                                "items": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 64
-                                }
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
                           "createdById": {
                             "type": [
                               "string",
@@ -39893,7 +40144,6 @@
                           "name",
                           "description",
                           "scope",
-                          "excludedOrigins",
                           "createdById",
                           "createdAt",
                           "updatedAt",
@@ -40307,22 +40557,6 @@
                         "ORGANIZATION"
                       ]
                     },
-                    "excludedOrigins": {
-                      "anyOf": [
-                        {
-                          "maxItems": 20,
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
-                          }
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -40344,7 +40578,6 @@
                     "name",
                     "description",
                     "scope",
-                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -40846,22 +41079,6 @@
                               "ORGANIZATION"
                             ]
                           },
-                          "excludedOrigins": {
-                            "anyOf": [
-                              {
-                                "maxItems": 20,
-                                "type": "array",
-                                "items": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 64
-                                }
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
                           "createdById": {
                             "type": [
                               "string",
@@ -40888,7 +41105,6 @@
                           "name",
                           "description",
                           "scope",
-                          "excludedOrigins",
                           "createdById",
                           "createdAt",
                           "updatedAt",
@@ -41303,22 +41519,6 @@
                         "ORGANIZATION"
                       ]
                     },
-                    "excludedOrigins": {
-                      "anyOf": [
-                        {
-                          "maxItems": 20,
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
-                          }
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -41340,7 +41540,6 @@
                     "name",
                     "description",
                     "scope",
-                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",

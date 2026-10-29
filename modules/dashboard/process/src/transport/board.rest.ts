@@ -29,7 +29,7 @@ import {
   dashboardWidgetResourceSchema,
   updateBoardSchema,
   updateDashboardWidgetSchema,
-  type Board,
+  type Dashboard,
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
@@ -72,7 +72,7 @@ const widgetNotFoundResponse: Record<404, RouteResponse> = {
 
 /** The board as the API publishes it. */
 export function boardResource(
-  board: Board,
+  board: Dashboard,
   platformUrl: string,
 ): z.infer<typeof boardResourceSchema> {
   return {
@@ -80,7 +80,6 @@ export function boardResource(
     name: board.name,
     description: board.description,
     scope: board.scope,
-    excludedOrigins: board.excludedOrigins,
     createdById: board.createdById,
     createdAt: board.createdAt.toISOString(),
     updatedAt: board.updatedAt.toISOString(),
@@ -184,7 +183,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Update a dashboard",
     description:
-      "Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).",
+      "Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -200,7 +199,6 @@ export const boardRest = defineRestRouter(DashboardApi)
       ...viewerOfActor({ actor }),
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
-      ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
     });
     const links = await app.getBoardLinks({ projectId, dashboardIds: [board.id] });
 
@@ -283,7 +281,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Create a widget on a dashboard",
     description:
-      "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
+      'Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. Each query\'s `sources` lists the trace origins it counts; a query that names none counts `["application"]`.',
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -344,7 +342,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Update a widget on a dashboard",
     description:
-      "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
+      "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value; a query sent without `sources` keeps the sources stored under its name, and `sources: null` clears them. A body with none of these fields is refused.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,

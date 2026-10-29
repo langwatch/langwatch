@@ -356,7 +356,7 @@ export interface paths {
         head?: never;
         /**
          * Update a dashboard
-         * @description Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).
+         * @description Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.
          */
         patch: operations["patchApiDashboardsByDashboardId"];
         trace?: never;
@@ -376,7 +376,7 @@ export interface paths {
         put?: never;
         /**
          * Create a widget on a dashboard
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a query that names none counts `["application"]`.
          */
         post: operations["postApiDashboardsByDashboardIdWidgets"];
         delete?: never;
@@ -408,7 +408,7 @@ export interface paths {
         head?: never;
         /**
          * Update a widget on a dashboard
-         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.
+         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value; a query sent without `sources` keeps the sources stored under its name, and `sources: null` clears them. A body with none of these fields is refused.
          */
         patch: operations["patchApiDashboardsByDashboardIdWidgetsByWidgetId"];
         trace?: never;
@@ -5101,7 +5101,6 @@ export interface operations {
                             description: string | null;
                             /** @enum {string} */
                             scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                            excludedOrigins: string[] | null;
                             createdById: string | null;
                             createdAt: string;
                             updatedAt: string;
@@ -5260,7 +5259,6 @@ export interface operations {
                         description: string | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                        excludedOrigins: string[] | null;
                         createdById: string | null;
                         createdAt: string;
                         updatedAt: string;
@@ -5413,7 +5411,6 @@ export interface operations {
                         description: string | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                        excludedOrigins: string[] | null;
                         createdById: string | null;
                         createdAt: string;
                         updatedAt: string;
@@ -5762,7 +5759,6 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
-                    excludedOrigins?: string[] | null;
                 };
             };
         };
@@ -5779,7 +5775,6 @@ export interface operations {
                         description: string | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                        excludedOrigins: string[] | null;
                         createdById: string | null;
                         createdAt: string;
                         updatedAt: string;
@@ -5972,6 +5967,7 @@ export interface operations {
                                         type: "string" | "number" | "boolean";
                                         default?: string | number | boolean;
                                     }[];
+                                    sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                                 }[];
                                 description?: string;
                                 prompt?: string;
@@ -6177,6 +6173,7 @@ export interface operations {
                             type: "string" | "number" | "boolean";
                             default?: string | number | boolean;
                         }[];
+                        sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                     }[];
                     description?: string;
                     prompt?: string;
@@ -6219,6 +6216,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6433,6 +6431,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6818,6 +6817,7 @@ export interface operations {
                             type: "string" | "number" | "boolean";
                             default?: string | number | boolean;
                         }[];
+                        sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                     }[];
                     description?: string;
                     source?: {
@@ -6859,6 +6859,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
