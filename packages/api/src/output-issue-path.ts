@@ -108,7 +108,9 @@ function stepWithin(schema: z.ZodType, segment: unknown, ancestors: Set<z.ZodTyp
 
   if (holdsNothing(schema)) return { next: [], holds: false, declared: false };
   if (schema instanceof z.ZodMap) {
-    return { next: [schema.def.valueType as z.ZodType], holds: true, declared: false };
+    // Zod files a key's own issues under the entry too, so below it may be either schema.
+    const entry = [schema.def.keyType as z.ZodType, schema.def.valueType as z.ZodType];
+    return { next: entry, holds: true, declared: false };
   }
   const found =
     typeof segment === "number"

@@ -75,6 +75,24 @@ describe("declaredPath", () => {
     });
 
     /** @scenario "A refused answer's log names the failing field without the caller's keys" */
+    it("keeps a map key's own issue path out, which Zod files under the entry", () => {
+      const key = z
+        .string()
+        .transform((text) => new Map([[Number(text), "bad"]]))
+        .pipe(z.map(z.number(), z.number()));
+      const schema = z.map(key, z.array(z.string()));
+      const parsed = schema.safeParse(new Map([["8675309", []]]));
+
+      const meta = validationMeta(parsed.error, {
+        privacy: "schema-only",
+        schemaPath: (path) => declaredPath(schema, path),
+      });
+
+      expect(meta?.issues.map((issue) => issue.path)).toEqual(["<key>[<key>]"]);
+      expect(JSON.stringify(meta)).not.toContain("8675309");
+    });
+
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
     it("keeps a number out of an intersection unless both sides index it", () => {
       const schema = z.intersection(z.array(z.string()), z.record(z.string(), z.string()));
 
