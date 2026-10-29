@@ -55,6 +55,7 @@ import {
   UnsupportedMediaTypeError,
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import { declaredPath } from "../output-issue-path.ts";
 import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
@@ -2627,7 +2628,10 @@ function respond({
         endpoint: context.get(ENDPOINT_ROUTE) ?? "<unregistered>",
         method: context.req.method,
         path: context.req.path,
-        validation: validationMeta(validation.error, { privacy: "schema-only" }),
+        validation: validationMeta(validation.error, {
+          privacy: "schema-only",
+          schemaPath: (path) => declaredPath(route.output as z.ZodType, path),
+        }),
       },
       "REST handler response did not match its declared output schema",
     );
@@ -2843,7 +2847,10 @@ function respondDeclared({
         method: context.req.method,
         path: context.req.path,
         status,
-        validation: validationMeta(validation.error, { privacy: "schema-only" }),
+        validation: validationMeta(validation.error, {
+          privacy: "schema-only",
+          schemaPath: (path) => declaredPath(schema, path),
+        }),
       },
       "REST handler response did not match the answer its declaration named",
     );

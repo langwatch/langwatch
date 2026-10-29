@@ -85,6 +85,15 @@ function stringList(value: unknown): string[] | undefined {
   return value.map((entry) => String(entry));
 }
 
+/**
+ * How a schema-only record names an issue's path: from the root of the value the schema
+ * checked, with every segment the schema does not declare (a record key, a key under `any`)
+ * replaced, so a caller's content never reaches the log. Without one the path is withheld.
+ */
+export type SchemaPathDescriber = (path: readonly unknown[]) => string;
+
+type Privacy = { schemaOnly: boolean; schemaPath: SchemaPathDescriber | undefined };
+
 type IssueFieldReader = (issue: RawIssue, schemaOnly: boolean) => Partial<ValidationIssueMeta>;
 
 const optionsFrom: IssueFieldReader = (issue) => ({ options: stringList(issue.options) });
@@ -135,11 +144,15 @@ const ISSUE_FIELD_READERS: ReadonlyMap<string, IssueFieldReader> = new Map<
  * vocabulary. Anything not named here is dropped, so a Zod version that adds a
  * field cannot start leaking content without this list changing first.
  */
-function metaForIssue(issue: RawIssue, schemaOnly: boolean): ValidationIssueMeta {
+function metaForIssue(
+  issue: RawIssue,
+  { schemaOnly, schemaPath }: Privacy,
+  base: readonly unknown[],
+): ValidationIssueMeta {
   const meta: ValidationIssueMeta = {
-    // Record-map keys and unrecognised keys can be caller content. Output
-    // validation therefore uses schema-only metadata and omits every path.
-    path: schemaOnly ? "<redacted>" : formatPath(issue.path),
+    // Record-map keys and unrecognised keys can be caller content, so a schema-only path keeps
+    // only what the schema declares, and none is written without the schema to tell them apart.
+    path: schemaOnly ? schemaOnlyPath(issue, base, schemaPath) : formatPath(issue.path),
     code: typeof issue.code === "string" ? issue.code : "unknown",
   };
 
@@ -147,6 +160,18 @@ function metaForIssue(issue: RawIssue, schemaOnly: boolean): ValidationIssueMeta
   if (readFields) Object.assign(meta, readFields(issue, schemaOnly));
 
   return meta;
+}
+
+function pathSegments(issue: RawIssue): unknown[] {
+  return Array.isArray(issue.path) ? issue.path : [];
+}
+
+function schemaOnlyPath(
+  issue: RawIssue,
+  base: readonly unknown[],
+  schemaPath: SchemaPathDescriber | undefined,
+): string {
+  return schemaPath ? schemaPath([...base, ...pathSegments(issue)]) : "<redacted>";
 }
 
 /**
@@ -172,20 +197,24 @@ function collectIssues({
   into,
   counter,
   maxIssues,
-  schemaOnly,
+  privacy,
+  base,
 }: {
   issues: RawIssue[];
   into: ValidationIssueMeta[];
   counter: { total: number };
   maxIssues: number;
-  schemaOnly: boolean;
+  privacy: Privacy;
+  /** Where these issues sit: a union arm's issues are relative to the union itself. */
+  base: readonly unknown[];
 }): void {
   for (const issue of issues) {
     counter.total += 1;
-    if (into.length < maxIssues) into.push(metaForIssue(issue, schemaOnly));
+    if (into.length < maxIssues) into.push(metaForIssue(issue, privacy, base));
 
+    const at = [...base, ...pathSegments(issue)];
     for (const branch of unionBranches(issue)) {
-      collectIssues({ issues: branch, into, counter, maxIssues, schemaOnly });
+      collectIssues({ issues: branch, into, counter, maxIssues, privacy, base: at });
     }
   }
 }
@@ -200,7 +229,13 @@ export function validationMeta(
   {
     maxIssues = MAX_VALIDATION_ISSUES,
     privacy = "standard",
-  }: { maxIssues?: number; privacy?: "standard" | "schema-only" } = {},
+    schemaPath,
+  }: {
+    maxIssues?: number;
+    privacy?: "standard" | "schema-only";
+    /** For `schema-only`: names each path from the schema that refused the value. */
+    schemaPath?: SchemaPathDescriber;
+  } = {},
 ): ValidationMeta | undefined {
   if (!hasIssues(error)) return undefined;
 
@@ -211,7 +246,8 @@ export function validationMeta(
     into: issues,
     counter,
     maxIssues,
-    schemaOnly: privacy === "schema-only",
+    privacy: { schemaOnly: privacy === "schema-only", schemaPath },
+    base: [],
   });
 
   const meta: ValidationMeta = { issueCount: counter.total, issues };
