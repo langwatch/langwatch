@@ -100,8 +100,14 @@ jobs:
           if [ "${#IMAGE_TAG}" -gt 128 ]; then
             echo "::error::image_tag is longer than 128 characters"; exit 1
           fi
+          # Tells cmd/ecrtag the tag is the dispatcher's (see the check below).
+          CUSTOM_TAG="false"
+          if [ "${IMAGE_TAG}" != "ref-${SHA:0:10}" ]; then
+            CUSTOM_TAG="true"
+          fi
           {
             echo "image_tag=${IMAGE_TAG}"
+            echo "custom_tag=${CUSTOM_TAG}"
             echo "sha=${SHA}"
           } >> "$GITHUB_OUTPUT"
 
@@ -129,8 +135,57 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"
 
+      # cmd/ecrtag comes from this workflow's own commit on main: the built ref
+      # may predate it. Removed again before the build, which reads the
+      # workspace as its context.
+      - name: Checkout cmd/ecrtag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: ci-tools
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts
+            cmd
+            tools
+            pkg
+            services
+            sdks/go
+            infra/clickhouse-serverless
+
+      - name: Set up Go for cmd/ecrtag
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ci-tools/go.work
+          cache-dependency-path: "ci-tools/*/go.sum"
+
+      # The tags are immutable. A second dispatch of the same ref finds its
+      # tag, labelled with that commit, and skips the build; a tag already
+      # there recording another commit, or none, cannot be moved and fails
+      # (tools/ecrtag).
+      - name: Check whether the tag is already published
+        id: exists
+        working-directory: ci-tools
+        env:
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          CUSTOM_TAG: ${{ steps.meta.outputs.custom_tag }}
+          SHA: ${{ steps.meta.outputs.sha }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          EXISTS=$(go run ./cmd/ecrtag published -repository "${IMAGE}" -tag "${IMAGE_TAG}" \
+            -source label -revision "${SHA}" -custom="${CUSTOM_TAG}")
+          if [ "${EXISTS}" = "true" ]; then
+            echo "::notice::${IMAGE}:${IMAGE_TAG} is already in ECR; skipping the build"
+          fi
+          echo "exists=${EXISTS}" >> "$GITHUB_OUTPUT"
+
+      - name: Remove the cmd/ecrtag checkout
+        run: rm -rf ci-tools
+
       - name: Build and push
         id: build
+        if: steps.exists.outputs.exists != 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -144,6 +199,9 @@ jobs:
             VERSION=${{ steps.meta.outputs.image_tag }}
             SERVICE_VERSION=${{ steps.meta.outputs.image_tag }}
             LANGWATCH_BUILD_COMMIT=${{ steps.meta.outputs.sha }}
+          # Read back by the existence check above on a second dispatch.
+          labels: |
+            org.opencontainers.image.revision=${{ steps.meta.outputs.sha }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ steps.meta.outputs.image_tag }}
 
@@ -151,9 +209,14 @@ jobs:
         env:
           IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          EXISTS: ${{ steps.exists.outputs.exists }}
           REF: ${{ inputs.ref }}
           SHA: ${{ steps.meta.outputs.sha }}
         run: |
+          if [ "${EXISTS}" = "true" ]; then
+            echo "\`${IMAGE}:${IMAGE_TAG}\` was already in ECR (ref \`${REF}\`, \`${SHA}\`); nothing was built" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           {
             echo "Published \`${IMAGE}:${IMAGE_TAG}\` to ECR (ref \`${REF}\`, \`${SHA}\`)"
             echo ""

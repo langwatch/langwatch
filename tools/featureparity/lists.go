@@ -65,6 +65,7 @@ var (
 		"tools/linkcheck",
 		"tools/chartpush",
 		"tools/slacknotify",
+		"tools/ecrtag",
 		"tools/chartheap",
 		"tools/suiteweights",
 		"tools/matrixseed",

@@ -1458,9 +1458,6 @@ jobs:
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
 
-      - name: Test publish-lambda-tag.sh
-        run: bash .github/scripts/__tests__/publish-lambda-tag.test.sh
-
       - name: Test publish-docker-ecr.yml path filters
         run: bash .github/scripts/__tests__/publish-ecr-filters.test.sh
 

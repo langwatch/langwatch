@@ -273,6 +273,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "tools/chartpush",
   // The main-red Slack post (specs/ci/package-suite-integration-lane.feature).
   "tools/slacknotify",
+  // Whether an immutable ECR tag may be skipped, and the Lambda re-tag
+  // (specs/ci/publish-ecr-images.feature).
+  "tools/ecrtag",
   "tools/chartheap",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
