@@ -273,11 +273,11 @@ export class LangWatchQLTimeWindowService {
       isLangWatchQLTimeWindowParameter(parameter.name),
     );
     const mistyped = [
-      ...reserved.filter((parameter) => !isLangWatchQLDateTimeParameterType(parameter.type)),
-      ...mistypedListParameters(declared).map((name) => ({ name })),
-    ]
-      .map((parameter) => parameter.name)
-      .toSorted();
+      ...reserved
+        .filter((parameter) => !isLangWatchQLDateTimeParameterType(parameter.type))
+        .map((parameter) => parameter.name),
+      ...mistypedListParameters(declared),
+    ].toSorted();
     if (mistyped.length > 0) {
       throw new LangWatchQLReservedParameterTypeError(mistyped);
     }

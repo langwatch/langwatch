@@ -35,7 +35,7 @@ const NON_DEFAULT: Readonly<Record<string, readonly string[]>> = {
 };
 
 describe("given the stock widgets of the catalogue", () => {
-  /** @scenario "AC202 Stock widgets: every stock query reads the sources parameter, except those on the exemption list" */
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("has every stock query read the parameter unless it reads only views with no origin", () => {
     const unread = queries.filter(({ sql }) => !readsSourcesParameter(sql));
 
@@ -49,7 +49,7 @@ describe("given the stock widgets of the catalogue", () => {
     expect(unread.length).toBeGreaterThan(0);
   });
 
-  /** @scenario "AC202 Stock widgets: every stock query reads the sources parameter, except those on the exemption list" */
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("does not count a placeholder that is only in a comment or a literal", () => {
     expect(readsSourcesParameter("SELECT 1 /* {dashboard_context_sources:Array(String)} */")).toBe(
       false,

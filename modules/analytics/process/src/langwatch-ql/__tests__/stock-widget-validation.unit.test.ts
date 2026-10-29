@@ -55,7 +55,7 @@ describe("given the stock widgets of the catalogue", () => {
     expect(queries.length).toBeGreaterThan(100);
   });
 
-  /** @scenario "AC202 Stock widgets: every stock query reads the sources parameter, except those on the exemption list" */
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("passes the validator for a member who sees everything", () => {
     const refused = queries.flatMap(({ label, sql }) => {
       const codes = violationsOf(sql, EVERYTHING);
@@ -65,7 +65,7 @@ describe("given the stock widgets of the catalogue", () => {
     expect(refused).toEqual([]);
   });
 
-  /** @scenario "AC202 Stock widgets: every stock query reads the sources parameter, except those on the exemption list" */
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("is never refused for a wildcard, whatever columns the member lacks", () => {
     const wildcard = queries.filter(({ sql }) =>
       violationsOf(sql, NO_CONTENT).includes("WILDCARD_NOT_ALLOWED"),

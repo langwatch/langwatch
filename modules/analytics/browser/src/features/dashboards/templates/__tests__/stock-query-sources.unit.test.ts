@@ -11,7 +11,7 @@ import { readSources } from "../model/stock-query-sources";
 const SOURCES = "{dashboard_context_sources:Array(String)}";
 
 describe("given a stock query over a view that names only a row's trace", () => {
-  /** @scenario "AC202 Stock widgets: every stock query reads the sources parameter, except those on the exemption list" */
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("looks the trace's origin up by (TenantId, TraceId)", () => {
     const sql = readSources("SELECT count() AS n FROM spans WHERE OccurredAt >= now()");
 
@@ -24,7 +24,7 @@ describe("given a stock query over a view that names only a row's trace", () => 
 });
 
 describe("given a query over a view that keeps an origin", () => {
-  /** @scenario "AC202 Stock widgets: every stock query reads the sources parameter, except those on the exemption list" */
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("adds the condition to an existing WHERE, parenthesising what was there", () => {
     expect(readSources("SELECT 1 FROM trace_metrics AS t WHERE a OR b GROUP BY x")).toBe(
       `SELECT 1 FROM trace_metrics AS t WHERE t.Source IN ${SOURCES} AND ( a OR b) GROUP BY x`,
@@ -49,7 +49,7 @@ describe("given a query over a view that keeps an origin", () => {
 });
 
 describe("given text that only looks like a view reference", () => {
-  /** @scenario "AC202 Stock widgets: every stock query reads the sources parameter, except those on the exemption list" */
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("leaves a comment, a string and a CTE named like a view as written", () => {
     const untouched = [
       "SELECT 1 -- FROM trace_metrics\nFROM numbers",
