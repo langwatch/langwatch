@@ -28,7 +28,7 @@ The completeness report is scoped the same way, so it counts the rows the widget
 Every comparison reads the origin through one expression, `ifNull(nullIf(Origin, ''),
 'application')`, so an unstamped trace (empty or NULL) is `application`'s and never NULL. A set
 without `other` keeps `origin IN (picked)`; a set with `other` drops the listed origins left out,
-`origin NOT IN (unpicked)`, so every unlisted origin stays. All nine keep every row: the statement
+`origin NOT IN (unpicked)`, so every unlisted origin stays. Picking every source keeps every row: the statement
 runs as written. An empty set reads no row of any view. The list is an enum checked at the door,
 and only the fixed names are ever written into a statement.
 

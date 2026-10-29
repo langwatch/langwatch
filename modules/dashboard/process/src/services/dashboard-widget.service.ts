@@ -121,6 +121,7 @@ export class DashboardWidgetService {
   /**
    * The repository merges the halves given into the stored half. Queries come with their
    * sources already merged over the stored ones, so a query sent without a list keeps its own.
+   * The read and the write are two steps: like every other widget field, the last write wins.
    */
   async updateWidget(
     input: UpdateDashboardWidgetInput & Viewed & OnBoard,

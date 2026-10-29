@@ -6,6 +6,11 @@ import {
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
+  effectiveSources,
+  KNOWN_TRACE_ORIGINS,
+  OTHER_TRACE_SOURCE,
+  type RunSources,
+  type TraceSource,
 } from "@langwatch/analytics-contract";
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";

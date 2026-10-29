@@ -43115,8 +43115,11 @@ curl -X PATCH "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/da
 
 The body takes any of `name`, `code`, `queries` and `description`. Each query
 may carry `sources`, such as `["application", "langy"]`; a query sent without
-it keeps the sources it stores, and `"sources": null` returns it to
-`application`. The answer is the updated widget. Each widget also records where it came from in
+it keeps the sources stored under its name, and `"sources": null` returns it to
+`application`. A query renamed without `sources` has no stored list under its new
+name, so it counts `application`; send its `sources` with the rename to keep them.
+
+The answer is the updated widget. Each widget also records where it came from in
 `definition.source`: a catalogue template, Langy, the code editor or the API.
 A widget you create through the API without a `source` is recorded as `api`.
 

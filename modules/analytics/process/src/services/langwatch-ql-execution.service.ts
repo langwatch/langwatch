@@ -10,6 +10,7 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
+  type RunSources,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";

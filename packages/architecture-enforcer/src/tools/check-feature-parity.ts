@@ -276,6 +276,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // Whether an immutable ECR tag may be skipped, and the Lambda re-tag
   // (specs/ci/publish-ecr-images.feature).
   "tools/ecrtag",
+  // The docs deploy's redirect store and its job (specs/ci/docs-deploy.feature).
+  "tools/docsdeploy",
   "tools/chartheap",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).

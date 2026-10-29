@@ -10,6 +10,7 @@ import {
   SESSION_REDACTION_SUMMARY,
 } from "../internal/generated/redaction/sessionReport";
 import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
+import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
@@ -2221,7 +2222,7 @@ function registerDashboardCommands(program: Command): void {
       )
       .option(
         "--sources <list>",
-        "Comma list of the trace origins every query counts: application, simulation, evaluation, coding_agent, gateway, workflow, playground, langy, other",
+        `Comma list of the trace origins every query counts: ${TRACE_SOURCES.join(", ")}`,
       )
       .option(
         "--projects <ids>",

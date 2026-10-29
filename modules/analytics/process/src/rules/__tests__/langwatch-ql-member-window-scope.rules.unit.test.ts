@@ -7,6 +7,7 @@ import {
   type LangWatchQLMemberWindow,
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
+  TRACE_SOURCES,
 } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 

@@ -9,6 +9,7 @@ import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
 import type { BoardTemplateWidget } from "./board-template.ts";

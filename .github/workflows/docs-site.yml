@@ -6,7 +6,7 @@
 # Shape: `changes` gates; `verify` (typecheck, lint, unit tests) and `build` (the
 # site at the root and under /docs, uploaded once) run in parallel; the
 # browser and link checks, and the audit, download the build instead of
-# rebuilding it.
+# rebuilding it. On main, `deploy` publishes the /docs build once the checks pass.
 name: docs-site
 
 on:
@@ -32,7 +32,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
-      docs-image: ${{ steps.detect.outputs.docs-image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -64,15 +63,11 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
               - '.github/workflows/docs-site.yml'
-              - 'infra/docker/Dockerfile.docs'
-              - '.dockerignore'
+              - 'cmd/docsdeploy/**'
+              - 'tools/docsdeploy/**'
               - '.github/actions/setup-pnpm-node/**'
               - '.github/actions/nx-cache/**'
               - '.github/actions/detect-changes/**'
-            docs-image:
-              - 'infra/docker/Dockerfile.docs'
-              - '.dockerignore'
-              - '.github/workflows/publish-docker-ecr.yml'
 
   verify:
     needs: changes
@@ -128,6 +123,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          # The /docs build on main is the one deployed: the sitemap dates each
+          # page from git history, and a shallow clone yields no dates.
+          fetch-depth: ${{ matrix.mount == 'docs' && github.ref == 'refs/heads/main' && '0' || '1' }}
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "@langwatch/docs-site..."
@@ -178,6 +176,9 @@ jobs:
       - name: Enforce the browser size budget
         if: matrix.mount == 'root'
         run: pnpm --filter @langwatch/docs-site size
+      - name: Check the deployed build dates its pages
+        if: matrix.mount == 'docs' && github.ref == 'refs/heads/main'
+        run: grep -q '<lastmod>' apps/docs/dist/sitemap.xml
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact }}
@@ -355,38 +356,107 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # The image publish-docker-ecr.yml pushes on main, built without a push so a
-  # broken Dockerfile fails here first; only when its recipe changes (30 minutes).
-  # Full history: the build checks sitemap dates.
-  image:
-    needs: changes
-    if: needs.changes.outputs.docs-image == 'true'
-    runs-on: ubuntu-24.04-arm
-    # Encodes every image and video from scratch: no BuildKit cache survives runners.
-    timeout-minutes: 50
+  # On main, once the checks pass: the /docs build to the docs bucket, the
+  # redirects to the edge, one invalidation. The role trusts only this workflow
+  # on main (langwatch-saas infrastructure/docs-site.tf); until its variables
+  # are set, the job is skipped. Spec: specs/ci/docs-deploy.feature
+  deploy:
+    needs: [changes, verify, build, check]
+    if: >-
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && needs.changes.outputs.relevant == 'true'
+      && vars.DOCS_SITE_BUCKET != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # One deploy at a time, in order; a newer commit's waits for the one running.
+    concurrency:
+      group: docs-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write # OIDC assume-role into the docs account
+    env:
+      AWS_REGION: eu-central-1
+      BUCKET: ${{ vars.DOCS_SITE_BUCKET }}
+      DISTRIBUTION: ${{ vars.DOCS_SITE_DISTRIBUTION_ID }}
+      SITE: apps/docs/dist
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          cleanup: false
-      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          context: .
-          file: infra/docker/Dockerfile.docs
-          push: false
-          platforms: linux/arm64/v8
-          provenance: false
-          cache-from: type=gha,scope=ecr-langwatch-docs-arm64
+          name: docs-site-mounted
+          path: ${{ env.SITE }}
+      # The two ARNs are secrets because they name the account; checked here, so a
+      # missing one stops the deploy before anything is uploaded.
+      - name: Check the deploy configuration
+        env:
+          ROLE_ARN: ${{ secrets.DOCS_DEPLOY_ROLE_ARN }}
+          KVS_ARN: ${{ secrets.DOCS_SITE_REDIRECTS_KVS_ARN }}
+        run: |
+          for name in BUCKET DISTRIBUTION ROLE_ARN KVS_ARN; do
+            if [ -z "${!name}" ]; then echo "::error::$name is not set"; exit 1; fi
+          done
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.DOCS_DEPLOY_ROLE_ARN }}
+          role-session-name: docs-deploy-${{ github.run_id }}
+      # Cache-Control by file name: a content hash in the name is immutable;
+      # pages, indexes and exports revalidate; other static files keep an hour.
+      # Hashed files go first and are never deleted, so a page still open in a
+      # tab loads its scripts; pages go last, so none names a missing file.
+      - name: Upload the content-hashed files
+        run: >-
+          aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors
+          --exclude '*' --include 'assets/*' --include '*.????????????.*'
+          --cache-control 'public, max-age=31536000, immutable'
+      - name: Upload the other static files
+        run: >-
+          aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors --delete
+          --exclude 'assets/*' --exclude '*.????????????.*' --exclude '.vite/*'
+          --exclude '*.br' --exclude '*.gz' --exclude '*.html' --exclude '*.json'
+          --exclude '*.xml' --exclude '*.txt' --exclude '*.md' --exclude '*.claude'
+          --exclude '*.agent'
+          --cache-control 'public, max-age=3600, stale-while-revalidate=86400'
+      - name: Upload the Markdown exports
+        run: >-
+          aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors --delete
+          --exclude '*' --include '*.md' --include '*.claude' --include '*.agent'
+          --exclude 'assets/*' --exclude '*.????????????.*' --content-type 'text/markdown; charset=utf-8' --cache-control 'no-cache'
+      - name: Upload the text indexes
+        run: >-
+          aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors --delete
+          --exclude '*' --include '*.txt' --exclude 'assets/*' --exclude '*.????????????.*'
+          --content-type 'text/plain; charset=utf-8' --cache-control 'no-cache'
+      - name: Upload the pages and indexes
+        run: >-
+          aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors --delete
+          --exclude '*' --include '*.html' --include '*.json' --include '*.xml'
+          --exclude '.vite/*' --exclude 'skipped.json' --exclude 'assets/*'
+          --exclude '*.????????????.*' --cache-control 'no-cache'
+      - name: Publish the redirects
+        env:
+          KVS_ARN: ${{ secrets.DOCS_SITE_REDIRECTS_KVS_ARN }}
+        run: go run ./cmd/docsdeploy redirects -kvs-arn "$KVS_ARN" -file "$SITE/redirects.json"
+      - name: Invalidate the distribution
+        run: >-
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION"
+          --paths '/docs' '/docs/*' --query Invalidation.Id --output text
 
   docs-site-complete:
-    needs: [changes, verify, build, check, audit, image]
+    needs: [changes, verify, build, check, audit, deploy]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: verify, build, check, audit, image
+          allowed-skips: verify, build, check, audit, deploy
