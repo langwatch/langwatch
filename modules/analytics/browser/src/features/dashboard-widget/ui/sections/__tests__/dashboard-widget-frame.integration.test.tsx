@@ -83,6 +83,7 @@ beforeEach(() => {
   executorMock.mockReturnValue({
     executeQuery: vi.fn(),
     params: { timeWindow: { start: 1_000, end: 2_000 }, granularitySeconds: 3600 },
+    limits: [],
   });
 });
 
@@ -220,6 +221,7 @@ function frameRuns(answer: () => Promise<unknown>) {
   executorMock.mockReturnValue({
     executeQuery,
     params: { timeWindow: { start: 1_000, end: 2_000 }, granularitySeconds: 3600 },
+    limits: [],
   });
   return async () => {
     await act(async () => {
@@ -316,6 +318,7 @@ describe("given a widget on a board", () => {
       executorMock.mockReturnValue({
         executeQuery: vi.fn(() => Promise.reject(BROKEN)),
         params: { timeWindow: { start: 1_000, end: 2_000 }, granularitySeconds: 3600 },
+        limits: [],
       });
       render(boardWidget({}));
       const aborted = new AbortController();
