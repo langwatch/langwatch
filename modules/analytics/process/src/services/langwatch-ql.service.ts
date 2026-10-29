@@ -17,6 +17,7 @@ import {
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
   type LangWatchQLTimeWindow,
+  type TraceSource,
 } from "@langwatch/analytics-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
@@ -29,7 +30,9 @@ import type {
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
+import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
+import { buildRunParams, resolveRunSources } from "../rules/langwatch-ql-run-params.rules.ts";
 import {
   langWatchQLMissingParameters,
   type ValidatedLangWatchQL,
@@ -157,6 +160,7 @@ export class LangWatchQLService {
     sql,
     parameters,
     timeWindow,
+    lists,
     isInstantEvalsEnabled,
   }: {
     /** Logged with a refusal. The database, not this, decides the tenant. */
@@ -167,11 +171,17 @@ export class LangWatchQLService {
     /** The period the surface is showing, when one is asking. */
     readonly timeWindow?: LangWatchQLTimeWindow;
     /**
+     * The origins and projects the surface binds the two list names to. Absent, a statement
+     * that declares them is checked against the default sources and no project (nothing runs).
+     */
+    readonly lists?: Readonly<{ sources: readonly TraceSource[]; projects: readonly string[] }>;
+    /**
      * Whether this caller may call an eval function. The surface answers it —
      * the flag for this project, in this caller's scope. Absent means no.
      */
     readonly isInstantEvalsEnabled?: boolean;
   }): ValidatedLangWatchQL {
+    assertNoReservedNameAssigned(sql);
     const validation = this.validation.validate({
       sql,
       // The datasets this caller can reach, not every dataset the catalog has. A dataset gated
@@ -225,6 +235,7 @@ export class LangWatchQLService {
       declared: validation.parameters,
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
+      lists: lists ?? { sources: resolveRunSources(undefined), projects: [] },
     });
 
     const missing = langWatchQLMissingParameters({ declared: validation.parameters, window });
@@ -235,6 +246,7 @@ export class LangWatchQLService {
     return {
       ...validation,
       followsTimeWindow: window.followsTimeWindow,
+      followsSources: window.followsSources,
       ...(window.parameters ? { boundParameters: window.parameters } : {}),
       awaitingTimeWindow: window.awaitingTimeWindow,
     };
@@ -270,6 +282,7 @@ export class LangWatchQLService {
       protections,
       sql,
       ...(parameters ? { parameters } : {}),
+      lists: { sources: resolveRunSources(undefined), projects: [project.id] },
       isInstantEvalsEnabled: isInstantEvalsEnabled === true,
     });
     timeWindows.resolveRunGranularityOrRefuseUnfilled({
@@ -325,12 +338,14 @@ export class LangWatchQLService {
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
+    const boundSources = resolveRunSources(sources);
     const validation = this.validate({
       projectId: projectIds.join(",") || "(none)",
       protections,
       sql,
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
+      lists: { sources: boundSources, projects: projectIds },
       isInstantEvalsEnabled: isInstantEvalsEnabled === true,
     });
     const granularity = timeWindows.resolveRunGranularityOrRefuseUnfilled({
@@ -370,7 +385,6 @@ export class LangWatchQLService {
       validation,
       granularity,
       tenantCapability,
-      sources,
       ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
@@ -382,14 +396,21 @@ export class LangWatchQLService {
       validation,
       database: this.deps.database,
       views: this.views,
-      sources,
       ...(memberWindows ? { memberWindows } : {}),
       timeWindow: followedWindow,
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
     });
 
-    if (completeness.kind !== "reported") return result;
-    return { ...result, completeness: completeness.completeness };
+    const params = buildRunParams({
+      sources: boundSources,
+      followsSources: validation.followsSources,
+      projects: projectIds,
+      followedWindow,
+      granularity,
+      parameters,
+    });
+    if (completeness.kind !== "reported") return { ...result, params };
+    return { ...result, params, completeness: completeness.completeness };
   }
 }
 

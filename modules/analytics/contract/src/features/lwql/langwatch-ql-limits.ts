@@ -18,6 +18,12 @@ export const MAX_LWQL_LENGTH = 50_000;
  */
 export const LWQL_MAX_RESULT_ROWS = 10_000;
 
+/**
+ * The most projects one run may name, equal to the key set's capability ceiling so a named list
+ * can never outgrow what a credential can carry.
+ */
+export const LWQL_MAX_NAMED_PROJECTS = 10_000;
+
 /** The byte ceiling a finished result may not exceed, pinned server-side as `max_result_bytes`. */
 export const LWQL_MAX_RESULT_BYTES = 8_000_000;
 

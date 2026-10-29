@@ -27,6 +27,7 @@ import {
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
+  LangWatchQLProjectNotFoundError,
   type LangWatchQLRunCaller,
   type LangWatchQLAcceptedStatement,
   type LangWatchQLAppFunctionCall,
@@ -57,7 +58,7 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
@@ -107,7 +108,10 @@ import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
-import { LangWatchQLAggregateScopeService } from "../services/langwatch-ql-aggregate-scope.service.ts";
+import {
+  LangWatchQLAggregateScopeService,
+  type LangWatchQLAggregateScope,
+} from "../services/langwatch-ql-aggregate-scope.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
   LangWatchQLConnectionService,
@@ -739,10 +743,16 @@ export class AnalyticsModule
       { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
-    const { reach, projectId, sql, parameters, timeWindow, granularitySeconds, signal } = input;
+    const { reach, projectId, projects: named, sql, parameters, timeWindow } = input;
+    const { granularitySeconds, sources, signal } = input;
+    if (projectId !== undefined && named !== undefined) {
+      throw new ValidationError("send projectId or projects, not both");
+    }
+    const wanted = named ?? (projectId === undefined ? undefined : [projectId]);
     const { projects, protections } = await this.#queryScope.resolve({
       reach,
-      ...(projectId === undefined ? {} : { projectId }),
+      requireProjects: true,
+      ...(wanted === undefined ? {} : { projects: wanted }),
     });
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
@@ -755,6 +765,7 @@ export class AnalyticsModule
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
       ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
+      ...(sources ? { sources } : {}),
       ...(signal ? { signal } : {}),
       isInstantEvalsEnabled:
         statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
@@ -836,7 +847,7 @@ export class AnalyticsModule
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
-    const { authorization, project, ...run } = input;
+    const { authorization, project, projects: named, userId, ...run } = input;
     const shared = authorization
       ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
       : [];
@@ -845,11 +856,30 @@ export class AnalyticsModule
       shared.length > 0 ? await this.#aggregateScope.getMemberScope({ shared }) : undefined;
 
     if (aggregate) {
+      const members = named === undefined ? aggregate : narrowAggregate({ aggregate, named });
       // A judged column is charged to one project, so an aggregate's statement may call none.
       return this.#dependencies.langWatchQL.executeForProjects({
         ...run,
-        projects: aggregate.projects,
-        memberWindows: aggregate.memberWindows,
+        projects: members.projects,
+        memberWindows: members.memberWindows,
+        isInstantEvalsEnabled: false,
+      });
+    }
+    if (named !== undefined && (named.length !== 1 || named[0] !== project.id)) {
+      if (userId === undefined) throw new LangWatchQLProjectNotFoundError();
+      const scope = await this.#queryScope.resolveMemberProjects({
+        userId,
+        projectIds: named,
+        ...(authorization ? { authorization } : {}),
+      });
+      for (const member of scope.projects) {
+        await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: member.id });
+      }
+
+      return this.#dependencies.langWatchQL.executeForProjects({
+        ...run,
+        projects: scope.projects,
+        protections: scope.protections,
         isInstantEvalsEnabled: false,
       });
     }
@@ -1073,7 +1103,7 @@ export class AnalyticsModule
   async resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller> {
     const project = await this.#dependencies.projects.findById(input.projectId);
     if (!project) {
-      throw new NotFoundError("project_not_found", { resource: "Project", id: input.projectId });
+      throw new LangWatchQLProjectNotFoundError();
     }
 
     return { id: project.id, lwqlKey: project.lwqlKey };
@@ -1086,4 +1116,25 @@ export class AnalyticsModule
   assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void> {
     return this.#widgetAccess.assertEnabled(input);
   }
+}
+
+/**
+ * An aggregate's members cut to the projects a card names. A name outside the aggregate refuses
+ * the run with the one id-free answer, as an unreadable project does.
+ */
+function narrowAggregate({
+  aggregate,
+  named,
+}: {
+  aggregate: LangWatchQLAggregateScope;
+  named: readonly string[];
+}): LangWatchQLAggregateScope {
+  const wanted = new Set(named);
+  const projects = aggregate.projects.filter((member) => wanted.has(member.id));
+  if (projects.length < wanted.size) throw new LangWatchQLProjectNotFoundError();
+
+  return {
+    projects,
+    memberWindows: aggregate.memberWindows.filter((window) => wanted.has(window.projectId)),
+  };
 }

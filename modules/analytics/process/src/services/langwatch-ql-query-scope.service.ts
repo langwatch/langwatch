@@ -1,18 +1,20 @@
-import type {
-  LangWatchQLCaller,
-  LangWatchQLKeyReach,
-  LangWatchQLProtections,
+import {
+  LangWatchQLProjectNotFoundError,
+  LangWatchQLProjectsRequiredError,
+  type LangWatchQLCaller,
+  type LangWatchQLKeyReach,
+  type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 /**
  * The query door's scope: the projects an API key may read and the protections to redact by.
  * The candidates are enumerated from the key's organization, never taken from the request, and
  * a key that reads nothing is a valid empty scope — the row policy, not the door, is the boundary.
  */
-import type { RestProjectCredentialPrincipal } from "@langwatch/authorization";
-import { NotFoundError } from "@langwatch/handled-error";
+import type { Authorization, RestProjectCredentialPrincipal } from "@langwatch/authorization";
 import { PROJECT_KIND, type Project, type ProjectApi } from "@langwatch/project-contract";
 
 import { strictestLangWatchQLProtections } from "../rules/langwatch-ql-query-scope.rules.ts";
+import { dedupeInOrder } from "../rules/langwatch-ql-run-params.rules.ts";
 import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "./langwatch-ql-capability.service.ts";
 import {
   WorkbenchProtectionsService,
@@ -45,20 +47,29 @@ export class LangWatchQLQueryScopeService {
   }
 
   /**
-   * The readable set and the strictest protections across it. A `projectId` narrows the set to
-   * that one project before any protection is read, and refuses one the key cannot read.
+   * The readable set and the strictest protections across it. Named `projects` narrow the set
+   * before any protection is read, and one the key cannot read refuses the whole run. With
+   * `requireProjects`, a key for an organization, a team or a person must name them.
+   * @throws {LangWatchQLProjectsRequiredError} when required and none are named.
+   * @throws {LangWatchQLProjectNotFoundError} for any named project the key cannot read.
    */
   async resolve({
     reach,
-    projectId,
+    projects,
+    requireProjects = false,
   }: {
     reach: LangWatchQLKeyReach;
-    projectId?: string;
+    projects?: readonly string[];
+    requireProjects?: boolean;
   }): Promise<LangWatchQLQueryScope> {
+    const named = projects === undefined ? undefined : dedupeInOrder(projects);
+    if (requireProjects && named === undefined && reach.kind !== "project") {
+      throw new LangWatchQLProjectsRequiredError();
+    }
     const readable =
       reach.kind === "project"
-        ? [await this.ownProject({ projectId: reach.projectId, requested: projectId })]
-        : await this.readableProjects({ reach, only: projectId });
+        ? [await this.ownProject({ projectId: reach.projectId, requested: named })]
+        : await this.readableProjects({ reach, only: named });
     // One project at a time: each answer is several grant reads, and fanning an organization's
     // worth out at once is what exhausts the connection pool.
     const protections: LangWatchQLProtections[] = [];
@@ -72,6 +83,48 @@ export class LangWatchQLQueryScopeService {
       projects: readable.map(({ project }) => ({ id: project.id, lwqlKey: project.lwqlKey })),
       protections: strictestLangWatchQLProtections(protections),
     };
+  }
+
+  /**
+   * The projects a signed-in member's card names and the strictest protections across them.
+   * Each must exist and hold `analytics:view` for the member; any that does not refuses the
+   * whole run with the one id-free answer, so a card never learns which of them was the cause.
+   * @throws {LangWatchQLProjectNotFoundError} for a project missing, foreign or unreadable.
+   */
+  async resolveMemberProjects({
+    userId,
+    projectIds,
+    authorization,
+  }: {
+    userId: string;
+    projectIds: readonly string[];
+    authorization?: Authorization;
+  }): Promise<LangWatchQLQueryScope> {
+    const projects: LangWatchQLCaller[] = [];
+    const protections: LangWatchQLProtections[] = [];
+    // One project at a time, for the same reason `resolve` reads protections one at a time.
+    for (const projectId of dedupeInOrder(projectIds)) {
+      const project = await this.dependencies.projects.findById(projectId);
+      const allowed =
+        project !== null &&
+        project !== undefined &&
+        (await this.dependencies.authz.hasPermission({
+          userId,
+          permission: "analytics:view",
+          projectId,
+        }));
+      if (!project || !allowed) throw new LangWatchQLProjectNotFoundError();
+      projects.push({ id: project.id, lwqlKey: project.lwqlKey });
+      protections.push(
+        await this.protections.resolveMemberProtections({
+          userId,
+          projectId,
+          ...(authorization ? { authorization } : {}),
+        }),
+      );
+    }
+
+    return { projects, protections: strictestLangWatchQLProtections(protections) };
   }
 
   /**
@@ -101,11 +154,11 @@ export class LangWatchQLQueryScopeService {
     requested,
   }: {
     projectId: string;
-    requested?: string;
+    requested?: readonly string[];
   }): Promise<ReadableProject> {
-    if (requested !== undefined && requested !== projectId) throw projectNotReadable(requested);
+    if (requested?.some((id) => id !== projectId)) throw new LangWatchQLProjectNotFoundError();
     const project = await this.dependencies.projects.findById(projectId);
-    if (!project) throw projectNotReadable(projectId);
+    if (!project) throw new LangWatchQLProjectNotFoundError();
 
     return { project, credential: { kind: "legacyProjectKey" } };
   }
@@ -119,13 +172,13 @@ export class LangWatchQLQueryScopeService {
     only,
   }: {
     reach: Extract<LangWatchQLKeyReach, { kind: "apiKey" }>;
-    only?: string;
+    only?: readonly string[];
   }): Promise<ReadableProject[]> {
     const listed = await this.dependencies.projects.listByOrganization({
       organizationId: reach.organizationId,
       page: 1,
       limit: LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
-      ...(only === undefined ? {} : { projectIds: [only] }),
+      ...(only === undefined ? {} : { projectIds: [...only] }),
     });
     if (listed.pagination.total > listed.data.length) {
       throw new Error(
@@ -151,13 +204,11 @@ export class LangWatchQLQueryScopeService {
       });
       if (viewable) readable.push({ project, credential });
     }
-    if (only !== undefined && readable.length === 0) throw projectNotReadable(only);
+    if (only === undefined) return readable;
+    const byId = new Map(readable.map((entry) => [entry.project.id, entry]));
+    const inRequestOrder = only.flatMap((id) => byId.get(id) ?? []);
+    if (inRequestOrder.length < only.length) throw new LangWatchQLProjectNotFoundError();
 
-    return readable;
+    return inRequestOrder;
   }
-}
-
-/** One answer for a project that is missing and one the key cannot read, so neither leaks. */
-function projectNotReadable(projectId: string): NotFoundError {
-  return new NotFoundError("project_not_found", { resource: "Project", id: projectId });
 }

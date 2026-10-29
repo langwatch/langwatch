@@ -8,8 +8,12 @@ import { defineMiddlewareContext, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { LWQL_ACCEPTED_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
-import { lwqlTimeWindowSchema, type LangWatchQLProtections } from "./analytics.lwql.ts";
-import { MAX_LWQL_LENGTH } from "./langwatch-ql-limits.ts";
+import {
+  lwqlTimeWindowSchema,
+  traceSourcesSchema,
+  type LangWatchQLProtections,
+} from "./analytics.lwql.ts";
+import { LWQL_MAX_NAMED_PROJECTS, MAX_LWQL_LENGTH } from "./langwatch-ql-limits.ts";
 
 /**
  * The caller-specific content gates the catalog understands, as a value a
@@ -127,6 +131,15 @@ export type LangWatchQLStatementRequest = z.infer<typeof lwqlStatementSchema>;
  * `POST /api/v1/query`'s body: a statement, optionally narrowed to one project the key reads.
  * The workbench runs inside one project already, so only the key door accepts `projectId`.
  */
+/** A list of project ids a run names: at least one, at most the capability ceiling. */
+const lwqlProjectsSchemaDefinition = z
+  .array(z.string().min(1))
+  .min(1, "projects must hold at least one id")
+  .max(LWQL_MAX_NAMED_PROJECTS, `projects holds at most ${LWQL_MAX_NAMED_PROJECTS} ids`)
+  .readonly();
+export interface LwqlProjectsSchema extends Named<typeof lwqlProjectsSchemaDefinition> {}
+export const lwqlProjectsSchema: LwqlProjectsSchema = lwqlProjectsSchemaDefinition;
+
 const lwqlKeyStatementSchemaDefinition = z.object({
   ...lwqlStatementSchema.shape,
   projectId: z
@@ -134,7 +147,18 @@ const lwqlKeyStatementSchemaDefinition = z.object({
     .min(1)
     .optional()
     .describe(
-      "Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.",
+      "Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both.",
+    ),
+  projects: lwqlProjectsSchema
+    .optional()
+    .describe(
+      "The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. The answer's params.projects lists what was read.",
+    ),
+  sources: traceSourcesSchema
+    .readonly()
+    .optional()
+    .describe(
+      "The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. Only a statement that reads the parameter is kept to them.",
     ),
 });
 export interface LwqlKeyStatementSchema extends Named<typeof lwqlKeyStatementSchemaDefinition> {}

@@ -27,6 +27,12 @@ const registry = {
       "Fix those fields and send the request again; retrying it unchanged will fail identically",
     ],
   },
+  projects_required: {
+    tips: [
+      "Send `projects`, a list of the project ids to read; the answer's `params.projects` lists what was read",
+      "A project API key needs none: it reads its own project",
+    ],
+  },
   malformed_request: {
     tips: [
       "The body could not be parsed at all; check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",

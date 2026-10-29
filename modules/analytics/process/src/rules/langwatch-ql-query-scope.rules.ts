@@ -6,13 +6,7 @@ import {
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
-  effectiveSources,
-  KNOWN_TRACE_ORIGINS,
-  OTHER_TRACE_SOURCE,
-  type RunSources,
-  type TraceSource,
 } from "@langwatch/analytics-contract";
-import { DEFAULT_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
@@ -44,19 +38,8 @@ export function strictestLangWatchQLProtections(
   };
 }
 
-const ORIGIN_COLUMN = "Origin";
 const TRACE_ID_COLUMN = "TraceId";
 const TENANT_COLUMN = "TenantId";
-
-/**
- * The one-row-per-trace view that knows each trace's origin. A view that only names a trace is
- * scoped through it, because spans, evaluations and the rest carry no origin of their own.
- */
-const TRACE_ORIGIN_VIEW = "trace_metrics";
-
-/** An unstamped origin is the application's, exactly as `deriveTraceOrigin` reads it. */
-const traceOriginOf = (column: string) =>
-  `ifNull(nullIf(${column}, ''), ${clickHouseLiteral(DEFAULT_TRACE_ORIGIN)})`;
 
 /**
  * Earliest `OccurredAt` of a trace owning a row in `window`: one window back for a comparison
@@ -235,78 +218,6 @@ export function assertNoUnsupportedTableModifiers({
   });
 }
 
-/** The origin filter a list runs as: keep only `origins`, drop them, or keep every one. */
-export type TraceSourceScope =
-  | Readonly<{ kind: "include" | "exclude"; origins: readonly string[] }>
-  | Readonly<{ kind: "every" }>;
-
-/**
- * With `other` in it, a list is every origin but the known ones left out, so it runs as an
- * exclusion; without it, as an inclusion. An empty list includes nothing.
- */
-export function traceSourceScope(sources: readonly TraceSource[]): TraceSourceScope {
-  if (!sources.includes(OTHER_TRACE_SOURCE)) {
-    return { kind: "include", origins: KNOWN_TRACE_ORIGINS.filter((o) => sources.includes(o)) };
-  }
-  const dropped = KNOWN_TRACE_ORIGINS.filter((o) => !sources.includes(o));
-  return dropped.length === 0 ? { kind: "every" } : { kind: "exclude", origins: dropped };
-}
-
-/**
- * The scope a run's sources keep it to. An unset widget query (`null`) counts the default
- * here, on the server, so every door runs it alike; a run that is no widget's keeps all.
- */
-function scopeOfSources(sources: RunSources | undefined): TraceSourceScope {
-  return sources === undefined ? { kind: "every" } : traceSourceScope(effectiveSources(sources));
-}
-
-/**
- * The predicate keeping each view's rows to the origins the scope keeps, keyed like a reference.
- * A view with no `Origin` and no `TraceId`, such as a per-minute rollup, gets none; a scope
- * keeping no origin reads no row of any view (dashboards-v2 AC200m).
- */
-function buildOriginPredicates({
-  views,
-  database,
-  scope,
-  timeWindow,
-}: {
-  views: readonly LangWatchQLViewDefinition[];
-  database: string;
-  scope: TraceSourceScope;
-  timeWindow: LangWatchQLTimeWindow | undefined;
-}): ReadonlyMap<string, string> {
-  if (scope.kind === "every") return new Map();
-  const qualified = (table: string) => qualifyTableName({ table, defaultDatabase: database });
-  if (scope.kind === "include" && scope.origins.length === 0) {
-    return new Map(views.map((view) => [qualified(view.name), NO_ROWS]));
-  }
-  const listed = scope.origins.map(clickHouseLiteral).join(", ");
-  // The origins dropped and kept, each over the same never-NULL expression, so NOT IN is safe.
-  const [dropped, kept] = scope.kind === "exclude" ? ["IN", "NOT IN"] : ["NOT IN", "IN"];
-  const traceOriginView = qualified(TRACE_ORIGIN_VIEW);
-  const canReachTraceOrigin = views.some((view) => qualified(view.name) === traceOriginView);
-  // A row is kept unless its trace is a dropped one: keeping application, a span stays unless
-  // its trace's origin is NOT IN ('application'). `ifNull`: `NULL NOT IN (…)` is NULL.
-  // Matched on (TenantId, TraceId) as `traceInside` is: one tenant's trace never decides another's.
-  const byTrace =
-    `(${TENANT_COLUMN}, ifNull(${TRACE_ID_COLUMN}, '')) NOT IN ` +
-    `(SELECT ${TENANT_COLUMN}, ${TRACE_ID_COLUMN} FROM ${database}.${TRACE_ORIGIN_VIEW} ` +
-    `WHERE ${traceOriginOf(ORIGIN_COLUMN)} ${dropped} (${listed})` +
-    (timeWindow ? ` AND OccurredAt >= ${traceLookupStart(timeWindow)}` : "") +
-    ")";
-  const byOrigin = `${traceOriginOf(ORIGIN_COLUMN)} ${kept} (${listed})`;
-
-  const predicates = new Map<string, string>();
-  for (const view of views) {
-    const columns = new Set(view.columns.map((column) => column.name));
-    const key = qualified(view.name);
-    if (columns.has(ORIGIN_COLUMN)) predicates.set(key, byOrigin);
-    else if (columns.has(TRACE_ID_COLUMN) && canReachTraceOrigin) predicates.set(key, byTrace);
-  }
-  return predicates;
-}
-
 /** The one-row-per-trace view a dated member's evaluations are timed through. */
 const TRACE_VIEW = "traces";
 
@@ -436,21 +347,18 @@ function datedPicks({
 }
 
 /**
- * `sql` with each catalogued view it reads replaced by that view kept to the `sources` traces
- * (ADR-061, analytics ADR-003). With `memberWindows`, each view is also kept to the members inside
- * their grants' windows, and a view outside `views` reads nothing (ADR-177 v4.14).
+ * `sql` with each catalogued view it reads kept to the members inside their grants' windows, and
+ * a view outside `views` reading nothing (ADR-177 v4.14). No origin filter is added: a statement
+ * is kept to its sources only where its SQL reads the sources parameter (dashboards-v2 AC204).
  */
 export function scopeLangWatchQL({
   sql,
-  sources,
   database,
   views,
   timeWindow,
   memberWindows,
 }: {
   sql: string;
-  /** A widget query's sources (AC200), `null` for its default; absent, every origin. */
-  sources?: RunSources | undefined;
   /** Where unqualified view names resolve. */
   database: string;
   views: readonly LangWatchQLViewDefinition[];
@@ -461,8 +369,7 @@ export function scopeLangWatchQL({
 }): string {
   // Whole-history members need no rewrite: the row policy bounds them exactly.
   const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
-  const scope = scopeOfSources(sources);
-  if (scope.kind === "every" && !isWindowed) {
+  if (!isWindowed) {
     assertNoUnsupportedTableModifiers({ sql, views, database });
     return sql;
   }
@@ -472,7 +379,6 @@ export function scopeLangWatchQL({
     throw new Error("LangWatchQL scope: an accepted statement no longer parses");
   }
 
-  const origins = buildOriginPredicates({ views, database, scope, timeWindow });
   const windows =
     isWindowed && memberWindows
       ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
@@ -483,10 +389,7 @@ export function scopeLangWatchQL({
   const rewrites = references.flatMap((reference) => {
     const window =
       windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
-    const predicate = [origins.get(reference.qualified), window]
-      .filter((part) => part !== undefined)
-      .join(" AND ");
-    return predicate === "" ? [] : [{ reference, predicate }];
+    return window === undefined ? [] : [{ reference, predicate: window }];
   });
   assertNoTableModifiers({
     statements: parsed.statements,

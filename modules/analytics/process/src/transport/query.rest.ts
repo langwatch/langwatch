@@ -69,9 +69,13 @@ const THE_KEY_FANS_OUT =
 const HEADER_RULE =
   "Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.";
 
-/** How the run door narrows to one project, which only its body can ask. */
+/** The run door's own rule: a key for several projects names the ones to read. */
+const RUN_HEADER_RULE =
+  "A project API key reads its own project. A key for an organization, a team or a person must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.";
+
+/** How the run door names its projects and sources, and what it answers with. */
 const PROJECT_NARROWING =
-  "To run over one project only, send its id as `projectId` in the body: the run then reads that project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same answer as a project that does not exist. Without `projectId` the run spans every project the key can read.";
+  "Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of another organization and a project that does not exist are all refused with `project_not_found` (404), with one body that names no id. Send `sources` to bind `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to the projects read. The answer's `params` lists what the run was bound to: `sources`, `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and `coarsenedFromSeconds` when the step was coarsened.";
 
 /** The result bounds, read off the enforced caps so this copy and the enforcement cannot drift. */
 const RESULT_CEILINGS = `A statement that names no \`LIMIT\` is capped at ${LWQL_MAX_RESULT_ROWS.toLocaleString("en-US")} rows: that \`LIMIT\` is appended before the query runs. A statement whose own \`LIMIT\` asks for more is refused with \`LIMIT_TOO_HIGH\` — lower it and page the rest with \`LIMIT\`/\`OFFSET\` and an \`ORDER BY\`. When using \`UNION\`, every top-level branch must carry its own \`LIMIT\` clause of ${LWQL_MAX_RESULT_ROWS.toLocaleString("en-US")} rows or fewer, or the query is refused with \`LIMIT_REQUIRED_PER_BRANCH\`. A result whose body exceeds about ${LWQL_MAX_RESULT_BYTES.toLocaleString("en-US")} bytes is refused outright with \`lwql_result_too_large\`, never cut — select fewer columns or a smaller \`LIMIT\`.`;
@@ -80,7 +84,7 @@ const RUN_DESCRIPTION =
   "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +
   `Diagnostics are advisory and never reject a query. ${LWQL_CLEAN_DIAGNOSTICS_MEANING}\n\n` +
   "A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.\n\n" +
-  `${HEADER_RULE}\n\n` +
+  `${RUN_HEADER_RULE}\n\n` +
   `${PROJECT_NARROWING}\n\n` +
   `${RESULT_CEILINGS}\n\n` +
   "Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.";

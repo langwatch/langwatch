@@ -89,6 +89,29 @@ export const queryCompletenessSchema: QueryCompletenessSchema = queryCompletenes
 export type QueryCompleteness = z.infer<typeof queryCompletenessSchema>;
 export type QueryCompletenessState = QueryCompleteness["state"];
 
+/**
+ * Every input a run depended on, answered with its success so an agent can read what ran: the
+ * origins bound, whether the SQL read them, the projects read, and the period and step the
+ * statement followed. Never holds a window, a protection or a key (permissions stay server-side).
+ */
+const langWatchQLRunParamsSchemaDefinition = z
+  .object({
+    sources: z.array(z.string()).readonly(),
+    followsSources: z.boolean(),
+    projects: z.array(z.string()).readonly(),
+    period: z.object({ start: z.string(), end: z.string() }).strict().optional(),
+    granularitySeconds: z.number().optional(),
+    coarsenedFromSeconds: z.number().optional(),
+    parameters: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+export interface LangWatchQLRunParamsSchema extends Named<
+  typeof langWatchQLRunParamsSchemaDefinition
+> {}
+export const langWatchQLRunParamsSchema: LangWatchQLRunParamsSchema =
+  langWatchQLRunParamsSchemaDefinition;
+export type LangWatchQLRunParams = z.infer<typeof langWatchQLRunParamsSchema>;
+
 /** The complete result envelope returned by the query transport. */
 const langWatchQLQueryResultSchemaDefinition = z
   .object({
@@ -102,6 +125,8 @@ const langWatchQLQueryResultSchemaDefinition = z
     coarsenedFromSeconds: z.number().optional(),
     /** Absent when the run had no time window or read no catalogued view, and on a failure. */
     completeness: queryCompletenessSchema.optional(),
+    /** What the run was bound to; absent on a pass and on a failure. */
+    params: langWatchQLRunParamsSchema.optional(),
   })
   .strict();
 export interface LangWatchQLQueryResultSchema extends Named<
@@ -280,8 +305,12 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
-  /** A widget query's sources (AC200), `null` for its default; every origin when absent. */
+  /** A widget query's sources (AC200), `null` for its default; the default when absent. */
   sources?: RunSources;
+  /** The projects a card names (AC207); absent, the board's project. */
+  projects?: readonly string[];
+  /** The member a card's named projects are checked for; absent, none may be named. */
+  userId?: string;
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
   signal?: AbortSignal;
 }>;

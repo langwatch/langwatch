@@ -1703,6 +1703,11 @@ const presentations = {
     describe: () =>
       "It may have been deleted, or it isn't shared with you. Reload to see the projects you can open.",
   },
+  projects_required: {
+    title: "Name the projects to query",
+    describe: () =>
+      "A key for an organization, a team or a person has no single project. Send `projects`, a list of project ids, and try again.",
+  },
   organization_not_found_for_team: {
     title: "Organization not found",
     describe: () =>

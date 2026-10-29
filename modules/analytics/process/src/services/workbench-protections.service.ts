@@ -1,7 +1,8 @@
-import type {
-  LangWatchQLCatalogueAccess,
-  LangWatchQLProtections,
-  LangWatchQLRunCaller,
+import {
+  LangWatchQLProjectNotFoundError,
+  type LangWatchQLCatalogueAccess,
+  type LangWatchQLProtections,
+  type LangWatchQLRunCaller,
 } from "@langwatch/analytics-contract";
 /**
  * What one caller may read of a project through LangWatchQL's catalogue: the tables and columns
@@ -21,7 +22,6 @@ import {
   type DataPrivacyApi,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -131,7 +131,7 @@ export class WorkbenchProtectionsService {
   }): Promise<LangWatchQLRunCaller> {
     const project = await this.dependencies.projects.findById(input.projectId);
     if (!project) {
-      throw new NotFoundError("project_not_found", { resource: "Project", id: input.projectId });
+      throw new LangWatchQLProjectNotFoundError();
     }
     const protections = await this.resolveMemberProtections(input);
     return { project: { id: project.id, lwqlKey: project.lwqlKey }, protections };
@@ -245,7 +245,7 @@ export class WorkbenchProtectionsService {
   private async projectScope(projectId: string): Promise<ProjectScope> {
     const scope = await this.dependencies.authz.getScope({ projectId });
     if (scope.type !== "project") {
-      throw new NotFoundError("project_not_found", { resource: "Project", id: projectId });
+      throw new LangWatchQLProjectNotFoundError();
     }
     return scope;
   }

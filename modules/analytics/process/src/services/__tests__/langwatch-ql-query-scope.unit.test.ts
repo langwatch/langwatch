@@ -218,7 +218,7 @@ describe("given a run that names one project", () => {
         privacy: { b: INPUT_HIDDEN_FROM_THE_PUBLIC },
       });
 
-      const scope = await service.resolve({ reach: KEY, projectId: "a" });
+      const scope = await service.resolve({ reach: KEY, projects: ["a"] });
 
       expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
       expect(scope.protections.canSeeCapturedInput).toBe(true);
@@ -251,7 +251,7 @@ describe("given a run that names one project", () => {
         grants: { a: ["analytics:view"], b: ["cost:view"] },
       });
 
-      await expect(service.resolve({ reach: KEY, projectId: "b" })).rejects.toMatchObject({
+      await expect(service.resolve({ reach: KEY, projects: ["b"] })).rejects.toMatchObject({
         code: "project_not_found",
       });
     });
@@ -263,9 +263,9 @@ describe("given a run that names one project", () => {
       });
       const otherOrganization = service.resolve({
         reach: { ...KEY, organizationId: "org-2" },
-        projectId: "a",
+        projects: ["a"],
       });
-      const missing = service.resolve({ reach: KEY, projectId: "nope" });
+      const missing = service.resolve({ reach: KEY, projects: ["nope"] });
 
       await expect(otherOrganization).rejects.toMatchObject({ code: "project_not_found" });
       await expect(missing).rejects.toMatchObject({ code: "project_not_found" });
@@ -277,7 +277,7 @@ describe("given a run that names one project", () => {
         grants: { gov: ["analytics:view"] },
       });
 
-      await expect(service.resolve({ reach: KEY, projectId: "gov" })).rejects.toMatchObject({
+      await expect(service.resolve({ reach: KEY, projects: ["gov"] })).rejects.toMatchObject({
         code: "project_not_found",
       });
     });
@@ -289,7 +289,7 @@ describe("given a run that names one project", () => {
 
       const scope = await service.resolve({
         reach: { kind: "project", projectId: "a" },
-        projectId: "a",
+        projects: ["a"],
       });
 
       expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
@@ -300,8 +300,92 @@ describe("given a run that names one project", () => {
       const { service } = scopeOver({ projects: [project("a"), project("b")], grants: {} });
 
       await expect(
-        service.resolve({ reach: { kind: "project", projectId: "a" }, projectId: "b" }),
+        service.resolve({ reach: { kind: "project", projectId: "a" }, projects: ["b"] }),
       ).rejects.toMatchObject({ code: "project_not_found" });
     });
+  });
+});
+
+describe("given a run that names projects", () => {
+  const PERMITTED = { a: ["analytics:view"], b: ["analytics:view"] };
+
+  /** @scenario "QP03b An organization, team or personal key that names no project is refused with a 422 naming the field" */
+  it("refuses an organization key that names none, when the door requires them", async () => {
+    const { service } = scopeOver({ projects: [project("a"), project("b")], grants: PERMITTED });
+
+    const refusal = await service
+      .resolve({ reach: KEY, requireProjects: true })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({
+      code: "projects_required",
+      httpStatus: 422,
+      message: "Name the projects to query: send `projects`, a list of project ids",
+    });
+  });
+
+  /** @scenario "QP03 A project key reads its own project by default" */
+  it("lets a project key read its own project without naming it", async () => {
+    const { service } = scopeOver({ projects: [project("a")], grants: {} });
+
+    const scope = await service.resolve({
+      reach: { kind: "project", projectId: "a" },
+      requireProjects: true,
+    });
+
+    expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
+  });
+
+  /** @scenario "QP12 A list that names one project twice reads it once, and params keeps the first place" */
+  it("reads each named project once, in the order named", async () => {
+    const { service } = scopeOver({ projects: [project("a"), project("b")], grants: PERMITTED });
+
+    const scope = await service.resolve({ reach: KEY, projects: ["b", "a", "b"] });
+
+    expect(scope.projects.map(({ id }) => id)).toEqual(["b", "a"]);
+  });
+
+  /** @scenario "QP09b The refusal for an unreadable project is byte-identical to the one for a missing project" */
+  it("answers an unreadable project and a missing one with the same body, naming neither", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"] },
+    });
+    const bodyOf = async (projects: string[]) => {
+      const refusal = await service
+        .resolve({ reach: KEY, projects })
+        .catch((error: unknown) => error);
+      const { code, message, meta, httpStatus } = refusal as Record<string, unknown>;
+
+      return JSON.stringify({ code, message, meta, httpStatus });
+    };
+
+    const unreadable = await bodyOf(["a", "c"]);
+    const missing = await bodyOf(["a", "z"]);
+
+    expect(unreadable).toBe(missing);
+    expect(unreadable).not.toMatch(/"c"|"z"|\bc\b|\bz\b/);
+  });
+
+  /** @scenario "QP09 One unreadable project in the list refuses the run" */
+  it("refuses the whole run when one named project is unreadable", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    await expect(service.resolve({ reach: KEY, projects: ["a", "c"] })).rejects.toMatchObject({
+      code: "project_not_found",
+      httpStatus: 404,
+    });
+  });
+
+  /** @scenario "QP03d A project key naming another project is refused" */
+  it("refuses a project key naming a project of its organization that is not its own", async () => {
+    const { service } = scopeOver({ projects: [project("a"), project("b")], grants: {} });
+
+    await expect(
+      service.resolve({ reach: { kind: "project", projectId: "a" }, projects: ["b"] }),
+    ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
   });
 });

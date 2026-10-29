@@ -4,6 +4,8 @@
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
+import { isLangWatchQLListParameter } from "./analytics.lwql-time-window.ts";
+
 /**
  * Feature flag disabled for this project; distinct from unavailable (no
  * identity)—administrator can enable.
@@ -172,6 +174,36 @@ export class LangWatchQLParameterMissingError extends HandledError {
 }
 
 /**
+ * An organization, team or personal key ran a statement without naming a project. The message
+ * names the field and never a project id (owner, 2026-10-29).
+ */
+export class LangWatchQLProjectsRequiredError extends HandledError {
+  declare readonly code: "projects_required";
+
+  constructor() {
+    super(
+      "projects_required",
+      "Name the projects to query: send `projects`, a list of project ids",
+      { httpStatus: 422, fault: "customer", ...remediation("projects_required") },
+    );
+    this.name = "LangWatchQLProjectsRequiredError";
+  }
+}
+
+/**
+ * A named project the caller cannot read, one that does not exist, or one of another
+ * organization. One body for all three and no id in it, so a refusal never says which.
+ */
+export class LangWatchQLProjectNotFoundError extends HandledError {
+  declare readonly code: "project_not_found";
+
+  constructor() {
+    super("project_not_found", "Project not found", { httpStatus: 404, fault: "customer" });
+    this.name = "LangWatchQLProjectNotFoundError";
+  }
+}
+
+/**
  * A bound parameter's value the server could not read as the type its placeholder
  * declares, such as an ISO `…Z` string on `{start:DateTime64(3)}`. Without this it
  * reached the caller as an unknown 500 for a one-edit fix (WEB-18301).
@@ -257,7 +289,9 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
   ) {
     super(
       "lwql_reserved_parameter_type",
-      "The query declares a time-window parameter with a type that is not a date-time.",
+      mistyped.length > 0 && mistyped.every(isLangWatchQLListParameter)
+        ? `The query declares ${mistyped.join(", ")} with a type other than Array(String).`
+        : "The query declares a time-window parameter with a type that is not a date-time.",
       {
         httpStatus: 400,
         fault: "customer",

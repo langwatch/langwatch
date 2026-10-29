@@ -6,7 +6,7 @@
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { lwqlStatementSchema } from "./analytics-lwql.schemas.ts";
+import { lwqlProjectsSchema, lwqlStatementSchema } from "./analytics-lwql.schemas.ts";
 import {
   langWatchQLAvailabilitySchema,
   langWatchQLQueryResultSchema,
@@ -40,6 +40,8 @@ export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDe
 const lwqlQueryRequestSchemaDefinition = z.object({
   ...lwqlRunRequestSchema.shape,
   sources: traceSourcesSchema.readonly().nullable().optional(),
+  /** The projects the card reads; absent, the board's project (AC206). */
+  projects: lwqlProjectsSchema.optional(),
 });
 export interface LwqlQueryRequestSchema extends Named<typeof lwqlQueryRequestSchemaDefinition> {}
 export const lwqlQueryRequestSchema: LwqlQueryRequestSchema = lwqlQueryRequestSchemaDefinition;

@@ -6,6 +6,8 @@
  * @see specs/lwql/api.feature
  */
 
+import { KNOWN_TRACE_ORIGINS } from "@langwatch/analytics-contract";
+
 import { CLICKHOUSE_OVERRIDES } from "../features/lwql-catalogue/rules/lwql-clickhouse-overrides.rules.ts";
 import { CODING_TOOL_RESULTS } from "../features/lwql-catalogue/rules/lwql-coding-overrides.rules.ts";
 import { defineCatalogTable } from "../features/lwql-catalogue/rules/lwql-dataset-derivation.rules.ts";
@@ -29,6 +31,13 @@ import {
   type UngatedViewDefinition,
   withCatalogueGates,
 } from "./lwql-gate.rules.ts";
+
+/** A trace's source in SQL: a listed origin as itself, a missing one as application, else other. */
+function sourceOfOrigin(origin: string): string {
+  const listed = KNOWN_TRACE_ORIGINS.map((known) => `'${known}'`).join(", ");
+
+  return `multiIf(ifNull(${origin}, '') = '', 'application', ${origin} IN (${listed}), ${origin}, 'other')`;
+}
 
 /**
  * How long after a write a row can be missing from these views. The projections are folded by
@@ -765,6 +774,14 @@ const TRACE_METRICS: UngatedViewDefinition = {
       sourceColumns: ["Origin"],
     },
     {
+      name: "Source",
+      type: "String",
+      description:
+        "The source the trace counts under: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list. Filter it with {dashboard_context_sources:Array(String)}.",
+      sourceColumns: ["Origin"],
+      expression: (source) => sourceOfOrigin(source("Origin")),
+    },
+    {
       name: "Models",
       type: "Array(String)",
       description: "Every model used anywhere in the trace.",
@@ -1239,6 +1256,14 @@ const EVALUATION_METRICS: UngatedViewDefinition = {
       type: "Nullable(String)",
       description: "Which product surface produced the evaluated trace.",
       sourceColumns: ["Origin"],
+    },
+    {
+      name: "Source",
+      type: "String",
+      description:
+        "The source the evaluated trace counts under: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list.",
+      sourceColumns: ["Origin"],
+      expression: (source) => sourceOfOrigin(source("Origin")),
     },
     {
       name: "DurationMs",
@@ -2560,6 +2585,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       ConversationId: "inherit",
       CustomerId: "inherit",
       Origin: "inherit",
+      Source: { source: "Origin" },
       Models: "inherit",
       Labels: "inherit",
       TotalCost: { access: { allOf: ["cost:view"] } },
@@ -2656,6 +2682,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       ConversationId: "inherit",
       CustomerId: "inherit",
       Origin: "inherit",
+      Source: { source: "Origin" },
       DurationMs: "inherit",
       TotalCost: { access: { allOf: ["cost:view"] } },
       NonBilledCost: { access: { allOf: ["cost:view"] } },
