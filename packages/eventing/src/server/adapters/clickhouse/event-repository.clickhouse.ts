@@ -293,7 +293,12 @@ export class EventingClickHouseEventRepository implements EventRepository {
       format: "JSONEachRow",
     });
     const rows = await result.json<EventLogRow>();
-    const records = mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
+    const records = mapEventLogRows({
+      rows,
+      tenantId,
+      aggregateType,
+      aggregateId,
+    });
 
     const record = records[0];
     if (!record) {
@@ -581,7 +586,11 @@ export class EventingClickHouseEventRepository implements EventRepository {
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
     occurredAtFromMs?: number;
-  }): { query: string; query_params: Record<string, unknown>; declaresFullScan: boolean } {
+  }): {
+    query: string;
+    query_params: Record<string, unknown>;
+    declaresFullScan: boolean;
+  } {
     const {
       tenantId,
       aggregateType,
@@ -734,7 +743,11 @@ export class EventingClickHouseEventRepository implements EventRepository {
       if (organizationId === undefined || organizationId === null) {
         await this.insertEventLog({ tenantId, rows: stampedRecords });
       } else {
-        await this.appendFold.append({ organizationId, tenantId, rows: stampedRecords });
+        await this.appendFold.append({
+          organizationId,
+          tenantId,
+          rows: stampedRecords,
+        });
       }
     } catch (error) {
       this.logger.debug(
@@ -750,14 +763,22 @@ export class EventingClickHouseEventRepository implements EventRepository {
     }
   }
 
-  /** One insert, flushed before it answers; a folded one declares its tenant set. */
+  /**
+   * One insert, flushed before it answers; a folded one declares its tenant set. Async
+   * deduplication is off, as the server's default before 26.2 has it: the log collapses repeats
+   * by IdempotencyKey itself, and an insert with it off may share a statement (ADR-187).
+   */
   private async insertEventLog({ tenantId, rows, tenantIds }: EventLogInsert): Promise<void> {
     const client = await this.getClient(tenantId);
     await client.insert({
       table: "event_log",
       values: rows,
       format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      clickhouse_settings: {
+        async_insert: 1,
+        wait_for_async_insert: 1,
+        async_insert_deduplicate: 0,
+      },
       ...(tenantIds === undefined ? {} : { tenantIds }),
     });
   }
