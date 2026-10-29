@@ -13,9 +13,11 @@ Feature: Every query door takes the same parameters and says what it ran with
   # What is not a parameter: the row policy, the share windows and the redaction of captured
   # content come from the credential and its grants, never from the request.
   # Decided by the owner (2026-10-29): no hidden filter, so QP05 and QP06 stand ("why have a hidden
-  # filter?"). QP03b: a key for an organization, a team or a person reads every project it can
-  # read, echoed in params.projects. An organization key has no current project, and a 422 would
-  # break existing scripts.
+  # filter?"). QP03b, decided later the same day: "That's an API thing on the query. we can require
+  # project(s) to be specified when creating a query, that seems fine". A key for an organization,
+  # a team or a person must name `projects` at REST, MCP and the CLI, or the run is refused with a
+  # 422 that names the field and no project id. A project key keeps its own project. Cards and
+  # widgets keep the board's project. This breaks existing organization-key scripts.
   # Evidence: the repo marks proof with `# Evidence:` lines under a scenario (dashboards-v2.feature);
   # each scenario here ends with one.
 
@@ -23,7 +25,7 @@ Feature: Every query door takes the same parameters and says what it ran with
 
     @unit @integration
     Scenario: QP01 A run that names no sources is bound to application
-      When a run at any door names no sources
+      When a run at any door, naming its projects where the key is not a project key, names no sources
       Then {dashboard_context_sources:Array(String)} is bound to ["application"]
       And params.sources is ["application"]
       # Evidence: the four answers (tRPC, REST, MCP, CLI) quoted for one statement
@@ -43,11 +45,22 @@ Feature: Every query door takes the same parameters and says what it ran with
       # Evidence: three answers quoted
 
     @unit @integration
-    Scenario: QP03b An organization, team or personal key reads every project it can read, and params lists them
-      Given an organization key that reads projects "A" and "B" and not "C"
-      When it runs a statement with no projects
-      Then it reads "A" and "B" and params.projects is ["A", "B"], in the order of the project ids sorted ascending
-      # Evidence: the REST answer quoted for an organization key and for a personal key
+    Scenario: QP03b An organization, team or personal key that names no project is refused with a 422 naming the field
+      Given an organization key that reads projects "A" and "B"
+      When it runs a statement with no `projects` and no `projectId`, at REST, MCP or the CLI
+      Then it is refused with the status 422 and the code "projects_required"
+      And the message is "Name the projects to query: send `projects`, a list of project ids"
+      And the body holds no project id, and no statement reaches the store
+      And the same key naming ["A"] reads "A", and params.projects is ["A"]
+      # Evidence: a real curl answer for an organization key without projects, and one with ["A"]
+
+    @unit @integration
+    Scenario: QP03e The CLI and the MCP tool tell the user to pass the projects
+      When `langwatch query run` is run with an organization key and no `--projects`, and run_query is called with no `projects`
+      Then the CLI prints "Name the projects to query: pass --projects <id,id>" and exits non-zero
+      And the MCP tool result is an error reading "Name the projects to query: pass `projects`, a list of project ids"
+      And neither message holds a project id
+      # Evidence: the CLI output and the MCP tool result, quoted
 
     @unit @integration
     Scenario: QP03c A key for a group project reads the group's members by default
@@ -211,7 +224,7 @@ Feature: Every query door takes the same parameters and says what it ran with
     @unit @integration
     Scenario: QP14 A statement widening its reach with TenantId still reads nothing it may not
       Given an API key that reads "A" and not "C"
-      When a statement compares TenantId with "C"
+      When a statement run with projects ["A"] compares TenantId with "C"
       Then it returns no row of "C", by the row policy
       # Evidence: the REST answer quoted
 
