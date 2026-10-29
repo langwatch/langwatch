@@ -435,7 +435,7 @@ export const instantEvalJudgeRoutePricingSchema: InstantEvalJudgeRoutePricingSch
   instantEvalJudgeRoutePricingSchemaDefinition;
 export type InstantEvalJudgeRoutePricing = z.infer<typeof instantEvalJudgeRoutePricingSchema>;
 
-const instantEvalJudgeRouteSchemaDefinition = z
+const instantEvalJudgeRouteRequestSchemaDefinition = z
   .object({
     job: jobSchema,
     /** Absent, the job's default mode in the table. */
@@ -452,12 +452,12 @@ const instantEvalJudgeRouteSchemaDefinition = z
     tokens: z.number().int().nonnegative().optional(),
   })
   .readonly();
-export interface InstantEvalJudgeRouteSchema extends Named<
-  typeof instantEvalJudgeRouteSchemaDefinition
+export interface InstantEvalJudgeRouteRequestSchema extends Named<
+  typeof instantEvalJudgeRouteRequestSchemaDefinition
 > {}
-export const instantEvalJudgeRouteSchema: InstantEvalJudgeRouteSchema =
-  instantEvalJudgeRouteSchemaDefinition;
-export type InstantEvalJudgeRoute = z.infer<typeof instantEvalJudgeRouteSchema>;
+export const instantEvalJudgeRouteRequestSchema: InstantEvalJudgeRouteRequestSchema =
+  instantEvalJudgeRouteRequestSchemaDefinition;
+export type InstantEvalJudgeRouteRequest = z.infer<typeof instantEvalJudgeRouteRequestSchema>;
 
 /** How a routed judgement was answered; never a provider's error text. */
 export interface InstantEvalJudgeRouting {

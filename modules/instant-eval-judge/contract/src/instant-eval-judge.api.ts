@@ -8,7 +8,10 @@
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
-import type { InstantEvalJudgeRoute, InstantEvalJudgeRouting } from "./instant-eval-judge-route.ts";
+import type {
+  InstantEvalJudgeRouteRequest,
+  InstantEvalJudgeRouting,
+} from "./instant-eval-judge-route.ts";
 
 /**
  * The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no
@@ -105,7 +108,7 @@ export interface InstantEvalClassification {
   /** Present when the project runs on its own decision model instead of LangWatch's. */
   readonly decisionModel?: InstantEvalOwnDecisionModel;
   /** Present when the call is routed; absent, the hosted classifier answers alone, as before. */
-  readonly route?: InstantEvalJudgeRoute;
+  readonly route?: InstantEvalJudgeRouteRequest;
 }
 
 /** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */

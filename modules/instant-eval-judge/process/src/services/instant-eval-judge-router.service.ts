@@ -10,7 +10,7 @@ import {
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
   type InstantEvalClassification,
-  type InstantEvalJudgeRoute,
+  type InstantEvalJudgeRouteRequest,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
   type InstantEvalQuestionKind,
@@ -36,7 +36,7 @@ type InstantEvalJudgeRouterServiceDeps = InstantEvalJudgeRouteRunDeps &
 
 /** A routed classification: today's input with the route it carries. */
 type RoutedClassification = Omit<InstantEvalClassification, "route" | "decisionModel"> & {
-  readonly route: InstantEvalJudgeRoute;
+  readonly route: InstantEvalJudgeRouteRequest;
 };
 
 export class InstantEvalJudgeRouterService {

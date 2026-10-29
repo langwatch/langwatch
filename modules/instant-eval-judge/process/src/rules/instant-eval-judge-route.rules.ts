@@ -16,7 +16,7 @@ import {
   type InstantEvalJudgeInputView,
   type InstantEvalJudgeJob,
   type InstantEvalJudgeMode,
-  type InstantEvalJudgeRoute,
+  type InstantEvalJudgeRouteRequest,
   type InstantEvalJudgeRouteEntry,
   type InstantEvalJudgeRouteSlot,
   type InstantEvalJudgeRouteTable,
@@ -72,7 +72,7 @@ export function instantEvalJudgeRoutePlanOf({
   table,
   kind = "boolean",
 }: {
-  route: InstantEvalJudgeRoute;
+  route: InstantEvalJudgeRouteRequest;
   text: string;
   questions: readonly InstantEvalQuestion[];
   table: InstantEvalJudgeRouteTable;
@@ -101,7 +101,13 @@ export function instantEvalJudgeRoutePlanOf({
  * The tools view earns its place only by being shorter: a trace that is mostly tool calls renders
  * a tools view as long as the trace, which costs the same and drops the conversation around it.
  */
-function isToolsViewShorter({ route, text }: { route: InstantEvalJudgeRoute; text: string }) {
+function isToolsViewShorter({
+  route,
+  text,
+}: {
+  route: InstantEvalJudgeRouteRequest;
+  text: string;
+}) {
   const tools = route.views?.tools;
   if (!tools?.trim()) return true;
   return estimateJudgedTextTokens({ text: tools }) < estimateJudgedTextTokens({ text });
@@ -129,7 +135,7 @@ function planForView({
   kind,
   inputView,
 }: {
-  route: InstantEvalJudgeRoute;
+  route: InstantEvalJudgeRouteRequest;
   text: string;
   questions: readonly InstantEvalQuestion[];
   table: InstantEvalJudgeRouteTable;
@@ -183,7 +189,7 @@ function instantEvalJudgeInputViewOf({
   route,
   table,
 }: {
-  route: InstantEvalJudgeRoute;
+  route: InstantEvalJudgeRouteRequest;
   table: InstantEvalJudgeRouteTable;
 }): InstantEvalJudgeInputView {
   if (route.inputView) return route.inputView;
@@ -242,7 +248,7 @@ function isArithmeticCall({
   questions,
   table,
 }: {
-  route: InstantEvalJudgeRoute;
+  route: InstantEvalJudgeRouteRequest;
   questions: readonly InstantEvalQuestion[];
   table: InstantEvalJudgeRouteTable;
 }): boolean {

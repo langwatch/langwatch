@@ -4,7 +4,7 @@ import {
   INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
   INSTANT_EVAL_JUDGE_JOBS,
   INSTANT_EVAL_JUDGE_MODES,
-  type InstantEvalJudgeRoute,
+  type InstantEvalJudgeRouteRequest,
 } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
@@ -26,7 +26,7 @@ import {
 const table = syntheticRouteTable();
 const UPSET = yesNo("q", "is the user upset");
 
-function plan(route: InstantEvalJudgeRoute, question = UPSET, text = "x") {
+function plan(route: InstantEvalJudgeRouteRequest, question = UPSET, text = "x") {
   return instantEvalJudgeRoutePlanOf({ route, text, questions: [question], table });
 }
 

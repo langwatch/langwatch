@@ -9,7 +9,7 @@ import {
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
   type InstantEvalJudgement,
-  type InstantEvalJudgeRoute,
+  type InstantEvalJudgeRouteRequest,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
   type InstantEvalQuestion,
@@ -108,7 +108,7 @@ function harness({
     limiter,
   });
   const classify = (
-    route: InstantEvalJudgeRoute,
+    route: InstantEvalJudgeRouteRequest,
     questions: InstantEvalQuestion[] = [Q],
     signal?: AbortSignal,
   ) =>
@@ -132,8 +132,8 @@ function timedTable(fallbacks: string[] = []): InstantEvalJudgeRouteTable {
   });
 }
 
-const SHORT: InstantEvalJudgeRoute = { job: "search", tokens: 500 };
-const PAIRED: InstantEvalJudgeRoute = { job: "search", tokens: 5000 };
+const SHORT: InstantEvalJudgeRouteRequest = { job: "search", tokens: 500 };
+const PAIRED: InstantEvalJudgeRouteRequest = { job: "search", tokens: 5000 };
 
 describe("InstantEvalJudgeRouterService", () => {
   describe("given a plan that escalates unsure answers", () => {
@@ -356,7 +356,11 @@ describe("InstantEvalJudgeRouterService", () => {
   });
 
   describe("given a leg that runs past its own timeout", () => {
-    const LONG_INSTANT: InstantEvalJudgeRoute = { job: "search", tokens: 20_000, mode: "instant" };
+    const LONG_INSTANT: InstantEvalJudgeRouteRequest = {
+      job: "search",
+      tokens: 20_000,
+      mode: "instant",
+    };
 
     /** @scenario "A leg past its own timeout is a failed leg, not a stopped page" */
     it("skips as provider unavailable instead of throwing the leg's timeout", async () => {
