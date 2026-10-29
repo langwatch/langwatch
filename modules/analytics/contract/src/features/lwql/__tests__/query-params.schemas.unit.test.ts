@@ -9,6 +9,7 @@ import { lwqlKeyStatementSchema } from "../analytics-lwql.schemas.ts";
 import { lwqlQueryRequestSchema } from "../analytics-lwql.trpc.ts";
 import { langWatchQLQueryResultSchema, TRACE_SOURCES } from "../analytics.lwql.ts";
 import { LWQL_MAX_MEMBER_PROJECTS, LWQL_MAX_NAMED_PROJECTS } from "../langwatch-ql-limits.ts";
+import { LangWatchQLReservedParameterSuppliedError } from "../langwatch-ql.errors.ts";
 
 const SQL = "SELECT 1";
 const issuesOf = (input: unknown) => {
@@ -118,5 +119,16 @@ describe("given the member door's body", () => {
     expect(refused.error?.issues[0]?.message).toBe(
       `projects holds at most ${LWQL_MAX_MEMBER_PROJECTS} ids`,
     );
+  });
+});
+
+describe("given a request that supplies a list name for itself", () => {
+  it("tells the caller which request field to send", () => {
+    const error = new LangWatchQLReservedParameterSuppliedError([
+      "dashboard_context_projects",
+      "dashboard_context_sources",
+    ]);
+
+    expect(error.message).toContain("the `projects` field and the `sources` field");
   });
 });

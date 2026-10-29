@@ -85,6 +85,12 @@ const str = (error: HandledErrorShape, key: string, fallback: string): string =>
  * person: a long list stops being copy and becomes a dump, and a single
  * oversized entry would push the rest off the screen.
  */
+/** The request field that sets each list name, which the supplied-parameter copy points at. */
+const LIST_REQUEST_FIELDS: Readonly<Record<string, string>> = {
+  dashboard_context_sources: "sources",
+  dashboard_context_projects: "projects",
+};
+
 const strList = (error: HandledErrorShape, key: string): string[] => {
   const value = error.meta[key];
   if (!Array.isArray(value)) return [];
@@ -557,7 +563,12 @@ const presentations = {
         return "Some of these parameters come from the page showing this chart. Remove them from your parameters and change the page's settings instead.";
       }
       const plural = supplied.length > 1;
-      return `${listLabels(supplied)} ${plural ? "come" : "comes"} from the page showing this chart. Remove ${plural ? "them" : "it"} from your parameters and change the page's settings instead.`;
+      const fields = supplied.flatMap((name) => LIST_REQUEST_FIELDS[name] ?? []);
+      const instead =
+        fields.length > 0
+          ? ` Send the ${listLabels(fields.map((field) => `\`${field}\``))} ${fields.length > 1 ? "fields" : "field"} of the request instead.`
+          : "";
+      return `${listLabels(supplied)} ${plural ? "come" : "comes"} from the page showing this chart. Remove ${plural ? "them" : "it"} from your parameters and change the page's settings instead.${instead}`;
     },
   },
   lwql_reserved_parameter_type: {

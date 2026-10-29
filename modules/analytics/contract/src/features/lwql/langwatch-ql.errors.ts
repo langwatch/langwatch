@@ -253,6 +253,20 @@ function suppliedParameterSentence(supplied: readonly string[]): string {
   return `The request supplied values for ${names}, which the surface sets itself.`;
 }
 
+/** The request field that sets a list name, so the message can point at it. */
+const LIST_FIELD: Readonly<Record<string, string>> = {
+  dashboard_context_sources: "sources",
+  dashboard_context_projects: "projects",
+};
+
+/** Adds, for each list name supplied, the request field to send in its place. */
+function withListFields(sentence: string, supplied: readonly string[]): string {
+  const fields = supplied.flatMap((name) => LIST_FIELD[name] ?? []);
+  if (fields.length === 0) return sentence;
+
+  return `${sentence} Send ${fields.map((field) => `the \`${field}\` field`).join(" and ")} of the request instead.`;
+}
+
 /**
  * Request supplies a value for surface-owned parameter (period bounds or
  * granularity); refused to prevent silent discard.
@@ -264,14 +278,18 @@ export class LangWatchQLReservedParameterSuppliedError extends HandledError {
     /** The reserved names the request carried. Sorted. */
     supplied: readonly string[],
   ) {
-    super("lwql_reserved_parameter_supplied", suppliedParameterSentence(supplied), {
-      httpStatus: 400,
-      fault: "customer",
-      // Named consumer: the parameter editor, which lists the rows to remove,
-      // and an agent repairing a request it composed.
-      meta: { parameters: supplied },
-      ...remediation("lwql_reserved_parameter_supplied"),
-    });
+    super(
+      "lwql_reserved_parameter_supplied",
+      withListFields(suppliedParameterSentence(supplied), supplied),
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumer: the parameter editor, which lists the rows to remove,
+        // and an agent repairing a request it composed.
+        meta: { parameters: supplied },
+        ...remediation("lwql_reserved_parameter_supplied"),
+      },
+    );
     this.name = "LangWatchQLReservedParameterSuppliedError";
   }
 }

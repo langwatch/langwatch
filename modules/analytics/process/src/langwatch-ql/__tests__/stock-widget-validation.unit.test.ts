@@ -5,6 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC202
  * @vitest-environment node
  */
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
@@ -18,20 +19,12 @@ import { validateLangWatchQL } from "./lwql-validate.ts";
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const database = "analytics";
 
-// The stock widgets live in the browser package, which this one does not depend on; loading them
-// by a computed path keeps the two projects apart for the compiler and joins them for this proof.
-const CATALOGUE = fileURLToPath(
-  new URL("../../../../browser/src/features/dashboards/catalogue/index.ts", import.meta.url),
-);
-const catalogue = (await import(/* @vite-ignore */ CATALOGUE)) as {
-  IMPLEMENTED_WIDGET_IDS: readonly string[];
-  implementedWidget(id: string): { definition: { queries: { name: string; sql: string }[] } };
-};
-const queries = catalogue.IMPLEMENTED_WIDGET_IDS.flatMap((id) =>
-  catalogue.implementedWidget(id).definition.queries.map(({ name, sql }) => ({
-    label: `${id}/${name}`,
-    sql,
-  })),
+// A committed copy of the stock SQL; the browser package's test keeps it equal to the catalogue.
+const queries: readonly { label: string; sql: string }[] = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL("./fixtures/stock-widget-queries.json", import.meta.url)),
+    "utf8",
+  ),
 );
 
 function violationsOf(sql: string, protections: LangWatchQLProtections) {

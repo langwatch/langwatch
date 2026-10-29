@@ -138,9 +138,12 @@ export class LangWatchQLQueryScopeService {
     const checked = await Promise.all(
       ids.map(async (projectId) => ({
         project: await this.dependencies.projects.findById(projectId),
-        allowed: await this.dependencies.authz
-          .hasPermission({ userId, permission: "analytics:view", projectId })
-          .catch(() => false),
+        // An authz outage propagates (a 5xx), never a 404: only a denial reads as not found.
+        allowed: await this.dependencies.authz.hasPermission({
+          userId,
+          permission: "analytics:view",
+          projectId,
+        }),
       })),
     );
     const readable: LangWatchQLCaller[] = [];

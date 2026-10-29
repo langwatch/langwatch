@@ -573,4 +573,17 @@ describe("given a member's card that names projects", () => {
     );
     expect(checked).toEqual([]);
   });
+
+  it("lets an authz outage propagate instead of reading it as a missing project", async () => {
+    const outage = new Error("authz unavailable");
+    const failing = LangWatchQLQueryScopeService.create({
+      projects: createApiFixture<ProjectApi>({ findById: () => Promise.resolve(project("a")) }),
+      authz: createApiFixture<AuthzApi>({ hasPermission: () => Promise.reject(outage) }),
+      dataPrivacy: createApiFixture<DataPrivacyApi>({}),
+    });
+
+    await expect(failing.readableByMember({ userId: "user-1", projectIds: ["a"] })).rejects.toBe(
+      outage,
+    );
+  });
 });

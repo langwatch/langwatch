@@ -132,6 +132,18 @@ describe("explainHandledError", () => {
       expect(description).toContain("Remove them");
     });
 
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("points a supplied sources or projects name at the request field", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["dashboard_context_sources", "dashboard_context_projects"] },
+        }),
+      );
+
+      expect(description).toContain("`sources` and `projects` fields");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("still says something useful when the supplied names are absent", () => {
       const { title, description } = explainHandledError(
