@@ -14,10 +14,12 @@ export const ID_INDEX_KEPT_FOREVER_DAYS = 65_535;
  */
 export const ID_INDEX_RAISE_PARAM_BYTES = 100 * 1024;
 
-/** The array's URL-encoded brackets, `%5B` and `%5D`. The days travel in their own, smaller field. */
+/**
+ * The array's URL-encoded brackets, `%5B` and `%5D`. The days travel in their own, smaller field.
+ */
 const ARRAY_BRACKET_BYTES = 6;
 
-/** The client's string escapes in a query parameter (`formatQueryParams` in `@clickhouse/client`). */
+/** The client's string escapes in a query parameter, as `formatQueryParams` writes them. */
 const PARAM_STRING_ESCAPES: Record<string, string> = {
   "\t": "\\t",
   "\n": "\\n",
@@ -31,10 +33,7 @@ const PARAM_STRING_ESCAPES: Record<string, string> = {
  * a comma, and form-encoded by `URLSearchParams`. A quote or backslash costs 6 bytes, not 1.
  */
 export function idIndexRaiseParamBytes(tenantId: string): number {
-  const escaped = tenantId.replace(
-    /[\t\n\r'\\]/g,
-    (c) => PARAM_STRING_ESCAPES[c]!,
-  );
+  const escaped = tenantId.replace(/[\t\n\r'\\]/g, (c) => PARAM_STRING_ESCAPES[c]!);
   return new URLSearchParams([["", `'${escaped}',`]]).toString().length - 1;
 }
 
@@ -70,9 +69,7 @@ export function idIndexRetentionRaises({
   const raises: IdIndexRetentionBatch[] = [];
   let current: IdIndexRetentionBatch = { tenantIds: [], retentionDays: [] };
   let bytes = ARRAY_BRACKET_BYTES;
-  const sorted = [...daysByTenant].toSorted(([left], [right]) =>
-    left.localeCompare(right),
-  );
+  const sorted = [...daysByTenant].toSorted(([left], [right]) => left.localeCompare(right));
   for (const [tenantId, days] of sorted) {
     const size = idIndexRaiseParamBytes(tenantId);
     if (ARRAY_BRACKET_BYTES + size > paramBytes) {

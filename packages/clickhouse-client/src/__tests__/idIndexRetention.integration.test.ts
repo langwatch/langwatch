@@ -10,10 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startTestClickHouseEndpoints } from "../clickhouse-test-endpoints.ts";
 import { ID_INDEX_FILL_MARKER } from "../idIndexReadiness.ts";
-import {
-  ID_INDEX_RETENTION_RAISE,
-  idIndexRetentionRaises,
-} from "../idIndexRetention.ts";
+import { ID_INDEX_RETENTION_RAISE, idIndexRetentionRaises } from "../idIndexRetention.ts";
 
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const INDEX = `fixture_retention_${RUN}_id_index`;
@@ -26,9 +23,7 @@ async function retentionByTenant(): Promise<Record<string, number>> {
     format: "JSONEachRow",
   });
   const rows = await result.json<{ TenantId: string; days: number | string }>();
-  return Object.fromEntries(
-    rows.map((row) => [row.TenantId, Number(row.days)]),
-  );
+  return Object.fromEntries(rows.map((row) => [row.TenantId, Number(row.days)]));
 }
 
 async function mutationsOn(): Promise<number> {
@@ -50,8 +45,7 @@ describe("an id index retention raise", () => {
       names: ["shared"],
       environment: process.env,
     });
-    if (endpoint === undefined)
-      throw new Error("No ClickHouse endpoint was provisioned");
+    if (endpoint === undefined) throw new Error("No ClickHouse endpoint was provisioned");
     probe = createClient({
       url: endpoint.url,
       clickhouse_settings: {
@@ -161,10 +155,7 @@ describe("an id index retention raise", () => {
       expect(rest).toHaveLength(0);
       // A native server may raise the cap; only one that refuses this field can show the refusal.
       const fieldBytes = new URLSearchParams([
-        [
-          "",
-          `[${(single?.tenantIds ?? []).map((tenantId) => `'${tenantId}'`).join(",")}]`,
-        ],
+        ["", `[${(single?.tenantIds ?? []).map((tenantId) => `'${tenantId}'`).join(",")}]`],
       ]).toString().length;
       const limit = await probe.query({
         query:
@@ -195,9 +186,7 @@ describe("an id index retention raise", () => {
 
       expect(raises.length).toBeGreaterThan(1);
       const raised = await retentionByTenant();
-      expect(tenants.filter((tenantId) => raised[tenantId] !== 180)).toEqual(
-        [],
-      );
+      expect(tenants.filter((tenantId) => raised[tenantId] !== 180)).toEqual([]);
     });
   });
 });
