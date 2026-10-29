@@ -68,7 +68,7 @@ Feature: Audit the built documentation for search, agents and page quality
 
   @unit
   Scenario: Report Lighthouse and on-page SEO for every page on the pull request
-    Given Lighthouse ran once per page on mobile and desktop for every published page, split across runners
+    Given Lighthouse ran on mobile and desktop for every published page, split across runners
     And the static search checks ran on every page
     When the runs are merged into one report
     Then one comment on the pull request is updated on each run, never a new one per push
@@ -77,3 +77,11 @@ Feature: Audit the built documentation for search, agents and page quality
     And the table of every page, grouped by section, is in the comment when it fits and linked when it does not
     And pages a runner never reported, or Lighthouse could not load, are named
     But the report never fails the run: budgets gate only the representative pages
+
+  @unit
+  Scenario: Recheck a page that scores under the threshold in the all-pages run
+    Given the all-pages run measures each page once with a recheck threshold of 0.9
+    When a page's performance score on a device is under 0.9
+    Then that page runs twice more on that device, one run per pass
+    And the report keeps the run with the median performance score of the three
+    But a page Lighthouse could not load is reported as unloadable, not rechecked

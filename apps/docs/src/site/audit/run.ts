@@ -23,6 +23,7 @@ import {
   type FormFactor,
   type PageBudget,
 } from "./budgets.ts";
+import { pageMedians, recheckPasses, type LighthouseTask } from "./recheck.ts";
 import { summaryMarkdown } from "./report.ts";
 import {
   applyKnownIssues,
@@ -61,7 +62,13 @@ const optionsSchema = z.object({
   "form-factors": list.pipe(z.array(z.enum(FORM_FACTORS))).default([...FORM_FACTORS]),
   concurrency: z.coerce.number().int().min(1).optional(),
   runs: z.coerce.number().int().min(1).default(1),
-  "recheck-below": z.coerce.number().min(0).max(1).optional(),
+  "recheck-below": z
+    .string()
+    .trim()
+    .min(1, "use --recheck-below <score>, a performance score from 0 to 1")
+    .transform(Number)
+    .pipe(z.number().min(0).max(1))
+    .optional(),
   json: z.boolean().default(false),
   lhr: z.boolean().default(false),
   "static-only": z.boolean().default(false),
@@ -208,16 +215,6 @@ async function pool<T, R>({
   return results;
 }
 
-/** The run with the median performance score, so one noisy run neither passes nor fails a page. */
-function medianRun({ runs }: { runs: AuditRun[] }) {
-  const sorted = runs.toSorted(
-    (a, b) => (a.scores.performance ?? -1) - (b.scores.performance ?? -1),
-  );
-  const median = sorted[Math.floor(sorted.length / 2)];
-  if (!median) throw new Error("No audit runs to take a median of");
-  return median;
-}
-
 async function checkExportTypes({ origin, exports }: { origin: string; exports: string[] }) {
   const wrong = await pool({
     items: exports,
@@ -268,11 +265,6 @@ function agentReadiness({
   });
   return { result, gate };
 }
-
-/** Extra runs for a page whose first median falls under `--recheck-below`: three runs in all. */
-const RECHECK_RUNS = 2;
-
-type LighthouseTask = { page: PageBudget; formFactor: FormFactor; attempt: number };
 
 /**
  * Lighthouse over the selected pages and form factors, the median of each page's runs. A page
@@ -325,35 +317,23 @@ async function lighthouseRuns({
         return run;
       },
     });
-  const medians = (all: AuditRun[]) =>
-    pages.flatMap((page) =>
-      options["form-factors"].map((formFactor) =>
-        medianRun({
-          runs: all.filter((run) => run.page === page.id && run.formFactor === formFactor),
-        }),
-      ),
-    );
+  const medians = (runs: AuditRun[]) =>
+    pageMedians({ pages, formFactors: options["form-factors"], runs });
   log({ json, message: `lighthouse: ${tasks.length} runs, ${limit} at a time` });
   const all = await measure(tasks);
+  const first = medians(all);
   const threshold = options["recheck-below"];
-  if (threshold === undefined) return medians(all);
-
-  const slow = medians(all).filter((run) => (run.scores.performance ?? 0) < threshold);
-  const rechecks = slow.flatMap((run) => {
-    const page = pages.find((candidate) => candidate.id === run.page);
-    if (!page) return [];
-    return Array.from({ length: RECHECK_RUNS }, (_, extra) => ({
-      page,
-      formFactor: run.formFactor,
-      attempt: options.runs + extra,
-    }));
-  });
-  if (rechecks.length === 0) return medians(all);
+  const passes =
+    threshold === undefined
+      ? []
+      : recheckPasses({ medians: first, threshold, firstAttempt: options.runs });
+  if (passes.length === 0) return first.map(({ run }) => run);
   log({
     json,
-    message: `lighthouse: ${slow.length} pages under ${threshold}, ${rechecks.length} rechecks`,
+    message: `lighthouse: ${passes[0]?.length} pages under ${threshold}, ${passes.length} more runs each`,
   });
-  return medians([...all, ...(await measure(rechecks))]);
+  for (const pass of passes) all.push(...(await measure(pass)));
+  return medians(all).map(({ run }) => run);
 }
 
 /** Stops before any check when the build was made for another mount: every URL would be wrong. */

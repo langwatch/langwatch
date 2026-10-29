@@ -1,11 +1,11 @@
 name: docs-site-lighthouse-all
 
-# Lighthouse (desktop and mobile, one run each) and the static search checks on
-# every published docs page, merged into one sticky PR comment, the run summary
-# and an artifact. Informational: never a gate, no aggregator, not required.
+# Lighthouse (desktop and mobile) and the static search checks on every
+# published docs page, merged into one sticky PR comment, the run summary and an
+# artifact. Informational: never a gate, no aggregator, not required.
 # The budgets gate only the representative pages in docs-site.yml's audit job.
-# A page under 0.9 runs twice more and reports the median: one run on a shared
-# runner swings a page's TBT from 0 to over a second.
+# Each page runs once; a page under 0.9 runs twice more and reports the median:
+# one run on a shared runner swings a page's TBT from 0 to over a second.
 # Same scripts: run.ts --all-pages --shard, then all-pages.ts merges the shards.
 #
 # To move to daily only, delete the pull_request trigger: schedule and
