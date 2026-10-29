@@ -18,7 +18,7 @@ import {
   updateWidgetOnDashboard,
 } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
-import { widgetProjectsInput } from "../schemas/widget-sources.ts";
+import { widgetProjectsInput, runQueryProjectsInput } from "../schemas/widget-sources.ts";
 import { handleAddDashboardWidget } from "../tools/add-dashboard-widget.js";
 import { handleListDashboards } from "../tools/list-dashboards.js";
 import { handleUpdateDashboardWidget } from "../tools/update-dashboard-widget.js";
@@ -491,5 +491,15 @@ describe('given a widget tool is sent projects "all"', () => {
 
   it("does not advertise all in the tool's JSON Schema", () => {
     expect(JSON.stringify(z.toJSONSchema(widgetProjectsInput))).not.toContain("all");
+  });
+});
+
+describe("given run_query's projects input", () => {
+  it.each([["all"], ["ALL"], [" All "], [["A", "B"]]])("accepts %s", (value) => {
+    expect(runQueryProjectsInput.validate(value)).toBe(true);
+  });
+
+  it.each([["everything"], [[]], [[""]]])("refuses %s", (value) => {
+    expect(runQueryProjectsInput.validate(value)).toBe(false);
   });
 });

@@ -18,7 +18,7 @@ const PROJECTS_REQUIRED_MESSAGE =
 export async function handleRunQuery(params: {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
-  projects?: string[] | "all";
+  projects?: string[] | string;
   sources?: string[];
 }): Promise<string> {
   const result = await runQuery(params).catch((error: unknown) => {

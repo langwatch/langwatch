@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { dashboardWidgetQuerySchema } from "../../dashboard-widget/dashboard-widget-definition.ts";
-import { lwqlKeyStatementSchema } from "../analytics-lwql.schemas.ts";
+import { holdsAllWord, lwqlKeyStatementSchema } from "../analytics-lwql.schemas.ts";
 import { lwqlQueryRequestSchema } from "../analytics-lwql.trpc.ts";
 import { langWatchQLQueryResultSchema, TRACE_SOURCES } from "../analytics.lwql.ts";
 import { LWQL_MAX_MEMBER_PROJECTS, LWQL_MAX_NAMED_PROJECTS } from "../langwatch-ql-limits.ts";
@@ -163,17 +163,18 @@ describe('given projects set to "all"', () => {
   /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
   it("is accepted by the key door and the member door as the string", () => {
     expect(issuesOf({ sql: SQL, projects: "all" })).toEqual([]);
+    expect(issuesOf({ sql: SQL, projects: " ALL " })).toEqual([]);
+    expect(lwqlKeyStatementSchema.parse({ sql: SQL, projects: "All" }).projects).toBe("all");
     expect(lwqlQueryRequestSchema.validate({ projectId: "p", sql: SQL, projects: "all" })).toBe(
       true,
     );
   });
 
   /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
-  it("stands alone: inside a list, in any case, it is refused, as is any other string", () => {
-    for (const word of ["all", "ALL", " All "]) {
-      const [message] = issuesOf({ sql: SQL, projects: ["p", word] });
-      expect(message).toBe('"all" stands alone; send it by itself, or list project ids');
-    }
+  it("is a list entry the schema leaves to the run, which refuses it; other strings fail here", () => {
+    expect(issuesOf({ sql: SQL, projects: ["p", "ALL"] })).toEqual([]);
+    expect(holdsAllWord(["p", " All "])).toBe(true);
+    expect(holdsAllWord(["p", "q"])).toBe(false);
     expect(issuesOf({ sql: SQL, projects: "everything" })).not.toEqual([]);
   });
 

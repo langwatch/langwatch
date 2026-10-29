@@ -129,10 +129,6 @@ export class LangWatchQLQueryScopeService {
       await this.ownProject({ projectId: reach.projectId, requested: named });
       return;
     }
-    // A widget's list has no request schema to cap it, so the cap is held here.
-    if (named.length > LWQL_TENANT_CAPABILITY_MAX_PROJECTS) {
-      throw new ValidationError(`Name at most ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects.`);
-    }
     await this.readableProjects({ reach, only: named });
   }
 
@@ -154,6 +150,9 @@ export class LangWatchQLQueryScopeService {
     anchorProjectId: string;
     authorization?: Authorization;
   }): Promise<LangWatchQLQueryScope> {
+    if (dedupeInOrder(projectIds).length > LWQL_MAX_MEMBER_PROJECTS) {
+      throw new ValidationError(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
+    }
     const projects = await this.readableByMember({ userId, projectIds, anchorProjectId });
     const protections: LangWatchQLProtections[] = [];
     // One project at a time, for the same reason `resolve` reads protections one at a time.
@@ -185,38 +184,32 @@ export class LangWatchQLQueryScopeService {
     anchorProjectId: string;
   }): Promise<LangWatchQLCaller[]> {
     const ids = dedupeInOrder(projectIds);
-    if (ids.length > LWQL_MAX_MEMBER_PROJECTS) {
-      throw new ValidationError(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
-    }
     if (ids.length === 0) return [];
     const organizationId = await this.dependencies.projects.findOrganizationId(anchorProjectId);
     if (organizationId === undefined) throw new LangWatchQLProjectNotFoundError();
-    // The organization read and every grant are asked all at once, before any is judged, so the
-    // answer's timing cannot tell a missing project from an unreadable one or place it in the list.
-    const [listed, allowed] = await Promise.all([
-      this.dependencies.projects.listByOrganization({
-        organizationId,
-        page: 1,
-        limit: ids.length,
-        projectIds: [...ids],
-      }),
-      // An authz outage propagates (a 5xx), never a 404: only a denial reads as not found.
-      Promise.all(
-        ids.map((projectId) =>
-          this.dependencies.authz.hasPermission({
-            userId,
-            permission: "analytics:view",
-            projectId,
-          }),
-        ),
-      ),
-    ]);
-    // The read drops archived, governance and foreign-organization projects.
+    // The read drops archived, governance and foreign-organization projects. Whatever the ids,
+    // the same two reads run, in the same order, so timing cannot tell the refusals apart.
+    const listed = await this.dependencies.projects.listByOrganization({
+      organizationId,
+      page: 1,
+      limit: ids.length,
+      projectIds: [...ids],
+    });
     const live = new Map(listed.data.map((project) => [project.id, project]));
+    // One batched decision for the whole list; an authz outage propagates (a 5xx), and only a
+    // denial reads as not found.
+    const decided = await this.dependencies.authz.canBatchByIds({
+      principal: { type: "user", id: userId },
+      permission: "analytics:view",
+      organizationId,
+      teams: [...new Set(listed.data.map(({ teamId }) => teamId))].map((teamId) => ({ teamId })),
+      projects: listed.data.map(({ id, teamId }) => ({ projectId: id, teamId })),
+    });
     const readable: LangWatchQLCaller[] = [];
-    for (const [index, id] of ids.entries()) {
+    for (const id of ids) {
       const project = live.get(id);
-      if (!project || !allowed[index]) throw new LangWatchQLProjectNotFoundError();
+      if (!project || decided.projects.get(id) !== true)
+        throw new LangWatchQLProjectNotFoundError();
       readable.push({ id: project.id, lwqlKey: project.lwqlKey });
     }
 
@@ -280,7 +273,6 @@ export class LangWatchQLQueryScopeService {
       ...(only === undefined ? {} : { projectIds: [...only] }),
     });
     if (listed.pagination.total > listed.data.length) {
-      // A named list is capped before it gets here, so only an unnamed read is over the cap.
       throw new ValidationError(
         `This organization has more than ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects; ` +
           `name the projects instead.`,

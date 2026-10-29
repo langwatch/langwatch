@@ -189,11 +189,11 @@ export class DashboardWidgetService {
     Keyed & {
       queries: readonly DashboardWidgetQuery[];
     }): Promise<void> {
-    // Each query's list is judged on its own: the caps are per run, and a query runs alone.
-    const lists = queries.map((query) => query.projects ?? []).filter((list) => list.length > 0);
-    await Promise.all(
-      lists.map((named) => this.#assertListReadable({ projectId, named, viewer, keyReach })),
-    );
+    // One check over the ids all queries name, once each: the schema already holds each query's
+    // list to the cap, and a repeated id costs one permission read.
+    const named = [...new Set(queries.flatMap((query) => query.projects ?? []))];
+    if (named.length === 0) return;
+    await this.#assertListReadable({ projectId, named, viewer, keyReach });
   }
 
   async #assertListReadable({

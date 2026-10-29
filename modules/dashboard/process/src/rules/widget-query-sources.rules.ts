@@ -39,8 +39,3 @@ export function mergeQuerySources({
     };
   });
 }
-
-/** Every project id the queries name, once each. */
-export function projectsNamedBy(queries: readonly DashboardWidgetQuery[]): string[] {
-  return [...new Set(queries.flatMap((query) => query.projects ?? []))];
-}

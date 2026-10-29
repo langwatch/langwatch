@@ -27,9 +27,9 @@ class PostApiV1QueryBody:
         granularity_seconds (Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset):
         project_id (str | Unset): Reads this one project, which the key must hold analytics:view on. Send projectId or
             projects, not both.
-        projects (list[str] | Literal['all'] | Unset): The projects to read, each one the key holds analytics:view on,
-            or the string "all" for every project the key can read. A key that reaches several projects must name them or
-            send "all"; a key that reads one project defaults to it. When the statement declares
+        projects (list[str] | str | Unset): The projects to read, each one the key holds analytics:view on, or the
+            string "all" for every project the key can read. A key that reaches several projects must name them or send
+            "all"; a key that reads one project defaults to it. When the statement declares
             {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.
         sources (list[PostApiV1QueryBodySourcesItem] | Unset): The trace origins
             {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter
@@ -42,7 +42,7 @@ class PostApiV1QueryBody:
     time_window: PostApiV1QueryBodyTimeWindow | Unset = UNSET
     granularity_seconds: Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset = UNSET
     project_id: str | Unset = UNSET
-    projects: list[str] | Literal["all"] | Unset = UNSET
+    projects: list[str] | str | Unset = UNSET
     sources: list[PostApiV1QueryBodySourcesItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -65,7 +65,7 @@ class PostApiV1QueryBody:
 
         project_id = self.project_id
 
-        projects: list[str] | Literal["all"] | Unset
+        projects: list[str] | str | Unset
         if isinstance(self.projects, Unset):
             projects = UNSET
         elif isinstance(self.projects, list):
@@ -159,18 +159,18 @@ class PostApiV1QueryBody:
 
         project_id = d.pop("projectId", UNSET)
 
-        def _parse_projects(data: object) -> list[str] | Literal["all"] | Unset:
+        def _parse_projects(data: object) -> list[str] | str | Unset:
             if isinstance(data, Unset):
                 return data
-            projects_type_0 = cast(Literal["all"], data)
-            if projects_type_0 != "all":
-                raise ValueError(f"projects_type_0 must match const 'all', got '{projects_type_0}'")
-            return projects_type_0
-            if not isinstance(data, list):
-                raise TypeError()
-            projects_type_1 = cast(list[str], data)
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                projects_type_1 = cast(list[str], data)
 
-            return projects_type_1
+                return projects_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(list[str] | str | Unset, data)
 
         projects = _parse_projects(d.pop("projects", UNSET))
 

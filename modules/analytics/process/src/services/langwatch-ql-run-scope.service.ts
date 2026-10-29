@@ -1,4 +1,6 @@
 import {
+  holdsAllWord,
+  LWQL_ALL_STANDS_ALONE,
   LangWatchQLProjectNotFoundError,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
@@ -52,7 +54,7 @@ export class LangWatchQLRunScopeService {
 
   /**
    * The projects a request names; none when it names none.
-   * @throws {ValidationError} when it names both `projectId` and `projects`.
+   * @throws {ValidationError} when it names both `projectId` and `projects`, or "all" in a list.
    */
   select(request: {
     projectId?: string | undefined;
@@ -60,6 +62,9 @@ export class LangWatchQLRunScopeService {
   }): { named: readonly string[] | undefined; all: boolean } {
     const { named, all, conflict } = selectNamedProjects(request);
     if (conflict) throw new ValidationError("send projectId or projects, not both");
+    if (Array.isArray(request.projects) && holdsAllWord(request.projects)) {
+      throw new ValidationError(LWQL_ALL_STANDS_ALONE);
+    }
 
     return { named, all };
   }

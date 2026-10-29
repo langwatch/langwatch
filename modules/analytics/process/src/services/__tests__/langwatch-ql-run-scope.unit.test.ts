@@ -25,6 +25,15 @@ describe("select", () => {
     );
   });
 
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("refuses the word all in a list, in any case, with its own message", () => {
+    for (const word of ["all", "ALL", " All "]) {
+      expect(() => service.select({ projects: ["B", word] })).toThrow(
+        '"all" stands alone; send it by itself, or list project ids',
+      );
+    }
+  });
+
   it("answers the names, or none", () => {
     expect(service.select({ projects: ["B"] }).named).toEqual(["B"]);
     expect(service.select({}).named).toBeUndefined();

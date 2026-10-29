@@ -67,10 +67,12 @@ Feature: Every query door takes the same parameters and says what it ran with
       When it runs a statement with `projects` set to the string "all", at REST, tRPC, the CLI as `--projects all` or MCP
       Then the statement runs over "A" and "B" only
       And params.dashboard_context_projects is ["A","B"], the tenant set the statement ran over, in id order
+      # Changed in batch 12: the lone word is read in any case and trimmed, so "ALL" alone is "all"
+      # at REST, tRPC, the CLI and MCP; the exact lowercase word is no longer the only one.
       # Changed in batch 11: "all" inside a list was a project id like any other; the CLI already
       # refused it, so the server now refuses it too, in any case, and only the exact word "all"
       # sent by itself asks for every project (the CLI lowercases what a person types).
-      And "all" inside a list is refused with the message that "all" stands alone, and `projectId` with "all" is refused as both named
+      And "all" inside a list is refused with a 422 whose own message says "all" stands alone, and `projectId` with "all" is refused as both named
 
     @unit @integration
     Scenario: QP03g The word all never reaches a project the caller cannot read, or another organization

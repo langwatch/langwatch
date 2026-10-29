@@ -59,7 +59,7 @@ function scopeOver(input: {
 }) {
   const orgOf = (id: string) => input.orgs?.[id] ?? ORGANIZATION_ID;
   const asked: { projectId: string; permission: string }[] = [];
-  const checked: string[] = [];
+  const batches: string[][] = [];
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
@@ -84,9 +84,18 @@ function scopeOver(input: {
         asked.push({ projectId: scope.id, permission });
         return Promise.resolve(input.grants[scope.id]?.includes(permission) === true);
       },
-      hasPermission: ({ permission, projectId }) => {
-        checked.push(projectId ?? "");
-        return Promise.resolve(input.grants[projectId ?? ""]?.includes(permission) === true);
+      canBatchByIds: ({ projects, permission }) => {
+        batches.push(projects.map(({ projectId }) => projectId));
+        return Promise.resolve({
+          teams: new Map(),
+          projects: new Map(
+            projects.map(({ projectId }) => [
+              projectId,
+              input.grants[projectId]?.includes(permission) === true,
+            ]),
+          ),
+          organizationRole: null,
+        });
       },
       getScope: ({ projectId = "" }) =>
         Promise.resolve({
@@ -121,7 +130,7 @@ function scopeOver(input: {
     }),
   });
 
-  return { service, asked, checked };
+  return { service, asked, batches };
 }
 
 describe("given an API key that reaches several projects of its organization", () => {
@@ -766,8 +775,8 @@ describe("given a member's card that names projects", () => {
     expect(body(await ask(["g"]))).toBe(missing);
   });
 
-  it("judges every named project before it refuses, so an early miss costs the same", async () => {
-    const { service, checked } = scopeOver({
+  it("decides every listed project in one batch, so an early miss costs the same", async () => {
+    const { service, batches } = scopeOver({
       projects: [project("a"), project("b")],
       grants: { a: ["analytics:view"], b: ["analytics:view"] },
     });
@@ -780,21 +789,22 @@ describe("given a member's card that names projects", () => {
       }),
     );
 
-    expect(checked.toSorted()).toEqual(["a", "b", "x"]);
+    expect(batches).toHaveLength(1);
+    expect(batches[0]?.toSorted()).toEqual(["a", "b"]);
   });
 
   /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
   it("refuses a list over the member cap with a clear message, before any lookup", async () => {
-    const { service, checked } = scopeOver({ projects: [], grants: {} });
+    const { service, batches } = scopeOver({ projects: [], grants: {} });
     const projectIds = Array.from(
       { length: LWQL_MAX_MEMBER_PROJECTS + 1 },
       (_, index) => `p${index}`,
     );
 
     await expect(
-      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }),
+      service.resolveMemberProjects({ userId: "user-1", anchorProjectId: "a", projectIds }),
     ).rejects.toThrow(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
-    expect(checked).toEqual([]);
+    expect(batches).toEqual([]);
   });
 
   it("lets an authz outage propagate instead of reading it as a missing project", async () => {
@@ -808,7 +818,7 @@ describe("given a member's card that names projects", () => {
             pagination: { page: 1, limit: 1, total: 1 },
           }),
       }),
-      authz: createApiFixture<AuthzApi>({ hasPermission: () => Promise.reject(outage) }),
+      authz: createApiFixture<AuthzApi>({ canBatchByIds: () => Promise.reject(outage) }),
       dataPrivacy: createApiFixture<DataPrivacyApi>({}),
     });
 

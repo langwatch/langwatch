@@ -58,9 +58,13 @@ const QUERY_TAGS = ["Query"];
 const REFERENCE_IS_THE_VOCABULARY_OF_BOTH_LANGUAGES =
   "Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused.";
 
-/** Why the run and schema doors name no route permission. */
+/** Why the run door names no route permission. */
 const THE_KEY_FANS_OUT =
   "Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is refused with `projects_unreadable` (422).";
+
+/** Why the schema door names no route permission. */
+const THE_SCHEMA_KEY_FANS_OUT =
+  "Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is answered with an empty scope rather than a refusal.";
 
 /**
  * How a caller reaches the projects it queries, shared by both doors so they can't describe the
@@ -71,7 +75,7 @@ const HEADER_RULE =
 
 /** The run door's own rule: a key for several projects names the ones to read. */
 const RUN_HEADER_RULE =
-  "A project API key, or any key that can read exactly one project, reads that project and needs none. A key that reaches several must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). A key that reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.";
+  'A project API key, or any key that can read exactly one project, reads that project and needs none. A key that reaches several must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). A key that reads no project is refused with `projects_unreadable` (422) when it names no project or sends "all"; a project it names and cannot read is `project_not_found` (404). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.';
 
 /** How the run door names its projects and sources, and what it answers with. */
 const PROJECT_NARROWING =
@@ -146,7 +150,7 @@ export const queryRest = defineRestRouter(AnalyticsQueryApi)
    * its input.
    */
   .get("/schema", "getApiV1QuerySchema")
-  .withAccess(anyAuthenticated({ reason: THE_KEY_FANS_OUT }))
+  .withAccess(anyAuthenticated({ reason: THE_SCHEMA_KEY_FANS_OUT }))
   .withMiddlewareContext(langWatchQLKeyReach)
   .withOutput(lwqlSchemaSchema)
   .withDocs({

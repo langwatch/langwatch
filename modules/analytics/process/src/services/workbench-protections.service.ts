@@ -49,6 +49,7 @@ export type WorkbenchProtectionsDependencies = Readonly<{
     | "getAccessBreakdown"
     | "hasPermission"
     | "hasApiKeyPermission"
+    | "canBatchByIds"
   >;
   dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject" | "getResolvedForProjects">;
   projects: Pick<ProjectApi, "findById">;

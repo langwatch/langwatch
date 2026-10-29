@@ -122,7 +122,7 @@ def sync_detailed(
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
-    """Run a LangWatchQL query
+    r"""Run a LangWatchQL query
 
      Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
     execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
@@ -144,8 +144,9 @@ def sync_detailed(
     A project API key, or any key that can read exactly one project, reads that project and needs none.
     A key that reaches several must name the projects to read in `projects`, each one it can read
     `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
-    reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than
-    one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+    reads no project is refused with `projects_unreadable` (422) when it names no project or sends
+    \"all\"; a project it names and cannot read is `project_not_found` (404). Rows from more than one
+    project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -203,7 +204,7 @@ def sync(
     | PostApiV1QueryResponse500
     | None
 ):
-    """Run a LangWatchQL query
+    r"""Run a LangWatchQL query
 
      Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
     execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
@@ -225,8 +226,9 @@ def sync(
     A project API key, or any key that can read exactly one project, reads that project and needs none.
     A key that reaches several must name the projects to read in `projects`, each one it can read
     `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
-    reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than
-    one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+    reads no project is refused with `projects_unreadable` (422) when it names no project or sends
+    \"all\"; a project it names and cannot read is `project_not_found` (404). Rows from more than one
+    project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -278,7 +280,7 @@ async def asyncio_detailed(
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
-    """Run a LangWatchQL query
+    r"""Run a LangWatchQL query
 
      Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
     execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
@@ -300,8 +302,9 @@ async def asyncio_detailed(
     A project API key, or any key that can read exactly one project, reads that project and needs none.
     A key that reaches several must name the projects to read in `projects`, each one it can read
     `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
-    reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than
-    one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+    reads no project is refused with `projects_unreadable` (422) when it names no project or sends
+    \"all\"; a project it names and cannot read is `project_not_found` (404). Rows from more than one
+    project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -357,7 +360,7 @@ async def asyncio(
     | PostApiV1QueryResponse500
     | None
 ):
-    """Run a LangWatchQL query
+    r"""Run a LangWatchQL query
 
      Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
     execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
@@ -379,8 +382,9 @@ async def asyncio(
     A project API key, or any key that can read exactly one project, reads that project and needs none.
     A key that reaches several must name the projects to read in `projects`, each one it can read
     `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
-    reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than
-    one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+    reads no project is refused with `projects_unreadable` (422) when it names no project or sends
+    \"all\"; a project it names and cannot read is `project_not_found` (404). Rows from more than one
+    project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of

@@ -28,7 +28,11 @@ import {
   triggerActionSchema,
   validateActionParamsForAction,
 } from "./schemas/triggers.ts";
-import { widgetProjectsInput, widgetSourcesInput } from "./schemas/widget-sources.ts";
+import {
+  runQueryProjectsInput,
+  widgetProjectsInput,
+  widgetSourcesInput,
+} from "./schemas/widget-sources.ts";
 import { handleExperimentResults } from "./tools/get-experiment-results.ts";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.ts";
 import { handleExperimentList } from "./tools/list-experiments.ts";
@@ -248,8 +252,7 @@ function registerObservabilityTools(server: McpServer): void {
         .describe(
           'Values for the parameters the statement declares, e.g. {"days": 7} for {days:UInt32}',
         ),
-      projects: z
-        .union([z.literal("all"), z.array(z.string().min(1)).min(1)])
+      projects: runQueryProjectsInput
         .optional()
         .describe(
           'The project ids to read, or the string "all" for every project the key can read (params.dashboard_context_projects lists them). A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it',

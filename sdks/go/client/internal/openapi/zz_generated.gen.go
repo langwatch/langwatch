@@ -24255,21 +24255,6 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds4) Valid() bool {
 	}
 }
 
-// Defines values for PostApiV1QueryJSONBodyProjects0.
-const (
-	PostApiV1QueryJSONBodyProjects0All PostApiV1QueryJSONBodyProjects0 = "all"
-)
-
-// Valid indicates whether the value is a known member of the PostApiV1QueryJSONBodyProjects0 enum.
-func (e PostApiV1QueryJSONBodyProjects0) Valid() bool {
-	switch e {
-	case PostApiV1QueryJSONBodyProjects0All:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for PostApiV1QueryJSONBodySources.
 const (
 	PostApiV1QueryJSONBodySourcesAiTool      PostApiV1QueryJSONBodySources = "ai_tool"
@@ -30803,13 +30788,13 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyKind) Valid() bool {
 
 // Defines values for PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode.
 const (
-	All PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode = "all"
+	PostApiSuitesByIdDuplicate201JSONResponseBodyScope0ModeAll PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode = "all"
 )
 
 // Valid indicates whether the value is a known member of the PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode enum.
 func (e PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode) Valid() bool {
 	switch e {
-	case All:
+	case PostApiSuitesByIdDuplicate201JSONResponseBodyScope0ModeAll:
 		return true
 	default:
 		return false
@@ -48026,7 +48011,7 @@ type PostApiV1QueryJSONBody_Parameters_AdditionalProperties struct {
 }
 
 // PostApiV1QueryJSONBodyProjects0 defines parameters for PostApiV1Query.
-type PostApiV1QueryJSONBodyProjects0 string
+type PostApiV1QueryJSONBodyProjects0 = string
 
 // PostApiV1QueryJSONBodyProjects1 defines parameters for PostApiV1Query.
 type PostApiV1QueryJSONBodyProjects1 = []string

@@ -186,19 +186,24 @@ function listRefusalOr(issue: {
 /** The word that asks for every project the caller can read, sent as the string, not in a list. */
 export const LWQL_ALL_PROJECTS = "all";
 
-/** A run's list never holds the word: it asks for every project alone, in any case. */
-const ALL_STANDS_ALONE = '"all" stands alone; send it by itself, or list project ids';
-const holdsNoAllWord = (ids: readonly string[]) =>
-  !ids.some((id) => id.trim().toLowerCase() === LWQL_ALL_PROJECTS);
+/** The refusal of a list holding the word; raised by the run, so it is the answer's own message. */
+export const LWQL_ALL_STANDS_ALONE = '"all" stands alone; send it by itself, or list project ids';
+
+/** Whether a list holds the word that asks for every project, which must be sent alone. */
+export function holdsAllWord(ids: readonly string[]): boolean {
+  return ids.some((id) => id.trim().toLowerCase() === LWQL_ALL_PROJECTS);
+}
+
+/** The lone word, in any case and with spaces around it, read as the one literal "all". */
+const allWordSchema = z
+  .string()
+  .refine((word) => word.trim().toLowerCase() === LWQL_ALL_PROJECTS)
+  .transform(() => LWQL_ALL_PROJECTS as typeof LWQL_ALL_PROJECTS);
 
 /** What a run's `projects` holds for a key: the ids to read, or "all" of those it can read. */
-const lwqlProjectsRequestSchemaDefinition = z.union(
-  [
-    z.literal(LWQL_ALL_PROJECTS),
-    lwqlProjectsSchemaDefinition.refine(holdsNoAllWord, { message: ALL_STANDS_ALONE }),
-  ],
-  { error: listRefusalOr },
-);
+const lwqlProjectsRequestSchemaDefinition = z.union([allWordSchema, lwqlProjectsSchemaDefinition], {
+  error: listRefusalOr,
+});
 export interface LwqlProjectsRequestSchema extends Named<
   typeof lwqlProjectsRequestSchemaDefinition
 > {}
@@ -207,10 +212,7 @@ export const lwqlProjectsRequestSchema: LwqlProjectsRequestSchema =
 
 /** The same for a signed-in member, whose list holds at most {@link LWQL_MAX_MEMBER_PROJECTS}. */
 const lwqlMemberProjectsRequestSchemaDefinition = z.union(
-  [
-    z.literal(LWQL_ALL_PROJECTS),
-    lwqlMemberProjectsSchemaDefinition.refine(holdsNoAllWord, { message: ALL_STANDS_ALONE }),
-  ],
+  [allWordSchema, lwqlMemberProjectsSchemaDefinition],
   { error: listRefusalOr },
 );
 export interface LwqlMemberProjectsRequestSchema extends Named<

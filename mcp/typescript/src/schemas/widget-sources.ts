@@ -52,3 +52,9 @@ export const widgetProjectsInput = z
   .describe(
     "The project ids every query of the widget reads, each one you can read. A new widget reads its board's project. null makes it unset again, reading the board's project.",
   );
+
+/** run_query's `projects`: project ids, or the lone word "all" in any case. */
+export const runQueryProjectsInput = z.union([
+  z.string().refine((word) => word.trim().toLowerCase() === "all"),
+  z.array(z.string().min(1)).min(1),
+]);

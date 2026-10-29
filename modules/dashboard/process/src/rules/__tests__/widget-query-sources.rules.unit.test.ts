@@ -4,11 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  mergeQuerySources,
-  projectsNamedBy,
-  withNewQuerySources,
-} from "../widget-query-sources.rules.ts";
+import { mergeQuerySources, withNewQuerySources } from "../widget-query-sources.rules.ts";
 
 const QUERY = { name: "main", sql: "SELECT 1" };
 
@@ -87,15 +83,5 @@ describe("a query's projects", () => {
   it("stores no projects on a query that had none", () => {
     expect(mergeQuerySources({ sent: [QUERY], stored: [QUERY] })).toEqual([QUERY]);
     expect(withNewQuerySources([QUERY])).toEqual([{ ...QUERY, sources: ["application"] }]);
-  });
-
-  it("names each project once across the queries", () => {
-    expect(
-      projectsNamedBy([
-        { ...QUERY, projects: ["B", "A"] },
-        { ...QUERY, name: "two", projects: ["A", "C"] },
-        { ...QUERY, name: "three" },
-      ]),
-    ).toEqual(["B", "A", "C"]);
   });
 });

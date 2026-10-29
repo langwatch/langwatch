@@ -279,8 +279,34 @@ describe("given a query's projects", () => {
     expect(asked).toEqual([["P1", "P2"]]);
   });
 
+  /** @scenario "AC210e Compatibility: a project key cannot change the SQL of a widget whose stored query names other projects" */
+  it("refuses a project key's SQL edit when the stored query names another project", async () => {
+    const { service } = setUp();
+    const created = await service.createWidget({
+      ...scope,
+      viewer: { userId: "user-1" },
+      input: {
+        name: "Stored",
+        code: CODE,
+        queries: [{ ...QUERY, projects: ["project-1", "project-2"] }],
+      },
+    });
+
+    const refusal = await service
+      .updateWidget({
+        ...scope,
+        id: created.id,
+        input: { queries: [{ ...QUERY, sql: "SELECT 2" }] },
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    const stored = await service.getById({ ...scope, id: created.id });
+    expect(stored.definition.queries[0]?.projects).toEqual(["project-1", "project-2"]);
+  });
+
   /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
-  it("holds the cap per query: two queries of 60 distinct projects are each within it", async () => {
+  it("checks the projects of all queries in one call, each query being within the cap", async () => {
     const asked: number[] = [];
     const analytics = createDashboardTestAnalytics({
       assertProjectsReadable: async ({ projectIds }) => void asked.push(projectIds.length),
@@ -301,7 +327,7 @@ describe("given a query's projects", () => {
       },
     });
 
-    expect(asked).toEqual([60, 60]);
+    expect(asked).toEqual([120]);
   });
 
   /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
