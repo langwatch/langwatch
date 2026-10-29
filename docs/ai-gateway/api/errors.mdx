@@ -116,7 +116,7 @@ When only the status and the message are available, the gateway writes the same 
 
 Once the stream is open the status is already `200`, so a failure arrives as a terminal `event: error` frame and the stream ends:
 
-```
+```text
 event: error
 data: {"type":"error","error":{"type":"provider_error","message":"upstream connection reset"}}
 

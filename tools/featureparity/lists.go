@@ -70,6 +70,7 @@ var (
 		"tools/suiteweights",
 		"tools/matrixseed",
 		"cmd/linkcheck",
+		"tools/docscheck",
 		"cmd/service",
 		"tools/upgradelab",
 		"services/sims/telemetrysim",

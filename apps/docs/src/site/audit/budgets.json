@@ -1,0 +1,184 @@
+{
+  "$comment": "Docs audit budgets (specs/audit.feature), run against a /docs build. Scores are 0..1; bytes are transferred bytes, with room for the Latin-ext font a page may fetch late. Accessibility, best practices and SEO hold at 100; performance floors leave room for GitHub's ubuntu-latest runners (median of 3), which score 5 to 10 points below a laptop. A page override below a default names why, so a later round can raise it. knownFailures and seo.known only shrink: a new failure fails the run. agentReadiness.known shrinks the same way (specs/agent-readiness.feature); pageTokens counts characters / 4.",
+  "categories": {
+    "mobile": {
+      "performance": 0.9,
+      "accessibility": 1,
+      "best-practices": 1,
+      "seo": 1
+    },
+    "desktop": {
+      "performance": 0.95,
+      "accessibility": 1,
+      "best-practices": 1,
+      "seo": 1
+    }
+  },
+  "maxCumulativeLayoutShift": 0.02,
+  "maxTransferBytes": 450000,
+  "maxRequests": 25,
+  "gatedAuditCategories": ["accessibility", "best-practices", "seo"],
+  "pages": [
+    {
+      "id": "home",
+      "path": "/",
+      "why": "The docs home and most common landing page.",
+      "categories": {},
+      "knownFailures": {}
+    },
+    {
+      "id": "guide",
+      "path": "/integration/quick-start",
+      "why": "A guide with code blocks and tabs.",
+      "categories": {},
+      "knownFailures": {}
+    },
+    {
+      "id": "long-page",
+      "path": "/features/webhooks",
+      "why": "A long page with a diagram and images.",
+      "categories": {},
+      "maxTransferBytes": 440000,
+      "knownFailures": {}
+    },
+    {
+      "id": "api-operation",
+      "path": "/api-reference/traces/get-trace",
+      "why": "An API reference operation with its playground.",
+      "categories": {},
+      "maxTransferBytes": 370000,
+      "knownFailures": {}
+    },
+    {
+      "id": "section-index",
+      "path": "/ai-governance/ingestion-sources",
+      "why": "A section index page, published at the section address.",
+      "categories": {},
+      "maxTransferBytes": 350000,
+      "knownFailures": {}
+    },
+    {
+      "id": "changelog",
+      "path": "/changelog",
+      "why": "The changelog: the newest releases injected at build time, a long page of short entries.",
+      "categories": {},
+      "knownFailures": {}
+    },
+    {
+      "id": "skills",
+      "path": "/skills/directory",
+      "why": "A skills page with prompt cards whose bodies load as fragments.",
+      "categories": {},
+      "knownFailures": {}
+    },
+    {
+      "id": "not-found",
+      "path": "/404.html",
+      "why": "The not-found page every broken link lands on; served as a file so Lighthouse loads it.",
+      "categories": {
+        "mobile": {
+          "seo": 0.5
+        },
+        "desktop": {
+          "seo": 0.5
+        }
+      },
+      "knownFailures": {
+        "is-crawlable": "Deliberate: the not-found page is noindex.",
+        "meta-description": "The not-found page has no description; it is never indexed."
+      }
+    }
+  ],
+  "seo": {
+    "title": {
+      "min": 10,
+      "max": 70
+    },
+    "description": {
+      "min": 50,
+      "max": 160
+    },
+    "known": {}
+  },
+  "agentReadiness": {
+    "pageTokens": 8000,
+    "integration": {
+      "groups": [
+        {
+          "anchor": "Observability",
+          "group": "Frameworks"
+        },
+        {
+          "anchor": "Observability",
+          "group": "Model Providers"
+        },
+        {
+          "anchor": "Observability",
+          "group": "Tools"
+        },
+        {
+          "anchor": "Observability",
+          "group": "No-Code Platforms"
+        },
+        {
+          "anchor": "Observability",
+          "group": "Direct Integrations"
+        },
+        {
+          "anchor": "AI Gateway",
+          "group": "SDK Integration"
+        }
+      ],
+      "pages": [
+        "integration/quick-start",
+        "integration/python/guide",
+        "integration/typescript/guide",
+        "integration/go/guide"
+      ],
+      "exclude": [
+        "ai-gateway/sdks/http",
+        "dspy-visualization/custom-optimizer",
+        "dspy-visualization/rag-visualization",
+        "integration/custom-models",
+        "integration/flowise",
+        "integration/openclaw",
+        "integration/openrouter-broadcast"
+      ]
+    },
+    "crawlers": [
+      "GPTBot",
+      "OAI-SearchBot",
+      "ChatGPT-User",
+      "ClaudeBot",
+      "Claude-User",
+      "Claude-SearchBot",
+      "PerplexityBot",
+      "Google-Extended",
+      "CCBot"
+    ],
+    "known": {
+      "code-missing-import": [
+        "/integration/go/reference",
+        "/prompt-management/features/advanced/a-b-testing",
+        "/prompt-management/features/essential/runtime-parameters",
+        "/prompt-management/features/essential/tags",
+        "/prompt-management/features/essential/version-control"
+      ],
+      "tokens-over-budget": [
+        "/agent-testing/connect-your-agent",
+        "/api-reference/agents/create-agents",
+        "/api-reference/query/discover-both-query-languages",
+        "/api-reference/query/overview",
+        "/api-reference/scenario-events/create-scenario-events",
+        "/api-reference/triggers/create-triggers",
+        "/evaluations/experiments/sdk",
+        "/features/webhooks",
+        "/integration/cli",
+        "/integration/python/reference",
+        "/integration/typescript/reference",
+        "/self-hosting/configuration/environment-variables",
+        "/self-hosting/upgrade"
+      ]
+    }
+  }
+}

@@ -8,13 +8,13 @@ import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
 LangWatch organizes what your LLM application sends into threads, traces and spans, each with its own ID. The optional `user_id`, `customer_id` and `labels` fields add correlation and filtering on top of them. The examples below come from an AI travel assistant and a text generation service.
 
-### Threads: The Whole Conversation
+## Threads: The Whole Conversation
 
 Field: `thread_id`
 
 Think of a **Thread** as the entire journey a user takes in a single session. It's the complete chat with your AI travel buddy, from "Where should I go?" to booking the flight. For the blog post generator, a `thread_id` bundles up the whole session, from brainstorming headlines to polishing the final SEO-optimized draft. It groups _all_ the back-and-forth interactions (Traces) for a specific task or conversation.
 
-### Traces: One Task, End-to-End
+## Traces: One Task, End-to-End
 
 Field: `trace_id`
 
@@ -30,7 +30,7 @@ Zooming in from Threads, a **Trace** represents a single, complete task performe
 
 Each `trace_id` captures an entire end-to-end generation, no matter how many internal steps (Spans) it takes.
 
-### Spans: The Building Blocks
+## Spans: The Building Blocks
 
 Field: `span_id`
 
@@ -46,19 +46,19 @@ Now, let's get granular! **Spans** are the individual steps or operations _withi
 
 Each `span_id` pinpoints a specific action taken by your system or an LLM call.
 
-### User ID: Who's Using the App?
+## User ID: Who's Using the App?
 
 Field: `user_id`
 
 Simple but crucial: The **User ID** identifies the actual end-user interacting with your product. Whether they're planning trips or writing posts, this `user_id` (usually their account ID in your system) links the activity back to a real person, helping you see how different users experience your AI features.
 
-### Customer ID: For Platform Builders
+## Customer ID: For Platform Builders
 
 Field: `customer_id`
 
 Are you building a platform _for other companies_ to create _their own_ LLM apps? That is what the **Customer ID** is for. If you're providing the tools for others (your customers) to build AI assistants for _their_ users, the `customer_id` lets you (and them!) track usage and performance per customer account. Scoping analytics by `customer_id` is what lets you give each customer a dashboard of how _their_ AI implementation is doing.
 
-### Labels: Organizing and Filtering Traces
+## Labels: Organizing and Filtering Traces
 
 Field: `labels`
 

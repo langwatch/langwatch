@@ -298,6 +298,23 @@ jobs:
               - '*/go.sum'
               - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
+            langwatch-docs:
+              - 'infra/docker/Dockerfile.docs'
+              - 'docs/**'
+              - 'apps/docs/**'
+              - 'packages/**'
+              - 'skills/**'
+              - 'patches/**'
+              - 'vendor/**'
+              - 'CHANGELOG.md'
+              - '.gitattributes'
+              - 'tsconfig.*.json'
+              - '.dockerignore'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
+              - '.github/workflows/publish-docker-ecr.yml'
 
       - name: Select the images to build
         id: select
@@ -307,6 +324,7 @@ jobs:
           LANGWATCH_NLP_SERVICE: ${{ steps.filter.outputs.langwatch-nlp-service }}
           LANGWATCH_LANGEVALS: ${{ steps.filter.outputs.langwatch-langevals }}
           LANGWATCH_GATEWAY: ${{ steps.filter.outputs.langwatch-gateway }}
+          LANGWATCH_DOCS: ${{ steps.filter.outputs.langwatch-docs }}
           LANGWATCH_NLP_LAMBDA: ${{ steps.filter.outputs.langwatch-nlp-lambda }}
           LANGWATCH_LANGY_AGENT: ${{ steps.filter.outputs.langwatch-langy-agent }}
           LANGWATCH_EVAL: ${{ steps.filter.outputs.langwatch-eval }}
@@ -322,12 +340,16 @@ jobs:
           # Runner labels mirror publish-docker-app.yml: the app's build needs
           # the 32GB larger runner for the pnpm/vite bundle, everything else
           # fits on the standard hosted arm runner.
+          #
+          # langwatch-docs (static files under /site, not meant to run) takes the
+          # same service shape, so the re-tag fallback in create-manifest holds for it.
           ALL=$(cat <<'JSON'
           [
             {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"arm64-runner-32gb"},
             {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
+            {"image":"langwatch-docs",        "dockerfile":"infra/docker/Dockerfile.docs",         "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langy-agent", "dockerfile":"infra/docker/Dockerfile.langyagent",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
           ]
           JSON
@@ -356,6 +378,7 @@ jobs:
               --arg nlp "${LANGWATCH_NLP_SERVICE}" \
               --arg evals "${LANGWATCH_LANGEVALS}" \
               --arg gateway "${LANGWATCH_GATEWAY}" \
+              --arg docs "${LANGWATCH_DOCS}" \
               --arg nlplambda "${LANGWATCH_NLP_LAMBDA}" \
               --arg langy "${LANGWATCH_LANGY_AGENT}" \
               --arg eval "${LANGWATCH_EVAL}" \
@@ -364,6 +387,7 @@ jobs:
                  "langwatch-nlp-service": $nlp,
                  "langwatch-langevals": $evals,
                  "langwatch-gateway": $gateway,
+                 "langwatch-docs": $docs,
                  "langwatch-langy-agent": $langy,
                  "langwatch-nlp-lambda": $nlplambda}
                 | to_entries[] | select(.value == "true") | .key]
@@ -408,6 +432,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
+          # The docs image dates its sitemap from git history and refuses a shallow clone.
+          fetch-depth: ${{ matrix.image == 'langwatch-docs' && '0' || '1' }}
 
       # No teardown: the runner is discarded after the job, and `docker buildx
       # rm` on a builder holding the app's layers took 79s of every app run.
@@ -857,7 +883,7 @@ jobs:
           }
 
           FAILED=()
-          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-langy-agent \
+          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-docs langwatch-langy-agent \
               langwatch-nlp-lambda langwatch-eval-azure langwatch-eval-langevals langwatch-eval-lingua \
               langwatch-eval-openai langwatch-eval-presidio langwatch-eval-ragas langwatch-eval-topic_clustering; do
             echo "::group::${IMAGE}"

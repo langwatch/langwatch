@@ -32,6 +32,7 @@ describe("given a process whose installed modules bind no API door", () => {
         trustCloudflare: false,
         executionProxyBaseUrl: void 0,
         publicBaseUrl: void 0,
+        docsOrigins: [],
         production: false,
         selection: TransportSelection.create().rest().browserBundle(false),
         sockets: WebSocketHost.create(),

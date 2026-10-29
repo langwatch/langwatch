@@ -1,5 +1,6 @@
 import type { RawHttpHost, TransportPeers, WebSocketHost } from "@langwatch/api";
 import type { TransportSelection } from "@langwatch/api/hosting";
+import { registeredDocsOrigins } from "@langwatch/config";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import type { ScopedSecrets } from "@langwatch/secrets";
 
@@ -51,6 +52,7 @@ export async function processSurface({
     trustCloudflare: cloudflareTrustOf(config),
     executionProxyBaseUrl,
     publicBaseUrl,
+    docsOrigins: registeredDocsOrigins({ configured: config.docsOrigins, isSaas, publicBaseUrl }),
     production,
     selection,
     sockets,

@@ -14649,6 +14649,21 @@ func (e GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType)
 	}
 }
 
+// Defines values for RevokeDocsSession200JSONResponseBodyRevoked.
+const (
+	RevokeDocsSession200JSONResponseBodyRevokedTrue RevokeDocsSession200JSONResponseBodyRevoked = true
+)
+
+// Valid indicates whether the value is a known member of the RevokeDocsSession200JSONResponseBodyRevoked enum.
+func (e RevokeDocsSession200JSONResponseBodyRevoked) Valid() bool {
+	switch e {
+	case RevokeDocsSession200JSONResponseBodyRevokedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiEvaluationsBatchLogResultsJSONBodyEvaluationsStatus0.
 const (
 	PostApiEvaluationsBatchLogResultsJSONBodyEvaluationsStatus0Processed PostApiEvaluationsBatchLogResultsJSONBodyEvaluationsStatus0 = "processed"
@@ -34034,13 +34049,13 @@ func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0Operator) Valid()
 
 // Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0.
 const (
-	N1 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 = 1
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0N1 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 = 1
 )
 
 // Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 enum.
 func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0) Valid() bool {
 	switch e {
-	case N1:
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0N1:
 		return true
 	default:
 		return false
@@ -43822,6 +43837,9 @@ type PatchApiDatasetBySlugOrIdRecordsByRecordIdJSONBody struct {
 type PostApiDatasetBySlugOrIdUploadMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
+
+// RevokeDocsSession200JSONResponseBodyRevoked defines parameters for RevokeDocsSession.
+type RevokeDocsSession200JSONResponseBodyRevoked bool
 
 // PostApiDspyLogStepsJSONBody defines parameters for PostApiDspyLogSteps.
 type PostApiDspyLogStepsJSONBody = []struct {
@@ -116873,6 +116891,9 @@ type ClientInterface interface {
 	// PostApiDatasetBySlugOrIdUploadWithBody request with any body
 	PostApiDatasetBySlugOrIdUploadWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RevokeDocsSession request
+	RevokeDocsSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiDspyLogStepsWithBody request with any body
 	PostApiDspyLogStepsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -120432,6 +120453,18 @@ func (c *Client) PatchApiDatasetBySlugOrIdRecordsByRecordId(ctx context.Context,
 
 func (c *Client) PostApiDatasetBySlugOrIdUploadWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiDatasetBySlugOrIdUploadRequestWithBody(c.Server, slugOrId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RevokeDocsSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeDocsSessionRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -131688,6 +131721,33 @@ func NewPostApiDatasetBySlugOrIdUploadRequestWithBody(server string, slugOrId st
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeDocsSessionRequest generates requests for RevokeDocsSession
+func NewRevokeDocsSessionRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/docs-session")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -143497,6 +143557,9 @@ type ClientWithResponsesInterface interface {
 
 	// PostApiDatasetBySlugOrIdUploadWithBodyWithResponse request with any body
 	PostApiDatasetBySlugOrIdUploadWithBodyWithResponse(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdUploadResponse, error)
+
+	// RevokeDocsSessionWithResponse request
+	RevokeDocsSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RevokeDocsSessionResponse, error)
 
 	// PostApiDspyLogStepsWithBodyWithResponse request with any body
 	PostApiDspyLogStepsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDspyLogStepsResponse, error)
@@ -155567,6 +155630,38 @@ func (r PostApiDatasetBySlugOrIdUploadResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PostApiDatasetBySlugOrIdUploadResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RevokeDocsSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Revoked RevokeDocsSession200JSONResponseBodyRevoked `json:"revoked"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeDocsSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeDocsSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeDocsSessionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -172301,6 +172396,15 @@ func (c *ClientWithResponses) PostApiDatasetBySlugOrIdUploadWithBodyWithResponse
 	return ParsePostApiDatasetBySlugOrIdUploadResponse(rsp)
 }
 
+// RevokeDocsSessionWithResponse request returning *RevokeDocsSessionResponse
+func (c *ClientWithResponses) RevokeDocsSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RevokeDocsSessionResponse, error) {
+	rsp, err := c.RevokeDocsSession(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeDocsSessionResponse(rsp)
+}
+
 // PostApiDspyLogStepsWithBodyWithResponse request with arbitrary body returning *PostApiDspyLogStepsResponse
 func (c *ClientWithResponses) PostApiDspyLogStepsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDspyLogStepsResponse, error) {
 	rsp, err := c.PostApiDspyLogStepsWithBody(ctx, contentType, body, reqEditors...)
@@ -187915,6 +188019,34 @@ func ParsePostApiDatasetBySlugOrIdUploadResponse(rsp *http.Response) (*PostApiDa
 		var dest struct {
 			DatasetId      string `json:"datasetId"`
 			RecordsCreated int    `json:"recordsCreated"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRevokeDocsSessionResponse parses an HTTP response from a RevokeDocsSessionWithResponse call
+func ParseRevokeDocsSessionResponse(rsp *http.Response) (*RevokeDocsSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeDocsSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Revoked RevokeDocsSession200JSONResponseBodyRevoked `json:"revoked"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

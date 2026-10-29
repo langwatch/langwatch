@@ -35,7 +35,7 @@ You can score an output in three ways:
 | **Custom Scoring** | N/A - you send the score directly | Proprietary logic, domain-specific metrics |
 
 <Accordion title="Decision flowchart">
-```
+```text
 Do you have your own evaluation logic?
 ├─ Yes → Use Custom Scoring
 └─ No → Do you want to configure via UI and reuse?
@@ -48,7 +48,7 @@ Do you have your own evaluation logic?
 
 An evaluator takes inputs (like the user question, LLM response, and optionally context or expected output) and returns a score indicating quality along some dimension.
 
-```
+```text
 Input + Output + Context → Evaluator → Score
                                         ↓
                               passed: true/false
@@ -129,6 +129,8 @@ langwatch.get_current_span().add_evaluation(
 Run evaluators on each row of your test dataset for batch evaluation:
 
 ```python
+import langwatch
+
 experiment = langwatch.experiment.init("my-experiment")
 
 for idx, row in experiment.loop(df.iterrows()):
@@ -163,6 +165,8 @@ Run evaluators automatically on production traces:
 Use evaluators to block harmful content in real-time:
 
 ```python
+import langwatch
+
 guardrail = langwatch.evaluation.evaluate(
     "azure/jailbreak",
     name="Jailbreak Detection",
@@ -197,6 +201,8 @@ Check each evaluator's documentation for required and optional inputs.
 </Warning>
 
 ```python
+import langwatch
+
 # Good - descriptive name
 langwatch.evaluation.evaluate(
     "langevals/llm_category",
