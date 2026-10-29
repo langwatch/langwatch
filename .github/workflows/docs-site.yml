@@ -291,6 +291,13 @@ jobs:
           echo "DOCS_HAVEN_BINARY=$RUNNER_TEMP/haven" >> "$GITHUB_ENV"
       - name: ${{ matrix.name }}
         run: pnpm --filter @langwatch/docs-site ${{ matrix.script }}
+      - name: Upload the layout screenshots
+        if: failure() && matrix.check == 'layout'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-layout-shots
+          path: apps/docs/layout-shots
+          retention-days: 7
 
   # Lighthouse on representative pages against budgets, one device per runner
   # so the two never share a CPU; static search and agent checks run once.

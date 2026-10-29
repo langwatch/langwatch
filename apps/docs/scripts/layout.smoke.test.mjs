@@ -139,7 +139,14 @@ await it("uses one document scroll and keeps the footer below both article and n
           return header.top >= 0 && title && title.top >= header.bottom && title.top < 300;
         });
         const box = await link.boundingBox();
-        assert.ok(box && box.y >= 0 && box.y + box.height <= 800);
+        if (!(box && box.y >= 0 && box.y + box.height <= 800)) {
+          await capture({ page, name: "rail-link-after-swap", width: 1440, mode: "light" });
+          const rail = await page.evaluate(() => {
+            const root = document.querySelector(".docs-left-rail");
+            return { scrollTop: root?.scrollTop, height: root?.clientHeight, pageY: scrollY };
+          });
+          assert.fail(`the clicked rail link left the viewport: ${JSON.stringify({ box, rail })}`);
+        }
       } finally {
         await context.close();
       }
