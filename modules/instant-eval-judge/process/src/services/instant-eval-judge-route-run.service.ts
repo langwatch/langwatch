@@ -86,11 +86,6 @@ export class InstantEvalJudgeRouteRunService {
     return new InstantEvalJudgeRouteRunService(input);
   }
 
-  /** One kind's judgement from its own first send. */
-  judge(questions: readonly InstantEvalQuestion[]): Promise<InstantEvalJudgement> {
-    return this.judgeFrom({ questions, first: this.firstLeg(questions) });
-  }
-
   /**
    * One kind's judgement from a first send, its own or one shared with other kinds. A caller's
    * stop after paid legs carries their spend, so the stopped batch still bills it; any other throw

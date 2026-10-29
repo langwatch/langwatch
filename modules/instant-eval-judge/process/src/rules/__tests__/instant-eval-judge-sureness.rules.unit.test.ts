@@ -129,11 +129,10 @@ describe("the slot of a score or category question", () => {
     });
 
   /** @scenario "A score or category question takes its kind's slot, else the kind's default" */
-  it("takes the job's slot the kind names, else the kind's default, with the kind's rule", () => {
+  it("takes the job's slot the kind names, else the kind's default", () => {
     const long = plan(POLITE, { job: "search", tokens: 9000 });
     expect(long).toMatchObject({
       kind: "score",
-      sureness: "spread",
       slot: "long",
       primary: "llm-b",
     });
@@ -146,7 +145,6 @@ describe("the slot of a score or category question", () => {
     });
     const paired = plan(TOPIC, { job: "llm_judge", tokens: 100 });
     expect(paired).toMatchObject({
-      sureness: "margin",
       slot: "short",
       mode: "instant",
       pairWith: "decision-b",

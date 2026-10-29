@@ -23,7 +23,6 @@ import {
   type InstantEvalQuestion,
   type InstantEvalQuestionKind,
   type InstantEvalSkipReason,
-  type InstantEvalJudgeSurenessRule,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 
@@ -34,8 +33,6 @@ export interface InstantEvalJudgeRoutePlan {
   readonly job: InstantEvalJudgeJob;
   /** The kind every question of the plan asks; one plan never mixes kinds. */
   readonly kind: InstantEvalQuestionKind;
-  /** How a score or category answer's sureness is read; yes or no is always |2p - 1|. */
-  readonly sureness?: InstantEvalJudgeSurenessRule;
   readonly modeRequested: InstantEvalJudgeMode;
   readonly mode: InstantEvalJudgeMode;
   readonly bucket: string;
@@ -155,7 +152,7 @@ function planForView({
       ? INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT
       : bucket;
   const modeRequested = route.mode ?? table.defaultMode[route.job];
-  const { slot, routeSlot, sureness } = routeSlotOf({
+  const { slot, routeSlot } = routeSlotOf({
     table,
     job: route.job,
     kind,
@@ -166,7 +163,6 @@ function planForView({
   return {
     job: route.job,
     kind,
-    ...(sureness ? { sureness } : {}),
     modeRequested,
     mode,
     bucket,
@@ -220,7 +216,6 @@ function routeSlotOf({
 }): {
   slot: string;
   routeSlot: InstantEvalJudgeRouteSlot;
-  sureness?: InstantEvalJudgeSurenessRule;
 } {
   if (kind === "boolean") {
     const routeSlot = table.routes[job][wanted];
@@ -230,12 +225,11 @@ function routeSlotOf({
   const routing = table.kinds[kind];
   if (!routing) throw new Error(`the route table does not route ${kind} questions`);
   const routes = routing.routes[job] ?? {};
-  const { sureness } = routing;
   for (const key of [wanted, bucket]) {
     const routeSlot = routes[key];
-    if (routeSlot) return { slot: key, routeSlot, sureness };
+    if (routeSlot) return { slot: key, routeSlot };
   }
-  return { slot: "default", routeSlot: routing.default, sureness };
+  return { slot: "default", routeSlot: routing.default };
 }
 
 function bucketOf({ tokens, table }: { tokens: number; table: InstantEvalJudgeRouteTable }) {
