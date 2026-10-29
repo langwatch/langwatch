@@ -105,9 +105,11 @@ export function DocsShell({
       position="relative"
       isolation="isolate"
       css={{
-        "--docs-header-h": `calc(${HEADER_HEIGHT.base} + var(--docs-banners-h))`,
+        // The header's 1px bottom border sits under its height; leave it out and a full rail
+        // overruns the viewport by a pixel, clipping its last link.
+        "--docs-header-h": `calc(${HEADER_HEIGHT.base} + 1px + var(--docs-banners-h))`,
         "@media (min-width: 64rem)": {
-          "--docs-header-h": `calc(${HEADER_HEIGHT.lg} + var(--docs-banners-h))`,
+          "--docs-header-h": `calc(${HEADER_HEIGHT.lg} + 1px + var(--docs-banners-h))`,
         },
         overflowX: "clip",
       }}

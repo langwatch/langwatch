@@ -138,6 +138,9 @@ await it("uses one document scroll and keeps the footer below both article and n
           const title = document.querySelector("main h1")?.getBoundingClientRect();
           return header.top >= 0 && title && title.top >= header.bottom && title.top < 300;
         });
+        // A full rail ends at the viewport's edge, never past it, so its last link is never clipped.
+        const railBox = await page.locator(".docs-left-rail").boundingBox();
+        assert.ok(railBox && railBox.y + railBox.height <= 800, JSON.stringify(railBox));
         const box = await link.boundingBox();
         if (!(box && box.y >= 0 && box.y + box.height <= 800)) {
           await capture({ page, name: "rail-link-after-swap", width: 1440, mode: "light" });
