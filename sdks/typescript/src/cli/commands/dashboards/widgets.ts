@@ -30,12 +30,15 @@ const refusedLocally = <T>(resolve: () => T): T => {
   }
 };
 
-/** The definition flags, resolved, with `--sources` set on every query when given. */
+/** The definition flags and `--sources`, each parsed once; the sources set on every query given. */
 const definitionOf = (flags: WidgetFlags) => {
-  const definition = refusedLocally(() => resolveDefinitionInput(flags));
+  const parsed = refusedLocally(() => resolveDefinitionInput(flags));
   const sources = refusedLocally(() => resolveSources(flags.sources));
-  if (!definition || !sources) return definition;
-  return { ...definition, queries: definition.queries.map((query) => ({ ...query, sources })) };
+  const definition =
+    parsed && sources
+      ? { ...parsed, queries: parsed.queries.map((query) => ({ ...query, sources })) }
+      : parsed;
+  return { definition, sources };
 };
 
 /** `langwatch dashboard widget list <dashboardId>`: the widgets on one dashboard. */
@@ -108,7 +111,7 @@ export const addWidgetToDashboardCommand = async (
   options: WidgetFlags,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
-  const definition = definitionOf(options);
+  const { definition } = definitionOf(options);
   if (!options.name || !definition) {
     console.error(
       chalk.red(
@@ -146,8 +149,7 @@ export const updateWidgetOnDashboardCommand = async (
   options: WidgetFlags,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
-  const definition = definitionOf(options);
-  const sources = definition ? undefined : refusedLocally(() => resolveSources(options.sources));
+  const { definition, sources } = definitionOf(options);
   const named = options.name !== undefined || options.description !== undefined;
   if (!named && !definition && !sources) {
     console.error(
@@ -162,11 +164,14 @@ export const updateWidgetOnDashboardCommand = async (
   try {
     const service = new DashboardsApiService();
     // --sources alone: every stored query, sent back with the new list.
-    const resourced = sources && {
-      queries: (await service.getWidget({ dashboardId, widgetId })).definition.queries.map(
-        (query) => ({ ...query, sources }),
-      ),
-    };
+    const resourced =
+      !definition && sources
+        ? {
+            queries: (await service.getWidget({ dashboardId, widgetId })).definition.queries.map(
+              (query) => ({ ...query, sources }),
+            ),
+          }
+        : {};
     const widget = await service.updateWidget({
       dashboardId,
       widgetId,

@@ -15,7 +15,7 @@ const query = (name: string, sources?: string[] | null) => ({
 
 describe("widgetSourcesLine", () => {
   /** @scenario "AC200f Sources: a query that stores none counts application traces" */
-  it("names application for a query that stores none", () => {
+  it("names application for an unset query", () => {
     expect(widgetSourcesLine([query("main")])).toBe("Sources: application");
   });
 
@@ -33,10 +33,15 @@ describe("widgetSourcesLine", () => {
   });
 
   /** @scenario "AC200m Sources: a query with no source picked counts nothing and says so" */
-  it("says no sources are picked when every query stores none picked", () => {
+  it("says no sources are picked when every query's list is empty", () => {
     expect(widgetSourcesLine([query("a", []), query("b", [])])).toBe("No sources picked");
     expect(picksNoSources([query("a", []), query("b", [])])).toBe(true);
     expect(picksNoSources([query("a", []), query("b")])).toBe(false);
     expect(picksNoSources([])).toBe(false);
+  });
+
+  /** @scenario "AC200 Sources: each query shows its sources as pills, and the card names them" */
+  it("is empty for a widget with no query, so the card shows no footer", () => {
+    expect(widgetSourcesLine([])).toBe("");
   });
 });

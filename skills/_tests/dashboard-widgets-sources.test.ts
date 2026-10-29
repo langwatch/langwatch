@@ -23,7 +23,7 @@ describe("the dashboard-widgets skill", () => {
 
     expect(rendered).toContain("`{ name, sql, parameters?, sources? }`");
     expect(rendered).toContain(
-      "`application`, `simulation`, `evaluation`, `coding_agent`, `gateway`, `workflow`, `playground`, `langy` and `other`",
+      "`application`, `simulation`, `evaluation`, `sample`, `coding_agent`, `ai_tool`, `gateway`, `workflow`, `playground`, `langy` and `other`",
     );
     expect(rendered).toContain('A query that names none counts `["application"]`');
     expect(rendered).toContain("`langy` for the user's own conversations with Langy");

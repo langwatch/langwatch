@@ -15,22 +15,25 @@ export interface DefinitionFlags {
 /** Thrown for input the CLI can refuse before any request is made. */
 export class WidgetInputError extends Error {}
 
+type TraceSource = NonNullable<DashboardWidgetQueryInput["sources"]>[number];
+
 /**
- * The trace origins a widget query can count, as the platform's widget schema lists them; the
- * server checks them again. "other" is every origin not listed before it.
+ * The trace origins a widget query can count, checked against the platform's published enum;
+ * the server checks them again. "other" is every origin not listed before it.
  */
 const TRACE_SOURCES = [
   "application",
   "simulation",
   "evaluation",
+  "sample",
   "coding_agent",
+  "ai_tool",
   "gateway",
   "workflow",
   "playground",
   "langy",
   "other",
-] as const;
-type TraceSource = (typeof TRACE_SOURCES)[number];
+] as const satisfies readonly TraceSource[];
 
 const isTraceSource = (value: string): value is TraceSource =>
   (TRACE_SOURCES as readonly string[]).includes(value);

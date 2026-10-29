@@ -7,8 +7,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { traceSourcesSchema } from "../lwql/analytics.lwql.ts";
 import { MAX_LWQL_LENGTH } from "../lwql/langwatch-ql-limits.ts";
-import { DEFAULT_WIDGET_SOURCES, traceSourcesSchema } from "../lwql/trace-sources.ts";
 
 /** The version this build writes, and the only one it reads. */
 export const DASHBOARD_WIDGET_DEFINITION_VERSION = 1;
@@ -129,8 +129,8 @@ const dashboardWidgetQuerySchemaDefinition = z.object({
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
   parameters: z.array(queryParameterDeclarationSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
   /**
-   * The trace origins the query counts (dashboards-v2 AC200). Absent on a query saved before it
-   * existed, which counts `DEFAULT_WIDGET_SOURCES`; `null` on a write clears it back to that.
+   * The trace origins the query counts (dashboards-v2 AC200); an empty list counts nothing.
+   * Unset (absent, or `null` on a write) counts `DEFAULT_WIDGET_SOURCES`.
    */
   sources: traceSourcesSchema.nullish(),
 });
@@ -198,34 +198,6 @@ export type DashboardWidgetQueryParameterDeclaration = z.infer<
 export type DashboardWidgetQuery = z.infer<typeof dashboardWidgetQuerySchema>;
 export type DashboardWidgetDefinition = z.infer<typeof dashboardWidgetDefinitionSchema>;
 export type DashboardWidgetSource = z.infer<typeof dashboardWidgetSourceSchema>;
-
-/** A new widget's queries: one naming no sources counts {@link DEFAULT_WIDGET_SOURCES}. */
-export function withNewQuerySources(
-  queries: readonly DashboardWidgetQuery[],
-): DashboardWidgetQuery[] {
-  return queries.map((query) => ({
-    ...query,
-    sources: query.sources ?? [...DEFAULT_WIDGET_SOURCES],
-  }));
-}
-
-/**
- * An update's queries over the stored ones: a query sent without `sources` keeps the sources
- * stored under its name, `null` clears them, and a stored query naming none stays unset.
- */
-export function mergeQuerySources({
-  sent,
-  stored,
-}: {
-  sent: readonly DashboardWidgetQuery[];
-  stored: readonly DashboardWidgetQuery[];
-}): DashboardWidgetQuery[] {
-  return sent.map(({ sources, ...query }) => {
-    const kept =
-      sources === undefined ? stored.find((s) => s.name === query.name)?.sources : sources;
-    return kept === undefined || kept === null ? query : { ...query, sources: kept };
-  });
-}
 
 /** A bound parameter's value, as `LW.query`'s caller may supply it. */
 export type DashboardWidgetQueryParamValue = string | number | boolean;

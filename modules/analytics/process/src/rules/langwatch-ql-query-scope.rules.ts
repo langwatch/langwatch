@@ -7,9 +7,10 @@ import {
   LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
   effectiveSources,
+  KNOWN_TRACE_ORIGINS,
+  OTHER_TRACE_SOURCE,
   type RunSources,
-  type TraceSourceScope,
-  traceSourceScope,
+  type TraceSource,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
@@ -45,6 +46,7 @@ export function strictestLangWatchQLProtections(
 
 const ORIGIN_COLUMN = "Origin";
 const TRACE_ID_COLUMN = "TraceId";
+const TENANT_COLUMN = "TenantId";
 
 /**
  * The one-row-per-trace view that knows each trace's origin. A view that only names a trace is
@@ -233,9 +235,26 @@ export function assertNoUnsupportedTableModifiers({
   });
 }
 
+/** The origin filter a list runs as: keep only `origins`, drop them, or keep every one. */
+export type TraceSourceScope =
+  | Readonly<{ kind: "include" | "exclude"; origins: readonly string[] }>
+  | Readonly<{ kind: "every" }>;
+
 /**
- * The scope a run's sources keep it to. A widget query storing none (`null`) counts the
- * default here, on the server, so every door runs it alike; a run that is no widget's keeps all.
+ * With `other` in it, a list is every origin but the known ones left out, so it runs as an
+ * exclusion; without it, as an inclusion. An empty list includes nothing.
+ */
+export function traceSourceScope(sources: readonly TraceSource[]): TraceSourceScope {
+  if (!sources.includes(OTHER_TRACE_SOURCE)) {
+    return { kind: "include", origins: KNOWN_TRACE_ORIGINS.filter((o) => sources.includes(o)) };
+  }
+  const dropped = KNOWN_TRACE_ORIGINS.filter((o) => !sources.includes(o));
+  return dropped.length === 0 ? { kind: "every" } : { kind: "exclude", origins: dropped };
+}
+
+/**
+ * The scope a run's sources keep it to. An unset widget query (`null`) counts the default
+ * here, on the server, so every door runs it alike; a run that is no widget's keeps all.
  */
 function scopeOfSources(sources: RunSources | undefined): TraceSourceScope {
   return sources === undefined ? { kind: "every" } : traceSourceScope(effectiveSources(sources));
@@ -265,14 +284,14 @@ function buildOriginPredicates({
   const listed = scope.origins.map(clickHouseLiteral).join(", ");
   // The origins dropped and kept, each over the same never-NULL expression, so NOT IN is safe.
   const [dropped, kept] = scope.kind === "exclude" ? ["IN", "NOT IN"] : ["NOT IN", "IN"];
-  const traceOriginView = qualifyTableName({ table: TRACE_ORIGIN_VIEW, defaultDatabase: database });
-  const canReachTraceOrigin = views.some(
-    (view) => qualifyTableName({ table: view.name, defaultDatabase: database }) === traceOriginView,
-  );
-  // `ifNull` because `NULL NOT IN (…)` is NULL, which would drop a row that belongs to no trace.
+  const traceOriginView = qualified(TRACE_ORIGIN_VIEW);
+  const canReachTraceOrigin = views.some((view) => qualified(view.name) === traceOriginView);
+  // A row is kept unless its trace is a dropped one: keeping application, a span stays unless
+  // its trace's origin is NOT IN ('application'). `ifNull`: `NULL NOT IN (…)` is NULL.
+  // Matched on (TenantId, TraceId) as `traceInside` is: one tenant's trace never decides another's.
   const byTrace =
-    `ifNull(${TRACE_ID_COLUMN}, '') NOT IN (SELECT ${TRACE_ID_COLUMN} ` +
-    `FROM ${database}.${TRACE_ORIGIN_VIEW} ` +
+    `(${TENANT_COLUMN}, ifNull(${TRACE_ID_COLUMN}, '')) NOT IN ` +
+    `(SELECT ${TENANT_COLUMN}, ${TRACE_ID_COLUMN} FROM ${database}.${TRACE_ORIGIN_VIEW} ` +
     `WHERE ${traceOriginOf(ORIGIN_COLUMN)} ${dropped} (${listed})` +
     (timeWindow ? ` AND OccurredAt >= ${traceLookupStart(timeWindow)}` : "") +
     ")";
@@ -281,14 +300,12 @@ function buildOriginPredicates({
   const predicates = new Map<string, string>();
   for (const view of views) {
     const columns = new Set(view.columns.map((column) => column.name));
-    const key = qualifyTableName({ table: view.name, defaultDatabase: database });
+    const key = qualified(view.name);
     if (columns.has(ORIGIN_COLUMN)) predicates.set(key, byOrigin);
     else if (columns.has(TRACE_ID_COLUMN) && canReachTraceOrigin) predicates.set(key, byTrace);
   }
   return predicates;
 }
-
-const TENANT_COLUMN = "TenantId";
 
 /** The one-row-per-trace view a dated member's evaluations are timed through. */
 const TRACE_VIEW = "traces";

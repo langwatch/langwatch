@@ -4,20 +4,23 @@
  */
 import { z } from "zod";
 
-import type { WidgetSource } from "../langwatch-api-dashboard-widgets.js";
-
 /** The sources the platform takes, "other" being every origin not listed before it. */
 const WIDGET_SOURCES = [
   "application",
   "simulation",
   "evaluation",
+  "sample",
   "coding_agent",
+  "ai_tool",
   "gateway",
   "workflow",
   "playground",
   "langy",
   "other",
-] as const satisfies readonly WidgetSource[];
+] as const;
+
+/** A trace origin a widget query can count. */
+export type WidgetSource = (typeof WIDGET_SOURCES)[number];
 
 /** The tools' `sources` input: refused at the tool when it names anything else. */
 export const widgetSourcesInput = z
@@ -26,5 +29,5 @@ export const widgetSourcesInput = z
   .nullable()
   .optional()
   .describe(
-    'The trace origins every query of the widget counts: any of application, simulation, evaluation, coding_agent, gateway, workflow, playground, langy, other (any origin not listed). A new widget counts ["application"]; add "langy" to count your own conversations, as a widget about Langy\'s requests needs. null clears it back to the default.',
+    `The trace origins every query of the widget counts: any of ${WIDGET_SOURCES.join(", ")} (other = any origin not listed). A new widget counts ["application"]; add "langy" to count your own conversations, as a widget about Langy's requests needs. null makes it unset again, counting the default.`,
   );

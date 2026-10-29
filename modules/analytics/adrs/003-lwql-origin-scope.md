@@ -19,7 +19,8 @@ The LangWatchQL door so far runs a statement as written, plus the default `LIMIT
 ## Decision
 
 A run may carry `sources`, the trace origins it counts, one of `application`, `simulation`,
-`evaluation`, `coding_agent`, `gateway`, `workflow`, `playground`, `langy` and `other`
+`evaluation`, `sample`, `coding_agent`, `ai_tool`, `gateway`, `workflow`, `playground`, `langy`
+and `other`
 (`TRACE_SOURCES` in the analytics contract). The service replaces every catalogued view the
 statement reads with that view kept to those origins (`rules/langwatch-ql-query-scope.rules.ts`).
 The completeness report is scoped the same way, so it counts the rows the widget counts.
@@ -29,7 +30,7 @@ Every comparison reads the origin through one expression, `ifNull(nullIf(Origin,
 without `other` keeps `origin IN (picked)`; a set with `other` drops the listed origins left out,
 `origin NOT IN (unpicked)`, so every unlisted origin stays. All nine keep every row: the statement
 runs as written. An empty set reads no row of any view. The list is an enum checked at the door,
-and only the nine fixed names are ever written into a statement.
+and only the fixed names are ever written into a statement.
 
 - A view with an `Origin` column (`trace_metrics`, `evaluation_metrics`) filters on it.
 - A view with a `TraceId` column filters out the traces `trace_metrics` gives an origin the set

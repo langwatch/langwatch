@@ -346,7 +346,7 @@ describe("given a project with its agent's traces and Langy's turns", () => {
   });
 
   describe("when a dashboard query names its sources", () => {
-    /** @scenario "AC200l Sources: other counts every origin outside the eight known ones" */
+    /** @scenario "AC200l Sources: other counts every origin outside the known ones" */
     it("counts unstamped traces under application and an unlisted origin under other", async () => {
       expect(await countSources(METRIC_COUNT, ["application"])).toBe(3);
       expect(await countSources(TRACE_COUNT, ["application"])).toBe(3);
@@ -365,7 +365,7 @@ describe("given a project with its agent's traces and Langy's turns", () => {
       );
     });
 
-    /** @scenario "AC200l Sources: other counts every origin outside the eight known ones" */
+    /** @scenario "AC200l Sources: other counts every origin outside the known ones" */
     it("counts an evaluation whose origin is NULL under application", async () => {
       expect(await countSources(EVALUATION_METRIC_COUNT, ["application"])).toBe(1);
       expect(await countSources(EVALUATION_METRIC_COUNT, ["other"])).toBe(1);

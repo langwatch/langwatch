@@ -4,6 +4,7 @@ from enum import Enum
 class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item(
     str, Enum
 ):
+    AI_TOOL = "ai_tool"
     APPLICATION = "application"
     CODING_AGENT = "coding_agent"
     EVALUATION = "evaluation"
@@ -11,6 +12,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200D
     LANGY = "langy"
     OTHER = "other"
     PLAYGROUND = "playground"
+    SAMPLE = "sample"
     SIMULATION = "simulation"
     WORKFLOW = "workflow"
 

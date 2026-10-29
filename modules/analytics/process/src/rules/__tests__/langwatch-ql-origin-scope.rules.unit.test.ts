@@ -6,20 +6,21 @@
 import { TRACE_SOURCES } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { scopeLangWatchQL } from "../langwatch-ql-query-scope.rules.ts";
+import { scopeLangWatchQL, traceSourceScope } from "../langwatch-ql-query-scope.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const WINDOW = { start: "2026-02-01T00:00:00.000Z", end: "2026-02-04T00:00:00.000Z" };
 const NOT_LANGY = "ifNull(nullIf(Origin, ''), 'application') NOT IN ('langy')";
 const LANGY_TRACES =
-  "SELECT TraceId FROM analytics.trace_metrics " +
+  "SELECT TenantId, TraceId FROM analytics.trace_metrics " +
   "WHERE ifNull(nullIf(Origin, ''), 'application') IN ('langy')";
 const WINDOW_START = "toDateTime('2026-02-01 00:00:00', 'UTC')";
 const WINDOW_END = "toDateTime('2026-02-04 00:00:00', 'UTC')";
 const LOOKUP_BOUND =
   ` AND OccurredAt >= subtractDays(subtractSeconds(${WINDOW_START}, ` +
   `dateDiff('second', ${WINDOW_START}, ${WINDOW_END})), 1)`;
-const notALangyTrace = (bound = "") => `ifNull(TraceId, '') NOT IN (${LANGY_TRACES}${bound})`;
+const notALangyTrace = (bound = "") =>
+  `(TenantId, ifNull(TraceId, '')) NOT IN (${LANGY_TRACES}${bound})`;
 
 function scope({
   sql,
@@ -196,17 +197,17 @@ describe("given a dashboard query's sources", () => {
         `WHERE ${ORIGIN} IN ('application', 'langy')) AS trace_metrics`,
     );
     expect(scoped(["langy"], "SELECT count() FROM spans")).toBe(
-      "SELECT count() FROM (SELECT * FROM spans WHERE ifNull(TraceId, '') NOT IN " +
-        `(SELECT TraceId FROM analytics.trace_metrics WHERE ${ORIGIN} NOT IN ('langy'))) AS spans`,
+      "SELECT count() FROM (SELECT * FROM spans WHERE (TenantId, ifNull(TraceId, '')) NOT IN " +
+        `(SELECT TenantId, TraceId FROM analytics.trace_metrics WHERE ${ORIGIN} NOT IN ('langy'))) AS spans`,
     );
   });
 
-  /** @scenario "AC200l Sources: other counts every origin outside the eight known ones" */
+  /** @scenario "AC200l Sources: other counts every origin outside the known ones" */
   it("with other picked, drops only the known origins left unpicked", () => {
     expect(scoped(["application", "other"], "SELECT count() FROM trace_metrics")).toBe(
       `SELECT count() FROM (SELECT * FROM trace_metrics WHERE ${ORIGIN} NOT IN ` +
-        "('simulation', 'evaluation', 'coding_agent', 'gateway', 'workflow', 'playground', " +
-        "'langy')) AS trace_metrics",
+        "('simulation', 'evaluation', 'sample', 'coding_agent', 'ai_tool', 'gateway', " +
+        "'workflow', 'playground', 'langy')) AS trace_metrics",
     );
   });
 
@@ -218,7 +219,9 @@ describe("given a dashboard query's sources", () => {
           "application",
           "simulation",
           "evaluation",
+          "sample",
           "coding_agent",
+          "ai_tool",
           "gateway",
           "workflow",
           "playground",
@@ -245,5 +248,64 @@ describe("given a dashboard query's sources", () => {
     expect(scoped([], "SELECT count() FROM trace_metrics")).toBe(
       "SELECT count() FROM (SELECT * FROM trace_metrics WHERE 0) AS trace_metrics",
     );
+  });
+});
+
+describe("traceSourceScope", () => {
+  describe("given a list without other", () => {
+    /** @scenario "AC200b Sources: a query saved with picked sources counts only traces of those origins" */
+    it("keeps only the listed origins", () => {
+      expect(traceSourceScope(["application", "langy"])).toEqual({
+        kind: "include",
+        origins: ["application", "langy"],
+      });
+    });
+  });
+
+  describe("given a list with other", () => {
+    /** @scenario "AC200l Sources: other counts every origin outside the known ones" */
+    it("drops the known origins left out, so every unlisted origin stays", () => {
+      expect(traceSourceScope(["application", "other"])).toEqual({
+        kind: "exclude",
+        origins: [
+          "simulation",
+          "evaluation",
+          "sample",
+          "coding_agent",
+          "ai_tool",
+          "gateway",
+          "workflow",
+          "playground",
+          "langy",
+        ],
+      });
+    });
+
+    it("drops nothing when every source is listed", () => {
+      expect(traceSourceScope([...TRACE_SOURCES])).toEqual({ kind: "every" });
+    });
+  });
+
+  describe("given an empty list", () => {
+    /** @scenario "AC200m Sources: a query with no source picked counts nothing and says so" */
+    it("keeps no origin at all", () => {
+      expect(traceSourceScope([])).toEqual({ kind: "include", origins: [] });
+    });
+  });
+});
+
+describe("given a view that names a row's trace, in a project sharing a trace id with another", () => {
+  it("looks the trace's origin up by (TenantId, TraceId), so another tenant's trace never decides", () => {
+    const scoped = scopeLangWatchQL({
+      sql: "SELECT count() FROM spans",
+      sources: ["application"],
+      database: "analytics",
+      views: LWQL_VIEW_CATALOG,
+    });
+
+    expect(scoped).toContain(
+      "(TenantId, ifNull(TraceId, '')) NOT IN (SELECT TenantId, TraceId FROM",
+    );
+    expect(scoped).not.toContain("ifNull(TraceId, '') NOT IN (SELECT TraceId");
   });
 });

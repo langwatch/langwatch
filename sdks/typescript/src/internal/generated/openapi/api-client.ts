@@ -5967,7 +5967,7 @@ export interface operations {
                                         type: "string" | "number" | "boolean";
                                         default?: string | number | boolean;
                                     }[];
-                                    sources?: ("application" | "simulation" | "evaluation" | "coding_agent" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                    sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                                 }[];
                                 description?: string;
                                 prompt?: string;
@@ -6173,7 +6173,7 @@ export interface operations {
                             type: "string" | "number" | "boolean";
                             default?: string | number | boolean;
                         }[];
-                        sources?: ("application" | "simulation" | "evaluation" | "coding_agent" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                        sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                     }[];
                     description?: string;
                     prompt?: string;
@@ -6216,7 +6216,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
-                                sources?: ("application" | "simulation" | "evaluation" | "coding_agent" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6431,7 +6431,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
-                                sources?: ("application" | "simulation" | "evaluation" | "coding_agent" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6817,7 +6817,7 @@ export interface operations {
                             type: "string" | "number" | "boolean";
                             default?: string | number | boolean;
                         }[];
-                        sources?: ("application" | "simulation" | "evaluation" | "coding_agent" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                        sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                     }[];
                     description?: string;
                     source?: {
@@ -6859,7 +6859,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
-                                sources?: ("application" | "simulation" | "evaluation" | "coding_agent" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;

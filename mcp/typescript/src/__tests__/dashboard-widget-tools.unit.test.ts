@@ -394,7 +394,7 @@ describe("a widget's sources through the MCP widget tools", () => {
   });
 
   /** @scenario "AC200n Sources: an unknown source is refused at every door" */
-  it("refuses an unknown source at both tools' input, and takes the nine", async () => {
+  it("refuses an unknown source at both tools' input, and takes every listed one", async () => {
     const { createMcpServer } = await import("../create-mcp-server.ts");
     const tools = (
       createMcpServer() as unknown as {

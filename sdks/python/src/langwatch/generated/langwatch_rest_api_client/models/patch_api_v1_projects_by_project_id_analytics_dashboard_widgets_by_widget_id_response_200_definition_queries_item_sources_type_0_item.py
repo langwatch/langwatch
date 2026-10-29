@@ -4,6 +4,7 @@ from enum import Enum
 class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item(
     str, Enum
 ):
+    AI_TOOL = "ai_tool"
     APPLICATION = "application"
     CODING_AGENT = "coding_agent"
     EVALUATION = "evaluation"
@@ -11,6 +12,7 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
     LANGY = "langy"
     OTHER = "other"
     PLAYGROUND = "playground"
+    SAMPLE = "sample"
     SIMULATION = "simulation"
     WORKFLOW = "workflow"
 

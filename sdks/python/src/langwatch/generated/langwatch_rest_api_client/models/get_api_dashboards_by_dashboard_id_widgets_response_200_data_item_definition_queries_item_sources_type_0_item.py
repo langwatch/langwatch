@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionQueriesItemSourcesType0Item(str, Enum):
+    AI_TOOL = "ai_tool"
     APPLICATION = "application"
     CODING_AGENT = "coding_agent"
     EVALUATION = "evaluation"
@@ -9,6 +10,7 @@ class GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionQueriesIt
     LANGY = "langy"
     OTHER = "other"
     PLAYGROUND = "playground"
+    SAMPLE = "sample"
     SIMULATION = "simulation"
     WORKFLOW = "workflow"
 

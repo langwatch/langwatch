@@ -11,13 +11,13 @@ import {
   langWatchQLAvailabilitySchema,
   langWatchQLQueryResultSchema,
   langWatchQLSchema,
+  traceSourcesSchema,
 } from "./analytics.lwql.ts";
 import {
   LWQL_CLAUSES,
   LWQL_VIOLATION_CODES,
   type LangWatchQLViolation,
 } from "./langwatch-ql-violation.ts";
-import { traceSourcesSchema } from "./trace-sources.ts";
 
 /** The project every workbench question is asked about. */
 const lwqlProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
