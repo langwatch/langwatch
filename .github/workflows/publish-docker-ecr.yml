@@ -74,7 +74,8 @@ permissions:
 
 # Never cancel in flight: a superseded run may already have pushed per-arch layers.
 # Merges that land while one builds wait as one: each newer commit replaces the
-# waiting one, so a burst builds its first and its newest commit.
+# waiting one, so a burst builds its first and its newest commit. The newest's
+# change set starts at the last published commit, so it covers the replaced ones.
 concurrency:
   group: publish-docker-ecr-${{ github.ref }}
   cancel-in-progress: false
@@ -153,6 +154,9 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     needs: meta
+    permissions:
+      contents: read
+      id-token: write # OIDC assume-role, to read which commits have images
     outputs:
       # A JSON `include:` list, one entry per (image, arch) worth rebuilding, and
       # the matching list of image names. A matrix rather than one boolean per image
@@ -165,13 +169,71 @@ jobs:
       lambda-matrix: ${{ steps.select.outputs.lambda-matrix }}
       built: ${{ steps.select.outputs.built }}
     steps:
+      # Full history, without file contents: dorny/paths-filter diffs two
+      # commits out of the object store, and the base step walks the history.
+      # The tree is the publish scripts and the Go workspace cmd/ecrtag needs.
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
-          # Nothing here reads working-tree content: dorny/paths-filter diffs two
-          # commits out of the object store, and the rest of this job is jq.
-          sparse-checkout: .github
+          sparse-checkout: |
+            .github
+            cmd
+            tools
+            pkg
+            services
+            sdks/go
+            infra/clickhouse-serverless
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Set up Go for cmd/ecrtag
+        if: github.event_name == 'push'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Configure AWS credentials (OIDC)
+        if: github.event_name == 'push'
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+          role-session-name: publish-docker-ecr-changes-${{ github.run_id }}
+
+      # The change set starts at the oldest commit whose image create-manifest
+      # would re-tag as this commit's (tools/ecrtag.DiffBase), not the previous
+      # push: a replaced run published nothing. `rebuild` is every image whose
+      # re-tag would copy a newer one, which a revert can hide from the diff.
+      # REPOSITORIES is create-manifest's list (ciguard).
+      - name: Find the last published commit
+        id: base
+        if: github.event_name == 'push'
+        env:
+          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
+          REPOSITORIES: >-
+            langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-langy-agent
+            langwatch-nlp-lambda langwatch-eval-azure langwatch-eval-langevals langwatch-eval-lingua
+            langwatch-eval-openai langwatch-eval-presidio langwatch-eval-ragas langwatch-eval-topic_clustering
+        run: |
+          set -euo pipefail
+          BASE=$(go run ./cmd/ecrtag diffbase -repositories "${REPOSITORIES}" -tag "${IMAGE_TAG}" \
+            -revision "${GITHUB_SHA}" -custom="${CUSTOM_TAG}")
+          TAG=$(printf '%s' "${BASE}" | jq -r '.base')
+          REBUILD=$(printf '%s' "${BASE}" | jq -c '.rebuild')
+          SHA=""
+          if [ -n "${TAG}" ]; then
+            SHA=$(git rev-parse --verify "${TAG#git-}^{commit}")
+            echo "Change set: ${TAG}..${GITHUB_SHA}; rebuilt whatever it says: ${REBUILD}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::notice::no image has been published from an ancestor; building every image"
+          fi
+          {
+            echo "sha=${SHA}"
+            echo "rebuild=${REBUILD}"
+          } >> "$GITHUB_OUTPUT"
 
       # NO NEGATION PATTERNS — dorny ORs a filter's patterns, so a lone `!x`
       # matches everything. See specs/ci/path-filters.feature.
@@ -180,9 +242,11 @@ jobs:
       # this workflow itself so a change to the build definition republishes
       # every image it describes.
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        if: github.event_name == 'push'
+        if: steps.base.outputs.sha != ''
         id: filter
         with:
+          # Without a base, a push diffs github.event.before, the previous push.
+          base: ${{ steps.base.outputs.sha }}
           filters: |
             langwatch-app:
               - 'infra/docker/Dockerfile'
@@ -302,7 +366,9 @@ jobs:
       - name: Select the images to build
         id: select
         env:
-          IS_PUSH: ${{ github.event_name == 'push' }}
+          # No base on a dispatch, or before any image is published: build all.
+          FILTERED: ${{ steps.base.outputs.sha != '' }}
+          REBUILD: ${{ steps.base.outputs.rebuild }}
           LANGWATCH_APP: ${{ steps.filter.outputs.langwatch-app }}
           LANGWATCH_NLP_SERVICE: ${{ steps.filter.outputs.langwatch-nlp-service }}
           LANGWATCH_LANGEVALS: ${{ steps.filter.outputs.langwatch-langevals }}
@@ -350,7 +416,7 @@ jobs:
           JSON
           )
 
-          if [ "${IS_PUSH}" = "true" ]; then
+          if [ "${FILTERED}" = "true" ]; then
             BUILT=$(jq -cn \
               --arg app "${LANGWATCH_APP}" \
               --arg nlp "${LANGWATCH_NLP_SERVICE}" \
@@ -360,6 +426,7 @@ jobs:
               --arg langy "${LANGWATCH_LANGY_AGENT}" \
               --arg eval "${LANGWATCH_EVAL}" \
               --argjson lambdas "${LAMBDAS}" \
+              --argjson rebuild "${REBUILD}" \
               '[{"langwatch-app": $app,
                  "langwatch-nlp-service": $nlp,
                  "langwatch-langevals": $evals,
@@ -369,7 +436,8 @@ jobs:
                 | to_entries[] | select(.value == "true") | .key]
                + (if $eval == "true"
                   then [$lambdas[] | select(.evaluator != "") | .image]
-                  else [] end)')
+                  else [] end)
+               + $rebuild | unique')
           else
             BUILT=$(jq -cn --argjson all "${ALL}" --argjson lambdas "${LAMBDAS}" \
               '[$all[].image, $lambdas[].image] | unique')

@@ -8,7 +8,9 @@ Feature: Publish every deployable image to the artifacts registry
   # gets its tag is cmd/ecrtag, bound by tools/ecrtag/lambda_test.go. The path filters
   # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, and where a Lambda
   # image starts by tools/ciguard/lambdaworkdir_test.go. That a release
-  # publishes nothing is bound by tools/ciguard/publishshape_test.go. The rest is the
+  # publishes nothing is bound by tools/ciguard/publishshape_test.go, and where a
+  # push run's change set starts by tools/ecrtag/diffbase_test.go and
+  # tools/ciguard/ecrdiffbase_test.go. The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 
@@ -38,6 +40,24 @@ Feature: Publish every deployable image to the artifacts registry
     Given git-<sha> images of an unchanged image built from other lines of history and from older ancestors pushed later
     When publish-docker-ecr re-tags that image for a commit that did not change it, Lambda or service image alike
     Then the commit tag names the image of the nearest commit on its first-parent history, never one reached only through a merged branch
+
+  @unit
+  Scenario: A commit whose run was replaced while it waited still rebuilds what it changed
+    Given merges B and C land while the run for an earlier merge A builds
+    And the waiting run for B is replaced by the run for C, so B publishes nothing
+    And B changed an image that C did not
+    When publish-docker-ecr selects the images to build for C
+    Then its change set starts at A, the commit whose image a re-tag of C would copy
+    And that image is rebuilt for C rather than re-tagged from A's image
+
+  @unit
+  Scenario: An image published after the change set's start is rebuilt even when a revert empties the diff
+    Given merge B changed the app and the evaluators, the app was published at B and an evaluator's build failed, so it stays at A
+    And merge C reverts B
+    When publish-docker-ecr selects the images to build for C
+    Then its change set starts at A, the oldest commit an image's re-tag would copy
+    And the app is rebuilt for C even though A..C shows no change, because its re-tag would copy B's reverted image
+    And an image whose re-tag would copy A's image follows the A..C diff
 
   @unit
   Scenario: A .dockerignore change rebuilds every image
