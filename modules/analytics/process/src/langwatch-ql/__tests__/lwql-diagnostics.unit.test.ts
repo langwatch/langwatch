@@ -288,6 +288,12 @@ describe("given a LangWatchQL query that ran", () => {
       });
     });
 
+    it("names the dataset as a statement does, without the database that holds it", () => {
+      const diagnostics = diagnose({ sql: "SELECT count() AS n FROM analytics.traces" });
+
+      expect(find(diagnostics, "UNBOUNDED_TIME_RANGE")!.message).toMatch(/^traces was read/);
+    });
+
     it("reports each unbounded dataset once, and not the bounded one beside it", () => {
       const diagnostics = diagnose({
         sql:

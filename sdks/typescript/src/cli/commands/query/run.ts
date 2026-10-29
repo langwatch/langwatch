@@ -93,9 +93,14 @@ function explainProjectsRequired(error: unknown): void {
   if (readCommandError(error).code === "projects_required") refuse(PROJECTS_REQUIRED_MESSAGE);
 }
 
+/** Whether the run was bound to any placeholder; an empty map has nothing to say. */
+function hasParams(result: Pick<QueryRunResult, "params">): boolean {
+  return result.params !== undefined && Object.keys(result.params).length > 0;
+}
+
 /** One line saying what the run was bound to, printed after a table. */
 function paramsLine(result: QueryRunResult): string {
-  return result.params ? chalk.dim(`Ran with ${JSON.stringify(result.params)}`) : "";
+  return hasParams(result) ? chalk.dim(`Ran with ${JSON.stringify(result.params)}`) : "";
 }
 
 /**
@@ -130,7 +135,7 @@ function machineBody({
 }): string {
   if (format === "json") return JSON.stringify(resultEnvelope({ rows, result }), null, 2);
   // CSV and JSON lines hold rows only, so what the run was bound to rides on stderr.
-  if (result.params) process.stderr.write(`${JSON.stringify({ params: result.params })}\n`);
+  if (hasParams(result)) process.stderr.write(`${JSON.stringify({ params: result.params })}\n`);
 
   return renderRows({ format, columns, rows });
 }

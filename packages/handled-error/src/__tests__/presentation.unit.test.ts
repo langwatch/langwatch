@@ -144,6 +144,12 @@ describe("explainHandledError", () => {
       expect(description).toContain("`sources` and `projects` fields");
     });
 
+    it("does not promise that a reload brings a missing project back", () => {
+      const { description } = explainHandledError(shape({ code: "project_not_found" }));
+
+      expect(description).not.toContain("Reload");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("still says something useful when the supplied names are absent", () => {
       const { title, description } = explainHandledError(

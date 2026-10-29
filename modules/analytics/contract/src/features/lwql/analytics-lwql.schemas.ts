@@ -7,7 +7,10 @@ import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwat
 import { defineMiddlewareContext, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { LWQL_ACCEPTED_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
+import {
+  isLangWatchQLSurfaceParameter,
+  LWQL_ACCEPTED_GRANULARITY_STEPS,
+} from "./analytics.lwql-time-window.ts";
 import {
   lwqlTimeWindowSchema,
   traceSourcesSchema,
@@ -90,6 +93,23 @@ export const lwqlParameterValueSchema: LwqlParameterValueSchema =
   lwqlParameterValueSchemaDefinition;
 
 /**
+ * The caller's parameters. A reserved name's value is not shape-checked: the refusal naming the
+ * request field to send instead (`lwql_reserved_parameter_supplied`) answers, not a shape error.
+ */
+const lwqlParametersSchemaDefinition = z.preprocess(
+  (parameters) =>
+    typeof parameters === "object" && parameters !== null && !Array.isArray(parameters)
+      ? Object.fromEntries(
+          Object.entries(parameters).map(([name, value]) => [
+            name,
+            isLangWatchQLSurfaceParameter(name) ? null : value,
+          ]),
+        )
+      : parameters,
+  z.record(z.string(), lwqlParameterValueSchema),
+);
+
+/**
  * The datapoint step a caller may request, as every door accepts it — one of
  * the {@link LWQL_ACCEPTED_GRANULARITY_STEPS}, nothing else, so an off-list
  * value is a schema rejection rather than the service's backstop.
@@ -113,7 +133,7 @@ const lwqlStatementSchemaDefinition = z.object({
   // that was submitted, and normalising it here — however harmlessly — is the
   // first step of the rewriting this API promises never to do.
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
-  parameters: z.record(z.string(), lwqlParameterValueSchema).optional(),
+  parameters: lwqlParametersSchemaDefinition.optional(),
   /**
    * The period this caller is reporting over. Honoured on both doors, because
    * the same saved chart is readable from both and a statement that follows the

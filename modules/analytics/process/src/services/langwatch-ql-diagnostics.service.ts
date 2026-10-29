@@ -132,7 +132,7 @@ function unboundedTimeRangeDiagnostics({
       diagnostics.push({
         code: "UNBOUNDED_TIME_RANGE",
         message:
-          `${reference.viewName} was read with no condition on ${timeColumn}, so the read ` +
+          `${bareViewName(reference.viewName)} was read with no condition on ${timeColumn}, so the read ` +
           `covers the whole history this project has rather than a window of it. Add a range ` +
           `on ${timeColumn} to bound the scan.`,
         meta: {
@@ -172,4 +172,9 @@ export class LangWatchQLDiagnosticsService {
       ...this.buckets.diagnose(input),
     ];
   }
+}
+
+/** The view as a statement names it, without the database this deployment keeps it in. */
+function bareViewName(viewName: string): string {
+  return viewName.slice(viewName.lastIndexOf(".") + 1);
 }

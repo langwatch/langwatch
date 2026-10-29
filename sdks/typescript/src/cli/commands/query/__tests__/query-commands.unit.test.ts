@@ -415,6 +415,16 @@ describe("runQueryCommand with --projects and --sources", () => {
     expect(printed).toContain('Ran with {"dashboard_context_projects":["A"]}');
   });
 
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("prints nothing about params when the statement declared no placeholder", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: {} });
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+    (result as { table: () => void }).table();
+
+    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).not.toContain("Ran with");
+  });
+
   /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
   it("tells the user to pass --projects when the platform asks for them", async () => {
     mockQuery.mockRejectedValue(

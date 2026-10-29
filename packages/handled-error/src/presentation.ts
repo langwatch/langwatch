@@ -1723,7 +1723,7 @@ const presentations = {
   project_not_found: {
     title: "Project not found",
     describe: () =>
-      "It may have been deleted, or it isn't shared with you. Reload to see the projects you can open.",
+      "It may have been deleted, or it isn't shared with you. Choose another project, or ask for access to this one.",
   },
   projects_required: {
     title: "Name the projects to query",

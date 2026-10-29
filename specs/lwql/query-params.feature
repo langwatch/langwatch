@@ -160,7 +160,10 @@ Feature: Every query door takes the same parameters and says what it ran with
     @unit @integration
     Scenario: QP09c Every door gives the same refusal body for the same missing project
       When tRPC, REST and MCP refuse the same unreadable project
-      Then the three bodies carry the code "project_not_found" and the message "Project not found"
+      # Changed in phase 2: the tRPC wire message is the error's code for every handled error
+      # (packages/api/src/trpc/policy.ts, #5984), so tRPC carries "project_not_found" as its message.
+      Then the three bodies carry the code "project_not_found"
+      And REST and MCP carry the message "Project not found", and tRPC carries the code as its message
       # Evidence: the three answers quoted
 
     @integration

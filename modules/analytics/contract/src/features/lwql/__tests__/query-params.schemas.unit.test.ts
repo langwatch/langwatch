@@ -132,3 +132,28 @@ describe("given a request that supplies a list name for itself", () => {
     expect(error.message).toContain("the `projects` field and the `sources` field");
   });
 });
+
+describe("given a reserved name in the parameters", () => {
+  /** @scenario "QP15 A caller cannot supply a reserved parameter in its own parameters" */
+  it("passes it through whatever its value, so the reserved-name refusal answers", () => {
+    const parse = (value: unknown) =>
+      lwqlQueryRequestSchema.safeParse({
+        projectId: "p",
+        sql: SQL,
+        parameters: { dashboard_context_sources: value },
+      });
+
+    expect(parse(["langy"]).success).toBe(true);
+    expect(parse("langy").success).toBe(true);
+  });
+
+  it("still refuses a structured value under a name that is not reserved", () => {
+    const refused = lwqlQueryRequestSchema.safeParse({
+      projectId: "p",
+      sql: SQL,
+      parameters: { limit: [1] },
+    });
+
+    expect(refused.error?.issues[0]?.path).toEqual(["parameters", "limit"]);
+  });
+});
