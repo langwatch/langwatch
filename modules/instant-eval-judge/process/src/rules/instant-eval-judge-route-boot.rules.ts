@@ -8,8 +8,10 @@
 import {
   INSTANT_EVAL_JUDGE_MODES,
   INSTANT_EVAL_PRICING,
+  instantEvalJudgeEnabledFallbacksOf,
   instantEvalJudgeEntryBackends,
   instantEvalJudgeRouteSlotsOf,
+  isInstantEvalJudgeEntryEnabled,
   type InstantEvalJudgeBackendKind,
   type InstantEvalJudgeRouteEntry,
   type InstantEvalJudgeRoutePricing,
@@ -81,9 +83,10 @@ function usableEntryBackendsOf({
   table: InstantEvalJudgeRouteTable;
   entry: InstantEvalJudgeRouteEntry;
 }): string[] {
-  const isEnabled = (name: string) => table.backends[name]?.enabled === true;
+  if (!isInstantEvalJudgeEntryEnabled({ entry, table })) return [];
   const backends = instantEvalJudgeEntryBackends(entry);
-  if (!backends.every(isEnabled)) return [];
-  const fallbacks = backends.flatMap((name) => table.backends[name]?.fallbacks ?? []);
-  return [...backends, ...fallbacks.filter(isEnabled)];
+  const fallbacks = backends.flatMap((backend) =>
+    instantEvalJudgeEnabledFallbacksOf({ backend, table }),
+  );
+  return [...backends, ...fallbacks];
 }

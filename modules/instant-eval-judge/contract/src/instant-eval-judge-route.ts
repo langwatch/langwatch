@@ -366,6 +366,32 @@ export function instantEvalJudgeEntryBackends(entry: InstantEvalJudgeRouteEntry)
   );
 }
 
+/** Whether every backend an entry may call is switched on; an entry with one off is unusable. */
+export function isInstantEvalJudgeEntryEnabled({
+  entry,
+  table,
+}: {
+  entry: InstantEvalJudgeRouteEntry;
+  table: InstantEvalJudgeRouteTable;
+}): boolean {
+  return instantEvalJudgeEntryBackends(entry).every(
+    (name) => table.backends[name]?.enabled === true,
+  );
+}
+
+/** A backend's fallbacks that are switched on, in the order they are tried. */
+export function instantEvalJudgeEnabledFallbacksOf({
+  backend,
+  table,
+}: {
+  backend: string;
+  table: InstantEvalJudgeRouteTable;
+}): string[] {
+  return (table.backends[backend]?.fallbacks ?? []).filter(
+    (fallback) => table.backends[fallback]?.enabled === true,
+  );
+}
+
 /** The public table: every slot asks the hosted classifier alone, which is today's call. */
 export const INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE: InstantEvalJudgeRouteTable =
   instantEvalJudgeRouteTableSchema.parse({

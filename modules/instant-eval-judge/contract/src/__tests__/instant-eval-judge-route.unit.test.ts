@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
   INSTANT_EVAL_JUDGE_JOBS,
+  instantEvalJudgeEnabledFallbacksOf,
   instantEvalJudgeRouteTableSchema,
+  isInstantEvalJudgeEntryEnabled,
 } from "../instant-eval-judge-route.ts";
 import { instantEvalJudgeConfig } from "../instant-eval-judge.config.ts";
 import {
@@ -223,6 +225,29 @@ describe("judge route table", () => {
         read({ INSTANT_EVAL_JUDGE_ROUTES: JSON.stringify(tableWith({ buckets: [] })) }),
       ).toThrow(ConfigParseError);
     });
+  });
+});
+
+describe("given backends that are switched off", () => {
+  const table = instantEvalJudgeRouteTableSchema.parse(
+    tableWith({
+      backends: {
+        jev: { kind: "jev", fallbacks: ["llm-a", "llm-b"] },
+        "llm-a": { kind: "anthropic_messages", model: "llm-model-a", enabled: false },
+        "llm-b": { kind: "anthropic_messages", model: "llm-model-b" },
+      },
+    }),
+  );
+
+  it("an entry is usable only when every backend it may call is on", () => {
+    expect(isInstantEvalJudgeEntryEnabled({ entry: { primary: "jev" }, table })).toBe(true);
+    const escalating = { primary: "jev", escalateTo: "llm-a", threshold: 0.5 };
+    expect(isInstantEvalJudgeEntryEnabled({ entry: escalating, table })).toBe(false);
+  });
+
+  it("a backend falls back only to the fallbacks that are on, in order", () => {
+    expect(instantEvalJudgeEnabledFallbacksOf({ backend: "jev", table })).toEqual(["llm-b"]);
+    expect(instantEvalJudgeEnabledFallbacksOf({ backend: "unknown", table })).toEqual([]);
   });
 });
 

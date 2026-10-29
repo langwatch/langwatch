@@ -10,7 +10,9 @@ import {
   instantEvalQuestionTokens,
   INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT,
   INSTANT_EVAL_JUDGE_MODES,
+  instantEvalJudgeEnabledFallbacksOf,
   instantEvalJudgeEntryBackends,
+  isInstantEvalJudgeEntryEnabled,
   type InstantEvalJudgeInputView,
   type InstantEvalJudgeJob,
   type InstantEvalJudgeMode,
@@ -263,19 +265,9 @@ function usableEntryOf({
   for (let at = INSTANT_EVAL_JUDGE_MODES.indexOf(requested); at > 0; at--) {
     const mode = INSTANT_EVAL_JUDGE_MODES[at]!;
     const entry = slot[mode];
-    if (entry && isEntryEnabled({ entry, table })) return { mode, entry };
+    if (entry && isInstantEvalJudgeEntryEnabled({ entry, table })) return { mode, entry };
   }
   return { mode: "instant", entry: slot.instant };
-}
-
-function isEntryEnabled({
-  entry,
-  table,
-}: {
-  entry: InstantEvalJudgeRouteEntry;
-  table: InstantEvalJudgeRouteTable;
-}): boolean {
-  return instantEvalJudgeEntryBackends(entry).every((name) => table.backends[name]?.enabled);
 }
 
 function fallbacksOf({
@@ -286,10 +278,8 @@ function fallbacksOf({
   table: InstantEvalJudgeRouteTable;
 }): Record<string, readonly string[]> {
   const fallbacks: Record<string, readonly string[]> = {};
-  for (const name of instantEvalJudgeEntryBackends(entry)) {
-    fallbacks[name] = (table.backends[name]?.fallbacks ?? []).filter(
-      (fallback) => table.backends[fallback]?.enabled,
-    );
+  for (const backend of instantEvalJudgeEntryBackends(entry)) {
+    fallbacks[backend] = instantEvalJudgeEnabledFallbacksOf({ backend, table });
   }
   return fallbacks;
 }
