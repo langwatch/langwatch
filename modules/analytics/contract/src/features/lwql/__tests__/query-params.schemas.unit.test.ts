@@ -2,11 +2,18 @@
  * The wire shape of a run's projects and sources: what each door accepts and refuses.
  * @see specs/lwql/query-params.feature
  */
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { dashboardWidgetQuerySchema } from "../../dashboard-widget/dashboard-widget-definition.ts";
-import { holdsAllWord, lwqlKeyStatementSchema } from "../analytics-lwql.schemas.ts";
+import {
+  holdsAllWord,
+  LWQL_ALL_STANDS_ALONE,
+  lwqlKeyStatementSchema,
+  lwqlMemberProjectsRequestSchema,
+} from "../analytics-lwql.schemas.ts";
 import { lwqlQueryRequestSchema } from "../analytics-lwql.trpc.ts";
 import { langWatchQLQueryResultSchema, TRACE_SOURCES } from "../analytics.lwql.ts";
 import { LWQL_MAX_MEMBER_PROJECTS, LWQL_MAX_NAMED_PROJECTS } from "../langwatch-ql-limits.ts";
@@ -170,6 +177,29 @@ describe('given projects set to "all"', () => {
     expect(lwqlQueryRequestSchema.validate({ projectId: "p", sql: SQL, projects: "all" })).toBe(
       true,
     );
+  });
+
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("is normalized to the string at the member door too", () => {
+    const body = lwqlQueryRequestSchema.parse({ projectId: "p", sql: SQL, projects: " ALL " });
+
+    expect(body.projects).toBe("all");
+    expect(lwqlMemberProjectsRequestSchema.parse(" ALL ")).toBe("all");
+  });
+
+  it("names what is accepted when a stray string is sent", () => {
+    expect(issuesOf({ sql: SQL, projects: "al" })).toEqual([
+      'projects: send "all" or a list of project ids',
+    ]);
+  });
+
+  it("is worded alike in the contract and the docs", () => {
+    const docs = readFileSync(
+      new URL("../../../../../../../docs/features/querying-your-data.mdx", import.meta.url),
+      "utf8",
+    );
+
+    expect(docs).toContain(LWQL_ALL_STANDS_ALONE);
   });
 
   /** @scenario "QP03f projects accepts the word all for every project the caller can read" */

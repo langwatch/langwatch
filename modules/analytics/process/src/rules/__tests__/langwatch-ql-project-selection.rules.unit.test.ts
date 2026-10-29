@@ -19,6 +19,14 @@ const MEMBERS = {
   ],
 };
 
+describe("selectNamedProjects with a stray string", () => {
+  it("flags it instead of spreading it as a list", () => {
+    const selected = selectNamedProjects({ projects: "al" as never });
+
+    expect(selected).toMatchObject({ stray: true, all: false, named: undefined });
+  });
+});
+
 describe("select", () => {
   it("flags a request that names both projectId and projects", () => {
     expect(selectNamedProjects({ projectId: "A", projects: ["B"] }).conflict).toBe(true);

@@ -34,6 +34,12 @@ describe("select", () => {
     }
   });
 
+  it("refuses a stray string with a 422 instead of reading it as a list", () => {
+    expect(() => service.select({ projects: "al" as never })).toThrow(
+      expect.objectContaining({ httpStatus: 422 }),
+    );
+  });
+
   it("answers the names, or none", () => {
     expect(service.select({ projects: ["B"] }).named).toEqual(["B"]);
     expect(service.select({}).named).toBeUndefined();

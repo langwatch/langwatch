@@ -20,13 +20,16 @@ export function selectNamedProjects({
 }: {
   projectId?: string | undefined;
   projects?: readonly string[] | "all" | undefined;
-}): { named: readonly string[] | undefined; all: boolean; conflict: boolean } {
+}): { named: readonly string[] | undefined; all: boolean; conflict: boolean; stray: boolean } {
   const all = projects === LWQL_ALL_PROJECTS;
-  const list = all ? undefined : projects;
+  // The schema normalizes the word; any other string would be spread as a list of characters.
+  const stray = typeof projects === "string" && !all;
+  const list = all || stray ? undefined : projects;
 
   return {
     named: list ?? (projectId === undefined ? undefined : [projectId]),
     all,
+    stray,
     conflict: projectId !== undefined && projects !== undefined,
   };
 }

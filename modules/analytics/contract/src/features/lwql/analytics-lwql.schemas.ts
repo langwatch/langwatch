@@ -176,9 +176,12 @@ export const lwqlMemberProjectsSchema: LwqlMemberProjectsSchema =
  */
 function listRefusalOr(issue: {
   code?: string;
+  input?: unknown;
   errors?: readonly (readonly { message: string }[])[];
 }) {
   if (issue.code !== "invalid_union") return undefined;
+  // A stray string fails the pattern and the list alike: say what is accepted.
+  if (typeof issue.input === "string") return 'projects: send "all" or a list of project ids';
 
   return issue.errors?.[1]?.[0]?.message ?? 'projects must be "all" or a list of project ids';
 }
@@ -198,7 +201,7 @@ export function holdsAllWord(ids: readonly string[]): boolean {
 const allWordSchema = z
   .string()
   .regex(/^\s*[aA][lL][lL]\s*$/)
-  .transform(() => LWQL_ALL_PROJECTS as typeof LWQL_ALL_PROJECTS);
+  .transform((): typeof LWQL_ALL_PROJECTS => LWQL_ALL_PROJECTS);
 
 /** What a run's `projects` holds for a key: the ids to read, or "all" of those it can read. */
 const lwqlProjectsRequestSchemaDefinition = z.union([allWordSchema, lwqlProjectsSchemaDefinition], {

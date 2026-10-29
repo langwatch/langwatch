@@ -58,6 +58,17 @@ async function askBatchPaths(
   return [anyOf.allowed, batch.byPermission.get("traces:view")?.projects.get(PROJECT)];
 }
 
+async function askWidgetWrite(authz: AuthzService) {
+  const batch = await authz.canBatchByIds({
+    principal: alice,
+    permission: "analytics:view",
+    organizationId: ORG,
+    teams: [],
+    projects: [{ projectId: PROJECT, teamId: "team-1" }],
+  });
+  return batch.projects.get(PROJECT);
+}
+
 describe("AuthzService batch decisions on an aggregate project", () => {
   describe("when a permitted member who is not an organization admin asks", () => {
     it("closes the aggregate in canAnyByIds and canBatchPermissionsByIds", async () => {
@@ -67,18 +78,10 @@ describe("AuthzService batch decisions on an aggregate project", () => {
     });
 
     /** @scenario "AC210f Compatibility: a member who is no admin cannot name an aggregate project in a widget" */
-    it("closes the aggregate in canBatchByIds, which the widget write uses", async () => {
+    it("closes the aggregate in canBatchByIds for analytics:view, which the widget write asks", async () => {
       const authz = makeAuthz({ role: "MEMBER", kind: "aggregate" });
 
-      const batch = await authz.canBatchByIds({
-        principal: alice,
-        permission: "traces:view",
-        organizationId: ORG,
-        teams: [],
-        projects: [{ projectId: PROJECT, teamId: "team-1" }],
-      });
-
-      expect(batch.projects.get(PROJECT)).toBe(false);
+      expect(await askWidgetWrite(authz)).toBe(false);
     });
 
     it("leaves an ordinary project open", async () => {
@@ -89,6 +92,12 @@ describe("AuthzService batch decisions on an aggregate project", () => {
   });
 
   describe("when an organization admin asks", () => {
+    it("opens the same aggregate to the widget write", async () => {
+      const authz = makeAuthz({ role: "ADMIN", kind: "aggregate" });
+
+      expect(await askWidgetWrite(authz)).toBe(true);
+    });
+
     it("opens the aggregate", async () => {
       const authz = makeAuthz({ role: "ADMIN", kind: "aggregate" });
 

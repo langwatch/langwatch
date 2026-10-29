@@ -54,6 +54,8 @@ const INPUT_HIDDEN_FROM_THE_PUBLIC: ResolvedDataPrivacy = {
 function scopeOver(input: {
   projects: readonly Project[];
   grants: Readonly<Record<string, readonly string[]>>;
+  /** What authz answers per project, when it is not just the grants. */
+  decisions?: Readonly<Record<string, boolean>>;
   privacy?: Readonly<Record<string, ResolvedDataPrivacy>>;
   /** Reshapes the rows the project read answers, e.g. to repeat one as an unstable page would. */
   rows?: (data: Project[]) => Project[];
@@ -91,11 +93,11 @@ function scopeOver(input: {
         batches.push(projects.map(({ projectId }) => projectId));
         return Promise.resolve({
           teams: new Map(),
-          // The real gate closes an aggregate to a member who is no admin (ADR-177).
+          // The gate itself is authz's (its own test); this fake only answers what the test sets.
           projects: new Map(
             projects.map(({ projectId }) => [
               projectId,
-              input.projects.find(({ id }) => id === projectId)?.kind !== "aggregate" &&
+              input.decisions?.[projectId] ??
                 input.grants[projectId]?.includes(permission) === true,
             ]),
           ),
@@ -790,10 +792,11 @@ describe("given a member's card that names projects", () => {
   });
 
   /** @scenario "AC210f Compatibility: a member who is no admin cannot name an aggregate project in a widget" */
-  it("refuses an aggregate project to a member, as a missing one", async () => {
-    const { service } = scopeOver({
+  it("sends an aggregate project to authz and refuses it, as a missing one, when authz says no", async () => {
+    const { service, batches } = scopeOver({
       projects: [project("a"), project("agg", { kind: "aggregate" as never })],
-      grants: { a: ["analytics:view"], agg: ["analytics:view"] },
+      grants: { a: ["analytics:view"] },
+      decisions: { a: true, agg: false },
     });
     const ask = (projectIds: string[]) =>
       refusalOf(service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }));
@@ -801,6 +804,7 @@ describe("given a member's card that names projects", () => {
     const aggregate = await ask(["a", "agg"]);
     const missing = await ask(["a", "nope"]);
 
+    expect(batches[0]).toContain("agg");
     expect(aggregate).toMatchObject({ code: "project_not_found", httpStatus: 404 });
     expect(body(aggregate)).toBe(body(missing));
   });

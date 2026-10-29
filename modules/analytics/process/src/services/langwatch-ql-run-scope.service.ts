@@ -60,7 +60,8 @@ export class LangWatchQLRunScopeService {
     projectId?: string | undefined;
     projects?: readonly string[] | "all" | undefined;
   }): { named: readonly string[] | undefined; all: boolean } {
-    const { named, all, conflict } = selectNamedProjects(request);
+    const { named, all, conflict, stray } = selectNamedProjects(request);
+    if (stray) throw new ValidationError('projects: send "all" or a list of project ids');
     if (conflict) throw new ValidationError("send projectId or projects, not both");
     if (Array.isArray(request.projects) && holdsAllWord(request.projects)) {
       throw new ValidationError(LWQL_ALL_STANDS_ALONE);
