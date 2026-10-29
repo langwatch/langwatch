@@ -6,11 +6,26 @@
 import { effectiveSources } from "@langwatch/analytics-contract";
 import { type DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
-type Sourced = Pick<DashboardWidgetQuery, "name" | "sources">;
+import { canFollowSources, readsSourcesParameter } from "./sources-parameter.ts";
 
-/** Every query's list is empty: the widget counts no trace, so nothing is run. */
+type Sourced = Pick<DashboardWidgetQuery, "name" | "sources" | "sql">;
+
+/** The card line when no query reads the parameter but a view could follow it (AC204). */
+export const ALL_SOURCES_LINE = "Sources: all sources";
+
+/** The card line when every view a widget reads keeps no origin (AC202f). */
+export const SOURCES_DO_NOT_APPLY_LINE =
+  "Sources don't apply: this widget reads a view that keeps no origin";
+
+/**
+ * Every query that reads the sources parameter has an empty list: the widget counts no trace,
+ * so nothing is run. A query that ignores the parameter counts every origin whatever it stores.
+ */
 export function picksNoSources(queries: readonly Sourced[]): boolean {
-  return queries.length > 0 && queries.every((query) => query.sources?.length === 0);
+  return (
+    queries.length > 0 &&
+    queries.every((query) => query.sources?.length === 0 && readsSourcesParameter(query.sql))
+  );
 }
 
 /**
@@ -23,11 +38,20 @@ export function withStoredSources(
   return queries.map((query) => ({ ...query, sources: query.sources ?? null }));
 }
 
-/** "Sources: application, langy"; each query's own list when they differ; "" with no query. */
+/**
+ * "Sources: application, langy" for the queries that read the parameter, each query's own list
+ * when they differ; "all sources" when none reads it; "" with no query.
+ */
 export function widgetSourcesLine(queries: readonly Sourced[]): string {
   if (queries.length === 0) return "";
   if (picksNoSources(queries)) return "No sources picked";
-  const named = queries.map((query) => ({
+  const following = queries.filter((query) => readsSourcesParameter(query.sql));
+  if (following.length === 0) {
+    return queries.some((query) => canFollowSources(query.sql))
+      ? ALL_SOURCES_LINE
+      : SOURCES_DO_NOT_APPLY_LINE;
+  }
+  const named = following.map((query) => ({
     name: query.name,
     list: effectiveSources(query.sources).join(", ") || "none",
   }));

@@ -1,0 +1,1318 @@
+{
+  "before": [
+    "application",
+    "simulation",
+    "evaluation",
+    "sample",
+    "coding_agent",
+    "ai_tool",
+    "gateway",
+    "workflow",
+    "playground",
+    "other"
+  ],
+  "families": {
+    "scenario": [
+      "simulation"
+    ],
+    "gateway": [
+      "gateway"
+    ],
+    "codingAgent": [
+      "coding_agent"
+    ],
+    "application": [
+      "application"
+    ]
+  },
+  "scenarioWidgets": [
+    "scenarios",
+    "ship-compare",
+    "ship-flaky",
+    "ship-suites",
+    "ship-verdict"
+  ],
+  "gatewayWidgets": [
+    "fd-gateway"
+  ],
+  "codingAgentWidgets": [
+    "fd-coding-agents"
+  ],
+  "exemptQueries": [
+    "cost-by-model/models",
+    "ext-precision-recall/main",
+    "fd-coding-agents/agents",
+    "fd-coding-agents/trend",
+    "fd-cost-efficiency/models",
+    "fd-gateway/main",
+    "scenarios/totals",
+    "scenarios/trend",
+    "ship-compare/main",
+    "ship-flaky/main",
+    "ship-models/main",
+    "ship-rollout/changes",
+    "ship-suites/suites",
+    "ship-suites/summary",
+    "ship-verdict/costs",
+    "ship-verdict/scenarios",
+    "so-changes/main",
+    "so-queue/flow",
+    "so-queue/summary",
+    "so-verdict/backlog",
+    "token-drift/main",
+    "tools-wrong-tool/changes",
+    "top-models/modelCosts",
+    "up-errors/changes",
+    "up-loops/totals"
+  ],
+  "changes": [
+    {
+      "widget": "ans-evaluators",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ans-idk",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ans-outcomes",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ans-review",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ans-topics",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ask-again",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ask-cannot",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ask-rising",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "att-change",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "att-share",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "att-table",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ck-attention",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ck-kpis",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ck-status",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ck-top-ask",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ck-trend",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "conversation-length",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "cost-accuracy",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "cost-by-model",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "cost-by-segment",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "cost-by-source",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "cost-verdict",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "cost-waste",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "data-health",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "error-rate",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "evaluation-coverage",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ext-cost-per-doc",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ext-field-accuracy",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ext-human-review",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ext-precision-recall",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "fd-coding-agents",
+      "added": [],
+      "removed": [
+        "application",
+        "simulation",
+        "evaluation",
+        "sample",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: the coding-agent widget counts coding_agent"
+    },
+    {
+      "widget": "fd-cost-efficiency",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "fd-failures",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "fd-feedback",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "fd-gateway",
+      "added": [],
+      "removed": [
+        "application",
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: the gateway widget counts gateway"
+    },
+    {
+      "widget": "fd-quality",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "fd-throughput",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "gen-acceptance",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "gen-dropoff",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "latency-slo",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "latency-spread",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "lowest-passing-evaluators",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "lowest-scores",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "noise",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "rag-dataset-versions",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "rag-empty-retrieval",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "rag-failure-source",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "satisfaction-shift",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "scenarios",
+      "added": [],
+      "removed": [
+        "application",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: scenario widgets count simulation"
+    },
+    {
+      "widget": "ship-compare",
+      "added": [],
+      "removed": [
+        "application",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: scenario widgets count simulation"
+    },
+    {
+      "widget": "ship-flaky",
+      "added": [],
+      "removed": [
+        "application",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: scenario widgets count simulation"
+    },
+    {
+      "widget": "ship-models",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ship-rollout",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "ship-suites",
+      "added": [],
+      "removed": [
+        "application",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: scenario widgets count simulation"
+    },
+    {
+      "widget": "ship-verdict",
+      "added": [],
+      "removed": [
+        "application",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: scenario widgets count simulation"
+    },
+    {
+      "widget": "slowest-models",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "so-agreement",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "so-changes",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "so-queue",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "so-rubric",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "so-verdict",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "spend",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "thumbs-down",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "token-drift",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "tools-error-rate",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "tools-wrong-tool",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "top-models",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "topics",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "traffic",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "up-errors",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "up-failing-traces",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "up-loops",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "up-step-latency",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "up-where-fails",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "voice-call-health",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "voice-cost-per-call",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "voice-task-success",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    },
+    {
+      "widget": "voice-turn-latency",
+      "added": [],
+      "removed": [
+        "simulation",
+        "evaluation",
+        "sample",
+        "coding_agent",
+        "ai_tool",
+        "gateway",
+        "workflow",
+        "playground",
+        "other"
+      ],
+      "reason": "tasks#1025: every other stock widget counts application"
+    }
+  ]
+}

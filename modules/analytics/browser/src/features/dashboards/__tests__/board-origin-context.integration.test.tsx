@@ -65,7 +65,12 @@ type StoredQuery = { name: string; sql: string; sources?: string[] | null };
 const GRAPH: { version: 1; code: string; queries: StoredQuery[] } = {
   version: 1,
   code: "export default function Widget() { return null; }",
-  queries: [{ name: "main", sql: "SELECT count() AS n FROM traces" }],
+  queries: [
+    {
+      name: "main",
+      sql: "SELECT count() AS n FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}",
+    },
+  ],
 };
 const WIDGET = {
   id: "w-1",
@@ -495,8 +500,8 @@ describe("given a member who may not edit the board", () => {
 });
 
 describe("given a From LangWatch board", () => {
-  /** @scenario "AC200h Sources: a From LangWatch board's widgets count every origin but Langy's" */
-  it("runs every widget with the catalogue's sources, in a personal project too", async () => {
+  /** @scenario "AC200h Sources: a From LangWatch board's widgets count the sources their definitions declare" */
+  it("runs every widget with the sources its definition declares, in a personal project too", async () => {
     for (const isPersonal of [false, true]) {
       const server = boardServer();
       const host = new StubAnalyticsHost({
@@ -518,9 +523,10 @@ describe("given a From LangWatch board", () => {
 
       expect(server.runs().length).toBeGreaterThan(0);
       const sent = server.runs().map((run) => run.sources as readonly string[]);
-      // Every source but Langy's, until stock widgets carry their own (tasks#1025).
-      expect(sent.every((sources) => sources.includes("application"))).toBe(true);
-      expect(sent.some((sources) => sources.includes("langy"))).toBe(false);
+      // Each widget counts its family's one source, never everything but Langy's (tasks#1025).
+      expect(sent.every((sources) => ["application", "simulation"].includes(sources.join()))).toBe(
+        true,
+      );
       cleanup();
     }
   });
