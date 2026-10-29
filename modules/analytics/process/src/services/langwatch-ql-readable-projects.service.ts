@@ -3,7 +3,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 type Dependencies = Readonly<{
-  authz: Pick<AuthzApi, "hasPermission">;
+  authz: Pick<AuthzApi, "canBatchByIds">;
   projects: Pick<
     ProjectApi,
     "findOrganizationId" | "findLiveNonGovernanceIdsByOrganization" | "listNamesByIds"
@@ -31,19 +31,19 @@ export class LangWatchQLReadableProjectsService {
     if (organizationId === undefined) return [];
 
     const ids = await projects.findLiveNonGovernanceIdsByOrganization({ organizationId });
-    const readable: string[] = [];
-    for (const id of ids) {
-      const allowed = await authz.hasPermission({
-        userId,
-        permission: "analytics:view",
-        projectId: id,
-      });
-      if (allowed) readable.push(id);
-    }
-    if (readable.length === 0) return [];
+    if (ids.length === 0) return [];
 
-    const named = await projects.listNamesByIds({ projectIds: readable });
+    const identities = await projects.listNamesByIds({ projectIds: ids });
+    const decided = await authz.canBatchByIds({
+      principal: { type: "user", id: userId },
+      permission: "analytics:view",
+      organizationId,
+      teams: [...new Set(identities.map(({ teamId }) => teamId))].map((teamId) => ({ teamId })),
+      projects: identities.map(({ id, teamId }) => ({ projectId: id, teamId })),
+    });
 
-    return named.map(({ id, name }) => ({ id, name }));
+    return identities
+      .filter(({ id }) => decided.projects.get(id) === true)
+      .map(({ id, name }) => ({ id, name }));
   }
 }

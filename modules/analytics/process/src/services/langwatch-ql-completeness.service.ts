@@ -10,7 +10,6 @@ import {
   type LangWatchQLTimeWindow,
   type QueryCompleteness,
   type QueryCompletenessState,
-  type RunSources,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";

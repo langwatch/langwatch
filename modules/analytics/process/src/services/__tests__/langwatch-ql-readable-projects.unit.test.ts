@@ -15,14 +15,25 @@ const NAMES = { a: "Alpha", b: "Beta", c: "Gamma" } as const;
 function serviceFor({ live, readable }: { live: readonly string[]; readable: readonly string[] }) {
   return LangWatchQLReadableProjectsService.create({
     authz: createApiFixture<AuthzApi>({
-      hasPermission: ({ projectId }) => Promise.resolve(readable.includes(projectId ?? "")),
+      canBatchByIds: ({ projects }) =>
+        Promise.resolve({
+          teams: new Map(),
+          projects: new Map(
+            projects.map(({ projectId }) => [projectId, readable.includes(projectId)]),
+          ),
+          organizationRole: null,
+        }),
     }),
     projects: createApiFixture<ProjectApi>({
       findOrganizationId: () => Promise.resolve("org-1"),
       findLiveNonGovernanceIdsByOrganization: () => Promise.resolve([...live]),
       listNamesByIds: ({ projectIds }) =>
         Promise.resolve(
-          projectIds.map((id) => ({ id, name: NAMES[id as keyof typeof NAMES] })) as never,
+          projectIds.map((id) => ({
+            id,
+            name: NAMES[id as keyof typeof NAMES],
+            teamId: `team-${id}`,
+          })) as never,
         ),
     }),
   });

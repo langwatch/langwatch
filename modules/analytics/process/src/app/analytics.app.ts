@@ -49,11 +49,7 @@ import {
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import {
-  type Authorization,
-  type RestCredentialPrincipal,
-  sharedWindowsReadBy,
-} from "@langwatch/authorization";
+import { type Authorization, type RestCredentialPrincipal } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -116,12 +112,12 @@ import {
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
 import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
-import { LangWatchQLProjectSelectionService } from "../services/langwatch-ql-project-selection.service.ts";
 import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
 import { LangWatchQLReadableProjectsService } from "../services/langwatch-ql-readable-projects.service.ts";
+import { LangWatchQLRunScopeService } from "../services/langwatch-ql-run-scope.service.ts";
 import { LangWatchQLValidationReportService } from "../services/langwatch-ql-validation-report.service.ts";
 import {
   DEFAULT_LWQL_DATABASE,
@@ -364,7 +360,6 @@ type AnalyticsSetup = FeatureSetup<
  * The two reads hydration makes, in the Trace peer's own vocabulary: it names
  * traces and threads where hydration names keys.
  */
-const projectSelection = LangWatchQLProjectSelectionService.create();
 
 class TraceApiHydrationSource implements LangWatchQLTraceSource {
   constructor(private readonly traces: TraceApi) {}
@@ -543,6 +538,7 @@ export class AnalyticsModule
   #queryScope: LangWatchQLQueryScopeService;
   #readableProjects: LangWatchQLReadableProjectsService;
   #aggregateScope: LangWatchQLAggregateScopeService;
+  #runScope: LangWatchQLRunScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
 
@@ -555,6 +551,11 @@ export class AnalyticsModule
       ...(dependencies.lwqlAggregateMaxMembers === undefined
         ? {}
         : { maxMembers: dependencies.lwqlAggregateMaxMembers }),
+    });
+    this.#runScope = LangWatchQLRunScopeService.create({
+      queryScope: this.#queryScope,
+      aggregateScope: this.#aggregateScope,
+      bounds: dependencies.lwqlBounds,
     });
     this.#protections = WorkbenchProtectionsService.create(dependencies);
     this.#validationReport = LangWatchQLValidationReportService.create({
@@ -749,7 +750,7 @@ export class AnalyticsModule
   ): Promise<LangWatchQLQueryResult> {
     const { reach, projectId, projects: named, sql, parameters, timeWindow } = input;
     const { granularitySeconds, sources, signal } = input;
-    const { named: wanted } = projectSelection.select({ projectId, projects: named });
+    const { named: wanted } = this.#runScope.select({ projectId, projects: named });
     const { projects, protections } = await this.#queryScope.resolve({
       reach,
       requireProjects: true,
@@ -849,35 +850,18 @@ export class AnalyticsModule
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
     const { authorization, project, projects: named, userId, ...run } = input;
-    const shared = authorization
-      ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
-      : [];
-    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
-    const aggregate =
-      shared.length > 0 ? await this.#aggregateScope.getMemberScope({ shared }) : undefined;
+    const scope = await this.#runScope.resolve({ authorization, project, named, userId });
 
-    if (aggregate) {
-      const members =
-        named === undefined ? aggregate : projectSelection.narrowAggregate({ aggregate, named });
+    if (scope.kind === "aggregate") {
       // A judged column is charged to one project, so an aggregate's statement may call none.
       return this.#dependencies.langWatchQL.executeForProjects({
         ...run,
-        projects: members.projects,
-        memberWindows: members.memberWindows,
+        projects: scope.projects,
+        memberWindows: scope.memberWindows,
         isInstantEvalsEnabled: false,
       });
     }
-    if (named !== undefined && (named.length !== 1 || named[0] !== project.id)) {
-      if (userId === undefined) throw new LangWatchQLProjectNotFoundError();
-      const scope = await this.#queryScope.resolveMemberProjects({
-        userId,
-        projectIds: named,
-        ...(authorization ? { authorization } : {}),
-      });
-      for (const member of scope.projects) {
-        await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: member.id });
-      }
-
+    if (scope.kind === "named") {
       return this.#dependencies.langWatchQL.executeForProjects({
         ...run,
         projects: scope.projects,

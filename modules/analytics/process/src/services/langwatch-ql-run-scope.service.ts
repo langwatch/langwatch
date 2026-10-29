@@ -1,0 +1,104 @@
+import {
+  LangWatchQLProjectNotFoundError,
+  type LangWatchQLCaller,
+  type LangWatchQLExecuteInput,
+  type LangWatchQLMemberWindow,
+  type LangWatchQLProtections,
+} from "@langwatch/analytics-contract";
+import { sharedWindowsReadBy, type Authorization } from "@langwatch/authorization";
+import { ValidationError } from "@langwatch/handled-error";
+
+import {
+  narrowAggregate,
+  selectNamedProjects,
+} from "../rules/langwatch-ql-project-selection.rules.ts";
+import type { LangWatchQLAggregateScopeService } from "./langwatch-ql-aggregate-scope.service.ts";
+import type { LangWatchQLBoundsService } from "./langwatch-ql-bounds.service.ts";
+import type { LangWatchQLQueryScopeService } from "./langwatch-ql-query-scope.service.ts";
+
+/** Where a member's run reads: the caller's own project, an aggregate's members, or a named set. */
+export type LangWatchQLRunScope =
+  | Readonly<{ kind: "own" }>
+  | Readonly<{
+      kind: "aggregate";
+      projects: readonly LangWatchQLCaller[];
+      memberWindows: readonly LangWatchQLMemberWindow[];
+    }>
+  | Readonly<{
+      kind: "named";
+      projects: readonly LangWatchQLCaller[];
+      protections: LangWatchQLProtections;
+    }>;
+
+type Dependencies = Readonly<{
+  queryScope: Pick<LangWatchQLQueryScopeService, "resolveMemberProjects">;
+  aggregateScope: Pick<LangWatchQLAggregateScopeService, "getMemberScope">;
+  bounds: Pick<LangWatchQLBoundsService, "assertQueryWithinBounds">;
+}>;
+
+/**
+ * Decides which projects one member's run reads, and counts the run against each one's window
+ * before the engine sees it. The caller's authorization decides whether the project is an
+ * aggregate whose members share windows; a named list is proven readable by the member.
+ */
+export class LangWatchQLRunScopeService {
+  static create(dependencies: Dependencies): LangWatchQLRunScopeService {
+    return new LangWatchQLRunScopeService(dependencies);
+  }
+
+  private constructor(private readonly dependencies: Dependencies) {}
+
+  /**
+   * The projects a request names; none when it names none.
+   * @throws {ValidationError} when it names both `projectId` and `projects`.
+   */
+  select(request: { projectId?: string | undefined; projects?: readonly string[] | undefined }): {
+    named: readonly string[] | undefined;
+  } {
+    const { named, conflict } = selectNamedProjects(request);
+    if (conflict) throw new ValidationError("send projectId or projects, not both");
+
+    return { named };
+  }
+
+  /** @throws {LangWatchQLProjectNotFoundError} for a name the member may not read. */
+  async resolve({
+    authorization,
+    project,
+    named,
+    userId,
+  }: Pick<LangWatchQLExecuteInput, "project" | "projects" | "userId"> & {
+    named: readonly string[] | undefined;
+    authorization: Authorization | undefined;
+  }): Promise<LangWatchQLRunScope> {
+    const { queryScope, aggregateScope, bounds } = this.dependencies;
+    const shared = authorization
+      ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
+      : [];
+    await bounds.assertQueryWithinBounds({ projectId: project.id });
+
+    if (shared.length > 0) {
+      const aggregate = await aggregateScope.getMemberScope({ shared });
+      if (named === undefined) return { kind: "aggregate", ...aggregate };
+      const { scope, complete } = narrowAggregate({ aggregate, named });
+      if (!complete) throw new LangWatchQLProjectNotFoundError();
+
+      return { kind: "aggregate", ...scope };
+    }
+    if (named === undefined || (named.length === 1 && named[0] === project.id)) {
+      return { kind: "own" };
+    }
+    if (userId === undefined) throw new LangWatchQLProjectNotFoundError();
+
+    const scope = await queryScope.resolveMemberProjects({
+      userId,
+      projectIds: named,
+      ...(authorization ? { authorization } : {}),
+    });
+    for (const member of scope.projects) {
+      await bounds.assertQueryWithinBounds({ projectId: member.id });
+    }
+
+    return { kind: "named", ...scope };
+  }
+}

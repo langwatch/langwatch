@@ -15735,7 +15735,7 @@
                     "minLength": 1
                   },
                   "projects": {
-                    "description": "The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. The answer's params.projects lists what was read.",
+                    "description": "The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.",
                     "readOnly": true,
                     "minItems": 1,
                     "maxItems": 10000,
@@ -30057,7 +30057,7 @@
                                         {
                                           "readOnly": true,
                                           "minItems": 1,
-                                          "maxItems": 10000,
+                                          "maxItems": 100,
                                           "type": "array",
                                           "items": {
                                             "type": "string",
@@ -30689,7 +30689,7 @@
                                   {
                                     "readOnly": true,
                                     "minItems": 1,
-                                    "maxItems": 10000,
+                                    "maxItems": 100,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -31305,7 +31305,7 @@
                             {
                               "readOnly": true,
                               "minItems": 1,
-                              "maxItems": 10000,
+                              "maxItems": 100,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -31520,7 +31520,7 @@
                                   {
                                     "readOnly": true,
                                     "minItems": 1,
-                                    "maxItems": 10000,
+                                    "maxItems": 100,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -32236,7 +32236,7 @@
                                   {
                                     "readOnly": true,
                                     "minItems": 1,
-                                    "maxItems": 10000,
+                                    "maxItems": 100,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -32943,7 +32943,7 @@
                             {
                               "readOnly": true,
                               "minItems": 1,
-                              "maxItems": 10000,
+                              "maxItems": 100,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -33615,7 +33615,7 @@
                                   {
                                     "readOnly": true,
                                     "minItems": 1,
-                                    "maxItems": 10000,
+                                    "maxItems": 100,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -36737,7 +36737,7 @@
                                         {
                                           "readOnly": true,
                                           "minItems": 1,
-                                          "maxItems": 10000,
+                                          "maxItems": 100,
                                           "type": "array",
                                           "items": {
                                             "type": "string",
@@ -37451,7 +37451,7 @@
                                   {
                                     "readOnly": true,
                                     "minItems": 1,
-                                    "maxItems": 10000,
+                                    "maxItems": 100,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -38149,7 +38149,7 @@
                             {
                               "readOnly": true,
                               "minItems": 1,
-                              "maxItems": 10000,
+                              "maxItems": 100,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -38364,7 +38364,7 @@
                                   {
                                     "readOnly": true,
                                     "minItems": 1,
-                                    "maxItems": 10000,
+                                    "maxItems": 100,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -39080,7 +39080,7 @@
                                   {
                                     "readOnly": true,
                                     "minItems": 1,
-                                    "maxItems": 10000,
+                                    "maxItems": 100,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -39787,7 +39787,7 @@
                             {
                               "readOnly": true,
                               "minItems": 1,
-                              "maxItems": 10000,
+                              "maxItems": 100,
                               "type": "array",
                               "items": {
                                 "type": "string",

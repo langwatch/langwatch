@@ -32,11 +32,8 @@ import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import {
-  buildRunParams,
-  resolveRunSources,
-  runNotes,
-} from "../rules/langwatch-ql-run-params.rules.ts";
+import { runNotes } from "../rules/langwatch-ql-run-notes.rules.ts";
+import { buildRunParams, resolveRunSources } from "../rules/langwatch-ql-run-params.rules.ts";
 import {
   langWatchQLExecutionParameters,
   langWatchQLMissingParameters,

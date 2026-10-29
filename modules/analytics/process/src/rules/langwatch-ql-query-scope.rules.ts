@@ -6,11 +6,6 @@ import {
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
-  effectiveSources,
-  KNOWN_TRACE_ORIGINS,
-  OTHER_TRACE_SOURCE,
-  type RunSources,
-  type TraceSource,
 } from "@langwatch/analytics-contract";
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
@@ -49,7 +44,7 @@ const TENANT_COLUMN = "TenantId";
 /**
  * Earliest `OccurredAt` of a trace owning a row in `window`: one window back for a comparison
  * with the period before, plus the day of slack catalogue lookups give a trace observed after its
- * first span started. `OccurredAt` leads the sort key, so it prunes (analytics ADR-003).
+ * first span started. `OccurredAt` leads the sort key, so it prunes.
  */
 function traceLookupStart(window: LangWatchQLTimeWindow): string {
   const at = (instant: string) =>
@@ -290,7 +285,7 @@ type WindowReach = {
   dated: readonly LangWatchQLMemberWindow[];
   canReachTraceView: boolean;
   evaluationViews: ReadonlySet<string>;
-  /** The statement's period, bounding the trace lookup as the origin lookup is bounded. */
+  /** The statement's period, bounding the trace lookup. */
   timeWindow: LangWatchQLTimeWindow | undefined;
 };
 
@@ -353,8 +348,8 @@ function datedPicks({
 
 /**
  * `sql` with each catalogued view it reads kept to the members inside their grants' windows, and
- * a view outside `views` reading nothing (ADR-177 v4.14). No origin filter is added: a statement
- * is kept to its sources only where its SQL reads the sources parameter (dashboards-v2 AC204).
+ * a view outside `views` reading nothing (ADR-177 v4.14). It adds no origin condition: a statement
+ * is kept to its sources only where its SQL reads the sources parameter (analytics ADR-003).
  */
 export function scopeLangWatchQL({
   sql,

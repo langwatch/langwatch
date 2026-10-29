@@ -8,7 +8,7 @@ import { z } from "zod";
 import { lwqlKeyStatementSchema } from "../analytics-lwql.schemas.ts";
 import { lwqlQueryRequestSchema } from "../analytics-lwql.trpc.ts";
 import { langWatchQLQueryResultSchema, TRACE_SOURCES } from "../analytics.lwql.ts";
-import { LWQL_MAX_NAMED_PROJECTS } from "../langwatch-ql-limits.ts";
+import { LWQL_MAX_MEMBER_PROJECTS, LWQL_MAX_NAMED_PROJECTS } from "../langwatch-ql-limits.ts";
 
 const SQL = "SELECT 1";
 const issuesOf = (input: unknown) => {
@@ -102,5 +102,21 @@ describe("given a result that carries params", () => {
 
     expect(before.parse(wire).rows).toEqual([{ n: 3 }]);
     expect(before.parse(wire)).not.toHaveProperty("params");
+  });
+});
+
+describe("given the member door's body", () => {
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
+  it("refuses more projects than a member's list may hold, naming the maximum", () => {
+    const ids = (count: number) => Array.from({ length: count }, (_, index) => `p${index}`);
+    const parse = (projects: string[]) =>
+      lwqlQueryRequestSchema.safeParse({ projectId: "p", sql: SQL, projects });
+
+    expect(parse(ids(LWQL_MAX_MEMBER_PROJECTS)).success).toBe(true);
+    const refused = parse(ids(LWQL_MAX_MEMBER_PROJECTS + 1));
+    expect(refused.success).toBe(false);
+    expect(refused.error?.issues[0]?.message).toBe(
+      `projects holds at most ${LWQL_MAX_MEMBER_PROJECTS} ids`,
+    );
   });
 });

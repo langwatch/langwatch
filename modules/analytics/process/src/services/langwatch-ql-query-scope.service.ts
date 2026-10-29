@@ -5,12 +5,14 @@ import {
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
+import { LWQL_MAX_MEMBER_PROJECTS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 /**
  * The query door's scope: the projects an API key may read and the protections to redact by.
  * The candidates are enumerated from the key's organization, never taken from the request, and
  * a key that reads nothing is a valid empty scope — the row policy, not the door, is the boundary.
  */
 import type { Authorization, RestProjectCredentialPrincipal } from "@langwatch/authorization";
+import { ValidationError } from "@langwatch/handled-error";
 import { PROJECT_KIND, type Project, type ProjectApi } from "@langwatch/project-contract";
 
 import { strictestLangWatchQLProtections } from "../rules/langwatch-ql-query-scope.rules.ts";
@@ -127,18 +129,28 @@ export class LangWatchQLQueryScopeService {
     userId: string;
     projectIds: readonly string[];
   }): Promise<LangWatchQLCaller[]> {
+    const ids = dedupeInOrder(projectIds);
+    if (ids.length > LWQL_MAX_MEMBER_PROJECTS) {
+      throw new ValidationError(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
+    }
+    // Every id is looked up and checked, all at once, before any is judged, so the answer's
+    // timing cannot tell a missing project from an unreadable one or place it in the list.
+    const checked = await Promise.all(
+      ids.map(async (projectId) => ({
+        project: await this.dependencies.projects.findById(projectId),
+        allowed: await this.dependencies.authz
+          .hasPermission({ userId, permission: "analytics:view", projectId })
+          .catch(() => false),
+      })),
+    );
     const readable: LangWatchQLCaller[] = [];
-    for (const projectId of dedupeInOrder(projectIds)) {
-      const project = await this.dependencies.projects.findById(projectId);
-      const allowed =
+    for (const { project, allowed } of checked) {
+      const live =
         project !== null &&
         project !== undefined &&
-        (await this.dependencies.authz.hasPermission({
-          userId,
-          permission: "analytics:view",
-          projectId,
-        }));
-      if (!project || !allowed) throw new LangWatchQLProjectNotFoundError();
+        project.archivedAt === null &&
+        project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE;
+      if (!live || !allowed) throw new LangWatchQLProjectNotFoundError();
       readable.push({ id: project.id, lwqlKey: project.lwqlKey });
     }
 

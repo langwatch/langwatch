@@ -13,7 +13,11 @@ import {
   traceSourcesSchema,
   type LangWatchQLProtections,
 } from "./analytics.lwql.ts";
-import { LWQL_MAX_NAMED_PROJECTS, MAX_LWQL_LENGTH } from "./langwatch-ql-limits.ts";
+import {
+  LWQL_MAX_MEMBER_PROJECTS,
+  LWQL_MAX_NAMED_PROJECTS,
+  MAX_LWQL_LENGTH,
+} from "./langwatch-ql-limits.ts";
 
 /**
  * The caller-specific content gates the catalog understands, as a value a
@@ -127,10 +131,6 @@ export const lwqlStatementSchema: LwqlStatementSchema = lwqlStatementSchemaDefin
 
 export type LangWatchQLStatementRequest = z.infer<typeof lwqlStatementSchema>;
 
-/**
- * `POST /api/v1/query`'s body: a statement, optionally narrowed to one project the key reads.
- * The workbench runs inside one project already, so only the key door accepts `projectId`.
- */
 /** A list of project ids a run names: at least one, at most the capability ceiling. */
 const lwqlProjectsSchemaDefinition = z
   .array(z.string().min(1))
@@ -140,6 +140,22 @@ const lwqlProjectsSchemaDefinition = z
 export interface LwqlProjectsSchema extends Named<typeof lwqlProjectsSchemaDefinition> {}
 export const lwqlProjectsSchema: LwqlProjectsSchema = lwqlProjectsSchemaDefinition;
 
+/** The same list for a signed-in member, at most {@link LWQL_MAX_MEMBER_PROJECTS} ids. */
+const lwqlMemberProjectsSchemaDefinition = z
+  .array(z.string().min(1))
+  .min(1, "projects must hold at least one id")
+  .max(LWQL_MAX_MEMBER_PROJECTS, `projects holds at most ${LWQL_MAX_MEMBER_PROJECTS} ids`)
+  .readonly();
+export interface LwqlMemberProjectsSchema extends Named<
+  typeof lwqlMemberProjectsSchemaDefinition
+> {}
+export const lwqlMemberProjectsSchema: LwqlMemberProjectsSchema =
+  lwqlMemberProjectsSchemaDefinition;
+
+/**
+ * `POST /api/v1/query`'s body: a statement, optionally narrowed to one project the key reads.
+ * The workbench runs inside one project already, so only the key door accepts `projectId`.
+ */
 const lwqlKeyStatementSchemaDefinition = z.object({
   ...lwqlStatementSchema.shape,
   projectId: z
@@ -152,7 +168,7 @@ const lwqlKeyStatementSchemaDefinition = z.object({
   projects: lwqlProjectsSchema
     .optional()
     .describe(
-      "The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. The answer's params.projects lists what was read.",
+      "The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.",
     ),
   sources: traceSourcesSchema
     .readonly()

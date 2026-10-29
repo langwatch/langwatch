@@ -6,9 +6,7 @@
 import { LWQL_DIAGNOSTIC_CODES } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { LangWatchQLProjectSelectionService } from "../../services/langwatch-ql-project-selection.service.ts";
-
-const selection = LangWatchQLProjectSelectionService.create();
+import { narrowAggregate, selectNamedProjects } from "../langwatch-ql-project-selection.rules.ts";
 
 const MEMBERS = {
   projects: [
@@ -22,33 +20,28 @@ const MEMBERS = {
 };
 
 describe("select", () => {
-  /** @scenario "QP12d A run that names both projectId and projects is refused" */
-  it("refuses a request that names both projectId and projects", () => {
-    expect(() => selection.select({ projectId: "A", projects: ["B"] })).toThrow(
-      "send projectId or projects, not both",
-    );
-    expect(() => selection.select({ projectId: "A", projects: ["B"] })).toThrow(
-      expect.objectContaining({ code: "validation_error", httpStatus: 422 }),
-    );
+  it("flags a request that names both projectId and projects", () => {
+    expect(selectNamedProjects({ projectId: "A", projects: ["B"] }).conflict).toBe(true);
   });
 
   it("reads projects, or the one projectId, or nothing", () => {
-    expect(selection.select({ projects: ["B", "A"] }).named).toEqual(["B", "A"]);
-    expect(selection.select({ projectId: "A" }).named).toEqual(["A"]);
-    expect(selection.select({}).named).toBeUndefined();
+    expect(selectNamedProjects({ projects: ["B", "A"] }).named).toEqual(["B", "A"]);
+    expect(selectNamedProjects({ projectId: "A" }).named).toEqual(["A"]);
+    expect(selectNamedProjects({}).named).toBeUndefined();
   });
 });
 
 describe("narrowAggregate", () => {
   /** @scenario "QP11b A group project narrows to its members and keeps their share windows" */
   it("keeps the named member and its own window, and refuses a name outside the group", () => {
-    expect(selection.narrowAggregate({ aggregate: MEMBERS, named: ["B"] })).toEqual({
-      projects: [{ id: "B", lwqlKey: "kb" }],
-      memberWindows: [{ projectId: "B", from: 1_700_000_000_000 }],
+    expect(narrowAggregate({ aggregate: MEMBERS, named: ["B"] })).toEqual({
+      complete: true,
+      scope: {
+        projects: [{ id: "B", lwqlKey: "kb" }],
+        memberWindows: [{ projectId: "B", from: 1_700_000_000_000 }],
+      },
     });
-    expect(() => selection.narrowAggregate({ aggregate: MEMBERS, named: ["Z"] })).toThrow(
-      expect.objectContaining({ code: "project_not_found", httpStatus: 404 }),
-    );
+    expect(narrowAggregate({ aggregate: MEMBERS, named: ["Z"] }).complete).toBe(false);
   });
 });
 

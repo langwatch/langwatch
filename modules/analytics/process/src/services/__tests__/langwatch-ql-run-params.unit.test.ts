@@ -498,3 +498,16 @@ describe("given a statement that compares TenantId with a project it may not rea
     expect(request?.tenantCapability.split(",")).toHaveLength(1);
   });
 });
+
+describe("given a statement that declares its own period parameter", () => {
+  /** @scenario "QP17 The params map holds the declared placeholders and the period, nothing else" */
+  it("echoes the caller's value, never the window's", async () => {
+    const { result } = await run({
+      sql: PERIOD_SQL.replace("LIMIT 1", "AND {period:String} != '' LIMIT 1"),
+      parameters: { period: "mine" },
+      timeWindow: WINDOW,
+    });
+
+    expect(result.params?.period).toBe("mine");
+  });
+});

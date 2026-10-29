@@ -1,0 +1,47 @@
+import type { LangWatchQLCaller, LangWatchQLMemberWindow } from "@langwatch/analytics-contract";
+
+/** The members an aggregate's statement runs over, and where each is read from. */
+export type MemberScope = Readonly<{
+  projects: readonly LangWatchQLCaller[];
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}>;
+
+/**
+ * The projects a request names: `projects`, or the one `projectId`; none when it names none.
+ * `conflict` is set when it names both, which no door accepts.
+ */
+export function selectNamedProjects({
+  projectId,
+  projects,
+}: {
+  projectId?: string | undefined;
+  projects?: readonly string[] | undefined;
+}): { named: readonly string[] | undefined; conflict: boolean } {
+  return {
+    named: projects ?? (projectId === undefined ? undefined : [projectId]),
+    conflict: projectId !== undefined && projects !== undefined,
+  };
+}
+
+/**
+ * An aggregate's members cut to the projects a card names. `complete` is false when a name is
+ * not a member, which the caller answers with the one id-free refusal.
+ */
+export function narrowAggregate({
+  aggregate,
+  named,
+}: {
+  aggregate: MemberScope;
+  named: readonly string[];
+}): { scope: MemberScope; complete: boolean } {
+  const wanted = new Set(named);
+  const projects = aggregate.projects.filter((member) => wanted.has(member.id));
+
+  return {
+    complete: projects.length === wanted.size,
+    scope: {
+      projects,
+      memberWindows: aggregate.memberWindows.filter((window) => wanted.has(window.projectId)),
+    },
+  };
+}

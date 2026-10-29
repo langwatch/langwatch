@@ -24,6 +24,13 @@ export const LWQL_MAX_RESULT_ROWS = 10_000;
  */
 export const LWQL_MAX_NAMED_PROJECTS = 10_000;
 
+/**
+ * The most projects a member's run or a stored widget query may name. A member's list is proven
+ * readable one project at a time, so it stays far below the key door's ceiling; 100 is more
+ * than an editor's picker can sensibly show.
+ */
+export const LWQL_MAX_MEMBER_PROJECTS = 100;
+
 /** The byte ceiling a finished result may not exceed, pinned server-side as `max_result_bytes`. */
 export const LWQL_MAX_RESULT_BYTES = 8_000_000;
 

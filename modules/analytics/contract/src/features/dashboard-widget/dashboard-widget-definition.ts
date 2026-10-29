@@ -7,7 +7,7 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { lwqlProjectsSchema } from "../lwql/analytics-lwql.schemas.ts";
+import { lwqlMemberProjectsSchema } from "../lwql/analytics-lwql.schemas.ts";
 import { traceSourcesSchema } from "../lwql/analytics.lwql.ts";
 import { MAX_LWQL_LENGTH } from "../lwql/langwatch-ql-limits.ts";
 
@@ -138,7 +138,7 @@ const dashboardWidgetQuerySchemaDefinition = z.object({
    * The projects the query reads (dashboards-v2 AC207). Unset (absent, or `null` on a write)
    * reads the board's project.
    */
-  projects: lwqlProjectsSchema.nullish(),
+  projects: lwqlMemberProjectsSchema.nullish(),
 });
 export interface DashboardWidgetQuerySchema extends Named<
   typeof dashboardWidgetQuerySchemaDefinition

@@ -1,3 +1,4 @@
+import { LWQL_MAX_MEMBER_PROJECTS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
@@ -52,6 +53,7 @@ function scopeOver(input: {
   privacy?: Readonly<Record<string, ResolvedDataPrivacy>>;
 }) {
   const asked: { projectId: string; permission: string }[] = [];
+  const checked: string[] = [];
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
@@ -70,8 +72,10 @@ function scopeOver(input: {
         asked.push({ projectId: scope.id, permission });
         return Promise.resolve(input.grants[scope.id]?.includes(permission) === true);
       },
-      hasPermission: ({ permission, projectId }) =>
-        Promise.resolve(input.grants[projectId ?? ""]?.includes(permission) === true),
+      hasPermission: ({ permission, projectId }) => {
+        checked.push(projectId ?? "");
+        return Promise.resolve(input.grants[projectId ?? ""]?.includes(permission) === true);
+      },
       getScope: ({ projectId = "" }) =>
         Promise.resolve({
           type: "project",
@@ -105,7 +109,7 @@ function scopeOver(input: {
     }),
   });
 
-  return { service, asked };
+  return { service, asked, checked };
 }
 
 describe("given an API key that reaches several projects of its organization", () => {
@@ -505,5 +509,68 @@ describe("given a member's card that names projects", () => {
     await expect(
       service.resolveMemberProjects({ userId: "owner-1", projectIds: ["c"] }),
     ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
+  });
+
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("refuses a missing, a foreign and an unreadable project with one body, wherever it sits in the list", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"] },
+    });
+    const ask = (projectIds: string[]) =>
+      refusalOf(service.readableByMember({ userId: "user-1", projectIds }));
+
+    // A project of another organization is one the member holds no grant on: same branch.
+    const [missing, unreadable, listedLate] = await Promise.all([
+      ask(["x"]),
+      ask(["c"]),
+      ask(["a", "x"]),
+    ]);
+
+    expect(body(missing)).toBe(body(unreadable));
+    expect(body(missing)).toBe(body(listedLate));
+    expect(JSON.parse(body(missing))).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(body(missing)).not.toMatch(/"x"|"c"/);
+  });
+
+  it("refuses an archived and a governance project as it refuses a missing one", async () => {
+    const archived = project("e", { archivedAt: new Date() });
+    const governance = project("g", { kind: "internal_governance" });
+    const { service } = scopeOver({
+      projects: [project("a"), archived, governance],
+      grants: { a: ["analytics:view"], e: ["analytics:view"], g: ["analytics:view"] },
+    });
+    const ask = (projectIds: string[]) =>
+      refusalOf(service.readableByMember({ userId: "user-1", projectIds }));
+
+    const missing = body(await ask(["x"]));
+
+    expect(body(await ask(["e"]))).toBe(missing);
+    expect(body(await ask(["g"]))).toBe(missing);
+  });
+
+  it("judges every named project before it refuses, so an early miss costs the same", async () => {
+    const { service, checked } = scopeOver({
+      projects: [project("a"), project("b")],
+      grants: { a: ["analytics:view"], b: ["analytics:view"] },
+    });
+
+    await refusalOf(service.readableByMember({ userId: "user-1", projectIds: ["x", "a", "b"] }));
+
+    expect(checked.toSorted()).toEqual(["a", "b", "x"]);
+  });
+
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
+  it("refuses a list over the member cap with a clear message, before any lookup", async () => {
+    const { service, checked } = scopeOver({ projects: [], grants: {} });
+    const projectIds = Array.from(
+      { length: LWQL_MAX_MEMBER_PROJECTS + 1 },
+      (_, index) => `p${index}`,
+    );
+
+    await expect(service.readableByMember({ userId: "user-1", projectIds })).rejects.toThrow(
+      `name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`,
+    );
+    expect(checked).toEqual([]);
   });
 });

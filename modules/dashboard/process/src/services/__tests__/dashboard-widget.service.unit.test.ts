@@ -212,7 +212,7 @@ describe("given a query's projects", () => {
     await expect(other).resolves.toMatchObject({ code: "project_not_found" });
   });
 
-  /** @scenario "AC207c Project: a query stores at most as many projects as the tenant capability allows" */
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
   it("refuses more projects than the capability allows", async () => {
     const { service } = setUp();
     const tooMany = Array.from({ length: 10_001 }, (_, index) => `p${index}`);
