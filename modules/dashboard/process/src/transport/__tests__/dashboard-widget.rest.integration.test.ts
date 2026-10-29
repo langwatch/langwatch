@@ -28,9 +28,14 @@ function queryDeclaring(parameter: { name: string; type: string; default?: unkno
   return [{ name: "traces", sql: SQL, parameters: [parameter] }];
 }
 
-/** A project key; `held` names its permissions, and without it the key holds every one. */
-function mountKey({ held }: { held?: readonly string[] } = {}) {
-  const app = createDashboardTestApp();
+/** A key on one app; `permits` decides each permission at the key door, as its role would. */
+function mountKey({
+  app = createDashboardTestApp(),
+  permits = () => true,
+}: {
+  app?: ReturnType<typeof createDashboardTestApp>;
+  permits?: (permission: string) => boolean;
+} = {}) {
   const caller = {
     actor: { type: "api_key" as const, id: "key-of-project-1" },
     scope: { tier: "project" as const, id: "project-1" },
@@ -39,14 +44,10 @@ function mountKey({ held }: { held?: readonly string[] } = {}) {
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
-      // A project-tier route asks its permission of the door itself.
       authenticate: ({ permission }) => {
-        if (held && !held.includes(permission)) {
-          throw new PermissionDeniedError({
-            permission,
-            scope: { type: "project", id: "project-1" },
-            denialReason: "no-grant",
-          });
+        if (!permits(permission)) {
+          const scope = { type: "project" as const, id: "project-1" };
+          throw new PermissionDeniedError({ permission, scope, denialReason: "no-grant" });
         }
         return caller;
       },
@@ -145,8 +146,89 @@ describe("given the dashboard widget REST family", () => {
       expect(created.status).toBe(201);
       expect(updated.status).toBe(422);
       expect(updated.json.code).toBe("validation_error");
-      expect(read.json.definition.queries).toEqual(queries);
+      expect(read.json.definition.queries).toEqual(
+        queries.map((query) => ({ ...query, sources: ["application"] })),
+      );
     });
+  });
+
+  describe("when a widget's query names its sources", () => {
+    /** @scenario "AC200o Sources: a new widget's query counts application traces" */
+    it("returns application on a created query that named none", async () => {
+      const key = mountKey();
+
+      const created = await key.create({
+        name: "Traces",
+        code: CODE,
+        queries: [{ name: "t", sql: SQL }],
+      });
+
+      expect(created.status).toBe(201);
+      expect(created.json.definition.queries[0].sources).toEqual(["application"]);
+    });
+
+    /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+    it("stores a picked set, keeps it through an update naming none, and null clears it", async () => {
+      const key = mountKey();
+      const created = await key.create({
+        name: "Traces",
+        code: CODE,
+        queries: [{ name: "t", sql: SQL, sources: ["langy", "other"] }],
+      });
+      const id = created.json.id;
+
+      const renamed = await key.update(id, { name: "Renamed" });
+      const resent = await key.update(id, { queries: [{ name: "t", sql: SQL }] });
+      const cleared = await key.update(id, { queries: [{ name: "t", sql: SQL, sources: null }] });
+      const read = await key.read(id);
+
+      expect(renamed.json.definition.queries[0].sources).toEqual(["langy", "other"]);
+      expect(resent.json.definition.queries[0].sources).toEqual(["langy", "other"]);
+      expect(cleared.status).toBe(200);
+      expect(read.json.definition.queries[0]).not.toHaveProperty("sources");
+    });
+
+    /** @scenario "AC200n Sources: an unknown source is refused at every door" */
+    it("refuses an unknown source on create and update, and stores nothing new", async () => {
+      const key = mountKey();
+      const bad = [{ name: "t", sql: SQL, sources: ["application", "langy' OR 1=1 --"] }];
+
+      const created = await key.create({ name: "Traces", code: CODE, queries: bad });
+      const good = await key.create({
+        name: "Traces",
+        code: CODE,
+        queries: [{ name: "t", sql: SQL }],
+      });
+      const updated = await key.update(good.json.id, { queries: bad });
+      const read = await key.read(good.json.id);
+
+      expect(created.status).toBe(422);
+      expect(created.json.code).toBe("validation_error");
+      expect(updated.status).toBe(422);
+      expect(read.json.definition.queries[0].sources).toEqual(["application"]);
+    });
+  });
+});
+
+describe("given a key whose role only views analytics", () => {
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("refuses a PATCH changing a query's sources with 403 and keeps the stored list", async () => {
+    const app = createDashboardTestApp();
+    const editor = mountKey({ app });
+    const viewer = mountKey({ app, permits: (permission) => permission === "analytics:view" });
+    const created = await editor.create({
+      name: "Traces",
+      code: CODE,
+      queries: [{ name: "traces", sql: SQL }],
+    });
+
+    const patched = await viewer.update(created.json.id, {
+      queries: [{ name: "traces", sql: SQL, sources: ["langy"] }],
+    });
+    const read = await editor.read(created.json.id);
+
+    expect(patched.status).toBe(403);
+    expect(read.json.definition.queries[0].sources).toEqual(["application"]);
   });
 });
 
@@ -159,7 +241,7 @@ describe("given a From LangWatch board's widget", () => {
   describe("when a key with analytics:view gets it by its template widget id", () => {
     /** @scenario "A From LangWatch widget is read over the API by its template widget id" */
     it("answers its name and queries from the catalogue, and refuses to change it", async () => {
-      const key = mountKey({ held: ["analytics:view"] });
+      const key = mountKey({ permits: (permission) => permission === "analytics:view" });
       const fullKey = mountKey();
 
       const read = await key.read(id);
@@ -181,7 +263,9 @@ describe("given a From LangWatch board's widget", () => {
   describe("when a key without analytics:view gets it", () => {
     /** @scenario "A From LangWatch widget is refused without analytics:view" */
     it("refuses the request as forbidden", async () => {
-      const key = mountKey({ held: ["analytics:create", "analytics:update"] });
+      const key = mountKey({
+        permits: (permission) => ["analytics:create", "analytics:update"].includes(permission),
+      });
 
       const read = await key.read(id);
 

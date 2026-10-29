@@ -16,9 +16,10 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 
 /**
  * 1,540 with `pnpm ensure:built` (#8795) once ops imports system-migrations types only.
+ * 1,561 with ADR-185: the docs consent screen reads api-key's web config and docs origins.
  * A ceiling, not a target. Lower it when earned; never raise it without saying why.
  */
-const CEILING = 1_560;
+const CEILING = 1_561;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

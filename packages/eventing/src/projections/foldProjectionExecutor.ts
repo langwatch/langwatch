@@ -10,6 +10,7 @@ import {
   observeEsFoldBlindReapplyEvents,
 } from "../metrics.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
+import { appliedTokenOf } from "./appliedToken.ts";
 import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext.ts";
@@ -128,15 +129,6 @@ function withAppliedEventIds(
   appliedEventIds: readonly string[],
 ): ProjectionStoreContext {
   return { ...context, appliedEventIds };
-}
-
-/**
- * An event's applied-set token: its idempotency key, else its id. The log reads one event per
- * key, so a set of ids could hold one no history read returns, and every re-fold would report
- * an incomplete history forever. Older sets hold ids; `appliedTokensOf` matches both.
- */
-function appliedTokenOf(event: Event): string {
-  return event.idempotencyKey || event.id;
 }
 
 /** The events with one kept per applied token: two ids under one key are one event. */

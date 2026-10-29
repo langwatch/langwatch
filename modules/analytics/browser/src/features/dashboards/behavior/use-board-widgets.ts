@@ -26,6 +26,7 @@ import {
   duplicateSlot,
 } from "../model/board-widgets.ts";
 import { CODE_SOURCE, catalogueSource } from "../model/widget-source.ts";
+import { withStoredSources } from "../model/widget-sources.ts";
 import { offerUndo, withdrawUndo } from "./widget-undo.ts";
 
 /** What a new widget is made from: its name, its stored parts and where it came from. */
@@ -136,7 +137,7 @@ export function useBoardWidgets({
               id,
               name,
               code: definition.code,
-              queries: definition.queries,
+              queries: withStoredSources(definition.queries),
             }),
           ),
         );
@@ -255,7 +256,12 @@ export function useBoardWidgets({
         write({
           fallbackTitle: "Couldn't save the widget",
           work: async () => {
-            await update.mutateAsync({ projectId, id: widget.id, ...draft });
+            await update.mutateAsync({
+              projectId,
+              id: widget.id,
+              ...draft,
+              queries: withStoredSources(draft.queries),
+            });
           },
         }),
     });

@@ -13,7 +13,7 @@ import { TEMPLATE_LIBRARY, type LibraryTemplate } from "./template-library.ts";
 
 /** What the From LangWatch group is, under its heading's (i); the prototype says the same. */
 export const FROM_LANGWATCH_ABOUT =
-  "Boards LangWatch made for you. They are read-only and improve over time. Duplicate one to " +
+  "Dashboards LangWatch made for you. They are read-only and improve over time. Duplicate one to " +
   "make a copy you can edit.";
 
 /** One From LangWatch board as the browser shows it: its definition and its library card. */

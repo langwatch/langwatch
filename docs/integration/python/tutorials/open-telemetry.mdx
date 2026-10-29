@@ -113,12 +113,11 @@ def handle_request(user_query: str):
 
     try:
         completion = client.chat.completions.create(
-            model="gpt-5",
+            model="gpt-6-luna",
             messages=[
                 {"role": "system", "content": f"Use this context: {context_docs}"},
                 {"role": "user", "content": user_query}
             ],
-            temperature=0.5,
         )
         llm_result = completion.choices[0].message.content
     except Exception as e:
@@ -365,6 +364,8 @@ This warning exists because replacing a globally configured provider can sometim
 If you are intentionally running LangWatch alongside an existing global OpenTelemetry setup and want LangWatch to add its exporter to that setup, you can silence this warning by setting:
 
 ```python
+import langwatch
+
 langwatch.setup(
     # ... other options
     ignore_global_tracer_provider_override_warning=True

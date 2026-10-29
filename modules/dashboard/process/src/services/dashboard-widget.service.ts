@@ -29,6 +29,7 @@ import type {
   DashboardWidgetLayoutsInput,
 } from "#repositories/dashboard-widget.repository";
 
+import { mergeQuerySources, withNewQuerySources } from "../rules/widget-query-sources.rules.ts";
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
@@ -99,7 +100,12 @@ export class DashboardWidgetService {
   async createWidget(
     input: Omit<CreateDashboardWidgetInput, "id"> & Viewed,
   ): Promise<DashboardWidget> {
-    const { viewer, ...fields } = input;
+    const { viewer, ...given } = input;
+    // A new widget's unset query stores application (AC200o).
+    const fields = {
+      ...given,
+      input: { ...given.input, queries: withNewQuerySources(given.input.queries) },
+    };
     await this.#assertEnabled(fields);
     if (fields.dashboardId !== undefined) {
       await this.#assertBoardWritable({ ...fields, dashboardId: fields.dashboardId, viewer });
@@ -115,15 +121,26 @@ export class DashboardWidgetService {
     return this.#present(await this.#repository.createWidget({ ...fields, id }));
   }
 
-  /** The repository merges the halves given into the stored half, which it parses first. */
+  /**
+   * The repository merges the halves given into the stored half. Queries come with their
+   * sources already merged over the stored ones, so a query sent without a list keeps its own.
+   * The read and the write are two steps: like every other widget field, the last write wins.
+   */
   async updateWidget(
     input: UpdateDashboardWidgetInput & Viewed & OnBoard,
   ): Promise<DashboardWidget> {
     const { viewer: _viewer, onDashboardId: _onBoard, ...fields } = input;
     await this.#assertEnabled(fields);
-    await this.#visibleRow(input);
+    const row = await this.#visibleRow(input);
     this.#assertWritable(input.id, definitionUpdateSchema.safeParse(input.input));
-    return this.#present(await this.#repository.updateWidget(fields));
+    const sent = fields.input.queries;
+    const queries =
+      sent === undefined
+        ? undefined
+        : mergeQuerySources({ sent, stored: this.#present(row).definition.queries });
+    const merged =
+      queries === undefined ? fields : { ...fields, input: { ...fields.input, queries } };
+    return this.#present(await this.#repository.updateWidget(merged));
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput & Viewed): Promise<DashboardWidget> {

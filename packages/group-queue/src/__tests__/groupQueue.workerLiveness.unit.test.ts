@@ -6,8 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GROUP_QUEUE_CONFIG, GroupQueueProcessor } from "../groupQueue.ts";
 import {
+  activeKeyHeartbeatMs,
   CLAIM_MARKER_TTL_SECONDS,
   GroupStagingScripts,
+  HELD_RESCORE_MS_PER_TTL_SEC,
   WORKER_LIVENESS_REFRESH_MS,
   WORKER_LIVENESS_TTL_SECONDS,
   WORKER_RETIRED_TTL_SECONDS,
@@ -73,6 +75,20 @@ describe("poison-guard timing invariants", () => {
         // A marker outliving the tombstone that explains its owner would decay
         // from "retired" into "no beacon" — a false death on a clean shutdown.
         expect(WORKER_RETIRED_TTL_SECONDS).toBeGreaterThan(CLAIM_MARKER_TTL_SECONDS);
+      });
+    });
+  });
+
+  describe("given a group a live worker holds", () => {
+    describe("when its heartbeat and its held ready score are compared", () => {
+      it("heartbeats before the group comes due, so a live claim is never looked at", () => {
+        // A held score inside the heartbeat lets every live group come due, filling the
+        // scan and the pending-age metric with work that is running.
+        const { activeTtlSec } = GROUP_QUEUE_CONFIG;
+
+        expect(activeKeyHeartbeatMs({ activeTtlSec })).toBeLessThan(
+          activeTtlSec * HELD_RESCORE_MS_PER_TTL_SEC,
+        );
       });
     });
   });

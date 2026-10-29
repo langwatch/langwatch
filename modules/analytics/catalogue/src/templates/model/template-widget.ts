@@ -4,6 +4,7 @@
  * source to set up, and the full-width and half-width places on the chart grid.
  */
 
+import { TRACE_SOURCES, type TraceSource } from "@langwatch/analytics-contract";
 import { CHART_GRID_COLUMNS } from "@langwatch/analytics-contract/chart-grid";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
@@ -13,6 +14,14 @@ import {
 import type { BoardTemplateWidget } from "./board-template.ts";
 import { PRESENCE_SQL } from "./source-presence-queries.ts";
 import type { WidgetCode } from "./widget-code-parts.ts";
+
+/**
+ * What a catalogue widget's queries count: every origin but Langy's turns, as boards counted
+ * before queries named their sources, so a scenario or coding-agent widget keeps its data.
+ */
+export const CATALOGUE_QUERY_SOURCES: readonly TraceSource[] = TRACE_SOURCES.filter(
+  (source) => source !== "langy",
+);
 
 export function definition({
   code,
@@ -25,7 +34,12 @@ export function definition({
   return {
     version: DASHBOARD_WIDGET_DEFINITION_VERSION,
     code: code.tsx,
-    queries: Object.entries(all).map(([name, text]) => ({ name, sql: text, parameters: [] })),
+    queries: Object.entries(all).map(([name, text]) => ({
+      name,
+      sql: text,
+      parameters: [],
+      sources: [...CATALOGUE_QUERY_SOURCES],
+    })),
     description: code.description,
   };
 }

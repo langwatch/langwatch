@@ -676,189 +676,249 @@
                     "params": {
                       "anyOf": [
                         {
-                          "allOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "frequency_penalty": {
-                                  "type": [
-                                    "number",
-                                    "null"
+                          "type": "object",
+                          "properties": {
+                            "frequency_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logit_bias": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "max_tokens": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "n": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "presence_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "seed": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stop": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
                                   ]
                                 },
-                                "logit_bias": {
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stream": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "temperature": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_p": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tools": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tool_choice": {
+                              "anyOf": [
+                                {
                                   "anyOf": [
                                     {
                                       "type": "object",
                                       "propertyNames": {
                                         "type": "string"
                                       },
-                                      "additionalProperties": {
-                                        "type": "number"
-                                      }
+                                      "additionalProperties": {}
                                     },
                                     {
-                                      "type": "null"
+                                      "type": "string"
                                     }
                                   ]
                                 },
-                                "logprobs": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
+                                {
+                                  "type": "null"
                                 },
-                                "top_logprobs": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "max_tokens": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "n": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "presence_penalty": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "seed": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "stop": {
-                                  "anyOf": [
-                                    {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "array",
-                                          "items": {
-                                            "type": "string"
-                                          }
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "stream": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
-                                },
-                                "temperature": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "top_p": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "tools": {
-                                  "anyOf": [
-                                    {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "tool_choice": {
-                                  "anyOf": [
-                                    {
-                                      "anyOf": [
-                                        {
-                                          "type": "object",
-                                          "propertyNames": {
-                                            "type": "string"
-                                          },
-                                          "additionalProperties": {}
-                                        },
-                                        {
-                                          "type": "string"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "parallel_tool_calls": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
-                                },
-                                "functions": {
-                                  "anyOf": [
-                                    {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "user": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                },
-                                "reasoning_effort": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                }
-                              }
+                                {}
+                              ]
                             },
-                            {
-                              "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "additionalProperties": {}
+                            "parallel_tool_calls": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "functions": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "user": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "reasoning_effort": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
                             }
-                          ]
+                          },
+                          "additionalProperties": {}
                         },
                         {
                           "type": "null"
@@ -1156,189 +1216,249 @@
                     "params": {
                       "anyOf": [
                         {
-                          "allOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "frequency_penalty": {
-                                  "type": [
-                                    "number",
-                                    "null"
+                          "type": "object",
+                          "properties": {
+                            "frequency_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logit_bias": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "max_tokens": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "n": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "presence_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "seed": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stop": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
                                   ]
                                 },
-                                "logit_bias": {
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stream": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "temperature": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_p": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tools": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tool_choice": {
+                              "anyOf": [
+                                {
                                   "anyOf": [
                                     {
                                       "type": "object",
                                       "propertyNames": {
                                         "type": "string"
                                       },
-                                      "additionalProperties": {
-                                        "type": "number"
-                                      }
+                                      "additionalProperties": {}
                                     },
                                     {
-                                      "type": "null"
+                                      "type": "string"
                                     }
                                   ]
                                 },
-                                "logprobs": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
+                                {
+                                  "type": "null"
                                 },
-                                "top_logprobs": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "max_tokens": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "n": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "presence_penalty": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "seed": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "stop": {
-                                  "anyOf": [
-                                    {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "array",
-                                          "items": {
-                                            "type": "string"
-                                          }
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "stream": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
-                                },
-                                "temperature": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "top_p": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "tools": {
-                                  "anyOf": [
-                                    {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "tool_choice": {
-                                  "anyOf": [
-                                    {
-                                      "anyOf": [
-                                        {
-                                          "type": "object",
-                                          "propertyNames": {
-                                            "type": "string"
-                                          },
-                                          "additionalProperties": {}
-                                        },
-                                        {
-                                          "type": "string"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "parallel_tool_calls": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
-                                },
-                                "functions": {
-                                  "anyOf": [
-                                    {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "user": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                },
-                                "reasoning_effort": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                }
-                              }
+                                {}
+                              ]
                             },
-                            {
-                              "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "additionalProperties": {}
+                            "parallel_tool_calls": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "functions": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "user": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "reasoning_effort": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
                             }
-                          ]
+                          },
+                          "additionalProperties": {}
                         },
                         {
                           "type": "null"
@@ -1734,189 +1854,249 @@
                     "params": {
                       "anyOf": [
                         {
-                          "allOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "frequency_penalty": {
-                                  "type": [
-                                    "number",
-                                    "null"
+                          "type": "object",
+                          "properties": {
+                            "frequency_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logit_bias": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "max_tokens": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "n": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "presence_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "seed": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stop": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
                                   ]
                                 },
-                                "logit_bias": {
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stream": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "temperature": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_p": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tools": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tool_choice": {
+                              "anyOf": [
+                                {
                                   "anyOf": [
                                     {
                                       "type": "object",
                                       "propertyNames": {
                                         "type": "string"
                                       },
-                                      "additionalProperties": {
-                                        "type": "number"
-                                      }
+                                      "additionalProperties": {}
                                     },
                                     {
-                                      "type": "null"
+                                      "type": "string"
                                     }
                                   ]
                                 },
-                                "logprobs": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
+                                {
+                                  "type": "null"
                                 },
-                                "top_logprobs": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "max_tokens": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "n": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "presence_penalty": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "seed": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "stop": {
-                                  "anyOf": [
-                                    {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "array",
-                                          "items": {
-                                            "type": "string"
-                                          }
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "stream": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
-                                },
-                                "temperature": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "top_p": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "tools": {
-                                  "anyOf": [
-                                    {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "tool_choice": {
-                                  "anyOf": [
-                                    {
-                                      "anyOf": [
-                                        {
-                                          "type": "object",
-                                          "propertyNames": {
-                                            "type": "string"
-                                          },
-                                          "additionalProperties": {}
-                                        },
-                                        {
-                                          "type": "string"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "parallel_tool_calls": {
-                                  "type": [
-                                    "boolean",
-                                    "null"
-                                  ]
-                                },
-                                "functions": {
-                                  "anyOf": [
-                                    {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "user": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                },
-                                "reasoning_effort": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                }
-                              }
+                                {}
+                              ]
                             },
-                            {
-                              "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "additionalProperties": {}
+                            "parallel_tool_calls": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "functions": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "user": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "reasoning_effort": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
                             }
-                          ]
+                          },
+                          "additionalProperties": {}
                         },
                         {
                           "type": "null"
@@ -19939,6 +20119,54 @@
         }
       }
     },
+    "/api/v1/docs-session": {
+      "delete": {
+        "operationId": "revokeDocsSession",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revoked": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "revoked"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, expired or already revoked key",
+            "content": {}
+          }
+        },
+        "description": "Revokes the docs session key that authenticates this request, so the documentation playground can end its session at once. Any other key is answered the same way and left as it is.",
+        "summary": "Disconnect a docs session",
+        "tags": [
+          "API Keys"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": []
+        }
+      }
+    },
     "/api/v1/auth/cli/device-code": {
       "post": {
         "operationId": "startCliDeviceCode",
@@ -21285,7 +21513,7 @@
             }
           }
         },
-        "description": "List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set. superseded by /api/grants, which answers the same rows as grants",
+        "description": "List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set. superseded by /api/grants, which answers the same rows as grants.",
         "tags": [
           "Role Bindings"
         ],
@@ -21482,7 +21710,7 @@
             }
           }
         },
-        "description": "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization; an identical binding is written again, because bindings are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. superseded by /api/grants, which answers the same rows as grants",
+        "description": "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization; an identical binding is written again, because bindings are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. superseded by /api/grants, which answers the same rows as grants.",
         "tags": [
           "Role Bindings"
         ],
@@ -21675,7 +21903,7 @@
             }
           }
         },
-        "description": "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. superseded by /api/grants, which answers the same rows as grants",
+        "description": "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. superseded by /api/grants, which answers the same rows as grants.",
         "tags": [
           "Role Bindings"
         ],
@@ -21758,7 +21986,7 @@
             }
           }
         },
-        "description": "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. superseded by /api/grants, which answers the same rows as grants",
+        "description": "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. superseded by /api/grants, which answers the same rows as grants.",
         "tags": [
           "Role Bindings"
         ],
@@ -29324,7 +29552,7 @@
             }
           }
         },
-        "description": "List all dashboards for the project with graph counts",
+        "description": "List all dashboards for the project with graph counts. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29341,7 +29569,8 @@
           "permissions": [
             "analytics:view"
           ]
-        }
+        },
+        "deprecated": true
       },
       "post": {
         "operationId": "postApiV1AnalyticsReports",
@@ -29393,7 +29622,7 @@
             }
           }
         },
-        "description": "Create a new dashboard",
+        "description": "Create a new dashboard. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29411,6 +29640,7 @@
             "analytics:create"
           ]
         },
+        "deprecated": true,
         "requestBody": {
           "required": true,
           "content": {
@@ -29458,7 +29688,7 @@
             }
           }
         },
-        "description": "Reorder dashboards by providing an ordered list of IDs",
+        "description": "Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29476,6 +29706,7 @@
             "analytics:update"
           ]
         },
+        "deprecated": true,
         "requestBody": {
           "required": true,
           "content": {
@@ -29648,7 +29879,7 @@
             }
           }
         },
-        "description": "Get a dashboard by its id, including its graphs",
+        "description": "Get a dashboard by its id, including its graphs. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29666,6 +29897,7 @@
             "analytics:view"
           ]
         },
+        "deprecated": true,
         "parameters": [
           {
             "in": "path",
@@ -29728,7 +29960,7 @@
             }
           }
         },
-        "description": "Rename a dashboard",
+        "description": "Rename a dashboard. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29746,6 +29978,7 @@
             "analytics:update"
           ]
         },
+        "deprecated": true,
         "parameters": [
           {
             "in": "path",
@@ -29808,7 +30041,7 @@
             }
           }
         },
-        "description": "Delete a dashboard and its graphs (hard delete, cascade)",
+        "description": "Delete a dashboard and its graphs (hard delete, cascade). The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29826,6 +30059,7 @@
             "analytics:manage"
           ]
         },
+        "deprecated": true,
         "parameters": [
           {
             "in": "path",
@@ -29927,6 +30161,33 @@
                                         ],
                                         "additionalProperties": false
                                       }
+                                    },
+                                    "sources": {
+                                      "anyOf": [
+                                        {
+                                          "maxItems": 11,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "application",
+                                              "simulation",
+                                              "evaluation",
+                                              "sample",
+                                              "coding_agent",
+                                              "ai_tool",
+                                              "gateway",
+                                              "workflow",
+                                              "playground",
+                                              "langy",
+                                              "other"
+                                            ]
+                                          }
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -30515,6 +30776,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -31087,6 +31375,33 @@
                               "type"
                             ]
                           }
+                        },
+                        "sources": {
+                          "anyOf": [
+                            {
+                              "maxItems": 11,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "application",
+                                  "simulation",
+                                  "evaluation",
+                                  "sample",
+                                  "coding_agent",
+                                  "ai_tool",
+                                  "gateway",
+                                  "workflow",
+                                  "playground",
+                                  "langy",
+                                  "other"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -31258,6 +31573,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -31930,6 +32272,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -32593,6 +32962,33 @@
                               "type"
                             ]
                           }
+                        },
+                        "sources": {
+                          "anyOf": [
+                            {
+                              "maxItems": 11,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "application",
+                                  "simulation",
+                                  "evaluation",
+                                  "sample",
+                                  "coding_agent",
+                                  "ai_tool",
+                                  "gateway",
+                                  "workflow",
+                                  "playground",
+                                  "langy",
+                                  "other"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -33221,6 +33617,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -33607,7 +34030,7 @@
             }
           },
           "404": {
-            "description": "No dashboard widget with this id, or no Dashboards board with this id, in this project. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
+            "description": "No dashboard widget with this id, or no dashboard with this id, in this project. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33836,7 +34259,7 @@
         "operationId": "getApiDashboards",
         "responses": {
           "200": {
-            "description": "The project's boards",
+            "description": "The project's dashboards",
             "content": {
               "application/json": {
                 "schema": {
@@ -34243,8 +34666,8 @@
             }
           }
         },
-        "description": "Lists the Dashboards boards of the key's project, each with how many widgets it holds.",
-        "summary": "List boards",
+        "description": "Lists the dashboards of the key's project, each with how many widgets it holds.",
+        "summary": "List dashboards",
         "tags": [
           "Dashboards"
         ],
@@ -34267,7 +34690,7 @@
         "operationId": "postApiDashboards",
         "responses": {
           "201": {
-            "description": "The board was created",
+            "description": "The dashboard was created",
             "content": {
               "application/json": {
                 "schema": {
@@ -34656,8 +35079,8 @@
             }
           }
         },
-        "description": "Creates an empty Dashboards board in the key's project. Add widgets to it with POST /api/v1/dashboards/{dashboardId}/widgets.",
-        "summary": "Create a board",
+        "description": "Creates an empty dashboard in the key's project. Add widgets to it with POST /api/v1/dashboards/{dashboardId}/widgets.",
+        "summary": "Create a dashboard",
         "tags": [
           "Dashboards"
         ],
@@ -34702,7 +35125,7 @@
         "operationId": "getApiDashboardsByDashboardId",
         "responses": {
           "200": {
-            "description": "The board",
+            "description": "The dashboard",
             "content": {
               "application/json": {
                 "schema": {
@@ -35009,7 +35432,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
+            "description": "No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35173,8 +35596,8 @@
             }
           }
         },
-        "description": "Returns one Dashboards board.",
-        "summary": "Get a board",
+        "description": "Returns one dashboard.",
+        "summary": "Get a dashboard",
         "tags": [
           "Dashboards"
         ],
@@ -35208,7 +35631,7 @@
         "operationId": "patchApiDashboardsByDashboardId",
         "responses": {
           "200": {
-            "description": "The updated board",
+            "description": "The updated dashboard",
             "content": {
               "application/json": {
                 "schema": {
@@ -35515,7 +35938,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
+            "description": "No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35679,8 +36102,8 @@
             }
           }
         },
-        "description": "Changes a board's name or description; a field the body leaves out keeps its value, and a null description clears it.",
-        "summary": "Update a board",
+        "description": "Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.",
+        "summary": "Update a dashboard",
         "tags": [
           "Dashboards"
         ],
@@ -35743,7 +36166,7 @@
         "operationId": "deleteApiDashboardsByDashboardId",
         "responses": {
           "200": {
-            "description": "The board was deleted",
+            "description": "The dashboard was deleted",
             "content": {
               "application/json": {
                 "schema": {
@@ -36015,7 +36438,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
+            "description": "No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36179,8 +36602,8 @@
             }
           }
         },
-        "description": "Deletes a board together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted board's id and name.",
-        "summary": "Delete a board",
+        "description": "Deletes a dashboard together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted dashboard's id and name.",
+        "summary": "Delete a dashboard",
         "tags": [
           "Dashboards"
         ],
@@ -36216,7 +36639,7 @@
         "operationId": "getApiDashboardsByDashboardIdWidgets",
         "responses": {
           "200": {
-            "description": "The board's widgets",
+            "description": "The dashboard's widgets",
             "content": {
               "application/json": {
                 "schema": {
@@ -36299,6 +36722,33 @@
                                         ],
                                         "additionalProperties": false
                                       }
+                                    },
+                                    "sources": {
+                                      "anyOf": [
+                                        {
+                                          "maxItems": 11,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "application",
+                                              "simulation",
+                                              "evaluation",
+                                              "sample",
+                                              "coding_agent",
+                                              "ai_tool",
+                                              "gateway",
+                                              "workflow",
+                                              "playground",
+                                              "langy",
+                                              "other"
+                                            ]
+                                          }
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -36692,7 +37142,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
+            "description": "No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36856,8 +37306,8 @@
             }
           }
         },
-        "description": "Lists the widgets on one board, each with its React source and named queries.",
-        "summary": "List a board's widgets",
+        "description": "Lists the widgets on one dashboard, each with its React source and named queries.",
+        "summary": "List a dashboard's widgets",
         "tags": [
           "Dashboards"
         ],
@@ -36891,7 +37341,7 @@
         "operationId": "postApiDashboardsByDashboardIdWidgets",
         "responses": {
           "201": {
-            "description": "The widget was saved on the board",
+            "description": "The widget was saved on the dashboard",
             "content": {
               "application/json": {
                 "schema": {
@@ -36969,6 +37419,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -37355,7 +37832,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
+            "description": "No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -37519,8 +37996,8 @@
             }
           }
         },
-        "description": "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this board at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
-        "summary": "Create a widget on a board",
+        "description": "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a query that names none counts `[\"application\"]`.",
+        "summary": "Create a widget on a dashboard",
         "tags": [
           "Dashboards"
         ],
@@ -37623,6 +38100,33 @@
                               "type"
                             ]
                           }
+                        },
+                        "sources": {
+                          "anyOf": [
+                            {
+                              "maxItems": 11,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "application",
+                                  "simulation",
+                                  "evaluation",
+                                  "sample",
+                                  "coding_agent",
+                                  "ai_tool",
+                                  "gateway",
+                                  "workflow",
+                                  "playground",
+                                  "langy",
+                                  "other"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -37794,6 +38298,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -38180,7 +38711,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id, or no widget with this id on that board",
+            "description": "No dashboard with this id, or no widget with this id on that dashboard",
             "content": {
               "application/json": {
                 "schema": {
@@ -38344,8 +38875,8 @@
             }
           }
         },
-        "description": "Returns one widget on this board with its React source and named queries.",
-        "summary": "Get a widget on a board",
+        "description": "Returns one widget on this dashboard with its React source and named queries.",
+        "summary": "Get a widget on a dashboard",
         "tags": [
           "Dashboards"
         ],
@@ -38466,6 +38997,33 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "sources": {
+                                "anyOf": [
+                                  {
+                                    "maxItems": 11,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "application",
+                                        "simulation",
+                                        "evaluation",
+                                        "sample",
+                                        "coding_agent",
+                                        "ai_tool",
+                                        "gateway",
+                                        "workflow",
+                                        "playground",
+                                        "langy",
+                                        "other"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -38852,7 +39410,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id, or no widget with this id on that board",
+            "description": "No dashboard with this id, or no widget with this id on that dashboard",
             "content": {
               "application/json": {
                 "schema": {
@@ -39016,8 +39574,8 @@
             }
           }
         },
-        "description": "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
-        "summary": "Update a widget on a board",
+        "description": "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value; a query sent without `sources` keeps the sources stored under its name, and `sources: null` clears them. A body with none of these fields is refused.",
+        "summary": "Update a widget on a dashboard",
         "tags": [
           "Dashboards"
         ],
@@ -39129,6 +39687,33 @@
                               "type"
                             ]
                           }
+                        },
+                        "sources": {
+                          "anyOf": [
+                            {
+                              "maxItems": 11,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "application",
+                                  "simulation",
+                                  "evaluation",
+                                  "sample",
+                                  "coding_agent",
+                                  "ai_tool",
+                                  "gateway",
+                                  "workflow",
+                                  "playground",
+                                  "langy",
+                                  "other"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -39469,7 +40054,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id, or no widget with this id on that board",
+            "description": "No dashboard with this id, or no widget with this id on that dashboard",
             "content": {
               "application/json": {
                 "schema": {
@@ -39633,8 +40218,8 @@
             }
           }
         },
-        "description": "Deletes one widget on this board. Answers 204 with no body.",
-        "summary": "Delete a widget on a board",
+        "description": "Deletes one widget on this dashboard. Answers 204 with no body.",
+        "summary": "Delete a widget on a dashboard",
         "tags": [
           "Dashboards"
         ],
@@ -39674,12 +40259,12 @@
         ]
       }
     },
-    "/api/v1/projects/{projectId}/analytics/boards": {
+    "/api/v1/projects/{projectId}/analytics/dashboards": {
       "get": {
-        "operationId": "getApiV1ProjectsByProjectIdAnalyticsBoards",
+        "operationId": "getApiV1ProjectsByProjectIdAnalyticsDashboards",
         "responses": {
           "200": {
-            "description": "The project's Dashboards boards",
+            "description": "The project's dashboards",
             "content": {
               "application/json": {
                 "schema": {
@@ -40086,8 +40671,8 @@
             }
           }
         },
-        "description": "Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports boards are listed by /api/v1/analytics/reports instead.",
-        "summary": "List Dashboards boards",
+        "description": "Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports are listed by /api/v1/analytics/reports instead.",
+        "summary": "List dashboards",
         "tags": [
           "Analytics / LangWatchQL"
         ],
@@ -40118,12 +40703,12 @@
         ]
       }
     },
-    "/api/v1/projects/{projectId}/analytics/boards/{boardId}": {
+    "/api/v1/projects/{projectId}/analytics/dashboards/{dashboardId}": {
       "get": {
-        "operationId": "getApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId",
+        "operationId": "getApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId",
         "responses": {
           "200": {
-            "description": "The Dashboards board",
+            "description": "The dashboard",
             "content": {
               "application/json": {
                 "schema": {
@@ -40430,7 +41015,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id in this project",
+            "description": "No dashboard with this id in this project",
             "content": {
               "application/json": {
                 "schema": {
@@ -40594,8 +41179,8 @@
             }
           }
         },
-        "description": "Returns one board of the Dashboards area. A board saved in another project, or one only Analytics Reports holds, is reported as not found.",
-        "summary": "Get a Dashboards board",
+        "description": "Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only Analytics Reports holds, is reported as not found.",
+        "summary": "Get a dashboard",
         "tags": [
           "Analytics / LangWatchQL"
         ],
@@ -40625,7 +41210,970 @@
           },
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/analytics/boards": {
+      "get": {
+        "operationId": "getApiV1ProjectsByProjectIdAnalyticsBoards",
+        "responses": {
+          "200": {
+            "description": "The project's dashboards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          },
+                          "description": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "scope": {
+                            "type": "string",
+                            "enum": [
+                              "PRIVATE",
+                              "PROJECT",
+                              "ORGANIZATION"
+                            ]
+                          },
+                          "createdById": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          },
+                          "platformUrl": {
+                            "type": "string"
+                          },
+                          "widgetCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "scope",
+                          "createdById",
+                          "createdAt",
+                          "updatedAt",
+                          "platformUrl",
+                          "widgetCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports are listed by /api/v1/analytics/reports instead. Use /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated.",
+        "summary": "List dashboards",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "analytics:view"
+          ]
+        },
+        "deprecated": true,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/analytics/boards/{dashboardId}": {
+      "get": {
+        "operationId": "getApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId",
+        "responses": {
+          "200": {
+            "description": "The dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "PRIVATE",
+                        "PROJECT",
+                        "ORGANIZATION"
+                      ]
+                    },
+                    "createdById": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "scope",
+                    "createdById",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No dashboard with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only Analytics Reports holds, is reported as not found. Use /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated.",
+        "summary": "Get a dashboard",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "analytics:view"
+          ]
+        },
+        "deprecated": true,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -46028,7 +47576,7 @@
             }
           }
         },
-        "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL) upload the file as a stored object with the purpose dataset_import, then create the dataset from it",
+        "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL). upload the file as a stored object with the purpose dataset_import, then create the dataset from it.",
         "requestBody": {
           "required": true,
           "content": {
@@ -46100,7 +47648,7 @@
             }
           }
         },
-        "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset upload the file as a stored object with the purpose dataset_import, then create the dataset from it",
+        "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset. upload the file as a stored object with the purpose dataset_import, then create the dataset from it.",
         "requestBody": {
           "required": true,
           "content": {
@@ -46174,7 +47722,7 @@
             "content": {}
           }
         },
-        "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. create the upload, send the file to the address it answers, confirm it as a stored object, then put its reference in the cell",
+        "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. create the upload, send the file to the address it answers, confirm it as a stored object, then put its reference in the cell.",
         "requestBody": {
           "required": true,
           "content": {
@@ -48973,6 +50521,11 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     }
+                  },
+                  "concurrency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 24
                   }
                 }
               }
@@ -96288,7 +97841,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -96301,7 +97854,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -96917,7 +98470,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -96930,7 +98483,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -97333,7 +98886,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -97346,7 +98899,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -113036,189 +114589,249 @@
                               "params": {
                                 "anyOf": [
                                   {
-                                    "allOf": [
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "frequency_penalty": {
-                                            "type": [
-                                              "number",
-                                              "null"
+                                    "type": "object",
+                                    "properties": {
+                                      "frequency_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logit_bias": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "propertyNames": {
+                                              "type": "string"
+                                            },
+                                            "additionalProperties": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "max_tokens": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "n": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "presence_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "seed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stop": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string"
+                                                }
+                                              }
                                             ]
                                           },
-                                          "logit_bias": {
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stream": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "temperature": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_p": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tools": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tool_choice": {
+                                        "anyOf": [
+                                          {
                                             "anyOf": [
                                               {
                                                 "type": "object",
                                                 "propertyNames": {
                                                   "type": "string"
                                                 },
-                                                "additionalProperties": {
-                                                  "type": "number"
-                                                }
+                                                "additionalProperties": {}
                                               },
                                               {
-                                                "type": "null"
+                                                "type": "string"
                                               }
                                             ]
                                           },
-                                          "logprobs": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
+                                          {
+                                            "type": "null"
                                           },
-                                          "top_logprobs": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "max_tokens": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "n": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "presence_penalty": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "seed": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "stop": {
-                                            "anyOf": [
-                                              {
-                                                "anyOf": [
-                                                  {
-                                                    "type": "string"
-                                                  },
-                                                  {
-                                                    "type": "array",
-                                                    "items": {
-                                                      "type": "string"
-                                                    }
-                                                  }
-                                                ]
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "stream": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
-                                          },
-                                          "temperature": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "top_p": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "tools": {
-                                            "anyOf": [
-                                              {
-                                                "type": "array",
-                                                "items": {
-                                                  "type": "object",
-                                                  "propertyNames": {
-                                                    "type": "string"
-                                                  },
-                                                  "additionalProperties": {}
-                                                }
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "tool_choice": {
-                                            "anyOf": [
-                                              {
-                                                "anyOf": [
-                                                  {
-                                                    "type": "object",
-                                                    "propertyNames": {
-                                                      "type": "string"
-                                                    },
-                                                    "additionalProperties": {}
-                                                  },
-                                                  {
-                                                    "type": "string"
-                                                  }
-                                                ]
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "parallel_tool_calls": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
-                                          },
-                                          "functions": {
-                                            "anyOf": [
-                                              {
-                                                "type": "array",
-                                                "items": {
-                                                  "type": "object",
-                                                  "propertyNames": {
-                                                    "type": "string"
-                                                  },
-                                                  "additionalProperties": {}
-                                                }
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "user": {
-                                            "type": [
-                                              "string",
-                                              "null"
-                                            ]
-                                          },
-                                          "reasoning_effort": {
-                                            "type": [
-                                              "string",
-                                              "null"
-                                            ]
-                                          }
-                                        }
+                                          {}
+                                        ]
                                       },
-                                      {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
+                                      "parallel_tool_calls": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "functions": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "user": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "reasoning_effort": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
                                       }
-                                    ]
+                                    },
+                                    "additionalProperties": {}
                                   },
                                   {
                                     "type": "null"
@@ -113516,189 +115129,249 @@
                               "params": {
                                 "anyOf": [
                                   {
-                                    "allOf": [
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "frequency_penalty": {
-                                            "type": [
-                                              "number",
-                                              "null"
+                                    "type": "object",
+                                    "properties": {
+                                      "frequency_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logit_bias": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "propertyNames": {
+                                              "type": "string"
+                                            },
+                                            "additionalProperties": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "max_tokens": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "n": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "presence_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "seed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stop": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string"
+                                                }
+                                              }
                                             ]
                                           },
-                                          "logit_bias": {
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stream": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "temperature": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_p": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tools": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tool_choice": {
+                                        "anyOf": [
+                                          {
                                             "anyOf": [
                                               {
                                                 "type": "object",
                                                 "propertyNames": {
                                                   "type": "string"
                                                 },
-                                                "additionalProperties": {
-                                                  "type": "number"
-                                                }
+                                                "additionalProperties": {}
                                               },
                                               {
-                                                "type": "null"
+                                                "type": "string"
                                               }
                                             ]
                                           },
-                                          "logprobs": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
+                                          {
+                                            "type": "null"
                                           },
-                                          "top_logprobs": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "max_tokens": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "n": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "presence_penalty": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "seed": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "stop": {
-                                            "anyOf": [
-                                              {
-                                                "anyOf": [
-                                                  {
-                                                    "type": "string"
-                                                  },
-                                                  {
-                                                    "type": "array",
-                                                    "items": {
-                                                      "type": "string"
-                                                    }
-                                                  }
-                                                ]
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "stream": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
-                                          },
-                                          "temperature": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "top_p": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "tools": {
-                                            "anyOf": [
-                                              {
-                                                "type": "array",
-                                                "items": {
-                                                  "type": "object",
-                                                  "propertyNames": {
-                                                    "type": "string"
-                                                  },
-                                                  "additionalProperties": {}
-                                                }
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "tool_choice": {
-                                            "anyOf": [
-                                              {
-                                                "anyOf": [
-                                                  {
-                                                    "type": "object",
-                                                    "propertyNames": {
-                                                      "type": "string"
-                                                    },
-                                                    "additionalProperties": {}
-                                                  },
-                                                  {
-                                                    "type": "string"
-                                                  }
-                                                ]
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "parallel_tool_calls": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
-                                          },
-                                          "functions": {
-                                            "anyOf": [
-                                              {
-                                                "type": "array",
-                                                "items": {
-                                                  "type": "object",
-                                                  "propertyNames": {
-                                                    "type": "string"
-                                                  },
-                                                  "additionalProperties": {}
-                                                }
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "user": {
-                                            "type": [
-                                              "string",
-                                              "null"
-                                            ]
-                                          },
-                                          "reasoning_effort": {
-                                            "type": [
-                                              "string",
-                                              "null"
-                                            ]
-                                          }
-                                        }
+                                          {}
+                                        ]
                                       },
-                                      {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
+                                      "parallel_tool_calls": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "functions": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "user": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "reasoning_effort": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
                                       }
-                                    ]
+                                    },
+                                    "additionalProperties": {}
                                   },
                                   {
                                     "type": "null"
@@ -114094,189 +115767,249 @@
                               "params": {
                                 "anyOf": [
                                   {
-                                    "allOf": [
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "frequency_penalty": {
-                                            "type": [
-                                              "number",
-                                              "null"
+                                    "type": "object",
+                                    "properties": {
+                                      "frequency_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logit_bias": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "propertyNames": {
+                                              "type": "string"
+                                            },
+                                            "additionalProperties": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "max_tokens": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "n": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "presence_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "seed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stop": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string"
+                                                }
+                                              }
                                             ]
                                           },
-                                          "logit_bias": {
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stream": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "temperature": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_p": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tools": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tool_choice": {
+                                        "anyOf": [
+                                          {
                                             "anyOf": [
                                               {
                                                 "type": "object",
                                                 "propertyNames": {
                                                   "type": "string"
                                                 },
-                                                "additionalProperties": {
-                                                  "type": "number"
-                                                }
+                                                "additionalProperties": {}
                                               },
                                               {
-                                                "type": "null"
+                                                "type": "string"
                                               }
                                             ]
                                           },
-                                          "logprobs": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
+                                          {
+                                            "type": "null"
                                           },
-                                          "top_logprobs": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "max_tokens": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "n": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "presence_penalty": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "seed": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "stop": {
-                                            "anyOf": [
-                                              {
-                                                "anyOf": [
-                                                  {
-                                                    "type": "string"
-                                                  },
-                                                  {
-                                                    "type": "array",
-                                                    "items": {
-                                                      "type": "string"
-                                                    }
-                                                  }
-                                                ]
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "stream": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
-                                          },
-                                          "temperature": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "top_p": {
-                                            "type": [
-                                              "number",
-                                              "null"
-                                            ]
-                                          },
-                                          "tools": {
-                                            "anyOf": [
-                                              {
-                                                "type": "array",
-                                                "items": {
-                                                  "type": "object",
-                                                  "propertyNames": {
-                                                    "type": "string"
-                                                  },
-                                                  "additionalProperties": {}
-                                                }
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "tool_choice": {
-                                            "anyOf": [
-                                              {
-                                                "anyOf": [
-                                                  {
-                                                    "type": "object",
-                                                    "propertyNames": {
-                                                      "type": "string"
-                                                    },
-                                                    "additionalProperties": {}
-                                                  },
-                                                  {
-                                                    "type": "string"
-                                                  }
-                                                ]
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "parallel_tool_calls": {
-                                            "type": [
-                                              "boolean",
-                                              "null"
-                                            ]
-                                          },
-                                          "functions": {
-                                            "anyOf": [
-                                              {
-                                                "type": "array",
-                                                "items": {
-                                                  "type": "object",
-                                                  "propertyNames": {
-                                                    "type": "string"
-                                                  },
-                                                  "additionalProperties": {}
-                                                }
-                                              },
-                                              {
-                                                "type": "null"
-                                              }
-                                            ]
-                                          },
-                                          "user": {
-                                            "type": [
-                                              "string",
-                                              "null"
-                                            ]
-                                          },
-                                          "reasoning_effort": {
-                                            "type": [
-                                              "string",
-                                              "null"
-                                            ]
-                                          }
-                                        }
+                                          {}
+                                        ]
                                       },
-                                      {
-                                        "type": "object",
-                                        "propertyNames": {
-                                          "type": "string"
-                                        },
-                                        "additionalProperties": {}
+                                      "parallel_tool_calls": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "functions": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "user": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "reasoning_effort": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
                                       }
-                                    ]
+                                    },
+                                    "additionalProperties": {}
                                   },
                                   {
                                     "type": "null"

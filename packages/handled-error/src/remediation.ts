@@ -241,7 +241,7 @@ const registry = {
   saved_workbench_charts_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
-      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {
@@ -334,6 +334,12 @@ const registry = {
   project_visibility_too_wide: {
     tips: ["Bind the key to the teams or projects it works with instead of the whole organization"],
     docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  docs_origin_not_registered: {
+    tips: [
+      "Open the playground from a documentation site this installation registers, or paste an API key instead",
+      "A self-hosted installation registers more documentation sites in its configuration",
+    ],
   },
   api_key_reserved_name: {
     tips: [

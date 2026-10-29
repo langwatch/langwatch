@@ -592,3 +592,14 @@ paths = [
   '''^modules/api-key/process/src/services/__tests__/api-key-token-resolution\.service\.unit\.test\.ts$''',
   '''^modules/auth/process/src/services/__tests__/api-rest-credentials\.service\.unit\.test\.ts$''',
 ]
+
+# The PostHog project API key (`phc_…`) is PostHog's public client key: every
+# browser that loads langwatch.ai receives it (`docs/posthog.js`, the marketing
+# site), and it can only send events into the project, never read from it.
+# ANCHORED to this one value, so any other `phc_` or high-entropy string in the
+# docs site is still caught.
+[[allowlists]]
+description = "LangWatch's public PostHog client key, shipped to every browser on langwatch.ai"
+targetRules = ["generic-api-key"]
+paths = ['''apps/docs/src/features/shell/browser/posthog\.ts''']
+regexes = ['''^phc_oOlj3H19T2JlGbFXmrGrjSLbDPDNyPKYdIFaTdrkXOY$''']

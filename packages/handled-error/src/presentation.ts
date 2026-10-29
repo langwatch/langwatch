@@ -668,7 +668,7 @@ const presentations = {
   dashboards_not_released: {
     title: "The Dashboards API isn't available here",
     describe: () =>
-      "Dashboards isn't switched on for this project yet. Analytics Reports boards are at /api/v1/analytics/reports.",
+      "Dashboards isn't switched on for this project yet. Analytics Reports are at /api/v1/analytics/reports.",
   },
   insight_not_found: {
     title: "Insight not found",
@@ -1330,6 +1330,11 @@ const presentations = {
   api_key_reserved_name: {
     title: "That name is reserved",
     describe: () => "Pick a different name for this key.",
+  },
+  docs_origin_not_registered: {
+    title: "This site can't connect to LangWatch",
+    describe: () =>
+      "The documentation site that opened this page is not registered with this LangWatch installation. Paste an API key into the playground instead.",
   },
   api_key_scope_violation: {
     title: "You don't have access for this",

@@ -11,6 +11,7 @@ import type { WidgetFace } from "../../../../model/dashboard-widget/widget-compl
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
+import { widgetSourcesLine } from "../../model/widget-sources.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetExportMenu } from "../blocks/widget-export-menu.tsx";
@@ -24,8 +25,8 @@ export function CuratedWidgetCard({
   rowSpan,
   timeWindow,
   granularitySeconds,
-  excludeOrigins,
   onAskLangy,
+  onEmptyChange,
 }: {
   widget: BoardTemplateWidget;
   /** The frame's id on this board: the template's id and the widget's key. */
@@ -37,10 +38,10 @@ export function CuratedWidgetCard({
   rowSpan: number;
   timeWindow: { start: number; end: number };
   granularitySeconds: BoardPeriod["granularitySeconds"];
-  /** Trace origins the board leaves out of every query this widget runs. */
-  excludeOrigins: readonly string[];
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: () => void;
+  /** Told whether the card shows none of the widget's data. */
+  onEmptyChange?: (empty: boolean) => void;
 }) {
   const { name, definition } = widget;
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
@@ -52,6 +53,7 @@ export function CuratedWidgetCard({
     <WidgetCardShell
       name={name}
       description={definition.description}
+      footer={widgetSourcesLine(definition.queries)}
       controls={
         hasControls && (
           <>
@@ -70,9 +72,9 @@ export function CuratedWidgetCard({
         maxHeight={widgetBodyHeightPx(rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
-        excludeOrigins={excludeOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
+        onEmptyChange={onEmptyChange}
       />
     </WidgetCardShell>
   );

@@ -53,7 +53,7 @@ def send_trace_with_metadata(
                 "type": "llm",
                 "span_id": span_id,
                 "name": "chat-completion",
-                "model": "gpt-4o-mini",
+                "model": "gpt-6-luna",
                 "input": {
                     "type": "chat_messages",
                     "value": [

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
+from ..models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition_queries_item_sources_type_0_item import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemSourcesType0Item,
+)
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -27,6 +30,8 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
         sql (str):
         parameters (list[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQu
             eriesItemParametersItem] | Unset):
+        sources (list[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueri
+            esItemSourcesType0Item] | None | Unset):
     """
 
     name: str
@@ -35,6 +40,13 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
         list[
             PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemParametersItem
         ]
+        | Unset
+    ) = UNSET
+    sources: (
+        list[
+            PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemSourcesType0Item
+        ]
+        | None
         | Unset
     ) = UNSET
 
@@ -50,6 +62,18 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
                 parameters_item = parameters_item_data.to_dict()
                 parameters.append(parameters_item)
 
+        sources: list[str] | None | Unset
+        if isinstance(self.sources, Unset):
+            sources = UNSET
+        elif isinstance(self.sources, list):
+            sources = []
+            for sources_type_0_item_data in self.sources:
+                sources_type_0_item = sources_type_0_item_data.value
+                sources.append(sources_type_0_item)
+
+        else:
+            sources = self.sources
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -60,6 +84,8 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
         )
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
+        if sources is not UNSET:
+            field_dict["sources"] = sources
 
         return field_dict
 
@@ -90,10 +116,50 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
 
                 parameters.append(parameters_item)
 
+        def _parse_sources(
+            data: object,
+        ) -> (
+            list[
+                PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemSourcesType0Item
+            ]
+            | None
+            | Unset
+        ):
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                sources_type_0 = []
+                _sources_type_0 = data
+                for sources_type_0_item_data in _sources_type_0:
+                    sources_type_0_item = PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemSourcesType0Item(
+                        sources_type_0_item_data
+                    )
+
+                    sources_type_0.append(sources_type_0_item)
+
+                return sources_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(
+                list[
+                    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemSourcesType0Item
+                ]
+                | None
+                | Unset,
+                data,
+            )
+
+        sources = _parse_sources(d.pop("sources", UNSET))
+
         post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition_queries_item = cls(
             name=name,
             sql=sql,
             parameters=parameters,
+            sources=sources,
         )
 
         return post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition_queries_item

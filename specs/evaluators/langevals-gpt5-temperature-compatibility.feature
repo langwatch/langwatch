@@ -22,6 +22,7 @@ Feature: Evaluator judge temperature on models that pin it
   # Bindings:
   #   services/langevals/langevals_core/langevals_core/litellm_patch.py
   #   services/langevals/langevals_core/tests/test_gpt5_temperature_compatibility.py
+  #   services/langevals/evaluators/langevals/tests/test_reasoning_model_judges.py (real calls)
 
   @unit
   Scenario: A judge pinned cold still reaches a model that only runs at its default temperature
@@ -81,3 +82,16 @@ Feature: Evaluator judge temperature on models that pin it
     Given an evaluator whose judge names no temperature
     When the evaluator asks a pinned-temperature model to judge
     Then the request leaves with no temperature at all
+
+  # Models outside the gpt-5 family refuse the same way (gpt-6 while its
+  # reasoning is on). The refusal names the value it accepts, so the request
+  # is sent once more at it and the model is remembered for the process. A
+  # refusal at the default too reaches the caller as the provider gave it.
+  @unit
+  Scenario: A model that refuses any temperature but its default is asked again at the default
+    Given an evaluator asking for temperature 0
+    And the model refuses any temperature but its default
+    When the evaluator runs
+    Then the request is sent again at temperature 1
+    And later requests to that model go out at temperature 1 from the start
+    And a refusal at temperature 1 reaches the caller as the provider gave it

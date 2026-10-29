@@ -1085,6 +1085,7 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "scope",
     "organizationId",
+    "excludedOrigins",
     "createdAt",
     "updatedAt"
   ],
@@ -2224,6 +2225,7 @@ export const prismaModelFieldCatalogue = {
     "ingestionTemplateId",
     "createdByDeviceLabel",
     "isSystemManaged",
+    "createdByBrowserSessionId",
     "createdAt",
     "updatedAt"
   ],

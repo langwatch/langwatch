@@ -32,24 +32,39 @@ func packagesDir(t *testing.T, names ...string) string {
 	return dir
 }
 
-/** @scenario "A merge to main publishes the langyagent prerelease chart to ECR" */
-func TestPushGivenOnePackagedChart(t *testing.T) {
+/** @scenario "A merge to main publishes every prerelease chart to ECR" */
+func TestPushGivenEveryPackagedChart(t *testing.T) {
 	var calls []call
-	dir := packagesDir(t, "langwatch-langyagent-3.21.0-main.80.1.abc1234.tgz", "langwatch-gateway-1.0.0-main.80.1.abc1234.tgz")
+	packages := map[string]string{
+		"clickhouse-serverless": "clickhouse-serverless-0.2.0-main.80.1.abc1234.tgz",
+		"langwatch-gateway":     "langwatch-gateway-1.0.0-main.80.1.abc1234.tgz",
+		"langwatch-langyagent":  "langwatch-langyagent-3.21.0-main.80.1.abc1234.tgz",
+		"langwatch":             "langwatch-3.21.0-main.80.1.abc1234.tgz",
+	}
+	charts := []string{"clickhouse-serverless", "langwatch-gateway", "langwatch-langyagent", "langwatch"}
+	files := make([]string, 0, len(charts))
+	for _, chart := range charts {
+		files = append(files, packages[chart])
+	}
 	results, err := Push(context.Background(), Options{
-		Registry: "registry.example", Charts: []string{"langwatch-langyagent"}, PackagesDir: dir,
-		Push: stubHelm(&calls, "Pushed: registry.example/langwatch-charts/langwatch-langyagent\nDigest: "+digest+"\n", nil),
+		Registry: "registry.example", Charts: charts, PackagesDir: packagesDir(t, files...),
+		Push: stubHelm(&calls, "Pushed: registry.example/langwatch-charts/chart\nDigest: "+digest+"\n", nil),
 	})
 	if err != nil {
 		t.Fatalf("push failed: %v", err)
 	}
-	want := []call{{"langwatch-langyagent-3.21.0-main.80.1.abc1234.tgz", "oci://registry.example/langwatch-charts"}}
-	if len(calls) != 1 || calls[0] != want[0] {
-		t.Fatalf("pushes the same package GHCR got, under langwatch-charts, and nothing else: got %v", calls)
+	if len(calls) != len(charts) || len(results) != len(charts) {
+		t.Fatalf("pushes each chart once and nothing else: got %v", calls)
 	}
-	line := "- ECR `langwatch-charts/langwatch-langyagent:3.21.0-main.80.1.abc1234` `" + digest + "`"
-	if len(results) != 1 || results[0].SummaryLine() != line {
-		t.Fatalf("summary line: got %v, want %q", results, line)
+	for i, chart := range charts {
+		if calls[i] != (call{packages[chart], "oci://registry.example/langwatch-charts"}) {
+			t.Errorf("pushes %s's own package under langwatch-charts: got %v", chart, calls[i])
+		}
+		version := strings.TrimSuffix(strings.TrimPrefix(packages[chart], chart+"-"), ".tgz")
+		line := "- ECR `langwatch-charts/" + chart + ":" + version + "` `" + digest + "`"
+		if results[i].SummaryLine() != line {
+			t.Errorf("summary line: got %q, want %q", results[i].SummaryLine(), line)
+		}
 	}
 }
 

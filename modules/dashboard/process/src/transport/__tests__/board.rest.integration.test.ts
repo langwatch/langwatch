@@ -141,6 +141,7 @@ async function projectWithBothBoards({
 
 const BOARDS = "/api/v1/dashboards";
 const REPORTS = "/api/v1/analytics/reports";
+const PROJECT_DASHBOARDS = `/api/v1/projects/${PROJECT}/analytics/dashboards`;
 const PROJECT_BOARDS = `/api/v1/projects/${PROJECT}/analytics/boards`;
 const ids = (json: { data?: { id: string }[] } | undefined) => json?.data?.map(({ id }) => id);
 const refusal = (answer: { status: number; json?: { code?: string } }) => ({
@@ -421,6 +422,32 @@ describe("given two Dashboards boards, one holding a widget", () => {
     });
   });
 
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("stores application on a new query, a picked set as sent, and keeps it through a rename", async () => {
+    const { other, send } = await twoBoards();
+    const widgets = `${BOARDS}/${other.id}/widgets`;
+    const query = { name: "turns", sql: "SELECT count() FROM traces" };
+
+    const created = await send("dashboards", widgets, {
+      method: "POST",
+      body: { name: "Langy refusals", code: CODE, queries: [query] },
+    });
+    const path = `${widgets}/${created.json?.id}`;
+    const picked = await send("dashboards", path, {
+      method: "PATCH",
+      body: { queries: [{ ...query, sources: ["langy"] }] },
+    });
+    const renamed = await send("dashboards", path, { method: "PATCH", body: { name: "Refused" } });
+    const sources = (response: typeof created) =>
+      response.json?.definition?.queries?.map((q: { sources?: unknown }) => q.sources);
+
+    expect({
+      created: sources(created),
+      picked: sources(picked),
+      renamed: sources(renamed),
+    }).toEqual({ created: [["application"]], picked: [["langy"]], renamed: [["langy"]] });
+  });
+
   /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */
   it("answers a widget reached through another board's path as not found, and leaves it", async () => {
     const { board, other, widget, send } = await twoBoards();
@@ -597,7 +624,7 @@ describe("given the Reports boards at /api/v1/analytics/reports", () => {
         renamed: "Spend",
         deleted: { id, name: "Spend" },
         dashboardsBoard: { status: 404, code: "dashboard_not_found" },
-        headers: answers.map(() => [null, null, null]),
+        headers: answers.map(() => ["true", '</api/v1/dashboards>; rel="successor-version"', null]),
       });
     }
   });
@@ -606,11 +633,51 @@ describe("given the Reports boards at /api/v1/analytics/reports", () => {
   it("leaves the project-path boards read without deprecation headers", async () => {
     const { board, send } = await projectWithBothBoards();
 
-    const listed = await send("projectBoards", PROJECT_BOARDS);
+    const listed = await send("projectBoards", PROJECT_DASHBOARDS);
 
     expect({ ids: ids(listed.json), headers: deprecationHeaders(listed) }).toEqual({
       ids: [board.id],
       headers: [null, null, null],
     });
+  });
+});
+
+describe("given a Dashboards board read on the project path", () => {
+  const deprecationHeaders = (answer: { headers: Headers }) =>
+    ["Deprecation", "Link"].map((name) => answer.headers.get(name));
+
+  /** @scenario "AC199y Names: the project-path dashboards read answers at /analytics/dashboards" */
+  it("answers at /analytics/dashboards, and the same at /analytics/boards, deprecated", async () => {
+    const { board, send } = await projectWithBothBoards();
+
+    const answers = await Promise.all(
+      [
+        PROJECT_DASHBOARDS,
+        `${PROJECT_DASHBOARDS}/${board.id}`,
+        PROJECT_BOARDS,
+        `${PROJECT_BOARDS}/${board.id}`,
+      ].map((path) => send("projectBoards", path)),
+    );
+
+    expect(
+      answers.map((answer) => ({
+        status: answer.status,
+        id: answer.json?.id ?? ids(answer.json)?.[0],
+        headers: deprecationHeaders(answer),
+      })),
+    ).toEqual([
+      { status: 200, id: board.id, headers: [null, null] },
+      { status: 200, id: board.id, headers: [null, null] },
+      {
+        status: 200,
+        id: board.id,
+        headers: ["true", `<${PROJECT_DASHBOARDS}>; rel="successor-version"`],
+      },
+      {
+        status: 200,
+        id: board.id,
+        headers: ["true", `<${PROJECT_DASHBOARDS}/${board.id}>; rel="successor-version"`],
+      },
+    ]);
   });
 });

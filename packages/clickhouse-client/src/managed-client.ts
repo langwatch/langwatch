@@ -270,7 +270,13 @@ export class ClickHouseStatementAdmission {
     // Each lane queue holds half the single-queue bound, so together they equal it.
     this.lanes =
       caps === null
-        ? [statementLane({ lane: "all", capMax: options.maxConcurrent, maxQueued: null })]
+        ? [
+            statementLane({
+              lane: "all",
+              capMax: options.maxConcurrent,
+              maxQueued: null,
+            }),
+          ]
         : (["insert", "read"] as const).map((lane) =>
             statementLane({
               lane,
@@ -303,15 +309,21 @@ export class ClickHouseStatementAdmission {
     });
   }
 
-  /** Runs `task` once its lane and the total grant a slot, or refuses it as overloaded. */
+  /**
+   * Runs `task` once its lane and the total grant a slot, or refuses it as overloaded. A refusal
+   * counts one shed per caller the statement carries: `callers`, read at the refusal, for an
+   * insert that carries several (insert-coalescing.ts, ClickHouseQueryClient), else one.
+   */
   async run<T>({
     operation,
     signal,
     task,
+    callers,
   }: {
     operation: ClickHouseStatementOperation;
     signal?: AbortSignalLike | undefined;
     task: () => Promise<T>;
+    callers?: (() => number) | undefined;
   }): Promise<T> {
     const { instance, telemetry } = this.options;
     const lane = this.laneFor(operation);
@@ -337,10 +349,29 @@ export class ClickHouseStatementAdmission {
       return await this.acquire({ lane, wait, onDriver });
     } catch (error) {
       if (admitted) throw error;
-      throw this.refusal({ error, timedOut: wait.hasTimedOut(), operation, startedAt });
+      throw this.refusal({
+        error,
+        timedOut: wait.hasTimedOut(),
+        operation,
+        startedAt,
+        callers: callers?.() ?? 1,
+      });
     } finally {
       wait.dispose();
     }
+  }
+
+  /**
+   * Whether a statement of `operation` would be granted a slot now: its lane and the total each
+   * have one free, and nothing is waiting ahead of it.
+   */
+  admitsNow(operation: ClickHouseStatementOperation): boolean {
+    const lane = this.laneFor(operation);
+    const total = this.total.stats();
+    if (total.queued > 0 || total.inFlight >= this.options.maxConcurrent) return false;
+    if (lane.cap === null) return true;
+    const capped = lane.cap.stats();
+    return capped.queued === 0 && capped.inFlight < lane.capMax;
   }
 
   private laneFor(operation: ClickHouseStatementOperation): StatementLane {
@@ -380,11 +411,13 @@ export class ClickHouseStatementAdmission {
     timedOut,
     operation,
     startedAt,
+    callers,
   }: {
     error: unknown;
     timedOut: boolean;
     operation: ClickHouseStatementOperation;
     startedAt: number;
+    callers: number;
   }): unknown {
     const { instance, telemetry, overloadErrorFactory, logger } = this.options;
     return statementRefusal({
@@ -395,7 +428,11 @@ export class ClickHouseStatementAdmission {
       subject: "a ClickHouse statement",
       logFields: { instance, operation },
       logger,
-      onShed: () => telemetry.incrementStatementsShed({ instance, operation }),
+      onShed: () => {
+        for (let caller = 0; caller < callers; caller++) {
+          telemetry.incrementStatementsShed({ instance, operation });
+        }
+      },
       createOverload: (input) => overloadErrorFactory.create(input),
     });
   }

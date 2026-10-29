@@ -113,6 +113,65 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     When the statements are issued
     Then no more statements run at once than the whole budget allows
 
+  # An async insert that waits for the server's flush holds its slot the whole
+  # flush while the server does nothing for it. Writers that insert a row at a
+  # time then spend slots at the rate rows arrive, so a burst fills the insert
+  # lane and sheds rows while ClickHouse has CPU and memory to spare. The
+  # server merges those rows into one flush anyway, so the client carries the
+  # rows that wait for a slot together in one statement: the slots a burst
+  # needs follow the tables being written, not the rows. Only inserts of one
+  # route (tenant, organisation, tenant set) share, and only those that turn
+  # async deduplication off explicitly: a deduplicated insert is known by its
+  # own data, which a shared statement would change.
+  @unit
+  Scenario: async inserts waiting for a slot go as one statement
+    Given the insert lane has used every slot it may hold
+    When several async inserts of one route and table with the same settings are issued
+    Then one statement carries all their rows once a slot frees
+    And every caller learns the statement's outcome
+
+  @unit
+  Scenario: an async insert with a slot free goes at once, alone
+    Given the insert lane has a free slot
+    When async inserts are issued in the same tick
+    Then each starts at once with its own rows
+
+  @unit
+  Scenario: only inserts that can share a statement share one
+    Given the insert lane has used every slot it may hold
+    When inserts are issued for different routes or tables, with different settings, with deduplication left on or tokened, or without waiting for the flush
+    Then each that cannot share a statement goes in its own
+
+  @unit
+  Scenario: a coalesced statement never exceeds its row cap
+    Given the insert lane has used every slot it may hold
+    When more rows wait for one table than one statement may carry
+    Then they go in as many statements as the cap requires
+    And an insert larger than the cap goes in a statement of its own
+
+  @unit
+  Scenario: a refused coalesced statement refuses and counts every caller
+    Given async inserts are waiting together for a slot that never frees
+    When the wait bound elapses
+    Then every caller is refused as overloaded
+    And each caller counts as one shed statement
+
+  # No failure proves the batch unwritten: another client's bad row in the
+  # server's async buffer fails every entry flushed with it, after the others
+  # were written, and nothing deduplicates a resend, so the rows would land twice.
+  @unit
+  Scenario: a failed coalesced statement is never resent
+    Given async inserts went together as one statement
+    When the statement fails, even as unparsable rows
+    Then every caller sees that failure
+    And no caller's rows are sent again
+
+  @unit
+  Scenario: coalesced inserts keep to the insert lane
+    Given async inserts are waiting together for a slot
+    Then reads still start at once
+    And a saturated read lane does not delay them
+
   # Sizing the bound is where this went wrong in practice. The budget was read
   # as one server's allowance and then divided across the whole fleet, but the
   # cluster runs several nodes and the fleet's statements spread over all of

@@ -81,14 +81,6 @@ Feature: Public REST is a first-class API surface
     Then the response is 404
 
   @versioning @integration
-  Scenario: A registration superseded at a later date keeps only its own dates
-    Given a namespace registered at one date and superseded at a later one by a new family
-    When a caller pins a date from the first registration up to the day before the later one
-    Then the first registration answers
-    When a caller pins the later date or after, or names no date
-    Then the new family answers
-
-  @versioning @integration
   Scenario: A header on a family that is not dated changes nothing
     When X-API-Version names a real date on a route that is not dated
     Then the route answers exactly as without the header

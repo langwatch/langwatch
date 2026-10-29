@@ -40,8 +40,8 @@ export type MountableRestApp = Hono;
 export const MANAGEMENT_API_VERSION = "2026-08-07";
 
 /**
- * The version `/api/v1/dashboards` became the Dashboards API at; before it, that path answered
- * the Analytics Reports boards. Clients written since name it in `X-API-Version`.
+ * The version the Dashboards API at `/api/v1/dashboards` is registered at; an earlier date finds
+ * nothing there. Clients written since name it in `X-API-Version`.
  */
 export const DASHBOARDS_API_VERSION = "2026-10-26";
 
@@ -333,6 +333,8 @@ export type RestAddressingOptions = Readonly<{
   v1Twin?: boolean;
   generation?: string;
   root?: boolean;
+  /** Every bare `/api/<namespace>` answer is deprecated in favour of the `/api/v1` twin. */
+  bareDeprecated?: boolean;
 }>;
 
 /** The generation a family names in its own path, when it names one: `v2`. */
@@ -368,6 +370,13 @@ export function assertAddressingOptions({
     throw new Error(
       `REST "${namespace}" answers at the root, where a path carries no /api prefix for ` +
         "/api/v1 to alias, so it must declare { v1Twin: false }",
+    );
+  }
+
+  if (options.bareDeprecated && (addressing !== "dated" || options.v1Twin === false)) {
+    throw new Error(
+      `REST "${namespace}" can deprecate its bare path only as a dated family with an /api/v1 ` +
+        "twin to name as its successor",
     );
   }
 
@@ -492,9 +501,6 @@ export function addressesOf<Api>({
     path: `/${version}${suffix}`,
     context: { version, status: "stable" as const, documented: false },
   };
-
-  // Superseded: the newer family in its namespace answers latest and the bare path.
-  if (declaration.supersededAt !== void 0) return [dated];
 
   return [
     dated,

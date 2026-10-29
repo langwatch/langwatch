@@ -108,10 +108,10 @@ def sync_detailed(
     | DeleteApiDashboardsByDashboardIdResponse404
     | DeleteApiDashboardsByDashboardIdResponse500
 ]:
-    """Delete a board
+    """Delete a dashboard
 
-     Deletes a board together with the widgets on it and every member's star of it; this cannot be
-    undone. Answers with the deleted board's id and name.
+     Deletes a dashboard together with the widgets on it and every member's star of it; this cannot be
+    undone. Answers with the deleted dashboard's id and name.
 
     Args:
         dashboard_id (str):
@@ -148,10 +148,10 @@ def sync(
     | DeleteApiDashboardsByDashboardIdResponse500
     | None
 ):
-    """Delete a board
+    """Delete a dashboard
 
-     Deletes a board together with the widgets on it and every member's star of it; this cannot be
-    undone. Answers with the deleted board's id and name.
+     Deletes a dashboard together with the widgets on it and every member's star of it; this cannot be
+    undone. Answers with the deleted dashboard's id and name.
 
     Args:
         dashboard_id (str):
@@ -182,10 +182,10 @@ async def asyncio_detailed(
     | DeleteApiDashboardsByDashboardIdResponse404
     | DeleteApiDashboardsByDashboardIdResponse500
 ]:
-    """Delete a board
+    """Delete a dashboard
 
-     Deletes a board together with the widgets on it and every member's star of it; this cannot be
-    undone. Answers with the deleted board's id and name.
+     Deletes a dashboard together with the widgets on it and every member's star of it; this cannot be
+    undone. Answers with the deleted dashboard's id and name.
 
     Args:
         dashboard_id (str):
@@ -220,10 +220,10 @@ async def asyncio(
     | DeleteApiDashboardsByDashboardIdResponse500
     | None
 ):
-    """Delete a board
+    """Delete a dashboard
 
-     Deletes a board together with the widgets on it and every member's star of it; this cannot be
-    undone. Answers with the deleted board's id and name.
+     Deletes a dashboard together with the widgets on it and every member's star of it; this cannot be
+    undone. Answers with the deleted dashboard's id and name.
 
     Args:
         dashboard_id (str):

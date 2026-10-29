@@ -8,6 +8,7 @@ import type {
   LangWatchQLAcceptedGranularityStep,
   LangWatchQLQueryResult,
   LangWatchQLGranularityStep,
+  RunSources,
 } from "@langwatch/analytics-contract";
 
 import {
@@ -37,8 +38,8 @@ export interface LangWatchQLExecuteRequest {
    * would ignore the one the surface chose.
    */
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
-  /** Trace origins the surface leaves out of every view the statement reads, as a board does. */
-  readonly excludeOrigins?: readonly string[];
+  /** The trace origins a dashboard query counts (AC200); every origin when absent. */
+  readonly sources?: RunSources;
 }
 
 /** How a submission reaches the server. */

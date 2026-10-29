@@ -61,7 +61,7 @@ const widgetNotFoundResponse: Record<404, RouteResponse> = {
 const widgetOrBoardNotFoundResponse: Record<404, RouteResponse> = {
   404: {
     description:
-      "No dashboard widget with this id, or no Dashboards board with this id, in this project. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
+      "No dashboard widget with this id, or no dashboard with this id, in this project. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
     content: { "application/json": { schema: resolver(apiErrorSchema) } },
   },
 };

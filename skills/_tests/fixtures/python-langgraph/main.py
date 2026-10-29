@@ -12,7 +12,7 @@ class State(TypedDict):
     response: str
 
 
-llm = ChatOpenAI(model="gpt-4o")
+llm = ChatOpenAI(model="gpt-6-luna")
 
 
 SYSTEM_PROMPT = "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."

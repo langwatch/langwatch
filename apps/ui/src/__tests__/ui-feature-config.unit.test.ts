@@ -18,6 +18,7 @@ describe("browser feature configuration", () => {
           federatedProviders: [],
           signUpMode: "invite_only",
         },
+        "api-key": { docsOrigins: ["https://app.langwatch.test", "https://langwatch.ai"] },
         authz: {},
         billing: {},
         evaluator: { hasLangevals: true },
