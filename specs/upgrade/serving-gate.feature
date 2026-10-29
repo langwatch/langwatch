@@ -186,6 +186,15 @@ Feature: Serving processes refuse to start when the installation is behind their
     Then it runs the upgrade once and its warning names the target
     And while the target stays behind each later pass waits twice as long, up to five minutes
 
+  # A private target the environment configures but the ledger has never recorded is behind too:
+  # the upgrade the pass runs seeds it, so a route added without a deploy still catches up.
+  @unit
+  Scenario: An admitted worker counts a configured private target with no ledger rows as behind
+    Given the ledger records "private:org_1" behind and no row at all for "private:org_2"
+    And the environment configures "shared", "private:org_1" and "private:org_2"
+    When the worker's catch-up pass reads the targets behind
+    Then it names "private:org_1" and "private:org_2" once each and never "shared"
+
   @unit
   Scenario: An admitted worker with every ClickHouse target current runs no upgrade
     Given an admitted worker and no ClickHouse target behind

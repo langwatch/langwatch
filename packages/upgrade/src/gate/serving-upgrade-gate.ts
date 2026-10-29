@@ -16,10 +16,10 @@ import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
-import { writeUpgradeLine } from "../runner/image-upgrade.ts";
+import { configuredClickHouseTargets, writeUpgradeLine } from "../runner/image-upgrade.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
-import { isPrivateTarget, PRIVATE_TARGET_PREFIX } from "../runner/schema-applier.ts";
+import { PRIVATE_TARGET_PREFIX } from "../runner/schema-applier.ts";
 import { EXIT_CODES, type UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
@@ -46,7 +46,7 @@ import {
   UPGRADE_RE_ASK_MS,
 } from "./serving-gate.ts";
 import { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
-import { startTargetCatchUp } from "./target-catch-up.ts";
+import { privateTargetsBehind, startTargetCatchUp } from "./target-catch-up.ts";
 import {
   redisTargetsCatchingUp,
   type TargetsCatchingUpStore,
@@ -104,6 +104,7 @@ export function upgradeGateOver({
   processId,
   firstInstall,
   credentialKeys,
+  clickhouseTargets = [],
   targetsCatchingUp = null,
   warn = emitWarning,
   wait = (ms) => sleep(ms),
@@ -118,6 +119,9 @@ export function upgradeGateOver({
   processId: string;
   firstInstall: FirstInstallUpgrade;
   credentialKeys?: readonly string[];
+  /** Every ClickHouse target the environment configures; a private one with no ledger rows
+   *  counts as behind, so the worker's catch-up pass runs the upgrade that seeds it. */
+  clickhouseTargets?: readonly string[];
   /** The shared list of private ClickHouse targets catching up (T7-F18); null without Redis. */
   targetsCatchingUp?: TargetsCatchingUpStore | null;
   warn?: ServingGateWarn;
@@ -229,6 +233,7 @@ export function upgradeGateOver({
             release,
             warn,
             catchUp: { upgrade: firstInstall, findLeaseHolder, targetsCatchingUp },
+            clickhouseTargets,
             redact: ledgerRedactor({ secretValues }),
           }),
         }
@@ -563,6 +568,7 @@ function backgroundStepsOver({
   release,
   warn,
   catchUp,
+  clickhouseTargets,
   redact,
 }: {
   postgres: UpgradePostgres;
@@ -577,6 +583,7 @@ function backgroundStepsOver({
     findLeaseHolder: UpgradeLeaseHolder;
     targetsCatchingUp: TargetsCatchingUpStore | null;
   };
+  clickhouseTargets: readonly string[];
   redact: LedgerTextRedactor;
 }) {
   const ledger = UpgradeLedgerRepository.create({ postgres, redact });
@@ -609,8 +616,11 @@ function backgroundStepsOver({
       const catchingUp = startTargetCatchUp({
         findTargetsBehind: async () => {
           if (!(await runner.ledgerExists())) return [];
-          const behind = (await ledger.findTargetsBehind()).map(({ target }) => target);
-          return [...new Set(behind.filter((target) => isPrivateTarget({ target })))];
+          return privateTargetsBehind({
+            behind: (await ledger.findTargetsBehind()).map(({ target }) => target),
+            recorded: await ledger.findRecordedTargets(),
+            configured: clickhouseTargets,
+          });
         },
         findLeaseHolder: catchUp.findLeaseHolder,
         upgrade: catchUp.upgrade,
@@ -731,6 +741,7 @@ export async function servingUpgradeGate({
             processId: `${hostname()}:${process.pid}:${role}`,
             firstInstall: upgrade,
             credentialKeys,
+            clickhouseTargets: configuredClickHouseTargets({ environment }),
             targetsCatchingUp: redisTargetsCatchingUp({
               url: redis?.trim() || undefined,
               environment,

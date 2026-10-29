@@ -65,6 +65,9 @@ export interface UpgradeRunnerOptions {
   };
   releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
+  /** The ledger name of every ClickHouse target the environment configures; a private one with
+   *  no target rows yet is seeded pending on every shipped step, so it reads behind. */
+  clickhouseTargets?: readonly string[];
   codeSteps?: readonly MigrationStep[];
   /** A Prisma folder's SQL, for the pre-built index check; else read from the image. */
   prismaSql?: (args: { folder: string }) => string | null;
@@ -596,6 +599,7 @@ export class UpgradeRunnerService {
     await this.runner.clearOperatorRetry({ ids: retried });
     await this.runner.registerSteps({ steps: this.shipped });
     await this.resolveLeftFailures({ signal, runId });
+    await this.seedUnrecordedTargets();
     await this.retryFailedBackgroundSteps({ runId });
     const reopened = await this.reopenAfterRollback({ ...before });
     await this.runner.setStatus({ ids: plan.notNeeded, status: "not-needed", runId });
@@ -1126,6 +1130,31 @@ export class UpgradeRunnerService {
       .map((step) => step.id);
     const reason = `reopened: image ${current} runs below the last upgrade to ${last}`;
     return this.runner.reopenDoneSteps({ ids: reopened, reason });
+  }
+
+  /**
+   * A private target configured after the last release that shipped schema has no rows, so it
+   * never reads behind and the catch-up never sees it. Its first run seeds it pending on every
+   * shipped ClickHouse step; the catch-up below then applies them. A seeded target writes nothing.
+   */
+  private async seedUnrecordedTargets(): Promise<void> {
+    const recorded = new Set(await this.ledger.findRecordedTargets());
+    const unrecorded = (this.options.clickhouseTargets ?? []).filter(
+      (target) => isPrivateTarget({ target }) && !recorded.has(target),
+    );
+    if (unrecorded.length === 0) return;
+    const ids = [...this.shippedIds].filter(isGoose).toSorted();
+    for (const target of unrecorded) {
+      for (const id of ids) {
+        const version = id.slice("clickhouse:".length);
+        await this.ledger.upsertTarget({ stepId: id, target, status: "pending", version });
+      }
+      this.narrate.info(`ClickHouse target ${target} is new and behind; this run catches it up`, {
+        phase: "preflight",
+        target,
+        steps: ids.length,
+      });
+    }
   }
 
   /**
