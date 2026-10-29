@@ -2,9 +2,9 @@
  * `add_dashboard_widget`: one create under the dashboard's path, which also places the widget.
  */
 
-import type { WidgetSource } from "../langwatch-api-dashboard-widgets.js";
 import { createWidgetOnDashboard } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
+import type { WidgetSource } from "../schemas/widget-sources.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,

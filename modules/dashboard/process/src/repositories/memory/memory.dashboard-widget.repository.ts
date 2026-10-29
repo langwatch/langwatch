@@ -10,7 +10,6 @@ import {
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
-  mergeQuerySources,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { nowInstant } from "@langwatch/time";
@@ -112,10 +111,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
       graph: {
         version: DASHBOARD_WIDGET_DEFINITION_VERSION,
         code: input.input.code ?? definition.data.code,
-        queries:
-          input.input.queries === undefined
-            ? definition.data.queries
-            : mergeQuerySources({ sent: input.input.queries, stored: definition.data.queries }),
+        queries: input.input.queries ?? definition.data.queries,
         ...(description === undefined ? {} : { description }),
         ...(prompt === undefined ? {} : { prompt }),
         ...(source === undefined ? {} : { source }),

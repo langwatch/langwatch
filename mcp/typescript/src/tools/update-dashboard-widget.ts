@@ -4,9 +4,10 @@
  * Spec: modules/dashboard/specs/dashboard-widget-mcp.feature
  */
 
-import type { DashboardWidget, WidgetSource } from "../langwatch-api-dashboard-widgets.js";
+import type { DashboardWidget } from "../langwatch-api-dashboard-widgets.js";
 import { getWidgetOnDashboard, updateWidgetOnDashboard } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
+import type { WidgetSource } from "../schemas/widget-sources.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,

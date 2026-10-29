@@ -12,7 +12,6 @@ import {
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
-  mergeQuerySources,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
@@ -195,10 +194,7 @@ export class PrismaDashboardWidgetRepository
     const source = input.source ?? definition.source;
     return graphOf({
       code: input.code ?? definition.code,
-      queries:
-        input.queries === undefined
-          ? definition.queries
-          : mergeQuerySources({ sent: input.queries, stored: definition.queries }),
+      queries: input.queries ?? definition.queries,
       ...(description === undefined ? {} : { description }),
       ...(prompt === undefined ? {} : { prompt }),
       ...(source === undefined ? {} : { source }),

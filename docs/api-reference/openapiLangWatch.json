@@ -29985,7 +29985,7 @@
                                     "sources": {
                                       "anyOf": [
                                         {
-                                          "maxItems": 9,
+                                          "maxItems": 11,
                                           "type": "array",
                                           "items": {
                                             "type": "string",
@@ -29993,7 +29993,9 @@
                                               "application",
                                               "simulation",
                                               "evaluation",
+                                              "sample",
                                               "coding_agent",
+                                              "ai_tool",
                                               "gateway",
                                               "workflow",
                                               "playground",
@@ -30598,7 +30600,7 @@
                               "sources": {
                                 "anyOf": [
                                   {
-                                    "maxItems": 9,
+                                    "maxItems": 11,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -30606,7 +30608,9 @@
                                         "application",
                                         "simulation",
                                         "evaluation",
+                                        "sample",
                                         "coding_agent",
+                                        "ai_tool",
                                         "gateway",
                                         "workflow",
                                         "playground",
@@ -31195,7 +31199,7 @@
                         "sources": {
                           "anyOf": [
                             {
-                              "maxItems": 9,
+                              "maxItems": 11,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -31203,7 +31207,9 @@
                                   "application",
                                   "simulation",
                                   "evaluation",
+                                  "sample",
                                   "coding_agent",
+                                  "ai_tool",
                                   "gateway",
                                   "workflow",
                                   "playground",
@@ -31391,7 +31397,7 @@
                               "sources": {
                                 "anyOf": [
                                   {
-                                    "maxItems": 9,
+                                    "maxItems": 11,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -31399,7 +31405,9 @@
                                         "application",
                                         "simulation",
                                         "evaluation",
+                                        "sample",
                                         "coding_agent",
+                                        "ai_tool",
                                         "gateway",
                                         "workflow",
                                         "playground",
@@ -32088,7 +32096,7 @@
                               "sources": {
                                 "anyOf": [
                                   {
-                                    "maxItems": 9,
+                                    "maxItems": 11,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -32096,7 +32104,9 @@
                                         "application",
                                         "simulation",
                                         "evaluation",
+                                        "sample",
                                         "coding_agent",
+                                        "ai_tool",
                                         "gateway",
                                         "workflow",
                                         "playground",
@@ -32776,7 +32786,7 @@
                         "sources": {
                           "anyOf": [
                             {
-                              "maxItems": 9,
+                              "maxItems": 11,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -32784,7 +32794,9 @@
                                   "application",
                                   "simulation",
                                   "evaluation",
+                                  "sample",
                                   "coding_agent",
+                                  "ai_tool",
                                   "gateway",
                                   "workflow",
                                   "playground",
@@ -33429,7 +33441,7 @@
                               "sources": {
                                 "anyOf": [
                                   {
-                                    "maxItems": 9,
+                                    "maxItems": 11,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -33437,7 +33449,9 @@
                                         "application",
                                         "simulation",
                                         "evaluation",
+                                        "sample",
                                         "coding_agent",
+                                        "ai_tool",
                                         "gateway",
                                         "workflow",
                                         "playground",
@@ -36532,7 +36546,7 @@
                                     "sources": {
                                       "anyOf": [
                                         {
-                                          "maxItems": 9,
+                                          "maxItems": 11,
                                           "type": "array",
                                           "items": {
                                             "type": "string",
@@ -36540,7 +36554,9 @@
                                               "application",
                                               "simulation",
                                               "evaluation",
+                                              "sample",
                                               "coding_agent",
+                                              "ai_tool",
                                               "gateway",
                                               "workflow",
                                               "playground",
@@ -37227,7 +37243,7 @@
                               "sources": {
                                 "anyOf": [
                                   {
-                                    "maxItems": 9,
+                                    "maxItems": 11,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -37235,7 +37251,9 @@
                                         "application",
                                         "simulation",
                                         "evaluation",
+                                        "sample",
                                         "coding_agent",
+                                        "ai_tool",
                                         "gateway",
                                         "workflow",
                                         "playground",
@@ -37906,7 +37924,7 @@
                         "sources": {
                           "anyOf": [
                             {
-                              "maxItems": 9,
+                              "maxItems": 11,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -37914,7 +37932,9 @@
                                   "application",
                                   "simulation",
                                   "evaluation",
+                                  "sample",
                                   "coding_agent",
+                                  "ai_tool",
                                   "gateway",
                                   "workflow",
                                   "playground",
@@ -38102,7 +38122,7 @@
                               "sources": {
                                 "anyOf": [
                                   {
-                                    "maxItems": 9,
+                                    "maxItems": 11,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -38110,7 +38130,9 @@
                                         "application",
                                         "simulation",
                                         "evaluation",
+                                        "sample",
                                         "coding_agent",
+                                        "ai_tool",
                                         "gateway",
                                         "workflow",
                                         "playground",
@@ -38799,7 +38821,7 @@
                               "sources": {
                                 "anyOf": [
                                   {
-                                    "maxItems": 9,
+                                    "maxItems": 11,
                                     "type": "array",
                                     "items": {
                                       "type": "string",
@@ -38807,7 +38829,9 @@
                                         "application",
                                         "simulation",
                                         "evaluation",
+                                        "sample",
                                         "coding_agent",
+                                        "ai_tool",
                                         "gateway",
                                         "workflow",
                                         "playground",
@@ -39487,7 +39511,7 @@
                         "sources": {
                           "anyOf": [
                             {
-                              "maxItems": 9,
+                              "maxItems": 11,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -39495,7 +39519,9 @@
                                   "application",
                                   "simulation",
                                   "evaluation",
+                                  "sample",
                                   "coding_agent",
+                                  "ai_tool",
                                   "gateway",
                                   "workflow",
                                   "playground",

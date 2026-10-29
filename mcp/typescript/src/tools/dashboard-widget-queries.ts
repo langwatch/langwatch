@@ -1,7 +1,5 @@
-import type {
-  DashboardWidgetQueryInput,
-  WidgetSource,
-} from "../langwatch-api-dashboard-widgets.js";
+import type { DashboardWidgetQueryInput } from "../langwatch-api-dashboard-widgets.js";
+import type { WidgetSource } from "../schemas/widget-sources.js";
 
 /** Every query with `sources` set to the list given; as given when no list was named. */
 export function withSources({

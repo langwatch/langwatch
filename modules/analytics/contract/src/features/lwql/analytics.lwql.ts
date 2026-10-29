@@ -7,7 +7,6 @@ import type {
   LangWatchQLAcceptedStatement,
   LangWatchQLAppFunctionCall,
 } from "./langwatch-ql-app-functions.ts";
-import type { RunSources } from "./trace-sources.ts";
 
 /** One column in a LangWatchQL result. */
 const langWatchQLColumnSchemaDefinition = z
@@ -475,3 +474,48 @@ export interface LangWatchQLAvailabilitySchema extends Named<
 export const langWatchQLAvailabilitySchema: LangWatchQLAvailabilitySchema =
   langWatchQLAvailabilitySchemaDefinition;
 export type LangWatchQLAvailability = z.infer<typeof langWatchQLAvailabilitySchema>;
+
+/** The origins LangWatch stamps, in the order the editor shows them. */
+export const KNOWN_TRACE_ORIGINS = [
+  "application",
+  "simulation",
+  "evaluation",
+  "sample",
+  "coding_agent",
+  "ai_tool",
+  "gateway",
+  "workflow",
+  "playground",
+  "langy",
+] as const;
+
+/** Every origin not in {@link KNOWN_TRACE_ORIGINS}. An unstamped trace is `application`'s. */
+export const OTHER_TRACE_SOURCE = "other";
+
+/**
+ * A dashboard query's sources, the trace origins it counts (dashboards-v2 AC200). Here, not in
+ * the trace contract, because that contract depends on this package.
+ */
+export const TRACE_SOURCES = [...KNOWN_TRACE_ORIGINS, OTHER_TRACE_SOURCE] as const;
+export type TraceSource = (typeof TRACE_SOURCES)[number];
+
+/** What an unset query counts, and what a new widget's query stores (owner, 2026-10-28). */
+export const DEFAULT_WIDGET_SOURCES: readonly TraceSource[] = ["application"];
+
+export const traceSourceSchema = z.enum(TRACE_SOURCES);
+const traceSourcesSchemaDefinition = z.array(traceSourceSchema).max(TRACE_SOURCES.length);
+export interface TraceSourcesSchema extends Named<typeof traceSourcesSchemaDefinition> {}
+export const traceSourcesSchema: TraceSourcesSchema = traceSourcesSchemaDefinition;
+
+/**
+ * What a run names: a widget query's list (empty counts nothing), `null` for an unset widget
+ * query (the server counts {@link DEFAULT_WIDGET_SOURCES}), or absent for a run no widget owns.
+ */
+export type RunSources = readonly TraceSource[] | null;
+
+/** A query's sources as it runs: its list, or {@link DEFAULT_WIDGET_SOURCES} when unset. */
+export function effectiveSources(
+  stored: readonly TraceSource[] | null | undefined,
+): readonly TraceSource[] {
+  return stored ?? DEFAULT_WIDGET_SOURCES;
+}

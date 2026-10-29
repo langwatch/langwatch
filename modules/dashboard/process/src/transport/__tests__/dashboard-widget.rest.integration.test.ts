@@ -9,6 +9,7 @@ import {
   canonicalErrorResponse,
   createRestRuntime,
 } from "@langwatch/api/rest";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
@@ -26,8 +27,14 @@ function queryDeclaring(parameter: { name: string; type: string; default?: unkno
   return [{ name: "traces", sql: SQL, parameters: [parameter] }];
 }
 
-function mountKey() {
-  const app = createDashboardTestApp();
+/** A key on one app; `permits` decides each permission at the key door, as its role would. */
+function mountKey({
+  app = createDashboardTestApp(),
+  permits = () => true,
+}: {
+  app?: ReturnType<typeof createDashboardTestApp>;
+  permits?: (permission: string) => boolean;
+} = {}) {
   const caller = {
     actor: { type: "api_key" as const, id: "key-of-project-1" },
     scope: { tier: "project" as const, id: "project-1" },
@@ -35,7 +42,16 @@ function mountKey() {
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
-    identity: { authenticate: () => caller, identify: () => caller },
+    identity: {
+      authenticate: ({ permission }) => {
+        if (!permits(permission)) {
+          const scope = { type: "project" as const, id: "project-1" };
+          throw new PermissionDeniedError({ permission, scope, denialReason: "no-grant" });
+        }
+        return caller;
+      },
+      identify: () => caller,
+    },
   });
   const hono = runtime.mount(dashboardWidgetRest.router(), {
     app: () => app,
@@ -189,5 +205,27 @@ describe("given the dashboard widget REST family", () => {
       expect(updated.status).toBe(422);
       expect(read.json.definition.queries[0].sources).toEqual(["application"]);
     });
+  });
+});
+
+describe("given a key whose role only views analytics", () => {
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("refuses a PATCH changing a query's sources with 403 and keeps the stored list", async () => {
+    const app = createDashboardTestApp();
+    const editor = mountKey({ app });
+    const viewer = mountKey({ app, permits: (permission) => permission === "analytics:view" });
+    const created = await editor.create({
+      name: "Traces",
+      code: CODE,
+      queries: [{ name: "traces", sql: SQL }],
+    });
+
+    const patched = await viewer.update(created.json.id, {
+      queries: [{ name: "traces", sql: SQL, sources: ["langy"] }],
+    });
+    const read = await editor.read(created.json.id);
+
+    expect(patched.status).toBe(403);
+    expect(read.json.definition.queries[0].sources).toEqual(["application"]);
   });
 });

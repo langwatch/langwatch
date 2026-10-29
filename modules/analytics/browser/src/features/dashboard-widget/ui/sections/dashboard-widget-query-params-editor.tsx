@@ -93,7 +93,7 @@ function rowVM({
 interface DashboardWidgetQueryParamsEditorProps {
   params: DashboardWidgetQueryParameterDeclaration[];
   onChange: (params: DashboardWidgetQueryParameterDeclaration[]) => void;
-  /** What the query stores; absent or null, it runs with the default and shows it. */
+  /** The query's list; unset (absent or null), it runs with the default and shows it. */
   sources: readonly TraceSource[] | null | undefined;
   /** Any change stores the list, the default included once a pill is touched. */
   onSourcesChange: (sources: TraceSource[]) => void;

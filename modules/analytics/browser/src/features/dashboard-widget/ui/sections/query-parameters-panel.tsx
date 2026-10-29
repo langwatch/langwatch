@@ -10,6 +10,7 @@
  * adapter shape, rather than hand-duplicating the row markup.
  */
 
+import type { TraceSource } from "@langwatch/analytics-contract";
 import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
@@ -73,12 +74,11 @@ export interface QueryParameterRowVM {
 
 /** A query's built-in `sources` row: the origins it counts, as removable pills. */
 export interface QuerySourcesVM {
-  /** What the query runs with: what it stores, else the default. */
-  readonly picked: readonly string[];
+  /** What the query runs with: its list, or the default when unset. */
+  readonly picked: readonly TraceSource[];
   /** Every source, in the order the menu offers the ones not picked. */
-  readonly all: readonly string[];
-  /** A method, so a caller's narrower list of sources fits. */
-  onChange(next: string[]): void;
+  readonly all: readonly TraceSource[];
+  readonly onChange: (next: TraceSource[]) => void;
 }
 
 export interface QueryParametersPanelProps {
@@ -139,7 +139,7 @@ function BuiltInBadge() {
   );
 }
 
-function SourcePill({ source, onRemove }: { source: string; onRemove: () => void }) {
+function SourcePill({ source, onRemove }: { source: TraceSource; onRemove: () => void }) {
   return (
     <HStack
       as="span"
@@ -175,8 +175,8 @@ function AddSourceMenu({
   missing,
   onAdd,
 }: {
-  missing: readonly string[];
-  onAdd: (source: string) => void;
+  missing: readonly TraceSource[];
+  onAdd: (source: TraceSource) => void;
 }) {
   return (
     <Menu.Root positioning={{ placement: "bottom-start" }}>
@@ -207,8 +207,7 @@ function AddSourceMenu({
 
 /** `sources = [pills] + Add source`, styled as a dashboard-context row (dashboards-v2 AC200). */
 function SourcesRow({ sources }: { sources: QuerySourcesVM }) {
-  const { picked, all } = sources;
-  const onChange = (next: string[]) => sources.onChange(next);
+  const { picked, all, onChange } = sources;
   const missing = all.filter((source) => !picked.includes(source));
   return (
     <HStack gap={2} align="start" data-testid="query-sources">

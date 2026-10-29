@@ -6,7 +6,6 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC200
  */
 
-import { DEFAULT_WIDGET_SOURCES } from "@langwatch/analytics-contract";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { act, cleanup, screen, within } from "@testing-library/react";
@@ -40,7 +39,6 @@ import {
 } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import { curatedBoardById } from "../model/curated-boards.ts";
-import { CATALOGUE_QUERY_SOURCES } from "../templates/model/template-widget.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -343,7 +341,7 @@ describe("given a stored widget whose query stores no sources", () => {
 
     // The run asks the server for the default; the pills show that same default.
     expect(sourcesOf(server.runs())).toEqual([null, null]);
-    expect(pickedSources(drawer)).toEqual([...DEFAULT_WIDGET_SOURCES]);
+    expect(pickedSources(drawer)).toEqual(["application"]);
     expect(server.runs().every((run) => run.excludeOrigins === undefined)).toBe(true);
   });
 
@@ -519,9 +517,10 @@ describe("given a From LangWatch board", () => {
       }
 
       expect(server.runs().length).toBeGreaterThan(0);
-      expect(new Set(server.runs().map((run) => JSON.stringify(run.sources)))).toEqual(
-        new Set([JSON.stringify(CATALOGUE_QUERY_SOURCES)]),
-      );
+      const sent = server.runs().map((run) => run.sources as readonly string[]);
+      // Every source but Langy's, until stock widgets carry their own (tasks#1025).
+      expect(sent.every((sources) => sources.includes("application"))).toBe(true);
+      expect(sent.some((sources) => sources.includes("langy"))).toBe(false);
       cleanup();
     }
   });

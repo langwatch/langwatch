@@ -22,7 +22,7 @@ const OWN_RANGE_SQL =
   "SELECT count() AS n FROM analytics.spans WHERE StartTime >= toStartOfMonth(now()) LIMIT 1";
 const WINDOW = { start: "2026-02-01T00:00:00.000Z", end: "2026-02-04T00:00:00.000Z" };
 const LANGY_TRACES =
-  "ifNull(TraceId, '') NOT IN (SELECT TraceId FROM analytics.trace_metrics " +
+  "(TenantId, ifNull(TraceId, '')) NOT IN (SELECT TenantId, TraceId FROM analytics.trace_metrics " +
   "WHERE ifNull(nullIf(Origin, ''), 'application') IN ('langy')";
 const LOOKUP_BOUND = " AND OccurredAt >= subtractDays(";
 
@@ -126,7 +126,7 @@ describe("given a dashboard query that names its sources", () => {
       sources: ["langy"],
     });
     const keepsLangy =
-      "ifNull(TraceId, '') NOT IN (SELECT TraceId FROM analytics.trace_metrics " +
+      "(TenantId, ifNull(TraceId, '')) NOT IN (SELECT TenantId, TraceId FROM analytics.trace_metrics " +
       "WHERE ifNull(nullIf(Origin, ''), 'application') NOT IN ('langy')";
 
     expect(statements).toHaveLength(2);
@@ -139,7 +139,7 @@ describe("given a stored widget's query that names no sources, run on the server
   it("scopes the statement and its report to application, as the card counts", async () => {
     const statements = await statementsSent({ sql: WINDOWED_SQL, sources: null });
     const keepsApplication =
-      "ifNull(TraceId, '') NOT IN (SELECT TraceId FROM analytics.trace_metrics " +
+      "(TenantId, ifNull(TraceId, '')) NOT IN (SELECT TenantId, TraceId FROM analytics.trace_metrics " +
       "WHERE ifNull(nullIf(Origin, ''), 'application') NOT IN ('application')";
 
     expect(statements).toHaveLength(2);
