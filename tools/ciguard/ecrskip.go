@@ -88,15 +88,15 @@ func jobSkipGates(rel, job string, j ciscan.Job) []string {
 			check = step
 		}
 		if pushes(step, exempt) {
-			problems = append(problems, pushProblems(rel+" job "+job, check, step)...)
+			problems = append(problems, pushProblems(rel+" job "+job, exempt, check, step)...)
 		}
 	}
 
 	return problems
 }
 
-func pushProblems(where string, check, step *ciscan.Step) []string {
-	if where == ImagesWorkflow+" job "+manifestJob {
+func pushProblems(where string, exempt bool, check, step *ciscan.Step) []string {
+	if exempt {
 		return []string{fmt.Sprintf("%s: %q writes to the registry with something other than `imagetools create` and %#q, the only writes behind its ecrtag checks", where, step.Name, ecrtagLambda)}
 	}
 	if check == nil || !gated(step.If) {
@@ -165,17 +165,16 @@ func ecrtagCalls(run string) []string {
 // repeatedFlag is a flag a call passes twice, "${from[@]}" counting as
 // -built-from, or "".
 func repeatedFlag(call string) string {
-	flags := []string{}
-	for range strings.Count(call, fromArgs) {
-		flags = append(flags, "built-from")
+	seen := map[string]int{"built-from": strings.Count(call, fromArgs)}
+	for _, m := range ecrtagFlag.FindAllStringSubmatch(call, -1) {
+		seen[m[1]]++
 	}
 	for _, m := range ecrtagFlag.FindAllStringSubmatch(call, -1) {
-		if slices.Contains(flags, m[1]) {
+		if seen[m[1]] > 1 {
 			return m[1]
 		}
-		flags = append(flags, m[1])
 	}
-	if strings.Count(call, fromArgs) > 1 {
+	if seen["built-from"] > 1 {
 		return "built-from"
 	}
 
