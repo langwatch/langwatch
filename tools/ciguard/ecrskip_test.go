@@ -119,6 +119,32 @@ func TestEveryECRPushAsksEcrtagFirst(t *testing.T) {
 		})
 	}
 
+	for name, breakIt := range map[string]func(string) string{
+		"a gate diluted by ||": func(s string) string {
+			return strings.Replace(s, "if: steps.exists.outputs.exists != 'true'", "if: always() || steps.exists.outputs.exists != 'true'", 1)
+		},
+		"push: ${{ true }} with no gate": func(s string) string {
+			s = strings.Replace(s, "        if: steps.exists.outputs.exists != 'true'\n", "", 1)
+			return strings.Replace(s, "          push: true\n", "          push: ${{ true }}\n", 1)
+		},
+		"a docker push inside a shell function": func(s string) string {
+			return strings.Replace(s, "      - name: Build\n", "      - name: Push by hand\n        run: |\n          publish() {\n            docker push \"$1\"\n          }\n          publish r:t\n      - name: Build\n", 1)
+		},
+		"a buildx build --push in a run step": func(s string) string {
+			return strings.Replace(s, "      - name: Build\n", "      - name: Buildx\n        run: |\n          docker buildx build . \\\n            --push -t r:t\n      - name: Build\n", 1)
+		},
+	} {
+		t.Run(name+" is refused", func(t *testing.T) {
+			assert.NotEmpty(t, skipRepo(t, gatedImages, breakIt(gatedPrivate)), breakIt(gatedPrivate))
+			assert.NotEmpty(t, skipRepo(t, breakIt(gatedImages), gatedPrivate))
+		})
+	}
+
+	t.Run("a gated run step that pushes passes", func(t *testing.T) {
+		private := strings.Replace(gatedPrivate, "      - name: Build\n", "      - name: Push by hand\n        if: success() && steps.exists.outputs.exists != 'true'\n        run: docker push r:t\n      - name: Build\n", 1)
+		assert.Empty(t, skipRepo(t, gatedImages, private))
+	})
+
 	t.Run("a Lambda check that refuses a re-tag is refused", func(t *testing.T) {
 		problems := skipRepo(t, strings.Replace(gatedImages, " -accept-retag", "", 1), gatedPrivate)
 		require.Len(t, problems, 1)
