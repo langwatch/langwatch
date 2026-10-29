@@ -261,8 +261,8 @@ describe("given a person's CLI access token naming a project in a widget", () =>
     await key.update(created.json.id, { queries: named });
 
     expect(asked).toEqual([
-      { userId: "user-1", projectIds: ["project-2"] },
-      { userId: "user-1", projectIds: ["project-2"] },
+      { userId: "user-1", projectIds: ["project-2"], anchorProjectId: "project-1" },
+      { userId: "user-1", projectIds: ["project-2"], anchorProjectId: "project-1" },
     ]);
   });
 });
