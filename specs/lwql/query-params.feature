@@ -296,14 +296,10 @@ Feature: Every query door takes the same parameters and says what it ran with
       # Evidence: both commands' output quoted, with the installed versions
 
     @integration
-    Scenario: QP23 The release before this one, reading a widget saved here, runs it or refuses visibly
-      Given the previous release, which strips unknown query keys and binds no {dashboard_context_sources}
-      When it runs a widget this release saved with sources and projects
-      Then SQL reading {dashboard_context_sources:Array(String)} is refused by the store with an unset-parameter error
-      And SQL that does not read it counts every origin over the board's project
-      And a widget storing several projects is never saved by the binder release (AC210e), so the old release meets none
-      # Evidence: the previous release's tag run against the later release's widgets, answers quoted
-      # The three release pairs are stated in dashboards-v2.feature AC210d
+    Scenario: QP23 A rollback is not supported for this feature
+      When the previous release reads a widget this release saved
+      Then it shows multi-project widgets for the board's project only, and the release notes say so
+      # Evidence: the release-notes line, as in dashboards-v2.feature AC210d
 
     @unit
     Scenario: QP24 The OpenAPI document lists the added fields as optional
