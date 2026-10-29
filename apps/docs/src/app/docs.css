@@ -1065,6 +1065,14 @@ figure > .docs-shot {
   margin-top: 32px;
 }
 
+/* Highlighted code is about half of a long page's elements, mostly below the fold. Off-screen
+   blocks skip style and layout until they near the viewport. The region is the horizontal
+   scroller, so the paint containment this implies clips nothing. 5.5rem is the median block
+   height; `auto` keeps a block's real height once it has rendered. */
+.docs-code-region {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 5.5rem;
+}
 .docs-code-region > pre {
   margin: 0;
   font: inherit;
