@@ -195,6 +195,17 @@ Feature: Serving processes refuse to start when the installation is behind their
     When the worker's catch-up pass reads the targets behind
     Then it names "private:org_1" and "private:org_2" once each and never "shared"
 
+  # The shared ClickHouse URL may come from a secret store rather than the process environment.
+  # The gate counts targets from the same environment the upgrade it triggers runs under, so a
+  # private route at the shared URL folds into "shared" for both and the pass never loops on it.
+  @unit
+  Scenario: The gate reads its ClickHouse targets from the environment the upgrade runs under
+    Given the shared ClickHouse URL is a resolved secret, absent from the process environment
+    And the process environment routes "org_1" to that same URL
+    When the gate builds the upgrade's environment
+    Then the environment carries DATABASE_URL and CLICKHOUSE_URL from the secrets
+    And the configured ClickHouse targets of that environment are "shared" alone
+
   @unit
   Scenario: An admitted worker with every ClickHouse target current runs no upgrade
     Given an admitted worker and no ClickHouse target behind
