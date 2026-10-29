@@ -179,10 +179,11 @@ holds it. What fixes it is that the token never enters the docs page.
   A script that also restyles the frame could trick that press; the frame counts only a press
   that begins after a short delay, never focuses Send itself, and does not otherwise defend
   against it.
-- The docs' Tag Manager refuses Custom HTML and custom JavaScript tags before the container
-  loads, so publishing a tag cannot add arbitrary code there; vendor tags run as gallery
-  templates, each limited to the hosts it declares. The Meta pixel and Reo.dev, which the
-  container runs as Custom HTML, are loaded by the page itself instead. All of it loads only
-  after the reader accepted cookies.
+- The docs' Tag Manager refuses Custom HTML, custom JavaScript and custom template tags before
+  the container loads, so publishing a tag cannot add arbitrary code there; a template can grant
+  itself any script, so only Google's built-in tags still run. The Meta, Reddit and X pixels and
+  Reo.dev, which the container runs as Custom HTML or custom templates, are loaded by the page
+  itself instead, the ad pixels only on langwatch.ai. All of it loads only after the reader
+  accepted cookies.
 - Supersedes steps 4 to 6 of the Flow, and the XSS consequence above for the docs' origin. An
   XSS on the app's origin still takes the key.

@@ -1,16 +1,18 @@
 import { loadPostHog } from "./posthog.ts";
-import { loadMetaPixel, loadReo } from "./vendor-tags.ts";
+import { loadMetaPixel, loadRedditPixel, loadReo, loadXPixel } from "./vendor-tags.ts";
 
 const INTERACTIONS = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
+/* The host the container fired its ad pixels on; a preview host sends them nothing. */
+const AD_PIXEL_HOST = "langwatch.ai";
 
 /* The marketing site's cookie banner writes the reader's choice here, on the same origin. */
 const CONSENT_STORAGE_KEY = "lw-cookie-consent";
 
 /*
  * Set by the page before the container loads, so publishing cannot widen it: no Custom HTML and
- * no custom JavaScript, which run any code at all. Google's tags and the gallery templates for
- * other vendors, each limited to the hosts it declares, still run.
+ * no custom JavaScript, which run any code at all. Blocking a class also refuses every custom
+ * template, which could grant itself any script; Google's built-in tags still run.
  */
 export const TAG_RESTRICTIONS = { "gtm.blocklist": ["html", "customScripts"] } as const;
 
@@ -29,6 +31,16 @@ export function analyticsConsented({ win }: { win: Pick<Window, "localStorage"> 
 export function tagManagerId({ doc, host }: { doc: Document; host: string }) {
   const id = doc.querySelector<HTMLMetaElement>('meta[name="docs-gtm"]')?.content ?? "";
   return /^GTM-[A-Z0-9]+$/.test(id) && !LOCAL_HOST.test(host) ? id : "";
+}
+
+/** The vendor tags the container would have run; the ad pixels only where it fired them. */
+function loadVendorTags({ win }: { win: TagWindow }) {
+  if (win.location.hostname === AD_PIXEL_HOST) {
+    loadMetaPixel({ win });
+    loadRedditPixel({ win });
+    loadXPixel({ win });
+  }
+  loadReo({ win });
 }
 
 /**
@@ -62,8 +74,7 @@ export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
     script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(id)}`;
     win.document.head.append(script);
     loadPostHog({ win });
-    loadMetaPixel({ win });
-    loadReo({ win });
+    loadVendorTags({ win });
   };
   for (const name of INTERACTIONS) win.addEventListener(name, start, { once: true, passive: true });
   const idle = () =>

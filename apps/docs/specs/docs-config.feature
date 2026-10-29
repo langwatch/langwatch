@@ -67,8 +67,8 @@ Feature: docs.json stays the single source of truth for both documentation sites
   Scenario: Refuse arbitrary code from the tag manager
     Given docs.json names a Google Tag Manager container
     When the container loads
-    Then the page has already refused custom HTML and custom JavaScript tags, whatever the container publishes
-    And Google's tags and the gallery templates for other vendors still run
+    Then the page has already refused custom HTML, custom JavaScript and custom template tags, whatever the container publishes
+    And Google's built-in tags still run
 
   @unit
   Scenario: Load PostHog with the tag manager, through the site's own proxy
@@ -78,11 +78,12 @@ Feature: docs.json stays the single source of truth for both documentation sites
     And a page that already started PostHog is left as it is
 
   @unit
-  Scenario: Load the Meta pixel and Reo.dev from the page, not from the tag manager
-    Given the container runs the Meta pixel and Reo.dev as custom HTML, which the docs refuse
+  Scenario: Load the vendor tags from the page, not from the tag manager
+    Given the container runs the Meta, Reddit and X pixels and Reo.dev as custom HTML or custom templates, which the docs refuse
     When the tag manager loads on a production page
-    Then the page loads the Meta pixel, with a page view, and Reo.dev itself
-    And neither loads before the reader accepted cookies
+    Then the page loads the Meta pixel with a page view, the Reddit pixel with a page visit, the X pixel and Reo.dev itself
+    And the ad pixels load only on langwatch.ai, as the container fired them
+    And none loads before the reader accepted cookies
 
   @unit
   Scenario: Mark deprecated pages
