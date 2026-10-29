@@ -76,11 +76,11 @@ describe("declaredPath", () => {
 
     /** @scenario "A refused answer's log names the failing field without the caller's keys" */
     it("keeps a map key's own issue path out, which Zod files under the entry", () => {
+      // The key's own check fails: its map's value is the key's text, and must be empty.
       const key = z
         .string()
-        // A string where the numeric map wants a number, so the key's own check fails.
-        .transform((text) => new Map([[Number(text), "bad" as unknown as number]]))
-        .pipe(z.map(z.number(), z.number()));
+        .transform((text) => new Map([[Number(text), text]]))
+        .pipe(z.map(z.number(), z.string().max(0)));
       const schema = z.map(key, z.array(z.string()));
       const parsed = schema.safeParse(new Map([["8675309", []]]));
 
