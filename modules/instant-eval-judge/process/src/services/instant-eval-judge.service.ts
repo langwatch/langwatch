@@ -8,6 +8,8 @@ import {
   INSTANT_EVAL_FREE_BUDGET_USD,
   InstantEvalFreeBudgetExhaustedError,
   InstantEvalJudgeStoppedError,
+  instantEvalSkipped,
+  type InstantEvalClassification,
   type InstantEvalJudgeAnswer,
   type InstantEvalJudgeCall,
   type InstantEvalJudgement,
@@ -51,10 +53,10 @@ type InstantEvalJudgeServiceDeps = Readonly<{
   decisionModels: InstantEvalDecisionModelChannel;
   /** Paces every classify send over the module's own rate buckets. */
   limiter: InstantEvalRateLimiter;
-  /** Answers a call that carries a route; absent, a route is ignored and the classifier answers. */
-  router?: InstantEvalJudgeRouterService;
+  /** Answers a call that carries a route. */
+  router: InstantEvalJudgeRouterService;
   /** The router's prices; a routed spend is priced from its cost at this markup. */
-  routePricing?: InstantEvalJudgeRoutePricing;
+  routePricing: InstantEvalJudgeRoutePricing;
   /** LangWatch cloud, the only install a judge call is answered on. */
   isCloud: boolean;
   /** Appends the priced fact; the judge's spend row and gateway's ledger row follow from it. */
@@ -77,25 +79,37 @@ export class InstantEvalJudgeService {
     return new InstantEvalJudgeService(deps);
   }
 
-  async judge({
+  /**
+   * One unmetered classify, the one dispatch `judge` and the Api's `classify` share: an own
+   * decision model, else the router for a routed call, else LangWatch's classifier, else a skip.
+   */
+  async classifyOnce({
     projectId,
     text,
     questions,
-    requestKey,
     signal,
     decisionModel,
     route,
-  }: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
+  }: InstantEvalClassification): Promise<InstantEvalJudgement> {
+    const signalArgs = signal ? [signal] : [];
     if (decisionModel) {
-      const judgement = await this.deps.decisionModels.classify(
-        { text, questions, decisionModel },
-        ...(signal ? [signal] : []),
-      );
-      return { outcome: "judged", judgement, priceUsd: 0 };
+      return this.deps.decisionModels.classify({ text, questions, decisionModel }, ...signalArgs);
+    }
+    const { classifier, limiter, router } = this.deps;
+    if (!classifier) return instantEvalSkipped("classifier_not_configured");
+    if (route) {
+      return router.classify({ projectId, text, questions, route, ...(signal ? { signal } : {}) });
+    }
+    return classifier.classify({ projectId, text, questions, limiter }, ...signalArgs);
+  }
+
+  async judge({ requestKey, ...call }: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
+    const { projectId, decisionModel } = call;
+    if (decisionModel) {
+      return { outcome: "judged", judgement: await this.classifyOnce(call), priceUsd: 0 };
     }
     // Off cloud nothing judges, so the project's placement is never the reason to give.
-    const { classifier } = this.deps;
-    if (!this.deps.isCloud || !classifier) {
+    if (!this.deps.isCloud || !this.deps.classifier) {
       return refused({ code: "classifier_not_configured", message: NOT_CONFIGURED_MESSAGE });
     }
     const placement = await this.deps.repositories.projects.getPlacement({ projectId });
@@ -118,19 +132,8 @@ export class InstantEvalJudgeService {
       return refused({ code: "instant_eval_free_budget_exhausted", message });
     }
 
-    const { router } = this.deps;
     const spend = { organizationId, projectId, requestKey };
-    const judgement =
-      route && router
-        ? await this.routed({
-            router,
-            spend,
-            call: { projectId, text, questions, route, ...(signal ? { signal } : {}) },
-          })
-        : await classifier.classify(
-            { projectId, text, questions, limiter: this.deps.limiter },
-            ...(signal ? [signal] : []),
-          );
+    const judgement = await this.classifyRecordingStop({ spend, call });
     // A skip billed nothing, so it records nothing.
     if (judgement.inputTokens <= 0) return { outcome: "judged", judgement, priceUsd: 0 };
 
@@ -139,18 +142,16 @@ export class InstantEvalJudgeService {
     return { outcome: "judged", judgement, priceUsd };
   }
 
-  /** A routed call. A stop after paid legs records what they spent, then is rethrown. */
-  private async routed({
-    router,
+  /** One classify; a routed stop after paid legs records what they spent, then is rethrown. */
+  private async classifyRecordingStop({
     spend,
     call,
   }: {
-    router: InstantEvalJudgeRouterService;
     spend: Readonly<{ organizationId: string; projectId: string; requestKey?: string | undefined }>;
-    call: Parameters<InstantEvalJudgeRouterService["classify"]>[0];
+    call: InstantEvalClassification;
   }): Promise<InstantEvalJudgement> {
     try {
-      return await router.classify(call);
+      return await this.classifyOnce(call);
     } catch (error) {
       if (error instanceof InstantEvalJudgeStoppedError) {
         const { inputTokens, costNanoUsd } = error;
@@ -232,9 +233,8 @@ export class InstantEvalJudgeService {
     costNanoUsd: number;
     routedInputTokens: number;
   }) {
-    const pricing = this.deps.routePricing;
-    if (!pricing || routedInputTokens <= 0) return undefined;
-    return { costNanoUsd, routedInputTokens, pricing };
+    if (routedInputTokens <= 0) return undefined;
+    return { costNanoUsd, routedInputTokens, pricing: this.deps.routePricing };
   }
 
   private pricing(): { pricing?: InstantEvalPricing } {

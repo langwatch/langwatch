@@ -1,5 +1,14 @@
-import type { InstantEvalJudgement } from "@langwatch/instant-eval-judge-contract";
+import {
+  INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING,
+  INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
+  type InstantEvalJudgement,
+  type InstantEvalJudgeRoutePricing,
+} from "@langwatch/instant-eval-judge-contract";
 
+import type {
+  InstantEvalClassifierChannel,
+  InstantEvalRateLimiter,
+} from "../../channels/instant-eval-classifier.channel.ts";
 import type {
   InstantEvalHostedDecisionsChannel,
   InstantEvalHostedDecisionsRequest,
@@ -9,6 +18,7 @@ import type {
   InstantEvalLlmJudgeChannel,
   InstantEvalLlmJudgeRequest,
 } from "../../channels/instant-eval-llm-judge.channel.ts";
+import { InstantEvalJudgeRouterService } from "../../services/instant-eval-judge-router.service.ts";
 
 type HostedDecisionsAnswer = (
   request: InstantEvalHostedDecisionsRequest,
@@ -71,4 +81,31 @@ export class ScriptedInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeCh
     this.requests.push(request);
     return this.answer(request, signal);
   }
+}
+
+/** A router over the public jev-only table and prices, for a judge service a test never routes. */
+export function publicInstantEvalJudgeRouter({
+  classifier,
+  limiter,
+}: {
+  classifier: InstantEvalClassifierChannel | undefined;
+  limiter: InstantEvalRateLimiter;
+}): { router: InstantEvalJudgeRouterService; routePricing: InstantEvalJudgeRoutePricing } {
+  const routePricing = INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING;
+  const router = InstantEvalJudgeRouterService.create({
+    table: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
+    pricing: routePricing,
+    classifier,
+    hostedDecisions: undefined,
+    llmJudge: ScriptedInstantEvalLlmJudgeChannel.create({
+      answer: () => ({
+        outcome: "skipped",
+        reason: "classifier_not_configured",
+        inputTokens: 0,
+        outputTokens: 0,
+      }),
+    }),
+    limiter,
+  });
+  return { router, routePricing };
 }

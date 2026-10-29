@@ -18,6 +18,7 @@ import { MemoryInstantEvalClassifierChannel } from "../../__tests__/support/inst
 import { ScriptedInstantEvalDecisionModelChannel } from "../../__tests__/support/instant-eval-decision-model.test-fakes.ts";
 import { syntheticRouteTable } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
 import {
+  publicInstantEvalJudgeRouter,
   ScriptedInstantEvalHostedDecisionsChannel,
   ScriptedInstantEvalLlmJudgeChannel,
 } from "../../__tests__/support/instant-eval-judge-router.test-fakes.ts";
@@ -64,7 +65,6 @@ function harness({
   isProjectKnown = true,
   usageBilled,
   spentNanoUsd = 0n,
-  isRouted = false,
   routeUsdPerMillion = 1,
 }: {
   isCloud?: boolean;
@@ -74,8 +74,6 @@ function harness({
   /** Absent leaves the organization never folded, which reads as not billed. */
   usageBilled?: boolean;
   spentNanoUsd?: bigint;
-  /** Gives the service a router over a synthetic table whose LLM leg answers yes. */
-  isRouted?: boolean;
   /** The Decisions backend's price; zero is a valid, self-hosted price. */
   routeUsdPerMillion?: number;
 } = {}) {
@@ -125,7 +123,9 @@ function harness({
     decisionModels,
     repositories,
     classifier: hasClassifier ? classifier : undefined,
-    ...(isRouted ? { router, routePricing } : {}),
+    // A router over a synthetic table whose LLM leg answers yes; only a call with a route uses it.
+    router,
+    routePricing,
     limiter,
     isCloud,
     // The spend pipeline's subscriber, stood in: one row per request, never rewritten.
@@ -412,11 +412,14 @@ describe("given a judge call the classifier answers", () => {
         }),
       };
       const { logger, lines } = createTestLogger();
+      const classifier = { classify: async () => answered(500) };
+      const limiter = MemoryInstantEvalRateLimiter.create();
       const service = InstantEvalJudgeService.create({
         decisionModels: MemoryInstantEvalDecisionModelChannel.create(),
         repositories,
-        limiter: MemoryInstantEvalRateLimiter.create(),
-        classifier: { classify: async () => answered(500) },
+        limiter,
+        classifier,
+        ...publicInstantEvalJudgeRouter({ classifier, limiter }),
         isCloud: true,
         recordSpendPriced: async () => {
           throw new Error("queue down");
@@ -482,11 +485,13 @@ describe("given an Instant Evals run's spend, for a project the judge has not le
 
   describe("when the priced fact cannot be stored", () => {
     it("throws, so the run's finish retries onto the same request id", async () => {
+      const limiter = MemoryInstantEvalRateLimiter.create();
       const service = InstantEvalJudgeService.create({
         decisionModels: MemoryInstantEvalDecisionModelChannel.create(),
         repositories: MemoryInstantEvalJudgeRepositories.create(),
-        limiter: MemoryInstantEvalRateLimiter.create(),
+        limiter,
         classifier: undefined,
+        ...publicInstantEvalJudgeRouter({ classifier: undefined, limiter }),
         isCloud: true,
         recordSpendPriced: async () => {
           throw new Error("queue down");
@@ -533,7 +538,7 @@ describe("given a judge call on an own decision model", () => {
 describe("given a judge call that carries a route", () => {
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
   it("prices the summed cost at the one published markup, under the router's model and rate", async () => {
-    const { service, classifier, recorded, seed } = harness({ isRouted: true });
+    const { service, classifier, recorded, seed } = harness();
     await seed();
 
     const answer = await service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
@@ -553,7 +558,7 @@ describe("given a judge call that carries a route", () => {
 
   /** @scenario "A call with no route keeps today's single classifier call" */
   it("keeps today's single classifier call and token price when no route is sent", async () => {
-    const { service, classifier, recorded, seed } = harness({ isRouted: true });
+    const { service, classifier, recorded, seed } = harness();
     await seed();
 
     const answer = await service.judge(call);
@@ -568,7 +573,7 @@ describe("given a judge call that carries a route", () => {
 
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
   it("records a run's routed spend from its summed cost", async () => {
-    const { service, recorded } = harness({ isRouted: true });
+    const { service, recorded } = harness();
 
     await service.recordSpend({
       organizationId: ORGANIZATION_ID,
@@ -590,7 +595,7 @@ describe("given a judge call that carries a route", () => {
 
   /** @scenario "A caller's stop keeps the legs already paid billed" */
   it("records what a stopped routed call's paid legs spent, then rethrows the stop", async () => {
-    const { service, router, recorded, seed } = harness({ isRouted: true });
+    const { service, router, recorded, seed } = harness();
     await seed();
     const stop = new InstantEvalJudgeStoppedError({
       inputTokens: 1000,
@@ -613,7 +618,7 @@ describe("given a judge call that carries a route", () => {
 
   /** @scenario "A routed judgement with a cost of zero is still routed" */
   it("prices a routed call that cost nothing at zero, under the router's model and rate", async () => {
-    const { service, recorded, seed } = harness({ isRouted: true, routeUsdPerMillion: 0 });
+    const { service, recorded, seed } = harness({ routeUsdPerMillion: 0 });
     await seed();
 
     const answer = await service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
@@ -630,7 +635,7 @@ describe("given a judge call that carries a route", () => {
 
   /** @scenario "Routed and unrouted tokens are billed separately" */
   it("bills a mixed run's unrouted tokens at the published rate on top of its routed cost", async () => {
-    const { service, recorded } = harness({ isRouted: true });
+    const { service, recorded } = harness();
 
     await service.recordSpend({
       organizationId: ORGANIZATION_ID,
@@ -645,5 +650,32 @@ describe("given a judge call that carries a route", () => {
 
     // $0.10 routed, plus one million unrouted tokens at the published $0.042 per million.
     expect(recorded[0]).toMatchObject({ costNanoUsd: 142_000_000, model: "langwatch-judge" });
+  });
+});
+
+describe("given the unmetered classify the Api and the judge call share", () => {
+  describe("when the call carries a route", () => {
+    it("asks the router, not the classifier, and records no spend", async () => {
+      const { service, classifier, recorded } = harness();
+
+      const judgement = await service.classifyOnce({
+        ...call,
+        route: { job: "llm_judge", tokens: 100 },
+      });
+
+      expect(classifier.classify).not.toHaveBeenCalled();
+      expect(judgement.costNanoUsd).toBe(1_000_000_000);
+      expect(recorded).toEqual([]);
+    });
+  });
+
+  describe("when no classifier is configured", () => {
+    it("is a skip, never a refusal", async () => {
+      const { service } = harness({ hasClassifier: false });
+
+      const judgement = await service.classifyOnce(call);
+
+      expect(judgement.skippedReason).toBe("classifier_not_configured");
+    });
   });
 });

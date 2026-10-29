@@ -16,7 +16,6 @@ import {
   type InstantEvalJudgeSpendRecord,
   type InstantEvalJudgement,
   type InstantEvalPricing,
-  instantEvalSkipped,
   isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
@@ -28,7 +27,6 @@ import {
   type InstantEvalClassifierChannel,
   type InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
-import type { InstantEvalDecisionModelChannel } from "../channels/instant-eval-decision-model.channel.ts";
 import { hostedDecisionsApiKey } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalJudgeChannels } from "../channels/instant-eval-judge.channels.ts";
 import {
@@ -85,19 +83,15 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
 
   readonly #facts: InstantEvalJudgeFactsService;
   readonly #classifier: InstantEvalClassifierChannel | undefined;
-  readonly #decisionModels: InstantEvalDecisionModelChannel;
-  readonly #limiter: InstantEvalRateLimiter;
   readonly #judge: InstantEvalJudgeService;
-  readonly #router: InstantEvalJudgeRouterService;
   readonly #queryHoldPricing: InstantEvalPricing;
   #spendCommands: EventingCommands<InstantEvalJudgeSpendPipeline> | undefined;
 
   private constructor(setup: InstantEvalJudgeSetup) {
     const { classifier, decisionModels } = setup.channels;
-    this.#decisionModels = decisionModels;
     this.#facts = InstantEvalJudgeFactsService.create({ repositories: setup.repositories });
     this.#classifier = classifier;
-    this.#limiter = InstantEvalJudgeModule.limiterOf(setup);
+    const limiter = InstantEvalJudgeModule.limiterOf(setup);
     const routePricing = setup.config.judgeRoutePricing ?? INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING;
     const routeTable = setup.config.judgeRoutes ?? INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE;
     InstantEvalJudgeModule.assertRoutable({ setup, table: routeTable, pricing: routePricing });
@@ -105,21 +99,21 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
       table: routeTable,
       pricing: routePricing,
     });
-    this.#router = InstantEvalJudgeRouterService.create({
+    const router = InstantEvalJudgeRouterService.create({
       table: routeTable,
       pricing: routePricing,
       classifier,
       hostedDecisions: setup.channels.hostedDecisions,
       llmJudge: setup.channels.llmJudge,
-      limiter: this.#limiter,
+      limiter,
     });
     this.#judge = InstantEvalJudgeService.create({
-      router: this.#router,
+      router,
       routePricing,
       repositories: setup.repositories,
       classifier,
       decisionModels,
-      limiter: this.#limiter,
+      limiter,
       isCloud: isLangWatchJudgeHost(setup.config),
       recordSpendPriced: async (fact) => {
         if (!this.#spendCommands) {
@@ -196,34 +190,8 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
     return this.#queryHoldPricing;
   }
 
-  async classify({
-    projectId,
-    text,
-    questions,
-    signal,
-    decisionModel,
-    route,
-  }: InstantEvalClassification): Promise<InstantEvalJudgement> {
-    if (decisionModel) {
-      return this.#decisionModels.classify(
-        { text, questions, decisionModel },
-        ...(signal ? [signal] : []),
-      );
-    }
-    if (!this.#classifier) return instantEvalSkipped("classifier_not_configured");
-    if (route) {
-      return this.#router.classify({
-        projectId,
-        text,
-        questions,
-        route,
-        ...(signal ? { signal } : {}),
-      });
-    }
-    return this.#classifier.classify(
-      { projectId, text, questions, limiter: this.#limiter },
-      ...(signal ? [signal] : []),
-    );
+  classify(input: InstantEvalClassification): Promise<InstantEvalJudgement> {
+    return this.#judge.classifyOnce(input);
   }
 
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
