@@ -99,6 +99,7 @@ describe("the modelProvider tRPC namespace", () => {
         "isManagedProvider",
         "listAllForOrganizationForFrontend",
         "listAllForProjectForFrontend",
+        "listDecisionModelsForProject",
         "saveDefaultModelsConfig",
         "setFeatureOverrideForScope",
         "setRoleAssignmentForScope",
