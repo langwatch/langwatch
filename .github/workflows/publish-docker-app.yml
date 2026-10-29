@@ -72,12 +72,16 @@ jobs:
             runner: ubuntu-24.04-arm
             arch: arm64
           - image: langwatch_nlp
-            dockerfile: infra/docker/Dockerfile.langwatch_nlp
+            dockerfile: infra/docker/Dockerfile.go
+            target: nlp
+            cache: go
             platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
           - image: langwatch_nlp
-            dockerfile: infra/docker/Dockerfile.langwatch_nlp
+            dockerfile: infra/docker/Dockerfile.go
+            target: nlp
+            cache: go
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64
@@ -92,12 +96,16 @@ jobs:
             runner: ubuntu-24.04-arm
             arch: arm64
           - image: ai-gateway
-            dockerfile: infra/docker/Dockerfile.go_service
+            dockerfile: infra/docker/Dockerfile.go
+            target: gateway
+            cache: go
             platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
           - image: ai-gateway
-            dockerfile: infra/docker/Dockerfile.go_service
+            dockerfile: infra/docker/Dockerfile.go
+            target: gateway
+            cache: go
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64
@@ -131,12 +139,15 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
           push: true
           platforms: ${{ matrix.platform }}
-          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,ignore-error=true,scope=${{ matrix.image }}-${{ matrix.arch }}
+          # ai-gateway and langwatch_nlp share one scope: both are targets of
+          # Dockerfile.go over the same go-build and sandbox stages.
+          cache-from: type=gha,scope=${{ matrix.cache || matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,ignore-error=true,scope=${{ matrix.cache || matrix.image }}-${{ matrix.arch }}
           # The Go images stamp this into main.Version, which every log line and
-          # the OTel resource report. Go_service and langwatch_nlp read VERSION,
+          # the OTel resource report. Dockerfile.go reads VERSION,
           # langyagent reads SERVICE_VERSION; the other images ignore both.
           build-args: |
             VERSION=${{ needs.extract-version.outputs.version || format('git-{0}', needs.extract-version.outputs.short_hash) }}

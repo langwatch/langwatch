@@ -30,7 +30,7 @@
 | Component                    | Repo             | Path                                                                        |
 | ---------------------------- | ---------------- | --------------------------------------------------------------------------- |
 | Go NLP service (sole engine) | `langwatch`      | `services/nlpgo/` (a subcommand of `cmd/service/main.go`)                   |
-| Self-hosted NLP image        | `langwatch`      | `infra/docker/Dockerfile.langwatch_nlp` (Go binary + slim stdlib `python3`) |
+| Self-hosted NLP image        | `langwatch`      | `infra/docker/Dockerfile.go`, target `nlp` (Go binary + slim stdlib `python3`) |
 | Helm                         | `langwatch`      | `charts/langwatch/templates/langwatch_nlp/` (single Go container)           |
 | BDD specs                    | `langwatch`      | `specs/nlp-go/`                                                             |
 | Production Lambda artifact   | `langwatch-saas` | `infrastructure/langwatch_nlp_lambda.tf` + saas runtime packaging           |
@@ -351,7 +351,7 @@ Two engine knobs additionally accept a bare **deployed alias**, resolved in `ser
 | Prefixed knob                     | Deployed alias       | Who sets the alias                                                        | Precedence                                         |
 | --------------------------------- | -------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
 | `NLPGO_ENGINE_LANGWATCH_BASE_URL` | `LANGWATCH_ENDPOINT` | `charts/.../langwatch_nlp/deployment.yaml`, and terraform on every Lambda | prefixed wins; alias is trailing-slash-trimmed     |
-| `NLPGO_ENGINE_SANDBOX_PYTHON`     | `SANDBOX_PYTHON`     | `infra/docker/Dockerfile.langwatch_nlp`                                   | prefixed wins; a blank alias is not an interpreter |
+| `NLPGO_ENGINE_SANDBOX_PYTHON`     | `SANDBOX_PYTHON`     | `infra/docker/Dockerfile.go`                                               | prefixed wins; a blank alias is not an interpreter |
 
 ### Root knobs (bare names)
 

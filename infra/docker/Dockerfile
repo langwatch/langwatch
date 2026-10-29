@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # services/scenariorunner, the Go drop-in for the Node scenario child. Its own
 # binary, never a cmd/service subcommand: that refuses to boot with
 # LANGWATCH_API_KEY set, and a run's key arrives in exactly that variable.
-# Cross-compiled on the build host, like Dockerfile.go_service.
+# Cross-compiled on the build host, like Dockerfile.go.
 FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS scenariorunner
 ARG TARGETOS
 ARG TARGETARCH

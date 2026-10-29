@@ -1,0 +1,137 @@
+# syntax=docker/dockerfile:1.7
+#
+# The Go services, langyagent aside, from one build of ./cmd/service (the
+# mono-binary: its first argument picks the service). Built from the
+# repository root with a target:
+#
+#   gateway  `service aigateway` on :5563
+#            (langwatch/ai-gateway, the langwatch-gateway ECR repository)
+#   nlp      `service nlpgo` on :5561
+#            (langwatch/langwatch_nlp, langwatch-nlp-service)
+#   lambda   nlpgo behind the AWS Lambda Web Adapter (langwatch-nlp-lambda)
+#
+#   docker build -f infra/docker/Dockerfile.go --target nlp .
+#
+# gateway and nlp share every layer of `service` and differ only in their
+# default command and listen address. Every chart and compose file passes the
+# command itself; once every deployment does too, one image serves both names.
+
+# The Lambda Web Adapter.
+FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 AS lambda-adapter
+
+# ─── Go build ─────────────────────────────────────────────────────────────────
+# Pin the build stage to the host arch (BUILDPLATFORM) and let Go cross-compile
+# to TARGETARCH natively. This avoids QEMU emulation when buildx is producing
+# images for an arch different from the host, which is the difference between
+# a 30-second compile and a 30-minute one.
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS go-build
+WORKDIR /src
+RUN apk add --no-cache git ca-certificates
+
+ARG TARGETOS
+ARG TARGETARCH
+
+# Dependency layer (cached until go.mod/go.sum change). The module cache is
+# arch-independent, but keying both caches by TARGETARCH keeps buildx from
+# churning a shared dir when producing multiple platforms in the same job.
+#
+# Monorepo: go.work ties the in-tree modules (cmd, pkg, services, tools, the
+# Go SDK, the ClickHouse operator) together, and it loads only when every
+# module it uses has its go.mod, so all of them land before `go mod download`.
+# sdks/go changes flow with nlpgo changes in the same commit, no
+# publish-then-bump ping-pong. The source the build needs is copied below.
+COPY go.work go.work.sum ./
+COPY cmd/go.* cmd/
+COPY pkg/go.* pkg/
+COPY services/go.* services/
+COPY tools/go.* tools/
+COPY sdks/go/go.* sdks/go/
+COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
+# services/go.mod replaces the Go scenario SDK with this vendored copy.
+COPY services/third_party/scenario-go/ services/third_party/scenario-go/
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    go mod download && go mod verify
+
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+COPY services/ services/
+COPY sdks/go/ sdks/go/
+ARG VERSION=dev
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+      -ldflags="-s -w -X main.Version=${VERSION}" -trimpath \
+      -o /out/service ./cmd/service
+
+# ─── Code-block sandbox libraries ──────────────────────────────────────────────
+# The curated set of packages available inside a Studio code block (see
+# sandbox-requirements.txt). The Python version (3.11) MUST match the
+# distroless/python3-debian12 runtime ABI so the compiled wheels (pydantic_core)
+# load. After install we prune the safe-to-drop bulk: bytecode caches, test
+# suites, and babel's full CLDR locale data (python-liquid pulls babel, but the
+# sandbox only needs en + root). We KEEP each *.dist-info: opentelemetry (a
+# langwatch dep) resolves its runtime context via importlib.metadata entry
+# points there, so pruning dist-info breaks `import langwatch` (StopIteration).
+FROM python:3.11-slim-bookworm AS sandbox-build
+COPY packages/ksuid-python/ /tmp/langwatch-ksuid/
+COPY sdks/python/ /tmp/langwatch-sdk/
+COPY services/nlpgo/app/engine/blocks/codeblock/sandbox-requirements.txt /tmp/sandbox-requirements.txt
+RUN pip install --no-cache-dir --target=/pylibs -r /tmp/sandbox-requirements.txt
+RUN set -eux; \
+    find /pylibs -name "__pycache__" -type d -prune -exec rm -rf {} +; \
+    find /pylibs -type d -name "tests" -prune -exec rm -rf {} +; \
+    find /pylibs/babel/locale-data -type f ! -name 'en*.dat' ! -name 'root.dat' -delete 2>/dev/null || true; \
+    du -sh /pylibs
+
+# ─── Runtime every target shares ───────────────────────────────────────────────
+# distroless/python3 (Python 3.11) provides a stdlib python3 for the code-block
+# sandbox with no shell and no package manager, and the CA certificates and
+# zoneinfo every service needs. The static Go binary is the only long-lived
+# process; nlpgo spawns python3 per code-block node and it exits. The nonroot
+# variant: the code-block sandbox isolates by file mode, which uid 0 bypasses.
+FROM gcr.io/distroless/python3-debian12:nonroot AS service
+# The nonroot base sets WORKDIR /home/nonroot, mode 0700 for uid 65532. Lambda
+# runs an image as its own user, which cannot enter it, so every start fails
+# with Runtime.InvalidEntrypoint. Start from / instead.
+WORKDIR /
+COPY --from=sandbox-build /pylibs /opt/sandbox-libs
+COPY --from=go-build /out/service /usr/local/bin/service
+
+# Code-block sandbox: the interpreter and its curated libraries. PYTHONPATH is
+# only consulted when nlpgo spawns python3 for a code-block node.
+ENV SANDBOX_PYTHON=/usr/bin/python3.11
+ENV PYTHONPATH=/opt/sandbox-libs
+ENV PYTHONDONTWRITEBYTECODE=1
+
+USER nonroot:nonroot
+ENTRYPOINT ["/usr/local/bin/service"]
+
+# ─── Lambda ────────────────────────────────────────────────────────────────────
+# nlpgo fronted by the AWS Lambda Web Adapter, so the function can stream
+# nlpgo's SSE flushes back through InvokeWithResponseStream. On Lambda the
+# image's USER does not decide who runs the code, so every file the function
+# needs must be readable by a non-root user.
+# https://docs.aws.amazon.com/lambda/latest/dg/images-create.html#images-reqs
+FROM service AS lambda
+COPY --from=lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
+# nlpgo binds $SERVER_ADDR and serves /go/* and /healthz. The adapter probes
+# its liveness and streams each SSE flush as its own response chunk.
+ENV SERVER_ADDR=:8080
+ENV AWS_LWA_READINESS_CHECK_PATH=/healthz
+ENV AWS_LWA_INVOKE_MODE=RESPONSE_STREAM
+EXPOSE 8080
+CMD ["nlpgo"]
+
+# ─── AI Gateway ────────────────────────────────────────────────────────────────
+# The gateway binds :5563 unless SERVER_ADDR says otherwise.
+FROM service AS gateway
+EXPOSE 5563
+CMD ["aigateway"]
+
+# ─── NLP ───────────────────────────────────────────────────────────────────────
+# nlpgo binds this port; compose and the helm chart dial
+# http://langwatch_nlp:5561 and set SERVER_ADDR themselves.
+FROM service AS nlp
+ENV SERVER_ADDR=:5561
+EXPOSE 5561
+CMD ["nlpgo"]

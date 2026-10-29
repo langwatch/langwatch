@@ -232,9 +232,9 @@ jobs:
           ALL=$(cat <<'JSON'
           [
             {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
+            {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.go","target":"nlp","cache":"go","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
+            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go","target":"gateway","cache":"go","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langy-agent", "dockerfile":"infra/docker/Dockerfile.langyagent",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
           ]
           JSON
@@ -245,7 +245,7 @@ jobs:
           # evaluator Dockerfile installs; empty for the NLP function.
           LAMBDAS=$(cat <<'JSON'
           [
-            {"image":"langwatch-nlp-lambda",          "dockerfile":"infra/docker/Dockerfile.langwatch_nlp.lambda","evaluator":""},
+            {"image":"langwatch-nlp-lambda",          "dockerfile":"infra/docker/Dockerfile.go","target":"lambda","cache":"go","evaluator":""},
             {"image":"langwatch-eval-azure",            "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"azure"},
             {"image":"langwatch-eval-langevals",        "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"langevals"},
             {"image":"langwatch-eval-lingua",           "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"lingua"},
@@ -374,14 +374,17 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          target: ${{ matrix.target }}
           platforms: ${{ matrix.platform }}
           # Keep each per-arch push a plain manifest. With provenance on, buildx
           # pushes an index carrying an attestation manifest, and the multi-arch
           # index assembled below would then nest indexes — which several ECR
           # consumers (Lambda in particular) refuse to run.
           provenance: false
-          cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
+          # The Go images share one scope: every one of them is a target of
+          # Dockerfile.go over the same go-build and sandbox stages.
+          cache-from: type=gha,scope=ecr-${{ matrix.cache || matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.cache || matrix.image }}-${{ matrix.arch }}
           # The Go images stamp this into main.Version, which every log line and
           # the OTel resource report; the other images ignore it.
           build-args: |
@@ -556,12 +559,13 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
           push: true
           platforms: linux/arm64
           provenance: false
           sbom: false
-          cache-from: type=gha,scope=ecr-${{ matrix.image }}-arm64
-          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-arm64
+          cache-from: type=gha,scope=ecr-${{ matrix.cache || matrix.image }}-arm64
+          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.cache || matrix.image }}-arm64
           build-args: |
             VERSION=${{ needs.meta.outputs.image_tag }}
             EVALUATOR=${{ matrix.evaluator }}
