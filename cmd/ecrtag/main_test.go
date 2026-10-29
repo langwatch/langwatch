@@ -92,7 +92,10 @@ func TestParseSelect(t *testing.T) {
 	images := `[{"image":"langwatch-app","dockerfile":"infra/docker/Dockerfile"}]`
 	o, err := parse("select", []string{"-images", images, "-tag", "git-abc", "-revision", "abc"})
 	require.NoError(t, err)
-	assert.Equal(t, []ecrtag.ImageSpec{{Image: "langwatch-app", Dockerfile: "infra/docker/Dockerfile"}}, o.images)
+	assert.Equal(t, []ecrtag.ImageSpec{{
+		Image: "langwatch-app", Dockerfile: "infra/docker/Dockerfile",
+		Row: `{"dockerfile":"infra/docker/Dockerfile","image":"langwatch-app"}`,
+	}}, o.images)
 	assert.Equal(t, "abc", o.head)
 
 	_, err = parse("select", []string{"-images", images, "-revision", "abc", "-all"})

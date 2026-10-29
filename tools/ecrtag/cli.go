@@ -151,7 +151,7 @@ func (c CLI) ImageLabel(ctx context.Context, ref Ref, key string) (string, error
 		return "", fmt.Errorf("parse the image config of %s: %w", ref, err)
 	}
 	if len(byPlatform) != 1 {
-		return "", fmt.Errorf("%s is an index over %d images, not one", ref, len(byPlatform))
+		return "", fmt.Errorf("%w: %s is an index over %d images", ErrNotOneImage, ref, len(byPlatform))
 	}
 	for _, one := range byPlatform {
 		if one.Config == nil {

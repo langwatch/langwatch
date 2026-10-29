@@ -2,13 +2,35 @@ package ecrtag
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 )
 
-// ImageSpec is one image a run publishes and the Dockerfile it builds from.
+// ImageSpec is one image a run publishes: its row of the workflow's build
+// table, which names the Dockerfile and what the build is passed.
 type ImageSpec struct {
-	Image      string `json:"image"`
-	Dockerfile string `json:"dockerfile"`
+	Image      string
+	Dockerfile string
+	// Row is the whole row, keys sorted, so any change to it is an input.
+	Row string
+}
+
+// UnmarshalJSON reads a build table row.
+func (s *ImageSpec) UnmarshalJSON(b []byte) error {
+	var row map[string]any
+	if err := json.Unmarshal(b, &row); err != nil {
+		return err
+	}
+	s.Image, _ = row["image"].(string)
+	s.Dockerfile, _ = row["dockerfile"].(string)
+	canonical, err := json.Marshal(row)
+	if err != nil {
+		return err
+	}
+	s.Row = string(canonical)
+
+	return nil
 }
 
 // Plan is what a run does with one image: build it, labelled with Inputs, or
@@ -51,7 +73,7 @@ func (s Select) Plan(ctx context.Context, images []ImageSpec) ([]Plan, error) {
 
 func (s Select) plan(ctx context.Context, img ImageSpec) (Plan, error) {
 	p := Plan{Image: img.Image, Build: true}
-	hash, err := s.Inputs.Hash(ctx, img.Image, img.Dockerfile)
+	hash, err := s.Inputs.Hash(ctx, img)
 	if err != nil {
 		p.Reason = fmt.Sprintf("its inputs could not be read (%v)", err)
 		return p, nil
@@ -70,6 +92,10 @@ func (s Select) plan(ctx context.Context, img ImageSpec) (Plan, error) {
 		return p, nil
 	}
 	label, err := s.Registry.ImageLabel(ctx, Ref{Repository: img.Image, Tag: source}, InputsKey)
+	if errors.Is(err, ErrNotOneImage) {
+		p.Reason = fmt.Sprintf("%s is not one image (%v)", source, err)
+		return p, nil
+	}
 	if err != nil {
 		return p, fmt.Errorf("read the inputs of %s:%s: %w", img.Image, source, err)
 	}

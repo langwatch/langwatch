@@ -51,7 +51,7 @@ Feature: Publish every deployable image to the artifacts registry
   Scenario: A Go image reads only the packages its binary builds from
     Given a merge to main changes a CI tool under cmd/ and a package under pkg/ that no image imports
     When publish-docker-ecr selects the images to build
-    Then no Go image is rebuilt, because a stage that runs go build reads from the Go modules it copies only the packages that build compiles, and their go.mod and go.sum
+    Then no Go image is rebuilt, because a stage that runs go build reads from the Go modules it copies only the packages that build compiles, their go.mod and go.sum, and any profile it builds with
     And a change to a package the binary imports, shared or not, rebuilds every image whose binary imports it
 
   @unit
@@ -79,7 +79,7 @@ Feature: Publish every deployable image to the artifacts registry
 
   @unit
   Scenario: An image whose inputs cannot be read is rebuilt
-    Given a Dockerfile with a step the inputs reader cannot follow, such as a go build of an import path or a heredoc
+    Given a Dockerfile with a step the inputs reader cannot follow, such as a go build of an import path or with -tags, go generate, GOFLAGS, a Go module copied to another path than its own, or a heredoc
     When publish-docker-ecr selects the images to build
     Then that image is built, with a warning, rather than re-tagged
     And the CI guard fails on that Dockerfile, so it does not rebuild on every commit unnoticed

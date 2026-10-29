@@ -2,6 +2,7 @@ package ecrtag_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,11 +11,11 @@ import (
 	"github.com/langwatch/langwatch/tools/ecrtag"
 )
 
-var gateway = []ecrtag.ImageSpec{{Image: "gateway", Dockerfile: "infra/docker/Dockerfile.go"}}
+var gateway = []ecrtag.ImageSpec{{Image: "gateway", Dockerfile: "infra/docker/Dockerfile.go", Row: `{"image":"gateway"}`}}
 
 func gatewayHash(t *testing.T) string {
 	t.Helper()
-	h, err := inputsOf(goTree(), goDockerfile).Hash(context.Background(), "gateway", "infra/docker/Dockerfile.go")
+	h, err := inputsOf(goTree(), goDockerfile).Hash(context.Background(), gateway[0])
 	require.NoError(t, err)
 	return h
 }
@@ -54,6 +55,10 @@ func TestAnImageIsBuiltUnlessItsReTagHasTheSameInputs(t *testing.T) {
 		},
 		"the image the re-tag copies records no inputs": {
 			newRegistry().push("git-b", entry{}), "git-b records no inputs",
+		},
+		"the image the re-tag copies is an index over more than one image": {
+			newRegistry().push("git-b", entry{labelErr: fmt.Errorf("%w: two platforms", ecrtag.ErrNotOneImage)}),
+			"git-b is not one image (not one image: two platforms)",
 		},
 		"no ancestor has an image": {
 			newRegistry().push("git-elsewhere", entry{}), "no ancestor has an image to re-tag",

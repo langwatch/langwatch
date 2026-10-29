@@ -66,8 +66,12 @@ func GoList(run Exec, root string) GoDeps {
 // goListFiles is the repository files of `go list -json` output, relative to
 // root. A standard library or module cache package is not the repository's.
 func goListFiles(out, root string) ([]string, error) {
+	// go reports directories with symlinks resolved, so compare resolved.
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
+		return nil, err
+	}
+	if absRoot, err = filepath.EvalSymlinks(absRoot); err != nil {
 		return nil, err
 	}
 	var files []string
@@ -83,7 +87,11 @@ func goListFiles(out, root string) ([]string, error) {
 		} else if err != nil {
 			return nil, fmt.Errorf("read go list: %w", err)
 		}
-		rel, err := filepath.Rel(absRoot, p.Dir)
+		dir, err := filepath.EvalSymlinks(p.Dir)
+		if err != nil {
+			dir = p.Dir
+		}
+		rel, err := filepath.Rel(absRoot, dir)
 		if p.Standard || err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			continue
 		}

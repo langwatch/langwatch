@@ -2,6 +2,7 @@ package ecrtag_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -52,6 +53,14 @@ func fakeGoDeps(_ context.Context, dir, pkg string) ([]string, error) {
 	return []string{"cmd/service/main.go", "pkg/clog/clog.go"}, nil
 }
 
+// spec is a build table row, read as the select step reads it.
+func spec(t *testing.T, row string) ecrtag.ImageSpec {
+	t.Helper()
+	var s ecrtag.ImageSpec
+	require.NoError(t, json.Unmarshal([]byte(row), &s))
+	return s
+}
+
 func inputsOf(tree ecrtag.Tree, dockerfile string) ecrtag.Inputs {
 	return ecrtag.Inputs{
 		Tree:   tree,
@@ -77,7 +86,7 @@ func TestAGoStageReadsOnlyThePackagesItBuilds(t *testing.T) {
 func TestTheHashFollowsTheInputsAlone(t *testing.T) {
 	ctx := context.Background()
 	hash := func(tree ecrtag.Tree, image string) string {
-		h, err := inputsOf(tree, goDockerfile).Hash(ctx, image, "infra/docker/Dockerfile.go")
+		h, err := inputsOf(tree, goDockerfile).Hash(ctx, spec(t, `{"image":"`+image+`","dockerfile":"infra/docker/Dockerfile.go"}`))
 		require.NoError(t, err)
 		return h
 	}
@@ -97,6 +106,17 @@ func TestTheHashFollowsTheInputsAlone(t *testing.T) {
 	assert.NotEqual(t, base, hash(changed("infra/docker/Dockerfile.go", "df'"), "gateway"), "the Dockerfile")
 	assert.NotEqual(t, base, hash(changed("infra/docker/prune.sh", "pr'"), "gateway"), "a bind-mounted script")
 	assert.NotEqual(t, base, hash(goTree(), "nlp"), "another image built from the same Dockerfile")
+	assert.NotEqual(t, base, hash(changed("cmd/service/default.pgo", "pgo"), "gateway"), "a profile -pgo=auto reads")
+	assert.NotEqual(t, base, hash(changed("infra/docker/Dockerfile.go.dockerignore", "di2"), "gateway"), "the Dockerfile's own .dockerignore")
+
+	withRow := func(row string) string {
+		h, err := inputsOf(goTree(), goDockerfile).Hash(ctx, spec(t, row))
+		require.NoError(t, err)
+		return h
+	}
+	azure := withRow(`{"image":"gateway","dockerfile":"infra/docker/Dockerfile.go","evaluator":"azure"}`)
+	assert.NotEqual(t, azure, withRow(`{"image":"gateway","dockerfile":"infra/docker/Dockerfile.go","evaluator":"ragas"}`), "a build argument from the table")
+	assert.Equal(t, azure, withRow(`{"evaluator":"azure","dockerfile":"infra/docker/Dockerfile.go","image":"gateway"}`), "the row's key order")
 }
 
 func TestAStageWithoutGoReadsEveryFileItCopies(t *testing.T) {
@@ -138,12 +158,24 @@ func TestWhatItCannotReadFails(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+	t.Run("go list names no file of the package it built", func(t *testing.T) {
+		in := inputsOf(goTree(), goDockerfile)
+		in.GoDeps = func(context.Context, string, string) ([]string, error) { return []string{"pkg/clog/clog.go"}, nil }
+		_, err := in.Files(context.Background(), "infra/docker/Dockerfile.go")
+		assert.Error(t, err, "a symlinked checkout reports directories go list resolved, and would leave every Go source out")
+	})
 	t.Run("go list fails", func(t *testing.T) {
 		in := inputsOf(goTree(), goDockerfile)
 		in.GoDeps = func(context.Context, string, string) ([]string, error) { return nil, errors.New("no go") }
 		_, err := in.Files(context.Background(), "infra/docker/Dockerfile.go")
 		assert.Error(t, err)
 	})
+}
+
+func TestATabAfterTheInstructionIsRead(t *testing.T) {
+	files, err := inputsOf(goTree(), "FROM node\nCOPY\tdocs/readme.md /dst/\n").Files(context.Background(), "infra/docker/Dockerfile.go")
+	require.NoError(t, err)
+	assert.Contains(t, files, "docs/readme.md")
 }
 
 func TestGlobsAndJSONFormSources(t *testing.T) {

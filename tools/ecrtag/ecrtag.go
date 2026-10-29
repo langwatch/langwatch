@@ -21,6 +21,10 @@ const RevisionKey = "org.opencontainers.image.revision"
 // lookup error means the registry did not answer.
 var ErrNotFound = errors.New("image not found")
 
+// ErrNotOneImage is a tag naming an index over more than one image, whose
+// label ImageLabel cannot pick.
+var ErrNotOneImage = errors.New("not one image")
+
 // ErrTagTaken is a write refused because the tag already names another image.
 var ErrTagTaken = errors.New("tag already names another image and cannot be moved")
 

@@ -257,9 +257,9 @@ jobs:
           JSON
           )
 
-          # One plan per image: its inputs hash, and whether to build it.
-          IMAGES=$(jq -cn --argjson all "${ALL}" --argjson lambdas "${LAMBDAS}" \
-            '[$all[], $lambdas[] | {image, dockerfile}]')
+          # One plan per image: its inputs hash, and whether to build it. The
+          # whole row is hashed, so a change to what a build is passed rebuilds.
+          IMAGES=$(jq -cn --argjson all "${ALL}" --argjson lambdas "${LAMBDAS}" '$all + $lambdas')
           SCOPE=(-tag "${IMAGE_TAG}")
           if [ "${PUSH}" != "true" ]; then
             SCOPE=(-all)

@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -39,15 +41,17 @@ type Inputs struct {
 	GoDeps GoDeps
 }
 
-// Hash is the image's inputs hash: the blob ids of its input files, the image
-// name (one Dockerfile builds every evaluator image) and inputsVersion.
-func (in Inputs) Hash(ctx context.Context, image, dockerfile string) (string, error) {
-	files, err := in.Files(ctx, dockerfile)
+// Hash is the image's inputs hash: the blob ids of its input files, its row
+// of the build table (the image name, and what the workflow passes the build,
+// such as the evaluator one Dockerfile builds every evaluator image for) and
+// inputsVersion.
+func (in Inputs) Hash(ctx context.Context, img ImageSpec) (string, error) {
+	files, err := in.Files(ctx, img.Dockerfile)
 	if err != nil {
 		return "", err
 	}
 	h := sha256.New()
-	fmt.Fprintf(h, "%s\nimage %s\n", inputsVersion, image)
+	fmt.Fprintf(h, "%s\nrow %s\n", inputsVersion, img.Row)
 	for _, f := range files {
 		fmt.Fprintf(h, "%s %s\n", in.Tree[f], f)
 	}
@@ -67,8 +71,11 @@ func (in Inputs) Files(ctx context.Context, dockerfile string) ([]string, error)
 		return nil, fmt.Errorf("%s: %w", dockerfile, err)
 	}
 	files := map[string]bool{dockerfile: true}
-	if _, ok := in.Tree[".dockerignore"]; ok {
-		files[".dockerignore"] = true
+	// BuildKit reads <Dockerfile>.dockerignore ahead of the root one.
+	for _, ignore := range []string{".dockerignore", dockerfile + ".dockerignore"} {
+		if _, ok := in.Tree[ignore]; ok {
+			files[ignore] = true
+		}
 	}
 	for _, s := range stages {
 		deps, err := in.stageDeps(ctx, s)
@@ -76,7 +83,7 @@ func (in Inputs) Files(ctx context.Context, dockerfile string) ([]string, error)
 			return nil, fmt.Errorf("%s: %w", dockerfile, err)
 		}
 		for _, src := range s.sources {
-			matched, err := in.expand(src, deps)
+			matched, err := in.expand(s, src, deps)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", dockerfile, err)
 			}
@@ -101,6 +108,13 @@ func (in Inputs) stageDeps(ctx context.Context, s stage) (map[string]bool, error
 		if err != nil {
 			return nil, fmt.Errorf("list the packages of go build %s in %s: %w", m.pkg, m.dir, err)
 		}
+		// A list without the main's own package read the wrong tree (a
+		// symlinked checkout, a WORKDIR the copies do not mirror); trusting it
+		// would leave every Go source out.
+		own := path.Join(m.dir, m.pkg) + "/"
+		if !slices.ContainsFunc(files, func(f string) bool { return strings.HasPrefix(f, own) }) {
+			return nil, fmt.Errorf("go list of %s in %s named no file of %s", m.pkg, m.dir, own)
+		}
 		for _, f := range files {
 			deps[f] = true
 		}
@@ -109,26 +123,53 @@ func (in Inputs) stageDeps(ctx context.Context, s stage) (map[string]bool, error
 	return deps, nil
 }
 
-// expand is the files one source names. With deps, a file of a copied Go
-// module counts only when the build reads it, or is a go.mod or go.sum.
-func (in Inputs) expand(src string, deps map[string]bool) ([]string, error) {
-	src = strings.TrimSuffix(strings.TrimPrefix(src, "./"), "/")
+// expand is the files one source names. With deps, a file of a Go module the
+// source copies counts only when the build reads it, or is a go.mod, go.sum
+// or profile. That holds only where the copy lands at the path the build
+// reads it from, so a copy that does not mirror the context fails.
+func (in Inputs) expand(s stage, src source, deps map[string]bool) ([]string, error) {
+	name := strings.TrimSuffix(strings.TrimPrefix(src.path, "./"), "/")
 	var out []string
 	for f := range in.Tree {
-		root, ok := matchSource(src, f)
+		root, ok := matchSource(name, f)
 		if !ok {
 			continue
 		}
-		if deps != nil && in.goModule(root) && !deps[f] && !isModuleFile(f) {
-			continue
+		if deps != nil && src.copied && in.goModule(root) {
+			if err := s.mirrors(src, root); err != nil {
+				return nil, err
+			}
+			if !deps[f] && !isModuleFile(f) {
+				continue
+			}
 		}
 		out = append(out, f)
 	}
-	if len(out) == 0 && !in.anyMatch(src) {
-		return nil, fmt.Errorf("COPY source %q names no file", src)
+	if len(out) == 0 && !in.anyMatch(name) {
+		return nil, fmt.Errorf("COPY source %q names no file", name)
 	}
 
 	return out, nil
+}
+
+// mirrors holds when a Go module copied from root lands at <WORKDIR>/root,
+// in the WORKDIR every go build of the stage runs in, as `go list` from the
+// context root assumes.
+func (s stage) mirrors(src source, root string) error {
+	dest := src.dest
+	if !path.IsAbs(dest) {
+		dest = path.Join(src.workdir, dest)
+	}
+	if path.Clean(dest) != path.Join(src.workdir, root) {
+		return fmt.Errorf("COPY %s %s copies Go module %s somewhere other than %s, which the inputs reader cannot follow", src.path, src.dest, root, path.Join(src.workdir, root))
+	}
+	for _, m := range s.mains {
+		if m.workdir != src.workdir {
+			return fmt.Errorf("go build %s runs in WORKDIR %s, not %s where Go module %s is copied", m.pkg, m.workdir, src.workdir, root)
+		}
+	}
+
+	return nil
 }
 
 // anyMatch: a Go module whose every file was left out still names files.
@@ -148,9 +189,11 @@ func (in Inputs) goModule(dir string) bool {
 	return ok && dir != ""
 }
 
+// isModuleFile is a file a Go build reads that `go list` does not name: a
+// module's go.mod and go.sum, and a profile -pgo=auto reads (default.pgo).
 func isModuleFile(f string) bool {
 	base := path.Base(f)
-	return base == "go.mod" || base == "go.sum"
+	return base == "go.mod" || base == "go.sum" || strings.HasSuffix(base, ".pgo")
 }
 
 // matchSource reports whether a COPY source names the file, as the file
@@ -189,17 +232,34 @@ func matchSource(src, file string) (string, bool) {
 // stage is one FROM of a Dockerfile: what it reads from the build context,
 // and the Go packages it builds.
 type stage struct {
-	sources []string
+	sources []source
 	mains   []goMain
 }
 
-type goMain struct{ dir, pkg string }
+// source is one context source: copied to dest under workdir, or bind-mounted.
+type source struct {
+	path, dest, workdir string
+	copied              bool
+}
+
+type goMain struct{ dir, pkg, workdir string }
+
+// goEnv changes what a Go build compiles without showing in `go list`.
+var goEnv = regexp.MustCompile(`\b(GOFLAGS|GOEXPERIMENT)=`)
+
+// escapeDirective changes the line continuation character, which
+// logicalLines does not follow.
+var escapeDirective = regexp.MustCompile(`(?mi)^#\s*escape\s*=`)
 
 // parseDockerfile reads each stage's context sources: COPY and ADD without
 // --from, and RUN bind mounts without from. A `go build` it cannot read
 // fails, as does a heredoc or a variable in a source.
 func parseDockerfile(text string) ([]stage, error) {
+	if escapeDirective.MatchString(text) {
+		return nil, errors.New("an escape directive is not read")
+	}
 	var stages []stage
+	workdir := "/"
 	cur := func() *stage {
 		if len(stages) == 0 {
 			stages = append(stages, stage{})
@@ -207,27 +267,48 @@ func parseDockerfile(text string) ([]stage, error) {
 		return &stages[len(stages)-1]
 	}
 	for _, line := range logicalLines(text) {
-		instruction, rest, _ := strings.Cut(line, " ")
-		rest = strings.TrimSpace(rest)
+		fields := strings.Fields(line)
+		instruction := fields[0]
+		rest := strings.TrimSpace(strings.TrimPrefix(line, instruction))
 		if strings.Contains(rest, "<<") {
 			return nil, fmt.Errorf("heredoc in %q is not read", truncate(line))
 		}
 		switch strings.ToUpper(instruction) {
 		case "FROM":
 			stages = append(stages, stage{})
+			workdir = "/"
+		case "WORKDIR":
+			if strings.Contains(rest, "$") {
+				return nil, fmt.Errorf("WORKDIR %s is not a path", rest)
+			}
+			workdir = path.Join(workdir, rest)
+			if path.IsAbs(rest) {
+				workdir = path.Clean(rest)
+			}
+		case "ENV", "ARG":
+			if goEnv.MatchString(rest) || strings.Contains(rest, "GOFLAGS") || strings.Contains(rest, "GOEXPERIMENT") {
+				return nil, fmt.Errorf("%s %s changes a Go build without showing in go list", instruction, truncate(rest))
+			}
 		case "COPY", "ADD":
-			sources, err := copySources(rest)
+			paths, dest, err := copySources(rest)
 			if err != nil {
 				return nil, err
 			}
-			cur().sources = append(cur().sources, sources...)
+			for _, p := range paths {
+				cur().sources = append(cur().sources, source{path: p, dest: dest, workdir: workdir, copied: true})
+			}
 		case "RUN":
 			s := cur()
 			mounts, body := runMounts(rest)
-			s.sources = append(s.sources, mounts...)
+			for _, m := range mounts {
+				s.sources = append(s.sources, source{path: m, workdir: workdir})
+			}
 			mains, err := goBuilds(body)
 			if err != nil {
 				return nil, err
+			}
+			for i := range mains {
+				mains[i].workdir = workdir
 			}
 			s.mains = append(s.mains, mains...)
 		}
@@ -260,35 +341,39 @@ func logicalLines(text string) []string {
 	return out
 }
 
-// copySources is a COPY or ADD's context sources: none with --from.
-func copySources(rest string) ([]string, error) {
+// copySources is a COPY or ADD's context sources, none with --from, and
+// where they land.
+func copySources(rest string) ([]string, string, error) {
 	var args []string
 	fields := strings.Fields(rest)
 	for len(fields) > 0 && strings.HasPrefix(fields[0], "--") {
 		if strings.HasPrefix(fields[0], "--from=") {
-			return nil, nil
+			return nil, "", nil
+		}
+		if strings.HasPrefix(fields[0], "--parents") {
+			return nil, "", fmt.Errorf("COPY %s is not read", fields[0])
 		}
 		fields = fields[1:]
 	}
 	joined := strings.Join(fields, " ")
 	if strings.HasPrefix(joined, "[") {
 		if err := json.Unmarshal([]byte(joined), &args); err != nil {
-			return nil, fmt.Errorf("read %q: %w", truncate(rest), err)
+			return nil, "", fmt.Errorf("read %q: %w", truncate(rest), err)
 		}
 	} else {
 		args = fields
 	}
 	if len(args) < 2 {
-		return nil, fmt.Errorf("COPY %q names no source", truncate(rest))
+		return nil, "", fmt.Errorf("COPY %q names no source", truncate(rest))
 	}
 	sources := args[:len(args)-1]
 	for _, s := range sources {
 		if strings.Contains(s, "$") || strings.Contains(s, "://") {
-			return nil, fmt.Errorf("COPY source %q is not a context path", s)
+			return nil, "", fmt.Errorf("COPY source %q is not a context path", s)
 		}
 	}
 
-	return sources, nil
+	return sources, args[len(args)-1], nil
 }
 
 // runMounts is a RUN's bind-mounted context sources, and its command.
@@ -327,14 +412,24 @@ func bindSource(opts string) (string, bool) {
 
 // goBuildValueFlags take their value as the next word.
 var goBuildValueFlags = []string{
-	"-o", "-ldflags", "-gcflags", "-asmflags", "-tags", "-mod", "-modfile", "-p", "-pkgdir",
-	"-toolexec", "-overlay", "-pgo", "-buildmode", "-compiler", "-installsuffix", "-C",
+	"-o", "-ldflags", "-gcflags", "-asmflags", "-mod", "-p", "-pkgdir",
+	"-toolexec", "-buildmode", "-compiler", "-installsuffix",
 }
+
+// goBuildUnread change which files a build reads, which `go list` as run
+// here would not see.
+var goBuildUnread = []string{"-tags", "-C", "-overlay", "-modfile", "-pgo"}
+
+// goToolOK are the go commands that read no source a build does not.
+var goToolOK = []string{"build", "mod", "version", "env"}
 
 // goBuilds is every `go build` in a RUN command, with the directory a `cd`
 // before it moved to. A package that is not a relative path, or a `cd` that
 // leaves the context, fails.
 func goBuilds(cmd string) ([]goMain, error) {
+	if goEnv.MatchString(cmd) {
+		return nil, fmt.Errorf("RUN %s sets GOFLAGS or GOEXPERIMENT, which go list does not see", truncate(cmd))
+	}
 	words := shellWords(cmd)
 	var mains []goMain
 	dir := "."
@@ -347,6 +442,8 @@ func goBuilds(cmd string) ([]goMain, error) {
 			}
 			dir = path.Join(dir, next)
 			i++
+		case words[i] == "go" && i+1 < len(words) && !slices.Contains(goToolOK, words[i+1]):
+			return nil, fmt.Errorf("go %s may read sources a go build does not, which the inputs reader cannot follow", words[i+1])
 		case words[i] == "go" && i+1 < len(words) && words[i+1] == "build":
 			pkgs, end, err := goBuildPackages(words[i+2:])
 			if err != nil {
@@ -372,6 +469,10 @@ func goBuildPackages(words []string) ([]string, int, error) {
 			break
 		}
 		if strings.HasPrefix(w, "-") {
+			flag, _, _ := strings.Cut("-"+strings.TrimLeft(w, "-"), "=")
+			if slices.Contains(goBuildUnread, flag) {
+				return nil, 0, fmt.Errorf("go build %s changes the files it reads, which go list as run here does not see", flag)
+			}
 			if slices.Contains(goBuildValueFlags, w) || slices.Contains(goBuildValueFlags, "-"+strings.TrimPrefix(w, "--")) {
 				i++
 			}
