@@ -10,6 +10,7 @@ import {
   type ClickHouseClientCreationInput,
   type ClickHouseCloseableClient,
 } from "./connection.ts";
+import { DEFAULT_INSERT_COALESCE_MAX_ROWS, InsertCoalescer } from "./insert-coalescing.ts";
 import type { AbortSignalLike } from "./query.ts";
 import {
   checkStatementTenantScope,
@@ -108,6 +109,8 @@ export interface ClickHouseManagedClientOptions<Client extends ClickHouseVendorC
   minimumStatementQueueDepth?: number | undefined;
   statementWaitTimeoutMs?: number | undefined;
   statementLaneReserveShare?: number | undefined;
+  /** Rows one coalesced async insert carries at most; 0 sends every insert alone. */
+  insertCoalesceMaxRows?: number | undefined;
   requestTimeoutMs?: number | undefined;
   idleSocketTtlMs?: number | undefined;
 }
@@ -158,6 +161,7 @@ export class ClickHouseManagedClientService<
       minimumStatementQueueDepth: this.options.minimumStatementQueueDepth,
       statementWaitTimeoutMs: this.options.statementWaitTimeoutMs,
       statementLaneReserveShare: this.options.statementLaneReserveShare,
+      insertCoalesceMaxRows: this.options.insertCoalesceMaxRows,
     });
     const defaulted = withClickHouseDefaultQuerySettings(
       limited,
@@ -224,6 +228,8 @@ export interface ClickHouseStatementLimitOptions<Client extends ClickHouseVendor
   minimumStatementQueueDepth?: number | undefined;
   statementWaitTimeoutMs?: number | undefined;
   statementLaneReserveShare?: number | undefined;
+  /** Rows one coalesced async insert carries at most; 0 sends every insert alone. */
+  insertCoalesceMaxRows?: number | undefined;
 }
 
 export interface ClickHouseStatementAdmissionOptions {
@@ -303,15 +309,21 @@ export class ClickHouseStatementAdmission {
     });
   }
 
-  /** Runs `task` once its lane and the total grant a slot, or refuses it as overloaded. */
+  /**
+   * Runs `task` once its lane and the total grant a slot, or refuses it as overloaded. A refusal
+   * counts one shed per caller the statement carries: `callers`, read at the refusal, for an
+   * insert that carries several (insert-coalescing.ts), else one.
+   */
   async run<T>({
     operation,
     signal,
     task,
+    callers,
   }: {
     operation: ClickHouseStatementOperation;
     signal?: AbortSignalLike | undefined;
     task: () => Promise<T>;
+    callers?: (() => number) | undefined;
   }): Promise<T> {
     const { instance, telemetry } = this.options;
     const lane = this.laneFor(operation);
@@ -337,7 +349,13 @@ export class ClickHouseStatementAdmission {
       return await this.acquire({ lane, wait, onDriver });
     } catch (error) {
       if (admitted) throw error;
-      throw this.refusal({ error, timedOut: wait.hasTimedOut(), operation, startedAt });
+      throw this.refusal({
+        error,
+        timedOut: wait.hasTimedOut(),
+        operation,
+        startedAt,
+        callers: callers?.() ?? 1,
+      });
     } finally {
       wait.dispose();
     }
@@ -380,11 +398,13 @@ export class ClickHouseStatementAdmission {
     timedOut,
     operation,
     startedAt,
+    callers,
   }: {
     error: unknown;
     timedOut: boolean;
     operation: ClickHouseStatementOperation;
     startedAt: number;
+    callers: number;
   }): unknown {
     const { instance, telemetry, overloadErrorFactory, logger } = this.options;
     return statementRefusal({
@@ -395,7 +415,11 @@ export class ClickHouseStatementAdmission {
       subject: "a ClickHouse statement",
       logFields: { instance, operation },
       logger,
-      onShed: () => telemetry.incrementStatementsShed({ instance, operation }),
+      onShed: () => {
+        for (let caller = 0; caller < callers; caller++) {
+          telemetry.incrementStatementsShed({ instance, operation });
+        }
+      },
       createOverload: (input) => overloadErrorFactory.create(input),
     });
   }
@@ -474,7 +498,10 @@ function boundStatementMethod({
   return [(params: unknown) => run({ operation, params, task: () => method.call(target, params) })];
 }
 
-/** Bounds every vendor statement method while preserving the caller's cancellation signal. */
+/**
+ * Bounds every vendor statement method while preserving the caller's cancellation signal. Async
+ * inserts that wait for a slot together go as one statement (insert-coalescing.ts).
+ */
 export function withClickHouseStatementLimit<Client extends ClickHouseVendorClient>(
   options: ClickHouseStatementLimitOptions<Client>,
 ): Client {
@@ -505,11 +532,21 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
     params: unknown;
     task: () => Promise<unknown>;
   }): Promise<unknown> => admission.run({ operation, signal: signalOf(params), task });
+  const coalescer = new InsertCoalescer(
+    {
+      admit: (task, callers) => admission.run({ operation: "insert", task, callers }),
+      insert: (params) => client.insert(params),
+    },
+    options.insertCoalesceMaxRows ?? DEFAULT_INSERT_COALESCE_MAX_ROWS,
+  );
 
   let closePromise: Promise<void> | undefined;
   return new Proxy(client, {
     get(target, property) {
       const [statement] = boundStatementMethod({ target, property, run });
+      if (property === "insert" && statement) {
+        return (params: unknown) => coalescer.submit(params) ?? statement(params);
+      }
       if (statement) return statement;
       const ping = target.ping;
       if (property === "ping" && ping !== undefined) return () => ping.call(target);
