@@ -9,6 +9,7 @@ import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
   type InstantEvalJudgeSpendRecord,
+  type InstantEvalPricing,
   type InstantEvalVerdict,
   INSTANT_EVAL_PRICING,
   InstantEvalJudgeStoppedError,
@@ -108,6 +109,7 @@ function harness({
   queryTokenBudget = 4_000_000,
   concurrency,
   recordJudgeSpend,
+  holdPricing = INSTANT_EVAL_PRICING,
 }: {
   judge?: ScriptedJudge;
   spentNanoUsd?: number;
@@ -115,6 +117,8 @@ function harness({
   concurrency?: number;
   /** The Instant Evals judge's record, which writes the ledger row from its priced fact. */
   recordJudgeSpend?: (input: InstantEvalJudgeSpendRecord) => Promise<void>;
+  /** What the judge says a query's hold is priced at: its dearest reachable rate. */
+  holdPricing?: InstantEvalPricing;
 } = {}) {
   const events: string[] = [];
   const priced: InstantEvalJudgeSpendRecord[] = [];
@@ -164,7 +168,7 @@ function harness({
         await spend.recordSpend(record);
       },
     },
-    pricing: INSTANT_EVAL_PRICING,
+    holdPricing: async () => holdPricing,
     queryTokenBudget,
     now: () => AT,
   });
@@ -536,6 +540,24 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
 
       const ceiling = instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens: 1_000 }) });
       expect(events).toEqual([`reserve ${ceiling} with 0 judged`, "release after 1 recorded"]);
+    });
+
+    /** @scenario "A judged query holds its ceiling while it judges" */
+    it("holds at the dearest rate a routed call could reach, as the judge names it", async () => {
+      const holdPricing = { usdPerMillionInputTokens: 3, markup: 1.3 };
+      const { service, events } = harness({ queryTokenBudget: 1_000, holdPricing });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }],
+      });
+
+      const ceiling = instantEvalPriceUsd({
+        costUsd: instantEvalCostUsd({ inputTokens: 1_000, pricing: holdPricing }),
+        pricing: holdPricing,
+      });
+      expect(events[0]).toBe(`reserve ${ceiling} with 0 judged`);
     });
 
     it("keeps the hold when the spend could not be recorded, still answering", async () => {

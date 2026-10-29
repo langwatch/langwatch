@@ -81,7 +81,7 @@ async function judgeQuery(spend: InstantEvalJudgedSpendService): Promise<void> {
     }),
     budget: { reserve: async () => undefined, release: async () => undefined },
     spend,
-    pricing: INSTANT_EVAL_PRICING,
+    holdPricing: async () => INSTANT_EVAL_PRICING,
     queryTokenBudget: 4_000_000,
     now: () => AT,
   });

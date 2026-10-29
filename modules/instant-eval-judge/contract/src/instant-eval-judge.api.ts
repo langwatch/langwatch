@@ -39,6 +39,11 @@ export interface InstantEvalJudgeApi {
    */
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
   /**
+   * The rates a judged query's budget hold is priced at: the dearest input rate a routed call
+   * could reach, never below the classifier's, so a routed query cannot outspend its hold.
+   */
+  queryHoldPricing(): Promise<InstantEvalPricing>;
+  /**
    * Copies one confirmed Instant Evals row of the gateway ledger into the judge's own spend, for
    * the spend catch-up (ADR-174 decision 17). A request the judge already holds is kept as it is.
    */

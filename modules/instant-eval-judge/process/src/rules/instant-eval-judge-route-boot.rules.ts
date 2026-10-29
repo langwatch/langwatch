@@ -7,12 +7,14 @@
 
 import {
   INSTANT_EVAL_JUDGE_MODES,
+  INSTANT_EVAL_PRICING,
   instantEvalJudgeEntryBackends,
   instantEvalJudgeRouteSlotsOf,
   type InstantEvalJudgeBackendKind,
   type InstantEvalJudgeRouteEntry,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
+  type InstantEvalPricing,
 } from "@langwatch/instant-eval-judge-contract";
 
 export function instantEvalJudgeRouteBootIssues({
@@ -35,6 +37,27 @@ export function instantEvalJudgeRouteBootIssues({
     }
   }
   return issues;
+}
+
+/**
+ * What a judged query's budget hold is priced at: the dearest input rate of any backend a route
+ * can reach, never below the classifier's, at the one markup. A routed query then cannot spend
+ * past its hold on a pricier leg than the classifier (ADR-174 decision 12's $1 budget).
+ */
+export function instantEvalJudgeQueryHoldPricingOf({
+  table,
+  pricing,
+  classifierPricing = INSTANT_EVAL_PRICING,
+}: {
+  table: InstantEvalJudgeRouteTable;
+  pricing: InstantEvalJudgeRoutePricing;
+  classifierPricing?: InstantEvalPricing;
+}): InstantEvalPricing {
+  const rates = [...reachableBackendsOf(table)].map(
+    (name) => pricing.backends[name]?.usdPerMillionInputTokens ?? 0,
+  );
+  const usdPerMillionInputTokens = Math.max(classifierPricing.usdPerMillionInputTokens, ...rates);
+  return { ...classifierPricing, usdPerMillionInputTokens };
 }
 
 /** Every enabled backend a usable entry may call, with its enabled fallbacks. */

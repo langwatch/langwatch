@@ -15,6 +15,7 @@ import {
   type InstantEvalJudgeServerConfig,
   type InstantEvalJudgeSpendRecord,
   type InstantEvalJudgement,
+  type InstantEvalPricing,
   instantEvalSkipped,
   isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
@@ -43,7 +44,10 @@ import {
   type InstantEvalJudgeSpendPipeline,
 } from "../eventing/instant-eval-judge-spend.pipeline.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
-import { instantEvalJudgeRouteBootIssues } from "../rules/instant-eval-judge-route-boot.rules.ts";
+import {
+  instantEvalJudgeQueryHoldPricingOf,
+  instantEvalJudgeRouteBootIssues,
+} from "../rules/instant-eval-judge-route-boot.rules.ts";
 import { InstantEvalJudgeFactsService } from "../services/instant-eval-judge-facts.service.ts";
 import { InstantEvalJudgeRouterService } from "../services/instant-eval-judge-router.service.ts";
 import { InstantEvalJudgeService } from "../services/instant-eval-judge.service.ts";
@@ -85,6 +89,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
   readonly #limiter: InstantEvalRateLimiter;
   readonly #judge: InstantEvalJudgeService;
   readonly #router: InstantEvalJudgeRouterService;
+  readonly #queryHoldPricing: InstantEvalPricing;
   #spendCommands: EventingCommands<InstantEvalJudgeSpendPipeline> | undefined;
 
   private constructor(setup: InstantEvalJudgeSetup) {
@@ -96,6 +101,10 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
     const routePricing = setup.config.judgeRoutePricing ?? INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING;
     const routeTable = setup.config.judgeRoutes ?? INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE;
     InstantEvalJudgeModule.assertRoutable({ setup, table: routeTable, pricing: routePricing });
+    this.#queryHoldPricing = instantEvalJudgeQueryHoldPricingOf({
+      table: routeTable,
+      pricing: routePricing,
+    });
     this.#router = InstantEvalJudgeRouterService.create({
       table: routeTable,
       pricing: routePricing,
@@ -181,6 +190,10 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
 
   async isClassifierConfigured(): Promise<boolean> {
     return this.#classifier !== undefined;
+  }
+
+  async queryHoldPricing(): Promise<InstantEvalPricing> {
+    return this.#queryHoldPricing;
   }
 
   async classify({

@@ -31,7 +31,7 @@ export class InstantEvalQueryJudgingService {
       rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
       budget: Pick<InstantEvalFreeBudgetService, "reserve" | "release">;
       spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
-      pricing: InstantEvalPricing;
+      holdPricing: () => Promise<InstantEvalPricing>;
       queryTokenBudget: number;
       now: () => Instant;
     },
@@ -41,14 +41,15 @@ export class InstantEvalQueryJudgingService {
     rows,
     budget,
     spend,
-    pricing,
+    holdPricing,
     queryTokenBudget,
     now = nowInstant,
   }: {
     rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
     budget: Pick<InstantEvalFreeBudgetService, "reserve" | "release">;
     spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
-    pricing: InstantEvalPricing;
+    /** The judge's hold rates: the dearest input rate a routed call could reach. */
+    holdPricing: () => Promise<InstantEvalPricing>;
     /** Input tokens one query may send: the ceiling it is held at and refused past. */
     queryTokenBudget: number;
     now?: () => Instant;
@@ -57,7 +58,7 @@ export class InstantEvalQueryJudgingService {
       rows,
       budget,
       spend,
-      pricing,
+      holdPricing,
       queryTokenBudget,
       now,
     });
@@ -75,7 +76,8 @@ export class InstantEvalQueryJudgingService {
 
     const { budget, queryTokenBudget } = this.options;
     const reservationId = instantEvalQueryReservationId();
-    await budget.reserve({ projectId, reservationId, priceUsd: this.#priceOf(queryTokenBudget) });
+    const priceUsd = await this.#holdPriceOf(queryTokenBudget);
+    await budget.reserve({ projectId, reservationId, priceUsd });
     let isRecorded = true;
     try {
       const judged = await this.options.rows.judgeRows({
@@ -98,9 +100,9 @@ export class InstantEvalQueryJudgingService {
     }
   }
 
-  /** A query is never routed in v1 (no route reaches the judge from here): classifier rate. */
-  #priceOf(inputTokens: number): number {
-    const { pricing } = this.options;
+  /** At the dearest rate a routed call could reach, so a routed query cannot outspend its hold. */
+  async #holdPriceOf(inputTokens: number): Promise<number> {
+    const pricing = await this.options.holdPricing();
 
     return instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens, pricing }), pricing });
   }

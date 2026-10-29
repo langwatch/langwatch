@@ -1,4 +1,5 @@
 import {
+  INSTANT_EVAL_PRICING,
   INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING,
   INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
   INSTANT_EVAL_JUDGE_JOBS,
@@ -11,7 +12,10 @@ import {
   syntheticRouteTable,
   yesNo,
 } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
-import { instantEvalJudgeRouteBootIssues } from "../instant-eval-judge-route-boot.rules.ts";
+import {
+  instantEvalJudgeQueryHoldPricingOf,
+  instantEvalJudgeRouteBootIssues,
+} from "../instant-eval-judge-route-boot.rules.ts";
 import { instantEvalJudgeCallCostOf } from "../instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeRoutePlanOf,
@@ -314,6 +318,42 @@ describe("a routed call's cost", () => {
     expect(cost({ backend: "other", inputTokens: 1, outputTokens: 0 })).toEqual({
       outcome: "unpriced",
     });
+  });
+});
+
+describe("the query hold rate", () => {
+  const priced = (usdPerMillionInputTokens: number) => ({
+    usdPerMillionInputTokens,
+    usdPerMillionOutputTokens: 0,
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("holds at the dearest input rate a route can reach, skipping switched-off backends", () => {
+    const off = syntheticRouteTable({
+      backends: { "llm-a": { kind: "anthropic_messages", model: "m", enabled: false } },
+    });
+    const hold = instantEvalJudgeQueryHoldPricingOf({
+      table: off,
+      pricing: {
+        version: "t",
+        backends: {
+          "decision-a": priced(0.1),
+          "decision-b": priced(0.05),
+          "llm-a": priced(9),
+          "llm-b": priced(2),
+        },
+      },
+    });
+    expect(hold).toEqual({ usdPerMillionInputTokens: 2, markup: INSTANT_EVAL_PRICING.markup });
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("holds at the classifier's published rate under the public table", () => {
+    const hold = instantEvalJudgeQueryHoldPricingOf({
+      table: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
+      pricing: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING,
+    });
+    expect(hold).toEqual(INSTANT_EVAL_PRICING);
   });
 });
 
