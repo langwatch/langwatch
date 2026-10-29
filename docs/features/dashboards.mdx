@@ -210,6 +210,18 @@ widget's name, its queries and the period.
 All dashboard data is read with LangWatchQL, LangWatch's query layer over your
 traces, evaluations and cost data.
 
+A widget query has two settings beside its SQL. `sources` lists the trace sources
+`{dashboard_context_sources:Array(String)}` is bound to (`application` by default), and a
+query is kept to them only where its SQL reads that parameter; a query that does not
+count every source, and its card says "all sources". `projects` lists the projects the
+query reads, bound to `{dashboard_context_projects:Array(String)}`; a query that names
+none reads its board's project. A project you cannot read makes that card draw "You can't
+read a project this widget uses" without naming it. When the server cut a run's rows, such
+as a project shared only from a date, the card shows one (i) line saying so.
+
+Rolling back to a release before this one shows multi-project widgets for the board's
+project only. A rollback is not supported for this feature.
+
 ## Build dashboards from your own AI agent
 
 Your coding assistant can build and edit LangWatch dashboards for you, through

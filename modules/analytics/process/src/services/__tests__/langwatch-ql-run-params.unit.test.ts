@@ -366,7 +366,7 @@ describe("given statements over views that keep no origin", () => {
     expect(result.params?.followsSources).toBe(false);
   });
 
-  /** @scenario "AC195 Langy: per-minute rollups keep no origin, so sources do not apply to them" */
+  /** @scenario "AC195 Langy: per-minute rollups cannot leave Langy out yet" */
   it("sends a per-minute rollup as written, saying it follows no sources", async () => {
     const { request, result } = await run({ sql: ROLLUP, sources: ["application"] });
 

@@ -59,3 +59,15 @@ export function widgetSourcesLine(queries: readonly Sourced[]): string {
   if (lists.size === 1) return `Sources: ${named[0]?.list}`;
   return `Sources: ${named.map(({ name, list }) => `${name}: ${list}`).join(" · ")}`;
 }
+
+/** The card's quiet line: its sources, then one (i) line of what the server limited in the run. */
+export function widgetCardFooter({
+  sourcesLine,
+  limits,
+}: {
+  sourcesLine: string;
+  /** The limiting messages of the latest runs, joined; "" when the server limited none. */
+  limits: string;
+}): string {
+  return [sourcesLine, limits === "" ? "" : `\u24D8 ${limits}`].filter(Boolean).join(" · ");
+}

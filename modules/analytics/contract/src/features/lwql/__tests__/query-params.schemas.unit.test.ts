@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { lwqlKeyStatementSchema } from "../analytics-lwql.schemas.ts";
 import { lwqlQueryRequestSchema } from "../analytics-lwql.trpc.ts";
-import { TRACE_SOURCES } from "../analytics.lwql.ts";
+import { langWatchQLQueryResultSchema, TRACE_SOURCES } from "../analytics.lwql.ts";
 import { LWQL_MAX_NAMED_PROJECTS } from "../langwatch-ql-limits.ts";
 
 const SQL = "SELECT 1";
@@ -61,5 +61,32 @@ describe("given the key door's body", () => {
     expect(issuesOf({ sql: SQL })).toEqual([]);
     expect(lwqlKeyStatementSchema.shape.projects.isOptional()).toBe(true);
     expect(lwqlKeyStatementSchema.shape.sources.isOptional()).toBe(true);
+  });
+});
+
+describe("given a result that carries params", () => {
+  const RESULT = {
+    columns: [],
+    rows: [],
+    statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
+    diagnostics: [],
+    followsTimeWindow: false,
+    followsGranularity: false,
+    params: {
+      sources: ["application"],
+      followsSources: true,
+      projects: ["A"],
+      parameters: { days: 7 },
+    },
+  };
+
+  /** @scenario "QP18 tRPC, REST and MCP return equal params for the same run" */
+  it("parses to the same params at the card door and the key door, which share one schema", () => {
+    const card = langWatchQLQueryResultSchema.parse(RESULT);
+
+    expect(card.params).toEqual(RESULT.params);
+    expect(langWatchQLQueryResultSchema.validate({ ...RESULT, params: { sources: [] } })).toBe(
+      false,
+    );
   });
 });

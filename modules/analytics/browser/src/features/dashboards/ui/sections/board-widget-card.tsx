@@ -18,7 +18,7 @@ import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
-import { picksNoSources, widgetSourcesLine } from "../../model/widget-sources.ts";
+import { picksNoSources, widgetCardFooter, widgetSourcesLine } from "../../model/widget-sources.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { NoSourcesPicked } from "../blocks/no-sources-picked.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
@@ -85,9 +85,10 @@ export function BoardWidgetCard({
     <WidgetCardShell
       name={widget.name}
       description={widget.definition.description}
-      footer={[widgetSourcesLine(widget.definition.queries), limits && `\u24D8 ${limits}`]
-        .filter(Boolean)
-        .join(" · ")}
+      footer={widgetCardFooter({
+        sourcesLine: widgetSourcesLine(widget.definition.queries),
+        limits,
+      })}
       controls={
         <>
           {onEdit && (

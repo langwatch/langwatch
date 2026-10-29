@@ -53,6 +53,23 @@ describe("given run_query is called with projects and sources", () => {
     expect(text).toContain('"projects": [\n      "A"\n    ]');
   });
 
+  /** @scenario "QP29 Every door returns the limiting diagnostics" */
+  it("prints the limiting diagnostics under the rows", async () => {
+    mockRunQuery.mockResolvedValue({
+      ...RESULT,
+      diagnostics: [
+        {
+          code: "SHARE_WINDOW_LIMITED",
+          message: "Some projects share data only from a date, so earlier rows are not included",
+        },
+      ],
+    });
+
+    expect(await handleRunQuery({ sql: "SELECT 1" })).toContain(
+      "SHARE_WINDOW_LIMITED: Some projects share data only from a date",
+    );
+  });
+
   it("shows the sources when the statement read them", async () => {
     mockRunQuery.mockResolvedValue({
       ...RESULT,

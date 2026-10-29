@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { picksNoSources, widgetSourcesLine } from "../model/widget-sources.ts";
+import { picksNoSources, widgetCardFooter, widgetSourcesLine } from "../model/widget-sources.ts";
 
 const READS =
   "SELECT count() FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}";
@@ -61,5 +61,20 @@ describe("widgetSourcesLine", () => {
     expect(widgetSourcesLine([query("a", ["application"], NO_ORIGIN)])).toBe(
       "Sources don't apply: this widget reads a view that keeps no origin",
     );
+  });
+});
+
+describe("widgetCardFooter", () => {
+  /** @scenario "AC213 Diagnostics: a card shows what the server limited as one (i) line" */
+  it("adds one (i) line of the limiting messages, and none when the run was not limited", () => {
+    const message = "Some projects share data only from a date, so earlier rows are not included";
+
+    expect(widgetCardFooter({ sourcesLine: "Sources: application", limits: message })).toBe(
+      `Sources: application \u00b7 \u24d8 ${message}`,
+    );
+    expect(widgetCardFooter({ sourcesLine: "Sources: application", limits: "" })).toBe(
+      "Sources: application",
+    );
+    expect(message).not.toMatch(/project-|\d/);
   });
 });

@@ -86,7 +86,7 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
     expect(await count(own, ["langy"])).toBe(0);
   });
 
-  /** @scenario "AC194 Langy: a query run outside a board counts every origin unless its SQL reads the sources parameter" */
+  /** @scenario "AC194 Langy: a query run outside a board is not scoped" */
   it("counts every origin when the statement does not read the parameter", async () => {
     expect(await count(`SELECT count() AS n FROM ${DATABASE}.trace_metrics`)).toBe(5);
     expect(await count(`SELECT count() AS n FROM ${DATABASE}.spans`)).toBe(7);
