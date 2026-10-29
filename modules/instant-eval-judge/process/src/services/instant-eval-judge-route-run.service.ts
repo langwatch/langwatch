@@ -24,6 +24,7 @@ import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-ju
 import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeLegPermitOf,
+  instantEvalJudgeLegsJoined,
   instantEvalRoutedVerdictsOf,
   isInstantEvalJudgeLegAnswered,
   isInstantEvalJudgeLegStop,
@@ -178,7 +179,10 @@ export class InstantEvalJudgeRouteRunService {
     return this.result({ questions, legs: [a, b], pick: (id) => winners.get(id) });
   }
 
-  /** A backend, then its enabled fallbacks except those in `skip`; the last failure otherwise. */
+  /**
+   * A backend, then its enabled fallbacks except those in `skip`; the last failure otherwise. An
+   * LLM that answered only some questions leaves the rest to the next fallback.
+   */
   private async ask({
     backend,
     questions,
@@ -193,15 +197,26 @@ export class InstantEvalJudgeRouteRunService {
       ...(this.plan.fallbacks[backend] ?? []).filter((fallback) => !skip.includes(fallback)),
     ];
     let last: Leg = { outcome: "failed", reason: "classifier_provider_unavailable" };
+    let answered: InstantEvalJudgeAnsweredLeg | undefined;
+    let pending = questions;
     for (const candidate of candidates) {
-      last = await this.askOne({ backend: candidate, questions });
-      if (last.outcome === "answered") {
-        if (candidate !== backend) this.flags.push(`fallback:${backend}->${candidate}`);
-        return last;
+      const leg = await this.askOne({ backend: candidate, questions: pending });
+      last = leg;
+      if (leg.outcome === "failed") {
+        this.flags.push(`${candidate}_failed:${leg.reason}`);
+        continue;
       }
-      this.flags.push(`${candidate}_failed:${last.reason}`);
+      if (candidate !== backend) this.flags.push(`fallback:${backend}->${candidate}`);
+      answered = instantEvalJudgeLegsJoined({ first: answered, next: leg });
+      pending = pending.filter((question) => !leg.answers.has(question.id));
+      if (pending.length === 0 || !this.isLlm(candidate)) return answered;
     }
-    return last;
+    return answered ?? last;
+  }
+
+  private isLlm(backend: string): boolean {
+    const kind = this.deps.table.backends[backend]?.kind;
+    return kind === "anthropic_messages" || kind === "openai_responses";
   }
 
   /**
@@ -377,6 +392,7 @@ export class InstantEvalJudgeRouteRunService {
     });
     const { answers, reason } = await leg.ask({ call: { wire, model, timeoutMs }, questions });
     if (answers.size === 0) return { outcome: "failed", reason };
+    if (answers.size < questions.length) this.flags.push(`${backend}_partial:${reason}`);
     return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
   }
 

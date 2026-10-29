@@ -30,7 +30,10 @@ import {
   ScriptedInstantEvalLlmJudgeChannel,
 } from "../../__tests__/support/instant-eval-judge-router.test-fakes.ts";
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
-import type { InstantEvalLlmJudgeAnswer } from "../../channels/instant-eval-llm-judge.channel.ts";
+import type {
+  InstantEvalLlmJudgeAnswer,
+  InstantEvalLlmJudgeRequest,
+} from "../../channels/instant-eval-llm-judge.channel.ts";
 import { InstantEvalJudgeRouterService } from "../instant-eval-judge-router.service.ts";
 
 const Q = yesNo("q", "is the user upset");
@@ -71,7 +74,10 @@ function harness({
 }: {
   decisions?: Script;
   jev?: Script;
-  llm?: (signal?: AbortSignal) => InstantEvalLlmJudgeAnswer | Promise<InstantEvalLlmJudgeAnswer>;
+  llm?: (
+    signal?: AbortSignal,
+    request?: InstantEvalLlmJudgeRequest,
+  ) => InstantEvalLlmJudgeAnswer | Promise<InstantEvalLlmJudgeAnswer>;
   hasDecisions?: boolean;
   table?: InstantEvalJudgeRouteTable;
   limiter?: MemoryInstantEvalRateLimiter;
@@ -80,7 +86,7 @@ function harness({
     answer: (_request, signal) => decisions(signal),
   });
   const llmJudge = ScriptedInstantEvalLlmJudgeChannel.create({
-    answer: (_request, signal) => llm(signal),
+    answer: (request, signal) => llm(signal, request),
   });
   let jevCalls = 0;
   const jevTexts: string[] = [];
@@ -289,6 +295,50 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.05 }]);
       expect(judgement.routing?.flags).toEqual(
         expect.arrayContaining(["llm-b_failed:classifier_failed", "fallback:llm-b->decision-a"]),
+      );
+    });
+
+    /** @scenario "A backend that is down falls back to its configured fallback" */
+    it("asks the fallback only the questions an LLM primary left unanswered, flagged", async () => {
+      const table = syntheticRouteTable({
+        backends: {
+          "llm-b": { kind: "openai_responses", model: "llm-model-b", fallbacks: ["decision-b"] },
+        },
+      });
+      const jevAsked: string[] = [];
+      const { classify } = harness({
+        table,
+        llm: (_signal, request) =>
+          request?.question.id === "q2"
+            ? {
+                outcome: "skipped",
+                reason: "classifier_provider_unavailable",
+                inputTokens: 0,
+                outputTokens: 0,
+              }
+            : llmSays(true),
+        jev: (_signal, asked = []) => {
+          jevAsked.push(...asked.map((question) => question.id));
+          return {
+            verdicts: asked.map((question) => ({ questionId: question.id, probability: 0.2 })),
+            inputTokens: 1000,
+            isTextTruncated: false,
+          };
+        },
+      });
+      const both = [Q, yesNo("q2", "is the user confused")];
+      const judgement = await classify({ ...SHORT, mode: "accurate" }, both);
+      expect(judgement.verdicts).toEqual([
+        { questionId: "q", probability: 1 },
+        { questionId: "q2", probability: 0.2 },
+      ]);
+      expect(jevAsked).toEqual(["q2"]);
+      expect(judgement.routing?.answeredBy).toEqual({ "llm-b": 1, "decision-b": 1 });
+      expect(judgement.routing?.flags).toEqual(
+        expect.arrayContaining([
+          "llm-b_partial:classifier_provider_unavailable",
+          "fallback:llm-b->decision-b",
+        ]),
       );
     });
 

@@ -317,6 +317,8 @@ export function isArithmeticQuestion(instructions: string): boolean {
 export interface InstantEvalJudgeRoutedAnswer {
   readonly verdict: InstantEvalVerdict;
   readonly sureness: number;
+  /** The fallback that supplied it, when not the leg's own backend. */
+  readonly backend?: string;
 }
 
 /** The answer per question one backend gave, or why it could not. */
@@ -336,6 +338,27 @@ export function isInstantEvalJudgeLegAnswered(
   leg: InstantEvalJudgeLeg,
 ): leg is InstantEvalJudgeAnsweredLeg {
   return leg.outcome === "answered";
+}
+
+/** A leg's answers with a fallback's for the questions it left, each naming its backend. */
+export function instantEvalJudgeLegsJoined({
+  first,
+  next,
+}: {
+  first: InstantEvalJudgeAnsweredLeg | undefined;
+  next: InstantEvalJudgeAnsweredLeg;
+}): InstantEvalJudgeAnsweredLeg {
+  if (!first) return next;
+  const answers = new Map(first.answers);
+  for (const [questionId, answer] of next.answers) {
+    answers.set(questionId, { ...answer, backend: answer.backend ?? next.backend });
+  }
+  return {
+    ...first,
+    answers,
+    isTextTruncated: first.isTextTruncated || next.isTextTruncated,
+    limiterWaitMs: first.limiterWaitMs + next.limiterWaitMs,
+  };
 }
 
 /** Per question the first leg (or `pick`) holding an answer supplies the verdict. */
@@ -358,7 +381,8 @@ export function instantEvalRoutedVerdictsOf({
     const answer = leg?.answers.get(question.id);
     if (!leg || !answer) continue;
     verdicts.push(answer.verdict);
-    answeredBy[leg.backend] = (answeredBy[leg.backend] ?? 0) + 1;
+    const backend = answer.backend ?? leg.backend;
+    answeredBy[backend] = (answeredBy[backend] ?? 0) + 1;
   }
   return { verdicts, answeredBy };
 }
