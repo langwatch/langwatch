@@ -183,6 +183,12 @@ export interface AnalyticsApi {
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
   /**
+   * Proves each project exists and holds `analytics:view` for the member, so a widget never
+   * stores a project its writer could not read.
+   * @throws LangWatchQLProjectNotFoundError with no id, for any that does not.
+   */
+  assertProjectsReadable(input: { userId: string; projectIds: readonly string[] }): Promise<void>;
+  /**
    * Re-validates the statement with the full policy, eval gate taken from the caller's
    * answer, then runs it inside the fixed wrapper its pass names: an instant-eval read.
    */

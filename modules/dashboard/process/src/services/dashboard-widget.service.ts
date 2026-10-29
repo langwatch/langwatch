@@ -1,9 +1,11 @@
 import {
   DashboardWidgetDefinitionInvalidError,
   DashboardWidgetNotFoundError,
+  LangWatchQLProjectNotFoundError,
   type AnalyticsApi,
   type DashboardWidget,
 } from "@langwatch/analytics-contract";
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
@@ -27,7 +29,11 @@ import type {
   DashboardWidgetLayoutsInput,
 } from "#repositories/dashboard-widget.repository";
 
-import { mergeQuerySources, withNewQuerySources } from "../rules/widget-query-sources.rules.ts";
+import {
+  mergeQuerySources,
+  projectsNamedBy,
+  withNewQuerySources,
+} from "../rules/widget-query-sources.rules.ts";
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
@@ -104,6 +110,11 @@ export class DashboardWidgetService {
         version: DASHBOARD_WIDGET_DEFINITION_VERSION,
       }),
     );
+    await this.#assertProjectsReadable({
+      projectId: fields.projectId,
+      queries: fields.input.queries,
+      viewer,
+    });
     return this.#present(await this.#repository.createWidget({ ...fields, id }));
   }
 
@@ -114,10 +125,15 @@ export class DashboardWidgetService {
   async updateWidget(
     input: UpdateDashboardWidgetInput & Viewed & OnBoard,
   ): Promise<DashboardWidget> {
-    const { viewer: _viewer, onDashboardId: _onBoard, ...fields } = input;
+    const { viewer, onDashboardId: _onBoard, ...fields } = input;
     await this.#assertEnabled(fields);
     const row = await this.#visibleRow(input);
     this.#assertWritable(input.id, definitionUpdateSchema.safeParse(input.input));
+    await this.#assertProjectsReadable({
+      projectId: fields.projectId,
+      queries: fields.input.queries ?? [],
+      viewer,
+    });
     const sent = fields.input.queries;
     const queries =
       sent === undefined
@@ -150,6 +166,29 @@ export class DashboardWidgetService {
       projectId: input.projectId,
       layouts: input.layouts.filter(({ graphId }) => !hidden.has(graphId)),
     });
+  }
+
+  /**
+   * A query stores only projects its writer can read: a member by the `analytics:view` they
+   * hold on each, a project credential by naming its own project alone. A project that is
+   * missing, foreign or unreadable gets the one id-free answer (AC210c).
+   */
+  async #assertProjectsReadable({
+    projectId,
+    queries,
+    viewer,
+  }: {
+    projectId: string;
+  } & Viewed & {
+      queries: readonly DashboardWidgetQuery[];
+    }): Promise<void> {
+    const named = projectsNamedBy(queries);
+    if (named.length === 0) return;
+    if (viewer === undefined) {
+      if (named.some((id) => id !== projectId)) throw new LangWatchQLProjectNotFoundError();
+      return;
+    }
+    await this.#analytics.assertProjectsReadable({ userId: viewer.userId, projectIds: named });
   }
 
   async #visibleRows(input: { projectId: string } & Viewed): Promise<DashboardWidgetRow[]> {

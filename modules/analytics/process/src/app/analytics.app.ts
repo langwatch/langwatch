@@ -894,6 +894,13 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
   }
 
+  async assertProjectsReadable(input: {
+    userId: string;
+    projectIds: readonly string[];
+  }): Promise<void> {
+    await this.#queryScope.readableByMember(input);
+  }
+
   /**
    * One instant-eval read. The eval gate is the caller's answer, never this module's flag read:
    * Instant Evals owns that rule. @see modules/instant-eval/specs/instant-eval-opt-in.feature

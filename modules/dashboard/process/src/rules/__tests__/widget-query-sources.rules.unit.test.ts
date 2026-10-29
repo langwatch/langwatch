@@ -4,7 +4,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { mergeQuerySources, withNewQuerySources } from "../widget-query-sources.rules.ts";
+import {
+  mergeQuerySources,
+  projectsNamedBy,
+  withNewQuerySources,
+} from "../widget-query-sources.rules.ts";
 
 const QUERY = { name: "main", sql: "SELECT 1" };
 
@@ -60,5 +64,38 @@ describe("mergeQuerySources", () => {
       { ...QUERY, name: "unset" },
       { ...QUERY, name: "new" },
     ]);
+  });
+});
+
+describe("a query's projects", () => {
+  const storedWithProjects = [{ ...QUERY, projects: ["A", "B"] }];
+
+  /** @scenario "AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources" */
+  it("keeps the list stored under the name when sent without one, clears it with null", () => {
+    expect(mergeQuerySources({ sent: [QUERY], stored: storedWithProjects })).toEqual([
+      { ...QUERY, projects: ["A", "B"] },
+    ]);
+    expect(
+      mergeQuerySources({ sent: [{ ...QUERY, projects: null }], stored: storedWithProjects }),
+    ).toEqual([QUERY]);
+    expect(
+      mergeQuerySources({ sent: [{ ...QUERY, projects: ["C"] }], stored: storedWithProjects }),
+    ).toEqual([{ ...QUERY, projects: ["C"] }]);
+  });
+
+  /** @scenario "AC210 Compatibility: a widget saved before projects existed reads the board's project" */
+  it("stores no projects on a query that had none", () => {
+    expect(mergeQuerySources({ sent: [QUERY], stored: [QUERY] })).toEqual([QUERY]);
+    expect(withNewQuerySources([QUERY])).toEqual([{ ...QUERY, sources: ["application"] }]);
+  });
+
+  it("names each project once across the queries", () => {
+    expect(
+      projectsNamedBy([
+        { ...QUERY, projects: ["B", "A"] },
+        { ...QUERY, name: "two", projects: ["A", "C"] },
+        { ...QUERY, name: "three" },
+      ]),
+    ).toEqual(["B", "A", "C"]);
   });
 });

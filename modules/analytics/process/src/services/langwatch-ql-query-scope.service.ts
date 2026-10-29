@@ -100,9 +100,34 @@ export class LangWatchQLQueryScopeService {
     projectIds: readonly string[];
     authorization?: Authorization;
   }): Promise<LangWatchQLQueryScope> {
-    const projects: LangWatchQLCaller[] = [];
+    const projects = await this.readableByMember({ userId, projectIds });
     const protections: LangWatchQLProtections[] = [];
     // One project at a time, for the same reason `resolve` reads protections one at a time.
+    for (const { id: projectId } of projects) {
+      protections.push(
+        await this.protections.resolveMemberProtections({
+          userId,
+          projectId,
+          ...(authorization ? { authorization } : {}),
+        }),
+      );
+    }
+
+    return { projects, protections: strictestLangWatchQLProtections(protections) };
+  }
+
+  /**
+   * The named projects, each proven to exist and to hold `analytics:view` for the member.
+   * @throws {LangWatchQLProjectNotFoundError} for any that does not, with no id in the answer.
+   */
+  async readableByMember({
+    userId,
+    projectIds,
+  }: {
+    userId: string;
+    projectIds: readonly string[];
+  }): Promise<LangWatchQLCaller[]> {
+    const readable: LangWatchQLCaller[] = [];
     for (const projectId of dedupeInOrder(projectIds)) {
       const project = await this.dependencies.projects.findById(projectId);
       const allowed =
@@ -114,17 +139,10 @@ export class LangWatchQLQueryScopeService {
           projectId,
         }));
       if (!project || !allowed) throw new LangWatchQLProjectNotFoundError();
-      projects.push({ id: project.id, lwqlKey: project.lwqlKey });
-      protections.push(
-        await this.protections.resolveMemberProtections({
-          userId,
-          projectId,
-          ...(authorization ? { authorization } : {}),
-        }),
-      );
+      readable.push({ id: project.id, lwqlKey: project.lwqlKey });
     }
 
-    return { projects, protections: strictestLangWatchQLProtections(protections) };
+    return readable;
   }
 
   /**
