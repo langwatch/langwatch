@@ -21,7 +21,7 @@ type TraceSource = NonNullable<DashboardWidgetQueryInput["sources"]>[number];
  * The trace origins a widget query can count, checked against the platform's published enum;
  * the server checks them again. "other" is every origin not listed before it.
  */
-const TRACE_SOURCES = [
+export const TRACE_SOURCES = [
   "application",
   "simulation",
   "evaluation",
