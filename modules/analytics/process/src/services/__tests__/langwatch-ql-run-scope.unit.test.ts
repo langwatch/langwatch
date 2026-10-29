@@ -94,6 +94,6 @@ describe("resolve", () => {
       userId: "u",
     });
 
-    expect(asked).toEqual([{ userId: "u", projectIds: ["A", "B"] }]);
+    expect(asked).toEqual([{ userId: "u", projectIds: ["A", "B"], anchorProjectId: "A" }]);
   });
 });

@@ -143,8 +143,9 @@ def sync_detailed(
 
     A project API key, or any key that can read exactly one project, reads that project and needs none.
     A key that reaches several must name the projects to read in `projects`, each one it can read
-    `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more
-    than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+    `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
+    reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than
+    one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -223,8 +224,9 @@ def sync(
 
     A project API key, or any key that can read exactly one project, reads that project and needs none.
     A key that reaches several must name the projects to read in `projects`, each one it can read
-    `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more
-    than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+    `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
+    reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than
+    one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -297,8 +299,9 @@ async def asyncio_detailed(
 
     A project API key, or any key that can read exactly one project, reads that project and needs none.
     A key that reaches several must name the projects to read in `projects`, each one it can read
-    `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more
-    than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+    `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
+    reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than
+    one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -375,8 +378,9 @@ async def asyncio(
 
     A project API key, or any key that can read exactly one project, reads that project and needs none.
     A key that reaches several must name the projects to read in `projects`, each one it can read
-    `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more
-    than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+    `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
+    reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than
+    one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of

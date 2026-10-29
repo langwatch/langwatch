@@ -60,7 +60,7 @@ const REFERENCE_IS_THE_VOCABULARY_OF_BOTH_LANGUAGES =
 
 /** Why the run and schema doors name no route permission. */
 const THE_KEY_FANS_OUT =
-  "Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal.";
+  "Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is refused with `projects_unreadable` (422).";
 
 /**
  * How a caller reaches the projects it queries, shared by both doors so they can't describe the
@@ -71,7 +71,7 @@ const HEADER_RULE =
 
 /** The run door's own rule: a key for several projects names the ones to read. */
 const RUN_HEADER_RULE =
-  "A project API key, or any key that can read exactly one project, reads that project and needs none. A key that reaches several must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.";
+  "A project API key, or any key that can read exactly one project, reads that project and needs none. A key that reaches several must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). A key that reads no project is refused with `projects_unreadable` (422) whatever it sends. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.";
 
 /** How the run door names its projects and sources, and what it answers with. */
 const PROJECT_NARROWING =

@@ -54,16 +54,20 @@ function scopeOver(input: {
   privacy?: Readonly<Record<string, ResolvedDataPrivacy>>;
   /** Reshapes the rows the project read answers, e.g. to repeat one as an unstable page would. */
   rows?: (data: Project[]) => Project[];
+  /** The organization of a project that is not in the default one. */
+  orgs?: Readonly<Record<string, string>>;
 }) {
+  const orgOf = (id: string) => input.orgs?.[id] ?? ORGANIZATION_ID;
   const asked: { projectId: string; permission: string }[] = [];
   const checked: string[] = [];
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
+      findOrganizationId: (id) => Promise.resolve(orgOf(id)),
       listByOrganization: ({ organizationId, page, limit, projectIds }) => {
         const matching = input.projects.filter(
           (p) =>
-            organizationId === ORGANIZATION_ID &&
+            organizationId === orgOf(p.id) &&
             !p.archivedAt &&
             // The real read drops governance projects unless asked, so the service need not.
             p.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
@@ -588,10 +592,37 @@ describe("given a member's card that names projects", () => {
     });
 
     const foreign = await refusalOf(
-      service.readableByMember({ userId: "user-1", projectIds: ["a", "z"] }),
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["a", "z"] }),
     );
     const missing = await refusalOf(
-      service.readableByMember({ userId: "user-1", projectIds: ["a", "nope"] }),
+      service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["a", "nope"],
+      }),
+    );
+
+    expect(foreign).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(body(foreign)).toBe(body(missing));
+  });
+
+  /** @scenario "AC208d Project: a crafted card run naming another organization's project is refused" */
+  it("refuses a project of another organization the member can read, as a missing one", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("y")],
+      grants: { a: ["analytics:view"], y: ["analytics:view"] },
+      orgs: { y: "org-y" },
+    });
+
+    const foreign = await refusalOf(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["a", "y"] }),
+    );
+    const missing = await refusalOf(
+      service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["a", "nope"],
+      }),
     );
 
     expect(foreign).toMatchObject({ code: "project_not_found", httpStatus: 404 });
@@ -605,7 +636,9 @@ describe("given a member's card that names projects", () => {
       grants: { a: ["analytics:view"] },
     });
 
-    const card = await refusalOf(service.readableByMember({ userId: "user-1", projectIds: ["z"] }));
+    const card = await refusalOf(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["z"] }),
+    );
     const key = await refusalOf(service.resolve({ reach: KEY, projects: ["z"] }));
 
     expect(body(card)).toBe(body(key));
@@ -616,7 +649,7 @@ describe("given a member's card that names projects", () => {
     const { service } = scopeOver({ projects: [project("a")], grants: {} });
 
     const refusal = await refusalOf(
-      service.readableByMember({ userId: "user-1", projectIds: ["a"] }),
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["a"] }),
     );
 
     expect(JSON.parse(body(refusal))).toEqual({
@@ -671,11 +704,19 @@ describe("given a member's card that names projects", () => {
     const after = scopeOver({ projects: [project("c")], grants: { c: ["analytics:view"] } });
 
     await expect(
-      before.service.readableByMember({ userId: "user-1", projectIds: ["c"] }),
+      before.service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["c"],
+      }),
     ).rejects.toMatchObject({ code: "project_not_found" });
-    expect(await after.service.readableByMember({ userId: "user-1", projectIds: ["c"] })).toEqual([
-      { id: "c", lwqlKey: "lwql-c" },
-    ]);
+    expect(
+      await after.service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["c"],
+      }),
+    ).toEqual([{ id: "c", lwqlKey: "lwql-c" }]);
   });
 
   /** @scenario "AC208c Project: an alert or a scheduled report never reads a project its owner cannot" */
@@ -683,7 +724,7 @@ describe("given a member's card that names projects", () => {
     const { service } = scopeOver({ projects: [project("a"), project("c")], grants: {} });
 
     await expect(
-      service.resolveMemberProjects({ userId: "owner-1", projectIds: ["c"] }),
+      service.resolveMemberProjects({ userId: "owner-1", anchorProjectId: "a", projectIds: ["c"] }),
     ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
   });
 
@@ -694,7 +735,7 @@ describe("given a member's card that names projects", () => {
       grants: { a: ["analytics:view"] },
     });
     const ask = (projectIds: string[]) =>
-      refusalOf(service.readableByMember({ userId: "user-1", projectIds }));
+      refusalOf(service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }));
 
     // A project of another organization is one the member holds no grant on: same branch.
     const [missing, unreadable, listedLate] = await Promise.all([
@@ -717,7 +758,7 @@ describe("given a member's card that names projects", () => {
       grants: { a: ["analytics:view"], e: ["analytics:view"], g: ["analytics:view"] },
     });
     const ask = (projectIds: string[]) =>
-      refusalOf(service.readableByMember({ userId: "user-1", projectIds }));
+      refusalOf(service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }));
 
     const missing = body(await ask(["x"]));
 
@@ -731,7 +772,13 @@ describe("given a member's card that names projects", () => {
       grants: { a: ["analytics:view"], b: ["analytics:view"] },
     });
 
-    await refusalOf(service.readableByMember({ userId: "user-1", projectIds: ["x", "a", "b"] }));
+    await refusalOf(
+      service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["x", "a", "b"],
+      }),
+    );
 
     expect(checked.toSorted()).toEqual(["a", "b", "x"]);
   });
@@ -744,22 +791,29 @@ describe("given a member's card that names projects", () => {
       (_, index) => `p${index}`,
     );
 
-    await expect(service.readableByMember({ userId: "user-1", projectIds })).rejects.toThrow(
-      `name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`,
-    );
+    await expect(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }),
+    ).rejects.toThrow(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
     expect(checked).toEqual([]);
   });
 
   it("lets an authz outage propagate instead of reading it as a missing project", async () => {
     const outage = new Error("authz unavailable");
     const failing = LangWatchQLQueryScopeService.create({
-      projects: createApiFixture<ProjectApi>({ findById: () => Promise.resolve(project("a")) }),
+      projects: createApiFixture<ProjectApi>({
+        findOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
+        listByOrganization: () =>
+          Promise.resolve({
+            data: [project("a")],
+            pagination: { page: 1, limit: 1, total: 1 },
+          }),
+      }),
       authz: createApiFixture<AuthzApi>({ hasPermission: () => Promise.reject(outage) }),
       dataPrivacy: createApiFixture<DataPrivacyApi>({}),
     });
 
-    await expect(failing.readableByMember({ userId: "user-1", projectIds: ["a"] })).rejects.toBe(
-      outage,
-    );
+    await expect(
+      failing.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["a"] }),
+    ).rejects.toBe(outage);
   });
 });

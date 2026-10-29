@@ -193,6 +193,8 @@ export interface AnalyticsApi {
     /** The API key writing, whose reach a run would apply. It decides over `userId`. */
     reach?: LangWatchQLKeyReach;
     projectIds: readonly string[];
+    /** The board's or run's project: a member's projects must lie in its organization. */
+    anchorProjectId: string;
   }): Promise<void>;
   /**
    * Re-validates the statement with the full policy, eval gate taken from the caller's

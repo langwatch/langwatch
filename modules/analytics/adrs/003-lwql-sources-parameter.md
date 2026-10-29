@@ -71,8 +71,10 @@ ignores it.
 - A widget that asks for `Origin = 'langy'` reads no rows until its sources name `langy`.
 - A run that is no widget's may send `projects` as the string `"all"` (owner, 2026-10-29: "1 sure"):
   every project the key or member holds `analytics:view` on, in its own organization, echoed in id
-  order in `params.dashboard_context_projects`. None is `project_not_found` (404); more than the
-  cap (10,000 for a key, 100 for a member) is a 422. A key that reaches several projects and names
-  none is still refused with `projects_required`, which names `"all"` as the way out. A widget
+  order in `params.dashboard_context_projects`. A member who reads none gets `project_not_found`
+  (404); a key that reads none gets `projects_unreadable` (422), as it does when it names nothing.
+  More than the cap (10,000 for a key, 100 for a member) is a 422. A key that reaches several
+  projects and names none is refused with `projects_required`, which names `"all"` as the way out.
+  `"all"` inside a list is refused: it stands alone. A widget
   stores explicit ids and refuses `"all"`, so a stored definition never changes meaning when access
   changes.

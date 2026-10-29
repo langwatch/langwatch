@@ -30,11 +30,7 @@ import type {
   DashboardWidgetLayoutsInput,
 } from "#repositories/dashboard-widget.repository";
 
-import {
-  mergeQuerySources,
-  projectsNamedBy,
-  withNewQuerySources,
-} from "../rules/widget-query-sources.rules.ts";
+import { mergeQuerySources, withNewQuerySources } from "../rules/widget-query-sources.rules.ts";
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
@@ -135,17 +131,19 @@ export class DashboardWidgetService {
     await this.#assertEnabled(fields);
     const row = await this.#visibleRow(input);
     this.#assertWritable(input.id, definitionUpdateSchema.safeParse(input.input));
-    await this.#assertProjectsReadable({
-      projectId: fields.projectId,
-      queries: fields.input.queries ?? [],
-      viewer,
-      keyReach,
-    });
     const sent = fields.input.queries;
     const queries =
       sent === undefined
         ? undefined
         : mergeQuerySources({ sent, stored: this.#present(row).definition.queries });
+    // The merged queries are what gets stored, so they are what must be readable: a query sent
+    // without a list keeps the projects it had.
+    await this.#assertProjectsReadable({
+      projectId: fields.projectId,
+      queries: queries ?? [],
+      viewer,
+      keyReach,
+    });
     const merged =
       queries === undefined ? fields : { ...fields, input: { ...fields.input, queries } };
     return this.#present(await this.#repository.updateWidget(merged));
@@ -191,17 +189,36 @@ export class DashboardWidgetService {
     Keyed & {
       queries: readonly DashboardWidgetQuery[];
     }): Promise<void> {
-    const named = projectsNamedBy(queries);
-    if (named.length === 0) return;
+    // Each query's list is judged on its own: the caps are per run, and a query runs alone.
+    const lists = queries.map((query) => query.projects ?? []).filter((list) => list.length > 0);
+    await Promise.all(
+      lists.map((named) => this.#assertListReadable({ projectId, named, viewer, keyReach })),
+    );
+  }
+
+  async #assertListReadable({
+    projectId,
+    named,
+    viewer,
+    keyReach,
+  }: { projectId: string; named: readonly string[] } & Viewed & Keyed): Promise<void> {
     if (keyReach?.kind === "apiKey") {
-      await this.#analytics.assertProjectsReadable({ reach: keyReach, projectIds: named });
+      await this.#analytics.assertProjectsReadable({
+        reach: keyReach,
+        projectIds: named,
+        anchorProjectId: projectId,
+      });
       return;
     }
     if (viewer === undefined) {
       if (named.some((id) => id !== projectId)) throw new LangWatchQLProjectNotFoundError();
       return;
     }
-    await this.#analytics.assertProjectsReadable({ userId: viewer.userId, projectIds: named });
+    await this.#analytics.assertProjectsReadable({
+      userId: viewer.userId,
+      projectIds: named,
+      anchorProjectId: projectId,
+    });
   }
 
   async #visibleRows(input: { projectId: string } & Viewed): Promise<DashboardWidgetRow[]> {

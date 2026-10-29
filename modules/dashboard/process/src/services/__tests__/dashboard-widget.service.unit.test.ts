@@ -241,8 +241,67 @@ describe("given a query's projects", () => {
       .catch((error: unknown) => error);
 
     expect(refusal).toMatchObject({ code: "project_not_found", httpStatus: 404 });
-    expect(asked).toEqual([{ reach: keyReach, projectIds: ["secret"] }]);
+    expect(asked).toEqual([
+      { reach: keyReach, projectIds: ["secret"], anchorProjectId: scope.projectId },
+    ]);
     expect(await repository.findAll(scope)).toEqual([]);
+  });
+
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("judges the projects an update keeps, not only those it sends", async () => {
+    const asked: string[][] = [];
+    let isRefusing = false;
+    const analytics = createDashboardTestAnalytics({
+      assertProjectsReadable: async ({ projectIds }) => {
+        if (!isRefusing) return;
+        asked.push([...projectIds]);
+        if (projectIds.includes("P2")) throw new LangWatchQLProjectNotFoundError();
+      },
+    });
+    const { service } = setUp(analytics);
+    const row = await service.createWidget({
+      ...scope,
+      viewer: { userId: "user-1" },
+      input: { name: "Stored", code: CODE, queries: [{ ...QUERY, projects: ["P1", "P2"] }] },
+    });
+    isRefusing = true;
+
+    const refusal = await service
+      .updateWidget({
+        ...scope,
+        id: row.id,
+        viewer: { userId: "user-1" },
+        input: { queries: [{ ...QUERY, sql: "SELECT 1" }] },
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(asked).toEqual([["P1", "P2"]]);
+  });
+
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
+  it("holds the cap per query: two queries of 60 distinct projects are each within it", async () => {
+    const asked: number[] = [];
+    const analytics = createDashboardTestAnalytics({
+      assertProjectsReadable: async ({ projectIds }) => void asked.push(projectIds.length),
+    });
+    const { service } = setUp(analytics);
+    const sixty = (prefix: string) => Array.from({ length: 60 }, (_, index) => `${prefix}${index}`);
+
+    await service.createWidget({
+      ...scope,
+      viewer: { userId: "user-1" },
+      input: {
+        name: "Two",
+        code: CODE,
+        queries: [
+          { ...QUERY, name: "one", projects: sixty("a") },
+          { ...QUERY, name: "two", projects: sixty("b") },
+        ],
+      },
+    });
+
+    expect(asked).toEqual([60, 60]);
   });
 
   /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */

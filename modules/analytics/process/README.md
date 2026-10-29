@@ -169,7 +169,7 @@ executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResu
 Proves each project exists and holds `analytics:view` for the member, so a widget never stores a project its writer could not read.
 
 ```typescript
-assertProjectsReadable(input: { userId?: string; /** The API key writing, whose reach a run would apply. It decides over `userId`. */ reach?: LangWatchQLKeyReach; projectIds: readonly string[]; }): Promise<void>;
+assertProjectsReadable(input: { userId?: string; /** The API key writing, whose reach a run would apply. It decides over `userId`. */ reach?: LangWatchQLKeyReach; projectIds: readonly string[]; /** The board's or run's project: a member's projects must lie in its organization. */ anchorProjectId: string; }): Promise<void>;
 ```
 
 #### `executeLangWatchQLPass`
@@ -315,12 +315,12 @@ interface Response {
 
 Run a LangWatchQL query
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:114`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is refused with `projects_unreadable` (422). Declared at `src/transport/query.rest.ts:114`.
 
 Answers at `/api/v1/query`.
 
 ```typescript
-type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:236
+type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:247
 type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:205
 ```
 
@@ -328,7 +328,7 @@ type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.i
 
 Discover the queryable LangWatchQL schema
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:148`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is refused with `projects_unreadable` (422). Declared at `src/transport/query.rest.ts:148`.
 
 Answers at `/api/v1/query/schema`.
 

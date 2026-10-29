@@ -14,7 +14,7 @@ import { LWQL_MAX_MEMBER_PROJECTS } from "@langwatch/analytics-contract/langwatc
  */
 import type { Authorization, RestProjectCredentialPrincipal } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
-import { PROJECT_KIND, type Project, type ProjectApi } from "@langwatch/project-contract";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
 
 import { inStableOrder } from "../rules/langwatch-ql-project-selection.rules.ts";
 import { strictestLangWatchQLProtections } from "../rules/langwatch-ql-query-scope.rules.ts";
@@ -33,10 +33,7 @@ export type LangWatchQLQueryScope = Readonly<{
 
 type ScopeDependencies = WorkbenchProtectionsDependencies &
   Readonly<{
-    projects: Pick<
-      ProjectApi,
-      "findById" | "listByOrganization" | "findLiveNonGovernanceIdsByOrganization"
-    >;
+    projects: Pick<ProjectApi, "findById" | "listByOrganization" | "findOrganizationId">;
   }>;
 
 type ReadableProject = Readonly<{
@@ -132,6 +129,10 @@ export class LangWatchQLQueryScopeService {
       await this.ownProject({ projectId: reach.projectId, requested: named });
       return;
     }
+    // A widget's list has no request schema to cap it, so the cap is held here.
+    if (named.length > LWQL_TENANT_CAPABILITY_MAX_PROJECTS) {
+      throw new ValidationError(`Name at most ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects.`);
+    }
     await this.readableProjects({ reach, only: named });
   }
 
@@ -144,13 +145,16 @@ export class LangWatchQLQueryScopeService {
   async resolveMemberProjects({
     userId,
     projectIds,
+    anchorProjectId,
     authorization,
   }: {
     userId: string;
     projectIds: readonly string[];
+    /** The project the run starts from; every named project must be in its organization. */
+    anchorProjectId: string;
     authorization?: Authorization;
   }): Promise<LangWatchQLQueryScope> {
-    const projects = await this.readableByMember({ userId, projectIds });
+    const projects = await this.readableByMember({ userId, projectIds, anchorProjectId });
     const protections: LangWatchQLProtections[] = [];
     // One project at a time, for the same reason `resolve` reads protections one at a time.
     for (const { id: projectId } of projects) {
@@ -167,41 +171,52 @@ export class LangWatchQLQueryScopeService {
   }
 
   /**
-   * The named projects, each proven to exist and to hold `analytics:view` for the member.
-   * @throws {LangWatchQLProjectNotFoundError} for any that does not, with no id in the answer.
+   * The named projects, each proven to be live in the anchor project's organization and to hold
+   * `analytics:view` for the member. A project of another organization is as missing as any.
+   * @throws {LangWatchQLProjectNotFoundError} for any that is not, with no id in the answer.
    */
   async readableByMember({
     userId,
     projectIds,
+    anchorProjectId,
   }: {
     userId: string;
     projectIds: readonly string[];
+    anchorProjectId: string;
   }): Promise<LangWatchQLCaller[]> {
     const ids = dedupeInOrder(projectIds);
     if (ids.length > LWQL_MAX_MEMBER_PROJECTS) {
       throw new ValidationError(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
     }
-    // Every id is looked up and checked, all at once, before any is judged, so the answer's
-    // timing cannot tell a missing project from an unreadable one or place it in the list.
-    const checked = await Promise.all(
-      ids.map(async (projectId) => ({
-        project: await this.dependencies.projects.findById(projectId),
-        // An authz outage propagates (a 5xx), never a 404: only a denial reads as not found.
-        allowed: await this.dependencies.authz.hasPermission({
-          userId,
-          permission: "analytics:view",
-          projectId,
-        }),
-      })),
-    );
+    if (ids.length === 0) return [];
+    const organizationId = await this.dependencies.projects.findOrganizationId(anchorProjectId);
+    if (organizationId === undefined) throw new LangWatchQLProjectNotFoundError();
+    // The organization read and every grant are asked all at once, before any is judged, so the
+    // answer's timing cannot tell a missing project from an unreadable one or place it in the list.
+    const [listed, allowed] = await Promise.all([
+      this.dependencies.projects.listByOrganization({
+        organizationId,
+        page: 1,
+        limit: ids.length,
+        projectIds: [...ids],
+      }),
+      // An authz outage propagates (a 5xx), never a 404: only a denial reads as not found.
+      Promise.all(
+        ids.map((projectId) =>
+          this.dependencies.authz.hasPermission({
+            userId,
+            permission: "analytics:view",
+            projectId,
+          }),
+        ),
+      ),
+    ]);
+    // The read drops archived, governance and foreign-organization projects.
+    const live = new Map(listed.data.map((project) => [project.id, project]));
     const readable: LangWatchQLCaller[] = [];
-    for (const { project, allowed } of checked) {
-      const live =
-        project !== null &&
-        project !== undefined &&
-        project.archivedAt === null &&
-        project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE;
-      if (!live || !allowed) throw new LangWatchQLProjectNotFoundError();
+    for (const [index, id] of ids.entries()) {
+      const project = live.get(id);
+      if (!project || !allowed[index]) throw new LangWatchQLProjectNotFoundError();
       readable.push({ id: project.id, lwqlKey: project.lwqlKey });
     }
 
@@ -265,7 +280,7 @@ export class LangWatchQLQueryScopeService {
       ...(only === undefined ? {} : { projectIds: [...only] }),
     });
     if (listed.pagination.total > listed.data.length) {
-      // Only an unnamed read can get here: the request schema caps a named list at this same cap.
+      // A named list is capped before it gets here, so only an unnamed read is over the cap.
       throw new ValidationError(
         `This organization has more than ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects; ` +
           `name the projects instead.`,

@@ -887,12 +887,13 @@ export class AnalyticsModule
     userId?: string;
     reach?: LangWatchQLKeyReach;
     projectIds: readonly string[];
+    anchorProjectId: string;
   }): Promise<void> {
-    const { userId, reach, projectIds } = input;
+    const { userId, reach, projectIds, anchorProjectId } = input;
     if (reach !== undefined) {
       await this.#queryScope.assertReadableByKey({ reach, projectIds });
     } else if (userId !== undefined) {
-      await this.#queryScope.readableByMember({ userId, projectIds });
+      await this.#queryScope.readableByMember({ userId, projectIds, anchorProjectId });
     } else {
       throw new LangWatchQLProjectNotFoundError();
     }

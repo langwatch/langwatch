@@ -443,6 +443,13 @@ describe("runQueryCommand with --projects and --sources", () => {
     expect(resolveCredentials).not.toHaveBeenCalled();
   });
 
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("refuses a bad --sources list before it reads any credential", async () => {
+    await expect(runQueryCommand("SELECT 1", { sources: " , " })).rejects.toThrow(ProcessExitError);
+
+    expect(resolveCredentials).not.toHaveBeenCalled();
+  });
+
   /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
   it("reads All and ALL as the word all", async () => {
     await runQueryCommand("SELECT 1", { projects: "ALL" });

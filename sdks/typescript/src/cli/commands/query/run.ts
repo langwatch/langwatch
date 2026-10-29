@@ -421,11 +421,11 @@ export const runQueryCommand = async (
   };
 
   const projects = readProjectsFlag({ project: options.project, projects: options.projects });
+  const sources = listFlag({ value: options.sources, flag: "--sources" });
   // Only an explicit `--project` narrows the run: the personal project the
   // credential falls back to is not a project the user asked to read alone.
   const credentials = await resolveCredentials({ project: options.project });
   const projectId = options.project === undefined ? undefined : credentials.projectId;
-  const sources = listFlag({ value: options.sources, flag: "--sources" });
   const reach: RunReach = {
     ...(projectId === undefined ? {} : { projectId }),
     ...(projects ? { projects } : {}),

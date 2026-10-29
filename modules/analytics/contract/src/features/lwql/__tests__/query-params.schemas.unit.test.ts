@@ -169,8 +169,11 @@ describe('given projects set to "all"', () => {
   });
 
   /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
-  it("is a project id like any other inside a list, and any other string is refused", () => {
-    expect(issuesOf({ sql: SQL, projects: ["all"] })).toEqual([]);
+  it("stands alone: inside a list, in any case, it is refused, as is any other string", () => {
+    for (const word of ["all", "ALL", " All "]) {
+      const [message] = issuesOf({ sql: SQL, projects: ["p", word] });
+      expect(message).toBe('"all" stands alone; send it by itself, or list project ids');
+    }
     expect(issuesOf({ sql: SQL, projects: "everything" })).not.toEqual([]);
   });
 

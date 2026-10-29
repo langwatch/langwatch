@@ -101,6 +101,7 @@ export class LangWatchQLRunScopeService {
     const scope = await queryScope.resolveMemberProjects({
       userId,
       projectIds: named,
+      anchorProjectId: project.id,
       ...(authorization ? { authorization } : {}),
     });
     for (const member of scope.projects) {
