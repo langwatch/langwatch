@@ -118,11 +118,11 @@ export class InstantEvalJudgeRouteRunService {
   async firstLeg(questions: readonly InstantEvalQuestion[]): Promise<InstantEvalJudgeFirstLeg> {
     const { primary, pairWith } = this.plan;
     if (!pairWith) return { primary: await this.ask({ backend: primary, questions }) };
-    const [a, b] = await Promise.all([
-      this.ask({ backend: primary, questions, skip: [pairWith] }),
-      this.ask({ backend: pairWith, questions, skip: [primary] }),
-    ]);
-    return { primary: a, pairWith: b };
+    const a = this.ask({ backend: primary, questions, skip: [pairWith] });
+    const b = this.ask({ backend: pairWith, questions, skip: [primary] });
+    // Both settle before a stop is rethrown, so a leg answering after the other stopped is billed.
+    await Promise.allSettled([a, b]);
+    return { primary: await a, pairWith: await b };
   }
 
   private async judgeLegs({

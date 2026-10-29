@@ -52,6 +52,13 @@ function judged(probability: number, inputTokens = 1000): InstantEvalJudgement {
   return { verdicts: [{ questionId: Q.id, probability }], inputTokens, isTextTruncated: false };
 }
 
+/** A send already completing when the caller stops: it answers, with its usage, just after. */
+function answeredAfterStop<T>(signal: AbortSignal | undefined, answer: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    signal?.addEventListener("abort", () => setTimeout(() => resolve(answer), 0), { once: true });
+  });
+}
+
 const llmSays = (verdict: boolean): InstantEvalLlmJudgeAnswer => ({
   outcome: "answered",
   verdict,
@@ -485,6 +492,43 @@ describe("InstantEvalJudgeRouterService", () => {
     expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
     // decision-a's 1000 tokens, plus the 2000 of the one LLM answer that came back.
     expect(error).toMatchObject({ inputTokens: 3000, costNanoUsd: 100_000 + 2_500_000 });
+  });
+
+  /** @scenario "A caller's stop keeps the legs already paid billed" */
+  it("bills an LLM answer that arrives after a sibling send stopped", async () => {
+    const stop = new AbortController();
+    let sends = 0;
+    const { classify } = harness({
+      decisions: () => judged(0.4),
+      llm: (signal) => {
+        sends += 1;
+        if (sends === 1) {
+          setTimeout(() => stop.abort(new DOMException("stopped", "AbortError")), 5);
+          return hangUntilAborted(signal);
+        }
+        return answeredAfterStop(signal, llmSays(true));
+      },
+    });
+    const both = [Q, yesNo("q2", "is the user confused")];
+    const error = await classify(SHORT, both, stop.signal).catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
+    // decision-a's 1000 tokens, plus the 2000 of the LLM answer that landed after the stop.
+    expect(error).toMatchObject({ inputTokens: 3000, costNanoUsd: 100_000 + 2_500_000 });
+  });
+
+  /** @scenario "A caller's stop keeps the legs already paid billed" */
+  it("bills a pair's leg that answers after the other leg stopped", async () => {
+    const stop = new AbortController();
+    const { classify } = harness({
+      decisions: (signal) => answeredAfterStop(signal, judged(0.9)),
+      jev: (signal) => {
+        setTimeout(() => stop.abort(new DOMException("stopped", "AbortError")), 5);
+        return hangUntilAborted<InstantEvalJudgement>(signal);
+      },
+    });
+    const error = await classify(PAIRED, [Q], stop.signal).catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
+    expect(error).toMatchObject({ inputTokens: 1000, costNanoUsd: 100_000 });
   });
 
   describe("given a text-view plan", () => {

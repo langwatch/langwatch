@@ -1,6 +1,7 @@
 /**
  * A routed run's LLM leg: one call per question on the full text, in parallel, each billed as it
- * arrives. Only the caller's stop is rethrown; any other throw is that question's skip.
+ * arrives. Only the caller's stop is rethrown, once every send has settled so a late answer is
+ * billed first; any other throw is that question's skip.
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
@@ -59,7 +60,10 @@ export class InstantEvalJudgeLlmLegService {
     call: InstantEvalJudgeLlmCall;
     questions: readonly InstantEvalQuestion[];
   }): Promise<InstantEvalJudgeLlmLegAnswers> {
-    const sent = await Promise.all(questions.map((question) => this.askOne({ call, question })));
+    const sends = questions.map((question) => this.askOne({ call, question }));
+    // Every send settles before a stop is rethrown, so an answer landing after it is billed too.
+    await Promise.allSettled(sends);
+    const sent = await Promise.all(sends);
     const answers = new Map<string, InstantEvalJudgeRoutedAnswer>();
     let reason: InstantEvalSkipReason = "classifier_provider_unavailable";
     sent.forEach((answer, at) => {
