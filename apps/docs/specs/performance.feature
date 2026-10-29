@@ -177,7 +177,6 @@ Feature: Static documentation with progressive interaction
     When a reader opens a guide with an accordion
     Then its content expands with keyboard activation
     And it collapses again without loading a page renderer
-    And its control reads the same quiet Show and Hide label as an API reference field
 
   @e2e
   Scenario: Answer a first click on search, a context menu or the playground on a small download

@@ -50,6 +50,7 @@ Feature: Generate documentation data from authored sources
     And it reads "Hide" in place of "Show" while open
     And the opened children hang from a left rule under their parent
     And a union option is named by the constant that tells it apart, as kind: "categorical"
+    And an authored Expandable, as in the Python reference, uses the same quiet Show and Hide control
 
   @integration
   Scenario: Render code spans in API descriptions

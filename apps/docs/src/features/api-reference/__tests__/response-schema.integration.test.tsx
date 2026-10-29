@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -123,14 +124,14 @@ describe("when a response nests objects and discriminated unions", () => {
     ],
   };
   /* Emotion writes its style tags inline, beside the elements they style: keep only the markup. */
-  const html = renderToStaticMarkup(
+  const markup = document.createElement("div");
+  markup.innerHTML = renderToStaticMarkup(
     <DesignSystemTestProvider>
       <Responses operation={operation} />
     </DesignSystemTestProvider>,
-  )
-    .split(/<style[^>]*>|<\/style>/)
-    .filter((_, index) => index % 2 === 0)
-    .join("");
+  );
+  for (const style of markup.querySelectorAll("style")) style.remove();
+  const html = markup.innerHTML;
 
   /** @scenario "Render nested objects and union options as connected groups" */
   it("counts every child disclosure and names union options by their constant", () => {
@@ -138,8 +139,8 @@ describe("when a response nests objects and discriminated unions", () => {
     expect(html).toContain("Show 2 child attributes");
     expect(html).toContain("Show 1 child attribute<");
     expect(html).not.toContain("nested child attributes");
-    expect(html).toContain("kind: &quot;categorical&quot;");
-    expect(html).toContain("kind: &quot;range&quot;");
+    expect(html).toContain(`kind: "categorical"`);
+    expect(html).toContain(`kind: "range"`);
   });
 
   /** @scenario "Render code spans in API descriptions" */
