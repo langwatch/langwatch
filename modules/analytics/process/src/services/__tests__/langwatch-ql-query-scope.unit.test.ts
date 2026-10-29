@@ -795,7 +795,7 @@ describe("given a member's card that names projects", () => {
   it("sends an aggregate project to authz and refuses it, as a missing one, when authz says no", async () => {
     const { service, batches } = scopeOver({
       projects: [project("a"), project("agg", { kind: "aggregate" as never })],
-      grants: { a: ["analytics:view"] },
+      grants: { a: ["analytics:view"], agg: ["analytics:view"] },
       decisions: { a: true, agg: false },
     });
     const ask = (projectIds: string[]) =>

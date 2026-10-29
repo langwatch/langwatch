@@ -180,10 +180,10 @@ function listRefusalOr(issue: {
   errors?: readonly (readonly { message: string }[])[];
 }) {
   if (issue.code !== "invalid_union") return undefined;
-  // A stray string fails the pattern and the list alike: say what is accepted.
-  if (typeof issue.input === "string") return 'projects: send "all" or a list of project ids';
+  // Neither the word nor a list (a stray string, a number, an object): say what is accepted.
+  if (!Array.isArray(issue.input)) return LWQL_PROJECTS_SEND_ALL_OR_LIST;
 
-  return issue.errors?.[1]?.[0]?.message ?? 'projects must be "all" or a list of project ids';
+  return issue.errors?.[1]?.[0]?.message ?? LWQL_PROJECTS_SEND_ALL_OR_LIST;
 }
 
 /** The word that asks for every project the caller can read, sent as the string, not in a list. */
@@ -191,6 +191,9 @@ export const LWQL_ALL_PROJECTS = "all";
 
 /** The refusal of a list holding the word; raised by the run, so it is the answer's own message. */
 export const LWQL_ALL_STANDS_ALONE = '"all" stands alone; send it by itself, or list project ids';
+
+/** The refusal of `projects` that is neither the word nor a list of ids. */
+export const LWQL_PROJECTS_SEND_ALL_OR_LIST = 'projects: send "all" or a list of project ids';
 
 /** Whether a list holds the word that asks for every project, which must be sent alone. */
 export function holdsAllWord(ids: readonly string[]): boolean {

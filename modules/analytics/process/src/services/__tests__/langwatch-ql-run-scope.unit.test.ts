@@ -3,6 +3,7 @@
  * @see specs/lwql/query-params.feature
  * @vitest-environment node
  */
+import { LWQL_PROJECTS_SEND_ALL_OR_LIST } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import { LangWatchQLRunScopeService } from "../langwatch-ql-run-scope.service.ts";
@@ -36,8 +37,12 @@ describe("select", () => {
 
   it("refuses a stray string with a 422 instead of reading it as a list", () => {
     expect(() => service.select({ projects: "al" as never })).toThrow(
-      expect.objectContaining({ httpStatus: 422 }),
+      expect.objectContaining({ httpStatus: 422, message: LWQL_PROJECTS_SEND_ALL_OR_LIST }),
     );
+  });
+
+  it("does not refuse exactly all", () => {
+    expect(service.select({ projects: "all" })).toMatchObject({ all: true });
   });
 
   it("answers the names, or none", () => {

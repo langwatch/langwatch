@@ -1,6 +1,7 @@
 import {
   holdsAllWord,
   LWQL_ALL_STANDS_ALONE,
+  LWQL_PROJECTS_SEND_ALL_OR_LIST,
   LangWatchQLProjectNotFoundError,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
@@ -61,7 +62,7 @@ export class LangWatchQLRunScopeService {
     projects?: readonly string[] | "all" | undefined;
   }): { named: readonly string[] | undefined; all: boolean } {
     const { named, all, conflict, stray } = selectNamedProjects(request);
-    if (stray) throw new ValidationError('projects: send "all" or a list of project ids');
+    if (stray) throw new ValidationError(LWQL_PROJECTS_SEND_ALL_OR_LIST);
     if (conflict) throw new ValidationError("send projectId or projects, not both");
     if (Array.isArray(request.projects) && holdsAllWord(request.projects)) {
       throw new ValidationError(LWQL_ALL_STANDS_ALONE);

@@ -105,7 +105,7 @@ export const reads = {
   "@langwatch/automation-contract": ["modules/automation/**/*"],
   "@langwatch/config": ["packages/browser/src/wire/public-config.ts"],
   "@langwatch/mail": ["skills/tracing/SKILL.mdx"],
-  "@langwatch/mcp-server": ["feature-map.json"],
+  "@langwatch/mcp-server": ["feature-map.json", "docs/features/querying-your-data.mdx"],
   "@langwatch/plans": ["packages/prisma-client/prisma/schema.prisma"],
   "@langwatch/langy-process": [
     "specs/langy/langy-frame-auth.vectors.json",
@@ -208,7 +208,10 @@ export const reads = {
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
-  "@langwatch/analytics-contract": ["dev/scripts/build-charts-lib.mjs"],
+  "@langwatch/analytics-contract": [
+    "dev/scripts/build-charts-lib.mjs",
+    "docs/features/querying-your-data.mdx",
+  ],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
   "@langwatch/docs-site": ["docs/**/*", "skills/_compiled/**/*"],

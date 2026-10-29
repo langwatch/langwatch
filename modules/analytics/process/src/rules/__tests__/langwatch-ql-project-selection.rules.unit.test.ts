@@ -20,6 +20,10 @@ const MEMBERS = {
 };
 
 describe("selectNamedProjects with a stray string", () => {
+  it("does not flag exactly all", () => {
+    expect(selectNamedProjects({ projects: "all" })).toMatchObject({ stray: false, all: true });
+  });
+
   it("flags it instead of spreading it as a list", () => {
     const selected = selectNamedProjects({ projects: "al" as never });
 

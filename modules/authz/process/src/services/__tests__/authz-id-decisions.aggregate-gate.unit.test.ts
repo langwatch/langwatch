@@ -84,6 +84,12 @@ describe("AuthzService batch decisions on an aggregate project", () => {
       expect(await askWidgetWrite(authz)).toBe(false);
     });
 
+    it("opens a non-aggregate project to the same member and permission", async () => {
+      const authz = makeAuthz({ role: "MEMBER", kind: "application" });
+
+      expect(await askWidgetWrite(authz)).toBe(true);
+    });
+
     it("leaves an ordinary project open", async () => {
       const authz = makeAuthz({ role: "MEMBER", kind: "project" });
 

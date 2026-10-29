@@ -11,6 +11,7 @@ import { dashboardWidgetQuerySchema } from "../../dashboard-widget/dashboard-wid
 import {
   holdsAllWord,
   LWQL_ALL_STANDS_ALONE,
+  LWQL_PROJECTS_SEND_ALL_OR_LIST,
   lwqlKeyStatementSchema,
   lwqlMemberProjectsRequestSchema,
 } from "../analytics-lwql.schemas.ts";
@@ -187,10 +188,13 @@ describe('given projects set to "all"', () => {
     expect(lwqlMemberProjectsRequestSchema.parse(" ALL ")).toBe("all");
   });
 
-  it("names what is accepted when a stray string is sent", () => {
-    expect(issuesOf({ sql: SQL, projects: "al" })).toEqual([
-      'projects: send "all" or a list of project ids',
-    ]);
+  it("names what is accepted when projects is neither the word nor a list", () => {
+    for (const projects of ["al", 5, {}, true]) {
+      expect(issuesOf({ sql: SQL, projects })).toEqual([LWQL_PROJECTS_SEND_ALL_OR_LIST]);
+      expect(lwqlMemberProjectsRequestSchema.safeParse(projects).error?.issues[0]?.message).toBe(
+        LWQL_PROJECTS_SEND_ALL_OR_LIST,
+      );
+    }
   });
 
   it("is worded alike in the contract and the docs", () => {
