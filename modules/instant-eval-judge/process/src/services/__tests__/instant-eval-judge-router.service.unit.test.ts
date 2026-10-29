@@ -714,6 +714,48 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.inputTokens).toBe(2000);
     });
 
+    /** Decisions answers only the yes-or-no questions of a request, leaving every score out. */
+    const answersYesNoOnly = (asked: readonly InstantEvalQuestion[] = []) =>
+      answerAsked({})(asked.filter((question) => question.kind === "boolean"));
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("sends a kind the shared send left unanswered to the primary's fallback", async () => {
+      const { classify, hostedDecisions, llmJudge, jevCalls } = harness({
+        table,
+        decisions: () => answersYesNoOnly(hostedDecisions.requests.at(-1)?.questions),
+        jev: (_signal, asked) => answerAsked({})(asked),
+      });
+      const judgement = await classify({ job: "llm_judge", tokens: 500 }, [Q, POLITE]);
+      expect(kindsSent(hostedDecisions.requests)).toEqual(["boolean,score"]);
+      expect(jevCalls()).toBe(1);
+      expect(llmJudge.requests).toHaveLength(0);
+      expect(judgement.verdicts).toEqual([
+        { questionId: "q", probability: 0.05 },
+        { questionId: "polite", score: 4.1, spread: 0.2 },
+      ]);
+      expect(judgement.inputTokens).toBe(2000);
+      expect(judgement.routing?.flags).toContainEqual(
+        expect.stringContaining("fallback:decision-a->decision-b"),
+      );
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("escalates a kind the shared send left unanswered as a failed primary", async () => {
+      const { classify, hostedDecisions, llmJudge } = harness({
+        table: noFallbackTable,
+        decisions: () => answersYesNoOnly(hostedDecisions.requests.at(-1)?.questions),
+        llm: () => ({ outcome: "answered", score: 2, inputTokens: 900, outputTokens: 80 }),
+      });
+      const judgement = await classify({ job: "llm_judge", tokens: 500 }, [Q, POLITE]);
+      expect(hostedDecisions.requests).toHaveLength(1);
+      expect(llmJudge.requests.map((request) => request.question.id)).toEqual(["polite"]);
+      expect(judgement.verdicts).toEqual([
+        { questionId: "q", probability: 0.05 },
+        { questionId: "polite", score: 2 },
+      ]);
+      expect(judgement.routing?.flags).toContainEqual(expect.stringContaining("primary_failed"));
+    });
+
     /** @scenario "An LLM leg that fails keeps the primary verdict, flagged" */
     it("keeps an unsure score when the LLM answers nothing readable", async () => {
       const { classify } = harness({

@@ -138,8 +138,9 @@ export class InstantEvalJudgeRouteRunService {
     firstSend: InstantEvalJudgeFirstLeg;
   }): Promise<InstantEvalJudgement> {
     const { primary, escalateTo } = this.plan;
-    const { primary: first, pairWith } = firstSend;
-    if (pairWith) return this.pair({ questions, a: first, b: pairWith });
+    if (firstSend.pairWith)
+      return this.pair({ questions, a: firstSend.primary, b: firstSend.pairWith });
+    const first = await this.ownAnswer({ questions, first: firstSend.primary });
     if (first.outcome === "failed") {
       if (!escalateTo) return this.nothingAnswered(first);
       this.flags.push("primary_failed");
@@ -148,6 +149,23 @@ export class InstantEvalJudgeRouteRunService {
       return this.result({ questions, legs: [second], escalated: second.answers.size });
     }
     return this.escalateUnsure({ questions, first });
+  }
+
+  /**
+   * The first send as this kind's own leg. A shared send that answered none of this kind's
+   * questions failed for this kind, so they go to the primary's fallbacks as a failed own send would.
+   */
+  private async ownAnswer({
+    questions,
+    first,
+  }: {
+    questions: readonly InstantEvalQuestion[];
+    first: Leg;
+  }): Promise<Leg> {
+    if (first.outcome === "failed" || questions.some((q) => first.answers.has(q.id))) return first;
+    const { primary } = this.plan;
+    this.flags.push(`${primary}_failed:classifier_provider_unavailable`);
+    return this.ask({ backend: primary, questions, skip: [primary] });
   }
 
   private async escalateUnsure({
@@ -201,8 +219,8 @@ export class InstantEvalJudgeRouteRunService {
   }
 
   /**
-   * A backend, then its enabled fallbacks except those in `skip`; the last failure otherwise. An
-   * LLM that answered only some questions leaves the rest to the next fallback.
+   * A backend, then its enabled fallbacks, leaving out those in `skip`; the last failure otherwise.
+   * An LLM that answered only some questions leaves the rest to the next fallback.
    */
   private async ask({
     backend,
@@ -213,10 +231,9 @@ export class InstantEvalJudgeRouteRunService {
     questions: readonly InstantEvalQuestion[];
     skip?: readonly string[];
   }): Promise<Leg> {
-    const candidates = [
-      backend,
-      ...(this.plan.fallbacks[backend] ?? []).filter((fallback) => !skip.includes(fallback)),
-    ];
+    const candidates = [backend, ...(this.plan.fallbacks[backend] ?? [])].filter(
+      (candidate) => !skip.includes(candidate),
+    );
     let last: Leg = { outcome: "failed", reason: "classifier_provider_unavailable" };
     let answered: InstantEvalJudgeAnsweredLeg | undefined;
     let pending = questions;

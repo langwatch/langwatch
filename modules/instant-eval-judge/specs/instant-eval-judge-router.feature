@@ -154,6 +154,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And kinds whose plans share a decision-model first send send the text once with all their questions
     And a first send is shared when the primary, pair partner, input view and fallbacks are the same
     And each kind escalates from that shared answer by its own sureness rule and threshold
+    And a kind the shared send answered none of is treated as its own failed send: fallbacks, then escalation
     And kinds whose plans start elsewhere send on their own, and an LLM leg still asks one question per call
     And the verdicts come back in the order asked with tokens and cost summed and each flag naming its kind
     And a kind whose run threw while another answered is a skip of that kind, keeping the paid parts billed
