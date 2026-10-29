@@ -47,7 +47,7 @@ export const INSIGHT_EVENT_VERSIONS = {
 
 /** Projection schema versions, calendar versioned. */
 export const INSIGHT_PROJECTION_VERSIONS = {
-  INSIGHT: "2026-10-09",
+  INSIGHT: "2026-10-29",
   READER: "2026-10-09",
 } as const;
 
@@ -57,6 +57,9 @@ export const INSIGHT_PIPELINE_NAME = "insight_processing";
 
 /** The release flag the inbox, its chrome and its procedures sit behind. */
 export const INSIGHTS_FLAG = "release_insights";
+
+/** The release flag an insight's action buttons and `runAction` sit behind, with the inbox's. */
+export const INSIGHT_ACTIONS_FLAG = "release_insight_actions";
 
 /**
  * The daily run pipeline's names. One aggregate per person and board, the project is the

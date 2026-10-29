@@ -33,6 +33,7 @@ function entry(overrides: Partial<InsightEntry> = {}): InsightEntry {
     ownerUserId: "user-filer",
     filedByUserId: "user-filer",
     findingKey: null,
+    actions: [],
     filedAt: NOW,
     renewedAt: null,
     seenAt: null,

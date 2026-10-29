@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Each person's own insights in a project. Every operation refuses with `insights_not_enabled` while `release_insights` is off for the project, and an insight another person owns answers `insight_not_found`, exactly as an id no insight has.
 
-Peers call these through the token, declared at `../contract/src/insight.api.ts:22`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/insight.api.ts:30`; nothing else in this package is public.
 
 #### `findInsights`
 
@@ -54,6 +54,14 @@ archiveInsight(input: { projectId: string; insightId: string } & Reader): Promis
 
 ```typescript
 keepInsight(input: { projectId: string; insightId: string } & Reader): Promise<void>;
+```
+
+#### `runInsightAction`
+
+Sends one stored action to Langy as the clicker, in their own conversation: the source, a fork of it, or a new one when it is gone. `insight_actions_not_enabled` while the flag is off; `insight_action_from_run` for an insight a run filed or saved from a run's conversation.
+
+```typescript
+runInsightAction(input: RunInsightActionInput & Clicker): Promise<InsightActionRun>;
 ```
 
 #### `requestDailyRun`
@@ -112,7 +120,7 @@ None: this module declares no REST family.
 
 ### `insights`
 
-Contract `../contract/src/insight.trpc.ts:28`, router `src/transport/insight.trpc.ts:10`.
+Contract `../contract/src/insight.trpc.ts:30`, router `src/transport/insight.trpc.ts:21`.
 
 | Procedure                         | Kind     | Gate                                        | Input                                 | Output                         |
 | --------------------------------- | -------- | ------------------------------------------- | ------------------------------------- | ------------------------------ |
@@ -121,44 +129,60 @@ Contract `../contract/src/insight.trpc.ts:28`, router `src/transport/insight.trp
 | `insights.markSeen`               | mutation | Permission `analytics:view`                 | `markInsightsSeenInputSchema`         | inline                         |
 | `insights.archive`                | mutation | Permission `analytics:view`                 | `insightScopeSchema`                  | inline                         |
 | `insights.keep`                   | mutation | Permission `analytics:view`                 | `insightScopeSchema`                  | inline                         |
+| `insights.runAction`              | mutation | Permission `analytics:view or langy:create` | `runInsightActionInputSchema`         | `insightActionRunSchema`       |
 | `insights.getBoardDailyRun`       | query    | Permission `analytics:view`                 | `insightBoardDailyRunScopeSchema`     | `insightDailyRunSettingSchema` |
 | `insights.configureBoardDailyRun` | mutation | Permission `analytics:view or langy:create` | `configureInsightDailyRunInputSchema` | inline                         |
 | `insights.turnOffBoardDailyRun`   | mutation | Permission `analytics:view`                 | `turnOffInsightDailyRunInputSchema`   | inline                         |
 
 ```typescript
 // insights.getAll
-// Input: insightProjectScopeSchema, ../contract/src/insight.ts:122
+// Input: insightProjectScopeSchema, ../contract/src/insight.ts:194
 interface Input {
   projectId: string;
 }
-// Output: insightEntrySchema.array() (inline, ../contract/src/insight.trpc.ts:31)
+// Output: insightEntrySchema.array() (inline, ../contract/src/insight.trpc.ts:33)
 
 // insights.file
-type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:142
-type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:114
+type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:216
+type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:186
 
 // insights.markSeen
-// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:162
+// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:236
 interface Input {
   projectId: string;
   insightIds: string[];
 }
-// Output: inline, ../contract/src/insight.trpc.ts:39
+// Output: inline, ../contract/src/insight.trpc.ts:41
 type Output = unknown;
 
 // insights.archive
-// Input: insightScopeSchema, ../contract/src/insight.ts:150
+// Input: insightScopeSchema, ../contract/src/insight.ts:224
 interface Input {
   projectId: string;
   insightId: string;
 }
-// Output: inline, ../contract/src/insight.trpc.ts:43
+// Output: inline, ../contract/src/insight.trpc.ts:45
 type Output = unknown;
 
 // insights.keep
-type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:150
-// Output: inline, ../contract/src/insight.trpc.ts:47
+type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:224
+// Output: inline, ../contract/src/insight.trpc.ts:49
 type Output = unknown;
+
+// insights.runAction
+// Input: runInsightActionInputSchema, ../contract/src/insight.ts:252
+interface Input {
+  projectId: string;
+  insightId: string;
+  actionId: string;
+  clickId: string;
+}
+// Output: insightActionRunSchema, ../contract/src/insight.ts:262
+interface Output {
+  conversationId: string;
+  turnId: string;
+  sourceGone: boolean;
+}
 
 // insights.getBoardDailyRun
 // Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:234
@@ -173,12 +197,12 @@ type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/i
 
 // insights.configureBoardDailyRun
 type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:247
-// Output: inline, ../contract/src/insight.trpc.ts:56
+// Output: inline, ../contract/src/insight.trpc.ts:62
 type Output = unknown;
 
 // insights.turnOffBoardDailyRun
 type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:259
-// Output: inline, ../contract/src/insight.trpc.ts:60
+// Output: inline, ../contract/src/insight.trpc.ts:66
 type Output = unknown;
 ```
 

@@ -175,6 +175,18 @@ export const INSIGHTS_CARD_TONES = ["bad", "watch", "good"] as const;
 /** A card lists more findings than a run files, never an unbounded list. */
 export const INSIGHTS_CARD_MAX_FINDINGS = 50;
 
+/** A finding proposes no more actions than an insight card shows. */
+export const INSIGHTS_CARD_MAX_ACTIONS = 4;
+
+/**
+ * One button a finding proposes for the insight saved from it: the label, and the prompt a
+ * click sends back to Langy. Insight checks the words again when the finding is saved.
+ */
+const insightsCardActionSchema = z.strictObject({
+  label: z.string().trim().min(1).max(40),
+  prompt: z.string().trim().min(1).max(1_000),
+});
+
 /**
  * One finding: a headline, a few paragraphs and a verdict, with the widget and the stored
  * query it came from. `key` names what was found; `renews` names the insight it repeats.
@@ -190,6 +202,7 @@ export const insightsCardFindingFields = {
   lwql: z.string().trim().min(1).max(20_000).optional(),
   key: z.string().trim().min(1).max(200).optional(),
   renews: z.string().min(1).max(200).optional(),
+  actions: z.array(insightsCardActionSchema).max(INSIGHTS_CARD_MAX_ACTIONS).optional(),
 } as const;
 
 /**

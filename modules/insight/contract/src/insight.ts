@@ -82,6 +82,76 @@ export interface InsightReplaySchema extends Named<typeof insightReplaySchemaDef
 export const insightReplaySchema: InsightReplaySchema = insightReplaySchemaDefinition;
 export type InsightReplay = z.infer<typeof insightReplaySchema>;
 
+/** At most this many actions ride on one insight. */
+export const MAX_INSIGHT_ACTIONS = 4;
+
+/** The hosts a link in an action may name; any other web address refuses the action. */
+export const INSIGHT_ACTION_LINK_HOSTS = ["langwatch.ai", "app.langwatch.ai"] as const;
+
+const ALLOWED_LINK_HOSTS: ReadonlySet<string> = new Set(INSIGHT_ACTION_LINK_HOSTS);
+const WEB_ADDRESS = /(?:https?:\/\/|www\.)[^\s<>"'`]*/gi;
+
+/**
+ * The host a browser would go to: after any `user@`, before any port, path or backslash, and
+ * without the punctuation of the sentence the link ends.
+ */
+function hostOf(address: string): string {
+  const authority = address.replace(/^https?:\/\//i, "").split(/[/?#\\]/, 1)[0] ?? "";
+  const host = authority.slice(authority.lastIndexOf("@") + 1).replace(/[.,;:!?)\]]+$/, "");
+  return host.replace(/:\d+$/, "").toLowerCase();
+}
+
+/** Every web address the words name points at an allowed host. */
+function namesOnlyAllowedLinks(words: string): boolean {
+  return [...words.matchAll(WEB_ADDRESS)].every(([address]) =>
+    ALLOWED_LINK_HOSTS.has(hostOf(address)),
+  );
+}
+
+const NOT_ALLOWED_LINK = "A link in an action may only point at langwatch.ai";
+
+const insightActionLabelSchema = z
+  .string()
+  .overwrite((label) => label.replaceAll(/\p{Cc}/gu, ""))
+  .trim()
+  .min(1)
+  .max(40)
+  .refine(namesOnlyAllowedLinks, { error: NOT_ALLOWED_LINK });
+
+/** A prompt keeps its line breaks and tabs; every other control character is dropped. */
+const insightActionPromptSchema = z
+  .string()
+  .overwrite((prompt) => prompt.replaceAll(/[^\P{Cc}\n\t]/gu, ""))
+  .trim()
+  .min(1)
+  .max(1_000)
+  .refine(namesOnlyAllowedLinks, { error: NOT_ALLOWED_LINK });
+
+/**
+ * An action Langy proposes for an insight, as a filing hands it over: a button label and the
+ * prompt a click sends to Langy. The prompt is shown before the click and sent word for word.
+ */
+const insightActionInputSchemaDefinition = z.object({
+  label: insightActionLabelSchema,
+  prompt: insightActionPromptSchema,
+});
+export interface InsightActionInputSchema extends Named<
+  typeof insightActionInputSchemaDefinition
+> {}
+export const insightActionInputSchema: InsightActionInputSchema =
+  insightActionInputSchemaDefinition;
+export type InsightActionInput = z.infer<typeof insightActionInputSchema>;
+
+/** A stored action: its id is minted by the module at filing (`a0`..`a3`, by position). */
+const insightActionSchemaDefinition = z.object({
+  id: z.string().min(1).max(8),
+  label: z.string().min(1).max(40),
+  prompt: z.string().min(1).max(1_000),
+});
+export interface InsightActionSchema extends Named<typeof insightActionSchemaDefinition> {}
+export const insightActionSchema: InsightActionSchema = insightActionSchemaDefinition;
+export type InsightAction = z.infer<typeof insightActionSchema>;
+
 /** One insight as its owner sees it: the record plus their own seen, done and kept state. */
 const insightEntrySchemaDefinition = z.object({
   id: z.string(),
@@ -102,6 +172,8 @@ const insightEntrySchemaDefinition = z.object({
   filedByUserId: z.string().nullable(),
   /** The key a daily run matches a repeated finding by; null when it was saved from a chat. */
   findingKey: z.string().nullable(),
+  /** What a click sends to Langy; none on an insight a run filed. */
+  actions: z.array(insightActionSchema),
   /** Epoch milliseconds. */
   filedAt: z.number(),
   /** When a later run last found it still true; null until one did. */
@@ -133,6 +205,8 @@ const fileInsightInputSchemaDefinition = z
     replay: insightReplaySchema.optional(),
     source: insightSourceSchema.optional(),
     board: insightBoardSchema.optional(),
+    /** None when left out; dropped when the source conversation is a run's. */
+    actions: z.array(insightActionInputSchema).max(MAX_INSIGHT_ACTIONS).optional(),
   })
   .refine(({ lwql, replay }) => replay === undefined || lwql !== undefined, {
     path: ["replay"],
@@ -161,3 +235,29 @@ export interface MarkInsightsSeenInputSchema extends Named<
 export const markInsightsSeenInputSchema: MarkInsightsSeenInputSchema =
   markInsightsSeenInputSchemaDefinition;
 export type MarkInsightsSeenInput = z.infer<typeof markInsightsSeenInputSchema>;
+
+/**
+ * One click on an action. `clickId` is minted by the browser per click, so a repeated request of
+ * the same click sends Langy nothing new. The prompt is never sent: the module reads it.
+ */
+const runInsightActionInputSchemaDefinition = z.object({
+  ...insightScopeSchema.shape,
+  actionId: z.string().min(1).max(8),
+  clickId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
+});
+export interface RunInsightActionInputSchema extends Named<
+  typeof runInsightActionInputSchemaDefinition
+> {}
+export const runInsightActionInputSchema: RunInsightActionInputSchema =
+  runInsightActionInputSchemaDefinition;
+export type RunInsightActionInput = z.infer<typeof runInsightActionInputSchema>;
+
+/** The Langy turn a click started; `sourceGone` when it is a new conversation, not the source. */
+const insightActionRunSchemaDefinition = z.object({
+  conversationId: z.string(),
+  turnId: z.string(),
+  sourceGone: z.boolean(),
+});
+export interface InsightActionRunSchema extends Named<typeof insightActionRunSchemaDefinition> {}
+export const insightActionRunSchema: InsightActionRunSchema = insightActionRunSchemaDefinition;
+export type InsightActionRun = z.infer<typeof insightActionRunSchema>;

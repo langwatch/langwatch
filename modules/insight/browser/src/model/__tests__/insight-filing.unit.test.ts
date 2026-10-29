@@ -2,6 +2,7 @@
  * What "Save as insight" files from a Langy answer: a finding of its insights card as typed
  * data, or the answer's own prose and subject when it carries no card.
  * @see modules/insight/specs/insight-inbox.feature
+ * @see modules/insight/specs/insight-actions.feature
  */
 
 import type { LangyInsightsCardFinding } from "@langwatch/langy-contract";
@@ -52,6 +53,16 @@ describe("draftOfAnswer", () => {
 });
 
 describe("filedFinding", () => {
+  describe("given a finding that proposes actions", () => {
+    /** @scenario "Saving a card's finding keeps the actions it proposes" */
+    it("files the actions as Langy proposed them, and none for an answer with no card", () => {
+      const actions = [{ label: "Find the traces", prompt: "Find the failing checkout traces." }];
+
+      expect(filedFinding({ card: {}, finding: finding({ actions }) }).actions).toEqual(actions);
+      expect(filedSubject(undefined)).not.toHaveProperty("actions");
+    });
+  });
+
   describe("given a card that names its board and its window", () => {
     /** @scenario "Saving a finding of an answer's insights card files its typed data" */
     it("files the board with the finding's widget, its query and the card's window", () => {

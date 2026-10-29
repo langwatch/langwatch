@@ -301,6 +301,13 @@ export const FEATURE_FLAGS = [
       "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
   },
   {
+    key: "release_insight_actions",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Shows up to four action buttons Langy proposed on an insight card, each with the exact prompt it sends; a click sends that prompt to Langy as the clicker, continuing the conversation the insight came from, a fork of it, or a new seeded one when it is gone (spec: modules/insight/specs/insight-actions.feature). Needs release_insights too. Default off; while off the buttons are hidden and insights.runAction refuses with insight_actions_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insight_actions.",
+  },
+  {
     key: "release_ui_comparison_leaderboard_enabled",
     scope: "PRODUCT",
     defaultValue: false,

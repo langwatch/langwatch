@@ -1,9 +1,13 @@
-import type { FileInsightInput, InsightEntry } from "@langwatch/insight-contract";
+import type { FileInsightInput, InsightAction, InsightEntry } from "@langwatch/insight-contract";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
+import { LANGY_CONVERSATION_ORIGIN, type LangyApi } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { InsightRepository } from "../repositories/insight.repository.ts";
+import { mintInsightActions } from "../rules/insight-action.rules.ts";
 import type { InsightCommandsService } from "./insight-commands.service.ts";
+
+type SourceConversations = Pick<LangyApi, "findByIdVisible">;
 
 /** How many of one person's newest insights in a project one inbox read carries. */
 const INBOX_READ_LIMIT = 500;
@@ -17,16 +21,20 @@ export class InsightService {
   private constructor(
     private readonly insights: InsightRepository,
     private readonly commands: InsightCommandsService,
+    private readonly conversations: SourceConversations,
   ) {}
 
   static create({
     insights,
     commands,
+    conversations,
   }: {
     insights: InsightRepository;
     commands: InsightCommandsService;
+    /** Asked only when a filing carries actions: is its source a run's conversation? */
+    conversations: SourceConversations;
   }): InsightService {
-    return new InsightService(insights, commands);
+    return new InsightService(insights, commands, conversations);
   }
 
   findForReader({
@@ -59,6 +67,7 @@ export class InsightService {
       filedByUserId: userId,
       // Only a run names its finding; a saved answer is matched by nothing.
       findingKey: null,
+      actions: await this.actionsOf({ ...input, userId }),
     };
     const { insightId, ...entry } = filed;
     await this.commands.fileInsight({ tenantId: input.projectId, occurredAt, ...filed });
@@ -78,6 +87,30 @@ export class InsightService {
       archivedAt: null,
       keptAt: null,
     };
+  }
+
+  /**
+   * The filing's actions with their ids; none when it was saved from a run's conversation, whose
+   * history holds trace text nobody vetted.
+   */
+  private async actionsOf({
+    projectId,
+    userId,
+    source,
+    actions = [],
+  }: Pick<FileInsightInput, "projectId" | "source" | "actions"> & {
+    userId: string;
+  }): Promise<InsightAction[]> {
+    if (actions.length === 0) return [];
+    if (source) {
+      const conversation = await this.conversations.findByIdVisible({
+        id: source.conversationId,
+        projectId,
+        userId,
+      });
+      if (conversation?.origin === LANGY_CONVERSATION_ORIGIN.RUN) return [];
+    }
+    return mintInsightActions(actions);
   }
 
   /**

@@ -8936,6 +8936,15 @@
           "isList": false,
           "isOptional": true,
           "documentation": "The stable key a daily run matches a repeated finding by, so it renews the insight\nand files no twin. NULL for an insight saved from a chat and on a row folded before\nthe column existed."
+        },
+        {
+          "name": "actions",
+          "columnName": "actions",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The actions a click sends to Langy: `[{ id, label, prompt }]`, at most four. NULL on a\nrow folded before the column existed, which reads as no actions."
         }
       ]
     },

@@ -31,6 +31,12 @@ Feature: The insights card
       Then it is accepted and its words are kept trimmed
 
     @unit
+    Scenario: A finding may propose up to four actions for the insight saved from it
+      Given a finding with actions, each a label and a prompt
+      When the card is validated
+      Then it is accepted with four actions, and refused with five or with a label past 40 characters
+
+    @unit
     Scenario: An insights card with no findings says nothing is worth reporting
       Given a card whose list of findings is empty
       When the card is validated

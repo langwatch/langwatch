@@ -343,6 +343,8 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       filedVia: "run",
       ownerUserId: userId,
       filedByUserId: null,
+      // A run's conversation holds trace text nobody vetted: nothing a click sends comes from it.
+      actions: [],
     });
   }
 
@@ -371,6 +373,8 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
           ? null
           : dailyRunReplay({ window, parameters: insight.replay?.parameters ?? {} }),
       source,
+      // The source becomes the run's conversation, so the insight keeps no action either.
+      actions: [],
     });
   }
 

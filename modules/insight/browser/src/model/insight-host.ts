@@ -26,6 +26,9 @@ export abstract class InsightHostApi {
   /** `release_insights`: undefined while not answered yet. */
   abstract isEnabled(): boolean | undefined;
 
+  /** `release_insight_actions`, the action buttons on a card: undefined while not answered yet. */
+  abstract isActionsEnabled(): boolean | undefined;
+
   abstract hasPermission(permission: string): boolean;
 
   abstract query(): Readonly<Record<string, string | undefined>>;
@@ -43,6 +46,9 @@ export abstract class InsightHostApi {
 
   /** Opens Langy with a question or a draft; does nothing where Langy is not installed. */
   abstract askLangy(request: LangyAskRequest): void;
+
+  /** Opens Langy on one of the reader's conversations, by its deep link on the address. */
+  abstract openLangyConversation(conversationId: string): void;
 }
 
 const InsightHostContext = createContext<InsightHostApi | undefined>(void 0);

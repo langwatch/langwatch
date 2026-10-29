@@ -30,6 +30,9 @@ export type InsightDraft = {
 /** Where the answer came from, as a filing keeps it. */
 type FiledOrigin = Pick<FileInsightInput, "board" | "lwql" | "replay">;
 
+/** A card's finding also hands over the actions Langy proposed with it. */
+type FiledFinding = FiledOrigin & Pick<FileInsightInput, "actions">;
+
 /** An answer with no card: its first line as the title, its prose as the body. */
 export function draftOfAnswer(answerText: string): InsightDraft {
   return {
@@ -72,7 +75,7 @@ export function filedSubject(subject: LangyAnswerSubject | undefined): FiledOrig
 
 /**
  * What a card's finding came from: the card's board with the finding's widget, the finding's
- * query, and the card's window when it is one a replay takes. Only a pointer and what to run.
+ * query, and the card's window when it is one a replay takes; and the actions it proposes.
  */
 export function filedFinding({
   card,
@@ -80,13 +83,16 @@ export function filedFinding({
 }: {
   card: Pick<LangyDerivedInsightsCard, "board" | "window">;
   finding: LangyInsightsCardFinding;
-}): FiledOrigin {
-  const { widgetId, widgetName, lwql } = finding;
+}): FiledFinding {
+  const { widgetId, widgetName, lwql, actions } = finding;
   const widget = widgetId && widgetName ? { id: widgetId, name: widgetName } : null;
   const replay = insightReplaySchema.safeParse({ ...card.window, period: null, parameters: {} });
   return {
     ...(card.board ? { board: { ...card.board, widget } } : {}),
     ...(lwql ? { lwql } : {}),
     ...(lwql && replay.success ? { replay: replay.data } : {}),
+    ...(actions?.length
+      ? { actions: actions.map(({ label, prompt }) => ({ label, prompt })) }
+      : {}),
   };
 }

@@ -4,6 +4,7 @@
  * insight a filed event makes it, and what a later run's renewal changes on it.
  * @see modules/insight/specs/insight-inbox.feature
  * @see modules/insight/specs/insight-daily-run.feature
+ * @see modules/insight/specs/insight-actions.feature
  */
 
 import {
@@ -72,6 +73,7 @@ describe("given a filed event stored without a board, a kind or a window", () =>
         ownerUserId: "user-filer",
         filedByUserId: "user-filer",
         findingKey: null,
+        actions: [],
         filedAt: FILED_AT,
         renewedAt: null,
       });
@@ -199,6 +201,54 @@ describe("given an insight a run filed with a key and a query", () => {
 
       expect(applyInsightEvent(renewed, renewedAfter(1, "An older run's words."))).toBe(renewed);
       expect(applyInsightEvent(renewed, renewedAfter(2))).toEqual(renewed);
+    });
+  });
+});
+
+describe("given an insight filed with actions", () => {
+  const ACTIONS = [
+    { id: "a0", label: "Find the traces", prompt: "Find the failing checkout traces." },
+    { id: "a1", label: "Draft an evaluator", prompt: "Draft an evaluator for checkout errors." },
+  ];
+  const filedWithActions = InsightFiledEventSchema.parse({
+    ...STORED_BEFORE_POINTERS,
+    data: { ...STORED_BEFORE_POINTERS.data, actions: ACTIONS },
+  });
+  const renewal = (data: Record<string, unknown>) =>
+    InsightRenewedEventSchema.parse({
+      ...STORED_BEFORE_POINTERS,
+      id: "event-renewed",
+      createdAt: FILED_AT + DAY_MS,
+      occurredAt: FILED_AT + DAY_MS,
+      type: INSIGHT_EVENT_TYPES.RENEWED,
+      version: INSIGHT_EVENT_VERSIONS.RENEWED,
+      data: {
+        insightId: "insight-1",
+        body: "Checkout errors are still twice the usual.",
+        validDays: 3,
+        replay: null,
+        source: { conversationId: "conversation-2", messageId: "message-2" },
+        ...data,
+      },
+    });
+  const filed = applyInsightEvent(INITIAL, filedWithActions);
+
+  describe("when it is folded", () => {
+    it("holds the actions as filed", () => {
+      expect(filed.actions).toEqual(ACTIONS);
+    });
+  });
+
+  describe("when a renewal is folded", () => {
+    /** @scenario "A renewal that carries actions replaces them" */
+    it("takes the renewal's actions, and keeps its own for a renewal stored before actions", () => {
+      const replacement = [{ id: "a0", label: "Check again", prompt: "Check checkout again." }];
+
+      expect(applyInsightEvent(filed, renewal({ actions: replacement })).actions).toEqual(
+        replacement,
+      );
+      expect(applyInsightEvent(filed, renewal({ actions: [] })).actions).toEqual([]);
+      expect(applyInsightEvent(filed, renewal({})).actions).toEqual(ACTIONS);
     });
   });
 });

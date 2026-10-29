@@ -1,4 +1,5 @@
 import {
+  insightActionSchema,
   type InsightBoard,
   type InsightEntry,
   insightFiledViaSchema,
@@ -40,6 +41,11 @@ function replayField(insight: InsightRow): Pick<InsightEntry, "replay"> {
     granularitySeconds: replayGranularitySeconds,
   });
   return { replay };
+}
+
+/** A row folded before the column existed holds NULL: no actions. */
+function actionsField(insight: InsightRow): Pick<InsightEntry, "actions"> {
+  return { actions: insightActionSchema.array().parse(insight.actions ?? []) };
 }
 
 type BoardColumns = Pick<InsightRow, "boardId" | "boardName" | "widgetId" | "widgetName">;
@@ -97,6 +103,7 @@ export function insightEntryFromRows({
     ownerUserId: insight.ownerUserId ?? insight.filedByUserId,
     filedByUserId: insight.filedByUserId,
     findingKey: insight.findingKey,
+    ...actionsField(insight),
     filedAt: insight.filedAt,
     renewedAt: insight.renewedAt,
     seenAt: reader?.seenAt ?? null,

@@ -4,6 +4,7 @@
  */
 
 import {
+  type InsightAction,
   type InsightBoard,
   type InsightEntry,
   type InsightFiledVia,
@@ -14,6 +15,24 @@ import {
   insightExpiresAt,
 } from "@langwatch/insight-contract";
 import { differenceInCalendarDays, format } from "@langwatch/time";
+
+/** Why the action buttons are disabled for a reader who may not send Langy a message. */
+export const ACTIONS_NEED_LANGY = "You need permission to use Langy";
+
+/**
+ * The action buttons a card shows: none while `release_insight_actions` is off, and none on an
+ * insight a run filed, whatever it holds.
+ */
+export function shownInsightActions({
+  entry,
+  isEnabled,
+}: {
+  entry: Pick<InsightEntry, "actions" | "filedVia">;
+  isEnabled: boolean;
+}): readonly InsightAction[] {
+  if (!isEnabled || entry.filedVia === "run") return [];
+  return entry.actions;
+}
 
 /** The verdict, written out: why you should care, not a colour to decode. */
 export const TONE_PRESENTATION: Record<InsightTone, { label: string; color: string }> = {
