@@ -2104,18 +2104,6 @@ from .get_api_trace_id_response_200_spans_item_type_0_output_type_0_type_1_value
 from .get_api_trace_id_response_200_spans_item_type_0_params_type_0 import (
     GetApiTraceIdResponse200SpansItemType0ParamsType0,
 )
-from .get_api_trace_id_response_200_spans_item_type_0_params_type_0_functions_type_0_item import (
-    GetApiTraceIdResponse200SpansItemType0ParamsType0FunctionsType0Item,
-)
-from .get_api_trace_id_response_200_spans_item_type_0_params_type_0_logit_bias_type_0 import (
-    GetApiTraceIdResponse200SpansItemType0ParamsType0LogitBiasType0,
-)
-from .get_api_trace_id_response_200_spans_item_type_0_params_type_0_tool_choice_type_0_type_0 import (
-    GetApiTraceIdResponse200SpansItemType0ParamsType0ToolChoiceType0Type0,
-)
-from .get_api_trace_id_response_200_spans_item_type_0_params_type_0_tools_type_0_item import (
-    GetApiTraceIdResponse200SpansItemType0ParamsType0ToolsType0Item,
-)
 from .get_api_trace_id_response_200_spans_item_type_0_timestamps import GetApiTraceIdResponse200SpansItemType0Timestamps
 from .get_api_trace_id_response_200_spans_item_type_1 import GetApiTraceIdResponse200SpansItemType1
 from .get_api_trace_id_response_200_spans_item_type_1_contexts_item import (
@@ -2145,18 +2133,6 @@ from .get_api_trace_id_response_200_spans_item_type_1_output_type_0_type_1_value
 from .get_api_trace_id_response_200_spans_item_type_1_params_type_0 import (
     GetApiTraceIdResponse200SpansItemType1ParamsType0,
 )
-from .get_api_trace_id_response_200_spans_item_type_1_params_type_0_functions_type_0_item import (
-    GetApiTraceIdResponse200SpansItemType1ParamsType0FunctionsType0Item,
-)
-from .get_api_trace_id_response_200_spans_item_type_1_params_type_0_logit_bias_type_0 import (
-    GetApiTraceIdResponse200SpansItemType1ParamsType0LogitBiasType0,
-)
-from .get_api_trace_id_response_200_spans_item_type_1_params_type_0_tool_choice_type_0_type_0 import (
-    GetApiTraceIdResponse200SpansItemType1ParamsType0ToolChoiceType0Type0,
-)
-from .get_api_trace_id_response_200_spans_item_type_1_params_type_0_tools_type_0_item import (
-    GetApiTraceIdResponse200SpansItemType1ParamsType0ToolsType0Item,
-)
 from .get_api_trace_id_response_200_spans_item_type_1_timestamps import GetApiTraceIdResponse200SpansItemType1Timestamps
 from .get_api_trace_id_response_200_spans_item_type_2 import GetApiTraceIdResponse200SpansItemType2
 from .get_api_trace_id_response_200_spans_item_type_2_error_type_0 import (
@@ -2179,18 +2155,6 @@ from .get_api_trace_id_response_200_spans_item_type_2_output_type_0_type_1_value
 )
 from .get_api_trace_id_response_200_spans_item_type_2_params_type_0 import (
     GetApiTraceIdResponse200SpansItemType2ParamsType0,
-)
-from .get_api_trace_id_response_200_spans_item_type_2_params_type_0_functions_type_0_item import (
-    GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item,
-)
-from .get_api_trace_id_response_200_spans_item_type_2_params_type_0_logit_bias_type_0 import (
-    GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0,
-)
-from .get_api_trace_id_response_200_spans_item_type_2_params_type_0_tool_choice_type_0_type_0 import (
-    GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0,
-)
-from .get_api_trace_id_response_200_spans_item_type_2_params_type_0_tools_type_0_item import (
-    GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item,
 )
 from .get_api_trace_id_response_200_spans_item_type_2_timestamps import GetApiTraceIdResponse200SpansItemType2Timestamps
 from .get_api_traces_by_trace_id_response_200 import GetApiTracesByTraceIdResponse200
@@ -9076,14 +9040,6 @@ from .trace_spans_item_type_0_output_type_0_type_1_value_type_0_type_3 import (
     TraceSpansItemType0OutputType0Type1ValueType0Type3,
 )
 from .trace_spans_item_type_0_params_type_0 import TraceSpansItemType0ParamsType0
-from .trace_spans_item_type_0_params_type_0_functions_type_0_item import (
-    TraceSpansItemType0ParamsType0FunctionsType0Item,
-)
-from .trace_spans_item_type_0_params_type_0_logit_bias_type_0 import TraceSpansItemType0ParamsType0LogitBiasType0
-from .trace_spans_item_type_0_params_type_0_tool_choice_type_0_type_0 import (
-    TraceSpansItemType0ParamsType0ToolChoiceType0Type0,
-)
-from .trace_spans_item_type_0_params_type_0_tools_type_0_item import TraceSpansItemType0ParamsType0ToolsType0Item
 from .trace_spans_item_type_0_timestamps import TraceSpansItemType0Timestamps
 from .trace_spans_item_type_1 import TraceSpansItemType1
 from .trace_spans_item_type_1_contexts_item import TraceSpansItemType1ContextsItem
@@ -9099,14 +9055,6 @@ from .trace_spans_item_type_1_output_type_0_type_1_value_type_0_type_3 import (
     TraceSpansItemType1OutputType0Type1ValueType0Type3,
 )
 from .trace_spans_item_type_1_params_type_0 import TraceSpansItemType1ParamsType0
-from .trace_spans_item_type_1_params_type_0_functions_type_0_item import (
-    TraceSpansItemType1ParamsType0FunctionsType0Item,
-)
-from .trace_spans_item_type_1_params_type_0_logit_bias_type_0 import TraceSpansItemType1ParamsType0LogitBiasType0
-from .trace_spans_item_type_1_params_type_0_tool_choice_type_0_type_0 import (
-    TraceSpansItemType1ParamsType0ToolChoiceType0Type0,
-)
-from .trace_spans_item_type_1_params_type_0_tools_type_0_item import TraceSpansItemType1ParamsType0ToolsType0Item
 from .trace_spans_item_type_1_timestamps import TraceSpansItemType1Timestamps
 from .trace_spans_item_type_2 import TraceSpansItemType2
 from .trace_spans_item_type_2_error_type_0 import TraceSpansItemType2ErrorType0
@@ -9120,14 +9068,6 @@ from .trace_spans_item_type_2_output_type_0_type_1_value_type_0_type_3 import (
     TraceSpansItemType2OutputType0Type1ValueType0Type3,
 )
 from .trace_spans_item_type_2_params_type_0 import TraceSpansItemType2ParamsType0
-from .trace_spans_item_type_2_params_type_0_functions_type_0_item import (
-    TraceSpansItemType2ParamsType0FunctionsType0Item,
-)
-from .trace_spans_item_type_2_params_type_0_logit_bias_type_0 import TraceSpansItemType2ParamsType0LogitBiasType0
-from .trace_spans_item_type_2_params_type_0_tool_choice_type_0_type_0 import (
-    TraceSpansItemType2ParamsType0ToolChoiceType0Type0,
-)
-from .trace_spans_item_type_2_params_type_0_tools_type_0_item import TraceSpansItemType2ParamsType0ToolsType0Item
 from .trace_spans_item_type_2_timestamps import TraceSpansItemType2Timestamps
 from .update_agent_body import UpdateAgentBody
 from .update_agent_body_config import UpdateAgentBodyConfig
@@ -10500,10 +10440,6 @@ __all__ = (
     "GetApiTraceIdResponse200SpansItemType0OutputType0Type1",
     "GetApiTraceIdResponse200SpansItemType0OutputType0Type1ValueType0Type3",
     "GetApiTraceIdResponse200SpansItemType0ParamsType0",
-    "GetApiTraceIdResponse200SpansItemType0ParamsType0FunctionsType0Item",
-    "GetApiTraceIdResponse200SpansItemType0ParamsType0LogitBiasType0",
-    "GetApiTraceIdResponse200SpansItemType0ParamsType0ToolChoiceType0Type0",
-    "GetApiTraceIdResponse200SpansItemType0ParamsType0ToolsType0Item",
     "GetApiTraceIdResponse200SpansItemType0Timestamps",
     "GetApiTraceIdResponse200SpansItemType1",
     "GetApiTraceIdResponse200SpansItemType1ContextsItem",
@@ -10515,10 +10451,6 @@ __all__ = (
     "GetApiTraceIdResponse200SpansItemType1OutputType0Type1",
     "GetApiTraceIdResponse200SpansItemType1OutputType0Type1ValueType0Type3",
     "GetApiTraceIdResponse200SpansItemType1ParamsType0",
-    "GetApiTraceIdResponse200SpansItemType1ParamsType0FunctionsType0Item",
-    "GetApiTraceIdResponse200SpansItemType1ParamsType0LogitBiasType0",
-    "GetApiTraceIdResponse200SpansItemType1ParamsType0ToolChoiceType0Type0",
-    "GetApiTraceIdResponse200SpansItemType1ParamsType0ToolsType0Item",
     "GetApiTraceIdResponse200SpansItemType1Timestamps",
     "GetApiTraceIdResponse200SpansItemType2",
     "GetApiTraceIdResponse200SpansItemType2ErrorType0",
@@ -10528,10 +10460,6 @@ __all__ = (
     "GetApiTraceIdResponse200SpansItemType2OutputType0Type1",
     "GetApiTraceIdResponse200SpansItemType2OutputType0Type1ValueType0Type3",
     "GetApiTraceIdResponse200SpansItemType2ParamsType0",
-    "GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item",
-    "GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0",
-    "GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0",
-    "GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item",
     "GetApiTraceIdResponse200SpansItemType2Timestamps",
     "GetApiTracesByTraceIdResponse200",
     "GetApiTracesByTraceIdResponse400",
@@ -14044,10 +13972,6 @@ __all__ = (
     "TraceSpansItemType0OutputType0Type1",
     "TraceSpansItemType0OutputType0Type1ValueType0Type3",
     "TraceSpansItemType0ParamsType0",
-    "TraceSpansItemType0ParamsType0FunctionsType0Item",
-    "TraceSpansItemType0ParamsType0LogitBiasType0",
-    "TraceSpansItemType0ParamsType0ToolChoiceType0Type0",
-    "TraceSpansItemType0ParamsType0ToolsType0Item",
     "TraceSpansItemType0Timestamps",
     "TraceSpansItemType1",
     "TraceSpansItemType1ContextsItem",
@@ -14059,10 +13983,6 @@ __all__ = (
     "TraceSpansItemType1OutputType0Type1",
     "TraceSpansItemType1OutputType0Type1ValueType0Type3",
     "TraceSpansItemType1ParamsType0",
-    "TraceSpansItemType1ParamsType0FunctionsType0Item",
-    "TraceSpansItemType1ParamsType0LogitBiasType0",
-    "TraceSpansItemType1ParamsType0ToolChoiceType0Type0",
-    "TraceSpansItemType1ParamsType0ToolsType0Item",
     "TraceSpansItemType1Timestamps",
     "TraceSpansItemType2",
     "TraceSpansItemType2ErrorType0",
@@ -14072,10 +13992,6 @@ __all__ = (
     "TraceSpansItemType2OutputType0Type1",
     "TraceSpansItemType2OutputType0Type1ValueType0Type3",
     "TraceSpansItemType2ParamsType0",
-    "TraceSpansItemType2ParamsType0FunctionsType0Item",
-    "TraceSpansItemType2ParamsType0LogitBiasType0",
-    "TraceSpansItemType2ParamsType0ToolChoiceType0Type0",
-    "TraceSpansItemType2ParamsType0ToolsType0Item",
     "TraceSpansItemType2Timestamps",
     "UpdateAgentBody",
     "UpdateAgentBodyConfig",
