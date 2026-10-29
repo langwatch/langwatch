@@ -60,10 +60,6 @@ function scopeOver(input: {
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
-      findLiveNonGovernanceIdsByOrganization: async ({ organizationId }) =>
-        input.projects
-          .filter((p) => organizationId === ORGANIZATION_ID && !p.archivedAt)
-          .map((p) => p.id),
       listByOrganization: ({ organizationId, page, limit, projectIds }) => {
         const matching = input.projects.filter(
           (p) =>
@@ -425,6 +421,8 @@ describe("given a run that names projects", () => {
       await expect(service.resolve({ reach: KEY, requireProjects: true })).rejects.toMatchObject({
         code: "projects_required",
         message: expect.stringContaining("reads no project"),
+        meta: { readsNone: true },
+        tips: [expect.stringContaining("Grant")],
       });
     });
   });
@@ -505,16 +503,17 @@ describe("given a run that names projects", () => {
 
       await expect(
         service.resolveAll({ reach: { ...KEY, organizationId: "org-2" } }),
-      ).rejects.toMatchObject({ code: "project_not_found" });
+      ).rejects.toMatchObject({ code: "projects_required", meta: { readsNone: true } });
     });
 
     /** @scenario "QP03h The word all that resolves to no project, or to more than the cap, is refused" */
-    it("refuses with the id-free not-found answer when the key reads no project", async () => {
+    it("refuses as a key that reads no project, the same as naming nothing", async () => {
       const { service } = scopeOver({ projects: [project("a")], grants: {} });
 
       await expect(service.resolveAll({ reach: KEY })).rejects.toMatchObject({
-        code: "project_not_found",
-        httpStatus: 404,
+        code: "projects_required",
+        httpStatus: 422,
+        meta: { readsNone: true },
       });
     });
   });

@@ -30,11 +30,13 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
+const spinnerFail = vi.hoisted(() => vi.fn());
+
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
-    fail: vi.fn(),
+    fail: spinnerFail,
   }),
 }));
 
@@ -430,6 +432,16 @@ describe("runQueryCommand with --projects and --sources", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("refuses --project beside --projects before anything is sent", async () => {
+    await expect(
+      runQueryCommand("SELECT 1", { project: "my-slug", projects: "proj_x" }),
+    ).rejects.toThrow(ProcessExitError);
+
+    expect(vi.mocked(console.error).mock.calls.flat().join("\n")).toContain("pass one of them");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
   it("reads All and ALL as the word all", async () => {
     await runQueryCommand("SELECT 1", { projects: "ALL" });
@@ -469,6 +481,30 @@ describe("runQueryCommand with --projects and --sources", () => {
       "Name the projects to query: pass --projects <id,id>, or --projects all",
     );
     expect(printed).not.toMatch(/project_[a-z0-9]+/);
+  });
+});
+
+describe("runQueryCommand when the key reads no project", () => {
+  /** @scenario "QP03j A key that reads no project is told so, not asked to name one" */
+  it("shows the platform's message, not a request to pass --projects", async () => {
+    mockQuery.mockRejectedValue(
+      Object.assign(new Error("This key reads no project. Ask an admin to grant one"), {
+        code: "projects_required",
+        kind: "projects_required",
+        httpStatus: 422,
+        meta: { readsNone: true },
+        isHandled: true,
+      }),
+    );
+
+    await expect(runQueryCommand("SELECT 1", {})).rejects.toThrow(ProcessExitError);
+
+    const printed = [
+      ...vi.mocked(console.error).mock.calls.flat(),
+      ...spinnerFail.mock.calls.flat(),
+    ].join("\n");
+    expect(printed).toContain("reads no project");
+    expect(printed).not.toContain("pass --projects");
   });
 });
 

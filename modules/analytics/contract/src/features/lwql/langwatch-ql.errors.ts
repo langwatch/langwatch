@@ -186,7 +186,21 @@ export class LangWatchQLProjectsRequiredError extends HandledError {
       readsNone
         ? "This key reads no project. Ask an admin to grant it `analytics:view` on one, then name it"
         : 'Name the projects to query: send `projects`, a list of project ids, or "all"',
-      { httpStatus: 422, fault: "customer", ...remediation("projects_required") },
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // `readsNone` tells the CLI and the MCP tool to show this message, not "name the projects".
+        // Naming projects or sending "all" gives a key that reads none nothing, so its only tip is
+        // the grant.
+        ...(readsNone
+          ? {
+              meta: { readsNone: true },
+              tips: [
+                "Grant the key's owner `analytics:view` on a project, or use a key that has it",
+              ],
+            }
+          : remediation("projects_required")),
+      },
     );
     this.name = "LangWatchQLProjectsRequiredError";
   }

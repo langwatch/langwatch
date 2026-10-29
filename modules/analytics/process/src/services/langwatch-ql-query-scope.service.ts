@@ -104,11 +104,12 @@ export class LangWatchQLQueryScopeService {
   /**
    * Every project the key reads, in id order, for `projects: "all"`. Each holds `analytics:view`
    * for the key, so a project it lacks, or of another organization, is never among them.
-   * @throws {LangWatchQLProjectNotFoundError} when the key reads none, with no id.
+   * @throws {LangWatchQLProjectsRequiredError} when the key reads none, as `resolve` says it.
    */
   async resolveAll({ reach }: { reach: LangWatchQLKeyReach }): Promise<LangWatchQLQueryScope> {
     const scope = await this.resolve({ reach });
-    if (scope.projects.length === 0) throw new LangWatchQLProjectNotFoundError();
+    if (scope.projects.length === 0)
+      throw new LangWatchQLProjectsRequiredError({ readsNone: true });
 
     return { ...scope, projects: inStableOrder(scope.projects) };
   }
@@ -244,8 +245,8 @@ export class LangWatchQLQueryScopeService {
 
   /**
    * Every live application project in the key's organization it holds `analytics:view` on,
-   * decided as `key ∩ owning user` at each project's own scope. Bounded: one id read, an
-   * organization over the cap refused, one row read of those ids (no paging to skip or repeat).
+   * decided as `key ∩ owning user` at each project's own scope. One page, as main reads it; an
+   * organization over the cap is refused, and `stopAfter` ends the judging early.
    */
   private async readableProjects({
     reach,
@@ -256,11 +257,13 @@ export class LangWatchQLQueryScopeService {
     only?: readonly string[] | undefined;
     stopAfter?: number | undefined;
   }): Promise<ReadableProject[]> {
-    const { organizationId } = reach;
-    const candidates =
-      only ??
-      (await this.dependencies.projects.findLiveNonGovernanceIdsByOrganization({ organizationId }));
-    if (candidates.length > LWQL_TENANT_CAPABILITY_MAX_PROJECTS) {
+    const listed = await this.dependencies.projects.listByOrganization({
+      organizationId: reach.organizationId,
+      page: 1,
+      limit: LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
+      ...(only === undefined ? {} : { projectIds: [...only] }),
+    });
+    if (listed.pagination.total > listed.data.length) {
       throw new ValidationError(
         only
           ? `Name at most ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects.`
@@ -268,14 +271,6 @@ export class LangWatchQLQueryScopeService {
               `name the projects instead.`,
       );
     }
-    if (candidates.length === 0)
-      return only === undefined ? [] : inRequestOrder({ readable: [], only });
-    const listed = await this.dependencies.projects.listByOrganization({
-      organizationId,
-      page: 1,
-      limit: LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
-      projectIds: [...candidates],
-    });
     // The id is the order and the dedupe: the same project can never be judged twice.
     const unique = [...new Map(listed.data.map((project) => [project.id, project])).values()];
     const readable = await this.permitted({

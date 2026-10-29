@@ -551,6 +551,7 @@ describe("given a project_not_found under a person's login", () => {
     const text = renderErrorForHumans(notFound);
 
     expect(text).toContain("your account can read the project");
+    expect(text).toContain("Create or select a project in the LangWatch dashboard");
     expect(text).not.toContain("API key belongs");
   });
 

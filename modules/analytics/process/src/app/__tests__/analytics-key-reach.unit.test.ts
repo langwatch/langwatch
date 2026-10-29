@@ -110,8 +110,6 @@ async function appOver(input: {
       }),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
-        findLiveNonGovernanceIdsByOrganization: () =>
-          Promise.resolve(input.listed.map(({ id }) => id)),
         listByOrganization: ({ limit, projectIds }) => {
           const data = input.listed.filter(({ id }) => !projectIds || projectIds.includes(id));
           return Promise.resolve({ data, pagination: { page: 1, limit, total: data.length } });

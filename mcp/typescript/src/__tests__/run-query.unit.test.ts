@@ -88,6 +88,22 @@ describe("given the platform asks for the projects", () => {
   });
 });
 
+describe("given the platform says the key reads no project", () => {
+  /** @scenario "QP03j A key that reads no project is told so, not asked to name one" */
+  it("passes the platform's message through instead of asking for projects", async () => {
+    mockRunQuery.mockRejectedValue(
+      new LangWatchApiError("This key reads no project. Ask an admin", 422, "{}", {
+        code: "projects_required",
+        meta: { readsNone: true },
+      }),
+    );
+
+    const refusal = await handleRunQuery({ sql: "SELECT 1" }).catch((error: unknown) => error);
+
+    expect((refusal as Error).message).toContain("reads no project");
+  });
+});
+
 describe('given run_query is called with projects "all"', () => {
   /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
   it("sends the string, not a list, and shows the projects the platform echoed", async () => {

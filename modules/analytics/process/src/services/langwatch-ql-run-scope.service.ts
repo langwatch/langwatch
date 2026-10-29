@@ -75,7 +75,8 @@ export class LangWatchQLRunScopeService {
     authorization: Authorization | undefined;
   }): Promise<LangWatchQLRunScope> {
     const { queryScope, aggregateScope, bounds, readable } = this.dependencies;
-    // "all" names the member's readable ids, then is proven like any named run, so the two agree.
+    // "all" names the member's readable ids, then is checked per project as a named run is; the
+    // second check costs what naming them costs, and the route's own permission covers "own".
     const named = selection.all
       ? await readable.allIdsFor({ projectId: project.id, userId })
       : selection.named;

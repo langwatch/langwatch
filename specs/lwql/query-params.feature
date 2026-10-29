@@ -79,8 +79,11 @@ Feature: Every query door takes the same parameters and says what it ran with
     Scenario: QP03h The word all that resolves to no project, or to more than the cap, is refused
       # Decided: none is the 404 "project_not_found" with no id (as a name the caller cannot read);
       # more than the cap is a 422 "validation_error" asking the caller to name the projects.
+      # Changed in batch 9: a key whose "all" resolves to none gets the QP03j 422, the same as a key
+      # naming nothing; a member keeps the 404 "project_not_found" with no id.
       When "all" resolves to no project the caller can read
-      Then it is refused with the status 404 and the code "project_not_found", with no id
+      Then a member is refused with the status 404 and the code "project_not_found", with no id
+      And a key is refused as in QP03j
       When "all" resolves to more than the cap: 10,000 for a key, LWQL_MAX_MEMBER_PROJECTS (100) for a member
       Then it is refused with the status 422 and no statement reaches the store
 
@@ -91,6 +94,7 @@ Feature: Every query door takes the same parameters and says what it ran with
       When it runs a statement that names no project
       Then it is refused with the status 422 and the code "projects_required"
       And the message says the key reads no project and that an admin can grant one
+      And the error carries meta.readsNone, so the CLI and the MCP tool show that message
 
     @unit
     Scenario: QP03i A widget write refuses the word all

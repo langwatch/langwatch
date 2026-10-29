@@ -110,15 +110,13 @@ const detailLines = (domain: LangWatchHandledErrorShape): string[] => {
 /** A login is a person's access, not a key with a project: the project hint fits the credential. */
 const withLoginProjectAdvice = (domain: LangWatchHandledErrorShape): LangWatchHandledErrorShape => {
   if (domain.code !== "project_not_found" || !usesLoginCredential()) return domain;
-  const keyAdvice = fallbackSuggestionsFor("project_not_found")?.suggestions ?? [];
-  const suggestions = (domain.suggestions ?? []).filter((line) => !keyAdvice.includes(line));
+  const [keyLine] = fallbackSuggestionsFor("project_not_found")?.suggestions ?? [];
+  const personLine =
+    "Check that your account can read the project; ask a workspace admin to grant you access";
 
   return {
     ...domain,
-    suggestions: [
-      "Check that your account can read the project; ask a workspace admin to grant you access",
-      ...suggestions,
-    ],
+    suggestions: (domain.suggestions ?? []).map((line) => (line === keyLine ? personLine : line)),
   };
 };
 

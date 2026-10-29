@@ -22,7 +22,11 @@ export async function handleRunQuery(params: {
   sources?: string[];
 }): Promise<string> {
   const result = await runQuery(params).catch((error: unknown) => {
-    if (error instanceof LangWatchApiError && error.code === "projects_required") {
+    if (
+      error instanceof LangWatchApiError &&
+      error.code === "projects_required" &&
+      error.meta?.readsNone !== true
+    ) {
       throw new Error(PROJECTS_REQUIRED_MESSAGE);
     }
     throw error;

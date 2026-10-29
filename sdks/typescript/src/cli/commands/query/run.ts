@@ -89,9 +89,33 @@ function listFlag({
   return items;
 }
 
+/** `--projects` as the request carries it: the string "all" alone, else a list of ids. */
+function readProjectsFlag({
+  project,
+  projects,
+}: {
+  project: string | undefined;
+  projects: string | undefined;
+}): string[] | "all" | undefined {
+  const listed = listFlag({ value: projects, flag: "--projects" });
+  const isAll = (item: string) => item.toLowerCase() === "all";
+  if (listed?.some(isAll) && listed.length > 1) {
+    refuse('--projects: "all" stands alone; pass it by itself, or list project ids');
+  }
+  // `--project` narrows the run to one project, so beside `--projects` it would be a second answer
+  // to the same question; the server refuses the pair, and the CLI says so before sending.
+  if (project !== undefined && listed !== undefined) {
+    refuse("--project and --projects both name the projects to read; pass one of them");
+  }
+
+  return listed?.[0] !== undefined && isAll(listed[0]) ? "all" : listed;
+}
+
 /** Turns the platform's `projects_required` into the flag that fixes it. */
 function explainProjectsRequired(error: unknown): void {
-  if (readCommandError(error).code === "projects_required") refuse(PROJECTS_REQUIRED_MESSAGE);
+  const { code, meta } = readCommandError(error);
+  // A key that reads no project is told so by the server; naming projects would not help it.
+  if (code === "projects_required" && meta?.readsNone !== true) refuse(PROJECTS_REQUIRED_MESSAGE);
 }
 
 /** Whether the run was bound to any placeholder; an empty map has nothing to say. */
@@ -402,12 +426,7 @@ export const runQueryCommand = async (
   // credential falls back to is not a project the user asked to read alone.
   const credentials = await resolveCredentials({ project: options.project });
   const projectId = options.project === undefined ? undefined : credentials.projectId;
-  const listed = listFlag({ value: options.projects, flag: "--projects" });
-  const isAll = (item: string) => item.toLowerCase() === "all";
-  if (listed?.some(isAll) && listed.length > 1) {
-    refuse('--projects: "all" stands alone; pass it by itself, or list project ids');
-  }
-  const projects = listed?.[0] !== undefined && isAll(listed[0]) ? "all" : listed;
+  const projects = readProjectsFlag({ project: options.project, projects: options.projects });
   const sources = listFlag({ value: options.sources, flag: "--sources" });
   const reach: RunReach = {
     ...(projectId === undefined ? {} : { projectId }),
