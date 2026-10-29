@@ -84,3 +84,20 @@ func TestPublishedWithoutRefuseRetagReadsNoAncestor(t *testing.T) {
 	assert.Empty(t, c.RefuseDigest)
 	assert.Empty(t, c.AcceptDigest)
 }
+
+func TestParseDiffBase(t *testing.T) {
+	o, err := parse("diffbase", []string{"-repositories", "langwatch-app  langwatch-eval-ragas", "-tag", "git-abc", "-revision", "abc", "-custom=false"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"langwatch-app", "langwatch-eval-ragas"}, o.repositories)
+
+	for _, args := range [][]string{
+		{"-tag", "git-abc", "-revision", "abc"},
+		{"-repositories", " ", "-tag", "git-abc", "-revision", "abc"},
+		{"-repositories", "r", "-revision", "abc"},
+		{"-repositories", "r", "-tag", "git-abc"},
+		{"-repositories", "r", "-tag", "release", "-revision", "abc", "-custom=true"},
+	} {
+		_, err := parse("diffbase", args)
+		assert.Error(t, err, args)
+	}
+}

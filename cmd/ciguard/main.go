@@ -49,6 +49,7 @@ func main() {
 		{name: "publish-shape", run: ciguard.PublishShape},
 		{name: "ecr-skip-gates", run: ciguard.ECRSkipGates},
 		{name: "ecr-dispatch-tags", run: ciguard.ECRDispatchTags},
+		{name: "ecr-diff-base", run: ciguard.ECRDiffBase},
 		{name: "transform-cache", run: ciguard.TransformCacheProblems},
 		{name: "vitest-transform-flag", run: ciguard.UncachedVitestScripts},
 		{name: "main-suites", run: ciguard.MainSuites},
