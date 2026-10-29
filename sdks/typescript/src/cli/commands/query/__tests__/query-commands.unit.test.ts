@@ -430,6 +430,13 @@ describe("runQueryCommand with --projects and --sources", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("reads All and ALL as the word all", async () => {
+    await runQueryCommand("SELECT 1", { projects: "ALL" });
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({ projects: "all" }));
+  });
+
   /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
   it("prints nothing about params when the statement declared no placeholder", async () => {
     mockQuery.mockResolvedValue({ ...RESULT, params: {} });

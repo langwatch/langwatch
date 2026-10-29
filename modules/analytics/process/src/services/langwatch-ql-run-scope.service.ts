@@ -75,7 +75,7 @@ export class LangWatchQLRunScopeService {
     authorization: Authorization | undefined;
   }): Promise<LangWatchQLRunScope> {
     const { queryScope, aggregateScope, bounds, readable } = this.dependencies;
-    // "all" is the member's readable list, proven once here; the scope below does not ask again.
+    // "all" names the member's readable ids, then is proven like any named run, so the two agree.
     const named = selection.all
       ? await readable.allIdsFor({ projectId: project.id, userId })
       : selection.named;
@@ -100,7 +100,6 @@ export class LangWatchQLRunScopeService {
     const scope = await queryScope.resolveMemberProjects({
       userId,
       projectIds: named,
-      alreadyAuthorized: selection.all,
       ...(authorization ? { authorization } : {}),
     });
     for (const member of scope.projects) {

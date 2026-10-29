@@ -31,15 +31,17 @@ export type LangWatchQLQueryScope = Readonly<{
 }>;
 
 type ScopeDependencies = WorkbenchProtectionsDependencies &
-  Readonly<{ projects: Pick<ProjectApi, "findById" | "listByOrganization"> }>;
+  Readonly<{
+    projects: Pick<
+      ProjectApi,
+      "findById" | "listByOrganization" | "findLiveNonGovernanceIdsByOrganization"
+    >;
+  }>;
 
 type ReadableProject = Readonly<{
   project: Pick<Project, "id" | "lwqlKey" | "teamId">;
   credential: RestProjectCredentialPrincipal;
 }>;
-
-/** How many of an organization's projects one scan page reads. */
-const SCAN_PAGE_SIZE = 100;
 
 export class LangWatchQLQueryScopeService {
   static create(dependencies: ScopeDependencies): LangWatchQLQueryScopeService {
@@ -80,7 +82,9 @@ export class LangWatchQLQueryScopeService {
             only: named,
             stopAfter: mustDefault ? 2 : undefined,
           });
-    if (mustDefault && readable.length === 0) throw new LangWatchQLProjectNotFoundError();
+    if (mustDefault && readable.length === 0) {
+      throw new LangWatchQLProjectsRequiredError({ readsNone: true });
+    }
     if (mustDefault && readable.length > 1) throw new LangWatchQLProjectsRequiredError();
     // One project at a time: each answer is several grant reads, and fanning an organization's
     // worth out at once is what exhausts the connection pool.
@@ -138,16 +142,13 @@ export class LangWatchQLQueryScopeService {
   async resolveMemberProjects({
     userId,
     projectIds,
-    alreadyAuthorized = false,
     authorization,
   }: {
     userId: string;
     projectIds: readonly string[];
-    /** The ids come from the member's own readable list, so the grant is not asked again. */
-    alreadyAuthorized?: boolean;
     authorization?: Authorization;
   }): Promise<LangWatchQLQueryScope> {
-    const projects = await this.readableByMember({ userId, projectIds, alreadyAuthorized });
+    const projects = await this.readableByMember({ userId, projectIds });
     const protections: LangWatchQLProtections[] = [];
     // One project at a time, for the same reason `resolve` reads protections one at a time.
     for (const { id: projectId } of projects) {
@@ -170,11 +171,9 @@ export class LangWatchQLQueryScopeService {
   async readableByMember({
     userId,
     projectIds,
-    alreadyAuthorized = false,
   }: {
     userId: string;
     projectIds: readonly string[];
-    alreadyAuthorized?: boolean;
   }): Promise<LangWatchQLCaller[]> {
     const ids = dedupeInOrder(projectIds);
     if (ids.length > LWQL_MAX_MEMBER_PROJECTS) {
@@ -186,13 +185,11 @@ export class LangWatchQLQueryScopeService {
       ids.map(async (projectId) => ({
         project: await this.dependencies.projects.findById(projectId),
         // An authz outage propagates (a 5xx), never a 404: only a denial reads as not found.
-        allowed:
-          alreadyAuthorized ||
-          (await this.dependencies.authz.hasPermission({
-            userId,
-            permission: "analytics:view",
-            projectId,
-          })),
+        allowed: await this.dependencies.authz.hasPermission({
+          userId,
+          permission: "analytics:view",
+          projectId,
+        }),
       })),
     );
     const readable: LangWatchQLCaller[] = [];
@@ -247,8 +244,8 @@ export class LangWatchQLQueryScopeService {
 
   /**
    * Every live application project in the key's organization it holds `analytics:view` on,
-   * decided as `key ∩ owning user` at each project's own scope. Read a page at a time; the cap
-   * counts what the key READS, not what the organization has. `stopAfter` ends the scan early.
+   * decided as `key ∩ owning user` at each project's own scope. Bounded: one id read, an
+   * organization over the cap refused, one row read of those ids (no paging to skip or repeat).
    */
   private async readableProjects({
     reach,
@@ -259,28 +256,33 @@ export class LangWatchQLQueryScopeService {
     only?: readonly string[] | undefined;
     stopAfter?: number | undefined;
   }): Promise<ReadableProject[]> {
-    const readable: ReadableProject[] = [];
-    let scanned = 0;
-    let total = Infinity;
-    for (let page = 1; scanned < total; page += 1) {
-      const listed = await this.dependencies.projects.listByOrganization({
-        organizationId: reach.organizationId,
-        page,
-        limit: only === undefined ? SCAN_PAGE_SIZE : LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
-        ...(only === undefined ? {} : { projectIds: [...only] }),
-      });
-      readable.push(
-        ...(await this.permitted({
-          reach,
-          projects: listed.data,
-          room: stopAfter - readable.length,
-        })),
+    const { organizationId } = reach;
+    const candidates =
+      only ??
+      (await this.dependencies.projects.findLiveNonGovernanceIdsByOrganization({ organizationId }));
+    if (candidates.length > LWQL_TENANT_CAPABILITY_MAX_PROJECTS) {
+      throw new ValidationError(
+        only
+          ? `Name at most ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects.`
+          : `This organization has more than ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects; ` +
+              `name the projects instead.`,
       );
-      assertWithinCap(readable.length);
-      if (readable.length >= stopAfter || only !== undefined || listed.data.length === 0) break;
-      scanned += listed.data.length;
-      total = listed.pagination.total;
     }
+    if (candidates.length === 0)
+      return only === undefined ? [] : inRequestOrder({ readable: [], only });
+    const listed = await this.dependencies.projects.listByOrganization({
+      organizationId,
+      page: 1,
+      limit: LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
+      projectIds: [...candidates],
+    });
+    // The id is the order and the dedupe: the same project can never be judged twice.
+    const unique = [...new Map(listed.data.map((project) => [project.id, project])).values()];
+    const readable = await this.permitted({
+      reach,
+      projects: inStableOrder(unique),
+      room: only === undefined ? stopAfter : Infinity,
+    });
 
     return only === undefined ? readable : inRequestOrder({ readable, only });
   }
@@ -308,15 +310,6 @@ export class LangWatchQLQueryScopeService {
 
     return found;
   }
-}
-
-/** @throws {ValidationError} when the key reads more projects than one run may. */
-function assertWithinCap(readCount: number): void {
-  if (readCount <= LWQL_TENANT_CAPABILITY_MAX_PROJECTS) return;
-  throw new ValidationError(
-    `The key can read more than ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects, over the ` +
-      `most a run may read. Name the projects instead.`,
-  );
 }
 
 /** @throws {LangWatchQLProjectNotFoundError} when any named project is not among those read. */

@@ -1,7 +1,8 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Digests of the add_dashboard_widget and update_dashboard_widget tools.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 vi.mock("../langwatch-api-dashboards.js", () => ({
   createWidgetOnDashboard: vi.fn(),
@@ -464,5 +465,9 @@ describe('given a widget tool is sent projects "all"', () => {
     expect(refused.error?.issues[0]?.message).toBe(
       'projects holds project ids; "all" is not stored in a widget',
     );
+  });
+
+  it("does not advertise all in the tool's JSON Schema", () => {
+    expect(JSON.stringify(z.toJSONSchema(widgetProjectsInput))).not.toContain("all");
   });
 });

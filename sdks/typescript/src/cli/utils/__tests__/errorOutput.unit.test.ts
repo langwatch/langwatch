@@ -16,6 +16,13 @@ function cliErrorDocument(output: unknown): LangWatchHandledErrorShape {
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
+const login = vi.hoisted(() => ({ used: false }));
+
+vi.mock("../loginScopeHint", () => ({
+  loginPermissionsHint: () => undefined,
+  usesLoginCredential: () => login.used,
+}));
+
 import { LangWatchHandledError } from "@/internal/api/errors";
 
 import { ExecutionContext, withExecutionContext } from "../../daemon/execution";
@@ -526,5 +533,31 @@ describe("given an escalation refusal", () => {
       expect(rendered).toContain("only permissions you hold yourself");
       expect(rendered).toContain("ask someone who holds those permissions");
     });
+  });
+});
+
+describe("given a project_not_found under a person's login", () => {
+  const notFound = {
+    code: "project_not_found",
+    message: "Project not found",
+    isHandled: true,
+    meta: {},
+  } as never;
+
+  /** @scenario The command line offers the same next steps */
+  it("advises on the person's access, not on an API key's project", () => {
+    login.used = true;
+
+    const text = renderErrorForHumans(notFound);
+
+    expect(text).toContain("your account can read the project");
+    expect(text).not.toContain("API key belongs");
+  });
+
+  /** @scenario The command line offers the same next steps */
+  it("keeps the key advice for a given API key", () => {
+    login.used = false;
+
+    expect(renderErrorForHumans(notFound)).toContain("Check which project your API key belongs to");
   });
 });

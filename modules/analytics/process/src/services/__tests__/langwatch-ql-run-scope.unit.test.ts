@@ -94,6 +94,6 @@ describe("resolve", () => {
       userId: "u",
     });
 
-    expect(asked).toEqual([{ userId: "u", projectIds: ["A", "B"], alreadyAuthorized: true }]);
+    expect(asked).toEqual([{ userId: "u", projectIds: ["A", "B"] }]);
   });
 });

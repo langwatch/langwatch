@@ -37,20 +37,14 @@ export const widgetSourcesInput = z
  * keeps what it stores (a new widget reads its board's project); null makes it unset again.
  */
 const ALL_NOT_STORED = 'projects holds project ids; "all" is not stored in a widget';
+// run_query takes "all"; a widget stores ids. The array schema carries the message, so the tool's
+// JSON Schema stays an array and never advertises "all".
 export const widgetProjectsInput = z
-  .union(
-    [
-      z.array(z.string().min(1)).min(1).nullable(),
-      // run_query takes "all"; a widget stores ids, so it is refused with the same words as REST.
-      z
-        .literal("all")
-        .refine(() => false)
-        .transform((): never => {
-          throw new Error(ALL_NOT_STORED);
-        }),
-    ],
-    { error: (issue) => (issue.input === "all" ? ALL_NOT_STORED : undefined) },
-  )
+  .array(z.string().min(1), {
+    error: (issue) => (issue.input === "all" ? ALL_NOT_STORED : undefined),
+  })
+  .min(1)
+  .nullable()
   .optional()
   .describe(
     "The project ids every query of the widget reads, each one you can read. A new widget reads its board's project. null makes it unset again, reading the board's project.",

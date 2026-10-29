@@ -180,10 +180,12 @@ export class LangWatchQLParameterMissingError extends HandledError {
 export class LangWatchQLProjectsRequiredError extends HandledError {
   declare readonly code: "projects_required";
 
-  constructor() {
+  constructor({ readsNone = false }: { readsNone?: boolean } = {}) {
     super(
       "projects_required",
-      'Name the projects to query: send `projects`, a list of project ids, or "all"',
+      readsNone
+        ? "This key reads no project. Ask an admin to grant it `analytics:view` on one, then name it"
+        : 'Name the projects to query: send `projects`, a list of project ids, or "all"',
       { httpStatus: 422, fault: "customer", ...remediation("projects_required") },
     );
     this.name = "LangWatchQLProjectsRequiredError";

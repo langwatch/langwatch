@@ -14,6 +14,7 @@ import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "../langwatch-ql-capability.service.ts";
 import { LangWatchQLQueryScopeService } from "../langwatch-ql-query-scope.service.ts";
 import { project } from "./project.fixture.ts";
 
@@ -51,12 +52,18 @@ function scopeOver(input: {
   projects: readonly Project[];
   grants: Readonly<Record<string, readonly string[]>>;
   privacy?: Readonly<Record<string, ResolvedDataPrivacy>>;
+  /** Reshapes the rows the project read answers, e.g. to repeat one as an unstable page would. */
+  rows?: (data: Project[]) => Project[];
 }) {
   const asked: { projectId: string; permission: string }[] = [];
   const checked: string[] = [];
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
+      findLiveNonGovernanceIdsByOrganization: async ({ organizationId }) =>
+        input.projects
+          .filter((p) => organizationId === ORGANIZATION_ID && !p.archivedAt)
+          .map((p) => p.id),
       listByOrganization: ({ organizationId, page, limit, projectIds }) => {
         const matching = input.projects.filter(
           (p) =>
@@ -64,7 +71,9 @@ function scopeOver(input: {
             !p.archivedAt &&
             (!projectIds || projectIds.includes(p.id)),
         );
-        const data = matching.slice((page - 1) * limit, page * limit);
+        const data = (input.rows ?? ((rows) => rows))(
+          matching.slice((page - 1) * limit, page * limit),
+        );
         return Promise.resolve({ data, pagination: { page, limit, total: matching.length } });
       },
     }),
@@ -409,13 +418,59 @@ describe("given a run that names projects", () => {
       expect(asked).toHaveLength(2);
     });
 
-    /** @scenario "QP03b An organization, team or personal key that names no project is refused with a 422 naming the field" */
-    it("answers not found, not a request to name projects, when it reads none", async () => {
+    /** @scenario "QP03j A key that reads no project is told so, not asked to name one" */
+    it("says it reads no project, and how to grant one, instead of a bare not found", async () => {
       const { service } = scopeOver({ projects: BIG, grants: {} });
 
       await expect(service.resolve({ reach: KEY, requireProjects: true })).rejects.toMatchObject({
-        code: "project_not_found",
+        code: "projects_required",
+        message: expect.stringContaining("reads no project"),
       });
+    });
+  });
+
+  describe("when the organization is larger than a run may read", () => {
+    const HUGE = Array.from({ length: LWQL_TENANT_CAPABILITY_MAX_PROJECTS + 1 }, (_, index) =>
+      project(`h${index}`),
+    );
+
+    /** @scenario "QP03h The word all that resolves to no project, or to more than the cap, is refused" */
+    it("refuses before any grant is read, saying the organization is too big", async () => {
+      const { service, asked } = scopeOver({ projects: HUGE, grants: PERMITTED });
+
+      await expect(service.resolveAll({ reach: KEY })).rejects.toMatchObject({
+        httpStatus: 422,
+        message: expect.stringContaining("This organization has more than"),
+      });
+
+      expect(asked).toEqual([]);
+    });
+
+    /** @scenario "QP03h The word all that resolves to no project, or to more than the cap, is refused" */
+    it("refuses a named list longer than the cap up front", async () => {
+      const { service, asked } = scopeOver({ projects: HUGE, grants: PERMITTED });
+
+      await expect(
+        service.resolve({ reach: KEY, projects: HUGE.map(({ id }) => id) }),
+      ).rejects.toMatchObject({ httpStatus: 422 });
+
+      expect(asked).toEqual([]);
+    });
+  });
+
+  describe("when a read repeats a project", () => {
+    /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+    it("judges and returns each project once, in id order", async () => {
+      const { service, asked } = scopeOver({
+        projects: [project("b"), project("a")],
+        grants: PERMITTED,
+        rows: (data) => [...data, ...data],
+      });
+
+      const scope = await service.resolveAll({ reach: KEY });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["a", "b"]);
+      expect(asked.filter(({ projectId }) => projectId === "a")).toHaveLength(1);
     });
   });
 

@@ -85,6 +85,14 @@ Feature: Every query door takes the same parameters and says what it ran with
       Then it is refused with the status 422 and no statement reaches the store
 
     @unit
+    Scenario: QP03j A key that reads no project is told so, not asked to name one
+      # Own call (batch 8): a bare not found does not help; the 422 "projects_required" says why.
+      Given an organization, team or personal key that holds analytics:view on no project
+      When it runs a statement that names no project
+      Then it is refused with the status 422 and the code "projects_required"
+      And the message says the key reads no project and that an admin can grant one
+
+    @unit
     Scenario: QP03i A widget write refuses the word all
       # Own call: widgets do not store "all" in this change; stored definitions stay explicit.
       When a widget query is saved with `projects` "all", over REST, tRPC, the CLI or MCP

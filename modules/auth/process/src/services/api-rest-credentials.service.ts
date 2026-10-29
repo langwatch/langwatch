@@ -306,11 +306,11 @@ export class ApiRestCredentialsService {
       };
     }
     const keyPrincipal = resolved ? keyPrincipalOfApiKey(resolved) : undefined;
-    if (resolved && keyPrincipal) {
+    if (keyPrincipal) {
       return {
         principal: keyPrincipal,
-        organizationId: resolved.organizationId,
-        markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
+        organizationId: keyPrincipal.organizationId,
+        markUsed: () => this.apiKeys.markUsed({ id: keyPrincipal.apiKeyId }),
       };
     }
 

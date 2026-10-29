@@ -10,8 +10,8 @@ import {
 import chalk from "chalk";
 
 import { redactSecrets } from "../telemetry/events";
-import { withFallbackSuggestions } from "./errorSuggestions";
-import { loginPermissionsHint } from "./loginScopeHint";
+import { fallbackSuggestionsFor, withFallbackSuggestions } from "./errorSuggestions";
+import { loginPermissionsHint, usesLoginCredential } from "./loginScopeHint";
 import { currentOutputScope, getOutputFormat, resolveOutputFormat } from "./outputScope";
 
 /**
@@ -107,13 +107,28 @@ const detailLines = (domain: LangWatchHandledErrorShape): string[] => {
   ];
 };
 
+/** A login is a person's access, not a key with a project: the project hint fits the credential. */
+const withLoginProjectAdvice = (domain: LangWatchHandledErrorShape): LangWatchHandledErrorShape => {
+  if (domain.code !== "project_not_found" || !usesLoginCredential()) return domain;
+  const keyAdvice = fallbackSuggestionsFor("project_not_found")?.suggestions ?? [];
+  const suggestions = (domain.suggestions ?? []).filter((line) => !keyAdvice.includes(line));
+
+  return {
+    ...domain,
+    suggestions: [
+      "Check that your account can read the project; ask a workspace admin to grant you access",
+      ...suggestions,
+    ],
+  };
+};
+
 /**
  * The fallback advice, plus what only this machine knows: the permissions the
  * login here was minted with. Applied to both renderings, so a person and an
  * agent are told the same thing about why a 403 happened.
  */
 const withCliAdvice = (domain: LangWatchHandledErrorShape): LangWatchHandledErrorShape => {
-  const enriched = withFallbackSuggestions(domain);
+  const enriched = withLoginProjectAdvice(withFallbackSuggestions(domain));
   const hint = loginPermissionsHint(enriched.code, enriched.meta);
   if (!hint) return enriched;
   return { ...enriched, suggestions: [...(enriched.suggestions ?? []), hint] };
