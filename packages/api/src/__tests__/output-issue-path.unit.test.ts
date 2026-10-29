@@ -42,6 +42,35 @@ describe("declaredPath", () => {
     });
   });
 
+  describe("when union arms read a segment differently", () => {
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
+    it("keeps a map arm's numeric key out, though an array arm would index it", () => {
+      const schema = z.object({
+        byId: z.union([z.map(z.number(), z.string()), z.array(z.string())]),
+      });
+
+      expect(declaredPath(schema, ["byId", 8675309])).toBe("byId[<key>]");
+    });
+
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
+    it("keeps a key one object arm declares out when another arm takes any key", () => {
+      const schema = z.union([z.object({ email: z.string() }), z.record(z.string(), z.number())]);
+
+      expect(declaredPath(schema, ["email"])).toBe("<key>");
+    });
+
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
+    it("names a key every holding arm declares, ignoring scalar arms", () => {
+      const schema = z.union([
+        z.object({ id: z.string() }),
+        z.object({ id: z.number() }),
+        z.string(),
+      ]);
+
+      expect(declaredPath(schema, ["id"])).toBe("id");
+    });
+  });
+
   describe("when a path passes through a key the schema does not declare", () => {
     /** @scenario "A refused answer's log names the failing field without the caller's keys" */
     it("replaces the key and keeps the rest of the path", () => {

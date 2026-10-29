@@ -337,7 +337,11 @@ describe("validationMeta", () => {
                     unionErrors: [
                       {
                         issues: [
-                          { code: "invalid_type", path: ["outer", "inner", "leaf"], expected: "string" },
+                          {
+                            code: "invalid_type",
+                            path: ["outer", "inner", "leaf"],
+                            expected: "string",
+                          },
                         ],
                       },
                     ],

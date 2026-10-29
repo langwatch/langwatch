@@ -384,9 +384,14 @@ function anyValueAlso<Shape extends z.ZodRawShape>(shape: Shape): AnyValueAlso<S
       while (declared instanceof z.ZodOptional || declared instanceof z.ZodNullable) {
         declared = declared.unwrap() as z.ZodType;
       }
-      return [key, z.union([declared, z.null(), z.unknown()]).optional()];
+      return [key, orAnyValue(declared)];
     }),
   ) as AnyValueAlso<Shape>;
+}
+
+/** One param's schema: its declared type first, `null` second, then any value. */
+function orAnyValue(declared: z.ZodType) {
+  return z.union([declared, z.null(), z.unknown()]).optional();
 }
 
 /**

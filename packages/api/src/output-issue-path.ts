@@ -18,40 +18,15 @@ const WRAPPERS = [
   z.ZodCatch,
 ] as const;
 
-/** The schemas one wrapper, lazy, pipe, union or intersection stands for; none for a leaf. */
-function openedBy(schema: z.ZodType): z.ZodType[] | undefined {
+/** The one schema a wrapper or lazy stands for; none for anything else. */
+function unwrapped(schema: z.ZodType): z.ZodType | undefined {
   const def: object = schema.def;
 
   if (WRAPPERS.some((wrapper) => schema instanceof wrapper) && "innerType" in def) {
-    return [def.innerType as z.ZodType];
+    return def.innerType as z.ZodType;
   }
-  if (schema instanceof z.ZodLazy) return [schema.def.getter() as z.ZodType];
-  if (schema instanceof z.ZodPipe || schema instanceof z.ZodCodec) {
-    return [schema.def.in as z.ZodType, schema.def.out as z.ZodType];
-  }
-  if (schema instanceof z.ZodUnion) return schema.options as z.ZodType[];
-  if (schema instanceof z.ZodIntersection) {
-    return [schema.def.left as z.ZodType, schema.def.right as z.ZodType];
-  }
+  if (schema instanceof z.ZodLazy) return schema.def.getter() as z.ZodType;
   return undefined;
-}
-
-/** The schemas that decide a segment: every wrapper and combinator opened down to its leaves. */
-function concrete(schemas: z.ZodType[]): z.ZodType[] {
-  const leaves: z.ZodType[] = [];
-  const seen = new Set<z.ZodType>();
-  const pending = [...schemas];
-
-  for (let schema = pending.pop(); schema; schema = pending.pop()) {
-    if (seen.has(schema)) continue;
-    seen.add(schema);
-
-    const opened = openedBy(schema);
-    if (opened) pending.push(...opened);
-    else leaves.push(schema);
-  }
-
-  return leaves;
 }
 
 /** Where an index leads in one schema. */
@@ -81,24 +56,83 @@ function keyIn(schema: z.ZodType, key: unknown): { next?: z.ZodType; declared: b
     : { declared: false };
 }
 
-/**
- * Where one segment leads, and whether a schema there names it: a key the shape declares, or an
- * index into an array or tuple. A number anywhere else (a map's key, one under `any`) is content.
- */
-function step(schemas: z.ZodType[], segment: unknown): { next: z.ZodType[]; declared: boolean } {
-  const next: z.ZodType[] = [];
-  let declared = false;
+/** One segment in one schema: where it leads, whether it can hold it, and whether it names it. */
+type Step = { next: z.ZodType[]; holds: boolean; declared: boolean };
 
-  for (const schema of concrete(schemas)) {
-    const found =
-      typeof segment === "number"
-        ? { next: indexIn(schema, segment), declared: indexes(schema) }
-        : keyIn(schema, segment);
-    if (found.next) next.push(found.next);
-    declared ||= found.declared;
+/**
+ * A declared key or an array/tuple index is named; any other key or number is content. A union
+ * names a segment only when every arm that could hold it does (an array arm never vouches for a
+ * map arm's key); an intersection or a pipe names it when either side does.
+ */
+function stepIn(schema: z.ZodType, segment: unknown, seen: Set<z.ZodType>): Step {
+  if (seen.has(schema)) return { next: [], holds: false, declared: false };
+  seen.add(schema);
+
+  const inner = unwrapped(schema);
+  if (inner) return stepIn(inner, segment, seen);
+
+  if (schema instanceof z.ZodUnion) {
+    const arms = (schema.options as z.ZodType[]).map((arm) => stepIn(arm, segment, seen));
+    const holders = arms.filter((arm) => arm.holds);
+    return {
+      next: arms.flatMap((arm) => arm.next),
+      holds: holders.length > 0,
+      declared: holders.length > 0 && holders.every((arm) => arm.declared),
+    };
   }
 
-  return { next, declared };
+  const sides = bothSidesOf(schema);
+  if (sides) {
+    const both = sides.map((side) => stepIn(side, segment, seen));
+    return {
+      next: both.flatMap((side) => side.next),
+      holds: both.some((side) => side.holds),
+      declared: both.some((side) => side.declared),
+    };
+  }
+
+  if (holdsNothing(schema)) return { next: [], holds: false, declared: false };
+  const found =
+    typeof segment === "number"
+      ? { next: indexIn(schema, segment), declared: indexes(schema) }
+      : keyIn(schema, segment);
+  return { next: found.next ? [found.next] : [], holds: true, declared: found.declared };
+}
+
+/** One segment read through every schema the path may be in: named only if each one names it. */
+function step(schemas: z.ZodType[], segment: unknown): { next: z.ZodType[]; declared: boolean } {
+  const steps = schemas.map((schema) => stepIn(schema, segment, new Set()));
+  const holders = steps.filter((each) => each.holds);
+  return {
+    next: steps.flatMap((each) => each.next),
+    declared: holders.length > 0 && holders.every((each) => each.declared),
+  };
+}
+
+/** The two schemas a value must meet at once: an intersection's sides, or a pipe's ends. */
+function bothSidesOf(schema: z.ZodType): z.ZodType[] | undefined {
+  if (schema instanceof z.ZodIntersection) {
+    return [schema.def.left as z.ZodType, schema.def.right as z.ZodType];
+  }
+  if (schema instanceof z.ZodPipe || schema instanceof z.ZodCodec) {
+    return [schema.def.in as z.ZodType, schema.def.out as z.ZodType];
+  }
+  return undefined;
+}
+
+/** A scalar arm: no key or index can lead into it, so it has no say over a segment. */
+function holdsNothing(schema: z.ZodType): boolean {
+  return (
+    schema instanceof z.ZodString ||
+    schema instanceof z.ZodNumber ||
+    schema instanceof z.ZodBoolean ||
+    schema instanceof z.ZodBigInt ||
+    schema instanceof z.ZodDate ||
+    schema instanceof z.ZodNull ||
+    schema instanceof z.ZodUndefined ||
+    schema instanceof z.ZodLiteral ||
+    schema instanceof z.ZodEnum
+  );
 }
 
 function indexes(schema: z.ZodType): boolean {
