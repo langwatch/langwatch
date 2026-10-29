@@ -77,7 +77,9 @@ function showScene({ root, path }: { root: HTMLElement; path: string }) {
   if (stage && !content && pages.length)
     stage.querySelector(".docs-nf-picks")?.replaceWith(picks({ pages, label: "Closest pages" }));
   fillRail({ pages: pages.length ? root.querySelector(".docs-nf-picks") : null, shown });
-  void arrive({ root });
+  void arrive({ root }).catch(() => {
+    root.dataset.ready = "";
+  });
 }
 
 const typing = (target: EventTarget | null) =>

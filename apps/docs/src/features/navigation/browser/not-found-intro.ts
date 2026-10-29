@@ -19,20 +19,30 @@ function settle({ path }: { path: SVGPathElement }) {
       ],
       { duration: SETTLE_MS, easing: "ease-out", fill: "forwards" },
     )
-    .finished.then(() => colour);
+    .finished.then(
+      () => colour,
+      () => colour,
+    );
 }
+
+/** The intro is on screen until the scene shows or the 1.2s CSS fallback hides it. */
+const onScreen = (svg: SVGSVGElement) =>
+  getComputedStyle(svg).visibility === "visible" && svg.getClientRects().length > 0;
 
 /** Shows the scene, flying the intro's mark into it when the intro is still on screen. */
 export async function arrive({ root }: { root: HTMLElement }) {
   const from = root.querySelector<SVGSVGElement>("[data-nf-intro] svg");
   const path = from?.querySelector("path");
-  const onScreen =
-    from && getComputedStyle(from).visibility === "visible" && from.getClientRects().length;
-  if (!from || !path || !onScreen || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (!from || !path || !onScreen(from) || matchMedia("(prefers-reduced-motion: reduce)").matches) {
     root.dataset.ready = "";
     return;
   }
   const colour = await settle({ path });
+  /* The fallback may have hidden the intro while its stroke settled: then the scene just shows. */
+  if (!onScreen(from)) {
+    root.dataset.ready = "";
+    return;
+  }
   const start = from.getBoundingClientRect();
   const base = root.getBoundingClientRect();
   const ghost = from.cloneNode(true) as SVGSVGElement;

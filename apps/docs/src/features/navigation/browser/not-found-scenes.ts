@@ -82,7 +82,7 @@ const block = (...children: Child[]) => h("p", { class: "docs-nf-line is-block" 
 
 /** The LangWatch box the intro's mark flies to: Langy's, in the orange to purple gradient as in
     the app, or the trace's service mark in plain orange. */
-function mark({
+function logoMark({
   className,
   width,
   gradient,
@@ -163,7 +163,7 @@ function terminal({ shown, host, pages, query }: SceneInput) {
       h(
         "div",
         { class: "docs-nf-banner" },
-        mark({ className: "docs-nf-langy", width: 30, gradient: true }),
+        logoMark({ className: "docs-nf-langy", width: 30, gradient: true }),
         h(
           "div",
           {},
@@ -229,7 +229,7 @@ function trace({ shown, pages }: SceneInput) {
       h(
         "span",
         {},
-        mark({ className: "docs-nf-trace-mark", width: 14, gradient: false }),
+        logoMark({ className: "docs-nf-trace-mark", width: 14, gradient: false }),
         h("strong", {}, "Page request"),
         span("docs-nf-dim", "3 spans"),
       ),

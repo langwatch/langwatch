@@ -212,6 +212,43 @@ await it("acts out a missing address in its section's scene and links its closes
   });
 });
 
+/** @scenario "Draw the mark until the scene is chosen" */
+await it("draws the mark at first paint, then shows the castle when the island is late", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const context = await browser.newContext();
+      try {
+        const page = await context.newPage();
+        /* Hold every script request: the inline theme script still runs, the island never does. */
+        await page.route("**/*", (route) =>
+          route.request().resourceType() === "script" ? undefined : route.continue(),
+        );
+        await page.goto(`${base}nonexistent-docs-intro-route`, { waitUntil: "commit" });
+        const intro = page.locator("[data-nf-intro] svg");
+        await intro.waitFor({ state: "visible" });
+        const stage = page.locator("[data-nf-stage]");
+        assert.equal(await stage.evaluate((node) => getComputedStyle(node).opacity), "0");
+        await page.waitForTimeout(1400);
+        assert.equal(await intro.isVisible(), false);
+        assert.equal(await stage.evaluate((node) => getComputedStyle(node).opacity), "1");
+        assert.equal(await page.locator(".docs-castle").isVisible(), true);
+      } finally {
+        await context.close();
+      }
+      const still = await browser.newContext({ javaScriptEnabled: false });
+      try {
+        const page = await still.newPage();
+        await page.goto(`${base}nonexistent-docs-intro-route`);
+        assert.equal(await page.locator("[data-nf-intro]").isVisible(), false);
+        assert.equal(await page.locator(".docs-castle").isVisible(), true);
+      } finally {
+        await still.close();
+      }
+    },
+  });
+});
+
 /** @scenario "Serve directory URLs consistently" */
 await it("serves directory URLs, redirects and the generated 404", async () => {
   const server = await startPreview({ outDir, port: 0 });

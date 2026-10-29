@@ -70,10 +70,9 @@ export function resolveAppOrigin({
 const PUBLISHED_ORIGIN = new URL(DOCS_URL).origin;
 
 /**
- * Whether the app frames its session document for this page. It frames only a registered docs
- * origin: the published docs, or its own origin when it serves the docs itself. Any other host
- * (the CDN origin, a preview, localhost) gets a refusal that nothing may frame, which the
- * browser reports as a CSP violation, so the page does not ask.
+ * Whether the app frames its session document here: only on the published docs or the app's
+ * own origin. Elsewhere (the CDN origin, previews, localhost) it refuses with frame-ancestors
+ * 'none', which the browser logs as a CSP violation, so the page does not ask.
  */
 export function appFramesPage({
   appOrigin,

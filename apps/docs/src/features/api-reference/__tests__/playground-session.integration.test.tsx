@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+// The app frames its session document only for the published docs origin.
+// @vitest-environment-options {"url": "https://langwatch.ai/docs/api-reference/traces/list"}
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -14,12 +16,6 @@ const APP = "https://app.example.test";
 vi.hoisted(() => {
   /* The build defines the app the docs connect to; here the test names one. */
   Object.assign(globalThis, { __DOCS_APP_ORIGIN__: "https://app.example.test" });
-  /* The app frames its session document only for the published docs origin. */
-  (globalThis as unknown as { jsdom: { reconfigure(o: { url: string }): void } }).jsdom.reconfigure(
-    {
-      url: "https://langwatch.ai/docs/api-reference/traces/list",
-    },
-  );
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   Element.prototype.scrollIntoView = () => {};
   /* The form slides open with the Web Animations API, which jsdom lacks. */
