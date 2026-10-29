@@ -19939,6 +19939,54 @@
         }
       }
     },
+    "/api/v1/docs-session": {
+      "delete": {
+        "operationId": "revokeDocsSession",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revoked": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "revoked"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, expired or already revoked key",
+            "content": {}
+          }
+        },
+        "description": "Revokes the docs session key that authenticates this request, so the documentation playground can end its session at once. Any other key is answered the same way and left as it is.",
+        "summary": "Disconnect a docs session",
+        "tags": [
+          "API Keys"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": []
+        }
+      }
+    },
     "/api/v1/auth/cli/device-code": {
       "post": {
         "operationId": "startCliDeviceCode",
@@ -50267,6 +50315,11 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     }
+                  },
+                  "concurrency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 24
                   }
                 }
               }

@@ -104,6 +104,8 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
+  "/api/docs-session":
+    "Live surface, intentionally undocumented: the docs playground's own revoke call for its session key (ADR-185), not an API for integrations.",
   "/api/checkup": UNDOCUMENTED_CHECKUP,
   "/api/checkup/run": UNDOCUMENTED_CHECKUP,
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,

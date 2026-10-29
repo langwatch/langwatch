@@ -337,6 +337,7 @@ export {
 export {
   assertKeyKind,
   keyCredentialOf,
+  keyCredentialOfDoor,
   REST_KEY_KINDS,
   type RestKeyCredential,
   type RestKeyDoor,

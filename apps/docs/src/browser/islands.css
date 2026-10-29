@@ -1,0 +1,176 @@
+[hidden] {
+  display: none !important;
+}
+.docs-island-dialog {
+  color: var(--chakra-colors-fg);
+  background: var(--chakra-colors-docs-paper);
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-xl);
+  padding: 0;
+  box-shadow: 0 20px 60px var(--chakra-colors-docs-shadow-strong);
+}
+.docs-island-dialog::backdrop {
+  background: var(--chakra-colors-bg-scrim);
+  backdrop-filter: blur(4px);
+}
+.docs-menu {
+  position: absolute;
+  z-index: 100;
+  right: 0;
+  top: 100%;
+  min-width: 10rem;
+  padding: 6px;
+  background: var(--chakra-colors-docs-raised);
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-lg);
+  box-shadow: 0 8px 24px var(--chakra-colors-docs-shadow-strong);
+}
+.docs-menu button,
+.docs-menu a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 14px;
+  border-radius: 6px;
+}
+.docs-menu :is(button, a):hover {
+  background: var(--chakra-colors-bg-hover);
+}
+.docs-mobile-dialog {
+  margin: 0;
+  max-width: 100%;
+  width: 360px;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+}
+.docs-mobile-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 48rem) {
+  .docs-mobile-dialog {
+    width: 100%;
+  }
+}
+.docs-nav-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.docs-media-error {
+  color: var(--chakra-colors-red-fg);
+  font-size: 14px;
+  margin-top: 12px;
+}
+.docs-request-error {
+  color: var(--chakra-colors-red-fg);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.docs-island-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-lg);
+  background: transparent;
+}
+.docs-island-button:hover {
+  background: var(--chakra-colors-bg-hover);
+}
+.docs-island-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.docs-button-ghost {
+  border-color: transparent;
+}
+.docs-response-panel {
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-showcase);
+  overflow: hidden;
+}
+.docs-response-panel h2 {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--chakra-colors-bg-subtle);
+  border-bottom: 1px solid var(--chakra-colors-border);
+}
+.docs-response-content {
+  padding: 16px;
+  font-size: 13px;
+}
+.docs-response-content pre {
+  overflow-x: auto;
+  padding: 16px;
+  margin-top: 12px;
+  background: var(--chakra-colors-bg-nested);
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-lg);
+  font-size: 13px;
+  line-height: 22px;
+}
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+[data-docs-toc] a {
+  color: var(--chakra-colors-docs-contents);
+  font-weight: 400;
+}
+[data-docs-toc] a[aria-current] {
+  color: var(--chakra-colors-accent-fg);
+  font-weight: 600;
+}
+.docs-island-dialog :is(button, input):focus-visible {
+  outline: 2px solid var(--chakra-colors-border-emphasized);
+  outline-offset: 2px;
+}
+
+/* Dialogs ease in and out; the phone menu slides from the edge like a drawer. */
+@media (prefers-reduced-motion: no-preference) {
+  .docs-island-dialog,
+  .docs-island-dialog::backdrop {
+    transition:
+      opacity 200ms ease,
+      transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      overlay 260ms allow-discrete,
+      display 260ms allow-discrete;
+  }
+  .docs-island-dialog:not([open]) {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  .docs-island-dialog:not([open])::backdrop {
+    opacity: 0;
+  }
+  .docs-mobile-dialog:not([open]) {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  @starting-style {
+    .docs-island-dialog[open] {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    .docs-island-dialog[open]::backdrop {
+      opacity: 0;
+    }
+    .docs-mobile-dialog[open] {
+      opacity: 1;
+      transform: translateX(-100%);
+    }
+  }
+}

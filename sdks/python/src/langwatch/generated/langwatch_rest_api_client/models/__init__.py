@@ -8578,6 +8578,7 @@ from .rerun_run_plan_response_200_items_item_target_type import RerunRunPlanResp
 from .rerun_run_plan_response_200_skipped_archived import RerunRunPlanResponse200SkippedArchived
 from .rerun_run_plan_response_404 import RerunRunPlanResponse404
 from .revoke_api_key_response_200 import RevokeApiKeyResponse200
+from .revoke_docs_session_response_200 import RevokeDocsSessionResponse200
 from .revoke_grant_response_200 import RevokeGrantResponse200
 from .revoke_organization_invite_response_200 import RevokeOrganizationInviteResponse200
 from .revoke_scim_token_response_200 import RevokeScimTokenResponse200
@@ -13707,6 +13708,7 @@ __all__ = (
     "RerunRunPlanResponse200SkippedArchived",
     "RerunRunPlanResponse404",
     "RevokeApiKeyResponse200",
+    "RevokeDocsSessionResponse200",
     "RevokeGrantResponse200",
     "RevokeOrganizationInviteResponse200",
     "RevokeScimTokenResponse200",

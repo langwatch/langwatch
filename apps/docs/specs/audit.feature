@@ -1,0 +1,79 @@
+Feature: Audit the built documentation for search, agents and page quality
+
+  Every docs change is held to the same bar before it ships: each published
+  page can be found, cited and read by people, search engines and agents, and
+  representative pages stay fast and accessible. Budgets live in one committed
+  file, so raising or relaxing the bar is a reviewed change.
+
+  @unit
+  Scenario: Report every search and agent-readiness gap across all pages
+    Given a build whose sitemap lists its navigable pages
+    When the static audit reads every listed page
+    Then a page without exactly one top-level heading is reported
+    And a page whose title or description is missing or outside the budgeted length is reported
+    And a page whose canonical address is missing, relative or not its sitemap address is reported
+    And a page missing its social title, description or absolute image is reported
+    And a page whose structured data does not parse is reported
+    And a navigable page marked noindex is reported
+    And a page without a nonempty Markdown export, or missing from llms.txt, is reported
+    And each report names the page and the exact gap
+
+  @unit
+  Scenario: Let crawlers in and point them at the sitemap
+    Given a build's robots.txt and not-found page
+    When the static audit reads them
+    Then robots.txt that blocks the documentation or names no sitemap is reported
+    And a not-found page that search engines may index is reported
+
+  @unit
+  Scenario: Hold Lighthouse results to the committed budgets
+    Given Lighthouse results for a page on mobile and desktop
+    When they are compared with the committed budgets
+    Then a category score below its budget fails the audit
+    And layout shift, transferred bytes or request count over budget fails the audit
+    And a failing accessibility, best-practice or search audit fails unless the page lists it as known, with a reason
+    And a page Lighthouse could not load fails the audit
+    But a known failure that no longer fails is reported so the budget can be tightened
+
+  @unit
+  Scenario: Summarise the audit for the pull request
+    Given an audit with scores, metrics and budget failures
+    When the summary is written
+    Then a table shows each page's scores, paint timings, blocking time, layout shift, bytes and requests per device
+    And each budget failure is listed with its page and device
+
+  @e2e
+  Scenario: Audit representative pages in a real browser
+    Given a production build served under /docs with compressed responses, as a CDN serves it
+    When the audit runs Lighthouse on the home page, a guide with code and tabs, a long page with diagrams and images, an API operation, a section index, the changelog, a skills page and the not-found page
+    Then each runs on mobile, emulated with a slow network and CPU, and on desktop, a few at a time
+    And accessibility, best practices and search score 100 on every page but the not-found page's search score
+    And Markdown exports are served as text/markdown
+    And the run fails when any budget or static check fails
+
+  @unit
+  Scenario: Refuse to audit a build made for another mount
+    Given a build made for the site root
+    When the audit is asked to read it under /docs
+    Then it stops before any check and names the base path the build was made for
+    And it says how to build for the mount it was asked to read
+
+  @unit
+  Scenario: Report Lighthouse's agentic browsing checks without gating on them
+    Given Lighthouse ran its experimental agentic browsing checklist on a page
+    When the summary is written
+    Then each page and device shows how many of the checks that apply passed
+    And the failing checks are named once
+    But they never fail the audit, because the checklist is still changing
+
+  @unit
+  Scenario: Report Lighthouse and on-page SEO for every page on the pull request
+    Given Lighthouse ran once per page on mobile and desktop for every published page, split across runners
+    And the static search checks ran on every page
+    When the runs are merged into one report
+    Then one comment on the pull request is updated on each run, never a new one per push
+    And it opens with the average score per category and device and how many pages meet each budget
+    And it lists the lowest scoring pages per category, and the pages with on-page search gaps
+    And the table of every page, grouped by section, is in the comment when it fits and linked when it does not
+    And pages a runner never reported, or Lighthouse could not load, are named
+    But the report never fails the run: budgets gate only the representative pages

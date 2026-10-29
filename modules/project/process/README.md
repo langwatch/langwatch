@@ -517,13 +517,14 @@ type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/
 
 ### `project`
 
-Contract `../contract/src/project.trpc.ts:28`, router `src/transport/project.trpc.ts:81`.
+Contract `../contract/src/project.trpc.ts:30`, router `src/transport/project.trpc.ts:95`.
 
 | Procedure                           | Kind     | Gate                                                                                                                                                                                                                                                                | Input                                         | Output                                   |
 | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------- |
 | `project.create`                    | mutation | Service-authorized: project:create, organization:manage; creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed | `projectCreateInputSchema`                    | `projectProvisionedSchema`               |
 | `project.getHasFirstMessage`        | query    | Permission `project:view`                                                                                                                                                                                                                                           | `projectScopeSchema`                          | `projectFirstMessageSchema`              |
 | `project.getLegacyKeyStatus`        | query    | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`                          | `projectLegacyKeyStatusSchema`           |
+| `project.legacyKeys`                | query    | Service-authorized: project:manage; the organisation-wide read asks project:manage of every project it found holding a live legacy key, which is only knowable after the read                                                                                       | `projectLegacyKeysInputSchema`                | `projectLegacyKeysSchema`                |
 | `project.revokeProjectApiKey`       | mutation | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`                          | `projectApiKeyRevokedSchema`             |
 | `project.update`                    | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectUpdateInputSchema`                    | `projectSettingsSavedSchema`             |
 | `project.archiveById`               | mutation | Permission `project:delete`                                                                                                                                                                                                                                         | `projectArchiveByIdInputSchema`               | `projectArchivedSchema`                  |
@@ -556,6 +557,19 @@ interface Output {
   present: boolean;
   lastUsedAt: unknown | null;
 }
+
+// project.legacyKeys
+// Input: projectLegacyKeysInputSchema, ../contract/src/project-trpc.schemas.ts:106
+interface Input {
+  organizationId: string;
+}
+// Output: projectLegacyKeysSchema, ../contract/src/project.responses.ts:160
+type Output = {
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+  lastUsedAt: unknown | null;
+}[];
 
 // project.revokeProjectApiKey
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:15
@@ -599,11 +613,11 @@ interface Output {
 }
 
 // project.aggregateMemberCandidates
-// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:108
+// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:117
 interface Input {
   organizationId: string;
 }
-// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:147
+// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:169
 type Output = {
   id: string;
   name: string;

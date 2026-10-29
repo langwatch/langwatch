@@ -55,6 +55,7 @@ import {
   UnsupportedMediaTypeError,
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
@@ -2617,7 +2618,9 @@ function respond({
   if (route.answers) return respondDeclared({ context, route, answers: route.answers, result });
 
   const validation = route.output.safeParse(result);
+  let answer: unknown = validation.data;
 
+  // A refused answer is logged and still sent, cut to the keys the schema names.
   if (!validation.success) {
     outputLogger.error(
       {
@@ -2629,16 +2632,19 @@ function respond({
       "REST handler response did not match its declared output schema",
     );
 
-    throw new Error(
-      `REST ${context.req.method} ${context.req.path} answered a value its declared output schema refuses`,
-    );
+    answer = withoutUndeclaredKeys(route.output as z.ZodType, result);
+  }
+
+  // A refused answer the schema left nothing of keeps the route's own status.
+  if (answer === undefined && !validation.success) {
+    return context.body(null, (route.status ?? 200) as ContentfulStatusCode);
   }
 
   // Reachable only for a `z.void()` output: a route that declared no answer
   // always takes this branch, and every other route never does.
-  if (validation.data === undefined) return context.body(null, route.status ?? 204);
+  if (answer === undefined) return context.body(null, route.status ?? 204);
 
-  return context.json(validation.data as never, route.status ?? 200);
+  return context.json(answer as never, route.status ?? 200);
 }
 
 /**
@@ -2841,17 +2847,20 @@ function respondDeclared({
       },
       "REST handler response did not match the answer its declaration named",
     );
-
-    throw new Error(
-      `REST ${route.operation} answered a body its declared ${String(status)} schema refuses`,
-    );
   }
 
   // The declared status IS the answer, whatever its class, so the request
   // record reads as one rather than as a server fault.
   context.set(DECLARED_ANSWER, true);
 
-  return context.json(validation.data as never, status as ContentfulStatusCode);
+  // A refused body is logged above and still sent, cut to the keys the schema names.
+  const body = validation.success
+    ? validation.data
+    : withoutUndeclaredKeys(schema as z.ZodType, answer.body);
+
+  if (body === undefined) return context.body(null, status as ContentfulStatusCode);
+
+  return context.json(body as never, status as ContentfulStatusCode);
 }
 
 /**

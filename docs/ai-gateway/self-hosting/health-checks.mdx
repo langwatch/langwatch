@@ -49,7 +49,7 @@ Chart values: `probes.liveness.*`. The handler does no network I/O.
 
 After `SIGTERM` the endpoint answers:
 
-```
+```http
 HTTP/1.1 503 Service Unavailable
 {"status":"draining","version":"local","uptime_s":1812.74}
 ```
