@@ -338,8 +338,9 @@ jobs:
           # the community; this registry serves one all-Graviton consumer.
           #
           # Runner labels mirror publish-docker-app.yml: every image, the app
-          # included, builds on the standard hosted arm runner. The app bundle
-          # caps Node's heap at 4 GiB (infra/docker/Dockerfile), well inside it.
+          # included, builds on the standard hosted arm runner: the app build
+          # peaked at about 5 GiB of its 16 GiB, with the contracts and app
+          # bundle steps capping Node's heap at 4 GiB (infra/docker/Dockerfile).
           #
           # langwatch-docs (static files under /site, not meant to run) takes the
           # same service shape, so the re-tag fallback in create-manifest holds for it.
