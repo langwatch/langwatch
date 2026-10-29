@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Digests of the add_dashboard_widget and update_dashboard_widget tools.
@@ -501,5 +503,18 @@ describe("given run_query's projects input", () => {
 
   it.each([["everything"], [[]], [[""]], [["p", "ALL"]]])("refuses %s", (value) => {
     expect(runQueryProjectsInput.validate(value)).toBe(false);
+  });
+});
+
+describe("given run_query's refusal of all inside a list", () => {
+  it("says what the docs say", () => {
+    const docs = readFileSync(
+      new URL("../../../../docs/features/querying-your-data.mdx", import.meta.url),
+      "utf8",
+    );
+    const message = runQueryProjectsInput.safeParse(["p", "all"]).error?.issues[0]?.message;
+
+    expect(message).toBeDefined();
+    expect(docs).toContain(message);
   });
 });

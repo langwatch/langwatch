@@ -1,4 +1,8 @@
-import type { LangWatchQLCaller, LangWatchQLMemberWindow } from "@langwatch/analytics-contract";
+import {
+  LWQL_ALL_PROJECTS,
+  type LangWatchQLCaller,
+  type LangWatchQLMemberWindow,
+} from "@langwatch/analytics-contract";
 
 /** The members an aggregate's statement runs over, and where each is read from. */
 export type MemberScope = Readonly<{
@@ -15,11 +19,10 @@ export function selectNamedProjects({
   projects,
 }: {
   projectId?: string | undefined;
-  projects?: readonly string[] | string | undefined;
+  projects?: readonly string[] | "all" | undefined;
 }): { named: readonly string[] | undefined; all: boolean; conflict: boolean } {
-  // A lone string is the word "all" in some case: the request schema admits no other.
-  const all = typeof projects === "string";
-  const list = typeof projects === "string" ? undefined : projects;
+  const all = projects === LWQL_ALL_PROJECTS;
+  const list = all ? undefined : projects;
 
   return {
     named: list ?? (projectId === undefined ? undefined : [projectId]),

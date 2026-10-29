@@ -15739,7 +15739,7 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "pattern": "^\\s*all\\s*$"
+                        "pattern": "^\\s*[aA][lL][lL]\\s*$"
                       },
                       {
                         "minItems": 1,

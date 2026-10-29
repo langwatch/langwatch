@@ -164,6 +164,9 @@ describe('given projects set to "all"', () => {
   it("is accepted by the key door and the member door as the string", () => {
     expect(issuesOf({ sql: SQL, projects: "all" })).toEqual([]);
     expect(issuesOf({ sql: SQL, projects: " ALL " })).toEqual([]);
+    for (const word of ["ALL", " all "]) {
+      expect(lwqlKeyStatementSchema.parse({ sql: SQL, projects: word }).projects).toBe("all");
+    }
     expect(lwqlQueryRequestSchema.validate({ projectId: "p", sql: SQL, projects: "all" })).toBe(
       true,
     );

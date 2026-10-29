@@ -132,9 +132,9 @@ export class LangWatchQLQueryScopeService {
       await this.ownProject({ projectId: reach.projectId, requested: named });
       return;
     }
-    // A widget's union of lists is capped by no request schema, so the cap is held here.
-    if (named.length > LWQL_TENANT_CAPABILITY_MAX_PROJECTS) {
-      throw new ValidationError(`Name at most ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects.`);
+    // The widget cap: 100 projects per query, 8 queries per widget (LWQL_MAX_WIDGET_PROJECTS).
+    if (named.length > LWQL_MAX_WIDGET_PROJECTS) {
+      throw new ValidationError(`Name at most ${LWQL_MAX_WIDGET_PROJECTS} projects.`);
     }
     await this.readableProjects({ reach, only: named });
   }
@@ -230,7 +230,7 @@ export class LangWatchQLQueryScopeService {
       permission: "analytics:view",
       organizationId,
       teams: [...new Set(listed.data.map(({ teamId }) => teamId))].map((teamId) => ({ teamId })),
-      projects: listed.data.map(({ id, teamId, kind }) => ({ projectId: id, teamId, kind })),
+      projects: listed.data.map(({ id, teamId }) => ({ projectId: id, teamId })),
     });
     const readable: LangWatchQLCaller[] = [];
     for (const id of ids) {

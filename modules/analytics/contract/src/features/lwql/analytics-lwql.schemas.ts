@@ -195,7 +195,10 @@ export function holdsAllWord(ids: readonly string[]): boolean {
 }
 
 /** The lone word, in any case and with spaces around it. A pattern, so the OpenAPI carries it. */
-const allWordSchema = z.string().regex(/^\s*all\s*$/i);
+const allWordSchema = z
+  .string()
+  .regex(/^\s*[aA][lL][lL]\s*$/)
+  .transform(() => LWQL_ALL_PROJECTS as typeof LWQL_ALL_PROJECTS);
 
 /** What a run's `projects` holds for a key: the ids to read, or "all" of those it can read. */
 const lwqlProjectsRequestSchemaDefinition = z.union([allWordSchema, lwqlProjectsSchemaDefinition], {

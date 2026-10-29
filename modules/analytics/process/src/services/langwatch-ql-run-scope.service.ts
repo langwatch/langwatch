@@ -58,7 +58,7 @@ export class LangWatchQLRunScopeService {
    */
   select(request: {
     projectId?: string | undefined;
-    projects?: readonly string[] | string | undefined;
+    projects?: readonly string[] | "all" | undefined;
   }): { named: readonly string[] | undefined; all: boolean } {
     const { named, all, conflict } = selectNamedProjects(request);
     if (conflict) throw new ValidationError("send projectId or projects, not both");

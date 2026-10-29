@@ -213,11 +213,7 @@ export class AuthzIdDecisionsService {
     permission: AuthzPermission;
     organizationId: string;
     teams: readonly { teamId: string }[];
-    projects: readonly {
-      projectId: string;
-      teamId?: string | undefined;
-      kind?: string | undefined;
-    }[];
+    projects: readonly { projectId: string; teamId?: string | undefined }[];
   }): Promise<{
     teams: Map<string, boolean>;
     projects: Map<string, boolean>;
@@ -252,11 +248,7 @@ export class AuthzIdDecisionsService {
     permissions: readonly AuthzPermission[];
     organizationId: string;
     teams: readonly { teamId: string }[];
-    projects: readonly {
-      projectId: string;
-      teamId?: string | undefined;
-      kind?: string | undefined;
-    }[];
+    projects: readonly { projectId: string; teamId?: string | undefined }[];
   }): Promise<{
     byPermission: Map<
       AuthzPermission,
@@ -284,10 +276,10 @@ export class AuthzIdDecisionsService {
         : false;
 
     const projectScopes = await Promise.all(
-      projects.map(async ({ projectId, teamId, kind }): Promise<[string, AuthzScopeRef | null]> => [
+      projects.map(async ({ projectId, teamId }): Promise<[string, AuthzScopeRef | null]> => [
         projectId,
         teamId
-          ? { type: "project", id: projectId, teamId, organizationId, ...(kind ? { kind } : {}) }
+          ? { type: "project", id: projectId, teamId, organizationId }
           : await this.deps.collector.findScopeRef({ projectId }),
       ]),
     );

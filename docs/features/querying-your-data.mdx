@@ -86,7 +86,7 @@ GROUP BY day ORDER BY day" --projects <project id>
 
 A key that reaches several projects must name the projects to read with `--projects` (the `projects` field over REST and in `run_query`). Without them the run is refused with `projects_required` (422): "Name the projects to query: send `projects`, a list of project ids, or \"all\"". A project API key, or any key that can read exactly one project, reads that project and needs none.
 
-Send `"all"` (the string, in any case; `--projects all` on the CLI) to read every project the key can read. It must stand alone: a list that holds it is refused with a 422. Only projects it holds `analytics:view` on, in its own organization, are read. `params.dashboard_context_projects` lists the projects that were read, in id order.
+Send `"all"` (the string, in any case; `--projects all` on the CLI) to read every project the key can read. It must stand alone: a list that holds it is refused with a 422: "all" stands alone; send it by itself, or list project ids. Only projects it holds `analytics:view` on, in its own organization, are read. `params.dashboard_context_projects` lists the projects that were read, in id order.
 
 If the key reads no project and it sends `"all"` or names no project, the run is refused with `projects_unreadable` (422); ask an admin to grant it `analytics:view` on one. A project it names and cannot read is refused with `project_not_found` (404). A member who reads none gets `project_not_found` (404). If it reads more than 10,000, the run is refused with a 422 asking you to name the projects. A widget does not store `"all"`; name its project ids.
 

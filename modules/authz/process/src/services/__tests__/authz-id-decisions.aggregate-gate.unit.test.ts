@@ -18,7 +18,7 @@ const admin: CollectedBinding[] = [
   { roleKey: "admin", scopeType: "PROJECT", scopeId: PROJECT, viaGroupId: null },
 ];
 
-function makeAuthz({ role, kind }: { role: "ADMIN" | "MEMBER"; kind: string }, lineage = vi.fn()) {
+function makeAuthz({ role, kind }: { role: "ADMIN" | "MEMBER"; kind: string }) {
   return AuthzService.create({
     isOnEngine: async () => true,
     repository: makeReader({
@@ -26,11 +26,9 @@ function makeAuthz({ role, kind }: { role: "ADMIN" | "MEMBER"; kind: string }, l
       findUserBindings: vi.fn().mockResolvedValue(admin),
       findApiKeyBindings: vi.fn().mockResolvedValue(admin),
       findApiKeyOwner: vi.fn().mockResolvedValue({ userId: alice.id }),
-      findProjectLineage: lineage.mockResolvedValue({
-        teamId: "team-1",
-        organizationId: ORG,
-        kind,
-      }),
+      findProjectLineage: vi
+        .fn()
+        .mockResolvedValue({ teamId: "team-1", organizationId: ORG, kind }),
       findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
     }),
     listing: new StubAuthzListingRepository(),
@@ -68,28 +66,25 @@ describe("AuthzService batch decisions on an aggregate project", () => {
       expect(await askBatchPaths(authz)).toEqual([false, false]);
     });
 
-    it("leaves an ordinary project open", async () => {
-      const authz = makeAuthz({ role: "MEMBER", kind: "project" });
-
-      expect(await askBatchPaths(authz)).toEqual([true, true]);
-    });
-  });
-
-  describe("when the caller passes the project's kind to canBatchByIds", () => {
-    it("closes the aggregate from the row, with no lineage read", async () => {
-      const lineage = vi.fn();
-      const authz = makeAuthz({ role: "MEMBER", kind: "aggregate" }, lineage);
+    /** @scenario "AC210f Compatibility: a member who is no admin cannot name an aggregate project in a widget" */
+    it("closes the aggregate in canBatchByIds, which the widget write uses", async () => {
+      const authz = makeAuthz({ role: "MEMBER", kind: "aggregate" });
 
       const batch = await authz.canBatchByIds({
         principal: alice,
         permission: "traces:view",
         organizationId: ORG,
         teams: [],
-        projects: [{ projectId: PROJECT, teamId: "team-1", kind: "aggregate" }],
+        projects: [{ projectId: PROJECT, teamId: "team-1" }],
       });
 
       expect(batch.projects.get(PROJECT)).toBe(false);
-      expect(lineage).not.toHaveBeenCalled();
+    });
+
+    it("leaves an ordinary project open", async () => {
+      const authz = makeAuthz({ role: "MEMBER", kind: "project" });
+
+      expect(await askBatchPaths(authz)).toEqual([true, true]);
     });
   });
 

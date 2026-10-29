@@ -54,7 +54,10 @@ export const widgetProjectsInput = z
     "The project ids every query of the widget reads, each one you can read. A new widget reads its board's project. null makes it unset again, reading the board's project.",
   );
 
-/** run_query's `projects`: project ids, or the lone word "all" in any case. */
+/**
+ * run_query's `projects`: ids, or the lone word "all" in any case. Mirrors holdsAllWord and
+ * LWQL_ALL_STANDS_ALONE in analytics-lwql.schemas.ts, which MCP cannot import.
+ */
 export const runQueryProjectsInput = z.union([
   z.string().refine(isAllWord),
   z

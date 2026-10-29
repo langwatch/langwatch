@@ -148,16 +148,7 @@ const authzCanBatchByIdsInputSchemaDefinition = z
     organizationId: z.string(),
     teams: z.array(z.object({ teamId: z.string() }).strict()).readonly(),
     projects: z
-      .array(
-        z
-          .object({
-            projectId: z.string(),
-            teamId: z.string().optional(),
-            /** `Project.kind`, when the caller holds it: the aggregate gate then reads no row. */
-            kind: z.string().optional(),
-          })
-          .strict(),
-      )
+      .array(z.object({ projectId: z.string(), teamId: z.string().optional() }).strict())
       .readonly(),
   })
   .strict();
@@ -189,16 +180,7 @@ const authzCanBatchPermissionsByIdsInputSchemaDefinition = z
     organizationId: z.string(),
     teams: z.array(z.object({ teamId: z.string() }).strict()).readonly(),
     projects: z
-      .array(
-        z
-          .object({
-            projectId: z.string(),
-            teamId: z.string().optional(),
-            /** `Project.kind`, when the caller holds it: the aggregate gate then reads no row. */
-            kind: z.string().optional(),
-          })
-          .strict(),
-      )
+      .array(z.object({ projectId: z.string(), teamId: z.string().optional() }).strict())
       .readonly(),
   })
   .strict();
