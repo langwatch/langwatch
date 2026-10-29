@@ -909,5 +909,42 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
       expect((error as InstantEvalJudgeStoppedError).inputTokens).toBe(1000);
     });
+
+    /** @scenario "A caller's stop keeps the legs already paid billed" */
+    it("bills a shared send once when the caller stops during another kind's escalation", async () => {
+      const stop = new AbortController();
+      const CLEAR = rating("clear", "how clear is the reply, 1 to 5");
+      const unsure = (id: string) => ({ questionId: id, score: 3, spread: 1.8 });
+      let llmSends = 0;
+      // Yes or no (the lead) and two scores share one send; both scores are unsure and escalate.
+      const { classify, hostedDecisions } = harness({
+        table,
+        decisions: () => ({
+          verdicts: [{ questionId: "q", probability: 0.05 }, unsure("polite"), unsure("clear")],
+          inputTokens: 1000,
+          isTextTruncated: false,
+        }),
+        llm: (signal) => {
+          llmSends += 1;
+          if (llmSends === 1) {
+            return { outcome: "answered", score: 2, inputTokens: 900, outputTokens: 80 };
+          }
+          setTimeout(() => stop.abort(new DOMException("stopped", "AbortError")), 5);
+          return hangUntilAborted(signal);
+        },
+      });
+      const error = await classify(
+        { job: "llm_judge", tokens: 500 },
+        [Q, POLITE, CLEAR],
+        stop.signal,
+      ).catch((caught: unknown) => caught);
+      expect(hostedDecisions.requests).toHaveLength(1);
+      expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
+      // The shared send's 1000 tokens once, plus the one LLM score that came back.
+      expect(error).toMatchObject({
+        inputTokens: 1000 + 900,
+        costNanoUsd: 100_000 + 1_800_000 + 640_000,
+      });
+    });
   });
 });
