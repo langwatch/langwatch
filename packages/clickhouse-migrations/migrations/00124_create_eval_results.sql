@@ -4,9 +4,9 @@
 -- ============================================================================
 -- eval_results, every Instant Evals judgment, recalled before judging (ADR-189).
 --
--- One row per judgment of one trace (or span) by one question and one judge
--- model, whoever asked: a quick eval() ask, a run, a dashboard widget or a
--- monitor on the Instant Evals judge. Before judging, the instant-eval module
+-- One row per judge call on one trace (or span), one question and one judge
+-- model. Any source may write: a quick eval() ask, a run, a dashboard widget or
+-- a monitor on the Instant Evals judge. Before judging, the instant-eval module
 -- looks up a matching row and reuses it; it judges only the misses and writes
 -- them in one bulk insert. Owned by instant-eval; other modules read it through
 -- InstantEvalApi.
@@ -17,8 +17,9 @@
 -- so every judgment is kept: a judge is not deterministic, and a re-judgment of
 -- the same trace by the same source adds a row rather than replacing one. A
 -- redelivered insert carries the same JudgedAt, so the replacing merge collapses
--- it. Reads MUST be replacement-aware (argMax or FINAL) and take the latest row
--- by JudgedAt.
+-- it. SourceId sits before JudgedAt, so the same verdict written by two sources
+-- is two rows. Recall never keys on SourceId: it takes the latest row by
+-- JudgedAt across every source. Reads MUST be replacement-aware (argMax or FINAL).
 --
 -- KeyVersion is the version of the recall key's hashing. Recall reads only rows
 -- of the current version, so rows written before recall is switched on, or
