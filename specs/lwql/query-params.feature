@@ -290,6 +290,56 @@ Feature: Every query door takes the same parameters and says what it ran with
       Then the two return the same rows and the same params
       # Evidence: the insight run's stored result and the card's tRPC answer for the same query, quoted and diffed
 
+  Rule: A run the server limited says so, without naming what it hid
+
+    # Decided by the owner's question (2026-10-29): "is there an easy way for us to send back from
+    # the query permission limitations? like 'this is a subset of data based on your permissions?'"
+    # Each diagnostic is non-fatal and appears only when the server actually limited this run.
+    # PROJECTS_NOT_READABLE is not a code: a named project the caller cannot read refuses the whole
+    # run with the 404 of QP09, so nothing is dropped and nothing is left to report.
+
+    @unit @integration
+    Scenario: QP25 FIELDS_REDACTED appears when a data protection hid fields the query reads
+      Given a project whose data protection hides captured input and a statement that selects CapturedInput
+      When the statement runs
+      Then diagnostics holds one FIELDS_REDACTED entry whose message reads "Some fields were hidden by data protection"
+      And its meta holds no project id and no count of projects
+      # Evidence: a real REST answer quoted, and a haven browser screenshot of the card's (i) line
+
+    @unit @integration
+    Scenario: QP26 SHARE_WINDOW_LIMITED appears when a dated member's rows were cut by its window
+      Given a group project sharing "B" from a date and a statement that reads rows older than that date
+      When the statement runs
+      Then diagnostics holds one SHARE_WINDOW_LIMITED entry whose message reads "Some projects share data only from a date, so earlier rows are not included"
+      And its message and meta name no project and count none
+      # Evidence: a real REST answer quoted, and a haven browser screenshot of the card's (i) line
+
+    @unit @integration
+    Scenario: QP27 A run the server did not limit carries neither diagnostic
+      Given a statement over a project with no protection that touches it and no dated member
+      When the statement runs
+      Then diagnostics holds no FIELDS_REDACTED and no SHARE_WINDOW_LIMITED entry
+      # Evidence: a real REST answer quoted, and a haven browser screenshot of a card with no (i) line
+
+    @unit @integration
+    Scenario: QP28 No limiting diagnostic names or counts a project the caller cannot read
+      Given a run limited by a protection and by a share window
+      Then no message, meta or detail of FIELDS_REDACTED or SHARE_WINDOW_LIMITED holds a project id, a project name or a number of projects
+      # Evidence: the answer's diagnostics quoted
+
+    @unit @integration
+    Scenario: QP29 Every door returns the limiting diagnostics
+      Given one limited run sent through analytics.lwql.query, POST /api/v1/query, run_query and the CLI
+      Then each answer carries the same diagnostics
+      And run_query and the CLI print them under the rows
+      # Evidence: the four answers quoted
+
+    @unit @integration
+    Scenario: QP30 A named project the caller cannot read is refused whole, with no PROJECTS_NOT_READABLE diagnostic
+      When a run names a project the caller cannot read
+      Then it is refused with the 404 of QP09 and no diagnostics list exists to carry a dropped project
+      # Evidence: the REST answer quoted
+
   Rule: A client or a release that does not know the new fields keeps working or refuses visibly
 
     @unit @integration
