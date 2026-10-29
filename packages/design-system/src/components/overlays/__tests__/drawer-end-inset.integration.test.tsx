@@ -22,17 +22,19 @@ function renderOpenDrawer(Parts: Pick<typeof Drawer, "Root" | "Content" | "Body"
   return screen.getByTestId("drawer");
 }
 
+// jsdom applies no media query, so this is the phone layout; the wide-screen yield is
+// measured in Chromium (tests/drawer-end-inset.browser.test.tsx).
 describe.each([Drawer, StudioDrawer])(
-  "given a docked side panel keeps room on the right edge",
+  "given a docked side panel keeps room on the right edge of a phone",
   (Parts) => {
     afterEach(() => {
       setDrawerEndInset(0);
       cleanup();
     });
 
-    it("every drawer yields that room", () => {
+    it("every drawer stays a sheet to the edge, below the header offset", () => {
       setDrawerEndInset(412);
-      expect(renderOpenDrawer(Parts)).toHaveStyle({ marginInlineEnd: "412px", marginTop: "48px" });
+      expect(renderOpenDrawer(Parts)).toHaveStyle({ marginInlineEnd: "0px", marginTop: "48px" });
     });
 
     it("keeps the default edge when the panel is not docked", () => {
