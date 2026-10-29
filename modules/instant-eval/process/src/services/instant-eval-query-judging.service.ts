@@ -10,7 +10,11 @@ import type {
   InstantEvalQueryJudgingInput,
 } from "@langwatch/instant-eval-contract";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalCostUsd,
+  instantEvalPriceUsd,
+  instantEvalRoutedSpendOf,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -124,9 +128,7 @@ export class InstantEvalQueryJudgingService {
         projectId,
         inputTokens: usage.inputTokens,
         requests: usage.requests,
-        ...(usage.routedInputTokens > 0
-          ? { costNanoUsd: usage.costNanoUsd, routedInputTokens: usage.routedInputTokens }
-          : {}),
+        ...instantEvalRoutedSpendOf(usage),
         occurredAt: this.options.now(),
       });
 

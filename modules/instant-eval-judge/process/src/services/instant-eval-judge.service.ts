@@ -8,6 +8,8 @@ import {
   INSTANT_EVAL_FREE_BUDGET_USD,
   InstantEvalFreeBudgetExhaustedError,
   InstantEvalJudgeStoppedError,
+  instantEvalJudgementRoutedSpendOf,
+  instantEvalRoutedSpendOf,
   instantEvalSkipped,
   type InstantEvalClassification,
   type InstantEvalJudgeAnswer,
@@ -18,6 +20,7 @@ import {
   type InstantEvalJudgeSpendPricedEventData,
   type InstantEvalJudgeSpendRecord,
   type InstantEvalPricing,
+  type InstantEvalRoutedSpend,
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
@@ -190,10 +193,7 @@ export class InstantEvalJudgeService {
       inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
       ...this.pricing(),
-      routed: this.routedOf({
-        costNanoUsd: costNanoUsd ?? 0,
-        routedInputTokens: costNanoUsd === undefined ? 0 : inputTokens,
-      }),
+      routed: this.priced(instantEvalJudgementRoutedSpendOf({ inputTokens, costNanoUsd })),
     });
     await this.record({ fact });
     return priceUsd;
@@ -209,8 +209,8 @@ export class InstantEvalJudgeService {
     projectId,
     requestId,
     inputTokens,
-    costNanoUsd = 0,
-    routedInputTokens = 0,
+    costNanoUsd,
+    routedInputTokens,
     requests,
     runId,
     occurredAt,
@@ -225,21 +225,14 @@ export class InstantEvalJudgeService {
       requests,
       runId,
       ...this.pricing(),
-      routed: this.routedOf({ costNanoUsd, routedInputTokens }),
+      routed: this.priced(instantEvalRoutedSpendOf({ costNanoUsd, routedInputTokens })),
     });
     await this.deps.recordSpendPriced(fact);
   }
 
-  /** Routed tokens price the spend from its routed cost; none prices the tokens as before. */
-  private routedOf({
-    costNanoUsd,
-    routedInputTokens,
-  }: {
-    costNanoUsd: number;
-    routedInputTokens: number;
-  }) {
-    if (routedInputTokens <= 0) return undefined;
-    return { costNanoUsd, routedInputTokens, pricing: this.deps.routePricing };
+  /** A routed spend is priced from its routed cost at the router's prices; none, as before. */
+  private priced(routed: InstantEvalRoutedSpend | undefined) {
+    return routed && { ...routed, pricing: this.deps.routePricing };
   }
 
   private pricing(): { pricing?: InstantEvalPricing } {

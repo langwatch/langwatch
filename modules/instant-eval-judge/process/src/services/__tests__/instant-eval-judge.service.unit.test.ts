@@ -678,6 +678,25 @@ describe("given a judge call that carries a route", () => {
     // $0.10 routed, plus one million unrouted tokens at the published $0.042 per million.
     expect(recorded[0]).toMatchObject({ costNanoUsd: 142_000_000, model: "langwatch-judge" });
   });
+
+  /** @scenario "Routed and unrouted tokens are billed separately" */
+  it("bills a routed cost that covers no input tokens, under the router's model", async () => {
+    const { service, recorded } = harness();
+
+    await service.recordSpend({
+      organizationId: ORGANIZATION_ID,
+      projectId: PROJECT_ID,
+      requestId: "run-1",
+      inputTokens: 1_000_000,
+      costNanoUsd: 5_000_000,
+      routedInputTokens: 0,
+      requests: 2,
+      occurredAt: NOW,
+    });
+
+    // $0.005 of output-only routed cost, plus one million unrouted tokens at $0.042.
+    expect(recorded[0]).toMatchObject({ costNanoUsd: 47_000_000, model: "langwatch-judge" });
+  });
 });
 
 describe("given the unmetered classify the Api and the judge call share", () => {

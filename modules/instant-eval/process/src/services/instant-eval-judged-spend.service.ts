@@ -5,7 +5,10 @@
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalRoutedSpendOf,
+  type InstantEvalJudgeApi,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
@@ -71,7 +74,7 @@ export class InstantEvalJudgedSpendService {
       requestId,
       inputTokens,
       requests,
-      ...(routedInputTokens ? { costNanoUsd: costNanoUsd ?? 0, routedInputTokens } : {}),
+      ...instantEvalRoutedSpendOf({ costNanoUsd, routedInputTokens }),
       ...(runId ? { runId } : {}),
       occurredAt: occurredAt.epochMilliseconds,
     });

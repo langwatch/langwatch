@@ -191,6 +191,25 @@ describe("given a routed run", () => {
     expect(recorded[0]).toMatchObject({ costNanoUsd: 0, routedInputTokens: 1_000_000 });
   });
 
+  /** @scenario "Routed and unrouted tokens are billed separately" */
+  it("hands a routed cost that covers no input tokens to the judge, as the run's cost counts it", async () => {
+    const { service, recorded } = finishing();
+
+    const spend = await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 1_000_000,
+      requests: 10,
+      costNanoUsd: 5_000_000,
+      routedInputTokens: 0,
+    });
+
+    // $0.005 of output-only routed cost, plus one million unrouted tokens at $0.042.
+    expect(spend.costUsd).toBe(0.047);
+    expect(recorded[0]).toMatchObject({ costNanoUsd: 5_000_000, routedInputTokens: 0 });
+  });
+
   /** @scenario "A page event without a routed cost still reads and prices from tokens" */
   it("prices the tokens as before when the run carries no routed cost", async () => {
     const { service, recorded } = finishing();

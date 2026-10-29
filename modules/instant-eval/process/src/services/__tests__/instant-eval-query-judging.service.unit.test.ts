@@ -440,6 +440,27 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
   });
 
   describe("given routed and unrouted judgements in one batch", () => {
+    /** @scenario "Routed and unrouted tokens are billed separately" */
+    it("records a routed cost that covers no input tokens, apart from the unrouted ones", async () => {
+      const judge = new ScriptedJudge(async ({ request, index }) => {
+        const judgement = await answerEvery({ probability: 0.7 })({ request, index });
+        return index === 0 ? { ...judgement, inputTokens: 0, costNanoUsd: 5000 } : judgement;
+      });
+      const { service, records } = harness({ judge, concurrency: 1 });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }, { annoyed: "two" }],
+      });
+
+      expect(records[0]).toMatchObject({
+        inputTokens: TOKENS_PER_TEXT,
+        costNanoUsd: 5000,
+        routedInputTokens: 0,
+      });
+    });
+
     /** @scenario "A routed judgement is priced from the summed cost of every call" */
     it("counts a routed judgement that cost nothing as routed tokens, apart from the unrouted ones", async () => {
       const judge = new ScriptedJudge(async ({ request, index }) => {

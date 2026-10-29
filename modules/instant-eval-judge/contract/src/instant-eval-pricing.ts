@@ -117,6 +117,40 @@ export function instantEvalSpentCostUsd({
   return toNanoUsdPrecision(costNanoUsd / NANO_USD_PER_USD + unroutedUsd);
 }
 
+/** The routed part of a spend: the summed routed cost and the input tokens it covers. */
+export type InstantEvalRoutedSpend = Readonly<{ costNanoUsd: number; routedInputTokens: number }>;
+
+/**
+ * The routed part of a page's, run's or query's spend, or undefined when nothing was routed. Routed
+ * tokens or a routed cost above zero mark it, so a cost that covers no input tokens (a backend
+ * that bills output alone) is billed too. The one rule for "routed" past a single judgement.
+ */
+export function instantEvalRoutedSpendOf({
+  costNanoUsd = 0,
+  routedInputTokens = 0,
+}: {
+  costNanoUsd?: number | undefined;
+  routedInputTokens?: number | undefined;
+}): InstantEvalRoutedSpend | undefined {
+  if (costNanoUsd <= 0 && routedInputTokens <= 0) return undefined;
+  return { costNanoUsd, routedInputTokens };
+}
+
+/**
+ * One judgement's routed part. The router prices every judgement it returns, so a cost, zero
+ * included, routes all of its input tokens; no cost is an unrouted judgement.
+ */
+export function instantEvalJudgementRoutedSpendOf({
+  inputTokens,
+  costNanoUsd,
+}: {
+  inputTokens: number;
+  costNanoUsd?: number | undefined;
+}): InstantEvalRoutedSpend | undefined {
+  if (costNanoUsd === undefined) return undefined;
+  return instantEvalRoutedSpendOf({ costNanoUsd, routedInputTokens: inputTokens });
+}
+
 /** What the customer is charged for a judgement, page or run: its spent cost at the markup. */
 export function instantEvalSpentPriceUsd({
   inputTokens,

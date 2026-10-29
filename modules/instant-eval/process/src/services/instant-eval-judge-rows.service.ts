@@ -8,6 +8,7 @@
 import {
   InstantEvalClassifierUnavailableError,
   InstantEvalJudgeStoppedError,
+  instantEvalJudgementRoutedSpendOf,
   type InstantEvalJudgement,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
@@ -154,8 +155,7 @@ export class InstantEvalJudgeRowsService {
       if (error instanceof InstantEvalJudgeStoppedError) {
         usage.requests += 1;
         usage.inputTokens += error.inputTokens;
-        usage.costNanoUsd += error.costNanoUsd;
-        usage.routedInputTokens += error.inputTokens;
+        recordRoutedCost({ judgement: error, usage });
       }
       if (signal?.aborted || isAbortError(error)) throw error;
 
@@ -204,20 +204,18 @@ function record({
   cells.set(unit.rowIndex, row);
 }
 
-/**
- * A routed judgement's cost, summed into the batch's usage. The router prices every judgement it
- * returns, so a cost, zero included, marks its tokens as routed.
- */
+/** A routed judgement's or stopped call's cost, and the tokens it covers, summed into the usage. */
 function recordRoutedCost({
   judgement,
   usage,
 }: {
-  judgement: InstantEvalJudgement;
+  judgement: Pick<InstantEvalJudgement, "inputTokens" | "costNanoUsd">;
   usage: InstantEvalJudgeUsage;
 }): void {
-  if (judgement.costNanoUsd === undefined) return;
-  usage.costNanoUsd += judgement.costNanoUsd;
-  usage.routedInputTokens += judgement.inputTokens;
+  const routed = instantEvalJudgementRoutedSpendOf(judgement);
+  if (!routed) return;
+  usage.costNanoUsd += routed.costNanoUsd;
+  usage.routedInputTokens += routed.routedInputTokens;
 }
 
 /** Whether a thrown value is a stop rather than a failure. */
