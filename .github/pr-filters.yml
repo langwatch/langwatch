@@ -65,7 +65,7 @@ e2e:
   - ".github/workflows/pr.yml"
   - ".github/pr-filters.yml"
 nlp:
-  - "infra/docker/Dockerfile.go"
+  - "infra/docker/Dockerfile.go-services"
   - "services/nlpgo/**"
   - "cmd/service/**"
   - "pkg/**"

@@ -22,7 +22,7 @@ services:
   #     ...
 
   # nlpgo — the Go NLP engine (langwatch/langwatch_nlp is now a static Go
-  # binary, Dockerfile.go). Binds :5561; reads LANGWATCH_ENDPOINT.
+  # binary, Dockerfile.go-services). Binds :5561; reads LANGWATCH_ENDPOINT.
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
     command: [nlpgo]

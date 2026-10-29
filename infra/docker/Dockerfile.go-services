@@ -10,7 +10,7 @@
 #            (langwatch/langwatch_nlp, langwatch-nlp-service)
 #   lambda   nlpgo behind the AWS Lambda Web Adapter (langwatch-nlp-lambda)
 #
-#   docker build -f infra/docker/Dockerfile.go --target nlp .
+#   docker build -f infra/docker/Dockerfile.go-services --target nlp .
 #
 # gateway and nlp share every layer of `service` and differ only in their
 # default command and listen address. Every chart and compose file passes the

@@ -21,7 +21,7 @@ import (
 const LambdaDockerfileGlob = "infra/docker/Dockerfile.*.lambda"
 
 // LambdaStage is the stage a Dockerfile that builds other images too builds
-// its Lambda image as, such as Dockerfile.go's.
+// its Lambda image as, such as Dockerfile.go-services.
 const LambdaStage = "lambda"
 
 // LambdaWorkdir reports each Lambda image whose stage sets no WORKDIR of its

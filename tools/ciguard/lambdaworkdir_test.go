@@ -25,7 +25,7 @@ func goRepo(t *testing.T, dockerfile string) string {
 	t.Helper()
 
 	root := t.TempDir()
-	writeDockerfile(t, root, "Dockerfile.go", dockerfile)
+	writeDockerfile(t, root, "Dockerfile.go-services", dockerfile)
 
 	return root
 }
@@ -86,13 +86,13 @@ func TestLambdaWorkdir(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, problems, 1)
-		assert.Contains(t, problems[0], "Dockerfile.go")
+		assert.Contains(t, problems[0], "Dockerfile.go-services")
 		assert.Contains(t, problems[0], "sets no WORKDIR")
 	})
 
 	t.Run("when a Dockerfile builds no Lambda image, its WORKDIR is not checked", func(t *testing.T) {
 		root := lambdaRepo(t, "FROM gcr.io/distroless/python3-debian12:nonroot\nWORKDIR /\n")
-		writeDockerfile(t, root, "Dockerfile.go", "FROM gcr.io/distroless/static:nonroot AS gateway\n")
+		writeDockerfile(t, root, "Dockerfile.go-services", "FROM gcr.io/distroless/static:nonroot AS gateway\n")
 
 		problems, err := ciguard.LambdaWorkdir(root)
 

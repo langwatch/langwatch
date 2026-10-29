@@ -62,7 +62,7 @@ func TestGatewayEgressPolicyUsesGlobalEnvironmentNames(t *testing.T) {
 // TestDeployedEnvNamesStillHydrate pins the exact variable names live
 // deployments set. The root leaves are bare because `charts/langwatch/
 // templates/langwatch_nlp/deployment.yaml` and
-// `infra/docker/Dockerfile.go` set them under those names; the
+// `infra/docker/Dockerfile.go-services` set them under those names; the
 // engine leaves carry the NLPGO_ENGINE_ prefix the hydrator builds from the
 // Engine field's own env tag. Renaming either half silently detaches a
 // running deployment from its own configuration, which is why the names are

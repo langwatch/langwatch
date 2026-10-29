@@ -27,7 +27,7 @@ deps:
 images:
 	$(MAKE) -C $(CH_CHART) images
 	docker build -t $(APP_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile $(APP_DIR)
-	docker build -t $(NLP_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile.go --target nlp $(APP_DIR)
+	docker build -t $(NLP_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile.go-services --target nlp $(APP_DIR)
 	docker build -t $(LANGEVALS_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile.langevals $(APP_DIR)
 
 ## Build + load all images into Kind

@@ -69,7 +69,7 @@ services:
     restart: always
 
   # nlpgo — the Go NLP engine, the `nlpgo` command of langwatch/langwatch_nlp
-  # (Dockerfile.go's nlp target). It binds SERVER_ADDR, :5561, and reads
+  # (the nlp target of Dockerfile.go-services). It binds SERVER_ADDR, :5561, and reads
   # LANGWATCH_ENDPOINT for evaluator + agent-workflow callbacks.
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest

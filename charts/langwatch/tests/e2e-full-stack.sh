@@ -64,7 +64,7 @@ build_and_load_images() {
     # NLP
     if ! docker image inspect "$NLP_IMAGE" &>/dev/null; then
       info "Building NLP image..."
-      docker build -t "$NLP_IMAGE" -f "$REPO_ROOT/infra/docker/Dockerfile.go" --target nlp "$REPO_ROOT"
+      docker build -t "$NLP_IMAGE" -f "$REPO_ROOT/infra/docker/Dockerfile.go-services" --target nlp "$REPO_ROOT"
     fi
 
     # Langevals
