@@ -9,6 +9,7 @@ import { writeFileSync } from "node:fs";
 import chalk from "chalk";
 
 import {
+  type QueryRunParams,
   type QueryRunResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
@@ -66,7 +67,7 @@ export interface QueryRunOptions {
 interface RunReach {
   projectId?: string;
   projects?: string[];
-  sources?: string[];
+  sources?: QueryRunParams["sources"];
 }
 
 /** What the CLI tells a person whose key names no project (the platform's `projects_required`). */
@@ -365,7 +366,8 @@ export const runQueryCommand = async (
   const reach: RunReach = {
     ...(projectId === undefined ? {} : { projectId }),
     ...(projects ? { projects } : {}),
-    ...(sources ? { sources } : {}),
+    // The server owns the origin list and refuses an unknown name with its own message.
+    ...(sources ? { sources: sources as QueryRunParams["sources"] } : {}),
   };
   const common = {
     ...resolved,

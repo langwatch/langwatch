@@ -71,7 +71,7 @@ function scopeOver(input: {
         return Promise.resolve(input.grants[scope.id]?.includes(permission) === true);
       },
       hasPermission: ({ permission, projectId }) =>
-        Promise.resolve(input.grants[projectId]?.includes(permission) === true),
+        Promise.resolve(input.grants[projectId ?? ""]?.includes(permission) === true),
       getScope: ({ projectId = "" }) =>
         Promise.resolve({
           type: "project",

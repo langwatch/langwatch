@@ -399,7 +399,10 @@ export type LangWatchQLPassInput = Pick<
  * secrets become the tenant-capability set, so the query reads the union of their rows; an
  * empty set is a valid scope that reads zero rows.
  */
-export type LangWatchQLProjectSetExecuteInput = Omit<LangWatchQLExecuteInput, "project"> &
+export type LangWatchQLProjectSetExecuteInput = Omit<
+  LangWatchQLExecuteInput,
+  "project" | "projects"
+> &
   Readonly<{ projects: readonly LangWatchQLCaller[] }>;
 
 /**
