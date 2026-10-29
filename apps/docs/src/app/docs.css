@@ -2558,15 +2558,6 @@ html[data-docs-theme-change]::view-transition-new(root) {
   background: var(--nf-bg);
   color: var(--nf-fg);
 }
-.docs-nf[data-scene="engineering"] {
-  --nf-bg: #f4efe4;
-  --nf-line: #ddd6c6;
-  font-family: var(--chakra-fonts-mono);
-}
-.dark .docs-nf[data-scene="engineering"] {
-  --nf-bg: #08080a;
-  --nf-line: #34343b;
-}
 @media (max-width: 47.99rem) {
   .docs-nf {
     padding: 28px 20px 40px;
@@ -2680,21 +2671,10 @@ html[data-docs-theme-change]::view-transition-new(root) {
   line-height: 46px;
   letter-spacing: -0.02em;
 }
-.docs-nf[data-scene="engineering"] .docs-nf-head h1 {
-  font-family: var(--chakra-fonts-mono);
-  font-weight: 500;
-  font-size: 30px;
-  line-height: 38px;
-  letter-spacing: -0.01em;
-}
 @media (max-width: 47.99rem) {
   .docs-nf-head h1 {
     font-size: 32px;
     line-height: 36px;
-  }
-  .docs-nf[data-scene="engineering"] .docs-nf-head h1 {
-    font-size: 24px;
-    line-height: 32px;
   }
 }
 .docs-nf-address {
@@ -2703,9 +2683,6 @@ html[data-docs-theme-change]::view-transition-new(root) {
   line-height: 26px;
   color: var(--nf-dim);
   overflow-wrap: anywhere;
-}
-.docs-nf[data-scene="engineering"] .docs-nf-address {
-  font-size: 14px;
 }
 .docs-nf-address code {
   font-family: var(--chakra-fonts-mono);
@@ -2785,10 +2762,51 @@ html[data-docs-theme-change]::view-transition-new(root) {
     grid-column: 2;
   }
 }
-/* Engineering: a Langy Code session, Claude Code's terminal with the name changed. */
+/* Engineering: a Langy Code session, Claude Code's terminal with the name changed, in a
+   terminal window of its own. */
+.docs-nf-window {
+  --nf-bg: #f4efe4;
+  --nf-line: #ddd6c6;
+  overflow: hidden;
+  border: 1px solid var(--nf-line);
+  border-radius: 12px;
+  background: var(--nf-bg);
+  font-family: var(--chakra-fonts-mono);
+  box-shadow: 0 16px 36px -14px rgb(20 15 30 / 0.18);
+}
+.dark .docs-nf-window {
+  --nf-bg: #08080a;
+  --nf-line: #34343b;
+  box-shadow: 0 16px 36px -14px rgb(0 0 0 / 0.6);
+}
+.docs-nf-window-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--nf-line);
+  font-size: 12px;
+  color: var(--nf-dim);
+}
+.docs-nf-window-dots {
+  display: flex;
+  gap: 8px;
+}
+.docs-nf-window-dots span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--nf-line);
+}
 .docs-nf-term {
+  padding: 22px 24px 18px;
   font-size: 14px;
   line-height: 22px;
+}
+@media (max-width: 47.99rem) {
+  .docs-nf-term {
+    padding: 18px 16px 14px;
+  }
 }
 .docs-nf-banner {
   display: flex;
@@ -2937,9 +2955,6 @@ html[data-docs-theme-change]::view-transition-new(root) {
   margin-inline-end: 8px;
   border-radius: 50%;
   background: var(--nf-mark);
-}
-.docs-nf[data-scene="engineering"] .docs-nf-dot {
-  display: none;
 }
 .docs-nf-icon {
   flex-shrink: 0;

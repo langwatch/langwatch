@@ -147,49 +147,60 @@ function terminal({ shown, host, pages, query }: SceneInput) {
     { class: "docs-nf-line docs-nf-dim", "data-nf-shortcuts": "", hidden: "" },
     "1-3 open a page · / search the docs · ? hide shortcuts",
   );
+  const bar = h(
+    "div",
+    { class: "docs-nf-window-bar", "aria-hidden": "true" },
+    span("docs-nf-window-dots", span(""), span(""), span("")),
+    span("", "langy — docs"),
+  );
   return h(
     "div",
-    { class: "docs-nf-term" },
+    { class: "docs-nf-window" },
+    bar,
     h(
       "div",
-      { class: "docs-nf-banner" },
-      mark({ className: "docs-nf-langy", width: 30, gradient: true }),
+      { class: "docs-nf-term" },
       h(
         "div",
-        {},
-        h("p", {}, h("strong", {}, "Langy Code")),
-        h("p", { class: "docs-nf-dim" }, "Langy · documentation agent"),
-        h("p", { class: "docs-nf-dim" }, `${host}`),
-      ),
-    ),
-    h("p", { class: "docs-nf-rule", "aria-hidden": "true" }, "session start"),
-    block(span("docs-nf-caret", "❯ "), `open ${shown}`),
-    block(
-      span("docs-nf-red", "⏺ "),
-      h("strong", {}, "Fetch"),
-      span("docs-nf-dim", `(${host}${shown})`),
-    ),
-    line(span("docs-nf-dim", "  ⎿  "), span("docs-nf-red", "404 Not found")),
-    pages.length
-      ? block(span("docs-nf-bullet", "⏺ "), "That page does not exist. The closest pages are:")
-      : block(span("docs-nf-bullet", "⏺ "), "That page does not exist. Try a search instead."),
-    pages.length ? picks({ pages, label: "Closest pages" }) : null,
-    h(
-      "div",
-      { class: "docs-nf-status" },
-      h("label", { class: "docs-nf-input" }, span("docs-nf-caret", "❯"), input),
-      h(
-        "p",
-        { class: "docs-nf-line docs-nf-hints" },
+        { class: "docs-nf-banner" },
+        mark({ className: "docs-nf-langy", width: 30, gradient: true }),
         h(
-          "span",
+          "div",
           {},
-          span("docs-nf-accent", "⏵⏵ "),
-          span("docs-nf-dim", "1-3 open a page · / search · ? shortcuts"),
+          h("p", {}, h("strong", {}, "Langy Code")),
+          h("p", { class: "docs-nf-dim" }, "Langy · documentation agent"),
+          h("p", { class: "docs-nf-dim" }, `${host}`),
         ),
-        h("span", {}, span("docs-nf-dim", "1 step · 0 tokens · "), span("docs-nf-accent", "404")),
       ),
-      shortcuts,
+      h("p", { class: "docs-nf-rule", "aria-hidden": "true" }, "session start"),
+      block(span("docs-nf-caret", "❯ "), `open ${shown}`),
+      block(
+        span("docs-nf-red", "⏺ "),
+        h("strong", {}, "Fetch"),
+        span("docs-nf-dim", `(${host}${shown})`),
+      ),
+      line(span("docs-nf-dim", "  ⎿  "), span("docs-nf-red", "404 Not found")),
+      pages.length
+        ? block(span("docs-nf-bullet", "⏺ "), "That page does not exist. The closest pages are:")
+        : block(span("docs-nf-bullet", "⏺ "), "That page does not exist. Try a search instead."),
+      pages.length ? picks({ pages, label: "Closest pages" }) : null,
+      h(
+        "div",
+        { class: "docs-nf-status" },
+        h("label", { class: "docs-nf-input" }, span("docs-nf-caret", "❯"), input),
+        h(
+          "p",
+          { class: "docs-nf-line docs-nf-hints" },
+          h(
+            "span",
+            {},
+            span("docs-nf-accent", "⏵⏵ "),
+            span("docs-nf-dim", "1-3 open a page · / search · ? shortcuts"),
+          ),
+          h("span", {}, span("docs-nf-dim", "1 step · 0 tokens · "), span("docs-nf-accent", "404")),
+        ),
+        shortcuts,
+      ),
     ),
   );
 }
