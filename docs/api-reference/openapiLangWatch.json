@@ -14990,7 +14990,8 @@
                               "APP_FUNCTION_VALUE_TRUNCATED",
                               "APP_FUNCTION_UNRESOLVED_KEYS",
                               "APP_FUNCTION_RESULT_TRUNCATED",
-                              "INSTANT_EVAL_SKIPPED"
+                              "INSTANT_EVAL_SKIPPED",
+                              "SHARE_WINDOW_LIMITED"
                             ]
                           },
                           "message": {
@@ -15106,6 +15107,64 @@
                         "total",
                         "fields"
                       ]
+                    },
+                    "params": {
+                      "type": "object",
+                      "properties": {
+                        "sources": {
+                          "readOnly": true,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "followsSources": {
+                          "type": "boolean"
+                        },
+                        "projects": {
+                          "readOnly": true,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "period": {
+                          "type": "object",
+                          "properties": {
+                            "start": {
+                              "type": "string"
+                            },
+                            "end": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "granularitySeconds": {
+                          "type": "number"
+                        },
+                        "coarsenedFromSeconds": {
+                          "type": "number"
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "sources",
+                        "followsSources",
+                        "projects",
+                        "parameters"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -15614,7 +15673,7 @@
             }
           }
         },
-        "description": "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nA projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.\n\nAny LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.\n\nTo run over one project only, send its id as `projectId` in the body: the run then reads that project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same answer as a project that does not exist. Without `projectId` the run spans every project the key can read.\n\nA statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
+        "description": "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nA projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.\n\nA project API key reads its own project. A key for an organization, a team or a person must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.\n\nSend `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of another organization and a project that does not exist are all refused with `project_not_found` (404), with one body that names no id. Send `sources` to bind `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to the projects read. The answer's `params` lists what the run was bound to: `sources`, `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and `coarsenedFromSeconds` when the step was coarsened.\n\nA statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
         "summary": "Run a LangWatchQL query",
         "tags": [
           "Query"
@@ -15720,9 +15779,42 @@
                     ]
                   },
                   "projectId": {
-                    "description": "Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.",
+                    "description": "Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both.",
                     "type": "string",
                     "minLength": 1
+                  },
+                  "projects": {
+                    "description": "The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. The answer's params.projects lists what was read.",
+                    "readOnly": true,
+                    "minItems": 1,
+                    "maxItems": 10000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "sources": {
+                    "description": "The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. Only a statement that reads the parameter is kept to them.",
+                    "readOnly": true,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "application",
+                        "simulation",
+                        "evaluation",
+                        "sample",
+                        "coding_agent",
+                        "ai_tool",
+                        "gateway",
+                        "workflow",
+                        "playground",
+                        "langy",
+                        "other"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -30008,6 +30100,23 @@
                                           "type": "null"
                                         }
                                       ]
+                                    },
+                                    "projects": {
+                                      "anyOf": [
+                                        {
+                                          "readOnly": true,
+                                          "minItems": 1,
+                                          "maxItems": 10000,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -30623,6 +30732,23 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "projects": {
+                                "anyOf": [
+                                  {
+                                    "readOnly": true,
+                                    "minItems": 1,
+                                    "maxItems": 10000,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -31222,6 +31348,23 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "projects": {
+                          "anyOf": [
+                            {
+                              "readOnly": true,
+                              "minItems": 1,
+                              "maxItems": 10000,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -31414,6 +31557,23 @@
                                         "langy",
                                         "other"
                                       ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "projects": {
+                                "anyOf": [
+                                  {
+                                    "readOnly": true,
+                                    "minItems": 1,
+                                    "maxItems": 10000,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
                                     }
                                   },
                                   {
@@ -32119,6 +32279,23 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "projects": {
+                                "anyOf": [
+                                  {
+                                    "readOnly": true,
+                                    "minItems": 1,
+                                    "maxItems": 10000,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -32809,6 +32986,23 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "projects": {
+                          "anyOf": [
+                            {
+                              "readOnly": true,
+                              "minItems": 1,
+                              "maxItems": 10000,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -33458,6 +33652,23 @@
                                         "langy",
                                         "other"
                                       ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "projects": {
+                                "anyOf": [
+                                  {
+                                    "readOnly": true,
+                                    "minItems": 1,
+                                    "maxItems": 10000,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
                                     }
                                   },
                                   {
@@ -36569,6 +36780,23 @@
                                           "type": "null"
                                         }
                                       ]
+                                    },
+                                    "projects": {
+                                      "anyOf": [
+                                        {
+                                          "readOnly": true,
+                                          "minItems": 1,
+                                          "maxItems": 10000,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -37266,6 +37494,23 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "projects": {
+                                "anyOf": [
+                                  {
+                                    "readOnly": true,
+                                    "minItems": 1,
+                                    "maxItems": 10000,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -37947,6 +38192,23 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "projects": {
+                          "anyOf": [
+                            {
+                              "readOnly": true,
+                              "minItems": 1,
+                              "maxItems": 10000,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -38139,6 +38401,23 @@
                                         "langy",
                                         "other"
                                       ]
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "projects": {
+                                "anyOf": [
+                                  {
+                                    "readOnly": true,
+                                    "minItems": 1,
+                                    "maxItems": 10000,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
                                     }
                                   },
                                   {
@@ -38844,6 +39123,23 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "projects": {
+                                "anyOf": [
+                                  {
+                                    "readOnly": true,
+                                    "minItems": 1,
+                                    "maxItems": 10000,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -39528,6 +39824,23 @@
                                   "langy",
                                   "other"
                                 ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "projects": {
+                          "anyOf": [
+                            {
+                              "readOnly": true,
+                              "minItems": 1,
+                              "maxItems": 10000,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
                               }
                             },
                             {

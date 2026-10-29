@@ -7963,6 +7963,7 @@ from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_50
 )
 from .post_api_v1_query_body import PostApiV1QueryBody
 from .post_api_v1_query_body_parameters import PostApiV1QueryBodyParameters
+from .post_api_v1_query_body_sources_item import PostApiV1QueryBodySourcesItem
 from .post_api_v1_query_body_time_window import PostApiV1QueryBodyTimeWindow
 from .post_api_v1_query_response_200 import PostApiV1QueryResponse200
 from .post_api_v1_query_response_200_columns_item import PostApiV1QueryResponse200ColumnsItem
@@ -7974,6 +7975,9 @@ from .post_api_v1_query_response_200_completeness_unpriced import PostApiV1Query
 from .post_api_v1_query_response_200_diagnostics_item import PostApiV1QueryResponse200DiagnosticsItem
 from .post_api_v1_query_response_200_diagnostics_item_code import PostApiV1QueryResponse200DiagnosticsItemCode
 from .post_api_v1_query_response_200_diagnostics_item_meta import PostApiV1QueryResponse200DiagnosticsItemMeta
+from .post_api_v1_query_response_200_params import PostApiV1QueryResponse200Params
+from .post_api_v1_query_response_200_params_parameters import PostApiV1QueryResponse200ParamsParameters
+from .post_api_v1_query_response_200_params_period import PostApiV1QueryResponse200ParamsPeriod
 from .post_api_v1_query_response_200_rows_item import PostApiV1QueryResponse200RowsItem
 from .post_api_v1_query_response_200_statistics import PostApiV1QueryResponse200Statistics
 from .post_api_v1_query_response_400 import PostApiV1QueryResponse400
@@ -13295,6 +13299,7 @@ __all__ = (
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse500Trace",
     "PostApiV1QueryBody",
     "PostApiV1QueryBodyParameters",
+    "PostApiV1QueryBodySourcesItem",
     "PostApiV1QueryBodyTimeWindow",
     "PostApiV1QueryResponse200",
     "PostApiV1QueryResponse200ColumnsItem",
@@ -13306,6 +13311,9 @@ __all__ = (
     "PostApiV1QueryResponse200DiagnosticsItem",
     "PostApiV1QueryResponse200DiagnosticsItemCode",
     "PostApiV1QueryResponse200DiagnosticsItemMeta",
+    "PostApiV1QueryResponse200Params",
+    "PostApiV1QueryResponse200ParamsParameters",
+    "PostApiV1QueryResponse200ParamsPeriod",
     "PostApiV1QueryResponse200RowsItem",
     "PostApiV1QueryResponse200Statistics",
     "PostApiV1QueryResponse400",

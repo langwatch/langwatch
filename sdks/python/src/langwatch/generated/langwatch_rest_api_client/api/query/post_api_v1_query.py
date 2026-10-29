@@ -141,16 +141,20 @@ def sync_detailed(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    Any LangWatch API key — project, organization or personal — reaches every project it can read
-    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
-    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
-    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+    A project API key reads its own project. A key for an organization, a team or a person must name the
+    projects to read in `projects`, each one it can read `analytics:view` on; without them the run is
+    refused with `projects_required` (422). Rows from more than one project come back flagged with the
+    `MULTI_PROJECT_RESULT` diagnostic.
 
-    To run over one project only, send its id as `projectId` in the body: the run then reads that
-    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
-    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
-    answer as a project that does not exist. Without `projectId` the run spans every project the key can
-    read.
+    Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
+    works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
+    another organization and a project that does not exist are all refused with `project_not_found`
+    (404), with one body that names no id. Send `sources` to bind
+    `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
+    that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
+    the projects read. The answer's `params` lists what the run was bound to: `sources`,
+    `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and
+    `coarsenedFromSeconds` when the step was coarsened.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -217,16 +221,20 @@ def sync(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    Any LangWatch API key — project, organization or personal — reaches every project it can read
-    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
-    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
-    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+    A project API key reads its own project. A key for an organization, a team or a person must name the
+    projects to read in `projects`, each one it can read `analytics:view` on; without them the run is
+    refused with `projects_required` (422). Rows from more than one project come back flagged with the
+    `MULTI_PROJECT_RESULT` diagnostic.
 
-    To run over one project only, send its id as `projectId` in the body: the run then reads that
-    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
-    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
-    answer as a project that does not exist. Without `projectId` the run spans every project the key can
-    read.
+    Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
+    works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
+    another organization and a project that does not exist are all refused with `project_not_found`
+    (404), with one body that names no id. Send `sources` to bind
+    `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
+    that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
+    the projects read. The answer's `params` lists what the run was bound to: `sources`,
+    `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and
+    `coarsenedFromSeconds` when the step was coarsened.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -287,16 +295,20 @@ async def asyncio_detailed(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    Any LangWatch API key — project, organization or personal — reaches every project it can read
-    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
-    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
-    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+    A project API key reads its own project. A key for an organization, a team or a person must name the
+    projects to read in `projects`, each one it can read `analytics:view` on; without them the run is
+    refused with `projects_required` (422). Rows from more than one project come back flagged with the
+    `MULTI_PROJECT_RESULT` diagnostic.
 
-    To run over one project only, send its id as `projectId` in the body: the run then reads that
-    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
-    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
-    answer as a project that does not exist. Without `projectId` the run spans every project the key can
-    read.
+    Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
+    works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
+    another organization and a project that does not exist are all refused with `project_not_found`
+    (404), with one body that names no id. Send `sources` to bind
+    `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
+    that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
+    the projects read. The answer's `params` lists what the run was bound to: `sources`,
+    `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and
+    `coarsenedFromSeconds` when the step was coarsened.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -361,16 +373,20 @@ async def asyncio(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    Any LangWatch API key — project, organization or personal — reaches every project it can read
-    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
-    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
-    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+    A project API key reads its own project. A key for an organization, a team or a person must name the
+    projects to read in `projects`, each one it can read `analytics:view` on; without them the run is
+    refused with `projects_required` (422). Rows from more than one project come back flagged with the
+    `MULTI_PROJECT_RESULT` diagnostic.
 
-    To run over one project only, send its id as `projectId` in the body: the run then reads that
-    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
-    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
-    answer as a project that does not exist. Without `projectId` the run spans every project the key can
-    read.
+    Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
+    works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
+    another organization and a project that does not exist are all refused with `project_not_found`
+    (404), with one body that names no id. Send `sources` to bind
+    `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
+    that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
+    the projects read. The answer's `params` lists what the run was bound to: `sources`,
+    `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and
+    `coarsenedFromSeconds` when the step was coarsened.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it

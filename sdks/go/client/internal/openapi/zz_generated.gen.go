@@ -24255,6 +24255,51 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds4) Valid() bool {
 	}
 }
 
+// Defines values for PostApiV1QueryJSONBodySources.
+const (
+	PostApiV1QueryJSONBodySourcesAiTool      PostApiV1QueryJSONBodySources = "ai_tool"
+	PostApiV1QueryJSONBodySourcesApplication PostApiV1QueryJSONBodySources = "application"
+	PostApiV1QueryJSONBodySourcesCodingAgent PostApiV1QueryJSONBodySources = "coding_agent"
+	PostApiV1QueryJSONBodySourcesEvaluation  PostApiV1QueryJSONBodySources = "evaluation"
+	PostApiV1QueryJSONBodySourcesGateway     PostApiV1QueryJSONBodySources = "gateway"
+	PostApiV1QueryJSONBodySourcesLangy       PostApiV1QueryJSONBodySources = "langy"
+	PostApiV1QueryJSONBodySourcesOther       PostApiV1QueryJSONBodySources = "other"
+	PostApiV1QueryJSONBodySourcesPlayground  PostApiV1QueryJSONBodySources = "playground"
+	PostApiV1QueryJSONBodySourcesSample      PostApiV1QueryJSONBodySources = "sample"
+	PostApiV1QueryJSONBodySourcesSimulation  PostApiV1QueryJSONBodySources = "simulation"
+	PostApiV1QueryJSONBodySourcesWorkflow    PostApiV1QueryJSONBodySources = "workflow"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1QueryJSONBodySources enum.
+func (e PostApiV1QueryJSONBodySources) Valid() bool {
+	switch e {
+	case PostApiV1QueryJSONBodySourcesAiTool:
+		return true
+	case PostApiV1QueryJSONBodySourcesApplication:
+		return true
+	case PostApiV1QueryJSONBodySourcesCodingAgent:
+		return true
+	case PostApiV1QueryJSONBodySourcesEvaluation:
+		return true
+	case PostApiV1QueryJSONBodySourcesGateway:
+		return true
+	case PostApiV1QueryJSONBodySourcesLangy:
+		return true
+	case PostApiV1QueryJSONBodySourcesOther:
+		return true
+	case PostApiV1QueryJSONBodySourcesPlayground:
+		return true
+	case PostApiV1QueryJSONBodySourcesSample:
+		return true
+	case PostApiV1QueryJSONBodySourcesSimulation:
+		return true
+	case PostApiV1QueryJSONBodySourcesWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1Query200JSONResponseBodyCompletenessState.
 const (
 	Complete  PostApiV1Query200JSONResponseBodyCompletenessState = "complete"
@@ -24289,6 +24334,7 @@ const (
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
 	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
 	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
+	SHAREWINDOWLIMITED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SHARE_WINDOW_LIMITED"
 	UNBOUNDEDTIMERANGE         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "UNBOUNDED_TIME_RANGE"
 )
 
@@ -24310,6 +24356,8 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	case MULTIPROJECTRESULT:
 		return true
 	case POSSIBLEFANOUT:
+		return true
+	case SHAREWINDOWLIMITED:
 		return true
 	case UNBOUNDEDTIMERANGE:
 		return true
@@ -43843,8 +43891,9 @@ type PostApiDashboardsByDashboardIdWidgetsJSONBody struct {
 			Name    string                                                                    `json:"name"`
 			Type    PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType        `json:"type"`
 		} `json:"parameters,omitempty"`
-		Sources *[]PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesSources `json:"sources,omitempty"`
-		Sql     string                                                         `json:"sql"`
+		Projects *[]string                                                      `json:"projects,omitempty"`
+		Sources  *[]PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesSources `json:"sources,omitempty"`
+		Sql      string                                                         `json:"sql"`
 	} `json:"queries"`
 	Source *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source `json:"source,omitempty"`
 }
@@ -44080,8 +44129,9 @@ type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody struct {
 			Name    string                                                                               `json:"name"`
 			Type    PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType        `json:"type"`
 		} `json:"parameters,omitempty"`
-		Sources *[]PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesSources `json:"sources,omitempty"`
-		Sql     string                                                                    `json:"sql"`
+		Projects *[]string                                                                 `json:"projects,omitempty"`
+		Sources  *[]PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesSources `json:"sources,omitempty"`
+		Sql      string                                                                    `json:"sql"`
 	} `json:"queries,omitempty"`
 	Source *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source `json:"source,omitempty"`
 }
@@ -46958,8 +47008,9 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody struct {
 			Name    string                                                                                    `json:"name"`
 			Type    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersType        `json:"type"`
 		} `json:"parameters,omitempty"`
-		Sources *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesSources `json:"sources,omitempty"`
-		Sql     string                                                                         `json:"sql"`
+		Projects *[]string                                                                      `json:"projects,omitempty"`
+		Sources  *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesSources `json:"sources,omitempty"`
+		Sql      string                                                                         `json:"sql"`
 	} `json:"queries"`
 	Source *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source `json:"source,omitempty"`
 }
@@ -47192,8 +47243,9 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody st
 			Name    string                                                                                               `json:"name"`
 			Type    PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodyQueriesParametersType        `json:"type"`
 		} `json:"parameters,omitempty"`
-		Sources *[]PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodyQueriesSources `json:"sources,omitempty"`
-		Sql     string                                                                                    `json:"sql"`
+		Projects *[]string                                                                                 `json:"projects,omitempty"`
+		Sources  *[]PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodyQueriesSources `json:"sources,omitempty"`
+		Sql      string                                                                                    `json:"sql"`
 	} `json:"queries,omitempty"`
 	Source *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source `json:"source,omitempty"`
 }
@@ -47903,9 +47955,15 @@ type PostApiV1QueryJSONBody struct {
 	GranularitySeconds *PostApiV1QueryJSONBody_GranularitySeconds                          `json:"granularitySeconds,omitempty"`
 	Parameters         *map[string]*PostApiV1QueryJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
 
-	// ProjectId Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.
-	ProjectId  *string `json:"projectId,omitempty"`
-	Sql        string  `json:"sql"`
+	// ProjectId Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both.
+	ProjectId *string `json:"projectId,omitempty"`
+
+	// Projects The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. The answer's params.projects lists what was read.
+	Projects *[]string `json:"projects,omitempty"`
+
+	// Sources The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. Only a statement that reads the parameter is kept to them.
+	Sources    *[]PostApiV1QueryJSONBodySources `json:"sources,omitempty"`
+	Sql        string                           `json:"sql"`
 	TimeWindow *struct {
 		End   PostApiV1QueryJSONBody_TimeWindow_End   `json:"end"`
 		Start PostApiV1QueryJSONBody_TimeWindow_Start `json:"start"`
@@ -47945,6 +48003,9 @@ type PostApiV1QueryJSONBodyParameters2 = bool
 type PostApiV1QueryJSONBody_Parameters_AdditionalProperties struct {
 	union json.RawMessage
 }
+
+// PostApiV1QueryJSONBodySources defines parameters for PostApiV1Query.
+type PostApiV1QueryJSONBodySources string
 
 // PostApiV1QueryJSONBodyTimeWindowEnd0 defines parameters for PostApiV1Query.
 type PostApiV1QueryJSONBodyTimeWindowEnd0 = string
@@ -154796,8 +154857,9 @@ type GetApiDashboardsByDashboardIdWidgetsResponse struct {
 						Name    string                                                                                              `json:"name"`
 						Type    GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType          `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                                 `json:"sql"`
+					Projects *[]string                                                                              `json:"projects,omitempty"`
+					Sources  *[]GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                                 `json:"sql"`
 				} `json:"queries"`
 				Source  *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                         `json:"version"`
@@ -154950,8 +155012,9 @@ type PostApiDashboardsByDashboardIdWidgetsResponse struct {
 					Name    string                                                                                          `json:"name"`
 					Type    PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 				} `json:"parameters,omitempty"`
-				Sources *[]PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-				Sql     string                                                                              `json:"sql"`
+				Projects *[]string                                                                           `json:"projects,omitempty"`
+				Sources  *[]PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+				Sql      string                                                                              `json:"sql"`
 			} `json:"queries"`
 			Source  *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source `json:"source,omitempty"`
 			Version float32                                                                     `json:"version"`
@@ -155228,8 +155291,9 @@ type GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse struct {
 					Name    string                                                                                                   `json:"name"`
 					Type    GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 				} `json:"parameters,omitempty"`
-				Sources *[]GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-				Sql     string                                                                                       `json:"sql"`
+				Projects *[]string                                                                                    `json:"projects,omitempty"`
+				Sources  *[]GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+				Sql      string                                                                                       `json:"sql"`
 			} `json:"queries"`
 			Source  *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 			Version float32                                                                              `json:"version"`
@@ -155381,8 +155445,9 @@ type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse struct {
 					Name    string                                                                                                     `json:"name"`
 					Type    PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 				} `json:"parameters,omitempty"`
-				Sources *[]PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-				Sql     string                                                                                         `json:"sql"`
+				Projects *[]string                                                                                      `json:"projects,omitempty"`
+				Sources  *[]PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+				Sql      string                                                                                         `json:"sql"`
 			} `json:"queries"`
 			Source  *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 			Version float32                                                                                `json:"version"`
@@ -163247,8 +163312,9 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 						Name    string                                                                                                              `json:"name"`
 						Type    GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionQueriesParametersType          `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                                                 `json:"sql"`
+					Projects *[]string                                                                                              `json:"projects,omitempty"`
+					Sources  *[]GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                                                 `json:"sql"`
 				} `json:"queries"`
 				Source  *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                                         `json:"version"`
@@ -163382,8 +163448,9 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 					Name    string                                                                                                          `json:"name"`
 					Type    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 				} `json:"parameters,omitempty"`
-				Sources *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-				Sql     string                                                                                              `json:"sql"`
+				Projects *[]string                                                                                           `json:"projects,omitempty"`
+				Sources  *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+				Sql      string                                                                                              `json:"sql"`
 			} `json:"queries"`
 			Source  *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source `json:"source,omitempty"`
 			Version float32                                                                                     `json:"version"`
@@ -163641,8 +163708,9 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 					Name    string                                                                                                                   `json:"name"`
 					Type    GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 				} `json:"parameters,omitempty"`
-				Sources *[]GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-				Sql     string                                                                                                       `json:"sql"`
+				Projects *[]string                                                                                                    `json:"projects,omitempty"`
+				Sources  *[]GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+				Sql      string                                                                                                       `json:"sql"`
 			} `json:"queries"`
 			Source  *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 			Version float32                                                                                              `json:"version"`
@@ -163794,8 +163862,9 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 					Name    string                                                                                                                     `json:"name"`
 					Type    PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 				} `json:"parameters,omitempty"`
-				Sources *[]PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-				Sql     string                                                                                                         `json:"sql"`
+				Projects *[]string                                                                                                      `json:"projects,omitempty"`
+				Sources  *[]PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+				Sql      string                                                                                                         `json:"sql"`
 			} `json:"queries"`
 			Source  *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 			Version float32                                                                                                `json:"version"`
@@ -163947,8 +164016,9 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 					Name    string                                                                                                                             `json:"name"`
 					Type    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 				} `json:"parameters,omitempty"`
-				Sources *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-				Sql     string                                                                                                                 `json:"sql"`
+				Projects *[]string                                                                                                              `json:"projects,omitempty"`
+				Sources  *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+				Sql      string                                                                                                                 `json:"sql"`
 			} `json:"queries"`
 			Source  *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 			Version float32                                                                                                        `json:"version"`
@@ -165578,11 +165648,23 @@ type PostApiV1QueryResponse struct {
 			Message string                                           `json:"message"`
 			Meta    *map[string]interface{}                          `json:"meta,omitempty"`
 		} `json:"diagnostics,omitempty"`
-		FollowsGranularity bool                      `json:"followsGranularity"`
-		FollowsTimeWindow  bool                      `json:"followsTimeWindow"`
-		GranularitySeconds *float32                  `json:"granularitySeconds,omitempty"`
-		Rows               *[]map[string]interface{} `json:"rows,omitempty"`
-		Statistics         struct {
+		FollowsGranularity bool     `json:"followsGranularity"`
+		FollowsTimeWindow  bool     `json:"followsTimeWindow"`
+		GranularitySeconds *float32 `json:"granularitySeconds,omitempty"`
+		Params             *struct {
+			CoarsenedFromSeconds *float32               `json:"coarsenedFromSeconds,omitempty"`
+			FollowsSources       bool                   `json:"followsSources"`
+			GranularitySeconds   *float32               `json:"granularitySeconds,omitempty"`
+			Parameters           map[string]interface{} `json:"parameters"`
+			Period               *struct {
+				End   string `json:"end"`
+				Start string `json:"start"`
+			} `json:"period,omitempty"`
+			Projects *[]string `json:"projects,omitempty"`
+			Sources  *[]string `json:"sources,omitempty"`
+		} `json:"params,omitempty"`
+		Rows       *[]map[string]interface{} `json:"rows,omitempty"`
+		Statistics struct {
 			BytesRead    float32 `json:"bytesRead"`
 			ElapsedMs    float32 `json:"elapsedMs"`
 			RowsRead     float32 `json:"rowsRead"`
@@ -187115,8 +187197,9 @@ func ParseGetApiDashboardsByDashboardIdWidgetsResponse(rsp *http.Response) (*Get
 							Name    string                                                                                              `json:"name"`
 							Type    GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType          `json:"type"`
 						} `json:"parameters,omitempty"`
-						Sources *[]GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesSources `json:"sources,omitempty"`
-						Sql     string                                                                                 `json:"sql"`
+						Projects *[]string                                                                              `json:"projects,omitempty"`
+						Sources  *[]GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesSources `json:"sources,omitempty"`
+						Sql      string                                                                                 `json:"sql"`
 					} `json:"queries"`
 					Source  *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source `json:"source,omitempty"`
 					Version float32                                                                         `json:"version"`
@@ -187295,8 +187378,9 @@ func ParsePostApiDashboardsByDashboardIdWidgetsResponse(rsp *http.Response) (*Po
 						Name    string                                                                                          `json:"name"`
 						Type    PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                              `json:"sql"`
+					Projects *[]string                                                                           `json:"projects,omitempty"`
+					Sources  *[]PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                              `json:"sql"`
 				} `json:"queries"`
 				Source  *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                     `json:"version"`
@@ -187625,8 +187709,9 @@ func ParseGetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp *http.Respo
 						Name    string                                                                                                   `json:"name"`
 						Type    GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                                       `json:"sql"`
+					Projects *[]string                                                                                    `json:"projects,omitempty"`
+					Sources  *[]GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                                       `json:"sql"`
 				} `json:"queries"`
 				Source  *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                              `json:"version"`
@@ -187804,8 +187889,9 @@ func ParsePatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp *http.Res
 						Name    string                                                                                                     `json:"name"`
 						Type    PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                                         `json:"sql"`
+					Projects *[]string                                                                                      `json:"projects,omitempty"`
+					Sources  *[]PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                                         `json:"sql"`
 				} `json:"queries"`
 				Source  *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                                `json:"version"`
@@ -195868,8 +195954,9 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 							Name    string                                                                                                              `json:"name"`
 							Type    GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionQueriesParametersType          `json:"type"`
 						} `json:"parameters,omitempty"`
-						Sources *[]GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionQueriesSources `json:"sources,omitempty"`
-						Sql     string                                                                                                 `json:"sql"`
+						Projects *[]string                                                                                              `json:"projects,omitempty"`
+						Sources  *[]GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionQueriesSources `json:"sources,omitempty"`
+						Sql      string                                                                                                 `json:"sql"`
 					} `json:"queries"`
 					Source  *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source `json:"source,omitempty"`
 					Version float32                                                                                         `json:"version"`
@@ -196023,8 +196110,9 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 						Name    string                                                                                                          `json:"name"`
 						Type    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                                              `json:"sql"`
+					Projects *[]string                                                                                           `json:"projects,omitempty"`
+					Sources  *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                                              `json:"sql"`
 				} `json:"queries"`
 				Source  *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                                     `json:"version"`
@@ -196328,8 +196416,9 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 						Name    string                                                                                                                   `json:"name"`
 						Type    GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                                                       `json:"sql"`
+					Projects *[]string                                                                                                    `json:"projects,omitempty"`
+					Sources  *[]GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                                                       `json:"sql"`
 				} `json:"queries"`
 				Source  *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                                              `json:"version"`
@@ -196507,8 +196596,9 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 						Name    string                                                                                                                     `json:"name"`
 						Type    PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                                                         `json:"sql"`
+					Projects *[]string                                                                                                      `json:"projects,omitempty"`
+					Sources  *[]PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                                                         `json:"sql"`
 				} `json:"queries"`
 				Source  *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                                                `json:"version"`
@@ -196686,8 +196776,9 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 						Name    string                                                                                                                             `json:"name"`
 						Type    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
 					} `json:"parameters,omitempty"`
-					Sources *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
-					Sql     string                                                                                                                 `json:"sql"`
+					Projects *[]string                                                                                                              `json:"projects,omitempty"`
+					Sources  *[]PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesSources `json:"sources,omitempty"`
+					Sql      string                                                                                                                 `json:"sql"`
 				} `json:"queries"`
 				Source  *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source `json:"source,omitempty"`
 				Version float32                                                                                                        `json:"version"`
@@ -198697,11 +198788,23 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 				Message string                                           `json:"message"`
 				Meta    *map[string]interface{}                          `json:"meta,omitempty"`
 			} `json:"diagnostics,omitempty"`
-			FollowsGranularity bool                      `json:"followsGranularity"`
-			FollowsTimeWindow  bool                      `json:"followsTimeWindow"`
-			GranularitySeconds *float32                  `json:"granularitySeconds,omitempty"`
-			Rows               *[]map[string]interface{} `json:"rows,omitempty"`
-			Statistics         struct {
+			FollowsGranularity bool     `json:"followsGranularity"`
+			FollowsTimeWindow  bool     `json:"followsTimeWindow"`
+			GranularitySeconds *float32 `json:"granularitySeconds,omitempty"`
+			Params             *struct {
+				CoarsenedFromSeconds *float32               `json:"coarsenedFromSeconds,omitempty"`
+				FollowsSources       bool                   `json:"followsSources"`
+				GranularitySeconds   *float32               `json:"granularitySeconds,omitempty"`
+				Parameters           map[string]interface{} `json:"parameters"`
+				Period               *struct {
+					End   string `json:"end"`
+					Start string `json:"start"`
+				} `json:"period,omitempty"`
+				Projects *[]string `json:"projects,omitempty"`
+				Sources  *[]string `json:"sources,omitempty"`
+			} `json:"params,omitempty"`
+			Rows       *[]map[string]interface{} `json:"rows,omitempty"`
+			Statistics struct {
 				BytesRead    float32 `json:"bytesRead"`
 				ElapsedMs    float32 `json:"elapsedMs"`
 				RowsRead     float32 `json:"rowsRead"`
