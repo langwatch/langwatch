@@ -72,7 +72,7 @@ describe("when the browser refuses to read the stored theme", () => {
     run(`window.matchMedia = () => ({ matches: true });
       Object.defineProperty(window, "localStorage", { configurable: true, get() { throw new DOMException("denied", "SecurityError"); } });`);
     document.documentElement.className = "";
-    run(themeScript.replace(/^<script>|<\/script>$/g, ""));
+    run(themeScript.slice("<script>".length, -"</script>".length));
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     run("delete window.matchMedia; delete window.localStorage;");
   });
