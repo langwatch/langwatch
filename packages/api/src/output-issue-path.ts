@@ -59,54 +59,71 @@ function keyIn(schema: z.ZodType, key: unknown): { next?: z.ZodType; declared: b
 /** One segment in one schema: where it leads, whether it can hold it, and whether it names it. */
 type Step = { next: z.ZodType[]; holds: boolean; declared: boolean };
 
+/** Where a holder leads that cannot say what it holds: every later segment there is content. */
+const OPAQUE: z.ZodType = z.unknown();
+
+/** A schema met again on its own branch: a cycle, read as a holder that names nothing. */
+const CYCLE: Step = { next: [OPAQUE], holds: true, declared: false };
+
+/** The segments of each arm or side, and whether they name it, all holders or any. */
+function combined(steps: Step[], named: "every" | "some"): Step {
+  const holders = steps.filter((each) => each.holds);
+  return {
+    next: steps.flatMap((each) => each.next),
+    holds: holders.length > 0,
+    declared: holders.length > 0 && holders[named]((each) => each.declared),
+  };
+}
+
 /**
  * A declared key or an array/tuple index is named; any other key or number is content. A union
- * names a segment only when every arm that could hold it does (an array arm never vouches for a
- * map arm's key); an intersection or a pipe names it when either side does.
+ * names a segment only when every arm that could hold it does; an intersection or a pipe names a
+ * key either side declares, but a number only when both index it. See stepWithin for cycles.
  */
-function stepIn(schema: z.ZodType, segment: unknown, seen: Set<z.ZodType>): Step {
-  if (seen.has(schema)) return { next: [], holds: false, declared: false };
-  seen.add(schema);
+function stepIn(schema: z.ZodType, segment: unknown, ancestors: Set<z.ZodType>): Step {
+  if (ancestors.has(schema)) return CYCLE;
+  ancestors.add(schema);
+  try {
+    return stepWithin(schema, segment, ancestors);
+  } finally {
+    ancestors.delete(schema);
+  }
+}
 
+/** stepIn below its cycle check: `ancestors` holds only this branch, so siblings each count. */
+function stepWithin(schema: z.ZodType, segment: unknown, ancestors: Set<z.ZodType>): Step {
   const inner = unwrapped(schema);
-  if (inner) return stepIn(inner, segment, seen);
+  if (inner) return stepIn(inner, segment, ancestors);
 
   if (schema instanceof z.ZodUnion) {
-    const arms = (schema.options as z.ZodType[]).map((arm) => stepIn(arm, segment, seen));
-    const holders = arms.filter((arm) => arm.holds);
-    return {
-      next: arms.flatMap((arm) => arm.next),
-      holds: holders.length > 0,
-      declared: holders.length > 0 && holders.every((arm) => arm.declared),
-    };
+    const arms = (schema.options as z.ZodType[]).map((arm) => stepIn(arm, segment, ancestors));
+    return combined(arms, "every");
   }
 
   const sides = bothSidesOf(schema);
   if (sides) {
-    const both = sides.map((side) => stepIn(side, segment, seen));
-    return {
-      next: both.flatMap((side) => side.next),
-      holds: both.some((side) => side.holds),
-      declared: both.some((side) => side.declared),
-    };
+    const both = sides.map((side) => stepIn(side, segment, ancestors));
+    return combined(both, typeof segment === "number" ? "every" : "some");
   }
 
   if (holdsNothing(schema)) return { next: [], holds: false, declared: false };
+  if (schema instanceof z.ZodMap) {
+    return { next: [schema.def.valueType as z.ZodType], holds: true, declared: false };
+  }
   const found =
     typeof segment === "number"
       ? { next: indexIn(schema, segment), declared: indexes(schema) }
       : keyIn(schema, segment);
-  return { next: found.next ? [found.next] : [], holds: true, declared: found.declared };
+  return { next: [found.next ?? OPAQUE], holds: true, declared: found.declared };
 }
 
 /** One segment read through every schema the path may be in: named only if each one names it. */
 function step(schemas: z.ZodType[], segment: unknown): { next: z.ZodType[]; declared: boolean } {
-  const steps = schemas.map((schema) => stepIn(schema, segment, new Set()));
-  const holders = steps.filter((each) => each.holds);
-  return {
-    next: steps.flatMap((each) => each.next),
-    declared: holders.length > 0 && holders.every((each) => each.declared),
-  };
+  const { next, declared } = combined(
+    schemas.map((schema) => stepIn(schema, segment, new Set())),
+    "every",
+  );
+  return { next: [...new Set(next)], declared };
 }
 
 /** The two schemas a value must meet at once: an intersection's sides, or a pipe's ends. */

@@ -53,6 +53,35 @@ describe("declaredPath", () => {
     });
 
     /** @scenario "A refused answer's log names the failing field without the caller's keys" */
+    it("counts a map arm the union shares with an intersection arm", () => {
+      const byNumber = z.map(z.number(), z.string());
+      const schema = z.object({
+        byId: z.union([z.intersection(z.array(z.string()), byNumber), byNumber]),
+      });
+
+      expect(declaredPath(schema, ["byId", 8675309])).toBe("byId[<key>]");
+    });
+
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
+    it("keeps every key below a map out, however deep, though an array arm indexes it", () => {
+      const schema = z.object({
+        byId: z.union([
+          z.map(z.number(), z.map(z.number(), z.string())),
+          z.array(z.array(z.string())),
+        ]),
+      });
+
+      expect(declaredPath(schema, ["byId", 12345, 8675309])).toBe("byId[<key>][<key>]");
+    });
+
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
+    it("keeps a number out of an intersection unless both sides index it", () => {
+      const schema = z.intersection(z.array(z.string()), z.record(z.string(), z.string()));
+
+      expect(declaredPath(schema, [3])).toBe("[<key>]");
+    });
+
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
     it("keeps a key one object arm declares out when another arm takes any key", () => {
       const schema = z.union([z.object({ email: z.string() }), z.record(z.string(), z.number())]);
 
