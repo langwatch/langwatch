@@ -7,5 +7,5 @@ import { KNOWN_TRACE_ORIGINS } from "@langwatch/analytics-contract";
 export function sourceOfOrigin(origin: string): string {
   const listed = KNOWN_TRACE_ORIGINS.map((known) => `'${known}'`).join(", ");
 
-  return `multiIf(ifNull(${origin}, '') = '', 'application', ${origin} IN (${listed}), ${origin}, 'other')`;
+  return `multiIf(ifNull(${origin}, '') = '', 'application', ${origin} IN (${listed}), ifNull(${origin}, ''), 'other')`;
 }

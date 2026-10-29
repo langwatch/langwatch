@@ -9,7 +9,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { sourceOfOrigin } from "../../rules/lwql-source-column.rules.ts";
 
-const url = process.env.TEST_CLICKHOUSE_URL;
+const url =
+  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
+  process.env.TEST_CLICKHOUSE_URL ??
+  process.env.CI_CLICKHOUSE_URL;
 const DATABASE = `lwql_source_${process.pid}`;
 let client: ClickHouseClient;
 
