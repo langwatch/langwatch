@@ -81,8 +81,6 @@ class ScriptedExecutor implements InstantEvalRunExecutor {
       requests: 500,
       costNanoUsd: 0,
       routedInputTokens: 0,
-      escalated: 0,
-      answeredBy: {},
       cursor: "t1000",
       cursorSpanId: null,
       hasNextPage: true,

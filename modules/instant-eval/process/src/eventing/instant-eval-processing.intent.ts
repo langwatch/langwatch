@@ -56,9 +56,6 @@ export interface InstantEvalPageOutcome {
   /** What the page's routed calls cost us, and the input tokens that cost covers. */
   readonly costNanoUsd: number;
   readonly routedInputTokens: number;
-  /** Questions the page escalated, and verdicts per routed backend. */
-  readonly escalated: number;
-  readonly answeredBy: Readonly<Record<string, number>>;
   /** The last trace id of the page, or null when it judged nothing. */
   readonly cursor: string | null;
   /** The last span id of the page, for a statement keyed by the pair. */
@@ -128,8 +125,6 @@ export interface InstantEvalOutcomeCommands {
     requests: number;
     costNanoUsd: number;
     routedInputTokens: number;
-    escalated: number;
-    answeredBy: Record<string, number>;
     cursor: string | null;
     cursorSpanId: string | null;
     hasNextPage: boolean;
@@ -328,8 +323,6 @@ export function createInstantEvalJudgePageHandler(
         requests: outcome.requests,
         costNanoUsd: outcome.costNanoUsd,
         routedInputTokens: outcome.routedInputTokens,
-        escalated: outcome.escalated,
-        answeredBy: { ...outcome.answeredBy },
         cursor: outcome.cursor,
         cursorSpanId: outcome.cursorSpanId,
         hasNextPage: outcome.hasNextPage,

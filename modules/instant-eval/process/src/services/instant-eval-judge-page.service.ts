@@ -67,8 +67,6 @@ const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
   requests: 0,
   costNanoUsd: 0,
   routedInputTokens: 0,
-  escalated: 0,
-  answeredBy: {},
   cursor: null,
   cursorSpanId: null,
   hasNextPage: false,
@@ -489,8 +487,6 @@ function outcomeFor({
     requests: usage.requests,
     costNanoUsd: usage.costNanoUsd,
     routedInputTokens: usage.routedInputTokens,
-    escalated: usage.escalated,
-    answeredBy: usage.answeredBy,
     cursor: cursor.traceId,
     // Empty when the statement has one row per trace, which is what tells the
     // next key pass to compare the trace alone.

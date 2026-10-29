@@ -113,10 +113,6 @@ const instantEvalPageJudgedEventDataSchemaDefinition = z.object({
   costNanoUsd: z.number().int().nonnegative().default(0),
   /** The input tokens `costNanoUsd` covers; an event written before it reads as unrouted. */
   routedInputTokens: z.number().int().nonnegative().default(0),
-  /** Questions this page escalated past an unsure or failed decision model. */
-  escalated: z.number().int().nonnegative().default(0),
-  /** Verdicts each routed backend supplied on this page, by backend name. */
-  answeredBy: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** The last trace id of this page, where the next one starts. Null ends the run. */
   cursor: z.string().nullable(),
   cursorSpanId: z.string().nullable().default(null),

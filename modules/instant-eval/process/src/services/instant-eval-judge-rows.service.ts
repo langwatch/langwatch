@@ -38,9 +38,6 @@ export interface InstantEvalJudgeUsage {
   /** The summed cost of routed judgements, and the input tokens that cost covers. */
   costNanoUsd: number;
   routedInputTokens: number;
-  /** Questions escalated past a decision model, and verdicts per routed backend. */
-  escalated: number;
-  answeredBy: Record<string, number>;
 }
 
 /** The rows as they are written, and what judging them sent. */
@@ -99,8 +96,6 @@ export class InstantEvalJudgeRowsService {
       limiterWaitMs: 0,
       costNanoUsd: 0,
       routedInputTokens: 0,
-      escalated: 0,
-      answeredBy: {},
     };
     const cells = new Map<number, Map<string, InstantEvalVerdict | null>>();
     let failures = 0;
@@ -196,7 +191,7 @@ function record({
   usage.requests += 1;
   usage.inputTokens += judgement.inputTokens;
   usage.limiterWaitMs += judgement.limiterWaitMs ?? 0;
-  recordRouting({ judgement, usage });
+  recordRoutedCost({ judgement, usage });
   if (judgement.skippedReason) {
     usage.skipped[judgement.skippedReason] = (usage.skipped[judgement.skippedReason] ?? 0) + 1;
   }
@@ -210,26 +205,19 @@ function record({
 }
 
 /**
- * A routed judgement's cost and how it was answered, summed into the batch's usage. The router
- * prices every judgement it returns, so a cost, zero included, marks its tokens as routed.
+ * A routed judgement's cost, summed into the batch's usage. The router prices every judgement it
+ * returns, so a cost, zero included, marks its tokens as routed.
  */
-function recordRouting({
+function recordRoutedCost({
   judgement,
   usage,
 }: {
   judgement: InstantEvalJudgement;
   usage: InstantEvalJudgeUsage;
 }): void {
-  if (judgement.costNanoUsd !== undefined) {
-    usage.costNanoUsd += judgement.costNanoUsd;
-    usage.routedInputTokens += judgement.inputTokens;
-  }
-  const { routing } = judgement;
-  if (!routing) return;
-  usage.escalated += routing.escalated;
-  for (const [backend, count] of Object.entries(routing.answeredBy)) {
-    usage.answeredBy[backend] = (usage.answeredBy[backend] ?? 0) + count;
-  }
+  if (judgement.costNanoUsd === undefined) return;
+  usage.costNanoUsd += judgement.costNanoUsd;
+  usage.routedInputTokens += judgement.inputTokens;
 }
 
 /** Whether a thrown value is a stop rather than a failure. */

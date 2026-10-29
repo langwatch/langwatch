@@ -38,12 +38,7 @@ describe("instant eval run events written before the router", () => {
         hasNextPage: false,
       },
     });
-    expect(event.data).toMatchObject({
-      costNanoUsd: 0,
-      routedInputTokens: 0,
-      escalated: 0,
-      answeredBy: {},
-    });
+    expect(event.data).toMatchObject({ costNanoUsd: 0, routedInputTokens: 0 });
   });
 
   it("reads a 2026-09-18 finished event with zero routed cost", () => {
