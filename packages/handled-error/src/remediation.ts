@@ -33,6 +33,11 @@ const registry = {
       "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
     ],
   },
+  projects_unreadable: {
+    tips: [
+      "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",
+    ],
+  },
   malformed_request: {
     tips: [
       "The body could not be parsed at all; check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",

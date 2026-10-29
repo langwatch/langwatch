@@ -467,13 +467,27 @@ describe('given a widget tool is sent projects "all"', () => {
     );
   });
 
-  it.each([["all"], ["ALL"]])("refuses %s inside the list with the same message", (word) => {
-    const refused = widgetProjectsInput.safeParse(["proj_1", word]);
+  it.each([["all"], ["ALL"], ["All"], [" all "]])(
+    "refuses the string %s with the same message",
+    (word) => {
+      const refused = widgetProjectsInput.safeParse(word);
 
-    expect(refused.error?.issues[0]?.message).toBe(
-      'projects holds project ids; "all" is not stored in a widget',
-    );
-  });
+      expect(refused.error?.issues[0]?.message).toBe(
+        'projects holds project ids; "all" is not stored in a widget',
+      );
+    },
+  );
+
+  it.each([["all"], ["ALL"], [" All "]])(
+    "refuses %s inside the list with the same message",
+    (word) => {
+      const refused = widgetProjectsInput.safeParse(["proj_1", word]);
+
+      expect(refused.error?.issues[0]?.message).toBe(
+        'projects holds project ids; "all" is not stored in a widget',
+      );
+    },
+  );
 
   it("does not advertise all in the tool's JSON Schema", () => {
     expect(JSON.stringify(z.toJSONSchema(widgetProjectsInput))).not.toContain("all");

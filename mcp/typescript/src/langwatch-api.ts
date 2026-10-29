@@ -149,8 +149,6 @@ export class LangWatchApiError extends Error {
    * between an agent correcting its own request and an agent guessing again.
    */
   readonly reasons?: SerializedReason[];
-  /** The error's own facts, e.g. `readsNone` on `projects_required`. */
-  readonly meta?: Record<string, unknown>;
 
   constructor(
     message: string,
@@ -162,7 +160,6 @@ export class LangWatchApiError extends Error {
       docsUrl?: string;
       fault?: HandledErrorFault;
       reasons?: SerializedReason[];
-      meta?: Record<string, unknown>;
     } = {},
   ) {
     super(message);
@@ -172,7 +169,6 @@ export class LangWatchApiError extends Error {
     this.docsUrl = options.docsUrl;
     this.fault = options.fault;
     this.reasons = options.reasons;
-    this.meta = options.meta;
   }
 }
 
@@ -313,7 +309,6 @@ function apiErrorOf({
     docsUrl: parsed.docsUrl,
     fault: parsed.fault,
     reasons: parsed.reasons,
-    meta: parsed.meta,
   });
 }
 

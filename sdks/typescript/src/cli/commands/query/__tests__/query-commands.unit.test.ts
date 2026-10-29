@@ -433,13 +433,14 @@ describe("runQueryCommand with --projects and --sources", () => {
   });
 
   /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
-  it("refuses --project beside --projects before anything is sent", async () => {
+  it("refuses --project beside --projects before it reads any credential", async () => {
     await expect(
       runQueryCommand("SELECT 1", { project: "my-slug", projects: "proj_x" }),
     ).rejects.toThrow(ProcessExitError);
 
     expect(vi.mocked(console.error).mock.calls.flat().join("\n")).toContain("pass one of them");
     expect(mockQuery).not.toHaveBeenCalled();
+    expect(resolveCredentials).not.toHaveBeenCalled();
   });
 
   /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
@@ -489,10 +490,10 @@ describe("runQueryCommand when the key reads no project", () => {
   it("shows the platform's message, not a request to pass --projects", async () => {
     mockQuery.mockRejectedValue(
       Object.assign(new Error("This key reads no project. Ask an admin to grant one"), {
-        code: "projects_required",
-        kind: "projects_required",
+        code: "projects_unreadable",
+        kind: "projects_unreadable",
         httpStatus: 422,
-        meta: { readsNone: true },
+        meta: {},
         isHandled: true,
       }),
     );

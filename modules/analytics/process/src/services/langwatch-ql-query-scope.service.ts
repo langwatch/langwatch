@@ -1,6 +1,7 @@
 import {
   LangWatchQLProjectNotFoundError,
   LangWatchQLProjectsRequiredError,
+  LangWatchQLProjectsUnreadableError,
   type LangWatchQLCaller,
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
@@ -58,7 +59,8 @@ export class LangWatchQLQueryScopeService {
    * The readable set and the strictest protections across it. Named `projects` narrow the set
    * before any protection is read, and one the key cannot read refuses the whole run. With
    * `requireProjects`, a key for an organization, a team or a person must name them.
-   * @throws {LangWatchQLProjectsRequiredError} when required and none are named.
+   * @throws {LangWatchQLProjectsRequiredError} when required and the key reads several.
+   * @throws {LangWatchQLProjectsUnreadableError} when required and the key reads none.
    * @throws {LangWatchQLProjectNotFoundError} for any named project the key cannot read.
    */
   async resolve({
@@ -83,7 +85,7 @@ export class LangWatchQLQueryScopeService {
             stopAfter: mustDefault ? 2 : undefined,
           });
     if (mustDefault && readable.length === 0) {
-      throw new LangWatchQLProjectsRequiredError({ readsNone: true });
+      throw new LangWatchQLProjectsUnreadableError();
     }
     if (mustDefault && readable.length > 1) throw new LangWatchQLProjectsRequiredError();
     // One project at a time: each answer is several grant reads, and fanning an organization's
@@ -104,12 +106,11 @@ export class LangWatchQLQueryScopeService {
   /**
    * Every project the key reads, in id order, for `projects: "all"`. Each holds `analytics:view`
    * for the key, so a project it lacks, or of another organization, is never among them.
-   * @throws {LangWatchQLProjectsRequiredError} when the key reads none, as `resolve` says it.
+   * @throws {LangWatchQLProjectsUnreadableError} when the key reads none.
    */
   async resolveAll({ reach }: { reach: LangWatchQLKeyReach }): Promise<LangWatchQLQueryScope> {
     const scope = await this.resolve({ reach });
-    if (scope.projects.length === 0)
-      throw new LangWatchQLProjectsRequiredError({ readsNone: true });
+    if (scope.projects.length === 0) throw new LangWatchQLProjectsUnreadableError();
 
     return { ...scope, projects: inStableOrder(scope.projects) };
   }
@@ -245,8 +246,8 @@ export class LangWatchQLQueryScopeService {
 
   /**
    * Every live application project in the key's organization it holds `analytics:view` on,
-   * decided as `key ∩ owning user` at each project's own scope. One page, as main reads it; an
-   * organization over the cap is refused, and `stopAfter` ends the judging early.
+   * decided as `key ∩ owning user` at each project's own scope. One page, as main reads it, and an
+   * organization over the cap is refused. `stopAfter` bounds the permission checks, not the read.
    */
   private async readableProjects({
     reach,
@@ -264,11 +265,10 @@ export class LangWatchQLQueryScopeService {
       ...(only === undefined ? {} : { projectIds: [...only] }),
     });
     if (listed.pagination.total > listed.data.length) {
+      // Only an unnamed read can get here: the request schema caps a named list at this same cap.
       throw new ValidationError(
-        only
-          ? `Name at most ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects.`
-          : `This organization has more than ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects; ` +
-              `name the projects instead.`,
+        `This organization has more than ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects; ` +
+          `name the projects instead.`,
       );
     }
     // The id is the order and the dedupe: the same project can never be judged twice.
@@ -296,7 +296,6 @@ export class LangWatchQLQueryScopeService {
     // One project at a time, for the pool reason `resolve` gives.
     for (const project of projects) {
       if (found.length >= room) break;
-      if (project.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) continue;
       const credential = keyCredentialFor({ reach, project });
       if (await this.protections.keyPermitted({ credential, permission: "analytics:view" })) {
         found.push({ project, credential });

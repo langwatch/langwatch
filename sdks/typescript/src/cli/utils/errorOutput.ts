@@ -116,7 +116,7 @@ const withLoginProjectAdvice = (domain: LangWatchHandledErrorShape): LangWatchHa
 
   return {
     ...domain,
-    suggestions: (domain.suggestions ?? []).map((line) => (line === keyLine ? personLine : line)),
+    suggestions: [personLine, ...(domain.suggestions ?? []).filter((line) => line !== keyLine)],
   };
 };
 

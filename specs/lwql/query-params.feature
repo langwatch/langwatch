@@ -89,12 +89,13 @@ Feature: Every query door takes the same parameters and says what it ran with
 
     @unit
     Scenario: QP03j A key that reads no project is told so, not asked to name one
-      # Own call (batch 8): a bare not found does not help; the 422 "projects_required" says why.
+      # Own call (batch 8): a bare not found does not help; the 422 "projects_unreadable" says why.
       Given an organization, team or personal key that holds analytics:view on no project
       When it runs a statement that names no project
-      Then it is refused with the status 422 and the code "projects_required"
+      Then it is refused with the status 422 and the code "projects_unreadable"
       And the message says the key reads no project and that an admin can grant one
-      And the error carries meta.readsNone, so the CLI and the MCP tool show that message
+      # Changed in batch 10: a code of its own, so the CLI and the MCP tool show that message and
+      # the tips never suggest naming projects or "all".
 
     @unit
     Scenario: QP03i A widget write refuses the word all

@@ -93,8 +93,7 @@ describe("given the platform says the key reads no project", () => {
   it("passes the platform's message through instead of asking for projects", async () => {
     mockRunQuery.mockRejectedValue(
       new LangWatchApiError("This key reads no project. Ask an admin", 422, "{}", {
-        code: "projects_required",
-        meta: { readsNone: true },
+        code: "projects_unreadable",
       }),
     );
 

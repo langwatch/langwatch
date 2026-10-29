@@ -113,9 +113,7 @@ function readProjectsFlag({
 
 /** Turns the platform's `projects_required` into the flag that fixes it. */
 function explainProjectsRequired(error: unknown): void {
-  const { code, meta } = readCommandError(error);
-  // A key that reads no project is told so by the server; naming projects would not help it.
-  if (code === "projects_required" && meta?.readsNone !== true) refuse(PROJECTS_REQUIRED_MESSAGE);
+  if (readCommandError(error).code === "projects_required") refuse(PROJECTS_REQUIRED_MESSAGE);
 }
 
 /** Whether the run was bound to any placeholder; an empty map has nothing to say. */
@@ -422,11 +420,11 @@ export const runQueryCommand = async (
     ...(options.out === undefined ? {} : { output: options.out }),
   };
 
+  const projects = readProjectsFlag({ project: options.project, projects: options.projects });
   // Only an explicit `--project` narrows the run: the personal project the
   // credential falls back to is not a project the user asked to read alone.
   const credentials = await resolveCredentials({ project: options.project });
   const projectId = options.project === undefined ? undefined : credentials.projectId;
-  const projects = readProjectsFlag({ project: options.project, projects: options.projects });
   const sources = listFlag({ value: options.sources, flag: "--sources" });
   const reach: RunReach = {
     ...(projectId === undefined ? {} : { projectId }),

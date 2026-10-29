@@ -626,6 +626,7 @@ export const APP_ERROR_CODES = [
   "project_slug_taken",
   "project_visibility_too_wide",
   "projects_required",
+  "projects_unreadable",
   "prompt_author_unknown",
   "prompt_execute_rate_limited",
   "prompt_handle_taken",

@@ -5,7 +5,7 @@ import {
   type DataPrivacyApi,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { PROJECT_KIND, type Project, type ProjectApi } from "@langwatch/project-contract";
 /**
  * The query door's scope: which projects one API key reads, and what it sees of them.
  * @see specs/lwql/api.feature
@@ -65,6 +65,8 @@ function scopeOver(input: {
           (p) =>
             organizationId === ORGANIZATION_ID &&
             !p.archivedAt &&
+            // The real read drops governance projects unless asked, so the service need not.
+            p.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
             (!projectIds || projectIds.includes(p.id)),
         );
         const data = (input.rows ?? ((rows) => rows))(
@@ -419,10 +421,9 @@ describe("given a run that names projects", () => {
       const { service } = scopeOver({ projects: BIG, grants: {} });
 
       await expect(service.resolve({ reach: KEY, requireProjects: true })).rejects.toMatchObject({
-        code: "projects_required",
+        code: "projects_unreadable",
         message: expect.stringContaining("reads no project"),
-        meta: { readsNone: true },
-        tips: [expect.stringContaining("Grant")],
+        tips: [expect.stringContaining("grant")],
       });
     });
   });
@@ -503,7 +504,7 @@ describe("given a run that names projects", () => {
 
       await expect(
         service.resolveAll({ reach: { ...KEY, organizationId: "org-2" } }),
-      ).rejects.toMatchObject({ code: "projects_required", meta: { readsNone: true } });
+      ).rejects.toMatchObject({ code: "projects_unreadable" });
     });
 
     /** @scenario "QP03h The word all that resolves to no project, or to more than the cap, is refused" */
@@ -511,9 +512,8 @@ describe("given a run that names projects", () => {
       const { service } = scopeOver({ projects: [project("a")], grants: {} });
 
       await expect(service.resolveAll({ reach: KEY })).rejects.toMatchObject({
-        code: "projects_required",
+        code: "projects_unreadable",
         httpStatus: 422,
-        meta: { readsNone: true },
       });
     });
   });

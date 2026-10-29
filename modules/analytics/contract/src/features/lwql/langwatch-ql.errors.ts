@@ -180,29 +180,30 @@ export class LangWatchQLParameterMissingError extends HandledError {
 export class LangWatchQLProjectsRequiredError extends HandledError {
   declare readonly code: "projects_required";
 
-  constructor({ readsNone = false }: { readsNone?: boolean } = {}) {
+  constructor() {
     super(
       "projects_required",
-      readsNone
-        ? "This key reads no project. Ask an admin to grant it `analytics:view` on one, then name it"
-        : 'Name the projects to query: send `projects`, a list of project ids, or "all"',
-      {
-        httpStatus: 422,
-        fault: "customer",
-        // `readsNone` tells the CLI and the MCP tool to show this message, not "name the projects".
-        // Naming projects or sending "all" gives a key that reads none nothing, so its only tip is
-        // the grant.
-        ...(readsNone
-          ? {
-              meta: { readsNone: true },
-              tips: [
-                "Grant the key's owner `analytics:view` on a project, or use a key that has it",
-              ],
-            }
-          : remediation("projects_required")),
-      },
+      'Name the projects to query: send `projects`, a list of project ids, or "all"',
+      { httpStatus: 422, fault: "customer", ...remediation("projects_required") },
     );
     this.name = "LangWatchQLProjectsRequiredError";
+  }
+}
+
+/**
+ * A key ran a statement, or sent "all", and holds `analytics:view` on no project. Naming projects
+ * would not help it, so this is a code of its own: the CLI and the MCP tool show its message.
+ */
+export class LangWatchQLProjectsUnreadableError extends HandledError {
+  declare readonly code: "projects_unreadable";
+
+  constructor() {
+    super(
+      "projects_unreadable",
+      "This key reads no project. Ask an admin to grant it `analytics:view` on a project.",
+      { httpStatus: 422, fault: "customer", ...remediation("projects_unreadable") },
+    );
+    this.name = "LangWatchQLProjectsUnreadableError";
   }
 }
 

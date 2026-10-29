@@ -1730,6 +1730,11 @@ const presentations = {
     describe: () =>
       'This key reads more than one project, so it must say which. Send `projects`, a list of project ids, or the string "all" for every project the key can read, and try again.',
   },
+  projects_unreadable: {
+    title: "This key reads no project",
+    describe: () =>
+      "This key holds `analytics:view` on no project, so there is nothing to query. Ask an admin to grant it `analytics:view` on a project, and try again.",
+  },
   organization_not_found_for_team: {
     title: "Organization not found",
     describe: () =>

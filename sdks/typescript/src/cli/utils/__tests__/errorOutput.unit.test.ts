@@ -556,6 +556,23 @@ describe("given a project_not_found under a person's login", () => {
   });
 
   /** @scenario The command line offers the same next steps */
+  it("puts the account line first and drops the key line from a server's own suggestions", () => {
+    login.used = true;
+    const withServerTips = {
+      code: "project_not_found",
+      message: "Project not found",
+      isHandled: true,
+      meta: {},
+      suggestions: ["Check which project your API key belongs to", "Ask the owner"],
+    } as never;
+
+    const text = renderErrorForHumans(withServerTips);
+
+    expect(text.indexOf("your account can read")).toBeLessThan(text.indexOf("Ask the owner"));
+    expect(text).not.toContain("API key belongs");
+  });
+
+  /** @scenario The command line offers the same next steps */
   it("keeps the key advice for a given API key", () => {
     login.used = false;
 

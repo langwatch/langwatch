@@ -39,12 +39,14 @@ export const widgetSourcesInput = z
 const ALL_NOT_STORED = 'projects holds project ids; "all" is not stored in a widget';
 // run_query takes "all"; a widget stores ids. The refine carries the message for "all" as a
 // string or inside the array, and adds nothing to the tool's JSON Schema.
+const isAllWord = (id: string) => id.trim().toLowerCase() === "all";
 export const widgetProjectsInput = z
   .array(z.string().min(1), {
-    error: (issue) => (issue.input === "all" ? ALL_NOT_STORED : undefined),
+    error: (issue) =>
+      typeof issue.input === "string" && isAllWord(issue.input) ? ALL_NOT_STORED : undefined,
   })
   .min(1)
-  .refine((ids) => !ids.some((id) => id.toLowerCase() === "all"), { message: ALL_NOT_STORED })
+  .refine((ids) => !ids.some(isAllWord), { message: ALL_NOT_STORED })
   .nullable()
   .optional()
   .describe(
