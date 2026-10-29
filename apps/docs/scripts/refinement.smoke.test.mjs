@@ -275,6 +275,41 @@ await it("captions each response example briefly and keeps the full description 
   });
 });
 
+/** @scenario "Render nested objects and union options as connected groups" */
+await it("names a disclosure's next action and hangs its children from a left rule", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+      try {
+        const page = await context.newPage();
+        await page.goto(base + FACETS);
+        const trigger = await page
+          .locator('.docs-expandable [data-part="item-trigger"]:not([data-state="open"])')
+          .first()
+          .elementHandle();
+        await trigger.scrollIntoViewIfNeeded();
+        assert.match(await trigger.innerText(), /^Show /);
+        await trigger.click();
+        await page.waitForFunction((node) => node.dataset.state === "open", trigger);
+        const open = await trigger.evaluate((node) => {
+          const content = node
+            .closest('[data-part="item"]')
+            .querySelector('[data-part="item-content"] > *');
+          return {
+            label: node.innerText.trim(),
+            rule: content ? parseFloat(getComputedStyle(content).borderInlineStartWidth) : 0,
+          };
+        });
+        assert.match(open.label, /^Hide /);
+        assert.ok(open.rule >= 1, `the open disclosure has a ${open.rule}px left rule`);
+      } finally {
+        await context.close();
+      }
+    },
+  });
+});
+
 /** @scenario "Show product imagery and the footer cleanly in either theme at any width" */
 await it("renders responsive product imagery and a solid footer across themes and screen sizes", async () => {
   await withPreviewBrowser({

@@ -122,12 +122,15 @@ describe("when a response nests objects and discriminated unions", () => {
       },
     ],
   };
-  /* Emotion writes its style tags inline, beside the elements they style. */
+  /* Emotion writes its style tags inline, beside the elements they style: keep only the markup. */
   const html = renderToStaticMarkup(
     <DesignSystemTestProvider>
       <Responses operation={operation} />
     </DesignSystemTestProvider>,
-  ).replace(/<style[^>]*>[^<]*<\/style>/g, "");
+  )
+    .split(/<style[^>]*>|<\/style>/)
+    .filter((_, index) => index % 2 === 0)
+    .join("");
 
   /** @scenario "Render nested objects and union options as connected groups" */
   it("counts every child disclosure and names union options by their constant", () => {

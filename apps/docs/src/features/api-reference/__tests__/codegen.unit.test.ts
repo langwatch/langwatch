@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 
 import { expect, it } from "vitest";
 
-import { generateExample } from "../model/codegen.ts";
+import { exampleFromSchema, generateExample } from "../model/codegen.ts";
 import { operationSchema } from "../model/operation-schema.ts";
 
 /** @scenario "Copy a request example" */
@@ -40,4 +40,18 @@ it("passes apostrophes and shell metacharacters as literal curl arguments", () =
   expect(argumentsReceived).toContain(body);
   expect(argumentsReceived).toContain(`X-Example: ${header}`);
   expect(argumentsReceived).toContain("https://app.langwatch.ai/example");
+});
+
+/** @scenario "Render nested objects and union options as connected groups" */
+it("seeds a constant field's example with its constant, ahead of its default and enum", () => {
+  expect(
+    exampleFromSchema({
+      schema: {
+        type: "object",
+        properties: {
+          kind: { type: "string", const: "categorical", default: "numeric", enum: ["range"] },
+        },
+      },
+    }),
+  ).toEqual({ kind: "categorical" });
 });

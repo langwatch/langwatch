@@ -151,6 +151,35 @@ await it("uses one document scroll and keeps the footer below both article and n
           });
           assert.fail(`the clicked rail link left the viewport: ${JSON.stringify({ box, rail })}`);
         }
+        // Long rail titles trim to one line, keep the full title on hover, and never scroll the
+        // rail sideways.
+        await page.goto(base + "api-reference/traces/discover-what-the-trace-filter-fields-hold");
+        const rail = await page.evaluate(() => {
+          const root = document.querySelector(".docs-left-rail");
+          const labels = [...root.querySelectorAll(".docs-nav-label")].filter(
+            (label) => label.getClientRects().length > 0,
+          );
+          const style = labels[0] && getComputedStyle(labels[0]);
+          return {
+            overflowX: root.scrollWidth - root.clientWidth,
+            untitled: labels.filter((label) => label.title !== label.textContent).length,
+            labels: labels.length,
+            wrap: style?.whiteSpace,
+            ellipsis: style?.textOverflow,
+          };
+        });
+        assert.ok(rail.labels > 0, JSON.stringify(rail));
+        assert.equal(rail.overflowX, 0, JSON.stringify(rail));
+        assert.equal(rail.untitled, 0, JSON.stringify(rail));
+        assert.equal(rail.wrap, "nowrap");
+        assert.equal(rail.ellipsis, "ellipsis");
+        // The feedback card keeps a gap above the site footer.
+        const gap = await page.evaluate(() => {
+          const footer = document.querySelector(".docs-page-footer");
+          const last = footer.lastElementChild.getBoundingClientRect();
+          return footer.getBoundingClientRect().bottom - last.bottom;
+        });
+        assert.ok(gap >= 48, `the feedback card sits ${gap}px from the page's end`);
       } finally {
         await context.close();
       }

@@ -9,7 +9,7 @@ describe("page menu markup", () => {
   it("hoists no image preload for the brand logos of its closed menu", () => {
     const html = renderToString(
       <DesignSystemTestProvider>
-        <PageMenu slug="a" actions={["copy", "claude", "chatgpt", "cursor"] as never} />
+        <PageMenu slug="a" actions={["copy", "claude", "chatgpt", "cursor"]} />
       </DesignSystemTestProvider>,
     );
     expect(html).toContain("/images/logos/openai.svg");

@@ -177,6 +177,7 @@ Feature: Static documentation with progressive interaction
     When a reader opens a guide with an accordion
     Then its content expands with keyboard activation
     And it collapses again without loading a page renderer
+    And its control reads the same quiet Show and Hide label as an API reference field
 
   @e2e
   Scenario: Answer a first click on search, a context menu or the playground on a small download
@@ -297,6 +298,12 @@ Feature: Static documentation with progressive interaction
     Then its copy button carries no second copy of the code
     And copying reads the code of the block, or of the selected tab, the button belongs to
     And a failed fetch or a denied clipboard reports that copying failed
+
+  @integration
+  Scenario: Set the theme before paint even when storage is blocked
+    Given the browser refuses to read the stored theme
+    When a page starts
+    Then the page still gets the light or dark theme from the reader's colour scheme
 
   @unit @e2e
   Scenario: Follow the reader's dark preference without JavaScript

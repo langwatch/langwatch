@@ -59,3 +59,21 @@ describe("a search shortcut pressed while the page loads", () => {
     expect(page.indexOf(themeScript)).toBeLessThan(page.indexOf("<main>"));
   });
 });
+
+describe("when the browser refuses to read the stored theme", () => {
+  /** @scenario "Set the theme before paint even when storage is blocked" */
+  it("still sets the theme from the reader's colour scheme", () => {
+    /* Inline scripts run in the page's own context, so the page's script installs the stubs. */
+    const run = (source: string) => {
+      const element = document.createElement("script");
+      element.textContent = source;
+      document.head.append(element);
+    };
+    run(`window.matchMedia = () => ({ matches: true });
+      Object.defineProperty(window, "localStorage", { configurable: true, get() { throw new DOMException("denied", "SecurityError"); } });`);
+    document.documentElement.className = "";
+    run(themeScript.replace(/^<script>|<\/script>$/g, ""));
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    run("delete window.matchMedia; delete window.localStorage;");
+  });
+});
