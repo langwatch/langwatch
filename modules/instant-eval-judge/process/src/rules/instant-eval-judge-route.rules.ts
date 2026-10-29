@@ -28,6 +28,7 @@ import {
 } from "@langwatch/instant-eval-judge-contract";
 
 import type { InstantEvalPermit } from "../channels/instant-eval-classifier.channel.ts";
+import { instantEvalVerdictSurenessOf } from "./instant-eval-judge-sureness.rules.ts";
 
 export interface InstantEvalJudgeRoutePlan {
   readonly job: InstantEvalJudgeJob;
@@ -329,6 +330,51 @@ export type InstantEvalJudgeLeg =
   | Readonly<{ outcome: "failed"; reason: InstantEvalSkipReason; error?: unknown }>;
 
 export type InstantEvalJudgeAnsweredLeg = Extract<InstantEvalJudgeLeg, { outcome: "answered" }>;
+
+/** A plan's first send: the primary's leg, and the partner's when the plan pairs. */
+export type InstantEvalJudgeFirstLeg = Readonly<{
+  primary: InstantEvalJudgeLeg;
+  pairWith?: InstantEvalJudgeLeg;
+}>;
+
+/**
+ * Each question's verdict from a decision model, with its sureness by its own kind's rule, so one
+ * send may carry several kinds. A verdict without its kind's field (a probability, a score, a
+ * label) is no answer.
+ */
+export function instantEvalDecisionAnswersOf({
+  questions,
+  judgement,
+  table,
+}: {
+  questions: readonly InstantEvalQuestion[];
+  judgement: { verdicts: readonly InstantEvalVerdict[] };
+  table: InstantEvalJudgeRouteTable;
+}): Map<string, InstantEvalJudgeRoutedAnswer> {
+  const answers = new Map<string, InstantEvalJudgeRoutedAnswer>();
+  for (const question of questions) {
+    const verdict = judgement.verdicts.find((v) => v.questionId === question.id);
+    if (!verdict || !answersItsKind({ question, verdict })) continue;
+    const rule = question.kind === "boolean" ? undefined : table.kinds[question.kind]?.sureness;
+    answers.set(question.id, {
+      verdict,
+      sureness: instantEvalVerdictSurenessOf({ question, verdict, rule }),
+    });
+  }
+  return answers;
+}
+
+function answersItsKind({
+  question,
+  verdict,
+}: {
+  question: InstantEvalQuestion;
+  verdict: InstantEvalVerdict;
+}): boolean {
+  if (question.kind === "boolean") return verdict.probability !== undefined;
+  if (question.kind === "score") return verdict.score !== undefined;
+  return verdict.label !== undefined;
+}
 
 export function isInstantEvalJudgeLegAnswered(
   leg: InstantEvalJudgeLeg,

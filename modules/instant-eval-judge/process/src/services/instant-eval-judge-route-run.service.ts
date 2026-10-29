@@ -1,7 +1,7 @@
 /**
- * One routed call's legs for questions of one kind: the plan's primary, then the pair in
- * parallel or an escalation for unsure answers, with fallbacks for a backend that is down. Each
- * kind reads sureness its own way; the legs are the same.
+ * One routed call's legs for questions of one kind: the plan's primary (a first send it may share
+ * with other kinds), then the pair in parallel or an escalation for unsure answers, with fallbacks
+ * for a backend that is down. Each kind reads sureness its own way; the legs are the same.
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
@@ -23,20 +23,18 @@ import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
 import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
+  instantEvalDecisionAnswersOf,
   instantEvalJudgeLegPermitOf,
   instantEvalJudgeLegsJoined,
   instantEvalRoutedVerdictsOf,
   isInstantEvalJudgeLegAnswered,
   isInstantEvalJudgeLegStop,
   type InstantEvalJudgeAnsweredLeg,
+  type InstantEvalJudgeFirstLeg,
   type InstantEvalJudgeLeg as Leg,
-  type InstantEvalJudgeRoutedAnswer,
   type InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
-import {
-  instantEvalVerdictSurenessOf,
-  isUnsureAnswer,
-} from "../rules/instant-eval-judge-sureness.rules.ts";
+import { isUnsureAnswer } from "../rules/instant-eval-judge-sureness.rules.ts";
 import { InstantEvalJudgeLegDeadlineService } from "./instant-eval-judge-leg-deadline.service.ts";
 import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
 
@@ -88,13 +86,25 @@ export class InstantEvalJudgeRouteRunService {
     return new InstantEvalJudgeRouteRunService(input);
   }
 
+  /** One kind's judgement from its own first send. */
+  judge(questions: readonly InstantEvalQuestion[]): Promise<InstantEvalJudgement> {
+    return this.judgeFrom({ questions, first: this.firstLeg(questions) });
+  }
+
   /**
-   * A caller's stop after paid legs carries their spend, so the stopped batch still bills it; any
-   * other throw after paid legs is a skip carrying that spend, so a merged call bills it too.
+   * One kind's judgement from a first send, its own or one shared with other kinds. A caller's
+   * stop after paid legs carries their spend, so the stopped batch still bills it; any other throw
+   * after paid legs is a skip carrying that spend, so a merged call bills it too.
    */
-  async judge(questions: readonly InstantEvalQuestion[]): Promise<InstantEvalJudgement> {
+  async judgeFrom({
+    questions,
+    first,
+  }: {
+    questions: readonly InstantEvalQuestion[];
+    first: Promise<InstantEvalJudgeFirstLeg>;
+  }): Promise<InstantEvalJudgement> {
     try {
-      return await this.judgeLegs(questions);
+      return await this.judgeLegs({ questions, firstSend: await first });
     } catch (error) {
       if (this.inputTokens <= 0) throw error;
       if (this.signal?.aborted) {
@@ -109,12 +119,27 @@ export class InstantEvalJudgeRouteRunService {
     }
   }
 
-  private async judgeLegs(
-    questions: readonly InstantEvalQuestion[],
-  ): Promise<InstantEvalJudgement> {
-    const { primary, pairWith, escalateTo } = this.plan;
-    if (pairWith) return this.pair({ questions, primary, pairWith });
-    const first = await this.ask({ backend: primary, questions });
+  /** The plan's first send for these questions: the primary, or both legs of a pair at once. */
+  async firstLeg(questions: readonly InstantEvalQuestion[]): Promise<InstantEvalJudgeFirstLeg> {
+    const { primary, pairWith } = this.plan;
+    if (!pairWith) return { primary: await this.ask({ backend: primary, questions }) };
+    const [a, b] = await Promise.all([
+      this.ask({ backend: primary, questions, skip: [pairWith] }),
+      this.ask({ backend: pairWith, questions, skip: [primary] }),
+    ]);
+    return { primary: a, pairWith: b };
+  }
+
+  private async judgeLegs({
+    questions,
+    firstSend,
+  }: {
+    questions: readonly InstantEvalQuestion[];
+    firstSend: InstantEvalJudgeFirstLeg;
+  }): Promise<InstantEvalJudgement> {
+    const { primary, escalateTo } = this.plan;
+    const { primary: first, pairWith } = firstSend;
+    if (pairWith) return this.pair({ questions, a: first, b: pairWith });
     if (first.outcome === "failed") {
       if (!escalateTo) return this.nothingAnswered(first);
       this.flags.push("primary_failed");
@@ -152,20 +177,16 @@ export class InstantEvalJudgeRouteRunService {
     return this.result({ questions, legs: [second, first], escalated });
   }
 
-  /** Both legs at once; per question the surer answer by its kind's rule wins, primary on a tie. */
-  private async pair({
+  /** A pair's two legs; per question the surer answer by its kind's rule wins, primary on a tie. */
+  private pair({
     questions,
-    primary,
-    pairWith,
+    a,
+    b,
   }: {
     questions: readonly InstantEvalQuestion[];
-    primary: string;
-    pairWith: string;
-  }): Promise<InstantEvalJudgement> {
-    const [a, b] = await Promise.all([
-      this.ask({ backend: primary, questions, skip: [pairWith] }),
-      this.ask({ backend: pairWith, questions, skip: [primary] }),
-    ]);
+    a: Leg;
+    b: Leg;
+  }): InstantEvalJudgement {
     if (a.outcome === "failed" && b.outcome === "failed") return this.nothingAnswered(a);
     if (a.outcome === "failed" || b.outcome === "failed") {
       return this.result({ questions, legs: [a, b].filter(isInstantEvalJudgeLegAnswered) });
@@ -282,7 +303,7 @@ export class InstantEvalJudgeRouteRunService {
     }
     this.paid({ backend, inputTokens: judgement.inputTokens, outputTokens: 0 });
     if (judgement.skippedReason) return { outcome: "failed", reason: judgement.skippedReason };
-    const answers = this.decisionAnswersOf({ questions, judgement });
+    const answers = instantEvalDecisionAnswersOf({ questions, judgement, table: this.deps.table });
     if (answers.size === 0) return { outcome: "failed", reason: "classifier_provider_unavailable" };
     return {
       outcome: "answered",
@@ -336,31 +357,6 @@ export class InstantEvalJudgeRouteRunService {
     if (allowed.includes(kind)) return text;
     this.flags.push(`${inputView}_view_refused:${backend}`);
     return fullText;
-  }
-
-  /**
-   * Each question's verdict with its sureness by the plan's rule; a verdict without the field its
-   * kind answers in (a probability, a score, a label) is no answer.
-   */
-  private decisionAnswersOf({
-    questions,
-    judgement,
-  }: {
-    questions: readonly InstantEvalQuestion[];
-    judgement: InstantEvalJudgement;
-  }): Map<string, InstantEvalJudgeRoutedAnswer> {
-    const answers = new Map<string, InstantEvalJudgeRoutedAnswer>();
-    for (const question of questions) {
-      const verdict = judgement.verdicts.find((v) => v.questionId === question.id);
-      if (!verdict || !answersItsKind({ question, verdict })) continue;
-      const sureness = instantEvalVerdictSurenessOf({
-        question,
-        verdict,
-        rule: this.plan.sureness,
-      });
-      answers.set(question.id, { verdict, sureness });
-    }
-    return answers;
   }
 
   /** One LLM call per question, in parallel; its answer is taken as sure. */
@@ -471,17 +467,4 @@ export class InstantEvalJudgeRouteRunService {
     const { mode, slot, inputView } = this.plan;
     return { answeredBy, escalated, mode, slot, inputView, flags: [...this.flags] };
   }
-}
-
-/** Whether a decision model's verdict carries the field its question's kind is answered in. */
-function answersItsKind({
-  question,
-  verdict,
-}: {
-  question: InstantEvalQuestion;
-  verdict: { probability?: number; score?: number; label?: string };
-}): boolean {
-  if (question.kind === "boolean") return verdict.probability !== undefined;
-  if (question.kind === "score") return verdict.score !== undefined;
-  return verdict.label !== undefined;
 }

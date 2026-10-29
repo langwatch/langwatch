@@ -1,6 +1,6 @@
 /**
  * The judge router: takes the place of the one hosted classifier call when a call carries a route.
- * Plans each question kind the table routes; a kind it does not route takes today's classifier.
+ * Plans each kind the table routes; kinds sharing a first send send it once, each escalates alone.
  * @see dev/docs/adr/190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
@@ -19,6 +19,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 
 import { instantEvalJudgeClassifierCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
+  instantEvalJudgeFirstSendLeadsOf,
   instantEvalJudgeKindGroupsOf,
   instantEvalMergedJudgementOf,
   type InstantEvalJudgeKindPart,
@@ -59,34 +60,47 @@ export class InstantEvalJudgeRouterService {
     const { questions } = input;
     const groups = instantEvalJudgeKindGroupsOf({ questions, table: this.deps.table });
     if (groups.length === 0) return this.unrouted(input);
-    const parts = groups.map(async (group) => ({
-      kind: group.kind,
-      judgement: await this.routedRun({ input, questions: group.questions, kind: group.kind }),
-    }));
+    const parts = this.routedRuns({ input, groups });
     if (parts.length === 1) return (await parts[0]!).judgement;
     return this.merged({ questions, parts, signal: input.signal });
   }
 
-  private routedRun({
+  /**
+   * One run per kind, in the kinds' order. Kinds whose plans make the same decision-model first
+   * send share one send of all their questions; each kind then escalates from it on its own.
+   */
+  private routedRuns({
     input,
-    questions,
-    kind,
+    groups,
   }: {
     input: RoutedClassification;
-    questions: readonly InstantEvalQuestion[];
-    kind: InstantEvalQuestionKind;
-  }): Promise<InstantEvalJudgement> {
+    groups: readonly { kind: InstantEvalQuestionKind; questions: readonly InstantEvalQuestion[] }[];
+  }): Promise<InstantEvalJudgeKindPart>[] {
     const { projectId, text, signal, route } = input;
     const { table } = this.deps;
-    const plan = instantEvalJudgeRoutePlanOf({ route, text, questions, table, kind });
-    const run = InstantEvalJudgeRouteRunService.create({
-      deps: this.deps,
-      plan,
-      projectId,
-      signal,
-      logger: this.logger,
+    const plans = groups.map(({ kind, questions }) =>
+      instantEvalJudgeRoutePlanOf({ route, text, questions, table, kind }),
+    );
+    const runs = plans.map((plan) =>
+      InstantEvalJudgeRouteRunService.create({
+        deps: this.deps,
+        plan,
+        projectId,
+        signal,
+        logger: this.logger,
+      }),
+    );
+    const leads = instantEvalJudgeFirstSendLeadsOf({ plans, table });
+    const firstSends = runs.map((run, at) => {
+      if (leads[at] !== at) return undefined;
+      return run.firstLeg(
+        groups.filter((_, other) => leads[other] === at).flatMap((g) => g.questions),
+      );
     });
-    return run.judge(questions);
+    return groups.map(async ({ kind, questions }, at) => {
+      const first = firstSends[leads[at]!]!;
+      return { kind, judgement: await runs[at]!.judgeFrom({ questions, first }) };
+    });
   }
 
   /**

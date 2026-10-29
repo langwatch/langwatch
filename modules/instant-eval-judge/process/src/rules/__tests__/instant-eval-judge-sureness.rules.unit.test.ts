@@ -15,6 +15,7 @@ import {
 } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
 import { instantEvalJudgeRouteBootIssues } from "../instant-eval-judge-route-boot.rules.ts";
 import {
+  instantEvalJudgeFirstSendLeadsOf,
   instantEvalJudgeKindGroupsOf,
   instantEvalMergedJudgementOf,
 } from "../instant-eval-judge-route-merge.rules.ts";
@@ -189,6 +190,26 @@ describe("a call with questions of several kinds", () => {
     ]);
     const both = instantEvalJudgeKindGroupsOf({ questions: [POLITE, upset, TOPIC], table });
     expect(both.map((group) => group.kind)).toEqual(["boolean", "score", "category"]);
+  });
+
+  /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+  it("shares a first send only between decision-model plans that send the same thing", () => {
+    const upset = yesNo("q", "upset");
+    const planOf = (kind: "boolean" | "score", mode: "balanced" | "accurate") =>
+      instantEvalJudgeRoutePlanOf({
+        route: { job: "llm_judge", tokens: 500, mode },
+        text: "x",
+        questions: [kind === "boolean" ? upset : POLITE],
+        table,
+        kind,
+      });
+    const decisions = [planOf("boolean", "balanced"), planOf("score", "balanced")];
+    expect(instantEvalJudgeFirstSendLeadsOf({ plans: decisions, table })).toEqual([0, 0]);
+    const viewed = [decisions[0]!, { ...decisions[1]!, inputView: "text" as const }];
+    expect(instantEvalJudgeFirstSendLeadsOf({ plans: viewed, table })).toEqual([0, 1]);
+    // An LLM primary asks per question, so even the same LLM never shares a send.
+    const llm = planOf("boolean", "accurate");
+    expect(instantEvalJudgeFirstSendLeadsOf({ plans: [llm, llm], table })).toEqual([0, 1]);
   });
 
   /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */

@@ -14,6 +14,8 @@ import {
   type InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
 
+import type { InstantEvalJudgeRoutePlan } from "./instant-eval-judge-route.rules.ts";
+
 /** The questions of one kind, in the order asked. */
 interface InstantEvalJudgeKindGroup {
   readonly kind: InstantEvalQuestionKind;
@@ -23,7 +25,7 @@ interface InstantEvalJudgeKindGroup {
 /**
  * The call's questions by kind when the router can take every one; none when any is of a kind
  * the table does not route, or malformed (a range not whole or inverted, no or repeated options).
- * Then the whole call keeps today's one classifier call: no text is sent and billed twice.
+ * Then the whole call keeps today's one classifier call instead of routing part of it.
  */
 export function instantEvalJudgeKindGroupsOf({
   questions,
@@ -37,6 +39,39 @@ export function instantEvalJudgeKindGroupsOf({
     const ofKind = questions.filter((question) => question.kind === kind);
     return ofKind.length > 0 ? [{ kind, questions: ofKind }] : [];
   });
+}
+
+/**
+ * Per kind's plan, the first kind whose plan makes the same first send: a decision-model primary
+ * with the same pair partner, input view, text and fallbacks. Those kinds send once with all
+ * their questions, and each escalates from that answer. An LLM asks per question, never shared.
+ */
+export function instantEvalJudgeFirstSendLeadsOf({
+  plans,
+  table,
+}: {
+  plans: readonly InstantEvalJudgeRoutePlan[];
+  table: InstantEvalJudgeRouteTable;
+}): number[] {
+  const isShareable = (plan: InstantEvalJudgeRoutePlan) => {
+    const kind = table.backends[plan.primary]?.kind;
+    return kind === "jev" || kind === "decisions";
+  };
+  return plans.map((plan, at) =>
+    isShareable(plan) ? plans.findIndex((lead) => isSameFirstSend(lead, plan)) : at,
+  );
+}
+
+function isSameFirstSend(a: InstantEvalJudgeRoutePlan, b: InstantEvalJudgeRoutePlan): boolean {
+  const fallbacksOf = (plan: InstantEvalJudgeRoutePlan) =>
+    [plan.primary, plan.pairWith].map((backend) => plan.fallbacks[backend ?? ""] ?? []);
+  return (
+    a.primary === b.primary &&
+    a.pairWith === b.pairWith &&
+    a.inputView === b.inputView &&
+    a.text === b.text &&
+    JSON.stringify(fallbacksOf(a)) === JSON.stringify(fallbacksOf(b))
+  );
 }
 
 function isRoutable({

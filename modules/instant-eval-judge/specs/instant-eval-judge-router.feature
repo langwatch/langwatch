@@ -150,7 +150,11 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   Scenario: Questions of several kinds in one call are routed per kind and merged in order
     Given a routed call asking yes-or-no, score and category questions
     When it is judged
-    Then each kind is planned and judged on its own, side by side
+    Then each kind is planned on its own, and the kinds are judged side by side
+    And kinds whose plans share a decision-model first send send the text once with all their questions
+    And a first send is shared when the primary, pair partner, input view and fallbacks are the same
+    And each kind escalates from that shared answer by its own sureness rule and threshold
+    And kinds whose plans start elsewhere send on their own, and an LLM leg still asks one question per call
     And the verdicts come back in the order asked with tokens and cost summed and each flag naming its kind
     And a kind whose run threw while another answered is a skip of that kind, keeping the paid parts billed
     And a caller's stop carries every part's paid spend

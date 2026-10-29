@@ -640,16 +640,28 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.routing).toMatchObject({ slot: "short", answeredBy: { "decision-b": 1 } });
     });
 
+    /** Answers every question a Decisions request asks, each kind in its own field. */
+    const answerAsked = ({
+      polite = scored(0.2),
+      topic = labelled({ billing: 0.9, other: 0.1 }),
+      q = judged(0.05),
+    }: Partial<Record<"polite" | "topic" | "q", InstantEvalJudgement>>) => {
+      const byId = { polite, topic, q };
+      return (asked: readonly InstantEvalQuestion[] = []): InstantEvalJudgement => ({
+        verdicts: asked.flatMap((question) => byId[question.id as keyof typeof byId].verdicts),
+        inputTokens: 1000,
+        isTextTruncated: false,
+      });
+    };
+    const kindsSent = (requests: readonly { questions: readonly InstantEvalQuestion[] }[]) =>
+      requests.map((request) => request.questions.map((question) => question.kind).join(","));
+
     /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
-    it("plans each kind on its own and merges the verdicts in the order asked", async () => {
+    it("sends kinds whose plans share a first send once, and merges the verdicts in the order asked", async () => {
+      const answer = answerAsked({});
       const { classify, hostedDecisions } = harness({
         table,
-        decisions: () => {
-          const asked = hostedDecisions.requests.at(-1)?.questions[0]?.id;
-          if (asked === "polite") return scored(0.2);
-          if (asked === "topic") return labelled({ billing: 0.9, other: 0.1 });
-          return judged(0.05);
-        },
+        decisions: () => answer(hostedDecisions.requests.at(-1)?.questions),
       });
       const judgement = await classify({ job: "llm_judge", tokens: 500 }, [TOPIC, Q, POLITE]);
       expect(judgement.verdicts.map((verdict) => verdict.questionId)).toEqual([
@@ -657,13 +669,49 @@ describe("InstantEvalJudgeRouterService", () => {
         "q",
         "polite",
       ]);
-      const kindsAsked = hostedDecisions.requests.map((request) =>
-        request.questions.map((q) => q.kind).join(","),
-      );
-      expect(kindsAsked.toSorted()).toEqual(["boolean", "category", "score"]);
+      // Yes or no and the score both start at decision-a, so they share one request.
+      expect(kindsSent(hostedDecisions.requests).toSorted()).toEqual(["boolean,score", "category"]);
       // The category's short llm_judge slot pairs with the classifier, paid but not answering it.
-      expect(judgement.inputTokens).toBe(4000);
+      expect(judgement.inputTokens).toBe(3000);
       expect(judgement.routing?.answeredBy).toEqual({ "decision-a": 3 });
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("escalates each kind from the shared answer by its own rule and threshold", async () => {
+      const answer = answerAsked({ polite: scored(1.8) });
+      const { classify, hostedDecisions, llmJudge } = harness({
+        table,
+        decisions: () => answer(hostedDecisions.requests.at(-1)?.questions),
+        llm: () => ({ outcome: "answered", score: 2, inputTokens: 900, outputTokens: 80 }),
+      });
+      const judgement = await classify({ job: "llm_judge", tokens: 500 }, [Q, POLITE]);
+      expect(hostedDecisions.requests).toHaveLength(1);
+      expect(llmJudge.requests.map((request) => request.question.id)).toEqual(["polite"]);
+      expect(judgement.verdicts).toEqual([
+        { questionId: "q", probability: 0.05 },
+        { questionId: "polite", score: 2 },
+      ]);
+      expect(judgement.inputTokens).toBe(1900);
+      expect(judgement.routing).toMatchObject({
+        answeredBy: { "decision-a": 1, "llm-a": 1 },
+        escalated: 1,
+      });
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("still splits kinds whose plans start at different backends", async () => {
+      // scenario_judge asks yes or no of the classifier alone and a score of Decisions alone.
+      const answer = answerAsked({});
+      const { classify, hostedDecisions, jevCalls } = harness({
+        table,
+        decisions: () => answer(hostedDecisions.requests.at(-1)?.questions),
+        jev: (_signal, asked) => answer(asked),
+      });
+      const judgement = await classify({ job: "scenario_judge", tokens: 500 }, [POLITE, Q]);
+      expect(kindsSent(hostedDecisions.requests)).toEqual(["score"]);
+      expect(jevCalls()).toBe(1);
+      expect(judgement.verdicts.map((verdict) => verdict.questionId)).toEqual(["polite", "q"]);
+      expect(judgement.inputTokens).toBe(2000);
     });
 
     /** @scenario "An LLM leg that fails keeps the primary verdict, flagged" */
@@ -795,6 +843,7 @@ describe("InstantEvalJudgeRouterService", () => {
       const answered = new Promise<void>((resolve) => {
         booleanAnswered = resolve;
       });
+      // The category pairs with the classifier, the yes or no asks Decisions alone: two sends.
       const { classify, hostedDecisions } = harness({
         table,
         decisions: async (signal) => {
@@ -808,10 +857,11 @@ describe("InstantEvalJudgeRouterService", () => {
           stop.abort();
           return hung;
         },
+        jev: (signal) => hangUntilAborted<InstantEvalJudgement>(signal),
       });
       const error = await classify(
         { job: "llm_judge", tokens: 500 },
-        [POLITE, Q],
+        [TOPIC, Q],
         stop.signal,
       ).catch((caught: unknown) => caught);
       expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
