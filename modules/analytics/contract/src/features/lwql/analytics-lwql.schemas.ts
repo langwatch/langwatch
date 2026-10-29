@@ -161,7 +161,7 @@ export const lwqlProjectsSchema: LwqlProjectsSchema = lwqlProjectsSchemaDefiniti
 
 /** The same list for a signed-in member, at most {@link LWQL_MAX_MEMBER_PROJECTS} ids. */
 const lwqlMemberProjectsSchemaDefinition = z
-  .array(z.string().min(1))
+  .array(z.string().min(1), 'projects holds project ids; "all" is not stored in a widget')
   .min(1, "projects must hold at least one id")
   .max(LWQL_MAX_MEMBER_PROJECTS, `projects holds at most ${LWQL_MAX_MEMBER_PROJECTS} ids`);
 export interface LwqlMemberProjectsSchema extends Named<
@@ -169,6 +169,44 @@ export interface LwqlMemberProjectsSchema extends Named<
 > {}
 export const lwqlMemberProjectsSchema: LwqlMemberProjectsSchema =
   lwqlMemberProjectsSchemaDefinition;
+
+/**
+ * A union hides why its list branch refused ("projects holds at most 100 ids"); this gives that
+ * reason back, so naming too many projects reads the same with or without "all" as a choice.
+ */
+function listRefusalOr(issue: {
+  code?: string;
+  errors?: readonly (readonly { message: string }[])[];
+}) {
+  if (issue.code !== "invalid_union") return undefined;
+
+  return issue.errors?.[1]?.[0]?.message ?? 'projects must be "all" or a list of project ids';
+}
+
+/** The word that asks for every project the caller can read, sent as the string, not in a list. */
+export const LWQL_ALL_PROJECTS = "all";
+
+/** What a run's `projects` holds for a key: the ids to read, or "all" of those it can read. */
+const lwqlProjectsRequestSchemaDefinition = z.union(
+  [z.literal(LWQL_ALL_PROJECTS), lwqlProjectsSchemaDefinition],
+  { error: listRefusalOr },
+);
+export interface LwqlProjectsRequestSchema extends Named<
+  typeof lwqlProjectsRequestSchemaDefinition
+> {}
+export const lwqlProjectsRequestSchema: LwqlProjectsRequestSchema =
+  lwqlProjectsRequestSchemaDefinition;
+
+/** The same for a signed-in member, whose list holds at most {@link LWQL_MAX_MEMBER_PROJECTS}. */
+const lwqlMemberProjectsRequestSchemaDefinition = z.union(
+  [z.literal(LWQL_ALL_PROJECTS), lwqlMemberProjectsSchemaDefinition],
+  { error: listRefusalOr },
+);
+export interface LwqlMemberProjectsRequestSchema extends Named<
+  typeof lwqlMemberProjectsRequestSchemaDefinition
+> {}
+export const lwqlMemberProjectsRequestSchema: LwqlMemberProjectsRequestSchema =
+  lwqlMemberProjectsRequestSchemaDefinition;
 
 /**
  * `POST /api/v1/query`'s body: a statement, optionally narrowed to one project the key reads.
@@ -183,10 +221,10 @@ const lwqlKeyStatementSchemaDefinition = z.object({
     .describe(
       "Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both.",
     ),
-  projects: lwqlProjectsSchema
+  projects: lwqlProjectsRequestSchema
     .optional()
     .describe(
-      "The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.",
+      'The projects to read, each one the key holds analytics:view on, or the string "all" for every project the key can read. A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.',
     ),
   sources: traceSourcesSchema
     .optional()

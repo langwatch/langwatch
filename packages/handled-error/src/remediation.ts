@@ -29,7 +29,7 @@ const registry = {
   },
   projects_required: {
     tips: [
-      "Send `projects`, a list of the project ids to read; the answer's `params.dashboard_context_projects` lists what was read",
+      'Send `projects`, a list of the project ids to read, or the string "all" for every project the key can read; the answer\'s `params.dashboard_context_projects` lists what was read',
       "A project API key needs none: it reads its own project",
     ],
   },

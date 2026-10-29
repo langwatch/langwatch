@@ -28,6 +28,7 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   LangWatchQLProjectNotFoundError,
+  LWQL_ALL_PROJECTS,
   type LangWatchQLRunCaller,
   type LangWatchQLAcceptedStatement,
   type LangWatchQLAppFunctionCall,
@@ -747,14 +748,23 @@ export class AnalyticsModule
       { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
-    const { reach, projectId, projects: named, sql, parameters, timeWindow } = input;
+    const { reach, projectId, projects: asked, sql, parameters, timeWindow } = input;
     const { granularitySeconds, sources, signal } = input;
-    const { named: wanted } = this.#runScope.select({ projectId, projects: named });
-    const { projects, protections } = await this.#queryScope.resolve({
-      reach,
-      requireProjects: true,
-      ...(wanted === undefined ? {} : { projects: wanted }),
+    const isAll = asked === LWQL_ALL_PROJECTS;
+    if (isAll && projectId !== undefined) {
+      throw new ValidationError("send projectId or projects, not both");
+    }
+    const { named: wanted } = this.#runScope.select({
+      projectId,
+      ...(isAll ? {} : { projects: asked }),
     });
+    const { projects, protections } = isAll
+      ? await this.#queryScope.resolveAll({ reach })
+      : await this.#queryScope.resolve({
+          reach,
+          requireProjects: true,
+          ...(wanted === undefined ? {} : { projects: wanted }),
+        });
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
     }
@@ -848,7 +858,11 @@ export class AnalyticsModule
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
-    const { authorization, project, projects: named, userId, ...run } = input;
+    const { authorization, project, projects: asked, userId, ...run } = input;
+    const named =
+      asked === LWQL_ALL_PROJECTS
+        ? await this.#readableProjects.allIdsFor({ projectId: project.id, userId })
+        : asked;
     const scope = await this.#runScope.resolve({ authorization, project, named, userId });
 
     if (scope.kind === "aggregate") {

@@ -15,6 +15,7 @@ import type { Authorization, RestProjectCredentialPrincipal } from "@langwatch/a
 import { ValidationError } from "@langwatch/handled-error";
 import { PROJECT_KIND, type Project, type ProjectApi } from "@langwatch/project-contract";
 
+import { inStableOrder } from "../rules/langwatch-ql-project-selection.rules.ts";
 import { strictestLangWatchQLProtections } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { dedupeInOrder } from "../rules/langwatch-ql-run-params.rules.ts";
 import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "./langwatch-ql-capability.service.ts";
@@ -91,6 +92,18 @@ export class LangWatchQLQueryScopeService {
       projects: readable.map(({ project }) => ({ id: project.id, lwqlKey: project.lwqlKey })),
       protections: strictestLangWatchQLProtections(protections),
     };
+  }
+
+  /**
+   * Every project the key reads, in id order, for `projects: "all"`. Each holds `analytics:view`
+   * for the key, so a project it lacks, or of another organization, is never among them.
+   * @throws {LangWatchQLProjectNotFoundError} when the key reads none, with no id.
+   */
+  async resolveAll({ reach }: { reach: LangWatchQLKeyReach }): Promise<LangWatchQLQueryScope> {
+    const scope = await this.resolve({ reach });
+    if (scope.projects.length === 0) throw new LangWatchQLProjectNotFoundError();
+
+    return { ...scope, projects: inStableOrder(scope.projects) };
   }
 
   /**
@@ -240,9 +253,9 @@ export class LangWatchQLQueryScopeService {
       ...(only === undefined ? {} : { projectIds: [...only] }),
     });
     if (listed.pagination.total > listed.data.length) {
-      throw new Error(
-        `LangWatchQL key scope spans ${listed.pagination.total} projects, over the ` +
-          `${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} cap — narrow the key's project scope`,
+      throw new ValidationError(
+        `The key reaches ${listed.pagination.total} projects, over the ` +
+          `${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} a run may read. Name the projects instead.`,
       );
     }
 

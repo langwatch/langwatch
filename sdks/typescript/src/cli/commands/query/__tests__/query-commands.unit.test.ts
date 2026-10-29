@@ -415,6 +415,13 @@ describe("runQueryCommand with --projects and --sources", () => {
     expect(printed).toContain('Ran with {"dashboard_context_projects":["A"]}');
   });
 
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it('sends "all" as the string when --projects is all', async () => {
+    await runQueryCommand("SELECT 1", { projects: "all" });
+
+    expect(mockQuery).toHaveBeenCalledWith({ sql: "SELECT 1", projects: "all" });
+  });
+
   /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
   it("prints nothing about params when the statement declared no placeholder", async () => {
     mockQuery.mockResolvedValue({ ...RESULT, params: {} });
@@ -429,7 +436,7 @@ describe("runQueryCommand with --projects and --sources", () => {
   it("tells the user to pass --projects when the platform asks for them", async () => {
     mockQuery.mockRejectedValue(
       Object.assign(
-        new Error("Name the projects to query: send `projects`, a list of project ids"),
+        new Error('Name the projects to query: send `projects`, a list of project ids, or "all"'),
         {
           code: "projects_required",
           kind: "projects_required",
@@ -443,7 +450,9 @@ describe("runQueryCommand with --projects and --sources", () => {
     await expect(runQueryCommand("SELECT 1", {})).rejects.toThrow(ProcessExitError);
 
     const printed = vi.mocked(console.error).mock.calls.flat().join("\n");
-    expect(printed).toContain("Name the projects to query: pass --projects <id,id>");
+    expect(printed).toContain(
+      "Name the projects to query: pass --projects <id,id>, or --projects all",
+    );
     expect(printed).not.toMatch(/project_[a-z0-9]+/);
   });
 });

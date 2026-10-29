@@ -103,7 +103,7 @@ export interface QueryReferenceResponse {
 export async function runQuery(params: {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
-  projects?: string[];
+  projects?: string[] | "all";
   sources?: string[];
 }): Promise<QueryRunResponse> {
   return makeRequest("POST", "/api/v1/query", {

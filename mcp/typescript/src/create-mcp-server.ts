@@ -249,11 +249,10 @@ function registerObservabilityTools(server: McpServer): void {
           'Values for the parameters the statement declares, e.g. {"days": 7} for {days:UInt32}',
         ),
       projects: z
-        .array(z.string().min(1))
-        .min(1)
+        .union([z.literal("all"), z.array(z.string().min(1)).min(1)])
         .optional()
         .describe(
-          "The project ids to read. A key for an organization or a team must name them; a project key reads its own project",
+          'The project ids to read, or the string "all" for every project the key can read (params.dashboard_context_projects lists them). A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it',
         ),
       sources: z
         .array(z.string())

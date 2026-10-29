@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { dashboardWidgetQuerySchema } from "../../dashboard-widget/dashboard-widget-definition.ts";
 import { lwqlKeyStatementSchema } from "../analytics-lwql.schemas.ts";
 import { lwqlQueryRequestSchema } from "../analytics-lwql.trpc.ts";
 import { langWatchQLQueryResultSchema, TRACE_SOURCES } from "../analytics.lwql.ts";
@@ -155,5 +156,35 @@ describe("given a reserved name in the parameters", () => {
     });
 
     expect(refused.error?.issues[0]?.path).toEqual(["parameters", "limit"]);
+  });
+});
+
+describe('given projects set to "all"', () => {
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("is accepted by the key door and the member door as the string", () => {
+    expect(issuesOf({ sql: SQL, projects: "all" })).toEqual([]);
+    expect(lwqlQueryRequestSchema.validate({ projectId: "p", sql: SQL, projects: "all" })).toBe(
+      true,
+    );
+  });
+
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("is a project id like any other inside a list, and any other string is refused", () => {
+    expect(issuesOf({ sql: SQL, projects: ["all"] })).toEqual([]);
+    expect(issuesOf({ sql: SQL, projects: "everything" })).not.toEqual([]);
+  });
+
+  /** @scenario "QP03i A widget write refuses the word all" */
+  it("is refused in a widget query, saying the widget does not store it", () => {
+    const refused = dashboardWidgetQuerySchema.safeParse({
+      name: "main",
+      sql: SQL,
+      projects: "all",
+    });
+
+    expect(refused.success).toBe(false);
+    expect(refused.error?.issues[0]?.message).toBe(
+      'projects holds project ids; "all" is not stored in a widget',
+    );
   });
 });

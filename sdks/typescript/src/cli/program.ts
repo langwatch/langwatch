@@ -3151,7 +3151,7 @@ function registerQueryCommands(program: Command): void {
       .option("--project <idOrSlug>", QUERY_PROJECT_FLAG_HELP)
       .option(
         "--projects <ids>",
-        "Project ids to read, comma separated. A login for an organization or a team must name them; a project key needs none",
+        'Project ids to read, comma separated, or "all" for every project the key can read. A login that reaches several projects must name them or pass all; one that reads a single project defaults to it',
       )
       .option(
         "--sources <list>",

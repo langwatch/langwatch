@@ -67,6 +67,9 @@ export const resolveProjects = (flag: string | undefined): string[] | undefined 
   if (picked.length === 0) {
     throw new WidgetInputError("--projects: pass a comma list of project ids");
   }
+  if (picked.includes("all")) {
+    throw new WidgetInputError('--projects: a widget stores project ids, not "all"; name them');
+  }
   return picked;
 };
 

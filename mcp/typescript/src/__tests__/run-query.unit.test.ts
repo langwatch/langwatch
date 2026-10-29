@@ -83,7 +83,22 @@ describe("given the platform asks for the projects", () => {
 
     expect(refusal).toBeInstanceOf(Error);
     expect((refusal as Error).message).toBe(
-      "Name the projects to query: pass `projects`, a list of project ids",
+      'Name the projects to query: pass `projects`, a list of project ids, or "all"',
     );
+  });
+});
+
+describe('given run_query is called with projects "all"', () => {
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("sends the string, not a list, and shows the projects the platform echoed", async () => {
+    mockRunQuery.mockResolvedValue({
+      ...RESULT,
+      params: { dashboard_context_projects: ["A", "B"] },
+    });
+
+    const text = await handleRunQuery({ sql: "SELECT 1", projects: "all" });
+
+    expect(mockRunQuery).toHaveBeenCalledWith({ sql: "SELECT 1", projects: "all" });
+    expect(text).toContain('"dashboard_context_projects"');
   });
 });

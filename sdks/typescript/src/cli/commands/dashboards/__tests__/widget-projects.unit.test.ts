@@ -98,3 +98,10 @@ describe("--projects on widget add and update", () => {
     ]);
   });
 });
+
+describe("--projects all on a widget", () => {
+  /** @scenario "QP03i A widget write refuses the word all" */
+  it("is refused before anything is sent, saying a widget stores ids", () => {
+    expect(() => resolveProjects("all")).toThrow(/not "all"/);
+  });
+});

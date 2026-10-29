@@ -66,12 +66,13 @@ export interface QueryRunOptions {
 /** The trace sources and projects a run names, as the request carries them. */
 interface RunReach {
   projectId?: string;
-  projects?: string[];
+  projects?: string[] | "all";
   sources?: QueryRunParams["sources"];
 }
 
 /** What the CLI tells a person whose key names no project (the platform's `projects_required`). */
-const PROJECTS_REQUIRED_MESSAGE = "Name the projects to query: pass --projects <id,id>";
+const PROJECTS_REQUIRED_MESSAGE =
+  "Name the projects to query: pass --projects <id,id>, or --projects all";
 
 /** A flag's comma list; a flag that is given but names nothing is refused, not read as unset. */
 function listFlag({
@@ -401,7 +402,8 @@ export const runQueryCommand = async (
   // credential falls back to is not a project the user asked to read alone.
   const credentials = await resolveCredentials({ project: options.project });
   const projectId = options.project === undefined ? undefined : credentials.projectId;
-  const projects = listFlag({ value: options.projects, flag: "--projects" });
+  const listed = listFlag({ value: options.projects, flag: "--projects" });
+  const projects = listed?.length === 1 && listed[0] === "all" ? "all" : listed;
   const sources = listFlag({ value: options.sources, flag: "--sources" });
   const reach: RunReach = {
     ...(projectId === undefined ? {} : { projectId }),

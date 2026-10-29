@@ -183,7 +183,7 @@ export class LangWatchQLProjectsRequiredError extends HandledError {
   constructor() {
     super(
       "projects_required",
-      "Name the projects to query: send `projects`, a list of project ids",
+      'Name the projects to query: send `projects`, a list of project ids, or "all"',
       { httpStatus: 422, fault: "customer", ...remediation("projects_required") },
     );
     this.name = "LangWatchQLProjectsRequiredError";

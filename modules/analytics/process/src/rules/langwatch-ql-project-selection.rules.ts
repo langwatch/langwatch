@@ -45,3 +45,10 @@ export function narrowAggregate({
     },
   };
 }
+
+/** Every project a key or member reads, in id order so the echoed list is stable. */
+export function inStableOrder<Project extends { id: string }>(
+  projects: readonly Project[],
+): Project[] {
+  return projects.toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id));
+}

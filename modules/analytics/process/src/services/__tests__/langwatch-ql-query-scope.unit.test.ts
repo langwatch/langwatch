@@ -341,7 +341,7 @@ describe("given a run that names projects", () => {
     expect(refusal).toMatchObject({
       code: "projects_required",
       httpStatus: 422,
-      message: "Name the projects to query: send `projects`, a list of project ids",
+      message: 'Name the projects to query: send `projects`, a list of project ids, or "all"',
     });
   });
 
@@ -367,6 +367,51 @@ describe("given a run that names projects", () => {
     const scope = await service.resolve({ reach: KEY, requireProjects: true });
 
     expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
+  });
+
+  describe('when a statement asks for "all" the key can read', () => {
+    /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+    it("reads the projects it holds analytics:view on, in id order, and echoes that same set", async () => {
+      const { service } = scopeOver({
+        projects: [project("b"), project("a")],
+        grants: PERMITTED,
+      });
+
+      const scope = await service.resolveAll({ reach: KEY });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["a", "b"]);
+    });
+
+    /** @scenario "QP03g The word all never reaches a project the caller cannot read, or another organization" */
+    it("leaves out a project of its organization it holds no analytics:view on", async () => {
+      const { service } = scopeOver({
+        projects: [project("a"), project("b"), project("c")],
+        grants: { a: ["analytics:view"], b: ["analytics:view"], c: ["cost:view"] },
+      });
+
+      const scope = await service.resolveAll({ reach: KEY });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["a", "b"]);
+    });
+
+    /** @scenario "QP03g The word all never reaches a project the caller cannot read, or another organization" */
+    it("never reads a project of another organization, which the key's organization lacks", async () => {
+      const { service } = scopeOver({ projects: [project("a")], grants: PERMITTED });
+
+      await expect(
+        service.resolveAll({ reach: { ...KEY, organizationId: "org-2" } }),
+      ).rejects.toMatchObject({ code: "project_not_found" });
+    });
+
+    /** @scenario "QP03h The word all that resolves to no project, or to more than the cap, is refused" */
+    it("refuses with the id-free not-found answer when the key reads no project", async () => {
+      const { service } = scopeOver({ projects: [project("a")], grants: {} });
+
+      await expect(service.resolveAll({ reach: KEY })).rejects.toMatchObject({
+        code: "project_not_found",
+        httpStatus: 404,
+      });
+    });
   });
 
   /** @scenario "QP12 A list that names one project twice reads it once, and params keeps the first place" */

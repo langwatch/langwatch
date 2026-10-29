@@ -13,12 +13,12 @@ export const RUN_QUERY_ROW_CAP = 50;
 
 /** What the tool tells an agent whose key names no project (the platform's `projects_required`). */
 const PROJECTS_REQUIRED_MESSAGE =
-  "Name the projects to query: pass `projects`, a list of project ids";
+  'Name the projects to query: pass `projects`, a list of project ids, or "all"';
 
 export async function handleRunQuery(params: {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
-  projects?: string[];
+  projects?: string[] | "all";
   sources?: string[];
 }): Promise<string> {
   const result = await runQuery(params).catch((error: unknown) => {

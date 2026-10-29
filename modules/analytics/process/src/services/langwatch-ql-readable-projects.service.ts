@@ -1,5 +1,10 @@
-import type { LangWatchQLReadableProject } from "@langwatch/analytics-contract";
+import {
+  LangWatchQLProjectNotFoundError,
+  type LangWatchQLReadableProject,
+} from "@langwatch/analytics-contract";
+import { LWQL_MAX_MEMBER_PROJECTS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 type Dependencies = Readonly<{ authz: AuthzApi; projects: ProjectApi }>;
@@ -39,5 +44,27 @@ export class LangWatchQLReadableProjectsService {
     return identities
       .filter(({ id }) => decided.projects.get(id) === true)
       .map(({ id, name }) => ({ id, name }));
+  }
+
+  /**
+   * What `projects: "all"` stands for a member: the ids `listFor` offers, in id order.
+   * @throws {LangWatchQLProjectNotFoundError} when none, or no member is known.
+   * @throws {ValidationError} when more than a member's list may hold.
+   */
+  async allIdsFor({
+    projectId,
+    userId,
+  }: {
+    projectId: string;
+    userId: string | undefined;
+  }): Promise<string[]> {
+    if (userId === undefined) throw new LangWatchQLProjectNotFoundError();
+    const ids = (await this.listFor({ projectId, userId })).map(({ id }) => id).toSorted();
+    if (ids.length === 0) throw new LangWatchQLProjectNotFoundError();
+    if (ids.length > LWQL_MAX_MEMBER_PROJECTS) {
+      throw new ValidationError(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
+    }
+
+    return ids;
   }
 }

@@ -52,19 +52,49 @@ Feature: Every query door takes the same parameters and says what it ran with
     @unit @integration
     Scenario: QP03b An organization, team or personal key that names no project is refused with a 422 naming the field
       Given an organization key that reads projects "A" and "B"
-      # Still held for the owner's answer on what a key that reaches several projects defaults to.
       When it runs a statement with no `projects` and no `projectId`, at REST, MCP or the CLI
       Then it is refused with the status 422 and the code "projects_required"
-      And the message is "Name the projects to query: send `projects`, a list of project ids"
+      # Changed in phase 2 (owner: "1 sure"): the message and the tip name "all" as the way out.
+      And the message is "Name the projects to query: send `projects`, a list of project ids, or "all""
       And the body holds no project id, and no statement reaches the store
       And the same key naming ["A"] reads "A", and params.dashboard_context_projects is ["A"]
       # Evidence: a real curl answer for an organization key without projects, and one with ["A"]
 
     @unit @integration
+    Scenario: QP03f projects accepts the word all for every project the caller can read
+      # Owner (2026-10-29), on the proposal that a key naming no project may send "all": "1 sure".
+      Given an organization key that holds analytics:view on projects "B" and "A", and not on "C" of the same organization
+      When it runs a statement with `projects` set to the string "all", at REST, tRPC, the CLI as `--projects all` or MCP
+      Then the statement runs over "A" and "B" only
+      And params.dashboard_context_projects is ["A","B"], the tenant set the statement ran over, in id order
+      And "all" inside a list is a project id like any other, and `projectId` with "all" is refused as both named
+
+    @unit @integration
+    Scenario: QP03g The word all never reaches a project the caller cannot read, or another organization
+      Given a project "C" of the key's organization without analytics:view for it, and a project "X" of another organization
+      When the key sends `projects` "all"
+      Then neither "C" nor "X" is read, named in the answer or echoed in params
+
+    @unit
+    Scenario: QP03h The word all that resolves to no project, or to more than the cap, is refused
+      # Decided: none is the 404 "project_not_found" with no id (as a name the caller cannot read);
+      # more than the cap is a 422 "validation_error" asking the caller to name the projects.
+      When "all" resolves to no project the caller can read
+      Then it is refused with the status 404 and the code "project_not_found", with no id
+      When "all" resolves to more than the cap: 10,000 for a key, LWQL_MAX_MEMBER_PROJECTS (100) for a member
+      Then it is refused with the status 422 and no statement reaches the store
+
+    @unit
+    Scenario: QP03i A widget write refuses the word all
+      # Own call: widgets do not store "all" in this change; stored definitions stay explicit.
+      When a widget query is saved with `projects` "all", over REST, tRPC, the CLI or MCP
+      Then it is refused naming the field, with the message that "all" is not stored in a widget
+
+    @unit @integration
     Scenario: QP03e The CLI and the MCP tool tell the user to pass the projects
       When `langwatch query run` is run with an organization key and no `--projects`, and run_query is called with no `projects`
-      Then the CLI prints "Name the projects to query: pass --projects <id,id>" and exits non-zero
-      And the MCP tool result is an error reading "Name the projects to query: pass `projects`, a list of project ids"
+      Then the CLI prints "Name the projects to query: pass --projects <id,id>, or --projects all" and exits non-zero
+      And the MCP tool result is an error reading "Name the projects to query: pass `projects`, a list of project ids, or "all""
       And neither message holds a project id
       # Evidence: the CLI output and the MCP tool result, quoted
 

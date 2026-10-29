@@ -3084,8 +3084,8 @@ export interface operations {
                     granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
                     /** @description Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both. */
                     projectId?: string;
-                    /** @description The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read. */
-                    projects?: string[];
+                    /** @description The projects to read, each one the key holds analytics:view on, or the string "all" for every project the key can read. A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read. */
+                    projects?: "all" | string[];
                     /** @description The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter by itself: the statement keeps its rows with a predicate such as WHERE Source IN {dashboard_context_sources:Array(String)}. A statement that never uses the placeholder counts every origin. */
                     sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[];
                 };

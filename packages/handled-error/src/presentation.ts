@@ -1728,7 +1728,7 @@ const presentations = {
   projects_required: {
     title: "Name the projects to query",
     describe: () =>
-      "A key for an organization, a team or a person has no single project. Send `projects`, a list of project ids, and try again.",
+      'A key for an organization, a team or a person has no single project. Send `projects`, a list of project ids, or the string "all" for every project the key can read, and try again.',
   },
   organization_not_found_for_team: {
     title: "Organization not found",

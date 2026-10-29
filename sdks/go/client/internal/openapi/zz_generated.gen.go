@@ -24255,6 +24255,21 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds4) Valid() bool {
 	}
 }
 
+// Defines values for PostApiV1QueryJSONBodyProjects0.
+const (
+	PostApiV1QueryJSONBodyProjects0All PostApiV1QueryJSONBodyProjects0 = "all"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1QueryJSONBodyProjects0 enum.
+func (e PostApiV1QueryJSONBodyProjects0) Valid() bool {
+	switch e {
+	case PostApiV1QueryJSONBodyProjects0All:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1QueryJSONBodySources.
 const (
 	PostApiV1QueryJSONBodySourcesAiTool      PostApiV1QueryJSONBodySources = "ai_tool"
@@ -30788,13 +30803,13 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyKind) Valid() bool {
 
 // Defines values for PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode.
 const (
-	PostApiSuitesByIdDuplicate201JSONResponseBodyScope0ModeAll PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode = "all"
+	All PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode = "all"
 )
 
 // Valid indicates whether the value is a known member of the PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode enum.
 func (e PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode) Valid() bool {
 	switch e {
-	case PostApiSuitesByIdDuplicate201JSONResponseBodyScope0ModeAll:
+	case All:
 		return true
 	default:
 		return false
@@ -47964,8 +47979,8 @@ type PostApiV1QueryJSONBody struct {
 	// ProjectId Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both.
 	ProjectId *string `json:"projectId,omitempty"`
 
-	// Projects The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.
-	Projects *[]string `json:"projects,omitempty"`
+	// Projects The projects to read, each one the key holds analytics:view on, or the string "all" for every project the key can read. A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.
+	Projects *PostApiV1QueryJSONBody_Projects `json:"projects,omitempty"`
 
 	// Sources The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter by itself: the statement keeps its rows with a predicate such as WHERE Source IN {dashboard_context_sources:Array(String)}. A statement that never uses the placeholder counts every origin.
 	Sources    *[]PostApiV1QueryJSONBodySources `json:"sources,omitempty"`
@@ -48007,6 +48022,17 @@ type PostApiV1QueryJSONBodyParameters2 = bool
 
 // PostApiV1QueryJSONBody_Parameters_AdditionalProperties defines parameters for PostApiV1Query.
 type PostApiV1QueryJSONBody_Parameters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PostApiV1QueryJSONBodyProjects0 defines parameters for PostApiV1Query.
+type PostApiV1QueryJSONBodyProjects0 string
+
+// PostApiV1QueryJSONBodyProjects1 defines parameters for PostApiV1Query.
+type PostApiV1QueryJSONBodyProjects1 = []string
+
+// PostApiV1QueryJSONBody_Projects defines parameters for PostApiV1Query.
+type PostApiV1QueryJSONBody_Projects struct {
 	union json.RawMessage
 }
 
@@ -96419,6 +96445,68 @@ func (t PostApiV1QueryJSONBody_Parameters_AdditionalProperties) MarshalJSON() ([
 }
 
 func (t *PostApiV1QueryJSONBody_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiV1QueryJSONBodyProjects0 returns the union data inside the PostApiV1QueryJSONBody_Projects as a PostApiV1QueryJSONBodyProjects0
+func (t PostApiV1QueryJSONBody_Projects) AsPostApiV1QueryJSONBodyProjects0() (PostApiV1QueryJSONBodyProjects0, error) {
+	var body PostApiV1QueryJSONBodyProjects0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1QueryJSONBodyProjects0 overwrites any union data inside the PostApiV1QueryJSONBody_Projects as the provided PostApiV1QueryJSONBodyProjects0
+func (t *PostApiV1QueryJSONBody_Projects) FromPostApiV1QueryJSONBodyProjects0(v PostApiV1QueryJSONBodyProjects0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1QueryJSONBodyProjects0 performs a merge with any union data inside the PostApiV1QueryJSONBody_Projects, using the provided PostApiV1QueryJSONBodyProjects0
+func (t *PostApiV1QueryJSONBody_Projects) MergePostApiV1QueryJSONBodyProjects0(v PostApiV1QueryJSONBodyProjects0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1QueryJSONBodyProjects1 returns the union data inside the PostApiV1QueryJSONBody_Projects as a PostApiV1QueryJSONBodyProjects1
+func (t PostApiV1QueryJSONBody_Projects) AsPostApiV1QueryJSONBodyProjects1() (PostApiV1QueryJSONBodyProjects1, error) {
+	var body PostApiV1QueryJSONBodyProjects1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1QueryJSONBodyProjects1 overwrites any union data inside the PostApiV1QueryJSONBody_Projects as the provided PostApiV1QueryJSONBodyProjects1
+func (t *PostApiV1QueryJSONBody_Projects) FromPostApiV1QueryJSONBodyProjects1(v PostApiV1QueryJSONBodyProjects1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1QueryJSONBodyProjects1 performs a merge with any union data inside the PostApiV1QueryJSONBody_Projects, using the provided PostApiV1QueryJSONBodyProjects1
+func (t *PostApiV1QueryJSONBody_Projects) MergePostApiV1QueryJSONBodyProjects1(v PostApiV1QueryJSONBodyProjects1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiV1QueryJSONBody_Projects) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiV1QueryJSONBody_Projects) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
