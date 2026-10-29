@@ -2026,10 +2026,13 @@ body {
   }
 }
 .docs-api-reference .docs-field {
-  padding-block: 10px;
+  padding-block: 14px;
+}
+.docs-api-reference .docs-field-body {
+  margin-top: 8px;
 }
 .docs-api-reference .docs-field-body p {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 /* An Expandable names what it does next: Show while closed, Hide while open. */
 .docs-expandable [data-part="item-trigger"][data-state="open"] > .docs-expandable-show,

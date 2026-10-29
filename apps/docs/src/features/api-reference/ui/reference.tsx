@@ -10,7 +10,7 @@ import { ParameterFields, SchemaFields } from "./schema.tsx";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Box as="section" id={title.toLowerCase().replaceAll(" ", "-")} marginTop="8">
+    <Box as="section" id={title.toLowerCase().replaceAll(" ", "-")} marginTop="10">
       <Text
         as="h2"
         margin="0"
@@ -38,7 +38,7 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
       alignItems="center"
       gap="3"
       wrap="wrap"
-      marginTop="6"
+      marginTop="8"
       padding="2"
       paddingInlineStart="3"
       borderWidth="1px"
