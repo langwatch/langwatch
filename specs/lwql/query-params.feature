@@ -12,8 +12,11 @@ Feature: Every query door takes the same parameters and says what it ran with
   # `projects`. The answer returns them as `params`.
   # What is not a parameter: the row policy, the share windows and the redaction of captured
   # content come from the credential and its grants, never from the request.
-  # PROPOSAL pending the owner's yes (sent 2026-10-29): QP05 and QP06 are the scenarios to flip if
-  # he prefers a filter the server always applies; every other scenario holds either way.
+  # PROPOSAL pending the owner's yes (sent 2026-10-29). Flip points: QP05 and QP06 if he prefers a
+  # filter the server always applies, and QP03b, which has two answers: (i) a key for an
+  # organization or a team reads every project it can read, echoed (written here), or (ii) such a
+  # key must name a project and is refused with a 422 "name a project". Every other scenario
+  # holds either way.
   # Evidence: the repo marks proof with `# Evidence:` lines under a scenario (dashboards-v2.feature);
   # each scenario here ends with one.
 
@@ -41,7 +44,7 @@ Feature: Every query door takes the same parameters and says what it ran with
       # Evidence: three answers quoted
 
     @unit @integration
-    Scenario: QP03b An organization or a personal key reads every project it can read, and params lists them
+    Scenario: QP03b FLIP POINT An organization, team or personal key reads every project it can read, and params lists them
       Given an organization key that reads projects "A" and "B" and not "C"
       When it runs a statement with no projects
       Then it reads "A" and "B" and params.projects is ["A", "B"], in the order of the project ids sorted ascending
@@ -79,6 +82,14 @@ Feature: Every query door takes the same parameters and says what it ran with
       And params.sources is ["application"] and params.followsSources is false
       # Evidence: the REST answer quoted with seeded traces of each origin
 
+    @unit
+    Scenario: QP05b followsSources comes from the parsed statement, not from its text
+      Given a statement that names {dashboard_context_sources:Array(String)} only in a comment or in a string literal
+      When it runs
+      Then params.followsSources is false
+      And a statement that reads the placeholder in an expression, in any clause or CTE, answers true
+      # Evidence: three REST answers quoted
+
     @unit @integration
     Scenario: QP06 The server adds no origin filter beneath the statement
       Given a statement that does not read the parameter, run with sources ["application"]
@@ -94,11 +105,12 @@ Feature: Every query door takes the same parameters and says what it ran with
       # Evidence: the REST answer quoted
 
     @unit @integration
-    Scenario: QP07b The source other and the unstamped origin keep their meaning in the bound list
-      Given traces whose origin is missing, empty, unlisted, or each listed one
-      When a statement reading the parameter runs with ["application"], ["other"] and each listed origin
-      Then the bound array holds the names picked, and params.sources echoes them in the order the sources are listed
-      # Evidence: the answers quoted for three runs
+    Scenario: QP07b The Source column keeps the meaning of other and of the unstamped origin, and params keeps the request's order
+      Given traces whose origin is missing, empty, NULL, unlisted, or each listed one
+      When a statement filtering Source with the parameter runs with ["application"], ["other"] and each listed origin
+      Then missing, empty and NULL count under "application" and an unlisted origin under "other" only
+      And params.sources is the list sent, in the order sent, a repeated source kept at its first place
+      # Evidence: three REST answers quoted with their row counts over seeded traces
 
     @unit @integration
     Scenario: QP08 An unknown source is refused at every door
@@ -120,7 +132,7 @@ Feature: Every query door takes the same parameters and says what it ran with
     Scenario: QP09b The refusal for an unreadable project is byte-identical to the one for a missing project
       Given an API key that reads "A", a project "C" it cannot read and an id "Z" that does not exist
       When it runs with ["A", "C"] and with ["A", "Z"]
-      Then the two response bodies and the two sets of headers that vary by project are equal byte for byte
+      Then the two response bodies, and all headers except Date and the request id, are equal byte for byte
       And neither body contains "C" or "Z", in its message or in its meta
       # Why: today NotFoundError adds the id to message and meta (packages/handled-error/src/handled-error.ts:318),
       # and langwatch-ql-query-scope.service.ts:162 passes it; both are changed here
@@ -170,9 +182,10 @@ Feature: Every query door takes the same parameters and says what it ran with
 
     @unit
     Scenario: QP12b A list longer than the tenant capability is refused
-      When a run names more projects than LWQL_TENANT_CAPABILITY_MAX_PROJECTS
-      Then it is refused with the code "validation_error" and the message names that maximum
-      # Evidence: the REST answer quoted
+      When a run names 10,001 projects, one more than LWQL_TENANT_CAPABILITY_MAX_PROJECTS (10,000)
+      Then it is refused with the code "validation_error" and the message names 10,000
+      And if the request body limit answers 413 first, the 413 body is what the evidence quotes
+      # Evidence: the REST answer quoted with the request's size
 
     @unit @integration
     Scenario: QP12c An empty list of projects is refused
@@ -263,7 +276,7 @@ Feature: Every query door takes the same parameters and says what it ran with
     Scenario: QP21 The insight gate's run equals the card run
       Given a widget query run by its card and by the insight gate for the same board, period and project
       Then the two return the same rows and the same params
-      # Evidence: the integration test output comparing them
+      # Evidence: the insight run's stored result and the card's tRPC answer for the same query, quoted and diffed
 
   Rule: A client or a release that does not know the new fields keeps working or refuses visibly
 
@@ -275,12 +288,12 @@ Feature: Every query door takes the same parameters and says what it ran with
       And `projectId` still narrows the run to that project
       # Evidence: both answers diffed
 
-    @unit
-    Scenario: QP22b SDK 2.0.0 and MCP 2.2.0 parse the answer that carries params
-      Given the response schema SDK 2.0.0 and MCP 2.2.0 parse with
-      When the answer carries `params`
-      Then they parse it without error and show no `params`
-      # Evidence: the compatibility test output
+    @integration
+    Scenario: QP22b The published CLI 2.0.0 and MCP 2.2.0 run against this server and ignore params
+      Given the published langwatch@2.0.0 CLI and the published MCP 2.2.0 installed from npm
+      When each runs a query against this server
+      Then each succeeds, prints its rows as before and shows no `params`
+      # Evidence: both commands' output quoted, with the installed versions
 
     @integration
     Scenario: QP23 The release before this one, reading a widget saved here, runs it or refuses visibly
@@ -288,10 +301,9 @@ Feature: Every query door takes the same parameters and says what it ran with
       When it runs a widget this release saved with sources and projects
       Then SQL reading {dashboard_context_sources:Array(String)} is refused by the store with an unset-parameter error
       And SQL that does not read it counts every origin over the board's project
-      And a widget this release saved with several projects reads only the board's project there
-      # Evidence: the previous release's tag run against this release's widgets, answers quoted
-      # Why: the last line cannot be made visible in the old release; the picker for several projects
-      # ships one release after the binder (the plan, section 8)
+      And a widget storing several projects is never saved by the binder release (AC210e), so the old release meets none
+      # Evidence: the previous release's tag run against the later release's widgets, answers quoted
+      # The three release pairs are stated in dashboards-v2.feature AC210d
 
     @unit
     Scenario: QP24 The OpenAPI document lists the added fields as optional
