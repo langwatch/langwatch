@@ -32,15 +32,10 @@ class OverloadFactory extends ClickHouseOverloadErrorFactory {
 
 class CountingTelemetry extends ClickHouseManagedClientTelemetry {
   readonly shed: ClickHouseStatementOperation[] = [];
-  registerLimiter(_input: {
-    instance: string;
-    stats: () => LimiterStats;
-  }): void {}
+  registerLimiter(_input: { instance: string; stats: () => LimiterStats }): void {}
   unregisterLimiter(_instance: string): void {}
   observeStatementWait(): void {}
-  incrementStatementsShed(input: {
-    operation: ClickHouseStatementOperation;
-  }): void {
+  incrementStatementsShed(input: { operation: ClickHouseStatementOperation }): void {
     this.shed.push(input.operation);
   }
 }
@@ -84,16 +79,13 @@ const plainInsert = (table: string): InsertRequest => ({
 });
 
 /** A ClickHouse server answer with its code, as the vendor client throws it. */
-const serverError = (code: string, message: string) =>
-  Object.assign(new Error(message), { code });
+const serverError = (code: string, message: string) => Object.assign(new Error(message), { code });
 
 /**
  * A driver whose statements finish only when the test says so. A poisoned row fails its
  * statement with `failure`, by default the server's parse refusal.
  */
-function holdingDriver(
-  failure: () => unknown = () => serverError("27", "Cannot parse input"),
-) {
+function holdingDriver(failure: () => unknown = () => serverError("27", "Cannot parse input")) {
   const pending: (() => void)[] = [];
   const inserts: InsertRequest[] = [];
   let reads = 0;
@@ -108,8 +100,7 @@ function holdingDriver(
     async insert(request) {
       inserts.push(request);
       await hold();
-      if (request.rows.some((each) => (each as Row).poisoned === true))
-        throw failure();
+      if (request.rows.some((each) => (each as Row).poisoned === true)) throw failure();
     },
     async command() {},
   };
@@ -190,9 +181,7 @@ describe("given the insert lane has used every slot it may hold", () => {
 
     /** @scenario async inserts waiting for a slot go as one statement */
     it("sends one statement carrying all their rows once a slot frees", async () => {
-      const writes = [1, 2, 3, 4, 5].map((n) =>
-        client.insert(asyncInsert("event_log", [row(n)])),
-      );
+      const writes = [1, 2, 3, 4, 5].map((n) => client.insert(asyncInsert("event_log", [row(n)])));
       await settleMicrotasks();
       expect(holding.inserts).toHaveLength(LANE_CAP);
 
@@ -220,10 +209,7 @@ describe("given the insert lane has used every slot it may hold", () => {
       await drain(holding);
       await Promise.all([early, late, ...holders]);
 
-      expect(holding.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([
-        [row(1)],
-        [row(2)],
-      ]);
+      expect(holding.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([[row(1)], [row(2)]]);
     });
   });
 
@@ -274,9 +260,7 @@ describe("given the insert lane has used every slot it may hold", () => {
       await Promise.all([...writes, ...holders]);
 
       expect(holding.inserts.slice(LANE_CAP).map(rowsOf)).toEqual(
-        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [
-          row(n, n === 3 ? "project_b" : "project_a"),
-        ]),
+        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [row(n, n === 3 ? "project_b" : "project_a")]),
       );
     });
   });
@@ -289,9 +273,7 @@ describe("given the insert lane has used every slot it may hold", () => {
       const holders = await saturateInsertLane(client);
 
       const writes = [
-        ...[1, 2, 3, 4].map((n) =>
-          client.insert(asyncInsert("event_log", [row(n)])),
-        ),
+        ...[1, 2, 3, 4].map((n) => client.insert(asyncInsert("event_log", [row(n)]))),
         client.insert(
           asyncInsert(
             "event_log",
@@ -302,10 +284,8 @@ describe("given the insert lane has used every slot it may hold", () => {
       await drain(holding);
       await Promise.all([...writes, ...holders]);
 
-      const sizes = holding.inserts
-        .slice(LANE_CAP)
-        .map((request) => request.rows.length);
-      expect(sizes.toSorted()).toEqual([1, 3, 4]);
+      const sizes = holding.inserts.slice(LANE_CAP).map((request) => request.rows.length);
+      expect(sizes.toSorted((left, right) => left - right)).toEqual([1, 3, 4]);
     });
   });
 
@@ -316,9 +296,7 @@ describe("given the insert lane has used every slot it may hold", () => {
       const holders = await saturateInsertLane(client);
 
       await Promise.all(
-        Array.from({ length: 1_000 }, () =>
-          client.insert(asyncInsert("event_log", [])),
-        ),
+        Array.from({ length: 1_000 }, () => client.insert(asyncInsert("event_log", []))),
       );
 
       expect(holding.inserts).toHaveLength(LANE_CAP);
@@ -340,8 +318,7 @@ describe("given the insert lane has a free slot", () => {
       await settleMicrotasks();
 
       expect(holding.inserts).toHaveLength(3);
-      for (const [at, request] of requests.entries())
-        expect(holding.inserts[at]).toBe(request);
+      for (const [at, request] of requests.entries()) expect(holding.inserts[at]).toBe(request);
 
       await drain(holding);
       await Promise.all(writes);
@@ -355,16 +332,11 @@ describe("given the insert lane has a free slot", () => {
       const { client } = clientOver(holding, { insertCoalesceMaxRows: 0 });
       const holders = await saturateInsertLane(client);
 
-      const writes = [1, 2].map((n) =>
-        client.insert(asyncInsert("event_log", [row(n)])),
-      );
+      const writes = [1, 2].map((n) => client.insert(asyncInsert("event_log", [row(n)])));
       await drain(holding);
       await Promise.all([...writes, ...holders]);
 
-      expect(holding.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([
-        [row(1)],
-        [row(2)],
-      ]);
+      expect(holding.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([[row(1)], [row(2)]]);
     });
   });
 });
@@ -380,14 +352,10 @@ describe("given async inserts are waiting together for a slot that never frees",
       const holders = await saturateInsertLane(client);
 
       const outcomes = await Promise.all(
-        [1, 2, 3].map((n) =>
-          outcome(client.insert(asyncInsert("event_log", [row(n)]))),
-        ),
+        [1, 2, 3].map((n) => outcome(client.insert(asyncInsert("event_log", [row(n)])))),
       );
 
-      expect(outcomes.every((each) => each instanceof OverloadedError)).toBe(
-        true,
-      );
+      expect(outcomes.every((each) => each instanceof OverloadedError)).toBe(true);
       expect(telemetry.shed).toEqual(["insert", "insert", "insert"]);
       expect(holding.inserts).toHaveLength(LANE_CAP);
 
@@ -403,25 +371,27 @@ describe("given async inserts went together as one statement", () => {
     const holding = holdingDriver(failure);
     const { client } = clientOver(holding);
     const holders = await saturateInsertLane(client);
-    const writes = [row(1), { ...row(2), poisoned: true as const }, row(3)].map(
-      (each) => outcome(client.insert(asyncInsert("event_log", [each]))),
+    const writes = [row(1), { ...row(2), poisoned: true as const }, row(3)].map((each) =>
+      outcome(client.insert(asyncInsert("event_log", [each]))),
     );
     await drain(holding);
     await Promise.all(holders);
     return { holding, outcomes: await Promise.all(writes) };
   }
 
-  describe("when the server rejects the rows unwritten", () => {
-    /** @scenario a coalesced statement whose rows are rejected is resent caller by caller */
-    it("resends each caller alone, so only the caller with the bad row fails", async () => {
-      const { holding, outcomes } = await coalescedWithPoison();
+  describe("when the server rejects the rows as unparsable", () => {
+    // Another client's bad row in the server's async buffer returns this code to every entry
+    // flushed with it, after the others were written, so it proves nothing unwritten.
+    /** @scenario a failed coalesced statement is never resent */
+    it.each([
+      { code: "6", message: "Cannot parse text" },
+      { code: "27", message: "Cannot parse input" },
+    ])("fails every caller with code $code and sends nothing again", async ({ code, message }) => {
+      const refused = serverError(code, message);
+      const { holding, outcomes } = await coalescedWithPoison(() => refused);
 
-      expect(outcomes[0]).toBe("written");
-      expect((outcomes[1] as Error).message).toBe("Cannot parse input");
-      expect(outcomes[2]).toBe("written");
-      expect(
-        holding.inserts.slice(LANE_CAP).map((request) => request.rows.length),
-      ).toEqual([3, 1, 1, 1]);
+      expect(outcomes).toEqual([refused, refused, refused]);
+      expect(holding.inserts).toHaveLength(LANE_CAP + 1);
     });
   });
 
@@ -442,8 +412,8 @@ describe("given async inserts went together as one statement", () => {
       name: "the server is overloaded",
       failure: () => serverError("202", "Too many simultaneous queries"),
     },
-  ])("when $name, which may have written the batch", ({ failure }) => {
-    /** @scenario a coalesced statement that may have written is never resent */
+  ])("when $name", ({ failure }) => {
+    /** @scenario a failed coalesced statement is never resent */
     it("fails every caller with that failure and sends nothing again", async () => {
       const failed = failure();
       const { holding, outcomes } = await coalescedWithPoison(() => failed);
@@ -460,9 +430,7 @@ describe("given async inserts went together as one statement", () => {
       const holders = await saturateInsertLane(client);
 
       const write = outcome(
-        client.insert(
-          asyncInsert("event_log", [{ ...row(1), poisoned: true }]),
-        ),
+        client.insert(asyncInsert("event_log", [{ ...row(1), poisoned: true }])),
       );
       await drain(holding);
       await Promise.all(holders);
@@ -480,9 +448,7 @@ describe("given async inserts are waiting together for a slot", () => {
       const holding = holdingDriver();
       const { client } = clientOver(holding);
       const holders = await saturateInsertLane(client);
-      const writes = [1, 2].map((n) =>
-        client.insert(asyncInsert("event_log", [row(n)])),
-      );
+      const writes = [1, 2].map((n) => client.insert(asyncInsert("event_log", [row(n)])));
 
       const read = client.query({
         tenantId: "",

@@ -156,19 +156,13 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     Then every caller is refused as overloaded
     And each caller counts as one shed statement
 
+  # No failure proves the batch unwritten: another client's bad row in the
+  # server's async buffer fails every entry flushed with it, after the others
+  # were written, and nothing deduplicates a resend, so the rows would land twice.
   @unit
-  Scenario: a coalesced statement whose rows are rejected is resent caller by caller
+  Scenario: a failed coalesced statement is never resent
     Given async inserts went together as one statement
-    When the server rejects the statement's rows as unparsable before writing any
-    Then each caller's rows are sent again in a statement of their own
-    And only the caller whose rows the server rejects sees the failure
-
-  # A reset, a timeout or a lost answer may come after the server wrote the
-  # batch, and nothing deduplicates a resend, so the rows would land twice.
-  @unit
-  Scenario: a coalesced statement that may have written is never resent
-    Given async inserts went together as one statement
-    When the statement fails in a way that may have written its rows
+    When the statement fails, even as unparsable rows
     Then every caller sees that failure
     And no caller's rows are sent again
 

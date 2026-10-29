@@ -54,14 +54,13 @@ a slot together:
 4. A batch refused for want of a slot refuses every member with the overload
    error, and counts one shed statement per member, so the shed count still
    counts callers.
-5. A batch that fails after admission sends each member's rows again alone
-   only when the server rejected the rows unwritten: a parse or conversion
-   code (`CANNOT_PARSE_*`, `TYPE_MISMATCH`, `INCORRECT_DATA` and the like).
-   A batch under `max_insert_block_size` is one block and one async insert
-   entry, so such a refusal wrote none of it, and one caller's bad row must
-   not fail the others. Any other failure (a reset, a timeout, a lost answer,
-   a server fault) may have written the batch; every member gets that failure
-   and nothing is sent again, as an insert alone would have had it.
+5. A batch that fails after admission fails every member with that failure,
+   and nothing is sent again. No error proves the rows unwritten: with
+   `async_insert` and `wait_for_async_insert` on, the server flushes entries
+   from many clients together, and one client's bad row (a parse error, a
+   materialised view's failed conversion) returns its code to every entry in
+   the flush after the others were written. Reproduced on ClickHouse 25.10:
+   code 6 to both clients, every valid row already in the table.
 
 ## Rationale / Trade-offs
 
@@ -85,12 +84,12 @@ longer match its first attempt. Async deduplication is off by default before
 ClickHouse 26.2, but the client cannot see the server's default, so an insert
 must say so itself.
 
-Three costs are accepted. A member that joins late inherits the batch's wait
-start, so it may be refused sooner than if it had waited alone. A batch whose
-rows are rejected is followed by one statement per member, which is what
-those callers would have sent without coalescing. A batch that fails in a way
-that may have written fails every member, where alone some of them might have
-succeeded; resending would risk writing their rows twice.
+Two costs are accepted. A member that joins late inherits the batch's wait
+start, so it may be refused sooner than if it had waited alone. A batch that
+fails fails every member, so one caller's bad row fails its batch-mates, where
+alone they would have succeeded; they retry through their own upstream retry,
+as any failed insert does. Resending them here would risk writing their rows
+twice.
 
 ## Consequences
 

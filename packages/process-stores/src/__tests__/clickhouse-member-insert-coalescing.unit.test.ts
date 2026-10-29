@@ -32,9 +32,7 @@ beforeAll(async () => {
       body += chunk.toString();
     });
     request.on("end", () => {
-      statements.push(
-        body.split("\n").filter((line) => line.length > 0).length,
-      );
+      statements.push(body.split("\n").filter((line) => line.length > 0).length);
       held.push(() => {
         response.setHeader("Content-Type", "application/x-ndjson");
         response.end();
@@ -43,8 +41,7 @@ beforeAll(async () => {
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  if (address === null || typeof address === "string")
-    throw new Error("No port was bound.");
+  if (address === null || typeof address === "string") throw new Error("No port was bound.");
   url = `http://127.0.0.1:${address.port}`;
 });
 
