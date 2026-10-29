@@ -19,7 +19,8 @@
 | ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------ | ------------------ |
 | Quick `eval()` in an LWQL query          | No, in memory for the call    | `instant-eval-judge-rows.service.ts:94` (a `Map`)                        | No                 |
 | Instant Eval run (search bar, CLI, REST) | Yes, indefinitely             | `instant_eval_runs` and `instant_eval_judgments` (migrations 00098, 00097) | No                 |
-| Dashboard widget with `eval()`           | No, judges on every refresh   | Same path as a quick `eval()`                                            | No                 |
+| Code widget with `eval()`                | No, judges on every run       | Same path as a quick `eval()` (`use-dashboard-widget-executor.ts:91`)    | No                 |
+| Saved-chart widget with `eval()`         | Cannot hold `eval()` today    | Save refuses it (`saved-workbench-chart-policy.service.ts:36-41`)        | No                 |
 | Monitor (online eval)                    | Yes, with the trace retention | `evaluation_runs` (00002), fed by `lw.evaluation.*` events               | Yes                |
 
 Facts the design rests on:
