@@ -15,6 +15,7 @@ import {
 import type { LangWatchQLAggregateScopeService } from "./langwatch-ql-aggregate-scope.service.ts";
 import type { LangWatchQLBoundsService } from "./langwatch-ql-bounds.service.ts";
 import type { LangWatchQLQueryScopeService } from "./langwatch-ql-query-scope.service.ts";
+import type { LangWatchQLReadableProjectsService } from "./langwatch-ql-readable-projects.service.ts";
 
 /** Where a member's run reads: the caller's own project, an aggregate's members, or a named set. */
 export type LangWatchQLRunScope =
@@ -33,6 +34,7 @@ export type LangWatchQLRunScope =
 type Dependencies = Readonly<{
   queryScope: Pick<LangWatchQLQueryScopeService, "resolveMemberProjects">;
   aggregateScope: Pick<LangWatchQLAggregateScopeService, "getMemberScope">;
+  readable: Pick<LangWatchQLReadableProjectsService, "allIdsFor">;
   bounds: Pick<LangWatchQLBoundsService, "assertQueryWithinBounds">;
 }>;
 
@@ -52,26 +54,31 @@ export class LangWatchQLRunScopeService {
    * The projects a request names; none when it names none.
    * @throws {ValidationError} when it names both `projectId` and `projects`.
    */
-  select(request: { projectId?: string | undefined; projects?: readonly string[] | undefined }): {
-    named: readonly string[] | undefined;
-  } {
-    const { named, conflict } = selectNamedProjects(request);
+  select(request: {
+    projectId?: string | undefined;
+    projects?: readonly string[] | "all" | undefined;
+  }): { named: readonly string[] | undefined; all: boolean } {
+    const { named, all, conflict } = selectNamedProjects(request);
     if (conflict) throw new ValidationError("send projectId or projects, not both");
 
-    return { named };
+    return { named, all };
   }
 
   /** @throws {LangWatchQLProjectNotFoundError} for a name the member may not read. */
   async resolve({
     authorization,
     project,
-    named,
+    selection,
     userId,
-  }: Pick<LangWatchQLExecuteInput, "project" | "projects" | "userId"> & {
-    named: readonly string[] | undefined;
+  }: Pick<LangWatchQLExecuteInput, "project" | "userId"> & {
+    selection: { named: readonly string[] | undefined; all: boolean };
     authorization: Authorization | undefined;
   }): Promise<LangWatchQLRunScope> {
-    const { queryScope, aggregateScope, bounds } = this.dependencies;
+    const { queryScope, aggregateScope, bounds, readable } = this.dependencies;
+    // "all" is the member's readable list, proven once here; the scope below does not ask again.
+    const named = selection.all
+      ? await readable.allIdsFor({ projectId: project.id, userId })
+      : selection.named;
     const shared = authorization
       ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
       : [];
@@ -93,6 +100,7 @@ export class LangWatchQLRunScopeService {
     const scope = await queryScope.resolveMemberProjects({
       userId,
       projectIds: named,
+      alreadyAuthorized: selection.all,
       ...(authorization ? { authorization } : {}),
     });
     for (const member of scope.projects) {

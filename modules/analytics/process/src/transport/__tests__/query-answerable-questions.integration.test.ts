@@ -1055,7 +1055,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // the reader rather than making itself.
       expect(codes(result)).toEqual(["POSSIBLE_FANOUT"]);
       expect(diagnostic(result, "POSSIBLE_FANOUT").meta).toMatchObject({
-        view: `${database}.traces`,
+        view: "traces",
         multipliedByView: `${database}.evaluations`,
       });
     });

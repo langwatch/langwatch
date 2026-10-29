@@ -136,7 +136,7 @@ function unboundedTimeRangeDiagnostics({
           `covers the whole history this project has rather than a window of it. Add a range ` +
           `on ${timeColumn} to bound the scan.`,
         meta: {
-          view: reference.viewName,
+          view: bareViewName(reference.viewName),
           /** Filter on this column to bound the read. */
           timeColumn,
         },

@@ -28,7 +28,6 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   LangWatchQLProjectNotFoundError,
-  LWQL_ALL_PROJECTS,
   type LangWatchQLRunCaller,
   type LangWatchQLAcceptedStatement,
   type LangWatchQLAppFunctionCall,
@@ -555,6 +554,7 @@ export class AnalyticsModule
     this.#runScope = LangWatchQLRunScopeService.create({
       queryScope: this.#queryScope,
       aggregateScope: this.#aggregateScope,
+      readable: this.#readableProjects,
       bounds: dependencies.lwqlBounds,
     });
     this.#protections = WorkbenchProtectionsService.create(dependencies);
@@ -750,15 +750,8 @@ export class AnalyticsModule
   ): Promise<LangWatchQLQueryResult> {
     const { reach, projectId, projects: asked, sql, parameters, timeWindow } = input;
     const { granularitySeconds, sources, signal } = input;
-    const isAll = asked === LWQL_ALL_PROJECTS;
-    if (isAll && projectId !== undefined) {
-      throw new ValidationError("send projectId or projects, not both");
-    }
-    const { named: wanted } = this.#runScope.select({
-      projectId,
-      ...(isAll ? {} : { projects: asked }),
-    });
-    const { projects, protections } = isAll
+    const { named: wanted, all } = this.#runScope.select({ projectId, projects: asked });
+    const { projects, protections } = all
       ? await this.#queryScope.resolveAll({ reach })
       : await this.#queryScope.resolve({
           reach,
@@ -859,11 +852,8 @@ export class AnalyticsModule
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
     const { authorization, project, projects: asked, userId, ...run } = input;
-    const named =
-      asked === LWQL_ALL_PROJECTS
-        ? await this.#readableProjects.allIdsFor({ projectId: project.id, userId })
-        : asked;
-    const scope = await this.#runScope.resolve({ authorization, project, named, userId });
+    const selection = this.#runScope.select({ projects: asked });
+    const scope = await this.#runScope.resolve({ authorization, project, selection, userId });
 
     if (scope.kind === "aggregate") {
       // A judged column is charged to one project, so an aggregate's statement may call none.

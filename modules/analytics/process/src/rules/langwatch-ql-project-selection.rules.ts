@@ -15,10 +15,14 @@ export function selectNamedProjects({
   projects,
 }: {
   projectId?: string | undefined;
-  projects?: readonly string[] | undefined;
-}): { named: readonly string[] | undefined; conflict: boolean } {
+  projects?: readonly string[] | "all" | undefined;
+}): { named: readonly string[] | undefined; all: boolean; conflict: boolean } {
+  const all = projects === "all";
+  const list = all ? undefined : projects;
+
   return {
-    named: projects ?? (projectId === undefined ? undefined : [projectId]),
+    named: list ?? (projectId === undefined ? undefined : [projectId]),
+    all,
     conflict: projectId !== undefined && projects !== undefined,
   };
 }

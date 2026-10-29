@@ -38,6 +38,9 @@ type ReadableProject = Readonly<{
   credential: RestProjectCredentialPrincipal;
 }>;
 
+/** How many of an organization's projects one scan page reads. */
+const SCAN_PAGE_SIZE = 100;
+
 export class LangWatchQLQueryScopeService {
   static create(dependencies: ScopeDependencies): LangWatchQLQueryScopeService {
     return new LangWatchQLQueryScopeService(dependencies);
@@ -66,19 +69,19 @@ export class LangWatchQLQueryScopeService {
     requireProjects?: boolean;
   }): Promise<LangWatchQLQueryScope> {
     const named = projects === undefined ? undefined : dedupeInOrder(projects);
+    // A key that reads exactly one project defaults to it; one that reads several must say which.
+    // Two readable projects settle that, so the scan stops there instead of reading the rest.
+    const mustDefault = requireProjects && named === undefined && reach.kind !== "project";
     const readable =
       reach.kind === "project"
         ? [await this.ownProject({ projectId: reach.projectId, requested: named })]
-        : await this.readableProjects({ reach, only: named });
-    // A key that reads exactly one project defaults to it; one that reads several must say which.
-    if (
-      requireProjects &&
-      named === undefined &&
-      reach.kind !== "project" &&
-      readable.length !== 1
-    ) {
-      throw new LangWatchQLProjectsRequiredError();
-    }
+        : await this.readableProjects({
+            reach,
+            only: named,
+            stopAfter: mustDefault ? 2 : undefined,
+          });
+    if (mustDefault && readable.length === 0) throw new LangWatchQLProjectNotFoundError();
+    if (mustDefault && readable.length > 1) throw new LangWatchQLProjectsRequiredError();
     // One project at a time: each answer is several grant reads, and fanning an organization's
     // worth out at once is what exhausts the connection pool.
     const protections: LangWatchQLProtections[] = [];
@@ -135,13 +138,16 @@ export class LangWatchQLQueryScopeService {
   async resolveMemberProjects({
     userId,
     projectIds,
+    alreadyAuthorized = false,
     authorization,
   }: {
     userId: string;
     projectIds: readonly string[];
+    /** The ids come from the member's own readable list, so the grant is not asked again. */
+    alreadyAuthorized?: boolean;
     authorization?: Authorization;
   }): Promise<LangWatchQLQueryScope> {
-    const projects = await this.readableByMember({ userId, projectIds });
+    const projects = await this.readableByMember({ userId, projectIds, alreadyAuthorized });
     const protections: LangWatchQLProtections[] = [];
     // One project at a time, for the same reason `resolve` reads protections one at a time.
     for (const { id: projectId } of projects) {
@@ -164,9 +170,11 @@ export class LangWatchQLQueryScopeService {
   async readableByMember({
     userId,
     projectIds,
+    alreadyAuthorized = false,
   }: {
     userId: string;
     projectIds: readonly string[];
+    alreadyAuthorized?: boolean;
   }): Promise<LangWatchQLCaller[]> {
     const ids = dedupeInOrder(projectIds);
     if (ids.length > LWQL_MAX_MEMBER_PROJECTS) {
@@ -178,11 +186,13 @@ export class LangWatchQLQueryScopeService {
       ids.map(async (projectId) => ({
         project: await this.dependencies.projects.findById(projectId),
         // An authz outage propagates (a 5xx), never a 404: only a denial reads as not found.
-        allowed: await this.dependencies.authz.hasPermission({
-          userId,
-          permission: "analytics:view",
-          projectId,
-        }),
+        allowed:
+          alreadyAuthorized ||
+          (await this.dependencies.authz.hasPermission({
+            userId,
+            permission: "analytics:view",
+            projectId,
+          })),
       })),
     );
     const readable: LangWatchQLCaller[] = [];
@@ -237,50 +247,107 @@ export class LangWatchQLQueryScopeService {
 
   /**
    * Every live application project in the key's organization it holds `analytics:view` on,
-   * decided as `key ∩ owning user` at each project's own scope.
+   * decided as `key ∩ owning user` at each project's own scope. Read a page at a time; the cap
+   * counts what the key READS, not what the organization has. `stopAfter` ends the scan early.
    */
   private async readableProjects({
     reach,
     only,
+    stopAfter = Infinity,
   }: {
     reach: Extract<LangWatchQLKeyReach, { kind: "apiKey" }>;
-    only?: readonly string[];
+    only?: readonly string[] | undefined;
+    stopAfter?: number | undefined;
   }): Promise<ReadableProject[]> {
-    const listed = await this.dependencies.projects.listByOrganization({
-      organizationId: reach.organizationId,
-      page: 1,
-      limit: LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
-      ...(only === undefined ? {} : { projectIds: [...only] }),
-    });
-    if (listed.pagination.total > listed.data.length) {
-      throw new ValidationError(
-        `The key reaches ${listed.pagination.total} projects, over the ` +
-          `${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} a run may read. Name the projects instead.`,
-      );
-    }
-
     const readable: ReadableProject[] = [];
-    for (const project of listed.data) {
-      if (project.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) continue;
-      const credential: RestProjectCredentialPrincipal = {
-        kind: "apiKey",
-        apiKeyId: reach.apiKeyId,
-        userId: reach.userId,
+    let scanned = 0;
+    let total = Infinity;
+    for (let page = 1; scanned < total; page += 1) {
+      const listed = await this.dependencies.projects.listByOrganization({
         organizationId: reach.organizationId,
-        projectId: project.id,
-        teamId: project.teamId,
-      };
-      const viewable = await this.protections.keyPermitted({
-        credential,
-        permission: "analytics:view",
+        page,
+        limit: only === undefined ? SCAN_PAGE_SIZE : LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
+        ...(only === undefined ? {} : { projectIds: [...only] }),
       });
-      if (viewable) readable.push({ project, credential });
+      readable.push(
+        ...(await this.permitted({
+          reach,
+          projects: listed.data,
+          room: stopAfter - readable.length,
+        })),
+      );
+      assertWithinCap(readable.length);
+      if (readable.length >= stopAfter || only !== undefined || listed.data.length === 0) break;
+      scanned += listed.data.length;
+      total = listed.pagination.total;
     }
-    if (only === undefined) return readable;
-    const byId = new Map(readable.map((entry) => [entry.project.id, entry]));
-    const inRequestOrder = only.flatMap((id) => byId.get(id) ?? []);
-    if (inRequestOrder.length < only.length) throw new LangWatchQLProjectNotFoundError();
 
-    return inRequestOrder;
+    return only === undefined ? readable : inRequestOrder({ readable, only });
   }
+
+  /** The first `room` of these projects the key holds `analytics:view` on, one at a time. */
+  private async permitted({
+    reach,
+    projects,
+    room,
+  }: {
+    reach: Extract<LangWatchQLKeyReach, { kind: "apiKey" }>;
+    projects: readonly Project[];
+    room: number;
+  }): Promise<ReadableProject[]> {
+    const found: ReadableProject[] = [];
+    // One project at a time, for the pool reason `resolve` gives.
+    for (const project of projects) {
+      if (found.length >= room) break;
+      if (project.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) continue;
+      const credential = keyCredentialFor({ reach, project });
+      if (await this.protections.keyPermitted({ credential, permission: "analytics:view" })) {
+        found.push({ project, credential });
+      }
+    }
+
+    return found;
+  }
+}
+
+/** @throws {ValidationError} when the key reads more projects than one run may. */
+function assertWithinCap(readCount: number): void {
+  if (readCount <= LWQL_TENANT_CAPABILITY_MAX_PROJECTS) return;
+  throw new ValidationError(
+    `The key can read more than ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects, over the ` +
+      `most a run may read. Name the projects instead.`,
+  );
+}
+
+/** @throws {LangWatchQLProjectNotFoundError} when any named project is not among those read. */
+function inRequestOrder({
+  readable,
+  only,
+}: {
+  readable: readonly ReadableProject[];
+  only: readonly string[];
+}): ReadableProject[] {
+  const byId = new Map(readable.map((entry) => [entry.project.id, entry]));
+  const ordered = only.flatMap((id) => byId.get(id) ?? []);
+  if (ordered.length < only.length) throw new LangWatchQLProjectNotFoundError();
+
+  return ordered;
+}
+
+/** The principal a key is judged as at one project's own scope. */
+function keyCredentialFor({
+  reach,
+  project,
+}: {
+  reach: Extract<LangWatchQLKeyReach, { kind: "apiKey" }>;
+  project: Pick<Project, "id" | "teamId">;
+}): RestProjectCredentialPrincipal {
+  return {
+    kind: "apiKey",
+    apiKeyId: reach.apiKeyId,
+    userId: reach.userId,
+    organizationId: reach.organizationId,
+    projectId: project.id,
+    teamId: project.teamId,
+  };
 }

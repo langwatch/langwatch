@@ -7,6 +7,8 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
 
+import { inStableOrder } from "../rules/langwatch-ql-project-selection.rules.ts";
+
 type Dependencies = Readonly<{ authz: AuthzApi; projects: ProjectApi }>;
 
 /** The projects a card's editor may offer a member: live ones in the project's organization. */
@@ -59,10 +61,13 @@ export class LangWatchQLReadableProjectsService {
     userId: string | undefined;
   }): Promise<string[]> {
     if (userId === undefined) throw new LangWatchQLProjectNotFoundError();
-    const ids = (await this.listFor({ projectId, userId })).map(({ id }) => id).toSorted();
+    const ids = inStableOrder(await this.listFor({ projectId, userId })).map(({ id }) => id);
     if (ids.length === 0) throw new LangWatchQLProjectNotFoundError();
     if (ids.length > LWQL_MAX_MEMBER_PROJECTS) {
-      throw new ValidationError(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
+      throw new ValidationError(
+        `You can read ${ids.length} projects, more than the ${LWQL_MAX_MEMBER_PROJECTS} one run ` +
+          `may read with "all". Name up to ${LWQL_MAX_MEMBER_PROJECTS} of them in \`projects\`.`,
+      );
     }
 
     return ids;

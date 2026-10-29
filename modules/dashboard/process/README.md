@@ -724,7 +724,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Get a dashboard widget
 
-Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:180`.
+Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:181`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
@@ -741,7 +741,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Update a dashboard widget
 
-Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:211`.
+Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:212`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
@@ -755,7 +755,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Add a dashboard widget to a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:252`.
+Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:253`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId/dashboard`.
 
@@ -772,13 +772,13 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Delete a dashboard widget
 
-Permission `analytics:delete`. Declared at `src/transport/dashboard-widget.rest.ts:287`.
+Permission `analytics:delete`. Declared at `src/transport/dashboard-widget.rest.ts:288`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
 ```typescript
 type Params = z.infer<typeof dashboardWidgetParamsSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:112
-// Response: inline, src/transport/dashboard-widget.rest.ts:306
+// Response: inline, src/transport/dashboard-widget.rest.ts:307
 type Response = unknown;
 ```
 

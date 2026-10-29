@@ -422,6 +422,14 @@ describe("runQueryCommand with --projects and --sources", () => {
     expect(mockQuery).toHaveBeenCalledWith({ sql: "SELECT 1", projects: "all" });
   });
 
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("refuses all mixed with ids, before anything is sent", async () => {
+    await expect(runQueryCommand("SELECT 1", { projects: "all,proj_x" })).rejects.toThrow(
+      ProcessExitError,
+    );
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
   it("prints nothing about params when the statement declared no placeholder", async () => {
     mockQuery.mockResolvedValue({ ...RESULT, params: {} });

@@ -17,6 +17,7 @@ import {
   updateWidgetOnDashboard,
 } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
+import { widgetProjectsInput } from "../schemas/widget-sources.ts";
 import { handleAddDashboardWidget } from "../tools/add-dashboard-widget.js";
 import { handleListDashboards } from "../tools/list-dashboards.js";
 import { handleUpdateDashboardWidget } from "../tools/update-dashboard-widget.js";
@@ -452,5 +453,16 @@ describe("a widget's projects through the MCP widget tools", () => {
       widgetId: "widget_1",
       queries: [{ ...QUERY, projects: null }],
     });
+  });
+});
+
+describe('given a widget tool is sent projects "all"', () => {
+  /** @scenario "QP03i A widget write refuses the word all" */
+  it("says a widget stores project ids, in the words REST gives", () => {
+    const refused = widgetProjectsInput.safeParse("all");
+
+    expect(refused.error?.issues[0]?.message).toBe(
+      'projects holds project ids; "all" is not stored in a widget',
+    );
   });
 });

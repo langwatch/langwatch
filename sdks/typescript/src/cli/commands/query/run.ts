@@ -403,7 +403,10 @@ export const runQueryCommand = async (
   const credentials = await resolveCredentials({ project: options.project });
   const projectId = options.project === undefined ? undefined : credentials.projectId;
   const listed = listFlag({ value: options.projects, flag: "--projects" });
-  const projects = listed?.length === 1 && listed[0] === "all" ? "all" : listed;
+  if (listed?.includes("all") && listed.length > 1) {
+    refuse('--projects: "all" stands alone; pass it by itself, or list project ids');
+  }
+  const projects = listed?.[0] === "all" ? "all" : listed;
   const sources = listFlag({ value: options.sources, flag: "--sources" });
   const reach: RunReach = {
     ...(projectId === undefined ? {} : { projectId }),

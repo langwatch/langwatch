@@ -57,14 +57,15 @@ function scopeOver(input: {
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
-      listByOrganization: ({ organizationId, limit, projectIds }) => {
-        const data = input.projects.filter(
+      listByOrganization: ({ organizationId, page, limit, projectIds }) => {
+        const matching = input.projects.filter(
           (p) =>
             organizationId === ORGANIZATION_ID &&
             !p.archivedAt &&
             (!projectIds || projectIds.includes(p.id)),
         );
-        return Promise.resolve({ data, pagination: { page: 1, limit, total: data.length } });
+        const data = matching.slice((page - 1) * limit, page * limit);
+        return Promise.resolve({ data, pagination: { page, limit, total: matching.length } });
       },
     }),
     authz: createApiFixture<AuthzApi>({
@@ -367,6 +368,55 @@ describe("given a run that names projects", () => {
     const scope = await service.resolve({ reach: KEY, requireProjects: true });
 
     expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
+  });
+
+  describe("when the organization has far more projects than the key reads", () => {
+    const BIG = Array.from({ length: 250 }, (_, index) =>
+      project(`p${String(index).padStart(3, "0")}`),
+    );
+    const grantsOn = (ids: readonly string[]) =>
+      Object.fromEntries(ids.map((id) => [id, ["analytics:view"]]));
+
+    /** @scenario "QP03 A project key reads its own project by default" */
+    it("defaults to the one project it reads, whatever the organization holds", async () => {
+      const { service } = scopeOver({ projects: BIG, grants: grantsOn(["p199"]) });
+
+      const scope = await service.resolve({ reach: KEY, requireProjects: true });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["p199"]);
+    });
+
+    /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+    it('reads the three it holds for "all", counting the cap against those three', async () => {
+      const { service } = scopeOver({ projects: BIG, grants: grantsOn(["p007", "p150", "p249"]) });
+
+      const scope = await service.resolveAll({ reach: KEY });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["p007", "p150", "p249"]);
+    });
+
+    /** @scenario "QP03b An organization, team or personal key that names no project is refused with a 422 naming the field" */
+    it("stops asking for grants once two projects settle that it must name them", async () => {
+      const { service, asked } = scopeOver({
+        projects: BIG,
+        grants: grantsOn(BIG.map((p) => p.id)),
+      });
+
+      await expect(service.resolve({ reach: KEY, requireProjects: true })).rejects.toMatchObject({
+        code: "projects_required",
+      });
+
+      expect(asked).toHaveLength(2);
+    });
+
+    /** @scenario "QP03b An organization, team or personal key that names no project is refused with a 422 naming the field" */
+    it("answers not found, not a request to name projects, when it reads none", async () => {
+      const { service } = scopeOver({ projects: BIG, grants: {} });
+
+      await expect(service.resolve({ reach: KEY, requireProjects: true })).rejects.toMatchObject({
+        code: "project_not_found",
+      });
+    });
   });
 
   describe('when a statement asks for "all" the key can read', () => {

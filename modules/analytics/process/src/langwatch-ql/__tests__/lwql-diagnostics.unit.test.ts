@@ -283,7 +283,7 @@ describe("given a LangWatchQL query that ran", () => {
 
       expect(codesOf(diagnostics)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(find(diagnostics, "UNBOUNDED_TIME_RANGE")!.meta).toEqual({
-        view: "analytics.traces",
+        view: "traces",
         timeColumn: "OccurredAt",
       });
     });
@@ -307,7 +307,7 @@ describe("given a LangWatchQL query that ran", () => {
         diagnostics
           .filter((diagnostic) => diagnostic.code === "UNBOUNDED_TIME_RANGE")
           .map((diagnostic) => diagnostic.meta?.view),
-      ).toEqual(["analytics.spans"]);
+      ).toEqual(["spans"]);
     });
 
     it("counts a condition written inside a common table expression as bounding it", () => {

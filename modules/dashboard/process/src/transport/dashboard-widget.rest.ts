@@ -161,10 +161,11 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       201: { description: "The widget was saved" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl, caller) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl, caller) => {
     const projectId = scope.id;
     const widget = await app.createDashboardWidget({
       projectId,
+      ...viewerOfActor({ actor }),
       ...(caller.keyReach ? { keyReach: caller.keyReach } : {}),
       name: input.name,
       code: input.code,
