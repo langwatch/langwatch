@@ -393,6 +393,16 @@ jobs:
         with:
           name: docs-site-mounted
           path: ${{ env.SITE }}
+      # The two ARNs are secrets because they name the account; checked here, so a
+      # missing one stops the deploy before anything is uploaded.
+      - name: Check the deploy configuration
+        env:
+          ROLE_ARN: ${{ secrets.DOCS_DEPLOY_ROLE_ARN }}
+          KVS_ARN: ${{ secrets.DOCS_SITE_REDIRECTS_KVS_ARN }}
+        run: |
+          for name in BUCKET DISTRIBUTION ROLE_ARN KVS_ARN; do
+            if [ -z "${!name}" ]; then echo "::error::$name is not set"; exit 1; fi
+          done
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
@@ -420,13 +430,18 @@ jobs:
         run: >-
           aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors --delete
           --exclude '*' --include '*.md' --include '*.claude' --include '*.agent'
-          --content-type 'text/markdown; charset=utf-8' --cache-control 'no-cache'
+          --exclude 'assets/*' --exclude '*.????????????.*' --content-type 'text/markdown; charset=utf-8' --cache-control 'no-cache'
+      - name: Upload the text indexes
+        run: >-
+          aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors --delete
+          --exclude '*' --include '*.txt' --exclude 'assets/*' --exclude '*.????????????.*'
+          --content-type 'text/plain; charset=utf-8' --cache-control 'no-cache'
       - name: Upload the pages and indexes
         run: >-
           aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors --delete
           --exclude '*' --include '*.html' --include '*.json' --include '*.xml'
-          --include '*.txt' --exclude '.vite/*' --exclude 'skipped.json' --exclude '*.????????????.*'
-          --cache-control 'no-cache'
+          --exclude '.vite/*' --exclude 'skipped.json' --exclude 'assets/*'
+          --exclude '*.????????????.*' --cache-control 'no-cache'
       - name: Publish the redirects
         env:
           KVS_ARN: ${{ secrets.DOCS_SITE_REDIRECTS_KVS_ARN }}

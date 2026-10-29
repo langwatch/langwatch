@@ -64,6 +64,7 @@ func TestDeployUploadsByNameInOrderAndNeverDeletesHashedFiles(t *testing.T) {
 		"Upload the content-hashed files",
 		"Upload the other static files",
 		"Upload the Markdown exports",
+		"Upload the text indexes",
 		"Upload the pages and indexes",
 		"Publish the redirects",
 		"Invalidate the distribution",
@@ -81,7 +82,11 @@ func TestDeployUploadsByNameInOrderAndNeverDeletesHashedFiles(t *testing.T) {
 	if strings.Contains(hashed, "--delete") || !strings.Contains(hashed, "immutable") {
 		t.Errorf("the hashed upload must be immutable and never delete:\n%s", hashed)
 	}
-	for _, name := range order[1:4] {
+	if !strings.Contains(s["Check the deploy configuration"], "ROLE_ARN KVS_ARN") ||
+		strings.Index(job, "Check the deploy configuration") > strings.Index(job, "Upload the content-hashed files") {
+		t.Error("the deploy does not check its configuration before it uploads")
+	}
+	for _, name := range order[1:5] {
 		body := s[name]
 		if !strings.Contains(body, "--delete") {
 			t.Errorf("%q does not delete what the build dropped", name)
@@ -89,11 +94,16 @@ func TestDeployUploadsByNameInOrderAndNeverDeletesHashedFiles(t *testing.T) {
 		if strings.Contains(body, "immutable") {
 			t.Errorf("%q marks unhashed files immutable", name)
 		}
-		if name != "Upload the Markdown exports" && !strings.Contains(body, "--exclude '*.????????????.*'") {
-			t.Errorf("%q could delete or re-head a hashed file", name)
+		for _, hashed := range []string{"--exclude 'assets/*'", "--exclude '*.????????????.*'"} {
+			if !strings.Contains(body, hashed) {
+				t.Errorf("%q could delete a hashed file: it lacks %s", name, hashed)
+			}
 		}
 	}
 	if !strings.Contains(s["Upload the Markdown exports"], "--content-type 'text/markdown; charset=utf-8'") {
 		t.Error("the exports are not uploaded as text/markdown")
+	}
+	if !strings.Contains(s["Upload the text indexes"], "--content-type 'text/plain; charset=utf-8'") {
+		t.Error("llms.txt and the other text files are not uploaded as UTF-8")
 	}
 }

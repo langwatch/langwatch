@@ -94,7 +94,7 @@ func TestPublishLeavesAnUnchangedStoreAlone(t *testing.T) {
 	if err := (docsdeploy.Publisher{Store: store, Log: &bytes.Buffer{}}).Publish(context.Background(), want); err != nil {
 		t.Fatal(err)
 	}
-	if len(store.updates) != 0 || store.described {
+	if len(store.updates) != 0 {
 		t.Errorf("an unchanged store was updated: %v", store.updates)
 	}
 }

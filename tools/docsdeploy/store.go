@@ -28,6 +28,12 @@ type Publisher struct {
 // Publish makes the store hold want.
 func (p Publisher) Publish(ctx context.Context, want []Item) error {
 	store := p.Store
+	// The version first: a write between it and the listing then fails the
+	// first update instead of being overwritten.
+	etag, err := store.ETag(ctx)
+	if err != nil {
+		return err
+	}
 	have, err := store.List(ctx)
 	if err != nil {
 		return err
@@ -36,10 +42,6 @@ func (p Publisher) Publish(ctx context.Context, want []Item) error {
 	fmt.Fprintf(p.Log, "%d redirect keys: %d to write, %d to delete\n", len(want), len(change.Puts), len(change.Deletes))
 	if len(change.Puts)+len(change.Deletes) == 0 {
 		return nil
-	}
-	etag, err := store.ETag(ctx)
-	if err != nil {
-		return err
 	}
 	for _, batch := range change.Batches() {
 		if etag, err = store.Update(ctx, etag, batch); err != nil {
