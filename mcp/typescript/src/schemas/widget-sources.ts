@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 /** The sources the platform takes, "other" being every origin not listed before it. */
-const WIDGET_SOURCES = [
+export const WIDGET_SOURCES = [
   "application",
   "simulation",
   "evaluation",

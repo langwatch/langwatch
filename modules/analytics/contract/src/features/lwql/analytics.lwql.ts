@@ -499,7 +499,7 @@ export const OTHER_TRACE_SOURCE = "other";
 export const TRACE_SOURCES = [...KNOWN_TRACE_ORIGINS, OTHER_TRACE_SOURCE] as const;
 export type TraceSource = (typeof TRACE_SOURCES)[number];
 
-/** What an unset query counts, and what a new widget's query stores (owner, 2026-10-28). */
+/** What an unset query counts, and what a new widget's query stores. */
 export const DEFAULT_WIDGET_SOURCES: readonly TraceSource[] = ["application"];
 
 const traceSourceSchema = z.enum(TRACE_SOURCES);
