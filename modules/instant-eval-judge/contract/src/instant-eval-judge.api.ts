@@ -42,8 +42,9 @@ export interface InstantEvalJudgeApi {
    */
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
   /**
-   * The rates a judged query's budget hold is priced at: the dearest input rate a routed call
-   * could reach, never below the classifier's, so a routed query cannot outspend its hold.
+   * The rates a judged query's budget hold is priced at: the dearest base input rate a routed call
+   * could reach, never below the classifier's. A best-effort hold, not a hard cap: a routed query
+   * re-sends text and pays output and long-context rates, so it can spend past it (ADR-190 d7).
    */
   queryHoldPricing(): Promise<InstantEvalPricing>;
   /**

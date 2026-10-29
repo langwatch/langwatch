@@ -563,7 +563,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
       expect(events).toEqual([`reserve ${ceiling} with 0 judged`, "release after 1 recorded"]);
     });
 
-    /** @scenario "A judged query holds its ceiling while it judges" */
+    /** @scenario "A judged query is held at the dearest rate a route can reach" */
     it("holds at the dearest rate a routed call could reach, as the judge names it", async () => {
       const holdPricing = { usdPerMillionInputTokens: 3, markup: 1.3 };
       const { service, events } = harness({ queryTokenBudget: 1_000, holdPricing });

@@ -327,7 +327,7 @@ describe("the query hold rate", () => {
     usdPerMillionOutputTokens: 0,
   });
 
-  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  /** @scenario "A judged query is held at the dearest rate a route can reach" */
   it("holds at the dearest input rate a route can reach, skipping switched-off backends", () => {
     const off = syntheticRouteTable({
       backends: { "llm-a": { kind: "anthropic_messages", model: "m", enabled: false } },
@@ -347,7 +347,7 @@ describe("the query hold rate", () => {
     expect(hold).toEqual({ usdPerMillionInputTokens: 2, markup: INSTANT_EVAL_PRICING.markup });
   });
 
-  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  /** @scenario "A judged query is held at the dearest rate a route can reach" */
   it("holds at the classifier's published rate under the public table", () => {
     const hold = instantEvalJudgeQueryHoldPricingOf({
       table: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,

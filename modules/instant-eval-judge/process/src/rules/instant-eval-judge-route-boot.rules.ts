@@ -42,9 +42,9 @@ export function instantEvalJudgeRouteBootIssues({
 }
 
 /**
- * What a judged query's budget hold is priced at: the dearest input rate of any backend a route
- * can reach, never below the classifier's, at the one markup. A routed query then cannot spend
- * past its hold on a pricier leg than the classifier (ADR-174 decision 12's $1 budget).
+ * What a judged query's budget hold is priced at: the dearest base input rate of any backend a
+ * route can reach, never below the classifier's, at the one markup. A best-effort hold, not a hard
+ * cap: it ignores re-sends, output tokens and long-context rates (ADR-190 decision 7).
  */
 export function instantEvalJudgeQueryHoldPricingOf({
   table,

@@ -44,6 +44,14 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
     Then the cost is 0 and its input tokens are not priced at the classifier's rate
 
   @unit
+  Scenario: A judged query is held at the dearest rate a route can reach
+    Given a route table whose enabled backends have different input rates
+    When a judged query's budget hold is priced
+    Then it is priced at the dearest base input rate any enabled backend or fallback reaches
+    And never below the classifier's published rate, at the one markup
+    And it is a best-effort hold, not a hard cap on what a routed query can spend
+
+  @unit
   Scenario: Routed and unrouted tokens are billed separately
     Given a run whose judgements carry a routed cost for some of its input tokens
     When the run is priced

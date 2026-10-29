@@ -45,7 +45,7 @@ slice and the priced event's schema. There is no transport.
   the single hosted classifier call.
 - `queryHoldPricing` returns the rate a judged query is held at: the dearest input rate any backend
   the route table can reach, never below the classifier rate, at the one markup. It is computed
-  once at boot (ADR-190 decision 7).
+  once at boot. It is a best-effort hold, not a hard cap on a routed query (ADR-190 decision 7).
 - `classify` is the unmetered call Instant Evals uses for its own runs and queries, which keep their
   own spend rule in wave 1.
 - `isClassifierConfigured` tells Instant Evals whether LangWatch's key is set, so it can choose this
