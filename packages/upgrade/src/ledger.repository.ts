@@ -304,6 +304,31 @@ export class UpgradeLedgerRepository {
     return rows.map((row) => upgradeTargetSchema.parse(row));
   }
 
+  /**
+   * Records every shipped ClickHouse step of a target that has no ledger rows yet, as pending, in
+   * one statement: either all its rows land or none, so an interrupted run never leaves a target
+   * recorded for part of the schema. A row already present keeps its status.
+   */
+  async seedTargetSteps({
+    target,
+    stepIds,
+  }: {
+    target: string;
+    stepIds: readonly string[];
+  }): Promise<UpgradeTarget[]> {
+    if (stepIds.length === 0) return [];
+    const { rows } = await this.query<object>(
+      (t) => `INSERT INTO ${t.target}
+              ("step_id", "target", "status", "version", "last_error", "updated_at")
+       SELECT source.step_id, $2, 'pending', source.version, NULL, ${NOW_UTC}
+         FROM unnest($1::text[], $3::text[]) AS source(step_id, version)
+       ON CONFLICT ("step_id", "target") DO NOTHING
+       RETURNING ${TARGET_COLUMNS}`,
+      [stepIds, target, stepIds.map((id) => id.slice("clickhouse:".length))],
+    );
+    return rows.map((row) => upgradeTargetSchema.parse(row));
+  }
+
   /** Every target with at least one row, whatever its status. */
   async findRecordedTargets(): Promise<string[]> {
     const { rows } = await this.query<{ target: string }>(
