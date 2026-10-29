@@ -78,7 +78,8 @@ describe("declaredPath", () => {
     it("keeps a map key's own issue path out, which Zod files under the entry", () => {
       const key = z
         .string()
-        .transform((text) => new Map([[Number(text), "bad"]]))
+        // A string where the numeric map wants a number, so the key's own check fails.
+        .transform((text) => new Map([[Number(text), "bad" as unknown as number]]))
         .pipe(z.map(z.number(), z.number()));
       const schema = z.map(key, z.array(z.string()));
       const parsed = schema.safeParse(new Map([["8675309", []]]));
