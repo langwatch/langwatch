@@ -194,6 +194,87 @@ await it("reveals the final setup tab horizontally while preserving vertical scr
   });
 });
 
+const FACETS = "api-reference/traces/discover-what-the-trace-filter-fields-hold";
+
+/** @scenario "Show tab number keys without moving the tabs" */
+await it("shows each tab's number key in its corner without moving any tab", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+      try {
+        const page = await context.newPage();
+        await page.goto(base + FACETS);
+        const tabs = page.locator('[data-docs-preference="api-language"] [role="tab"]');
+        const boxes = () =>
+          tabs.evaluateAll((all) => all.map((tab) => tab.getBoundingClientRect().toJSON()));
+        const before = await boxes();
+        assert.ok(before.length >= 2);
+        await tabs.first().hover();
+        await page.waitForTimeout(250);
+        assert.deepEqual(await boxes(), before);
+        const hints = await tabs.evaluateAll((all) =>
+          all.map((tab) => {
+            const hint = getComputedStyle(tab, "::after");
+            return { content: hint.content, position: hint.position };
+          }),
+        );
+        for (const hint of hints.slice(0, 9)) {
+          assert.equal(hint.content, "counter(docs-tab)");
+          assert.equal(hint.position, "absolute");
+        }
+      } finally {
+        await context.close();
+      }
+    },
+  });
+});
+
+/** @scenario "Keep the response example panel brief" */
+await it("captions each response example briefly and keeps the full description in the reference", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+      try {
+        const page = await context.newPage();
+        await page.goto(base + FACETS);
+        const panel = page.locator("[data-response-status]:not([hidden])");
+        for (const status of ["200", "400"]) {
+          await page.getByRole("tab", { name: status, exact: true }).click();
+          assert.equal(await panel.getAttribute("data-response-status"), status);
+          const caption = await panel.evaluate((node) => {
+            const [description, meta] = node.querySelectorAll(":scope > div > p");
+            return {
+              lines: description
+                ? Math.round(
+                    description.getBoundingClientRect().height /
+                      parseFloat(getComputedStyle(description).lineHeight),
+                  )
+                : 0,
+              full: description?.getAttribute("title") ?? "",
+              meta: meta?.textContent ?? description?.textContent ?? "",
+            };
+          });
+          assert.ok(caption.lines <= 2, `${status} caption has ${caption.lines} lines`);
+          assert.match(caption.meta, /application\/json · (Example|Generated from schema)/);
+          if (caption.full) {
+            const words = caption.full.slice(0, 40);
+            const inReference = await page.evaluate((text) => {
+              const page = document.body.cloneNode(true);
+              for (const panel of page.querySelectorAll("[data-response-status]")) panel.remove();
+              return page.textContent.replace(/\s+/g, " ").includes(text);
+            }, words);
+            assert.ok(inReference, `${status} description is in the reference`);
+          }
+        }
+      } finally {
+        await context.close();
+      }
+    },
+  });
+});
+
 /** @scenario "Show product imagery and the footer cleanly in either theme at any width" */
 await it("renders responsive product imagery and a solid footer across themes and screen sizes", async () => {
   await withPreviewBrowser({
