@@ -1,3 +1,4 @@
+import { LOGO_LINES_PATH } from "@langwatch/design-system/logo-paths";
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -5,8 +6,9 @@ import { pagePath } from "../../../lib/site-path.ts";
 import type { NotFoundIndex } from "../model/not-found.ts";
 import { Castle } from "./castle.tsx";
 
-/* The static 404: the castle and three starting points, readable without scripts. The 404
-   island swaps in the scene for the missing address's section (`browser/not-found-scenes.ts`). */
+/* The static 404: the castle and three starting points, readable without scripts. With scripts,
+   the mark draws itself until the 404 island has picked the scene for the missing address's
+   section, then flies to that scene's mark (`browser/not-found-intro.ts`). */
 const STARTING_POINTS = [
   { slug: "integration/quick-start", title: "Quick Start" },
   { slug: "skills/directory", title: "Skills Directory" },
@@ -66,16 +68,26 @@ export function NotFoundPage({ title, index }: { title: string; index: NotFoundI
           or the page may have moved.
         </p>
       </header>
-      <div className="docs-nf-stage" data-nf-stage="">
-        <Castle />
-        <nav className="docs-nf-fix" aria-label="Suggested pages">
-          <p className="docs-nf-fix-head">
-            <strong>Try one of these instead</strong>
-            <span className="docs-nf-dim">Nearby pages, or good places to start.</span>
+      <div className="docs-nf-scene">
+        <div className="docs-nf-intro" data-nf-intro="" aria-hidden="true">
+          <svg viewBox="0 0 38 52" width="74" height="101">
+            <path d={LOGO_LINES_PATH} pathLength={1} />
+          </svg>
+          <p>
+            finding the page<span>_</span>
           </p>
-          <Picks pages={STARTING_POINTS} label="Starting points" />
-        </nav>
-        <p className="docs-nf-keys">Press 1 to 3 to open a page, or / to search the docs.</p>
+        </div>
+        <div className="docs-nf-stage" data-nf-stage="">
+          <Castle />
+          <nav className="docs-nf-fix" aria-label="Suggested pages">
+            <p className="docs-nf-fix-head">
+              <strong>Try one of these instead</strong>
+              <span className="docs-nf-dim">Nearby pages, or good places to start.</span>
+            </p>
+            <Picks pages={STARTING_POINTS} label="Starting points" />
+          </nav>
+          <p className="docs-nf-keys">Press 1 to 3 to open a page, or / to search the docs.</p>
+        </div>
       </div>
     </div>
   );

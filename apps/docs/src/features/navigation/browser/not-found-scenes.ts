@@ -80,41 +80,54 @@ const line = (...children: Child[]) => h("p", { class: "docs-nf-line" }, ...chil
 /** A line that starts a new block of the session, after a blank line as Claude Code prints. */
 const block = (...children: Child[]) => h("p", { class: "docs-nf-line is-block" }, ...children);
 
-/** Langy's mark: the LangWatch box in the orange to purple gradient, as in the app. */
-function langyMark() {
+/** The LangWatch box the intro's mark flies to: Langy's, in the orange to purple gradient as in
+    the app, or the trace's service mark in plain orange. */
+function mark({
+  className,
+  width,
+  gradient,
+}: {
+  className: string;
+  width: number;
+  gradient: boolean;
+}) {
   const svg = document.createElementNS(SVG, "svg");
   for (const [name, value] of Object.entries({
     viewBox: "0 0 38 52",
-    width: "30",
-    height: "41",
-    class: "docs-nf-langy",
+    width: String(width),
+    height: String(Math.round((width * 52) / 38)),
+    class: className,
     "aria-hidden": "true",
+    "data-nf-mark": "",
   }))
     svg.setAttribute(name, value);
-  const defs = document.createElementNS(SVG, "defs");
-  const gradient = document.createElementNS(SVG, "linearGradient");
-  for (const [name, value] of Object.entries({
-    id: "docs-nf-langy",
-    x1: "0",
-    y1: "1",
-    x2: "1",
-    y2: "0",
-  }))
-    gradient.setAttribute(name, value);
-  for (const { offset, className } of [
-    { offset: "0", className: "is-orange" },
-    { offset: "1", className: "is-purple" },
-  ]) {
-    const stop = document.createElementNS(SVG, "stop");
-    stop.setAttribute("offset", offset);
-    stop.setAttribute("class", className);
-    gradient.append(stop);
+  const path = document.createElementNS(SVG, "path");
+  path.setAttribute("d", LOGO_LINES_PATH);
+  if (gradient) {
+    const defs = document.createElementNS(SVG, "defs");
+    const fill = document.createElementNS(SVG, "linearGradient");
+    for (const [name, value] of Object.entries({
+      id: "docs-nf-langy",
+      x1: "0",
+      y1: "1",
+      x2: "1",
+      y2: "0",
+    }))
+      fill.setAttribute(name, value);
+    for (const { offset, className: stop } of [
+      { offset: "0", className: "is-orange" },
+      { offset: "1", className: "is-purple" },
+    ]) {
+      const node = document.createElementNS(SVG, "stop");
+      node.setAttribute("offset", offset);
+      node.setAttribute("class", stop);
+      fill.append(node);
+    }
+    defs.append(fill);
+    svg.append(defs);
+    path.setAttribute("fill", "url(#docs-nf-langy)");
   }
-  defs.append(gradient);
-  const mark = document.createElementNS(SVG, "path");
-  mark.setAttribute("d", LOGO_LINES_PATH);
-  mark.setAttribute("fill", "url(#docs-nf-langy)");
-  svg.append(defs, mark);
+  svg.append(path);
   return svg;
 }
 
@@ -140,7 +153,7 @@ function terminal({ shown, host, pages, query }: SceneInput) {
     h(
       "div",
       { class: "docs-nf-banner" },
-      langyMark(),
+      mark({ className: "docs-nf-langy", width: 30, gradient: true }),
       h(
         "div",
         {},
@@ -205,12 +218,7 @@ function trace({ shown, pages }: SceneInput) {
       h(
         "span",
         {},
-        icon(
-          "M6 3v12",
-          "M18 6m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0",
-          "M6 18m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0",
-          "M18 9a9 9 0 0 1-9 9",
-        ),
+        mark({ className: "docs-nf-trace-mark", width: 14, gradient: false }),
         h("strong", {}, "Page request"),
         span("docs-nf-dim", "3 spans"),
       ),
