@@ -14,6 +14,8 @@ type ImageSpec struct {
 	Dockerfile string
 	// Row is the whole row, keys sorted, so any change to it is an input.
 	Row string
+	// Platform is the row's platform, "" for the workflow's default.
+	Platform string
 }
 
 // UnmarshalJSON reads a build table row.
@@ -24,6 +26,7 @@ func (s *ImageSpec) UnmarshalJSON(b []byte) error {
 	}
 	s.Image, _ = row["image"].(string)
 	s.Dockerfile, _ = row["dockerfile"].(string)
+	s.Platform, _ = row["platform"].(string)
 	canonical, err := json.Marshal(row)
 	if err != nil {
 		return err

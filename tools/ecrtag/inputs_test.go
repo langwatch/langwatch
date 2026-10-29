@@ -146,12 +146,26 @@ func TestAGoBuildAfterCdReadsFromThatDirectory(t *testing.T) {
 // @scenario "An image whose inputs cannot be read is rebuilt"
 func TestWhatItCannotReadFails(t *testing.T) {
 	for name, dockerfile := range map[string]string{
-		"a go build of an import path": "FROM golang\nCOPY cmd ./cmd\nRUN go build github.com/x/y\n",
-		"a cd that leaves the context": "FROM golang\nCOPY cmd ./cmd\nRUN cd /src && go build ./cmd/service\n",
-		"a source that names no file":  "FROM node\nCOPY missing/ ./\n",
-		"a variable in a source":       "FROM node\nARG DIR\nCOPY ${DIR} ./\n",
-		"a heredoc":                    "FROM node\nRUN <<EOF\necho hi\nEOF\n",
-		"a COPY with no destination":   "FROM node\nCOPY pkg\n",
+		"a go build of an import path":                    "FROM golang\nCOPY cmd ./cmd\nRUN go build github.com/x/y\n",
+		"a cd that leaves the context":                    "FROM golang\nCOPY cmd ./cmd\nRUN cd /src && go build ./cmd/service\n",
+		"a source that names no file":                     "FROM node\nCOPY missing/ ./\n",
+		"a variable in a source":                          "FROM node\nARG DIR\nCOPY ${DIR} ./\n",
+		"a heredoc":                                       "FROM node\nRUN <<EOF\necho hi\nEOF\n",
+		"a COPY with no destination":                      "FROM node\nCOPY pkg\n",
+		"go generate beside a build":                      "FROM golang\nCOPY cmd ./cmd\nRUN go generate ./... && go build ./cmd/service\n",
+		"a go build with -tags":                           "FROM golang\nCOPY cmd ./cmd\nRUN go build -tags extra ./cmd/service\n",
+		"GOFLAGS on the RUN":                              "FROM golang\nCOPY cmd ./cmd\nRUN GOFLAGS=-tags=x go build ./cmd/service\n",
+		"GOFLAGS in ENV":                                  "FROM golang\nENV GOFLAGS=-tags=x\nCOPY cmd ./cmd\nRUN go build ./cmd/service\n",
+		"a module copied elsewhere":                       "FROM golang\nWORKDIR /src\nCOPY cmd /other/cmd\nRUN go build ./cmd/service\n",
+		"a build in another WORKDIR":                      "FROM golang\nWORKDIR /src\nCOPY cmd ./cmd\nWORKDIR /src/cmd\nRUN go build ./service\n",
+		"an escape directive":                             "# escape=`\nFROM golang\nCOPY cmd ./cmd\n",
+		"COPY --parents":                                  "FROM node\nCOPY --parents pkg /dst/\n",
+		"cgo on the RUN":                                  "FROM golang\nCOPY cmd ./cmd\nRUN CGO_ENABLED=1 go build ./cmd/service\n",
+		"another GOARCH in ENV":                           "FROM golang\nENV GOARCH=amd64\nCOPY cmd ./cmd\nRUN go build ./cmd/service\n",
+		"another GOOS on the RUN":                         "FROM golang\nCOPY cmd ./cmd\nRUN GOOS=darwin go build ./cmd/service\n",
+		"a build on a stage that read the context":        "FROM golang AS deps\nCOPY cmd ./cmd\nFROM deps\nRUN go build ./cmd/service\n",
+		"a build after COPY --from a stage that read it":  "FROM golang AS src\nCOPY cmd ./cmd\nFROM golang\nCOPY --from=src /cmd ./cmd\nRUN go build ./cmd/service\n",
+		"a build mounting a stage that read it, by index": "FROM golang\nCOPY cmd ./cmd\nFROM golang\nRUN --mount=from=0,target=/cmd go build ./cmd/service\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := inputsOf(goTree(), dockerfile).Files(context.Background(), "infra/docker/Dockerfile.go")
@@ -170,6 +184,19 @@ func TestWhatItCannotReadFails(t *testing.T) {
 		_, err := in.Files(context.Background(), "infra/docker/Dockerfile.go")
 		assert.Error(t, err)
 	})
+}
+
+func TestTheTargetPlatformAndARuntimeStageAreRead(t *testing.T) {
+	dockerfile := "FROM golang AS build\nCOPY cmd ./cmd\nRUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=$TARGETARCH go build ./cmd/service\n" +
+		"FROM distroless\nCOPY --from=build /out/service /service\n"
+	_, err := inputsOf(goTree(), dockerfile).Files(context.Background(), "infra/docker/Dockerfile.go")
+	assert.NoError(t, err, "the build's own target platform, and a runtime stage copying its binary, are what every image does")
+}
+
+func TestAnotherPlatformInTheBuildTableFails(t *testing.T) {
+	_, err := inputsOf(goTree(), goDockerfile).Hash(context.Background(),
+		spec(t, `{"image":"gateway","dockerfile":"infra/docker/Dockerfile.go","platform":"linux/amd64"}`))
+	assert.Error(t, err)
 }
 
 func TestATabAfterTheInstructionIsRead(t *testing.T) {

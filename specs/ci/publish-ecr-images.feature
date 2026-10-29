@@ -79,7 +79,7 @@ Feature: Publish every deployable image to the artifacts registry
 
   @unit
   Scenario: An image whose inputs cannot be read is rebuilt
-    Given a Dockerfile with a step the inputs reader cannot follow, such as a go build of an import path or with -tags, go generate, GOFLAGS, a Go module copied to another path than its own, or a heredoc
+    Given a Dockerfile with a step the inputs reader cannot follow, such as a go build of an import path or with -tags, go generate, GOFLAGS, cgo or a platform other than linux/arm64, a Go module copied to another path than its own, a go build on a stage that read the build context, or a heredoc
     When publish-docker-ecr selects the images to build
     Then that image is built, with a warning, rather than re-tagged
     And the CI guard fails on that Dockerfile, so it does not rebuild on every commit unnoticed
