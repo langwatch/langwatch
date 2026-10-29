@@ -1901,7 +1901,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # The helper (decided): a `Source` column the LWQL views expose, computed at read time from
   # `Origin` (lwql-view-catalog.rules.ts sourceColumns); no ClickHouse migration. It reads: a missing, empty or NULL origin reads "application", an origin outside the eight
   # listed reads "other", a listed origin reads as itself. A view keyed by TraceId is reached
-  # through `TraceId IN (SELECT TraceId FROM trace_metrics WHERE Source IN {…})`. A view with
+  # through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})`. A view with
   # neither column is on the exemption list (AC202f).
 
   @unit
@@ -2048,7 +2048,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Changed after the security review (2026-10-29): a member's list is proven readable one project at a
     # time, so the cap is LWQL_MAX_MEMBER_PROJECTS, 100, not the key door's 10,000.
     When a widget's query, or a card run, names more projects than LWQL_MAX_MEMBER_PROJECTS
-    Then the write is refused with the code "validation_error" and the message names the maximum, 100
+    Then the write is refused with the code "dashboard_widget_definition_refused" (422) and the message "This dashboard widget's definition is invalid."
+    And a card run over the tRPC door is refused by the schema, with the message "projects holds at most 100 ids"
     And a write of 101 ids is refused so
     And the editor offers no further project once the maximum is picked
     # Evidence: the refusal quoted from one dashboard API write of 10,001 ids, with the body size

@@ -8,6 +8,7 @@ import { Box } from "@langwatch/design-system/primitives";
 import { GripVertical } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useReadableProjects } from "../../../../behavior/use-readable-projects.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid.tsx";
@@ -18,7 +19,12 @@ import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
-import { picksNoSources, widgetCardFooter, widgetSourcesLine } from "../../model/widget-sources.ts";
+import {
+  picksNoSources,
+  widgetCardFooter,
+  widgetProjectsLine,
+  widgetSourcesLine,
+} from "../../model/widget-sources.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { NoSourcesPicked } from "../blocks/no-sources-picked.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
@@ -68,6 +74,7 @@ export function BoardWidgetCard({
   onEmptyChange?: (empty: boolean) => void;
 }) {
   const host = useAnalyticsHost();
+  const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
   const clipboard = useWidgetClipboard({ dashboardId });
   const csvExport = useWidgetCsvExport({ board: boardName, widget: widget.name });
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
@@ -87,6 +94,11 @@ export function BoardWidgetCard({
       description={widget.definition.description}
       footer={widgetCardFooter({
         sourcesLine: widgetSourcesLine(widget.definition.queries),
+        projectsLine: widgetProjectsLine({
+          queries: widget.definition.queries,
+          boardProjectName: host.project()?.name ?? "",
+          readable,
+        }),
         limits,
       })}
       controls={

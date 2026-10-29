@@ -4,6 +4,8 @@
  * AC207, AC208b).
  */
 
+import { LWQL_MAX_MEMBER_PROJECTS } from "@langwatch/analytics-contract/langwatch-ql-limits";
+
 /** A project the member may read, as the picker names it. */
 export interface PickableProject {
   readonly id: string;
@@ -12,10 +14,13 @@ export interface PickableProject {
 
 export interface QueryProjectsView {
   /** The named projects the member reads, with their position in the stored list. */
-  readonly entries: readonly { readonly index: number; readonly id: string; readonly name: string }[];
+  readonly entries: readonly {
+    readonly index: number;
+    readonly id: string;
+    readonly name: string;
+  }[];
   /** Where the named projects the member cannot read sit in the stored list; no name, no id. */
   readonly hiddenAt: readonly number[];
-  readonly hiddenCount: number;
   /** Readable projects not picked yet, in the order the organization lists them. */
   readonly offered: readonly PickableProject[];
   /** While the query stores none, it reads the board's project. */
@@ -41,8 +46,10 @@ export function queryProjectsView({
   return {
     entries,
     hiddenAt,
-    hiddenCount: hiddenAt.length,
-    offered: readable.filter((project) => !stored.includes(project.id)),
+    offered:
+      stored.length >= LWQL_MAX_MEMBER_PROJECTS
+        ? []
+        : readable.filter((project) => !stored.includes(project.id)),
     followsBoard: stored.length === 0,
   };
 }

@@ -213,15 +213,19 @@ describe("given a query's projects", () => {
   });
 
   /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
-  it("refuses more projects than the capability allows", async () => {
+  it("refuses more projects than a member's list may hold", async () => {
     const { service } = setUp();
-    const tooMany = Array.from({ length: 10_001 }, (_, index) => `p${index}`);
+    const tooMany = Array.from({ length: 101 }, (_, index) => `p${index}`);
 
     await expect(
       service.createWidget({
         ...scope,
         input: { name: "Many", code: CODE, queries: [{ ...QUERY, projects: tooMany }] },
       }),
-    ).rejects.toMatchObject({ code: "dashboard_widget_definition_refused", httpStatus: 422 });
+    ).rejects.toMatchObject({
+      code: "dashboard_widget_definition_refused",
+      httpStatus: 422,
+      message: "This dashboard widget's definition is invalid.",
+    });
   });
 });

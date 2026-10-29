@@ -65,14 +65,42 @@ export function widgetSourcesLine(queries: readonly Sourced[]): string {
   return `Sources: ${named.map(({ name, list }) => `${name}: ${list}`).join(" · ")}`;
 }
 
-/** The card's quiet line: its sources, then one (i) line of what the server limited in the run. */
+/**
+ * "Project: Alpha" while no query stores projects (the board's project reads), else "Projects:"
+ * and the picked names in order. A project the reader cannot read is not named; "" when none is.
+ */
+export function widgetProjectsLine({
+  queries,
+  boardProjectName,
+  readable,
+}: {
+  queries: readonly Pick<DashboardWidgetQuery, "projects">[];
+  boardProjectName: string;
+  readable: readonly { id: string; name: string }[];
+}): string {
+  const picked = [...new Set(queries.flatMap((query) => query.projects ?? []))];
+  if (picked.length === 0) return boardProjectName === "" ? "" : `Project: ${boardProjectName}`;
+  const names = picked.flatMap((id) => readable.find((project) => project.id === id)?.name ?? []);
+  if (names.length === 0) return "";
+
+  return `${names.length === 1 ? "Project" : "Projects"}: ${names.join(", ")}`;
+}
+
+/**
+ * The card's quiet line: its sources and projects, then one (i) line of what the server limited
+ * in the run.
+ */
 export function widgetCardFooter({
   sourcesLine,
+  projectsLine,
   limits,
 }: {
   sourcesLine: string;
+  projectsLine: string;
   /** The limiting messages of the latest runs, joined; "" when the server limited none. */
   limits: string;
 }): string {
-  return [sourcesLine, limits === "" ? "" : `\u24D8 ${limits}`].filter(Boolean).join(" · ");
+  return [sourcesLine, projectsLine, limits === "" ? "" : `\u24D8 ${limits}`]
+    .filter(Boolean)
+    .join(" · ");
 }

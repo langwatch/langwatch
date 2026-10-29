@@ -19,8 +19,9 @@ export const MAX_LWQL_LENGTH = 50_000;
 export const LWQL_MAX_RESULT_ROWS = 10_000;
 
 /**
- * The most projects one run may name, equal to the key set's capability ceiling so a named list
- * can never outgrow what a credential can carry.
+ * The most projects one run may name, and the most one tenant capability may carry. The set rides
+ * in the request URI as a query setting, 65 bytes a project, so this sits well under ClickHouse's
+ * 1 MiB URI ceiling. The capability service takes its ceiling from here, so the two never drift.
  */
 export const LWQL_MAX_NAMED_PROJECTS = 10_000;
 

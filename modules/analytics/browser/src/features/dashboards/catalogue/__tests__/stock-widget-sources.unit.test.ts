@@ -6,7 +6,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { readsSourcesParameter, viewsWithoutOrigin } from "../../model/sources-parameter.ts";
+import {
+  namedViews,
+  readsSourcesParameter,
+  VIEWS_WITH_ORIGIN,
+} from "../../model/sources-parameter.ts";
 import { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "../index.ts";
 import { STOCK_WIDGET_SOURCES } from "../model/stock-widget-sources.ts";
 import fixture from "./fixtures/stock-widget-sources.json" with { type: "json" };
@@ -36,7 +40,10 @@ describe("given the stock widgets of the catalogue", () => {
         ?.definition.queries.find((query) => query.name === name)?.sql;
 
       expect(sql, exempt).toBeDefined();
-      expect(viewsWithoutOrigin(sql ?? "").length, exempt).toBeGreaterThan(0);
+      expect(
+        namedViews(sql ?? "").filter((view) => !VIEWS_WITH_ORIGIN.includes(view)).length,
+        exempt,
+      ).toBeGreaterThan(0);
       expect(readsSourcesParameter(sql ?? ""), exempt).toBe(false);
     }
   });

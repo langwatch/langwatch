@@ -381,7 +381,7 @@ describe("given a stored widget whose query stores no sources", () => {
     const drawer = await openEditor(user);
     const row = within(drawer).getByTestId("query-sources");
 
-    expect(footer.textContent).toBe("Sources: application");
+    expect(footer.textContent).toBe("Sources: application · Project: Test Project");
     expect(within(drawer).getByText("Parameters")).toBeTruthy();
     expect(within(drawer).queryByText(/declared by you/)).toBeNull();
     expect(within(drawer).queryByText("No parameters declared yet.")).toBeNull();
@@ -464,7 +464,9 @@ describe("given a member changes a query's sources in the editor", () => {
     expect(preview).toBe("No sources picked");
     expect(server.updates()[0]?.queries[0]?.sources).toEqual([]);
     await vi.waitFor(() => expect(screen.getByTestId("no-sources-picked")).toBeTruthy());
-    expect(screen.getByTestId("widget-card-footer").textContent).toBe("No sources picked");
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe(
+      "No sources picked · Project: Test Project",
+    );
     expect(screen.queryByTestId("sandboxed-frame")).toBeNull();
   });
 });
@@ -485,7 +487,9 @@ describe("given a member saves only a query's sources and presses Undo", () => {
 
     expect(server.updates()[1]?.queries[0]?.sources).toBeNull();
     await vi.waitFor(() =>
-      expect(screen.getByTestId("widget-card-footer").textContent).toBe("Sources: application"),
+      expect(screen.getByTestId("widget-card-footer").textContent).toBe(
+        "Sources: application · Project: Test Project",
+      ),
     );
   });
 
@@ -517,7 +521,9 @@ describe("given a member who may not edit the board", () => {
     await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
     await screen.findByRole("menuitem", { name: "Copy widget id" });
 
-    expect(screen.getByTestId("widget-card-footer").textContent).toBe("Sources: application");
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe(
+      "Sources: application · Project: Test Project",
+    );
     expect(screen.queryByRole("menuitem", { name: "Edit code" })).toBeNull();
   });
 });
@@ -746,5 +752,31 @@ describe("given a member changes a query's projects in the editor", () => {
 
     expect(server.updates()[0]?.queries[0]?.projects).toEqual(["proj-b"]);
     expect(server.updates()[1]?.queries[0]?.projects).toBeNull();
+  });
+});
+
+describe("given a card whose query names projects", () => {
+  /** @scenario "AC206 Project: a card reads the board's project unless its query names others" */
+  it("names the board's project while the query stores none", async () => {
+    openBoard();
+    await screen.findByTestId("sandboxed-frame");
+
+    expect(screen.getByTestId("widget-card-footer").textContent).toContain("Project: Test Project");
+  });
+
+  /** @scenario "AC207b Project: a query saved with picked projects reads only those projects, in the order picked" */
+  it("names the picked projects in the order picked", async () => {
+    const picked = {
+      ...WIDGET,
+      graph: { ...GRAPH, queries: [{ ...GRAPH.queries[0]!, projects: ["proj-b", "proj-a"] }] },
+    };
+    openBoard({ widgets: [picked] });
+    await screen.findByTestId("sandboxed-frame");
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId("widget-card-footer").textContent).toContain(
+        "Projects: Beta, Alpha",
+      ),
+    );
   });
 });

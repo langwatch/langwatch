@@ -30,7 +30,6 @@ import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
 
-/** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 /** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
 const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
   "SHARE_WINDOW_LIMITED",
@@ -38,6 +37,7 @@ const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
   "GRANULARITY_COARSENED",
 ];
 
+/** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
 
 export interface QueryLastRun {

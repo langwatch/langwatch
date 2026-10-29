@@ -28,7 +28,7 @@ describe("given a member who reads A and B and not C", () => {
     const view = queryProjectsView({ picked: ["A", "C"], readable: READABLE });
 
     expect(view.entries).toEqual([{ index: 0, id: "A", name: "Alpha" }]);
-    expect(view.hiddenCount).toBe(1);
+    expect(view.hiddenAt).toHaveLength(1);
     expect(view.hiddenAt).toEqual([1]);
     expect(JSON.stringify(view)).not.toContain('"C"');
   });
@@ -37,5 +37,12 @@ describe("given a member who reads A and B and not C", () => {
   it("drops an entry by its position, and stores none once the list is empty", () => {
     expect(withoutProjectAt({ picked: ["A", "C", "B"], index: 1 })).toEqual(["A", "B"]);
     expect(withoutProjectAt({ picked: ["C"], index: 0 })).toBeNull();
+  });
+
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
+  it("offers no further project once the maximum is picked", () => {
+    const picked = Array.from({ length: 100 }, (_, index) => `p${index}`);
+
+    expect(queryProjectsView({ picked, readable: READABLE }).offered).toEqual([]);
   });
 });

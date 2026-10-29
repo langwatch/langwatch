@@ -1,20 +1,21 @@
 /**
- * Whether a query's SQL reads {dashboard_context_sources:Array(String)}, and which views it
- * names that keep no origin. A query that does not read the parameter counts every origin
+ * Whether a query's SQL reads {dashboard_context_sources:Array(String)}, and whether it names a
+ * view that can follow it. A query that does not read the parameter counts every origin
  * (dashboards-v2 AC204), and one that reads only origin-less views cannot follow sources (AC202f).
  */
 
-export const SOURCES_PLACEHOLDER = "{dashboard_context_sources:Array(String)}";
+import { LWQL_SOURCES_PARAMETER } from "@langwatch/analytics-contract";
+
+export const SOURCES_PLACEHOLDER = `{${LWQL_SOURCES_PARAMETER}:Array(String)}`;
+
+/** Views with the normalised `Source` column. */
+export const SOURCE_VIEWS = ["trace_metrics", "evaluation_metrics"] as const;
+
+/** Views keyed by the trace that carries the origin, reached through `trace_metrics`. */
+export const TRACE_VIEWS = ["traces", "spans", "evaluations", "annotations"] as const;
 
 /** Views that keep an origin, or reach one through their trace. */
-export const VIEWS_WITH_ORIGIN = [
-  "trace_metrics",
-  "evaluation_metrics",
-  "traces",
-  "spans",
-  "evaluations",
-  "annotations",
-] as const;
+export const VIEWS_WITH_ORIGIN: readonly string[] = [...SOURCE_VIEWS, ...TRACE_VIEWS];
 
 /** The SQL without its comments, and with its string literals emptied. */
 function codeOf(sql: string): string {
@@ -29,20 +30,16 @@ export function readsSourcesParameter(sql: string): boolean {
   return codeOf(sql).includes(SOURCES_PLACEHOLDER);
 }
 
-/** The views a query reads that keep no origin and cannot reach one through a trace. */
-export function viewsWithoutOrigin(sql: string): string[] {
+/** The distinct views a query names after FROM or JOIN, in the order first named. */
+export function namedViews(sql: string): string[] {
   const named = [...codeOf(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:analytics\.)?([a-z_]+)/gi)].map(
     (match) => match[1] ?? "",
   );
 
-  return [...new Set(named)].filter(
-    (view) => !(VIEWS_WITH_ORIGIN as readonly string[]).includes(view),
-  );
+  return [...new Set(named)];
 }
 
 /** Whether a query can follow sources at all: it names a view that keeps an origin. */
 export function canFollowSources(sql: string): boolean {
-  const named = [...codeOf(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:analytics\.)?([a-z_]+)/gi)];
-
-  return named.some((match) => (VIEWS_WITH_ORIGIN as readonly string[]).includes(match[1] ?? ""));
+  return namedViews(sql).some((view) => VIEWS_WITH_ORIGIN.includes(view));
 }

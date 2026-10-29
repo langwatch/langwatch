@@ -69,12 +69,12 @@ describe("widgetCardFooter", () => {
   it("adds one (i) line of the limiting messages, and none when the run was not limited", () => {
     const message = "Some projects share data only from a date, so earlier rows are not included";
 
-    expect(widgetCardFooter({ sourcesLine: "Sources: application", limits: message })).toBe(
-      `Sources: application \u00b7 \u24d8 ${message}`,
-    );
-    expect(widgetCardFooter({ sourcesLine: "Sources: application", limits: "" })).toBe(
-      "Sources: application",
-    );
+    expect(
+      widgetCardFooter({ sourcesLine: "Sources: application", projectsLine: "", limits: message }),
+    ).toBe(`Sources: application \u00b7 \u24d8 ${message}`);
+    expect(
+      widgetCardFooter({ sourcesLine: "Sources: application", projectsLine: "", limits: "" }),
+    ).toBe("Sources: application");
     expect(message).not.toMatch(/project-|\d/);
   });
 });

@@ -360,7 +360,6 @@ type AnalyticsSetup = FeatureSetup<
  * The two reads hydration makes, in the Trace peer's own vocabulary: it names
  * traces and threads where hydration names keys.
  */
-
 class TraceApiHydrationSource implements LangWatchQLTraceSource {
   constructor(private readonly traces: TraceApi) {}
 

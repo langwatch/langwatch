@@ -153,7 +153,8 @@ function BuiltInBadge() {
   );
 }
 
-function SourcePill({ source, onRemove }: { source: string; onRemove: () => void }) {
+/** A removable pill: a label and the button that drops it. */
+function RemovablePill({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <HStack
       as="span"
@@ -167,7 +168,7 @@ function SourcePill({ source, onRemove }: { source: string; onRemove: () => void
       colorPalette="orange"
       textStyle="monoSm"
     >
-      {source}
+      {label}
       <Button
         size="2xs"
         variant="ghost"
@@ -176,13 +177,18 @@ function SourcePill({ source, onRemove }: { source: string; onRemove: () => void
         padding={0.5}
         borderRadius="full"
         color="fg.subtle"
-        aria-label={`Remove ${source}`}
+        aria-label={`Remove ${label}`}
         onClick={onRemove}
       >
         <X size={11} />
       </Button>
     </HStack>
   );
+}
+
+/** A sources pill: one trace origin the query counts. */
+function SourcePill({ source, onRemove }: { source: TraceSource; onRemove: () => void }) {
+  return <RemovablePill label={source} onRemove={onRemove} />;
 }
 
 function AddSourceMenu({
@@ -325,12 +331,12 @@ function ProjectsRow({ projects }: { projects: QueryProjectsVM }) {
           </Text>
         )}
         {view.entries.map((entry) => (
-          <SourcePill key={entry.id} source={entry.name} onRemove={() => onRemove(entry.index)} />
+          <RemovablePill key={entry.id} label={entry.name} onRemove={() => onRemove(entry.index)} />
         ))}
         {view.hiddenAt.map((index) => (
-          <SourcePill
+          <RemovablePill
             key={`hidden-${index}`}
-            source="1 project you can't read"
+            label="1 project you can't read"
             onRemove={() => onRemove(index)}
           />
         ))}
