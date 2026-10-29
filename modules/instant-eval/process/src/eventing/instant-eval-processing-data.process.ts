@@ -64,6 +64,8 @@ export const instantEvalFinishIntentSchema = z.object({
   requests: z.number().int().nonnegative(),
   /** The run's routed cost, summed from its pages; zero when it was not routed. */
   costNanoUsd: z.number().int().nonnegative().default(0),
+  /** The input tokens the routed cost covers; the rest are priced at the published rate. */
+  routedInputTokens: z.number().int().nonnegative().default(0),
 });
 export type InstantEvalFinishIntent = z.infer<typeof instantEvalFinishIntentSchema>;
 
@@ -85,6 +87,7 @@ export const instantEvalProcessStateSchema = z.object({
   requests: z.number(),
   /** The routed cost so far, in nano-USD; a state persisted before the router reads zero. */
   costNanoUsd: z.number().default(0),
+  routedInputTokens: z.number().default(0),
   /** When the run last did something, which is what the stall wake measures. */
   lastActivityAtMs: z.number(),
   cancelRequestedAtMs: z.number().nullable(),
@@ -102,6 +105,7 @@ export const INITIAL_INSTANT_EVAL_STATE: InstantEvalProcessState = {
   inputTokens: 0,
   requests: 0,
   costNanoUsd: 0,
+  routedInputTokens: 0,
   lastActivityAtMs: 0,
   cancelRequestedAtMs: null,
 };
@@ -124,6 +128,7 @@ export const instantEvalProcessEventViewSchema = z.object({
   inputTokens: z.number().default(0),
   requests: z.number().default(0),
   costNanoUsd: z.number().default(0),
+  routedInputTokens: z.number().default(0),
   cursor: z.string().nullable().default(null),
   cursorSpanId: z.string().nullable().default(null),
   hasNextPage: z.boolean().default(false),

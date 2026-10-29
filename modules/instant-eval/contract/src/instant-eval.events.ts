@@ -111,6 +111,8 @@ const instantEvalPageJudgedEventDataSchemaDefinition = z.object({
   requests: z.number().int().nonnegative(),
   /** What this page's routed calls cost us, summed; zero when the run is not routed. */
   costNanoUsd: z.number().int().nonnegative().default(0),
+  /** The input tokens `costNanoUsd` covers; an event written before it reads as unrouted. */
+  routedInputTokens: z.number().int().nonnegative().default(0),
   /** Questions this page escalated past an unsure or failed decision model. */
   escalated: z.number().int().nonnegative().default(0),
   /** Verdicts each routed backend supplied on this page, by backend name. */

@@ -64,6 +64,7 @@ function harness({
   usageBilled,
   spentNanoUsd = 0n,
   isRouted = false,
+  routeUsdPerMillion = 1,
 }: {
   isCloud?: boolean;
   hasClassifier?: boolean;
@@ -74,6 +75,8 @@ function harness({
   spentNanoUsd?: bigint;
   /** Gives the service a router over a synthetic table whose LLM leg answers yes. */
   isRouted?: boolean;
+  /** The Decisions backend's price; zero is a valid, self-hosted price. */
+  routeUsdPerMillion?: number;
 } = {}) {
   const repositories = {
     ...MemoryInstantEvalJudgeRepositories.create(),
@@ -97,7 +100,9 @@ function harness({
   const limiter = MemoryInstantEvalRateLimiter.create();
   const routePricing = {
     version: "test",
-    backends: { "decision-a": { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 0 } },
+    backends: {
+      "decision-a": { usdPerMillionInputTokens: routeUsdPerMillion, usdPerMillionOutputTokens: 0 },
+    },
   };
   const router = InstantEvalJudgeRouterService.create({
     table: syntheticRouteTable(),
@@ -156,6 +161,7 @@ function harness({
   };
   return {
     service,
+    router,
     classifier: { classify: classifySpy },
     decisionModels,
     recorded,
@@ -569,6 +575,7 @@ describe("given a judge call that carries a route", () => {
       requestId: "run-1",
       inputTokens: 10,
       costNanoUsd: 500,
+      routedInputTokens: 10,
       requests: 1,
       occurredAt: NOW,
     });
@@ -578,5 +585,41 @@ describe("given a judge call that carries a route", () => {
       priceNanoUsd: Math.round(500 * INSTANT_EVAL_PRICING.markup),
       model: "langwatch-judge",
     });
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("prices a routed call that cost nothing at zero, under the router's model and rate", async () => {
+    const { service, recorded, seed } = harness({ isRouted: true, routeUsdPerMillion: 0 });
+    await seed();
+
+    const answer = await service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
+
+    expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0 });
+    expect(recorded[0]).toMatchObject({
+      model: "langwatch-judge",
+      rateVersion: `instant_eval_judge_router@testx${INSTANT_EVAL_PRICING.markup}`,
+      costNanoUsd: 0,
+      priceNanoUsd: 0,
+      inputTokens: 1_000_000,
+    });
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("bills a mixed run's unrouted tokens at the published rate on top of its routed cost", async () => {
+    const { service, recorded } = harness({ isRouted: true });
+
+    await service.recordSpend({
+      organizationId: ORGANIZATION_ID,
+      projectId: PROJECT_ID,
+      requestId: "run-1",
+      inputTokens: 1_500_000,
+      costNanoUsd: 100_000_000,
+      routedInputTokens: 500_000,
+      requests: 2,
+      occurredAt: NOW,
+    });
+
+    // $0.10 routed, plus one million unrouted tokens at the published $0.042 per million.
+    expect(recorded[0]).toMatchObject({ costNanoUsd: 142_000_000, model: "langwatch-judge" });
   });
 });

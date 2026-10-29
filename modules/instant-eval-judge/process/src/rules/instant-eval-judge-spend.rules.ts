@@ -8,10 +8,10 @@ import {
   INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL,
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_SPEND_MODEL,
-  instantEvalCostUsd,
   instantEvalJudgeRouteRateVersion,
   instantEvalPriceUsd,
   instantEvalRateVersion,
+  instantEvalSpentCostUsd,
   NANO_USD_PER_USD,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeSpendPricedEventData,
@@ -56,12 +56,24 @@ export function instantEvalJudgeSpendPricedOf({
   requests?: number | undefined;
   runId?: string | undefined;
   pricing?: InstantEvalPricing;
-  /** A routed spend: its summed cost at the one markup, under the router's model and rate. */
-  routed?: Readonly<{ costNanoUsd: number; pricing: InstantEvalJudgeRoutePricing }> | undefined;
+  /**
+   * A routed spend: its summed cost for the routed tokens plus any other tokens at the published
+   * rate, at the one markup, under the router's model and rate.
+   */
+  routed?:
+    | Readonly<{
+        costNanoUsd: number;
+        routedInputTokens: number;
+        pricing: InstantEvalJudgeRoutePricing;
+      }>
+    | undefined;
 }): Readonly<{ priceUsd: number; fact: InstantEvalJudgeSpendPricedEventData }> {
-  const costUsd = routed
-    ? routed.costNanoUsd / NANO_USD_PER_USD
-    : instantEvalCostUsd({ inputTokens, pricing });
+  const costUsd = instantEvalSpentCostUsd({
+    inputTokens,
+    costNanoUsd: routed?.costNanoUsd,
+    routedInputTokens: routed?.routedInputTokens,
+    pricing,
+  });
   const priceUsd = instantEvalPriceUsd({ costUsd, pricing });
   return {
     priceUsd,

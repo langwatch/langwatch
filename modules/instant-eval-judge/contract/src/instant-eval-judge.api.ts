@@ -121,8 +121,10 @@ export interface InstantEvalJudgeSpendRecord {
   readonly requestId: string;
   /** Input tokens the classifier billed for. Zero records nothing. */
   readonly inputTokens: number;
-  /** The summed cost of routed calls; when above zero it is priced instead of the tokens. */
+  /** The summed cost of routed calls, priced for the routed tokens instead of the rate. */
   readonly costNanoUsd?: number;
+  /** The input tokens `costNanoUsd` covers; absent or zero, the spend is unrouted. */
+  readonly routedInputTokens?: number;
   /** Classifications made, one per judged text. */
   readonly requests: number;
   /** The run the spend belongs to, when it belongs to one. */

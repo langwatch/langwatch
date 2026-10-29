@@ -35,8 +35,9 @@ export interface InstantEvalJudgeUsage {
   inputTokens: number;
   skipped: Record<string, number>;
   limiterWaitMs: number;
-  /** The summed cost of routed judgements; zero when nothing was routed. */
+  /** The summed cost of routed judgements, and the input tokens that cost covers. */
   costNanoUsd: number;
+  routedInputTokens: number;
   /** Questions escalated past a decision model, and verdicts per routed backend. */
   escalated: number;
   answeredBy: Record<string, number>;
@@ -97,6 +98,7 @@ export class InstantEvalJudgeRowsService {
       skipped: {},
       limiterWaitMs: 0,
       costNanoUsd: 0,
+      routedInputTokens: 0,
       escalated: 0,
       answeredBy: {},
     };
@@ -158,6 +160,7 @@ export class InstantEvalJudgeRowsService {
         usage.requests += 1;
         usage.inputTokens += error.inputTokens;
         usage.costNanoUsd += error.costNanoUsd;
+        usage.routedInputTokens += error.inputTokens;
       }
       if (signal?.aborted || isAbortError(error)) throw error;
 
@@ -206,7 +209,10 @@ function record({
   cells.set(unit.rowIndex, row);
 }
 
-/** A routed judgement's cost and how it was answered, summed into the batch's usage. */
+/**
+ * A routed judgement's cost and how it was answered, summed into the batch's usage. The router
+ * prices every judgement it returns, so a cost, zero included, marks its tokens as routed.
+ */
 function recordRouting({
   judgement,
   usage,
@@ -214,7 +220,10 @@ function recordRouting({
   judgement: InstantEvalJudgement;
   usage: InstantEvalJudgeUsage;
 }): void {
-  usage.costNanoUsd += judgement.costNanoUsd ?? 0;
+  if (judgement.costNanoUsd !== undefined) {
+    usage.costNanoUsd += judgement.costNanoUsd;
+    usage.routedInputTokens += judgement.inputTokens;
+  }
   const { routing } = judgement;
   if (!routing) return;
   usage.escalated += routing.escalated;

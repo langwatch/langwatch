@@ -143,7 +143,11 @@ export class InstantEvalJudgeService {
       inputTokens: judgement.inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
       ...this.pricing(),
-      routed: this.routedOf(judgement.costNanoUsd),
+      // The router prices every judgement it returns, zero included: a cost marks it routed.
+      routed: this.routedOf({
+        costNanoUsd: judgement.costNanoUsd ?? 0,
+        routedInputTokens: judgement.costNanoUsd === undefined ? 0 : judgement.inputTokens,
+      }),
     });
     await this.record({ fact });
     return { outcome: "judged", judgement, priceUsd };
@@ -159,7 +163,8 @@ export class InstantEvalJudgeService {
     projectId,
     requestId,
     inputTokens,
-    costNanoUsd,
+    costNanoUsd = 0,
+    routedInputTokens = 0,
     requests,
     runId,
     occurredAt,
@@ -174,16 +179,22 @@ export class InstantEvalJudgeService {
       requests,
       runId,
       ...this.pricing(),
-      routed: this.routedOf(costNanoUsd),
+      routed: this.routedOf({ costNanoUsd, routedInputTokens }),
     });
     await this.deps.recordSpendPriced(fact);
   }
 
-  /** A routed cost prices the spend; none, or zero, prices the tokens as before. */
-  private routedOf(costNanoUsd: number | undefined) {
+  /** Routed tokens price the spend from its routed cost; none prices the tokens as before. */
+  private routedOf({
+    costNanoUsd,
+    routedInputTokens,
+  }: {
+    costNanoUsd: number;
+    routedInputTokens: number;
+  }) {
     const pricing = this.deps.routePricing;
-    if (!pricing || costNanoUsd === undefined || costNanoUsd <= 0) return undefined;
-    return { costNanoUsd, pricing };
+    if (!pricing || routedInputTokens <= 0) return undefined;
+    return { costNanoUsd, routedInputTokens, pricing };
   }
 
   private pricing(): { pricing?: InstantEvalPricing } {

@@ -86,6 +86,7 @@ export function view(
     inputTokens: 0,
     requests: 0,
     costNanoUsd: 0,
+    routedInputTokens: 0,
     cursor: null,
     cursorSpanId: null,
     hasNextPage: false,

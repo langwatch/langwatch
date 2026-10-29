@@ -148,6 +148,7 @@ export const handleInstantEvalPlanned: EventHandler<
           inputTokens: state.inputTokens,
           requests: state.requests,
           costNanoUsd: state.costNanoUsd,
+          routedInputTokens: state.routedInputTokens,
         }),
       ],
     });
@@ -178,6 +179,7 @@ export const handleInstantEvalPlanned: EventHandler<
           inputTokens: state.inputTokens,
           requests: state.requests,
           costNanoUsd: state.costNanoUsd,
+          routedInputTokens: state.routedInputTokens,
         }),
       ],
     });
@@ -223,6 +225,7 @@ export const handleInstantEvalPageJudged: EventHandler<
     inputTokens: state.inputTokens + data.inputTokens,
     requests: state.requests + data.requests,
     costNanoUsd: state.costNanoUsd + data.costNanoUsd,
+    routedInputTokens: state.routedInputTokens + data.routedInputTokens,
   };
 
   const isCancelling = state.phase === "cancelling";
@@ -246,6 +249,7 @@ export const handleInstantEvalPageJudged: EventHandler<
             inputTokens: advanced.inputTokens,
             requests: advanced.requests,
             costNanoUsd: advanced.costNanoUsd,
+            routedInputTokens: advanced.routedInputTokens,
           },
         ),
       ],
@@ -329,6 +333,7 @@ export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIn
           inputTokens: state.inputTokens,
           requests: state.requests,
           costNanoUsd: state.costNanoUsd,
+          routedInputTokens: state.routedInputTokens,
         }),
       ],
     };
@@ -352,6 +357,7 @@ export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIn
         inputTokens: state.inputTokens,
         requests: state.requests,
         costNanoUsd: state.costNanoUsd,
+        routedInputTokens: state.routedInputTokens,
       }),
     ],
   };
@@ -382,6 +388,7 @@ export function buildInstantEvalProcessEventView(
     inputTokens: number("inputTokens"),
     requests: number("requests"),
     costNanoUsd: number("costNanoUsd"),
+    routedInputTokens: number("routedInputTokens"),
     cursor: typeof data.cursor === "string" ? data.cursor : null,
     cursorSpanId: typeof data.cursorSpanId === "string" ? data.cursorSpanId : null,
     hasNextPage: data.hasNextPage === true,

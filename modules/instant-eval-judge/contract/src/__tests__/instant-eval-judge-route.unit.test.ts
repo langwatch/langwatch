@@ -232,7 +232,33 @@ describe("spent cost", () => {
 
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
   it("takes the routed cost when one was recorded", () => {
-    expect(instantEvalSpentCostUsd({ inputTokens: 1_000_000, costNanoUsd: 2_500 })).toBe(0.0000025);
+    expect(
+      instantEvalSpentCostUsd({
+        inputTokens: 1_000_000,
+        costNanoUsd: 2_500,
+        routedInputTokens: 1_000_000,
+      }),
+    ).toBe(0.0000025);
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("adds the unrouted tokens of a mixed run at the published rate", () => {
+    const costUsd = instantEvalSpentCostUsd({
+      inputTokens: 1_000_000,
+      costNanoUsd: 100_000_000,
+      routedInputTokens: 500_000,
+    });
+    expect(costUsd).toBe(0.121);
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("prices routed tokens that cost nothing at zero, not at the published rate", () => {
+    const costUsd = instantEvalSpentCostUsd({
+      inputTokens: 20_000,
+      costNanoUsd: 0,
+      routedInputTokens: 20_000,
+    });
+    expect(costUsd).toBe(0);
   });
 });
 

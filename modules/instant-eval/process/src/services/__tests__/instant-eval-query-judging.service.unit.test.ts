@@ -431,6 +431,30 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
 
       expect(judged.cancellation).toEqual({ unjudgedRows: [1] });
       expect(records.map((record) => record.inputTokens)).toEqual([TOKENS_PER_TEXT + 40]);
+      expect(records[0]).toMatchObject({ routedInputTokens: 40, costNanoUsd: 0 });
+    });
+  });
+
+  describe("given routed and unrouted judgements in one batch", () => {
+    /** @scenario "A routed judgement is priced from the summed cost of every call" */
+    it("counts a routed judgement that cost nothing as routed tokens, apart from the unrouted ones", async () => {
+      const judge = new ScriptedJudge(async ({ request, index }) => {
+        const judgement = await answerEvery({ probability: 0.7 })({ request, index });
+        return index === 0 ? { ...judgement, costNanoUsd: 0 } : judgement;
+      });
+      const { service, records } = harness({ judge, concurrency: 1 });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }, { annoyed: "two" }],
+      });
+
+      expect(records[0]).toMatchObject({
+        inputTokens: 2 * TOKENS_PER_TEXT,
+        costNanoUsd: 0,
+        routedInputTokens: TOKENS_PER_TEXT,
+      });
     });
   });
 

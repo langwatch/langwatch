@@ -66,6 +66,7 @@ const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
   inputTokens: 0,
   requests: 0,
   costNanoUsd: 0,
+  routedInputTokens: 0,
   escalated: 0,
   answeredBy: {},
   cursor: null,
@@ -306,17 +307,16 @@ export class InstantEvalJudgePageService {
   }
 
   /**
-   * What this run has already spent, priced the way its finish prices it. Read
-   * off the run row rather than tracked here: the process that judges page six
-   * need not be the one that judged page five, and the row is what they share.
+   * What the run has spent so far, off the run row the judging processes share. The row keeps no
+   * routed token count, so every token is also priced at the published rate: never below the bill.
    */
   #spentSoFarUsd({ tokens, costUsd }: { tokens: number; costUsd: number }): number {
     if (tokens <= 0) return 0;
-    const costNanoUsd = Math.round(costUsd * NANO_USD_PER_USD);
+    const { pricing } = this.judge;
     return instantEvalSpentPriceUsd({
       inputTokens: tokens,
-      costNanoUsd,
-      pricing: this.judge.pricing,
+      costNanoUsd: Math.round(costUsd * NANO_USD_PER_USD),
+      pricing,
     });
   }
 
@@ -488,6 +488,7 @@ function outcomeFor({
     inputTokens: usage.inputTokens,
     requests: usage.requests,
     costNanoUsd: usage.costNanoUsd,
+    routedInputTokens: usage.routedInputTokens,
     escalated: usage.escalated,
     answeredBy: usage.answeredBy,
     cursor: cursor.traceId,

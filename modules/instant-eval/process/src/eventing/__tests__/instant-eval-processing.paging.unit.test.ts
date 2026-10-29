@@ -134,6 +134,31 @@ describe("given a run judging its pages", () => {
 
       expect(evolution.state).toMatchObject({ inputTokens: 2_000, requests: 1_000 });
     });
+
+    /** @scenario "A routed judgement is priced from the summed cost of every call" */
+    it("sums the routed tokens beside the routed cost and hands both to the finish", () => {
+      const { ctx, emitted } = context();
+      const routedSoFar = { ...running, costNanoUsd: 300, routedInputTokens: 400 };
+
+      const evolution = handleInstantEvalPageJudged(
+        routedSoFar,
+        view({
+          page: 2,
+          rows: 500,
+          inputTokens: 1_200,
+          costNanoUsd: 0,
+          routedInputTokens: 1_200,
+          cursor: "t1000",
+          hasNextPage: false,
+        }),
+        ctx,
+      );
+
+      expect(evolution.state).toMatchObject({ costNanoUsd: 300, routedInputTokens: 1_600 });
+      expect(emitted[0]).toMatchObject({
+        payload: { inputTokens: 2_000, costNanoUsd: 300, routedInputTokens: 1_600 },
+      });
+    });
   });
 });
 

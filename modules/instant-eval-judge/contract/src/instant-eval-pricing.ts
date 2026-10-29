@@ -94,32 +94,37 @@ export function instantEvalJudgeRouteRateVersion({
 }
 
 /**
- * What a judgement, page or run cost us: the summed routed cost when the calls were routed,
- * else its input tokens at the published rate, as before. A run routes every call or none.
+ * What a judgement, page or run cost us: the routed calls' summed cost, plus the tokens no route
+ * covered at the published rate. Zero routed tokens is an unrouted spend, priced as before.
  */
 export function instantEvalSpentCostUsd({
   inputTokens,
-  costNanoUsd,
+  costNanoUsd = 0,
+  routedInputTokens = 0,
   pricing = INSTANT_EVAL_PRICING,
 }: {
   inputTokens: number;
   costNanoUsd?: number | undefined;
+  /** The tokens `costNanoUsd` covers; the rest are priced at the published rate. */
+  routedInputTokens?: number | undefined;
   pricing?: InstantEvalPricing;
 }): number {
-  if (costNanoUsd !== undefined && costNanoUsd > 0) return costNanoUsd / NANO_USD_PER_USD;
-  return instantEvalCostUsd({ inputTokens, pricing });
+  const unroutedUsd = instantEvalCostUsd({ inputTokens: inputTokens - routedInputTokens, pricing });
+  return toNanoUsdPrecision(costNanoUsd / NANO_USD_PER_USD + unroutedUsd);
 }
 
 /** What the customer is charged for a judgement, page or run: its spent cost at the markup. */
 export function instantEvalSpentPriceUsd({
   inputTokens,
   costNanoUsd,
+  routedInputTokens,
   pricing = INSTANT_EVAL_PRICING,
 }: {
   inputTokens: number;
   costNanoUsd?: number | undefined;
+  routedInputTokens?: number | undefined;
   pricing?: InstantEvalPricing;
 }): number {
-  const costUsd = instantEvalSpentCostUsd({ inputTokens, costNanoUsd, pricing });
+  const costUsd = instantEvalSpentCostUsd({ inputTokens, costNanoUsd, routedInputTokens, pricing });
   return instantEvalPriceUsd({ costUsd, pricing });
 }

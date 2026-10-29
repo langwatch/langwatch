@@ -53,8 +53,9 @@ export interface InstantEvalPageOutcome {
   readonly skipped: number;
   readonly inputTokens: number;
   readonly requests: number;
-  /** What the page's routed calls cost us; zero when the run is not routed. */
+  /** What the page's routed calls cost us, and the input tokens that cost covers. */
   readonly costNanoUsd: number;
+  readonly routedInputTokens: number;
   /** Questions the page escalated, and verdicts per routed backend. */
   readonly escalated: number;
   readonly answeredBy: Readonly<Record<string, number>>;
@@ -98,6 +99,7 @@ export interface InstantEvalRunExecutor {
     inputTokens: number;
     requests: number;
     costNanoUsd: number;
+    routedInputTokens: number;
   }): Promise<InstantEvalSpend>;
 }
 
@@ -125,6 +127,7 @@ export interface InstantEvalOutcomeCommands {
     inputTokens: number;
     requests: number;
     costNanoUsd: number;
+    routedInputTokens: number;
     escalated: number;
     answeredBy: Record<string, number>;
     cursor: string | null;
@@ -324,6 +327,7 @@ export function createInstantEvalJudgePageHandler(
         inputTokens: outcome.inputTokens,
         requests: outcome.requests,
         costNanoUsd: outcome.costNanoUsd,
+        routedInputTokens: outcome.routedInputTokens,
         escalated: outcome.escalated,
         answeredBy: { ...outcome.answeredBy },
         cursor: outcome.cursor,
@@ -360,6 +364,7 @@ export function createInstantEvalFinishHandler(
         inputTokens: payload.inputTokens,
         requests: payload.requests,
         costNanoUsd: payload.costNanoUsd,
+        routedInputTokens: payload.routedInputTokens,
       });
     } catch (error) {
       // The payload already carries what every judged page spent, so a finish

@@ -59,17 +59,25 @@ export class InstantEvalFinishService {
     inputTokens,
     requests,
     costNanoUsd = 0,
+    routedInputTokens = 0,
   }: {
     runId: string;
     projectId: string;
     outcome: InstantEvalOutcome;
     inputTokens: number;
     requests: number;
-    /** A routed run's summed cost; zero prices its tokens as before. */
+    /** A routed run's summed cost, and the input tokens it covers; none prices the tokens. */
     costNanoUsd?: number;
+    routedInputTokens?: number;
   }): Promise<InstantEvalSpend> {
-    const costUsd = instantEvalSpentCostUsd({ inputTokens, costNanoUsd, pricing: this.pricing });
-    const priceUsd = instantEvalPriceUsd({ costUsd, pricing: this.pricing });
+    const { pricing } = this;
+    const costUsd = instantEvalSpentCostUsd({
+      inputTokens,
+      costNanoUsd,
+      routedInputTokens,
+      pricing,
+    });
+    const priceUsd = instantEvalPriceUsd({ costUsd, pricing });
 
     // A run that judged no row records no spend: a record of zero is one a
     // customer has to read and dismiss.
@@ -79,7 +87,7 @@ export class InstantEvalFinishService {
         runId,
         inputTokens,
         requests,
-        ...(costNanoUsd > 0 ? { costNanoUsd } : {}),
+        ...(routedInputTokens > 0 ? { costNanoUsd, routedInputTokens } : {}),
         occurredAt: this.now(),
       });
       logger.debug(
