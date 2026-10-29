@@ -57,6 +57,9 @@ type Registry interface {
 	Put(ctx context.Context, ref Ref, m Manifest) error
 	// Label reads one label of the single-manifest image a tag names.
 	Label(ctx context.Context, ref Ref, key string) (string, error)
+	// ImageLabel reads one label of the image a tag names, a single manifest
+	// or an index over exactly one.
+	ImageLabel(ctx context.Context, ref Ref, key string) (string, error)
 }
 
 // Ancestry picks, from git-<sha> tags, the one of the nearest commit on

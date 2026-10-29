@@ -57,6 +57,9 @@ func (oneTag) Put(context.Context, ecrtag.Ref, ecrtag.Manifest) error { return n
 func (oneTag) Label(context.Context, ecrtag.Ref, string) (string, error) {
 	return "", nil
 }
+func (oneTag) ImageLabel(context.Context, ecrtag.Ref, string) (string, error) {
+	return "", nil
+}
 func (oneTag) Nearest(_ context.Context, tags []string, _ string) (string, error) {
 	return tags[0], nil
 }
@@ -85,19 +88,28 @@ func TestPublishedWithoutRefuseRetagReadsNoAncestor(t *testing.T) {
 	assert.Empty(t, c.AcceptDigest)
 }
 
-func TestParseDiffBase(t *testing.T) {
-	o, err := parse("diffbase", []string{"-repositories", "langwatch-app  langwatch-eval-ragas", "-tag", "git-abc", "-revision", "abc", "-custom=false"})
+func TestParseSelect(t *testing.T) {
+	images := `[{"image":"langwatch-app","dockerfile":"infra/docker/Dockerfile"}]`
+	o, err := parse("select", []string{"-images", images, "-tag", "git-abc", "-revision", "abc"})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"langwatch-app", "langwatch-eval-ragas"}, o.repositories)
+	assert.Equal(t, []ecrtag.ImageSpec{{Image: "langwatch-app", Dockerfile: "infra/docker/Dockerfile"}}, o.images)
+	assert.Equal(t, "abc", o.head)
+
+	_, err = parse("select", []string{"-images", images, "-revision", "abc", "-all"})
+	require.NoError(t, err, "a dispatch needs no commit tag to compare with")
+
+	o, err = parse("select", []string{"-images", images, "-tag", "release", "-revision", "abc", "-custom=true"})
+	require.NoError(t, err)
+	assert.True(t, o.all, "a custom tag is a dispatch, which builds every image")
 
 	for _, args := range [][]string{
 		{"-tag", "git-abc", "-revision", "abc"},
-		{"-repositories", " ", "-tag", "git-abc", "-revision", "abc"},
-		{"-repositories", "r", "-revision", "abc"},
-		{"-repositories", "r", "-tag", "git-abc"},
-		{"-repositories", "r", "-tag", "release", "-revision", "abc", "-custom=true"},
+		{"-images", "[]", "-tag", "git-abc", "-revision", "abc"},
+		{"-images", `[{"image":"r"}]`, "-tag", "git-abc", "-revision", "abc"},
+		{"-images", images, "-revision", "abc"},
+		{"-images", images, "-tag", "git-abc"},
 	} {
-		_, err := parse("diffbase", args)
+		_, err := parse("select", args)
 		assert.Error(t, err, args)
 	}
 }

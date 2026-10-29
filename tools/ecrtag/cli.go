@@ -120,15 +120,11 @@ func (c CLI) Put(ctx context.Context, ref Ref, m Manifest) error {
 // Label implements Registry. A tag naming an index has no single image config
 // to read a label from, and is refused.
 func (c CLI) Label(ctx context.Context, ref Ref, key string) (string, error) {
-	raw, err := c.Run(ctx, Command{Name: "docker", Args: []string{"buildx", "imagetools", "inspect", c.Host + "/" + ref.String(), "--format", "{{json .Image}}"}})
+	raw, err := c.inspect(ctx, ref)
 	if err != nil {
 		return "", err
 	}
-	var image struct {
-		Config *struct {
-			Labels map[string]string `json:"Labels"`
-		} `json:"config"`
-	}
+	var image imageConfig
 	if err := json.Unmarshal([]byte(raw), &image); err != nil {
 		return "", fmt.Errorf("parse the image config of %s: %w", ref, err)
 	}
@@ -137,6 +133,44 @@ func (c CLI) Label(ctx context.Context, ref Ref, key string) (string, error) {
 	}
 
 	return image.Config.Labels[key], nil
+}
+
+// ImageLabel implements Registry. `imagetools inspect` answers an index with
+// one image per platform; an index over more than one is refused.
+func (c CLI) ImageLabel(ctx context.Context, ref Ref, key string) (string, error) {
+	raw, err := c.inspect(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+	var image imageConfig
+	if err := json.Unmarshal([]byte(raw), &image); err == nil && image.Config != nil {
+		return image.Config.Labels[key], nil
+	}
+	var byPlatform map[string]imageConfig
+	if err := json.Unmarshal([]byte(raw), &byPlatform); err != nil {
+		return "", fmt.Errorf("parse the image config of %s: %w", ref, err)
+	}
+	if len(byPlatform) != 1 {
+		return "", fmt.Errorf("%s is an index over %d images, not one", ref, len(byPlatform))
+	}
+	for _, one := range byPlatform {
+		if one.Config == nil {
+			return "", errors.New(ref.String() + " has no image config to read a label from")
+		}
+		return one.Config.Labels[key], nil
+	}
+
+	return "", nil
+}
+
+type imageConfig struct {
+	Config *struct {
+		Labels map[string]string `json:"Labels"`
+	} `json:"config"`
+}
+
+func (c CLI) inspect(ctx context.Context, ref Ref) (string, error) {
+	return c.Run(ctx, Command{Name: "docker", Args: []string{"buildx", "imagetools", "inspect", c.Host + "/" + ref.String(), "--format", "{{json .Image}}"}})
 }
 
 // Script is the Ancestry of .github/scripts/nearest-ancestor-tag.sh, which the
