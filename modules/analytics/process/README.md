@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable analytics capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/analytics.api.ts:78`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/analytics.api.ts:79`; nothing else in this package is public.
 
 #### `getTimeseries`
 
@@ -169,7 +169,7 @@ executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResu
 Proves each project exists and holds `analytics:view` for the member, so a widget never stores a project its writer could not read.
 
 ```typescript
-assertProjectsReadable(input: { userId: string; projectIds: readonly string[] }): Promise<void>;
+assertProjectsReadable(input: { userId?: string; /** The API key writing, whose reach a run would apply. It decides over `userId`. */ reach?: LangWatchQLKeyReach; projectIds: readonly string[]; }): Promise<void>;
 ```
 
 #### `executeLangWatchQLPass`
