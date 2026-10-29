@@ -561,9 +561,20 @@ const presentations = {
     },
   },
   lwql_reserved_parameter_type: {
-    title: "The time window has to be a date and time",
-    describe: () =>
-      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+    title: "A dashboard parameter has the wrong type",
+    describe: (error) => {
+      const names = strList(error, "parameters");
+      const lists = names.filter(
+        (name) => name === "dashboard_context_sources" || name === "dashboard_context_projects",
+      );
+      const listRule = `Declare ${listLabels(lists)} as Array(String), for example {dashboard_context_sources:Array(String)}`;
+      const windowRule =
+        "Declare period_start and period_end as DateTime, for example {period_start:DateTime}";
+      if (lists.length === 0) return `${windowRule}, and run the query again.`;
+      if (lists.length === names.length) return `${listRule}, and run the query again.`;
+
+      return `${listRule}. ${windowRule}. Then run the query again.`;
+    },
   },
   lwql_result_too_large: {
     title: "This result is too large to return",

@@ -1705,7 +1705,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC193 Sources: a run whose sources hold every origin reads every trace, Langy's included
-    Given a widget query whose sources hold all nine sources and whose SQL reads the parameter
+    Given a widget query whose sources hold all eleven sources and whose SQL reads the parameter
     When it runs
     Then it counts Langy's conversations too
     # Evidence: the card answer quoted with row counts
@@ -1899,7 +1899,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # into account"). AC190, AC193, AC194, AC195, AC200f, AC200h, AC200l, AC200m, AC201b, AC204
   # and AC204b stand as written; the earlier text is in git at c5743d82.
   # The helper (decided): a `Source` column the LWQL views expose, computed at read time from
-  # `Origin` (lwql-view-catalog.rules.ts sourceColumns); no ClickHouse migration. It reads: a missing, empty or NULL origin reads "application", an origin outside the eight
+  # `Origin` (lwql-view-catalog.rules.ts sourceColumns); no ClickHouse migration. It reads: a missing, empty or NULL origin reads "application", an origin outside the ten
   # listed reads "other", a listed origin reads as itself. A view keyed by TraceId is reached
   # through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})`. A view with
   # neither column is on the exemption list (AC202f).
@@ -1915,19 +1915,25 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC202b Stock widgets: each stock widget declares its own list of sources
+    # Changed in phase 2 (coordinator, 2026-10-29): a stock query whose SQL never reads the parameter
+    # stores no list, since a list the SQL ignores says what is not so.
     Given the stock widgets of the catalogue
-    Then each widget definition names a non-empty sources list, with no list shared between widgets by a constant
-    And a widget added from the picker or a template stores that list on every query
+    Then each query that reads the sources parameter stores its widget's non-empty list, with no list shared between widgets by a constant
+    And a query that reads only views with no origin stores no list
+    And a widget added from the picker or a template stores those lists
     And the constant CATALOGUE_QUERY_SOURCES is not exported
     # Evidence: the catalogue unit test output, and a screenshot of an added stock widget's sources pills in the editor
 
   @unit
   Scenario: AC202c Stock widgets: each widget family declares the list tasks#1025 names, and a change-table row carries any other
-    Given the fixture "stock-widget-sources.json" and the stock widget families
-    Then scenario widgets declare ["simulation"], gateway widgets ["gateway"], coding-agent widgets ["coding_agent"] and every other widget ["application"]
-    And a widget declaring anything else has a row in the fixture's "changes" array with its origins added, its origins removed and the owner's reason
-    And a row without a reason fails the check
-    # Evidence: the fixture and the unit test output, and a before and after haven browser screenshot of one changed widget's card
+    # Changed in phase 2: the scenario, gateway and coding-agent widgets read only views with no origin, so
+    # they store no list (AC202f); the change table lives in stock-widget-sources.unit.test.ts, not a fixture.
+    Given the stock widgets of the catalogue
+    Then every query that reads sources stores ["application"], except the change-table widgets
+    And "cost-by-source" stores every source, because it slices spend by origin
+    And "cost-waste", "voice-cost-per-call" and "ext-cost-per-doc" store ["application", "gateway"], the origins their SQL kept by hand before
+    And a stock query holds no hand-written Origin condition
+    # Evidence: the unit test output, and the SQL before and after for the four widgets, quoted
 
   @integration
   Scenario: AC202d Stock widgets: a widget whose list did not change returns the same rows
@@ -1948,11 +1954,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC202f Stock widgets: a widget that reads a view with no origin says that sources do not apply
-    Given a stock widget whose queries read only views with neither an Origin nor a TraceId, such as the per-minute rollups
-    Then the fixture's exemption list names its views and its change table has a row for it
+    Given a stock widget none of whose queries reads a view with an Origin or a TraceId, such as the per-minute rollups or simulations
+    Then its queries store no sources list
     And its card reads "Sources don't apply: this widget reads a view that keeps no origin"
-    And its run answers a SOURCES_IGNORED diagnostic
-    # Evidence: a haven browser screenshot of the card, and the answer's params quoted
+    # Evidence: a haven browser screenshot of the card
 
   @unit @integration
   Scenario: AC203 Sources: a query reading the parameter is kept to the list it stores

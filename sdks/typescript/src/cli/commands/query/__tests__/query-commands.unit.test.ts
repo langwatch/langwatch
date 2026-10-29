@@ -195,7 +195,7 @@ describe("runQueryCommand", () => {
     /** @scenario "The row limit is applied to what is printed" */
     it("keeps only that many rows", async () => {
       const result = await runQueryCommand("SELECT 1", { limit: "1" });
-      expect((result as { data: unknown[] }).data).toHaveLength(1);
+      expect((result as { data: { rows: unknown[] } }).data.rows).toHaveLength(1);
     });
 
     it("refuses a limit that is not a whole number", async () => {
@@ -204,17 +204,16 @@ describe("runQueryCommand", () => {
   });
 
   describe("when the format is the default", () => {
-    // The payload is the rows array, so `-o json` prints exactly one JSON
-    // array. The columns reach a reader through the table renderer, which the
-    // command hands back alongside it.
+    // The payload is the rows with the run's params and diagnostics beside them (owner: "they
+    // get the params back as part of the success or final state object in the response").
     /** @scenario "The table format prints the result's own columns" */
     it("returns the rows for the table renderer to print", async () => {
       const result = await runQueryCommand("SELECT 1", {});
       const { data, table } = result as {
-        data: Record<string, unknown>[];
+        data: { rows: Record<string, unknown>[] };
         table: () => void;
       };
-      expect(Object.keys(data[0] ?? {})).toEqual(["TraceId", "OccurredAt"]);
+      expect(Object.keys(data.rows[0] ?? {})).toEqual(["TraceId", "OccurredAt"]);
       expect(typeof table).toBe("function");
     });
   });
@@ -391,7 +390,7 @@ describe("runQueryCommand across projects", () => {
 });
 
 describe("runQueryCommand with --projects and --sources", () => {
-  /** @scenario "QP19 The CLI sends the parameters and prints the params" */
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
   it("sends the named projects and sources as lists", async () => {
     await runQueryCommand("SELECT 1", { projects: "A, B", sources: "application,langy" });
 
@@ -402,7 +401,7 @@ describe("runQueryCommand with --projects and --sources", () => {
     });
   });
 
-  /** @scenario "QP19 The CLI sends the parameters and prints the params" */
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
   it("prints what the run was bound to under the table", async () => {
     mockQuery.mockResolvedValue({
       ...RESULT,
@@ -442,15 +441,39 @@ describe("runQueryCommand with --projects and --sources", () => {
 describe("runQueryCommand with machine output", () => {
   const PARAMS = { dashboard_context_sources: ["application"], dashboard_context_projects: ["A"] };
 
-  /** @scenario "QP19 The CLI sends the parameters and prints the params" */
-  it("keeps stdout to the rows and writes the params to stderr as one JSON line", async () => {
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("returns params and diagnostics beside the rows in the success object", async () => {
     mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
-    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+
+    expect((result as { data: unknown }).data).toEqual({
+      rows: RESULT.rows,
+      params: PARAMS,
+      diagnostics: RESULT.diagnostics,
+    });
+  });
+
+  it("prints one JSON object with the rows and params for --format json", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
 
     await runQueryCommand("SELECT 1", { projects: "A", format: "json" });
 
-    expect(stderr).toHaveBeenCalledWith(`${JSON.stringify({ params: PARAMS })}\n`);
     const printed = stdoutWrite.mock.calls.map(([chunk]) => String(chunk)).join("");
-    expect(JSON.parse(printed)).toEqual(RESULT.rows);
+    expect(JSON.parse(printed)).toMatchObject({ rows: RESULT.rows, params: PARAMS });
+  });
+
+  it("keeps CSV and JSON lines to the rows and puts params on stderr", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runQueryCommand("SELECT 1", { projects: "A", format: "jsonl" });
+
+    expect(stderr).toHaveBeenCalledWith(`${JSON.stringify({ params: PARAMS })}\n`);
+  });
+
+  it("refuses a blank --projects or --sources rather than reading the default", async () => {
+    await expect(runQueryCommand("SELECT 1", { projects: "," })).rejects.toThrow(ProcessExitError);
+    await expect(runQueryCommand("SELECT 1", { sources: "" })).rejects.toThrow(ProcessExitError);
   });
 });

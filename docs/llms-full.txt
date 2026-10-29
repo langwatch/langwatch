@@ -19807,7 +19807,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command except `query run` when the sessions live in a team project instead. `query run` takes the projects to read from `--projects <id,id>` (Step 3), and refuses `--project` beside it.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -19840,7 +19840,7 @@ Every query below is LangWatchQL, run with `langwatch query run "<sql>" --projec
 
 `langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
-A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach:
+A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach: page through `langwatch projects list` until it has no more, since it lists 50 at a time.
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
@@ -42963,7 +42963,9 @@ widget's name, its queries and the period.
 All dashboard data is read with LangWatchQL, LangWatch's query layer over your
 traces, evaluations and cost data.
 
-A widget query has two settings beside its SQL. `sources` lists the trace sources `{dashboard_context_sources:Array(String)}` is bound to (`application` by default), and a query is kept to them only where its SQL reads that parameter; a query that does not count every source, and its card says "all sources". `projects` lists the projects the query reads, bound to `{dashboard_context_projects:Array(String)}`; a query that names none reads its board's project.
+A widget query has two settings beside its SQL. `sources` lists the trace sources `{dashboard_context_sources:Array(String)}` is bound to (`application` by default), and a query is kept to them only where its SQL uses that parameter in a condition, such as `WHERE Source IN {dashboard_context_sources:Array(String)}`. A query that does not use it is not filtered by `sources` and counts every source, and its card says "all sources".
+
+`projects` lists the projects the query reads, bound to `{dashboard_context_projects:Array(String)}`; a query that names none reads its board's project.
 
 A project you cannot read makes that card draw "You can't read a project this widget uses" without naming it. When the server cut a run's rows, such as a project shared only from a date, the card shows one (i) line saying so.
 
@@ -44182,9 +44184,11 @@ GROUP BY day ORDER BY day" --projects <project id>
 
 A key for an organization, a team or a person must name the projects to read with `--projects` (the `projects` field over REST and in `run_query`); without them the run is refused with `projects_required` (422): "Name the projects to query: send `projects`, a list of project ids". A project API key reads its own project and needs none.
 
-Every run answers with `params`: each placeholder the statement declares, by its SQL name, with the value it ran with (for example `dashboard_context_sources` and `dashboard_context_projects`), plus the `period` it followed. A statement that does not read `{dashboard_context_sources:Array(String)}` counts every origin, and the answer says so with a `SOURCES_IGNORED` diagnostic. A step the period was too long for runs coarser, with a `GRANULARITY_COARSENED` diagnostic.
+Every REST answer carries `params`: each placeholder the statement declares, by its SQL name, with the value it ran with (for example `dashboard_context_sources` and `dashboard_context_projects`), plus the `period` it followed. The CLI returns the same `params` and the `diagnostics` beside the rows in `-o json` and `--format json` (one object with `rows`, `params` and `diagnostics`). For CSV and JSON lines it prints `params` as one JSON line on stderr, and the table format adds a line under the table.
 
-`--sources` (`sources`) sets the origins that parameter is bound to; the default is `application`.
+The placeholder does not filter by itself: write a condition such as `WHERE Source IN {dashboard_context_sources:Array(String)}`. A statement that never uses `{dashboard_context_sources:Array(String)}` counts every origin. When the request named `sources`, the answer says so with a `SOURCES_IGNORED` diagnostic; a request that named none gets no note. When the period is too long for the step asked, the query runs at a coarser step and the answer carries a `GRANULARITY_COARSENED` diagnostic.
+
+`--sources` (`sources`) sets the origins that parameter is bound to; the default is `application`, which applies only to a statement that uses the parameter.
 
 The statement runs exactly as submitted. Filter on the dataset's time column, as
 every example does: without that predicate the read touches every partition your
@@ -57233,7 +57237,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command except `query run` when the sessions live in a team project instead. `query run` takes the projects to read from `--projects <id,id>` (Step 3), and refuses `--project` beside it.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -57266,7 +57270,7 @@ Every query below is LangWatchQL, run with `langwatch query run "<sql>" --projec
 
 `langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
-A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach:
+A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach: page through `langwatch projects list` until it has no more, since it lists 50 at a time.
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd

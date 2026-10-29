@@ -551,11 +551,14 @@ describe("given a From LangWatch board", () => {
       }
 
       expect(server.runs().length).toBeGreaterThan(0);
-      const sent = server.runs().map((run) => run.sources as readonly string[]);
-      // Each widget counts its family's one source, never everything but Langy's (tasks#1025).
-      expect(sent.every((sources) => ["application", "simulation"].includes(sources.join()))).toBe(
-        true,
-      );
+      const sent = server.runs().map((run) => (run.sources as readonly string[] | null)?.join());
+      // A query that reads sources stores its widget's list, and one that does not stores none
+      // and is sent as unset; never everything but Langy's (tasks#1025).
+      expect(
+        sent.every((sources) =>
+          [undefined, "application", "application,gateway"].includes(sources),
+        ),
+      ).toBe(true);
       cleanup();
     }
   });

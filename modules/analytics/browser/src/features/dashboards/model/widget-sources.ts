@@ -6,7 +6,7 @@
 import { effectiveSources } from "@langwatch/analytics-contract";
 import { type DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
-import { canFollowSources, readsSourcesParameter } from "./sources-parameter.ts";
+import { canFollowSources, PRESENCE_QUERY, readsSourcesParameter } from "./sources-parameter.ts";
 
 type Sourced = Pick<DashboardWidgetQuery, "name" | "sources" | "sql">;
 
@@ -22,9 +22,11 @@ export const SOURCES_DO_NOT_APPLY_LINE =
  * so nothing is run. A query that ignores the parameter counts every origin whatever it stores.
  */
 export function picksNoSources(queries: readonly Sourced[]): boolean {
+  // The template-owned presence query reads every origin by design, whatever list it stores.
+  const counted = queries.filter((query) => query.name !== PRESENCE_QUERY);
   return (
-    queries.length > 0 &&
-    queries.every((query) => query.sources?.length === 0 && readsSourcesParameter(query.sql))
+    counted.length > 0 &&
+    counted.every((query) => query.sources?.length === 0 && readsSourcesParameter(query.sql))
   );
 }
 
@@ -47,7 +49,8 @@ export function withStoredSources(
  * "Sources: application, langy" for the queries that read the parameter, each query's own list
  * when they differ; "all sources" when none reads it; "" with no query.
  */
-export function widgetSourcesLine(queries: readonly Sourced[]): string {
+export function widgetSourcesLine(allQueries: readonly Sourced[]): string {
+  const queries = allQueries.filter((query) => query.name !== PRESENCE_QUERY);
   if (queries.length === 0) return "";
   if (picksNoSources(queries)) return "No sources picked";
   const following = queries.filter((query) => readsSourcesParameter(query.sql));

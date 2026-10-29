@@ -39,7 +39,7 @@ export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDe
  */
 const lwqlQueryRequestSchemaDefinition = z.object({
   ...lwqlRunRequestSchema.shape,
-  sources: traceSourcesSchema.readonly().nullable().optional(),
+  sources: traceSourcesSchema.nullable().optional(),
   /** The projects the card reads; absent, the board's project (AC206). */
   projects: lwqlMemberProjectsSchema.optional(),
 });

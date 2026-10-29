@@ -11,17 +11,16 @@ import {
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
+import { PRESENCE_QUERY, readsSourcesParameter } from "../../model/sources-parameter.ts";
 import type { BoardTemplateWidget } from "./board-template.ts";
 import { PRESENCE_SQL } from "./source-presence-queries.ts";
 import { readSources } from "./stock-query-sources.ts";
 import type { WidgetCode } from "./widget-code-parts.ts";
 
-/** The presence query tells a quiet period from a source never set up: every origin. */
-const PRESENCE_QUERY = "present";
-
 /**
- * A stock widget's stored definition: each query reads the sources the widget counts, and the
- * widget stores that list on every query (dashboards-v2 AC202, AC202b).
+ * A stock widget's stored definition: each query that reads the sources parameter stores the list
+ * the widget counts; one that never reads it stores none, since the list would say what is not so
+ * (dashboards-v2 AC202, AC202b, AC202f).
  */
 export function definition({
   code,
@@ -36,12 +35,15 @@ export function definition({
   return {
     version: DASHBOARD_WIDGET_DEFINITION_VERSION,
     code: code.tsx,
-    queries: Object.entries(all).map(([name, text]) => ({
-      name,
-      sql: name === PRESENCE_QUERY ? text : readSources(text),
-      parameters: [],
-      sources: [...sources],
-    })),
+    queries: Object.entries(all).map(([name, text]) => {
+      const sql = name === PRESENCE_QUERY ? text : readSources(text);
+      return {
+        name,
+        sql,
+        parameters: [],
+        ...(readsSourcesParameter(sql) ? { sources: [...sources] } : {}),
+      };
+    }),
     description: code.description,
   };
 }

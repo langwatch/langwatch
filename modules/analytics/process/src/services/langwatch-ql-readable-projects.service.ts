@@ -2,13 +2,7 @@ import type { LangWatchQLReadableProject } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-type Dependencies = Readonly<{
-  authz: Pick<AuthzApi, "canBatchByIds">;
-  projects: Pick<
-    ProjectApi,
-    "findOrganizationId" | "findLiveNonGovernanceIdsByOrganization" | "listNamesByIds"
-  >;
-}>;
+type Dependencies = Readonly<{ authz: AuthzApi; projects: ProjectApi }>;
 
 /** The projects a card's editor may offer a member: live ones in the project's organization. */
 export class LangWatchQLReadableProjectsService {

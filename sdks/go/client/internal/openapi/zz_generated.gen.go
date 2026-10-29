@@ -47967,7 +47967,7 @@ type PostApiV1QueryJSONBody struct {
 	// Projects The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.
 	Projects *[]string `json:"projects,omitempty"`
 
-	// Sources The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. Only a statement that reads the parameter is kept to them.
+	// Sources The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter by itself: the statement keeps its rows with a predicate such as WHERE Source IN {dashboard_context_sources:Array(String)}. A statement that never uses the placeholder counts every origin.
 	Sources    *[]PostApiV1QueryJSONBodySources `json:"sources,omitempty"`
 	Sql        string                           `json:"sql"`
 	TimeWindow *struct {

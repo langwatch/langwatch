@@ -86,9 +86,11 @@ GROUP BY day ORDER BY day" --projects <project id>
 
 A key for an organization, a team or a person must name the projects to read with `--projects` (the `projects` field over REST and in `run_query`); without them the run is refused with `projects_required` (422): "Name the projects to query: send `projects`, a list of project ids". A project API key reads its own project and needs none.
 
-Every run answers with `params`: each placeholder the statement declares, by its SQL name, with the value it ran with (for example `dashboard_context_sources` and `dashboard_context_projects`), plus the `period` it followed. A statement that does not read `{dashboard_context_sources:Array(String)}` counts every origin, and the answer says so with a `SOURCES_IGNORED` diagnostic. A step the period was too long for runs coarser, with a `GRANULARITY_COARSENED` diagnostic.
+Every REST answer carries `params`: each placeholder the statement declares, by its SQL name, with the value it ran with (for example `dashboard_context_sources` and `dashboard_context_projects`), plus the `period` it followed. The CLI returns the same `params` and the `diagnostics` beside the rows in `-o json` and `--format json` (one object with `rows`, `params` and `diagnostics`). For CSV and JSON lines it prints `params` as one JSON line on stderr, and the table format adds a line under the table.
 
-`--sources` (`sources`) sets the origins that parameter is bound to; the default is `application`.
+The placeholder does not filter by itself: write a condition such as `WHERE Source IN {dashboard_context_sources:Array(String)}`. A statement that never uses `{dashboard_context_sources:Array(String)}` counts every origin. When the request named `sources`, the answer says so with a `SOURCES_IGNORED` diagnostic; a request that named none gets no note. When the period is too long for the step asked, the query runs at a coarser step and the answer carries a `GRANULARITY_COARSENED` diagnostic.
+
+`--sources` (`sources`) sets the origins that parameter is bound to; the default is `application`, which applies only to a statement that uses the parameter.
 
 The statement runs exactly as submitted. Filter on the dataset's time column, as
 every example does: without that predicate the read touches every partition your

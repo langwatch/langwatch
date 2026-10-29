@@ -135,8 +135,7 @@ export type LangWatchQLStatementRequest = z.infer<typeof lwqlStatementSchema>;
 const lwqlProjectsSchemaDefinition = z
   .array(z.string().min(1))
   .min(1, "projects must hold at least one id")
-  .max(LWQL_MAX_NAMED_PROJECTS, `projects holds at most ${LWQL_MAX_NAMED_PROJECTS} ids`)
-  .readonly();
+  .max(LWQL_MAX_NAMED_PROJECTS, `projects holds at most ${LWQL_MAX_NAMED_PROJECTS} ids`);
 export interface LwqlProjectsSchema extends Named<typeof lwqlProjectsSchemaDefinition> {}
 export const lwqlProjectsSchema: LwqlProjectsSchema = lwqlProjectsSchemaDefinition;
 
@@ -144,8 +143,7 @@ export const lwqlProjectsSchema: LwqlProjectsSchema = lwqlProjectsSchemaDefiniti
 const lwqlMemberProjectsSchemaDefinition = z
   .array(z.string().min(1))
   .min(1, "projects must hold at least one id")
-  .max(LWQL_MAX_MEMBER_PROJECTS, `projects holds at most ${LWQL_MAX_MEMBER_PROJECTS} ids`)
-  .readonly();
+  .max(LWQL_MAX_MEMBER_PROJECTS, `projects holds at most ${LWQL_MAX_MEMBER_PROJECTS} ids`);
 export interface LwqlMemberProjectsSchema extends Named<
   typeof lwqlMemberProjectsSchemaDefinition
 > {}
@@ -171,10 +169,9 @@ const lwqlKeyStatementSchemaDefinition = z.object({
       "The projects to read, each one the key holds analytics:view on. A key for an organization, a team or a person must name them; a project key reads its own project. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.",
     ),
   sources: traceSourcesSchema
-    .readonly()
     .optional()
     .describe(
-      "The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. Only a statement that reads the parameter is kept to them.",
+      "The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter by itself: the statement keeps its rows with a predicate such as WHERE Source IN {dashboard_context_sources:Array(String)}. A statement that never uses the placeholder counts every origin.",
     ),
 });
 export interface LwqlKeyStatementSchema extends Named<typeof lwqlKeyStatementSchemaDefinition> {}

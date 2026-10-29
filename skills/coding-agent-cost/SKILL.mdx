@@ -17,7 +17,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 <CliInstall />
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command except `query run` when the sessions live in a team project instead. `query run` takes the projects to read from `--projects <id,id>` (Step 3), and refuses `--project` beside it.
 
 <CliSetup />
 
@@ -36,7 +36,7 @@ Every query below is LangWatchQL, run with `langwatch query run "<sql>" --projec
 
 `langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
-A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach:
+A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach: page through `langwatch projects list` until it has no more, since it lists 50 at a time.
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd

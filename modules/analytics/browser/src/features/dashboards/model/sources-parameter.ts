@@ -8,6 +8,9 @@ import { LWQL_SOURCES_PARAMETER } from "@langwatch/analytics-contract";
 
 export const SOURCES_PLACEHOLDER = `{${LWQL_SOURCES_PARAMETER}:Array(String)}`;
 
+/** The presence query tells a quiet period from a source never set up: it reads every origin. */
+export const PRESENCE_QUERY = "present";
+
 /** Views with the normalised `Source` column. */
 export const SOURCE_VIEWS = ["trace_metrics", "evaluation_metrics"] as const;
 

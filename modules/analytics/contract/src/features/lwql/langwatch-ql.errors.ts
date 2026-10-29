@@ -276,9 +276,22 @@ export class LangWatchQLReservedParameterSuppliedError extends HandledError {
   }
 }
 
+/** What a reserved name declared with the wrong type should have been, for each kind named. */
+function reservedTypeMessage(mistyped: readonly string[]): string {
+  const lists = mistyped.filter(isLangWatchQLListParameter);
+  if (lists.length === 0) {
+    return "The query declares a time-window parameter with a type that is not a date-time.";
+  }
+  const listFault = `The query declares ${lists.join(", ")} with a type other than Array(String).`;
+
+  return lists.length === mistyped.length
+    ? listFault
+    : `${listFault} It also declares a time-window parameter with a type that is not a date-time.`;
+}
+
 /**
- * Time-window parameter declared as non-DateTime; caught at save via the
- * shared validator.
+ * A reserved parameter declared with the wrong type (a time-window name that is not a DateTime,
+ * a list name that is not Array(String)); caught at save via the shared validator.
  */
 export class LangWatchQLReservedParameterTypeError extends HandledError {
   declare readonly code: "lwql_reserved_parameter_type";
@@ -287,19 +300,13 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
     /** The reserved names declared with the wrong type. Sorted. */
     mistyped: readonly string[],
   ) {
-    super(
-      "lwql_reserved_parameter_type",
-      mistyped.length > 0 && mistyped.every(isLangWatchQLListParameter)
-        ? `The query declares ${mistyped.join(", ")} with a type other than Array(String).`
-        : "The query declares a time-window parameter with a type that is not a date-time.",
-      {
-        httpStatus: 400,
-        fault: "customer",
-        // Named consumer: the editor, which says which declaration to rewrite.
-        meta: { parameters: mistyped },
-        ...remediation("lwql_reserved_parameter_type"),
-      },
-    );
+    super("lwql_reserved_parameter_type", reservedTypeMessage(mistyped), {
+      httpStatus: 400,
+      fault: "customer",
+      // Named consumer: the editor, which says which declaration to rewrite.
+      meta: { parameters: mistyped },
+      ...remediation("lwql_reserved_parameter_type"),
+    });
     this.name = "LangWatchQLReservedParameterTypeError";
   }
 }

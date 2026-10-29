@@ -130,8 +130,8 @@ Feature: Every query door takes the same parameters and says what it ran with
 
     @unit @integration
     Scenario: QP08 An unknown source is refused at every door
-      When a run names a source outside the nine, over tRPC, REST, MCP or the CLI
-      Then it is refused with the code "validation_error" and a message that lists the nine sources
+      When a run names a source outside the eleven, over tRPC, REST, MCP or the CLI
+      Then it is refused with the code "validation_error" and a message that lists the eleven sources
       # Evidence: the four refusals quoted
 
   Rule: A project the credential cannot read is refused whole, and the refusal names nothing
@@ -279,11 +279,16 @@ Feature: Every query door takes the same parameters and says what it ran with
       # Evidence: the three answers diffed
 
     @unit @integration
-    Scenario: QP19 The CLI sends the parameters and prints the params
+    Scenario: QP19 The CLI sends the parameters and returns the params in the result
+      # Changed (owner, 2026-10-29: "they get the params back as part of the success or final state
+      # object in the response so agents can understand"): the earlier text put params on stderr
+      # and kept `-o json` to a bare array of rows.
       When `langwatch query run --sources application,langy --projects A,B` succeeds
       Then the request carries sources and projects
-      And with a machine format the rows stay the only thing on stdout, and `params` is one JSON line on stderr
+      And `-o json` and `--format json` print one object holding rows, params and diagnostics
+      And CSV and JSON lines hold the rows only, with `params` as one JSON line on stderr
       And with the table format a line under the table says what the run was bound to
+      And a blank --projects or --sources is refused, never read as unset
       # Evidence: the command's output quoted
 
     @unit @integration

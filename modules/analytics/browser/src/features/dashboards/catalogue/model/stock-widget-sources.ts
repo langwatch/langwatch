@@ -1,88 +1,27 @@
 /**
- * The trace sources each stock widget counts (dashboards-v2 AC202b, AC202c; tasks#1025): scenario
- * widgets simulation, the gateway widget gateway, the coding-agent widget coding_agent, every
- * other widget application. A widget that differs from before is in `stock-widget-sources.json`.
+ * The trace sources a stock widget counts when they are not the default (dashboards-v2 AC202b,
+ * AC202c; tasks#1025); a widget not listed counts `application`. The reviewed change table is
+ * in `stock-widget-sources.unit.test.ts`.
  */
 
-import type { TraceSource } from "@langwatch/analytics-contract";
+import {
+  DEFAULT_WIDGET_SOURCES,
+  TRACE_SOURCES,
+  type TraceSource,
+} from "@langwatch/analytics-contract";
 
-export const STOCK_WIDGET_SOURCES: Readonly<Record<string, readonly TraceSource[]>> = {
-  "ans-evaluators": ["application"],
-  "ans-idk": ["application"],
-  "ans-outcomes": ["application"],
-  "ans-review": ["application"],
-  "ans-topics": ["application"],
-  "ask-again": ["application"],
-  "ask-cannot": ["application"],
-  "ask-rising": ["application"],
-  "att-change": ["application"],
-  "att-share": ["application"],
-  "att-table": ["application"],
-  "ck-attention": ["application"],
-  "ck-kpis": ["application"],
-  "ck-status": ["application"],
-  "ck-top-ask": ["application"],
-  "ck-trend": ["application"],
-  "conversation-length": ["application"],
-  "cost-accuracy": ["application"],
-  "cost-by-model": ["application"],
-  "cost-by-segment": ["application"],
-  "cost-by-source": ["application"],
-  "cost-verdict": ["application"],
-  "cost-waste": ["application"],
-  "data-health": ["application"],
-  "error-rate": ["application"],
-  "evaluation-coverage": ["application"],
-  "ext-cost-per-doc": ["application"],
-  "ext-field-accuracy": ["application"],
-  "ext-human-review": ["application"],
-  "ext-precision-recall": ["application"],
-  "fd-coding-agents": ["coding_agent"],
-  "fd-cost-efficiency": ["application"],
-  "fd-failures": ["application"],
-  "fd-feedback": ["application"],
-  "fd-gateway": ["gateway"],
-  "fd-quality": ["application"],
-  "fd-throughput": ["application"],
-  "gen-acceptance": ["application"],
-  "gen-dropoff": ["application"],
-  "latency-slo": ["application"],
-  "latency-spread": ["application"],
-  "lowest-passing-evaluators": ["application"],
-  "lowest-scores": ["application"],
-  noise: ["application"],
-  "rag-dataset-versions": ["application"],
-  "rag-empty-retrieval": ["application"],
-  "rag-failure-source": ["application"],
-  "satisfaction-shift": ["application"],
-  scenarios: ["simulation"],
-  "ship-compare": ["simulation"],
-  "ship-flaky": ["simulation"],
-  "ship-models": ["application"],
-  "ship-rollout": ["application"],
-  "ship-suites": ["simulation"],
-  "ship-verdict": ["simulation"],
-  "slowest-models": ["application"],
-  "so-agreement": ["application"],
-  "so-changes": ["application"],
-  "so-queue": ["application"],
-  "so-rubric": ["application"],
-  "so-verdict": ["application"],
-  spend: ["application"],
-  "thumbs-down": ["application"],
-  "token-drift": ["application"],
-  "tools-error-rate": ["application"],
-  "tools-wrong-tool": ["application"],
-  "top-models": ["application"],
-  topics: ["application"],
-  traffic: ["application"],
-  "up-errors": ["application"],
-  "up-failing-traces": ["application"],
-  "up-loops": ["application"],
-  "up-step-latency": ["application"],
-  "up-where-fails": ["application"],
-  "voice-call-health": ["application"],
-  "voice-cost-per-call": ["application"],
-  "voice-task-success": ["application"],
-  "voice-turn-latency": ["application"],
+const PRODUCTION: readonly TraceSource[] = ["application", "gateway"];
+
+const NON_DEFAULT_SOURCES: Readonly<Record<string, readonly TraceSource[]>> = {
+  // Slices spend by where it came from, so it counts every source.
+  "cost-by-source": TRACE_SOURCES,
+  // Production spend: what the widgets' own `Origin IN ('', 'application', 'gateway')` kept.
+  "cost-waste": PRODUCTION,
+  "voice-cost-per-call": PRODUCTION,
+  "ext-cost-per-doc": PRODUCTION,
 };
+
+/** The sources a stock widget counts: its own list, else the default every query uses. */
+export function stockWidgetSources(id: string): readonly TraceSource[] {
+  return NON_DEFAULT_SOURCES[id] ?? DEFAULT_WIDGET_SOURCES;
+}

@@ -17,9 +17,9 @@ import {
 import { resolveCredentials } from "../../utils/apiKey";
 import { readCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { resolveOutputFormat } from "../../utils/outputScope";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { parseCommaList } from "../comma-list";
 import { type QueryColumn, type QueryOutputFormat, type QueryRow, renderRows } from "./rows";
 import {
   type ParameterValue,
@@ -73,14 +73,19 @@ interface RunReach {
 /** What the CLI tells a person whose key names no project (the platform's `projects_required`). */
 const PROJECTS_REQUIRED_MESSAGE = "Name the projects to query: pass --projects <id,id>";
 
-/** A comma list as an array, with blanks dropped. */
-function splitList(value: string | undefined): string[] | undefined {
+/** A flag's comma list; a flag that is given but names nothing is refused, not read as unset. */
+function listFlag({
+  value,
+  flag,
+}: {
+  value: string | undefined;
+  flag: string;
+}): string[] | undefined {
   if (value === undefined) return undefined;
-  const items = value
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item !== "");
-  return items.length === 0 ? undefined : items;
+  const items = parseCommaList(value);
+  if (items.length === 0) refuse(`${flag}: pass a comma list`);
+
+  return items;
 }
 
 /** Turns the platform's `projects_required` into the flag that fixes it. */
@@ -91,6 +96,43 @@ function explainProjectsRequired(error: unknown): void {
 /** One line saying what the run was bound to, printed after a table. */
 function paramsLine(result: QueryRunResult): string {
   return result.params ? chalk.dim(`Ran with ${JSON.stringify(result.params)}`) : "";
+}
+
+/**
+ * What a machine reads on success: the rows, and beside them what the run was bound to and what
+ * the server said about it, so an agent can tell a limited answer from a whole one.
+ */
+function resultEnvelope({
+  rows,
+  result,
+}: {
+  rows: readonly QueryRow[];
+  result: Pick<QueryRunResult, "params" | "diagnostics">;
+}) {
+  return {
+    rows,
+    ...(result.params ? { params: result.params } : {}),
+    diagnostics: result.diagnostics,
+  };
+}
+
+/** The bytes of a machine format: one JSON object holding the envelope, or bare rows. */
+function machineBody({
+  format,
+  columns,
+  rows,
+  result,
+}: {
+  format: Exclude<QueryOutputFormat, "table">;
+  columns: readonly QueryColumn[];
+  rows: readonly QueryRow[];
+  result: Pick<QueryRunResult, "params" | "diagnostics">;
+}): string {
+  if (format === "json") return JSON.stringify(resultEnvelope({ rows, result }), null, 2);
+  // CSV and JSON lines hold rows only, so what the run was bound to rides on stderr.
+  if (result.params) process.stderr.write(`${JSON.stringify({ params: result.params })}\n`);
+
+  return renderRows({ format, columns, rows });
 }
 
 /** Where the next page of a keyset walk starts. */
@@ -226,8 +268,8 @@ async function runKeysetWalk({
   output?: string;
 }): Promise<void> {
   const spinner = createSpinner("Running statement...").start();
-  const chunks: string[] = [];
-  let columns: readonly QueryColumn[] = [];
+  const collected: QueryRow[] = [];
+  let first: QueryRunResult | undefined;
   try {
     const walked = await walkKeyset({
       service,
@@ -237,14 +279,8 @@ async function runKeysetWalk({
       reach,
       limit,
       onPage: (page, rows) => {
-        columns = page.columns;
-        chunks.push(
-          renderRows({
-            format: format === "table" ? "jsonl" : format,
-            columns: page.columns,
-            rows,
-          }),
-        );
+        first ??= page;
+        collected.push(...rows);
       },
     });
     spinner.succeed(
@@ -255,7 +291,18 @@ async function runKeysetWalk({
     failSpinner({ spinner, error, action: "run statement" });
     process.exit(1);
   }
-  writeOrPrint({ body: chunks.join("\n"), output, columns });
+  if (!first) return writeOrPrint({ body: "", output, columns: [] });
+
+  writeOrPrint({
+    body: machineBody({
+      format: format === "table" ? "jsonl" : format,
+      columns: first.columns,
+      rows: collected,
+      result: first,
+    }),
+    output,
+    columns: first.columns,
+  });
 }
 
 async function runSinglePage({
@@ -297,30 +344,23 @@ async function runSinglePage({
     `${rows.length} row${rows.length !== 1 ? "s" : ""} in ${result.statistics.elapsedMs}ms`,
   );
 
-  // Stdout stays exactly the rows a machine reads; what the run was bound to goes to stderr.
-  const machineOutput =
-    format !== "table" || output !== undefined || resolveOutputFormat() !== "text";
-  if (machineOutput && result.params) {
-    process.stderr.write(`${JSON.stringify({ params: result.params })}\n`);
-  }
   if (format !== "table" || output !== undefined) {
     return writeOrPrint({
-      body: renderRows({
+      body: machineBody({
         format: format === "table" ? "json" : format,
         columns: result.columns,
         rows,
+        result,
       }),
       output,
       columns: result.columns,
     });
   }
 
-  // `data` is the rows array, not the whole result: `langwatch query "<sql>"
-  // -o json` must print exactly one JSON array of rows, which is also what
-  // `--format json` renders. The statistics and diagnostics reach a reader
-  // through the table and the spinner line, not through the machine payload.
+  // `data` carries the rows with `params` and `diagnostics` beside them, so `-o json` and the
+  // other machine outputs return what the run was bound to as part of the answer.
   return {
-    data: rows,
+    data: resultEnvelope({ rows, result }),
     table: () => {
       printTable({ ...result, rows });
       const line = paramsLine(result);
@@ -356,8 +396,8 @@ export const runQueryCommand = async (
   // credential falls back to is not a project the user asked to read alone.
   const credentials = await resolveCredentials({ project: options.project });
   const projectId = options.project === undefined ? undefined : credentials.projectId;
-  const projects = splitList(options.projects);
-  const sources = splitList(options.sources);
+  const projects = listFlag({ value: options.projects, flag: "--projects" });
+  const sources = listFlag({ value: options.sources, flag: "--sources" });
   const reach: RunReach = {
     ...(projectId === undefined ? {} : { projectId }),
     ...(projects ? { projects } : {}),
