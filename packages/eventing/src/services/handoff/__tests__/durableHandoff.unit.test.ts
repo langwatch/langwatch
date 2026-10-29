@@ -360,8 +360,20 @@ describe("durable hand-off", () => {
         },
       };
       const store = vi.spyOn(projection.store, "store");
-      const harness = serviceWith({ handoffStore, stateProjections: [sealStateProjection(projection)] });
+      const harness = serviceWith({
+        handoffStore,
+        stateProjections: [sealStateProjection(projection)],
+      });
       return { ...harness, held, store };
+    };
+
+    /** A first request applied, and the projection's next update refused once. */
+    const afterAppliedRequestThenRefusal = async () => {
+      const harness = setUp();
+      const first = { ...appendedAt(1_000), occurredAt: 1_000, idempotencyKey: "bootstrap" };
+      await harness.service.storeEvents([first], { tenantId });
+      harness.store.mockRejectedValueOnce(new Error("postgres refused"));
+      return { ...harness, first };
     };
 
     /** The log read: ascending, first row per idempotency key, as `deduplicateEvents` keeps it. */
@@ -377,10 +389,7 @@ describe("durable hand-off", () => {
 
     /** @scenario "A state projection that missed a re-send under a held key rebuilds from the log's copy" */
     it("folds the re-send in at its own position instead of waiting for its id", async () => {
-      const { service, eventStore, drain, held, store } = setUp();
-      const first = { ...appendedAt(1_000), occurredAt: 1_000, idempotencyKey: "bootstrap" };
-      await service.storeEvents([first], { tenantId });
-      store.mockRejectedValueOnce(new Error("postgres refused"));
+      const { service, eventStore, drain, held } = await afterAppliedRequestThenRefusal();
       const resend = { ...appendedAt(2_000), occurredAt: 2_000, idempotencyKey: "bootstrap" };
       await service.storeEvents([resend], { tenantId });
       readingFirstCopyOnly(eventStore, [resend.id]);
@@ -393,10 +402,7 @@ describe("durable hand-off", () => {
     });
 
     it("rebuilds from the log alone once the read returns the re-send itself", async () => {
-      const { service, eventStore, drain, held, store } = setUp();
-      const first = { ...appendedAt(1_000), occurredAt: 1_000, idempotencyKey: "bootstrap" };
-      await service.storeEvents([first], { tenantId });
-      store.mockRejectedValueOnce(new Error("postgres refused"));
+      const { service, eventStore, drain, held } = await afterAppliedRequestThenRefusal();
       const resend = { ...appendedAt(2_000), occurredAt: 2_000, idempotencyKey: "bootstrap" };
       await service.storeEvents([resend], { tenantId });
       // A merge in the same partition keeps the newer row (the highest EventTimestamp).
@@ -408,10 +414,7 @@ describe("durable hand-off", () => {
     });
 
     it("still retries a missed event whose key the log does not hold yet", async () => {
-      const { service, eventStore, drain, held, store } = setUp();
-      const first = { ...appendedAt(1_000), occurredAt: 1_000, idempotencyKey: "bootstrap" };
-      await service.storeEvents([first], { tenantId });
-      store.mockRejectedValueOnce(new Error("postgres refused"));
+      const { service, eventStore, drain, held, first } = await afterAppliedRequestThenRefusal();
       const other = { ...appendedAt(2_000), occurredAt: 2_000, idempotencyKey: "manual:2000" };
       await service.storeEvents([other], { tenantId });
       readingFirstCopyOnly(eventStore, [other.id]);
