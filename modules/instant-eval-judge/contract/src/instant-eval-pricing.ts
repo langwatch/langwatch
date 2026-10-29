@@ -125,7 +125,7 @@ export type InstantEvalRoutedSpend = Readonly<{ costNanoUsd: number; routedInput
  * tokens or a routed cost above zero mark it, so a cost that covers no input tokens (a backend
  * that bills output alone) is billed too. The one rule for "routed" past a single judgement.
  */
-export function instantEvalRoutedSpendOf({
+export function pickInstantEvalRoutedSpend({
   costNanoUsd = 0,
   routedInputTokens = 0,
 }: {
@@ -140,7 +140,7 @@ export function instantEvalRoutedSpendOf({
  * One judgement's routed part. The router prices every judgement it returns, so a cost, zero
  * included, routes all of its input tokens; no cost is an unrouted judgement.
  */
-export function instantEvalJudgementRoutedSpendOf({
+export function pickInstantEvalJudgementRoutedSpend({
   inputTokens,
   costNanoUsd,
 }: {
@@ -148,7 +148,7 @@ export function instantEvalJudgementRoutedSpendOf({
   costNanoUsd?: number | undefined;
 }): InstantEvalRoutedSpend | undefined {
   if (costNanoUsd === undefined) return undefined;
-  return instantEvalRoutedSpendOf({ costNanoUsd, routedInputTokens: inputTokens });
+  return pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens: inputTokens });
 }
 
 /** What the customer is charged for a judgement, page or run: its spent cost at the markup. */

@@ -8,7 +8,7 @@
 import {
   InstantEvalClassifierUnavailableError,
   InstantEvalJudgeStoppedError,
-  instantEvalJudgementRoutedSpendOf,
+  pickInstantEvalJudgementRoutedSpend,
   type InstantEvalJudgement,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
@@ -212,7 +212,7 @@ function recordRoutedCost({
   judgement: Pick<InstantEvalJudgement, "inputTokens" | "costNanoUsd">;
   usage: InstantEvalJudgeUsage;
 }): void {
-  const routed = instantEvalJudgementRoutedSpendOf(judgement);
+  const routed = pickInstantEvalJudgementRoutedSpend(judgement);
   if (!routed) return;
   usage.costNanoUsd += routed.costNanoUsd;
   usage.routedInputTokens += routed.routedInputTokens;

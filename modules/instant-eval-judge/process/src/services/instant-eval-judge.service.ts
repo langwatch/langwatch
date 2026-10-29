@@ -8,8 +8,8 @@ import {
   INSTANT_EVAL_FREE_BUDGET_USD,
   InstantEvalFreeBudgetExhaustedError,
   InstantEvalJudgeStoppedError,
-  instantEvalJudgementRoutedSpendOf,
-  instantEvalRoutedSpendOf,
+  pickInstantEvalJudgementRoutedSpend,
+  pickInstantEvalRoutedSpend,
   instantEvalSkipped,
   type InstantEvalClassification,
   type InstantEvalJudgeAnswer,
@@ -193,7 +193,7 @@ export class InstantEvalJudgeService {
       inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
       ...this.pricing(),
-      routed: this.priced(instantEvalJudgementRoutedSpendOf({ inputTokens, costNanoUsd })),
+      routed: this.priced(pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd })),
     });
     await this.record({ fact });
     return priceUsd;
@@ -225,7 +225,7 @@ export class InstantEvalJudgeService {
       requests,
       runId,
       ...this.pricing(),
-      routed: this.priced(instantEvalRoutedSpendOf({ costNanoUsd, routedInputTokens })),
+      routed: this.priced(pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens })),
     });
     await this.deps.recordSpendPriced(fact);
   }

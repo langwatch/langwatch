@@ -8,7 +8,7 @@ import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
 import {
   instantEvalPriceUsd,
-  instantEvalRoutedSpendOf,
+  pickInstantEvalRoutedSpend,
   instantEvalSpentCostUsd,
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
@@ -88,7 +88,7 @@ export class InstantEvalFinishService {
         runId,
         inputTokens,
         requests,
-        ...instantEvalRoutedSpendOf({ costNanoUsd, routedInputTokens }),
+        ...pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens }),
         occurredAt: this.now(),
       });
       logger.debug(

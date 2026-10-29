@@ -148,7 +148,7 @@ export class InstantEvalJudgeRouteRunService {
 
   /**
    * The first send as this kind's own leg. A shared send that answered none of this kind's
-   * questions failed for this kind, so they go to the primary's fallbacks as a failed own send would.
+   * questions failed for this kind, so they go to the primary's fallbacks, as a failed send would.
    */
   private async ownAnswer({
     questions,

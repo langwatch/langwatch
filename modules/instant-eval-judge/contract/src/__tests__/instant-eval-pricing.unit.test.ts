@@ -8,9 +8,9 @@ import { describe, expect, it } from "vitest";
 import {
   INSTANT_EVAL_PRICING,
   instantEvalCostUsd,
-  instantEvalJudgementRoutedSpendOf,
+  pickInstantEvalJudgementRoutedSpend,
   instantEvalPriceUsd,
-  instantEvalRoutedSpendOf,
+  pickInstantEvalRoutedSpend,
   toNanoUsdPrecision,
 } from "../instant-eval-pricing.ts";
 
@@ -73,14 +73,14 @@ describe("given a spend that may be routed", () => {
   describe("when its routed part is read", () => {
     /** @scenario "Routed and unrouted tokens are billed separately" */
     it("is routed when it has routed tokens or a routed cost above zero, and unrouted otherwise", () => {
-      expect(instantEvalRoutedSpendOf({})).toBeUndefined();
-      expect(instantEvalRoutedSpendOf({ costNanoUsd: 0, routedInputTokens: 0 })).toBeUndefined();
+      expect(pickInstantEvalRoutedSpend({})).toBeUndefined();
+      expect(pickInstantEvalRoutedSpend({ costNanoUsd: 0, routedInputTokens: 0 })).toBeUndefined();
       // A backend that bills output tokens alone has a cost and no routed input tokens.
-      expect(instantEvalRoutedSpendOf({ costNanoUsd: 5000, routedInputTokens: 0 })).toEqual({
+      expect(pickInstantEvalRoutedSpend({ costNanoUsd: 5000, routedInputTokens: 0 })).toEqual({
         costNanoUsd: 5000,
         routedInputTokens: 0,
       });
-      expect(instantEvalRoutedSpendOf({ costNanoUsd: 0, routedInputTokens: 40 })).toEqual({
+      expect(pickInstantEvalRoutedSpend({ costNanoUsd: 0, routedInputTokens: 40 })).toEqual({
         costNanoUsd: 0,
         routedInputTokens: 40,
       });
@@ -88,8 +88,8 @@ describe("given a spend that may be routed", () => {
 
     /** @scenario "A routed judgement with a cost of zero is still routed" */
     it("routes all of a judgement's tokens when it carries a cost, zero included", () => {
-      expect(instantEvalJudgementRoutedSpendOf({ inputTokens: 500 })).toBeUndefined();
-      expect(instantEvalJudgementRoutedSpendOf({ inputTokens: 500, costNanoUsd: 0 })).toEqual({
+      expect(pickInstantEvalJudgementRoutedSpend({ inputTokens: 500 })).toBeUndefined();
+      expect(pickInstantEvalJudgementRoutedSpend({ inputTokens: 500, costNanoUsd: 0 })).toEqual({
         costNanoUsd: 0,
         routedInputTokens: 500,
       });
