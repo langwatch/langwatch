@@ -1781,7 +1781,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the key sends PATCH with "excludedOrigins": []
     Then the board leaves out no origin and reads back "excludedOrigins": []
     And PATCH with "excludedOrigins": null returns it to the default
-    # The CLI, MCP and Python SDK flags are a follow-up
+
+  @unit
+  Scenario: AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out
+    Given a Dashboards board
+    When `langwatch dashboard update` is given --include-langy-traces, --exclude-langy-traces or --reset-langy-traces
+    Then --include-langy-traces and --exclude-langy-traces read the board and add or remove only "langy", keeping the other origins it leaves out
+    And --reset-langy-traces sends "excludedOrigins" as null without reading the board
+    And the MCP rename_dashboard tool and the Python dashboards.update helper send the list they are given
+    And `langwatch dashboard get` and the MCP get_dashboard tool show the setting
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -1842,4 +1850,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
   # AC 190-195: "Dashboards show your agent, not Langy's work for you" (owner, 2026-10-09) → Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default; Scenario: AC191 Langy: a widget's own origin filter keeps its meaning; Scenario: AC192 Langy: data that is Langy's own is not filtered; Scenario: AC193 Langy: the origins a board leaves out are a list a board parameter can set later; Scenario: AC194 Langy: a query run outside a board is not scoped; Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
   # AC 198: "A personal project's boards show Langy" (owner, 2026-10-10) → Scenario: AC198 Langy: a board in a personal project shows Langy's conversations
-  # AC 200: "A board's Langy traces setting" (owner, 2026-10-27) → Scenario: AC200 Langy setting: a board leaves Langy's conversations out until a member includes them; Scenario: AC200b Langy setting: a board set to include Langy runs every widget with no origin left out; Scenario: AC200c Langy setting: a personal project's board still includes Langy by default; Scenario: AC200d Langy setting: only a member who can edit the board changes it; Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out
+  # AC 200: "A board's Langy traces setting" (owner, 2026-10-27) → Scenario: AC200 Langy setting: a board leaves Langy's conversations out until a member includes them; Scenario: AC200b Langy setting: a board set to include Langy runs every widget with no origin left out; Scenario: AC200c Langy setting: a personal project's board still includes Langy by default; Scenario: AC200d Langy setting: only a member who can edit the board changes it; Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out; Scenario: AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out

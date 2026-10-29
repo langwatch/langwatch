@@ -70,6 +70,27 @@ describe("DashboardsApiService", () => {
       ],
     });
   });
+
+  /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
+  it("sends excludedOrigins as [], a list or null, and leaves it out when not given", async () => {
+    const client = { PATCH: ok({ id: "b_1" }) };
+    const service = new DashboardsApiService({
+      langwatchApiClient: client as unknown as LangwatchApiClient,
+    });
+
+    await service.update({ dashboardId: "b_1", excludedOrigins: [] });
+    await service.update({ dashboardId: "b_1", excludedOrigins: ["langy"] });
+    await service.update({ dashboardId: "b_1", excludedOrigins: null });
+    await service.update({ dashboardId: "b_1", name: "Usage" });
+
+    const calls = client.PATCH.mock.calls as unknown as [string, { body: unknown }][];
+    expect(calls.map(([, init]) => init.body)).toEqual([
+      { excludedOrigins: [] },
+      { excludedOrigins: ["langy"] },
+      { excludedOrigins: null },
+      { name: "Usage" },
+    ]);
+  });
 });
 
 describe("AnalyticsReportsApiService", () => {

@@ -47,6 +47,7 @@ const sampleDashboard = {
   name: "Agent health",
   description: null,
   scope: "PROJECT" as const,
+  excludedOrigins: null,
   createdById: null,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",

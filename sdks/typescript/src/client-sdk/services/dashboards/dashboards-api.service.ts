@@ -93,15 +93,20 @@ export class DashboardsApiService {
     return data as Dashboard;
   }
 
-  /** `description: null` clears it; a field left out keeps its value. */
+  /**
+   * `description: null` clears it; a field left out keeps its value. `excludedOrigins: []`
+   * includes Langy's traces, `["langy"]` leaves them out and `null` restores the default.
+   */
   async update({
     dashboardId,
     name,
     description,
+    excludedOrigins,
   }: {
     dashboardId: string;
     name?: string;
     description?: string | null;
+    excludedOrigins?: string[] | null;
   }): Promise<Dashboard> {
     const operation = `update dashboard "${dashboardId}"`;
     const { data, error, response } = await this.apiClient.PATCH(
@@ -111,6 +116,7 @@ export class DashboardsApiService {
         body: {
           ...(name === undefined ? {} : { name }),
           ...(description === undefined ? {} : { description }),
+          ...(excludedOrigins === undefined ? {} : { excludedOrigins }),
         },
       },
     );

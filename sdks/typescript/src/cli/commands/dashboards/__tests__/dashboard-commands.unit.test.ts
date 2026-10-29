@@ -72,6 +72,31 @@ describe("the langwatch dashboard command group", () => {
 
     expect(failure).toBe("commander.conflictingOption");
   });
+
+  /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
+  it("refuses two Langy traces flags at once before any request", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const program = buildProgram();
+    const update = child(child(program, "dashboard"), "update")!;
+    update.exitOverride().configureOutput({ writeErr: () => undefined });
+
+    const failure = await program
+      .parseAsync([
+        "node",
+        "langwatch",
+        "dashboard",
+        "update",
+        "d_1",
+        "--include-langy-traces",
+        "--exclude-langy-traces",
+      ])
+      .then(
+        () => undefined,
+        (error: CommanderError) => error.code,
+      );
+
+    expect(failure).toBe("commander.conflictingOption");
+  });
 });
 
 describe("the old command names", () => {

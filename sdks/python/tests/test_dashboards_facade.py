@@ -99,6 +99,29 @@ def test_dashboard_routes_and_bodies():
     ]
 
 
+# @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out"
+def test_update_sends_excluded_origins_as_list_or_none():
+    handler, calls = recorder(
+        {("PATCH", "/api/v1/dashboards/d_1"): {"id": "d_1", "excludedOrigins": []}}
+    )
+    dashboards = DashboardsFacade(FakeRestClient(handler))  # type: ignore[arg-type]
+
+    dashboards.update("d_1", excluded_origins=[])
+    dashboards.update("d_1", excluded_origins=["langy"])
+    dashboards.update("d_1", excluded_origins=None)
+    dashboards.update("d_1", name="Usage")
+    result = dashboards.update("d_1", excluded_origins=[])
+
+    assert [body for _, _, body in calls] == [
+        {"excludedOrigins": []},
+        {"excludedOrigins": ["langy"]},
+        {"excludedOrigins": None},
+        {"name": "Usage"},
+        {"excludedOrigins": []},
+    ]
+    assert result["excludedOrigins"] == []
+
+
 # @scenario "AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports"
 def test_update_naming_nothing_is_refused_before_any_call():
     handler, calls = recorder({})

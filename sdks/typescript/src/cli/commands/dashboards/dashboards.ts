@@ -66,6 +66,9 @@ export const getDashboardCommand = async (dashboardId: string): Promise<CommandR
           `  ${chalk.gray("Name:")}  ${chalk.cyan(sanitizeTerminalText(dashboard.name))}`,
         );
         console.log(`  ${chalk.gray("Scope:")} ${dashboard.scope}`);
+        console.log(
+          `  ${chalk.gray("Langy traces:")} ${describeLangyTraces(dashboard.excludedOrigins)}`,
+        );
         if (dashboard.platformUrl) {
           console.log(`  ${chalk.gray("View:")}  ${chalk.underline(dashboard.platformUrl)}`);
         }
@@ -102,26 +105,78 @@ export const createDashboardCommand = async (name: string): Promise<CommandResul
   }
 };
 
+const LANGY_ORIGIN = "langy";
+
+/** The stored origins a dashboard leaves out, in words; null is the project default. */
+function describeLangyTraces(excludedOrigins: string[] | null | undefined): string {
+  if (excludedOrigins == null) return "default (left out, included in a personal project)";
+  if (excludedOrigins.length === 0) return "included";
+  const others = excludedOrigins.filter((origin) => origin !== LANGY_ORIGIN);
+  const langy = excludedOrigins.includes(LANGY_ORIGIN) ? "left out" : "included";
+  return others.length === 0 ? langy : `${langy}; also leaves out ${others.join(", ")}`;
+}
+
+/**
+ * The flags change only "langy" and keep the other origins, as the board does.
+ * A stored null counts as none: the default holds at most "langy", which the flag decides.
+ */
+function langyTracesList({
+  stored,
+  includeLangy,
+}: {
+  stored: string[] | null | undefined;
+  includeLangy: boolean;
+}): string[] {
+  const others = (stored ?? []).filter((origin) => origin !== LANGY_ORIGIN);
+  return includeLangy ? others : [...others, LANGY_ORIGIN];
+}
+
 /** A call naming nothing is refused locally, matching the API's own refusal. */
 export const updateDashboardCommand = async (
   dashboardId: string,
-  options: { name?: string; description?: string; clearDescription?: boolean },
+  options: {
+    name?: string;
+    description?: string;
+    clearDescription?: boolean;
+    includeLangyTraces?: boolean;
+    excludeLangyTraces?: boolean;
+    resetLangyTraces?: boolean;
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
   const description = options.clearDescription ? null : options.description;
-  if (options.name === undefined && description === undefined) {
+  const changesLangy = Boolean(options.includeLangyTraces) || Boolean(options.excludeLangyTraces);
+  if (
+    options.name === undefined &&
+    description === undefined &&
+    !changesLangy &&
+    !options.resetLangyTraces
+  ) {
     console.error(
-      chalk.red("Error: nothing to update — pass --name, --description or --clear-description"),
+      chalk.red(
+        "Error: nothing to update — pass --name, --description, --clear-description, --include-langy-traces, --exclude-langy-traces or --reset-langy-traces",
+      ),
     );
     process.exit(1);
   }
   const spinner = createSpinner(`Updating dashboard "${dashboardId}"...`).start();
 
   try {
-    const dashboard = await new DashboardsApiService().update({
+    const service = new DashboardsApiService();
+    let excludedOrigins: string[] | null | undefined;
+    if (changesLangy) {
+      excludedOrigins = langyTracesList({
+        stored: (await service.get(dashboardId)).excludedOrigins,
+        includeLangy: Boolean(options.includeLangyTraces),
+      });
+    } else if (options.resetLangyTraces) {
+      excludedOrigins = null;
+    }
+    const dashboard = await service.update({
       dashboardId,
       ...(options.name === undefined ? {} : { name: options.name }),
       ...(description === undefined ? {} : { description }),
+      ...(excludedOrigins === undefined ? {} : { excludedOrigins }),
     });
     spinner.succeed(`Updated dashboard "${chalk.cyan(sanitizeTerminalText(dashboard.name))}"`);
 

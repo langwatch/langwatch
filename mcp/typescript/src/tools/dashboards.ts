@@ -14,12 +14,21 @@ import {
   updateDashboard,
 } from "../langwatch-api-dashboards.js";
 
+function describeLangyTraces(excludedOrigins: string[] | null | undefined): string {
+  if (excludedOrigins == null) return "default (left out, included in a personal project)";
+  if (excludedOrigins.length === 0) return "included";
+  const others = excludedOrigins.filter((origin) => origin !== "langy");
+  const langy = excludedOrigins.includes("langy") ? "left out" : "included";
+  return others.length === 0 ? langy : `${langy}; also leaves out ${others.join(", ")}`;
+}
+
 function describeDashboard(dashboard: Dashboard): string[] {
   return [
     `**Name**: ${dashboard.name}`,
     `**ID**: ${dashboard.id}`,
     `**Scope**: ${dashboard.scope}`,
     ...(dashboard.description ? [`**Description**: ${dashboard.description}`] : []),
+    `**Langy traces**: ${describeLangyTraces(dashboard.excludedOrigins)}`,
     `**URL**: ${dashboard.platformUrl}`,
   ];
 }
@@ -48,18 +57,21 @@ export async function handleRenameDashboard({
   dashboardId,
   name,
   description,
+  excludedOrigins,
 }: {
   dashboardId: string;
   name?: string;
   description?: string;
+  excludedOrigins?: string[] | null;
 }): Promise<string> {
-  if (name === undefined && description === undefined) {
-    throw new Error("Provide at least one of name or description to change.");
+  if (name === undefined && description === undefined && excludedOrigins === undefined) {
+    throw new Error("Provide at least one of name, description or excludedOrigins to change.");
   }
   const dashboard = await updateDashboard({
     dashboardId,
     ...(name === undefined ? {} : { name }),
     ...(description === undefined ? {} : { description }),
+    ...(excludedOrigins === undefined ? {} : { excludedOrigins }),
   });
   return ["Dashboard updated.\n", ...describeDashboard(dashboard)].join("\n");
 }
