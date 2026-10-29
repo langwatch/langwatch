@@ -140,6 +140,55 @@ describe("ClickHouse ownership records", () => {
     });
   });
 
+  describe("given a table reserved for a module", () => {
+    const RESERVED: DeclaredOwnership = {
+      ...DECLARED,
+      records: [
+        ...DECLARED.records,
+        { table: "eval_results", owner: "reserved", writer: "instant-eval", reason: "step 1" },
+      ],
+    };
+    const reserved = () => {
+      const world = fixture(RESERVED);
+      world.write(
+        "packages/clickhouse-migrations/migrations/00005_eval_results.sql",
+        create("eval_results"),
+      );
+      return world;
+    };
+
+    /** @scenario "A table reserved for a module is not an ownerless table" */
+    it("reports nothing before the module writes it", () => {
+      expect(reserved().messages()).toEqual([]);
+    });
+
+    /** @scenario "The reserved module's first write asks for the record to be deleted" */
+    it("asks for the record to be deleted once the module writes it", () => {
+      const world = reserved();
+      world.write(
+        "modules/instant-eval/process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts",
+        writer("eval_results"),
+      );
+
+      expect(world.messages()).toEqual([
+        "instant-eval writes eval_results, reserved for it. Delete the record: the write owns the table now.",
+      ]);
+    });
+
+    /** @scenario "Another module writing a reserved table is reported" */
+    it("reports another module writing it", () => {
+      const world = reserved();
+      world.write(
+        "modules/trace/process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts",
+        writer("eval_results"),
+      );
+
+      expect(world.messages()).toEqual([
+        "trace writes eval_results, recorded as reserved owned (instant-eval: step 1).",
+      ]);
+    });
+  });
+
   describe("given a module writes a recorded table", () => {
     /** @scenario "A module writing a recorded table is reported" */
     it("reports the module, the record and its reason", () => {
@@ -281,6 +330,7 @@ describe("ClickHouse ownership records", () => {
         "stored_objects",
         "automation_audit",
         "langy_messages",
+        "eval_results",
       ]);
       expect(DECLARED_OWNERSHIP.exceptions).toHaveLength(3);
       expect(DECLARED_OWNERSHIP.shared.map((item) => item.table)).toEqual([

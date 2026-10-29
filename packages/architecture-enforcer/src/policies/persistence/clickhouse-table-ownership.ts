@@ -49,10 +49,14 @@ type ScanRoot = { module: string; directory: string };
 const ALLOWED =
   "Write a ClickHouse table from one module's repositories only, and read it elsewhere through that module's api. See ADR-134.";
 
-/** A table no module writes, recorded with who does and why (Alex, 2026-10-06, Q207). */
+/**
+ * A table no module writes, recorded with who does and why (Alex, 2026-10-06, Q207).
+ * A `reserved` table is created ahead of its writer: `writer` names the module
+ * whose first write must replace the record.
+ */
 export type OwnershipRecord = {
   table: string;
-  owner: "framework" | "legacy";
+  owner: "framework" | "legacy" | "reserved";
   writer: string;
   reason: string;
 };
@@ -123,6 +127,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       owner: "legacy",
       writer: LEGACY,
       reason: "Langy conversation content (migration 00036), still read; no module writes it here",
+    },
+    {
+      table: "eval_results",
+      owner: "reserved",
+      writer: "instant-eval",
+      reason:
+        "created ahead of instant-eval's recall-and-write repository (ADR-189 step 1); its first write deletes this record",
     },
   ],
   exceptions: [
@@ -687,7 +698,10 @@ function recordFindings({
       key: `${writer.module}|${record.table}`,
       file: writer.file,
       line: writer.line,
-      message: `${writer.module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`,
+      message:
+        record.owner === "reserved" && writer.module === record.writer
+          ? `${writer.module} writes ${record.table}, reserved for it. Delete the record: the write owns the table now.`
+          : `${writer.module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`,
     }));
   });
 }
@@ -909,9 +923,9 @@ export function clickhouseScanOf(snapshot: WorkspaceSnapshot): ClickhouseScan {
   return scan;
 }
 
-/** A framework table is its writing package's; every legacy table is one owner, `legacy`. */
+/** A framework or reserved table is its named writer's; every legacy table is owner `legacy`. */
 function recordedOwner(record: OwnershipRecord): string {
-  return record.owner === "framework" ? record.writer : "legacy";
+  return record.owner === "legacy" ? "legacy" : record.writer;
 }
 
 /** Each table's owner: its writing module, its view source's, or its record (D3). */

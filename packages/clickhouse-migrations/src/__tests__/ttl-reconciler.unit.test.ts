@@ -321,6 +321,7 @@ describe("ttlReconciler", () => {
         "governance_cost_rollup_charges",
         "governance_cost_rollup_restatement_index",
         "instant_eval_judgments",
+        "eval_results",
         "instant_eval_runs",
       ]);
     });
