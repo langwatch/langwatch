@@ -144,7 +144,7 @@ function WidgetFrameOverWindow({
   const {
     executeQuery: runQuery,
     params: hostParams,
-    limits = [],
+    limits,
   } = useDashboardWidgetExecutor(projectId, definition.queries, {
     timeWindow,
     ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
