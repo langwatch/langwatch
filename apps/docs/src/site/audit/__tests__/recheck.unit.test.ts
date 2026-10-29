@@ -47,7 +47,6 @@ function run({
 const pages = [page("fast"), page("slow"), page("broken")];
 
 describe("recheckPasses", () => {
-  /** @scenario "Recheck a page that scores under the threshold in the all-pages run" */
   describe("when one page's first run scores under the threshold", () => {
     const medians = pageMedians({
       pages,
@@ -60,6 +59,7 @@ describe("recheckPasses", () => {
     });
     const passes = recheckPasses({ medians, threshold: 0.9, firstAttempt: 1 });
 
+    /** @scenario "Recheck a page that scores under the threshold in the all-pages run" */
     it("runs only that page again, once per pass, numbering the attempts after the first runs", () => {
       expect(passes).toHaveLength(RECHECK_RUNS);
       expect(passes.map((pass) => pass.map(({ page, attempt }) => [page.id, attempt]))).toEqual([
@@ -68,6 +68,7 @@ describe("recheckPasses", () => {
       ]);
     });
 
+    /** @scenario "Recheck a page that scores under the threshold in the all-pages run" */
     it("leaves a page Lighthouse could not load to the report instead of rechecking it", () => {
       expect(passes.flat().some(({ page }) => page.id === "broken")).toBe(false);
     });
@@ -86,8 +87,8 @@ describe("recheckPasses", () => {
 });
 
 describe("pageMedians", () => {
-  /** @scenario "Recheck a page that scores under the threshold in the all-pages run" */
   describe("when a slow first run is rechecked twice", () => {
+    /** @scenario "Recheck a page that scores under the threshold in the all-pages run" */
     it("reports the median of the three runs for that page and device", () => {
       const medians = pageMedians({
         pages: [page("slow")],

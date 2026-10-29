@@ -9,7 +9,7 @@ export type LighthouseTask = { page: PageBudget; formFactor: FormFactor; attempt
 export type PageMedian = { page: PageBudget; formFactor: FormFactor; run: AuditRun };
 
 /** The run with the median performance score, so one noisy run neither passes nor fails a page. */
-export function medianRun({ runs }: { runs: AuditRun[] }) {
+function medianRun({ runs }: { runs: AuditRun[] }) {
   const sorted = runs.toSorted(
     (a, b) => (a.scores.performance ?? -1) - (b.scores.performance ?? -1),
   );
