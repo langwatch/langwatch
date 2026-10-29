@@ -187,6 +187,17 @@ describe("ClickHouse ownership records", () => {
         "trace writes eval_results, recorded as reserved owned (instant-eval: step 1).",
       ]);
     });
+
+    /** @scenario "Another module reading a reserved table is reported" */
+    it("reports another module reading it", () => {
+      const world = reserved();
+      world.write(
+        "modules/trace/process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts",
+        reader("eval_results"),
+      );
+
+      expect(world.messages()).toEqual(["trace reads eval_results, owned by instant-eval."]);
+    });
   });
 
   describe("given a module writes a recorded table", () => {

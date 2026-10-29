@@ -44,6 +44,12 @@ Feature: ClickHouse ownership records and named exceptions
     Then the policy reports trace writing a table reserved for instant-eval
 
   @unit @architecture
+  Scenario: Another module reading a reserved table is reported
+    Given the policy records eval_results as reserved for instant-eval
+    When trace's repository reads eval_results
+    Then the policy reports trace reading a table owned by instant-eval
+
+  @unit @architecture
   Scenario: A module writing a recorded table is reported
     Given the policy records event_log as framework owned
     When a module's repository inserts into event_log

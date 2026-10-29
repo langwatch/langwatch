@@ -671,18 +671,19 @@ function owners(access: readonly Access[]): Map<string, Access[]> {
 
 type Feeds = ReadonlyMap<string, readonly string[]>;
 
-/** A recorded table no migration creates, or a module writing one. */
+/** A recorded table no migration creates, a module writing one, or a foreign read of a reserved one. */
 function recordFindings({
   tables,
   writers,
   records,
-  root,
+  context,
 }: {
   tables: ReadonlyMap<string, string>;
   writers: ReadonlyMap<string, Access[]>;
   records: readonly OwnershipRecord[];
-  root: string;
+  context: Pick<TableContext, "access" | "exceptions" | "shared" | "root">;
 }): Finding[] {
+  const { root } = context;
   return records.flatMap((record): Finding[] => {
     if (!tables.has(record.table)) {
       return [
@@ -694,7 +695,7 @@ function recordFindings({
       ];
     }
 
-    return (writers.get(record.table) ?? []).map((writer) => ({
+    const writes = (writers.get(record.table) ?? []).map((writer) => ({
       key: `${writer.module}|${record.table}`,
       file: writer.file,
       line: writer.line,
@@ -703,6 +704,44 @@ function recordFindings({
           ? `${writer.module} writes ${record.table}, reserved for it. Delete the record: the write owns the table now.`
           : `${writer.module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`,
     }));
+
+    return record.owner === "reserved"
+      ? [...writes, ...reservedReads({ record, context })]
+      : writes;
+  });
+}
+
+/** A reserved table has a known owner, so a read by any other module is reported as for a written table. */
+function reservedReads({
+  record,
+  context,
+}: {
+  record: OwnershipRecord;
+  context: Pick<TableContext, "access" | "exceptions" | "shared" | "root">;
+}): Finding[] {
+  const { access, exceptions, shared, root } = context;
+  const readers = access.filter(
+    (entry) =>
+      entry.table === record.table &&
+      !entry.write &&
+      entry.module !== record.writer &&
+      !isExcepted({ entry, exceptions, root }) &&
+      !isSharedRead({ entry, owner: record.writer, shared }),
+  );
+  const seen = new Set<string>();
+
+  return readers.flatMap((entry): Finding[] => {
+    if (seen.has(entry.module)) return [];
+    seen.add(entry.module);
+
+    return [
+      {
+        key: `${entry.module}|${record.table}`,
+        file: entry.file,
+        line: entry.line,
+        message: `${entry.module} reads ${record.table}, owned by ${record.writer}.`,
+      },
+    ];
   });
 }
 
@@ -885,7 +924,7 @@ function collectFindings({
 
   return [
     ...findings.values(),
-    ...recordFindings({ tables, writers, records: declared.records, root }),
+    ...recordFindings({ tables, writers, records: declared.records, context }),
     ...staleExceptions({ access, exceptions, root }),
     ...staleShared({ access, tables, writers, feeds, shared, root }),
   ];
