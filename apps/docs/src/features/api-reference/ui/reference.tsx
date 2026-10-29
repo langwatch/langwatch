@@ -2,7 +2,7 @@ import { Box, Button, Flex, Text, chakra } from "@langwatch/design-system/primit
 import { ChevronDown, Play } from "lucide-react";
 
 import { TypeRegion } from "../../../lib/type-mode.tsx";
-import { DocsField } from "../../content/ui.ts";
+import { DocsField, TextWithCode } from "../../content/ui.ts";
 import type { Operation } from "../model/operation.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { MethodBadge } from "./method-badge.tsx";
@@ -10,7 +10,7 @@ import { ParameterFields, SchemaFields } from "./schema.tsx";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Box as="section" id={title.toLowerCase().replaceAll(" ", "-")} marginTop="8">
+    <Box as="section" id={title.toLowerCase().replaceAll(" ", "-")} marginTop="10">
       <Text
         as="h2"
         margin="0"
@@ -38,7 +38,7 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
       alignItems="center"
       gap="3"
       wrap="wrap"
-      marginTop="6"
+      marginTop="8"
       padding="2"
       paddingInlineStart="3"
       borderWidth="1px"
@@ -134,7 +134,7 @@ export function Responses({ operation }: { operation: Operation }) {
               {response.status}
             </Box>
             <Text margin="0" fontSize="14px" lineHeight="22px" color="docs.body">
-              {response.description}
+              <TextWithCode text={response.description} />
             </Text>
             <ChevronDown size={16} aria-hidden="true" />
           </Flex>
@@ -176,7 +176,7 @@ export function EndpointReference({
   return (
     <TypeRegion mode="productive" className="docs-api-reference">
       {operation.schemes.length > 0 ? (
-        <Section title="Authorisation">
+        <Section title="Authorization">
           {operation.schemes.map((scheme) => (
             <DocsField
               key={scheme.id}
@@ -185,7 +185,11 @@ export function EndpointReference({
               location={scheme.in ?? "header"}
               required
             >
-              {scheme.description ? <p>{scheme.description}</p> : null}
+              {scheme.description ? (
+                <p>
+                  <TextWithCode text={scheme.description} />
+                </p>
+              ) : null}
             </DocsField>
           ))}
         </Section>

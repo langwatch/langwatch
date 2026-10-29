@@ -25,10 +25,10 @@ import { startSession } from "./session-controls.ts";
 /** What the reader is told when the session frame did not send the request. */
 const FRAME_FAILURES: Record<FrameFailure, string> = {
   "not-connected": "Your access ended. Connect again, or paste an API key.",
-  declined: "You cancelled this request in the LangWatch frame, so it was not sent.",
+  declined: "You canceled this request in the LangWatch frame, so it was not sent.",
   refused: "LangWatch would not send this request from the docs.",
   timeout: "Request timed out",
-  cancelled: "Request cancelled",
+  cancelled: "Request canceled",
   network: "The browser could not reach this endpoint. Copy the curl request to run it locally.",
 };
 

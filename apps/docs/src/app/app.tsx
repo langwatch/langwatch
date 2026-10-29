@@ -49,7 +49,7 @@ function PageContent({ slug, page, operation, examples }: AppProps) {
   const toc = operation
     ? [
         ...(operation.schemes.length
-          ? [{ depth: 2, text: "Authorisation", id: "authorisation" }]
+          ? [{ depth: 2, text: "Authorization", id: "authorization" }]
           : []),
         ...[
           { location: "path", text: "Path parameters" },

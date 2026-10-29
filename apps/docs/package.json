@@ -98,6 +98,7 @@
         "navigation"
       ],
       "shell": [
+        "content",
         "navigation",
         "search"
       ]

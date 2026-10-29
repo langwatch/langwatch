@@ -1177,6 +1177,7 @@ figure > .docs-shot {
     position: sticky;
     top: var(--docs-header-h);
     max-height: calc(100dvh - var(--docs-header-h));
+    overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
@@ -2025,10 +2026,18 @@ body {
   }
 }
 .docs-api-reference .docs-field {
-  padding-block: 10px;
+  padding-block: 14px;
+}
+.docs-api-reference .docs-field-body {
+  margin-top: 8px;
 }
 .docs-api-reference .docs-field-body p {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+}
+/* An Expandable names what it does next: Show while closed, Hide while open. */
+.docs-expandable [data-part="item-trigger"][data-state="open"] > .docs-expandable-show,
+.docs-expandable [data-part="item-trigger"]:not([data-state="open"]) > .docs-expandable-hide {
+  display: none;
 }
 .docs-response-schema > summary::-webkit-details-marker {
   display: none;
@@ -2293,29 +2302,35 @@ body {
   }
 }
 
-/* Number-key hints on the tab group a pointer or keyboard is in; keys 1 to 9 pick a tab. */
+/* Number-key hints on the tab group a pointer or keyboard is in; keys 1 to 9 pick a tab.
+   Each hint sits in its tab's top corner, out of flow, so showing it never moves a label. */
 @media (hover: hover) and (pointer: fine) {
   [role="tablist"] {
     counter-reset: docs-tab;
   }
   [role="tablist"] [role="tab"] {
+    position: relative;
     counter-increment: docs-tab;
   }
   [data-scope="tabs"][data-part="root"]:is(:hover, :focus-within)
     [role="tablist"]
     > [role="tab"]:nth-child(-n + 9)::after {
     content: counter(docs-tab);
-    margin-inline-start: 6px;
-    padding-inline: 4px;
-    min-width: 16px;
+    position: absolute;
+    top: 3px;
+    inset-inline-end: 1px;
+    min-width: 13px;
+    padding-inline: 2px;
     border: 1px solid var(--chakra-colors-border);
-    border-radius: 4px;
+    border-radius: 3px;
+    background: var(--chakra-colors-bg-panel);
     color: var(--chakra-colors-fg-muted);
     font-family: var(--chakra-fonts-mono);
-    font-size: 10px;
-    line-height: 14px;
+    font-size: 9px;
+    line-height: 11px;
     font-weight: 500;
     text-align: center;
+    pointer-events: none;
     animation: docs-hint-in 160ms ease-out both;
   }
 }
@@ -2550,34 +2565,109 @@ html[data-docs-theme-change]::view-transition-new(root) {
   --nf-accent: var(--chakra-colors-accent-fg);
   --nf-line: var(--chakra-colors-border);
   --nf-mark: var(--chakra-colors-docs-primary);
+  position: relative;
   flex: 1;
   min-width: 0;
   padding: 40px 48px 64px;
   background: var(--nf-bg);
   color: var(--nf-fg);
 }
-.docs-nf[data-scene="engineering"] {
-  --nf-bg: #f4efe4;
-  --nf-line: #ddd6c6;
-  font-family: var(--chakra-fonts-mono);
-}
-.dark .docs-nf[data-scene="engineering"] {
-  --nf-bg: #08080a;
-  --nf-line: #34343b;
-}
 @media (max-width: 47.99rem) {
   .docs-nf {
     padding: 28px 20px 40px;
   }
 }
-/* With scripts on, the scene waits for the island to pick it, and shows anyway after 1.2s. */
-:is(.light, .dark) .docs-nf:not([data-ready]) > * {
+/* Without scripts the castle shows at once. With them, the mark draws itself while the island
+   picks the scene, then flies into it (browser/not-found-intro.ts). If the island is late, the
+   castle shows anyway after 1.2s. */
+.docs-nf-scene {
+  display: grid;
+  margin-top: 28px;
+}
+.docs-nf-scene > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.docs-nf-intro {
+  display: none;
+}
+:is(.light, .dark) .docs-nf:not([data-ready]) .docs-nf-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: start;
+  padding-top: 72px;
+  animation: docs-nf-hide 0s 1.2s forwards;
+}
+:is(.light, .dark) .docs-nf:not([data-ready]) .docs-nf-stage {
   opacity: 0;
   animation: docs-nf-show 0s 1.2s forwards;
 }
 @keyframes docs-nf-show {
   to {
     opacity: 1;
+  }
+}
+@keyframes docs-nf-hide {
+  to {
+    visibility: hidden;
+  }
+}
+.docs-nf-intro svg {
+  overflow: visible;
+}
+.docs-nf-intro path {
+  fill: none;
+  stroke: var(--nf-mark);
+  stroke-width: 0.7;
+  stroke-dasharray: 1 1;
+}
+.docs-nf-intro p {
+  margin: 16px 0 0;
+  font-family: var(--chakra-fonts-mono);
+  font-size: 12px;
+  color: var(--nf-dim);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .docs-nf-intro path {
+    animation: docs-nf-draw 1.6s ease-in-out infinite;
+  }
+  .docs-nf-intro span {
+    animation: docs-nf-blink 1s steps(1) infinite;
+  }
+  .docs-nf[data-flight] .docs-castle-floor path {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: docs-nf-floor 480ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms both;
+  }
+  .docs-nf[data-flight] .docs-castle-floor path:nth-child(2) {
+    animation-delay: 210ms;
+  }
+  .docs-nf[data-flight] .docs-castle-floor path:nth-child(1) {
+    animation-delay: 300ms;
+  }
+}
+@keyframes docs-nf-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  55%,
+  70% {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+@keyframes docs-nf-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes docs-nf-floor {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
   }
 }
 .docs-nf-path {
@@ -2595,21 +2685,10 @@ html[data-docs-theme-change]::view-transition-new(root) {
   line-height: 46px;
   letter-spacing: -0.02em;
 }
-.docs-nf[data-scene="engineering"] .docs-nf-head h1 {
-  font-family: var(--chakra-fonts-mono);
-  font-weight: 500;
-  font-size: 30px;
-  line-height: 38px;
-  letter-spacing: -0.01em;
-}
 @media (max-width: 47.99rem) {
   .docs-nf-head h1 {
     font-size: 32px;
     line-height: 36px;
-  }
-  .docs-nf[data-scene="engineering"] .docs-nf-head h1 {
-    font-size: 24px;
-    line-height: 32px;
   }
 }
 .docs-nf-address {
@@ -2619,16 +2698,12 @@ html[data-docs-theme-change]::view-transition-new(root) {
   color: var(--nf-dim);
   overflow-wrap: anywhere;
 }
-.docs-nf[data-scene="engineering"] .docs-nf-address {
-  font-size: 14px;
-}
 .docs-nf-address code {
   font-family: var(--chakra-fonts-mono);
   font-size: 0.875em;
   color: var(--nf-fg);
 }
 .docs-nf-stage {
-  margin-top: 28px;
   max-width: 900px;
 }
 .docs-nf-dim {
@@ -2701,10 +2776,51 @@ html[data-docs-theme-change]::view-transition-new(root) {
     grid-column: 2;
   }
 }
-/* Engineering: a Langy Code session, Claude Code's terminal with the name changed. */
+/* Engineering: a Langy Code session, Claude Code's terminal with the name changed, in a
+   terminal window of its own. */
+.docs-nf-window {
+  --nf-bg: #f4efe4;
+  --nf-line: #ddd6c6;
+  overflow: hidden;
+  border: 1px solid var(--nf-line);
+  border-radius: 12px;
+  background: var(--nf-bg);
+  font-family: var(--chakra-fonts-mono);
+  box-shadow: 0 16px 36px -14px rgb(20 15 30 / 0.18);
+}
+.dark .docs-nf-window {
+  --nf-bg: #08080a;
+  --nf-line: #34343b;
+  box-shadow: 0 16px 36px -14px rgb(0 0 0 / 0.6);
+}
+.docs-nf-window-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--nf-line);
+  font-size: 12px;
+  color: var(--nf-dim);
+}
+.docs-nf-window-dots {
+  display: flex;
+  gap: 8px;
+}
+.docs-nf-window-dots span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--nf-line);
+}
 .docs-nf-term {
+  padding: 22px 24px 18px;
   font-size: 14px;
   line-height: 22px;
+}
+@media (max-width: 47.99rem) {
+  .docs-nf-term {
+    padding: 18px 16px 14px;
+  }
 }
 .docs-nf-banner {
   display: flex;
@@ -2854,9 +2970,6 @@ html[data-docs-theme-change]::view-transition-new(root) {
   border-radius: 50%;
   background: var(--nf-mark);
 }
-.docs-nf[data-scene="engineering"] .docs-nf-dot {
-  display: none;
-}
 .docs-nf-icon {
   flex-shrink: 0;
 }
@@ -2893,6 +3006,9 @@ html[data-docs-theme-change]::view-transition-new(root) {
 }
 .docs-nf-trace-head .docs-nf-icon {
   color: var(--nf-dim);
+}
+.docs-nf-trace-mark {
+  fill: var(--nf-mark);
 }
 .docs-nf-trace-head strong {
   font-weight: 500;
@@ -3273,7 +3389,7 @@ html[data-docs-theme-change]::view-transition-new(root) {
   display: none !important;
 }
 
-/* The app's session frame sizes itself; this is its room until it says how tall it is. */
+/* The app's session frame sizes itself; this is its room from its first word until it says how tall. */
 .docs-session-frame {
   display: block;
   width: 100%;
@@ -3281,4 +3397,10 @@ html[data-docs-theme-change]::view-transition-new(root) {
   margin: 8px 0;
   border: 0;
   color-scheme: normal;
+}
+/* Until the frame first speaks it takes no room: a refused frame shows nothing at all. */
+.docs-session-frame:not([data-docs-frame-ready]) {
+  height: 0 !important;
+  margin: 0;
+  visibility: hidden;
 }

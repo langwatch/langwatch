@@ -49,6 +49,15 @@ export function DocsInlineCode({ children }: { children?: ReactNode }) {
   );
 }
 
+/** Plain text with Markdown code spans, as OpenAPI and frontmatter descriptions write them. */
+export function TextWithCode({ text }: { text: string }) {
+  return text
+    .split(/(`[^`\n]+`)/)
+    .map((part, index) =>
+      index % 2 === 1 ? <DocsInlineCode key={index}>{part.slice(1, -1)}</DocsInlineCode> : part,
+    );
+}
+
 export function DocsTable(props: ComponentProps<"table">) {
   return (
     <TypeRegion

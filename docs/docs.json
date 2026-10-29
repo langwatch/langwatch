@@ -1122,7 +1122,7 @@
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",
-              "api-reference/traces/discover-what-the-trace-filter-fields-ho",
+              "api-reference/traces/discover-what-the-trace-filter-fields-hold",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
               "api-reference/traces/get-transcript",
@@ -1139,7 +1139,7 @@
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
               "api-reference/datasets/create-attachments",
-              "api-reference/datasets/create-an-upload-for-an-image-or-file-ce",
+              "api-reference/datasets/create-an-upload-for-an-image-or-file-cell",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-a-dataset-from-an-uploaded-file",
               "api-reference/datasets/create-upload",
@@ -1805,6 +1805,14 @@
     }
   },
   "redirects": [
+    {
+      "source": "/api-reference/traces/discover-what-the-trace-filter-fields-ho",
+      "destination": "/api-reference/traces/discover-what-the-trace-filter-fields-hold"
+    },
+    {
+      "source": "/api-reference/datasets/create-an-upload-for-an-image-or-file-ce",
+      "destination": "/api-reference/datasets/create-an-upload-for-an-image-or-file-cell"
+    },
     {
       "source": "/api-reference/projects/get-a-dashboards-board",
       "destination": "/api-reference/projects/get-a-dashboard"

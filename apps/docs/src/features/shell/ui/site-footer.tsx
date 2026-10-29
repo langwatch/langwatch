@@ -100,7 +100,7 @@ export function SiteFooter() {
         fontSize="13px"
         color="docs.lede"
       >
-        <Text margin="0">LangWatch B.V. · Built in Amsterdam.</Text>
+        <Text margin="0">Reasoning Engine B.V. · Built in Amsterdam.</Text>
         <Link href={`${site.github}/blob/main/LICENSE.md`} color="inherit">
           Apache 2.0 + Enterprise
         </Link>

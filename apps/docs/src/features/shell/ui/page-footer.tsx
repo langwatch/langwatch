@@ -155,7 +155,11 @@ export function PageFooter({
     body: `Page: ${canonicalUrl({ slug })}\n\nWhat is outdated or broken?\n\nExpected behavior or suggested correction:\n`,
   })}`;
   return (
-    <Box className="docs-page-footer" marginTop={{ base: "12", lg: "16" }}>
+    <Box
+      className="docs-page-footer"
+      marginTop={{ base: "12", lg: "16" }}
+      paddingBottom={{ base: "12", lg: "16" }}
+    >
       {updated ? (
         <Box marginBottom="6">
           <LastUpdated date={updated} />

@@ -168,7 +168,9 @@ Feature: Static documentation with progressive interaction
     And unrelated navigation groups start collapsed
     And the active page remains in an expanded branch
     And initial loading preserves the article heading and top gap
-    And operation names occupy no more than two lines
+    And page list titles occupy one line, trimmed with an ellipsis and kept whole in their title attribute
+    And the page list never scrolls sideways
+    And the page feedback card keeps clear space beneath it before the footer
 
   @e2e
   Scenario: Use a static MDX disclosure
@@ -295,6 +297,12 @@ Feature: Static documentation with progressive interaction
     Then its copy button carries no second copy of the code
     And copying reads the code of the block, or of the selected tab, the button belongs to
     And a failed fetch or a denied clipboard reports that copying failed
+
+  @integration
+  Scenario: Set the theme before paint even when storage is blocked
+    Given the browser refuses to read the stored theme
+    When a page starts
+    Then the page still gets the light or dark theme from the reader's colour scheme
 
   @unit @e2e
   Scenario: Follow the reader's dark preference without JavaScript

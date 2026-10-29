@@ -44,7 +44,7 @@ function ParamInput({
         fontSize="13px"
         lineHeight="20px"
         fontWeight="600"
-        marginBottom="1"
+        marginBottom="1.5"
       >
         <Box as="span" fontFamily="mono">
           {param.name}
@@ -193,7 +193,7 @@ function AuthField({
             Clear
           </Button>
         </Flex>
-        <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
+        <Text margin="0" marginTop="2" fontSize="12px" color="fg.muted">
           Kept in this tab. Cleared when you reload.
         </Text>
       </Box>
@@ -218,7 +218,7 @@ function SendActions({
   host: string;
 }) {
   return (
-    <Box>
+    <Box marginTop="1">
       {mutating ? (
         <Text margin="0" marginBottom="2" fontSize="12px" color="fg.muted">
           This sends a live request to {host}.
@@ -342,12 +342,12 @@ function ParameterFields({
     <>
       {" "}
       {required.length > 0 ? (
-        <Flex className="docs-request-fields" direction="column" gap="3">
+        <Flex className="docs-request-fields" direction="column" gap="4">
           {required.map(renderParam)}
         </Flex>
       ) : null}
       {optional.length > 0 ? (
-        <Flex className="docs-request-fields" direction="column" gap="3">
+        <Flex className="docs-request-fields" direction="column" gap="4">
           {optional.map(renderParam)}
         </Flex>
       ) : null}
@@ -366,7 +366,7 @@ function ParameterFields({
           }}
         >
           <summary>▸ Optional fields (deprecated)</summary>
-          <Flex direction="column" gap="3" marginTop="2">
+          <Flex direction="column" gap="4" marginTop="2">
             {deprecated.map(renderParam)}
           </Flex>
         </chakra.details>
@@ -434,7 +434,14 @@ export function PlaygroundRequest({
             </Button>
           }
         >
-          <Flex direction="column" gap="4" padding="4" ref={formRef}>
+          <Flex
+            direction="column"
+            gap="5"
+            paddingX="4"
+            paddingTop="4"
+            paddingBottom="5"
+            ref={formRef}
+          >
             <Text margin="0" fontSize="12px" color="fg.muted">
               {host}
             </Text>

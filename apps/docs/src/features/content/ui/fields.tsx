@@ -93,6 +93,9 @@ export function DocsField({
 export const ParamField = (props: FieldProps) => <DocsField kind="param" {...props} />;
 export const ResponseField = (props: FieldProps) => <DocsField kind="response" {...props} />;
 
+/* A quiet text disclosure (still a 44px tap target); its children hang from a left rule under the
+   chevron, so they read as the parent's. The label swaps Show for Hide in CSS as the disclosure
+   island flips data-state. */
 export function Expandable({
   title,
   defaultOpen,
@@ -109,33 +112,40 @@ export function Expandable({
       multiple
       defaultValue={flag(defaultOpen) ? ["item"] : []}
       variant="plain"
-      marginTop="2"
+      className="docs-expandable"
     >
       <Accordion.Item value="item">
         <Accordion.ItemTrigger
           minHeight="44px"
-          paddingX="3"
+          paddingY="0"
+          paddingInlineStart="0"
+          paddingInlineEnd="2"
           width="fit-content"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="lg"
-          gap="2"
+          gap="1.5"
           cursor="pointer"
           color="fg.muted"
-          fontSize="14px"
+          fontSize="13px"
+          fontWeight="500"
+          borderRadius="md"
+          _hover={{ color: "fg" }}
         >
           <Accordion.ItemIndicator />
-          <Box as="span">{title ? `Show ${label}` : "Show child fields"}</Box>
+          <Box as="span" className="docs-expandable-show">
+            Show {label}
+          </Box>
+          <Box as="span" className="docs-expandable-hide">
+            Hide {label}
+          </Box>
         </Accordion.ItemTrigger>
         <Accordion.ItemContent data-docs-panel="">
           <Accordion.ItemBody
-            paddingStart="4"
-            padding="3"
-            borderWidth="1px"
-            borderRadius="lg"
-            marginTop="2"
-            borderColor="border.muted"
-            marginBottom="2"
+            paddingY="0"
+            paddingInlineEnd="0"
+            paddingInlineStart="4"
+            marginInlineStart="7px"
+            marginBottom="1"
+            borderInlineStartWidth="1px"
+            borderColor="border"
           >
             {children}
           </Accordion.ItemBody>

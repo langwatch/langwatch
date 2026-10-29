@@ -71,7 +71,13 @@ export function PageMenu({ slug, actions }: { slug: string; actions: ContextualO
   const url = canonicalUrl({ slug });
   const prompt = `Read ${url} and help me understand this page.`;
   const logo = (name: string) => (
-    <img src={sitePath({ path: `/images/logos/${name}.svg` })} alt="" width={16} height={16} />
+    <img
+      src={sitePath({ path: `/images/logos/${name}.svg` })}
+      alt=""
+      width={16}
+      height={16}
+      loading="lazy"
+    />
   );
   const external = ({
     id,

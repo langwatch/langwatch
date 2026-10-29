@@ -218,3 +218,18 @@ Feature: Actionable documentation and restrained reading surfaces
     Then its product image loads as a responsive WebP and the page never scrolls sideways
     And the footer meets the bottom of the window in the page's own colour, with no overscroll bounce
     And no script error is raised
+
+  @e2e
+  Scenario: Show tab number keys without moving the tabs
+    Given a tab group and a fine pointer
+    When the reader hovers or focuses the group
+    Then each of the first nine tabs shows its number key in its top corner
+    And no tab label moves
+
+  @e2e
+  Scenario: Keep the response example panel brief
+    Given an API page with documented responses
+    When a reader picks a status in the response example panel
+    Then the panel captions it with at most two lines of its description
+    And a quieter line below names the media type and whether the example is declared or generated from the schema
+    And the full description stays under Responses in the reference

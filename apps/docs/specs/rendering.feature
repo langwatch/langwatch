@@ -28,6 +28,16 @@ Feature: Read and navigate the generated documentation
     Then the server returns a 404 page in the documentation shell
     And the reader can open search or follow a starting-point link
 
+  @integration
+  Scenario: Draw the mark until the scene is chosen
+    When a reader with scripts opens a missing address
+    Then the first paint shows the 404 heading and the LangWatch mark drawing itself, not an empty page
+    And once the scene is chosen, the mark fills and flies to the scene's own mark
+    And the scene's mark is Langy's in the terminal, the service mark in the trace, or the castle's turret
+    And a reader who prefers reduced motion sees the scene without the flight
+    And if the scene is late, the castle replaces the mark after 1.2 seconds
+    And a reader without scripts sees the castle at once
+
   @unit
   Scenario: Suggest the closest pages for a missing address
     Given no redirect matches a missing address such as "/integration/pyhton/langchain"

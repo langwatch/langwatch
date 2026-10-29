@@ -30,7 +30,10 @@ const recursive = {
       type: "array",
       items: {
         type: "object",
-        properties: { children: { type: "array", items: { $recursive: "Span" } } },
+        properties: {
+          children: { type: "array", items: { $recursive: "Span" } },
+          kind: { type: "string", title: "Span kind", const: "llm" },
+        },
         additionalProperties: { type: ["string", "null"] },
         allOf: [{ properties: { id: { type: "string", minLength: 1 } } }],
       },

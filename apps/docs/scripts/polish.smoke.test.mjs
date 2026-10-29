@@ -134,7 +134,7 @@ await it("shows descriptive page actions and switches the theme from one button"
           const html = page.locator("html");
           const other = mode === "dark" ? "light" : "dark";
           assert.equal(await html.getAttribute("class"), mode);
-          const toggle = page.getByRole("button", { name: "Switch colour theme" });
+          const toggle = page.getByRole("button", { name: "Switch color theme" });
           await toggle.click();
           await page.waitForFunction((next) => document.documentElement.className === next, other);
           assert.equal(await page.evaluate(() => localStorage.getItem("theme")), other);

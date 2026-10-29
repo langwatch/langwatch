@@ -7,7 +7,7 @@ export function ThemeMenu() {
       type="button"
       data-docs-theme=""
       className="docs-theme-toggle"
-      aria-label="Switch colour theme"
+      aria-label="Switch color theme"
       title="Switch between light and dark"
     >
       <svg className="docs-theme-icon" viewBox="0 0 24 24" aria-hidden="true">

@@ -1,6 +1,7 @@
 import { DOCS_URL, sitePath, stripBasePath } from "../../../lib/site-path.ts";
 import { notFoundContext, searchWords, type NotFoundIndex } from "../model/not-found.ts";
 import { matchRedirect, type RedirectRules } from "../model/redirect-match.ts";
+import { arrive } from "./not-found-intro.ts";
 import { picks, sceneContent } from "./not-found-scenes.ts";
 
 /* Loaded on the 404 page only. A static host serves exact redirects as pages, but a pattern
@@ -29,15 +30,7 @@ function shownPath() {
   }
 }
 
-function fillRail({
-  root,
-  pages,
-  shown,
-}: {
-  root: HTMLElement;
-  pages: Element | null;
-  shown: string;
-}) {
+function fillRail({ pages, shown }: { pages: Element | null; shown: string }) {
   const rail = document.querySelector<HTMLElement>("[data-nf-matches]");
   const list = rail?.querySelector("[data-nf-rail-matches]");
   if (rail && list && pages) {
@@ -61,7 +54,6 @@ function fillRail({
     url.searchParams.set("body", `${location.href} returns a 404.\n\n${from}.`);
     report.href = url.href;
   }
-  root.dataset.ready = "";
 }
 
 function showScene({ root, path }: { root: HTMLElement; path: string }) {
@@ -84,7 +76,10 @@ function showScene({ root, path }: { root: HTMLElement; path: string }) {
   if (stage && content) stage.replaceChildren(content);
   if (stage && !content && pages.length)
     stage.querySelector(".docs-nf-picks")?.replaceWith(picks({ pages, label: "Closest pages" }));
-  fillRail({ root, pages: pages.length ? root.querySelector(".docs-nf-picks") : null, shown });
+  fillRail({ pages: pages.length ? root.querySelector(".docs-nf-picks") : null, shown });
+  void arrive({ root }).catch(() => {
+    root.dataset.ready = "";
+  });
 }
 
 const typing = (target: EventTarget | null) =>

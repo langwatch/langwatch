@@ -23,7 +23,7 @@ describe("documentation discovery", () => {
     expect(files["sitemap.xml"]?.match(/<url>/g)).toHaveLength(2);
     expect(files["robots.txt"]).toContain("Sitemap: https://langwatch.ai/docs/sitemap.xml");
     expect(files["agents.txt"]).toContain("not automatically installed agent configuration");
-    expect(files["humans.txt"]).toContain("LangWatch B.V.");
+    expect(files["humans.txt"]).toContain("Reasoning Engine B.V.");
     expect(files["llms.txt"]).toContain(
       "- [Coding agents](https://langwatch.ai/docs/coding-agents/overview.md): Trace agents",
     );

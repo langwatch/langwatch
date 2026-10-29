@@ -197,7 +197,9 @@ function GroupRow({
         _currentPage={{ color: "accent.fg", bg: "accent.subtle" }}
       >
         {item.icon ? <NavGlyph icon={item.icon} /> : null}
-        <span className="docs-nav-label">{item.title}</span>
+        <span className="docs-nav-label" title={item.title}>
+          {item.title}
+        </span>
         {endpoints > 0 ? (
           <Text
             as="span"

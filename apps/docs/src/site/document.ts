@@ -48,8 +48,8 @@ export function pageData({ slug, operation }: { slug: string; operation: Operati
   return `<script type="application/json" id="docs-page-data">${json}</script>`;
 }
 
-/** Sets the theme before paint, and notes a search shortcut pressed before the bootstrap ran. */
-export const themeScript = `<script>try{var e=document.documentElement,t=localStorage.getItem("theme"),d=t=="dark"||(!t||t=="system")&&matchMedia("(prefers-color-scheme: dark)").matches;e.classList.add(d?"dark":"light");e.style.colorScheme=d?"dark":"light"}catch{}addEventListener("keydown",k=>{if((k.metaKey||k.ctrlKey)&&/^k$/i.test(k.key)){k.preventDefault();window.docsSearchKey=1}})</script>`;
+/** Sets the theme before paint, even with storage blocked, and notes an early search shortcut. */
+export const themeScript = `<script>var e=document.documentElement,t=null;try{t=localStorage.getItem("theme")}catch{}try{var d=t=="dark"||(!t||t=="system")&&matchMedia("(prefers-color-scheme: dark)").matches;e.classList.add(d?"dark":"light");e.style.colorScheme=d?"dark":"light"}catch{}addEventListener("keydown",k=>{if((k.metaKey||k.ctrlKey)&&/^k$/i.test(k.key)){k.preventDefault();window.docsSearchKey=1}})</script>`;
 
 /** Shows the stored code language in every tab group offering it before the page first paints. */
 export const languageScript = `<script>try{const f=localStorage.getItem("lw-docs:code-language"),R='[data-scope="tabs"][data-part="root"]';f&&document.querySelectorAll(R).forEach(r=>{const own=s=>[...r.querySelectorAll(s)].filter(n=>n.closest(R)===r),t=own('[role="tab"]'),b=t.find(n=>n.dataset.docsFamily===f);if(!b||t.some(n=>n.dataset.docsFamily===f&&n.getAttribute("aria-selected")==="true"))return;t.forEach(n=>{const s=n===b;n.setAttribute("aria-selected",s);n.toggleAttribute("data-selected",s);n.tabIndex=s?0:-1});own('[role="tabpanel"]').forEach(p=>{const s=p.getAttribute("aria-labelledby")===b.id,c=r.querySelector("[data-docs-code-title]");p.hidden=!s;p.dataset.state=s?"open":"closed";s&&b.setAttribute("aria-controls",p.id);if(s&&c&&p.dataset.codeTitle)c.textContent=p.dataset.codeTitle})})}catch{}</script>`;

@@ -22,7 +22,7 @@ export function Castle() {
             strokeDasharray="3 5"
           />
         </g>
-        <g transform={MARK}>
+        <g data-nf-mark="" transform={MARK}>
           <path className="docs-castle-plate" d={LOGO_PLATE_PATH} />
           <path className="docs-castle-lines" d={LOGO_LINES_PATH} />
         </g>

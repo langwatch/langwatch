@@ -88,7 +88,7 @@ rules, with no floating panel or gradient ground. The navigation rail stays belo
 header and scrolls on its own; a tall contents rail flows with the document and
 only one that fits the available viewport becomes sticky.
 Code, tables, prompts and API responses have no vertical scroll limit. The sidebar is 280 pixels
-wide with compact method badges. Operation labels occupy at most two lines, with
+wide with compact method badges. Page list labels occupy one line, trimmed with an ellipsis, with
 full text retained for assistive technology and in the title.
 
 The page tree draws a faint guide line down every open group, at every depth, and

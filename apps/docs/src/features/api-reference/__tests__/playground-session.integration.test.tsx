@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+// The app frames its session document only for the published docs origin.
+// @vitest-environment-options {"url": "https://langwatch.ai/docs/api-reference/traces/list"}
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -137,6 +139,20 @@ describe("when I open the playground on an endpoint that takes X-Auth-Token", ()
     expect(fetches).toEqual([]);
   });
 
+  /** @scenario "Show the frame only once it speaks" */
+  it("takes no room until the frame speaks", async () => {
+    await act(async () => document.dispatchEvent(new Event("docs:leaving")));
+    await act(async () => document.getElementById("try-it-button")?.click());
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(false);
+    fromFrame(
+      { kind: "state", connected: true, project: "Evil" },
+      { origin: "https://evil.example" },
+    );
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(false);
+    await connectedIn(null);
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(true);
+  });
+
   /** @scenario "Embed the app's session frame where a project key answers" */
   it("sizes the frame as the frame asks", async () => {
     fromFrame({ kind: "height", height: 131.2 });
@@ -260,7 +276,7 @@ describe("when the reader cancels the request in the frame", () => {
     await send();
     fromFrame({ kind: "failed", id: sends()[0]?.message.id, reason: "declined" });
     await settle();
-    expect(liveResponse()).toMatch(/cancelled this request in the LangWatch frame/);
+    expect(liveResponse()).toMatch(/canceled this request in the LangWatch frame/);
   });
 
   /** @scenario "Say so when the reader declines a request in the frame" */

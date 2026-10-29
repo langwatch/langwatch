@@ -16,7 +16,7 @@ export function requestErrorOutcome({ signal }: { signal: AbortSignal }): Outcom
   if (signal.aborted)
     return {
       kind: "error",
-      message: signal.reason === "timeout" ? "Request timed out" : "Request cancelled",
+      message: signal.reason === "timeout" ? "Request timed out" : "Request canceled",
       retry: true,
     };
   return {
