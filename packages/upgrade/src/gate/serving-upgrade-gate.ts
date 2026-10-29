@@ -722,7 +722,12 @@ export async function servingUpgradeGate({
         withStoreUrls(secrets, ({ redis, credentialKeys }) => {
           const databaseUrl = database?.trim();
           if (!databaseUrl) return { ...NO_LEDGER_GATE, runOnce: refuseWithoutDatabase };
-          const stores = { bootModules, databaseUrl, clickhouse, redis, environment };
+          const upgradeEnvironment = upgradeEnvironmentOver({
+            environment,
+            databaseUrl,
+            clickhouse,
+          });
+          const stores = { bootModules, databaseUrl, redis, environment: upgradeEnvironment };
           const upgrade = upgradeIn({ ...stores, admitAtBlockingDone: true });
           const runOnce = async () =>
             EXIT_CODES[(await upgradeIn({ ...stores, admitAtBlockingDone: false })()).code];
@@ -741,7 +746,7 @@ export async function servingUpgradeGate({
             processId: `${hostname()}:${process.pid}:${role}`,
             firstInstall: upgrade,
             credentialKeys,
-            clickhouseTargets: configuredClickHouseTargets({ environment }),
+            clickhouseTargets: configuredClickHouseTargets({ environment: upgradeEnvironment }),
             targetsCatchingUp: redisTargetsCatchingUp({
               url: redis?.trim() || undefined,
               environment,
@@ -756,33 +761,49 @@ export async function servingUpgradeGate({
   );
 }
 
+/**
+ * The environment the in-process upgrade runs under: the process's, with the resolved store
+ * secrets set. The gate reads its ClickHouse targets from this same environment, so the targets
+ * it counts behind are exactly the ones the upgrade it triggers sees and seeds.
+ */
+export function upgradeEnvironmentOver({
+  environment,
+  databaseUrl,
+  clickhouse,
+}: {
+  environment: Readonly<Record<string, string | undefined>>;
+  databaseUrl: string;
+  clickhouse: string | undefined;
+}): Readonly<Record<string, string | undefined>> {
+  const sharedUrl = clickhouse?.trim();
+  return {
+    ...environment,
+    DATABASE_URL: databaseUrl,
+    ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
+  };
+}
+
 /** The upgrade this process runs: in-process over its modules, or a refusal where it has none. */
 function upgradeIn({
   bootModules,
   databaseUrl,
-  clickhouse,
   redis,
   environment,
   admitAtBlockingDone,
 }: {
   bootModules: BootUpgradeModules | undefined;
   databaseUrl: string;
-  clickhouse: string | undefined;
   redis: string | undefined;
+  /** The upgrade's environment, from `upgradeEnvironmentOver`. */
   environment: Readonly<Record<string, string | undefined>>;
   /** True for the serving worker, which takes jobs while the run's reconcilers finish. */
   admitAtBlockingDone: boolean;
 }): FirstInstallUpgrade {
   if (!bootModules) return refuseWithoutModules;
-  const sharedUrl = clickhouse?.trim();
   return inProcessUpgrade({
     boot: bootModules,
     databaseUrl,
-    environment: {
-      ...environment,
-      DATABASE_URL: databaseUrl,
-      ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
-    },
+    environment,
     development: environment.NODE_ENV === "development",
     admitAtBlockingDone,
     openPublisher: redisReadHintPublisher({ url: redis?.trim() || undefined, environment }),
