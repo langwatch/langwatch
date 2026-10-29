@@ -119,4 +119,56 @@ describe("an id index retention raise", () => {
       });
     });
   });
+
+  describe("given more tenants than one URL field carries", () => {
+    /** Ids as long as production's, so 6000 of them pass the 128 KiB field cap in one raise. */
+    const tenants = Array.from(
+      { length: 6000 },
+      (_, at) => `crowded_${String(at).padStart(24, "0")}`,
+    );
+
+    beforeAll(async () => {
+      const now = new Date().toISOString();
+      await probe.insert({
+        table: INDEX,
+        format: "JSONEachRow",
+        values: tenants.map((tenantId) => ({
+          TenantId: tenantId,
+          TraceId: `trace-${tenantId}`,
+          FromAt: now,
+          ToAt: now,
+          _retention_days: 30,
+        })),
+      });
+    }, 120_000);
+
+    it("is refused in one raise at the old 512 KiB budget", async () => {
+      const daysByTenant = new Map(tenants.map((tenantId) => [tenantId, 90]));
+      const [single, ...rest] = idIndexRetentionRaises({ daysByTenant, paramBytes: 512 * 1024 });
+
+      expect(rest).toHaveLength(0);
+      await expect(
+        probe.command({
+          query: `ALTER TABLE ${INDEX} ${ID_INDEX_RETENTION_RAISE}`,
+          query_params: single,
+        }),
+      ).rejects.toThrow(/Field value too long/);
+    });
+
+    it("splits under the field cap and raises every tenant", async () => {
+      const daysByTenant = new Map(tenants.map((tenantId) => [tenantId, 180]));
+      const raises = idIndexRetentionRaises({ daysByTenant });
+
+      for (const params of raises) {
+        await probe.command({
+          query: `ALTER TABLE ${INDEX} ${ID_INDEX_RETENTION_RAISE}`,
+          query_params: params,
+        });
+      }
+
+      expect(raises.length).toBeGreaterThan(1);
+      const raised = await retentionByTenant();
+      expect(tenants.filter((tenantId) => raised[tenantId] !== 180)).toEqual([]);
+    });
+  });
 });

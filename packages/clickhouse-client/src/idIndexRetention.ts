@@ -8,12 +8,16 @@
 export const ID_INDEX_KEPT_FOREVER_DAYS = 65_535;
 
 /**
- * Bytes of bound tenant ids one raise carries. Parameters travel in the HTTP URL, and the server's
- * default `http_max_uri_size` is 1 MiB, so a raise splits only past half of it.
+ * Bytes of bound tenant ids one raise carries. Each parameter is one URL field, and the server caps
+ * a field at `http_max_field_value_size` (128 KiB) before the URI's 1 MiB, so the budget sits under
+ * the field cap: past it the server refuses the request ("Field value too long").
  */
-export const ID_INDEX_RAISE_PARAM_BYTES = 512 * 1024;
+export const ID_INDEX_RAISE_PARAM_BYTES = 100 * 1024;
 
-/** Per id: the URL-encoded quotes and comma around it, and its days with their comma. */
+/**
+ * Per id: the URL-encoded quotes and comma around it (9 bytes), with margin. The days travel in
+ * their own, smaller field.
+ */
 const PER_TENANT_OVERHEAD_BYTES = 16;
 
 /** One raise's parameters: the tenants, and each one's days at the same position. */

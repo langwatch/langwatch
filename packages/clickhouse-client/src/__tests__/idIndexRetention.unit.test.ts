@@ -36,4 +36,45 @@ describe("idIndexRetentionRaises", () => {
       expect(idIndexRetentionRaises({ daysByTenant })).toHaveLength(1);
     });
   });
+
+  describe("given a target with tens of thousands of tenants", () => {
+    /** ClickHouse's default `http_max_field_value_size`: one URL field's value, at most. */
+    const MAX_FIELD_VALUE_BYTES = 128 * 1024;
+
+    /** One parameter as `@clickhouse/client` puts it in the URL: an array literal, encoded. */
+    const urlField = (name: string, values: readonly (string | number)[]): number => {
+      const literal = `[${values
+        .map((value) =>
+          typeof value === "number"
+            ? String(value)
+            : `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`,
+        )
+        .join(",")}]`;
+      return new URLSearchParams([[`param_${name}`, literal]]).toString().length;
+    };
+
+    const daysByTenant = new Map(
+      Array.from({ length: 20_000 }, (_, at) => [
+        `project_${String(at).padStart(21, "x")}`,
+        [0, 30, 365][at % 3] ?? 30,
+      ]),
+    );
+
+    it("keeps every raise's tenant ids under one URL field's cap", () => {
+      const raises = idIndexRetentionRaises({ daysByTenant });
+
+      expect(raises.length).toBeGreaterThan(1);
+      expect(raises.flatMap((each) => each.tenantIds)).toHaveLength(daysByTenant.size);
+      for (const raise of raises) {
+        expect(urlField("tenantIds", raise.tenantIds)).toBeLessThan(MAX_FIELD_VALUE_BYTES);
+        expect(urlField("retentionDays", raise.retentionDays)).toBeLessThan(MAX_FIELD_VALUE_BYTES);
+      }
+    });
+
+    it("would pass the field cap at the old 512 KiB budget", () => {
+      const [first] = idIndexRetentionRaises({ daysByTenant, paramBytes: 512 * 1024 });
+
+      expect(urlField("tenantIds", first?.tenantIds ?? [])).toBeGreaterThan(MAX_FIELD_VALUE_BYTES);
+    });
+  });
 });
