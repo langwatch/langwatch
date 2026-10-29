@@ -15,8 +15,6 @@ import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
   isLangWatchQLGranularityParameterType,
-  isLangWatchQLListParameter,
-  isLangWatchQLListParameterType,
   isLangWatchQLSurfaceParameter,
   isLangWatchQLTimeWindowParameter,
   type LangWatchQLTimeWindow,
@@ -27,10 +25,13 @@ import {
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
-  LWQL_SOURCES_PARAMETER,
 } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 
+import {
+  bindListParameters,
+  mistypedListParameters,
+} from "../rules/langwatch-ql-reserved-lists.rules.ts";
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
 /** What a statement's reserved names mean for the request about to be made. */
@@ -271,31 +272,16 @@ export class LangWatchQLTimeWindowService {
     const reserved = declared.filter((parameter) =>
       isLangWatchQLTimeWindowParameter(parameter.name),
     );
-    const declaredLists = declared.filter((parameter) =>
-      isLangWatchQLListParameter(parameter.name),
-    );
-
     const mistyped = [
       ...reserved.filter((parameter) => !isLangWatchQLDateTimeParameterType(parameter.type)),
-      ...declaredLists.filter((parameter) => !isLangWatchQLListParameterType(parameter.type)),
+      ...mistypedListParameters(declared).map((name) => ({ name })),
     ]
       .map((parameter) => parameter.name)
       .toSorted();
     if (mistyped.length > 0) {
       throw new LangWatchQLReservedParameterTypeError(mistyped);
     }
-    const followsSources = declaredLists.some(
-      (parameter) => parameter.name === LWQL_SOURCES_PARAMETER,
-    );
-    const listValues = Object.fromEntries(
-      declaredLists.map((parameter) => [
-        parameter.name,
-        parameter.name === LWQL_SOURCES_PARAMETER ? lists?.sources : lists?.projects,
-      ]),
-    );
-    const listBound = Object.fromEntries(
-      Object.entries(listValues).filter(([, value]) => value !== undefined),
-    );
+    const { followsSources, bound: listBound } = bindListParameters({ declared, lists });
 
     const supplied = Object.keys(parameters ?? {})
       .filter(isLangWatchQLSurfaceParameter)

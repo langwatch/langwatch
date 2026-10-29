@@ -184,46 +184,12 @@ export class LangWatchQLService {
     readonly isInstantEvalsEnabled?: boolean;
   }): ValidatedLangWatchQL {
     assertNoReservedNameAssigned(sql);
-    const validation = this.validation.validate({
+    const validation = this.validateAgainstPolicy({
+      projectId,
+      protections,
       sql,
-      // The datasets this caller can reach, not every dataset the catalog has. A dataset gated
-      // as a whole is absent from the schema endpoint, and `allowedTables` is what makes it
-      // *unnameable* rather than merely unlisted: derived from the full catalog, a caller could
-      // name a hidden dataset and read its row-policed rows despite holding none of the
-      // permissions that dataset requires.
-      allowedTables: catalogShapes.allowedTables({
-        database: this.deps.database,
-        views: catalogShapes.visibleViews({
-          protections,
-          views: this.views,
-          catalog: this.catalog,
-        }),
-      }),
-      // Derived from the *full* catalog on purpose: a column of a hidden
-      // dataset must stay gated so that naming it unqualified — where no table
-      // reference reveals which dataset it came from — is refused too.
-      gatedColumns: catalogShapes.gatedColumns({ protections, views: this.views }),
-      // What would lift each of those, so a refusal can say "you may not see this" apart from
-      // "this query is broken". It names a permission, never a value.
-      gatedColumnGates: catalogShapes.gatedColumnGates({ protections, views: this.views }),
-      // An app function returning captured content is as restricted as a
-      // column holding it, so the gate reads the same permissions.
-      heldPermissions: [...catalogShapes.heldPermissions(protections)],
       isInstantEvalsEnabled: isInstantEvalsEnabled === true,
-      defaultDatabase: this.deps.database,
     });
-
-    if (!validation.ok) {
-      logger.info(
-        {
-          projectId,
-          violations: validation.violations.map((violation) => violation.code),
-        },
-        "LangWatchQL refused by policy",
-      );
-
-      throw lwqlValidationErrors.forRejection(validation);
-    }
 
     // The granularity rules ride on every validate -- persisted saves AND
     // ad-hoc execution, since execute() calls validate() -- which is what
@@ -251,6 +217,96 @@ export class LangWatchQLService {
       followsSources: window.followsSources,
       ...(window.parameters ? { boundParameters: window.parameters } : {}),
       awaitingTimeWindow: window.awaitingTimeWindow,
+    };
+  }
+
+  /** The policy half of validation: what this caller may name, refused with the policy's error. */
+  private validateAgainstPolicy({
+    projectId,
+    protections,
+    sql,
+    isInstantEvalsEnabled,
+  }: {
+    readonly projectId: string;
+    readonly protections: LangWatchQLProtections;
+    readonly sql: string;
+    readonly isInstantEvalsEnabled: boolean;
+  }) {
+    const validation = this.validation.validate({
+      sql,
+      // The datasets this caller can reach, not every dataset the catalog has. A dataset gated
+      // as a whole is absent from the schema endpoint, and `allowedTables` is what makes it
+      // *unnameable* rather than merely unlisted: derived from the full catalog, a caller could
+      // name a hidden dataset and read its row-policed rows despite holding none of the
+      // permissions that dataset requires.
+      allowedTables: catalogShapes.allowedTables({
+        database: this.deps.database,
+        views: catalogShapes.visibleViews({
+          protections,
+          views: this.views,
+          catalog: this.catalog,
+        }),
+      }),
+      // Derived from the *full* catalog on purpose: a column of a hidden
+      // dataset must stay gated so that naming it unqualified — where no table
+      // reference reveals which dataset it came from — is refused too.
+      gatedColumns: catalogShapes.gatedColumns({ protections, views: this.views }),
+      // What would lift each of those, so a refusal can say "you may not see this" apart from
+      // "this query is broken". It names a permission, never a value.
+      gatedColumnGates: catalogShapes.gatedColumnGates({ protections, views: this.views }),
+      // An app function returning captured content is as restricted as a
+      // column holding it, so the gate reads the same permissions.
+      heldPermissions: [...catalogShapes.heldPermissions(protections)],
+      isInstantEvalsEnabled,
+      defaultDatabase: this.deps.database,
+    });
+
+    if (!validation.ok) {
+      logger.info(
+        {
+          projectId,
+          violations: validation.violations.map((violation) => violation.code),
+        },
+        "LangWatchQL refused by policy",
+      );
+
+      throw lwqlValidationErrors.forRejection(validation);
+    }
+
+    return validation;
+  }
+
+  /** The result with what the run was bound to, and the notes on what limited or ignored it. */
+  private withRunNotes({
+    result,
+    validation,
+    granularity,
+    followedWindow,
+    memberWindows,
+    sources,
+  }: {
+    result: LangWatchQLQueryResult;
+    validation: ValidatedLangWatchQL;
+    granularity: Parameters<typeof langWatchQLExecutionParameters>[0]["granularity"];
+    followedWindow: LangWatchQLTimeWindow | undefined;
+    memberWindows: Parameters<typeof runNotes>[0]["memberWindows"];
+    sources: Parameters<typeof runNotes>[0]["sources"];
+  }): LangWatchQLQueryResult {
+    return {
+      ...result,
+      params: buildRunParams({
+        bound: langWatchQLExecutionParameters({ validation, granularity }),
+        followedWindow,
+      }),
+      diagnostics: [
+        ...result.diagnostics,
+        ...runNotes({
+          memberWindows,
+          sources,
+          followsSources: validation.followsSources,
+          granularity,
+        }),
+      ],
     };
   }
 
@@ -403,23 +459,14 @@ export class LangWatchQLService {
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
     });
 
-    const params = buildRunParams({
-      bound: langWatchQLExecutionParameters({ validation, granularity }),
+    const limited = this.withRunNotes({
+      result,
+      validation,
+      granularity,
       followedWindow,
+      memberWindows,
+      sources,
     });
-    const limited = {
-      ...result,
-      params,
-      diagnostics: [
-        ...result.diagnostics,
-        ...runNotes({
-          memberWindows,
-          sources,
-          followsSources: validation.followsSources,
-          granularity,
-        }),
-      ],
-    };
     if (completeness.kind !== "reported") return limited;
     return { ...limited, completeness: completeness.completeness };
   }
