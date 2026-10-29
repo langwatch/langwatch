@@ -1,8 +1,9 @@
 // Package ecrtag decides whether a publish step may write an image tag to the
 // artifacts ECR, whose tags are immutable, and gives a Lambda image its commit
-// tag. A default tag already there is skipped only when it records this
-// commit; a custom tag already there, another commit's tag, a tag that records
-// no commit and a lookup that did not answer all fail, so nothing is written.
+// tag. A tag already there is skipped when it records this commit, or, for a
+// default tag only, when its digest is the re-tag's own copy (AcceptDigest);
+// another commit's tag, a tag that records no commit, a push run's re-tag met
+// by a run that built the image and a lookup that did not answer all fail.
 //
 // Spec: specs/ci/publish-ecr-images.feature
 package ecrtag

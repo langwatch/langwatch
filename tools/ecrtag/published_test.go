@@ -93,9 +93,9 @@ func TestATagRecordingNoCommitFailsClosed(t *testing.T) {
 	}
 }
 
-// @scenario "A dispatch with a custom tag that is already there fails the run"
+// @scenario "A dispatch whose custom tag is already there for another commit or none fails the run"
 // @scenario "A re-run of a dispatch with a custom tag publishes nothing already there"
-// @scenario "A private build never reuses a custom tag"
+// @scenario "A private build reuses a tag only for the commit it records"
 func TestACustomTagAlreadyThere(t *testing.T) {
 	reg := registryOfTags().
 		push("hotfix-other", entry{label: other}).
@@ -125,7 +125,7 @@ func TestACustomTagAlreadyThere(t *testing.T) {
 	})
 }
 
-// @scenario "A private build never reuses a custom tag"
+// @scenario "A private build reuses a tag only for the commit it records"
 func TestADefaultTagAlreadyThereForThisCommitIsSkipped(t *testing.T) {
 	reg := newRegistry().push("ref-1111111aaa", entry{label: this}).push("ref-1111111bbb", entry{label: other})
 
@@ -186,7 +186,10 @@ func TestAnIndexTagMustNameTheManifestThisRunBuilt(t *testing.T) {
 		push("git-1111111", entry{mediaType: index, body: `{"manifests":[{"digest":"sha256:built"}],` + annotated(this)[1:]}).
 		push("git-2222222-arm64", entry{digest: "sha256:built2", label: this}).
 		// A push run re-tagged the ancestor's index and annotated it with this commit.
-		push("git-2222222", entry{mediaType: index, body: `{"manifests":[{"digest":"sha256:ancestor"}],` + annotated(this)[1:]})
+		push("git-2222222", entry{mediaType: index, body: `{"manifests":[{"digest":"sha256:ancestor"}],` + annotated(this)[1:]}).
+		push("git-3333333-arm64", entry{digest: "sha256:built3", label: this}).
+		// An index naming this run's build beside another manifest.
+		push("git-3333333", entry{mediaType: index, body: `{"manifests":[{"digest":"sha256:built3"},{"digest":"sha256:ancestor"}],` + annotated(this)[1:]})
 	built := func(tag string) ecrtag.Check {
 		c := check(tag, ecrtag.Annotation)
 		c.BuiltFrom = tag + "-arm64"
@@ -199,6 +202,10 @@ func TestAnIndexTagMustNameTheManifestThisRunBuilt(t *testing.T) {
 
 	_, err = ecrtag.Published(context.Background(), reg, built("git-2222222"))
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "re-tagged by a push run")
+
+	_, err = ecrtag.Published(context.Background(), reg, built("git-3333333"))
+	require.Error(t, err, "an index naming more than this run's build")
 	assert.Contains(t, err.Error(), "re-tagged by a push run")
 }
 

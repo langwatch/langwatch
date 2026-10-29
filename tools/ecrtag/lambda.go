@@ -21,7 +21,8 @@ type Lambda struct {
 	// Built is true when this run rebuilt the image and so pushed Tag itself;
 	// otherwise the image of the nearest ancestor of Head is re-tagged as Tag.
 	Built bool
-	// Custom is a dispatcher's tag: one already there fails.
+	// Custom is a dispatcher's tag: one already there is skipped only when
+	// it records this commit, never as the copy a re-tag would make.
 	Custom bool
 	// Log receives what was done and the ::warning:: an unseeded image gets.
 	Log io.Writer
