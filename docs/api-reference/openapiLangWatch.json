@@ -33876,6 +33876,22 @@
                               "ORGANIZATION"
                             ]
                           },
+                          "excludedOrigins": {
+                            "anyOf": [
+                              {
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "createdById": {
                             "type": [
                               "string",
@@ -33902,6 +33918,7 @@
                           "name",
                           "description",
                           "scope",
+                          "excludedOrigins",
                           "createdById",
                           "createdAt",
                           "updatedAt",
@@ -34302,6 +34319,22 @@
                         "ORGANIZATION"
                       ]
                     },
+                    "excludedOrigins": {
+                      "anyOf": [
+                        {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -34323,6 +34356,7 @@
                     "name",
                     "description",
                     "scope",
+                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -34737,6 +34771,22 @@
                         "ORGANIZATION"
                       ]
                     },
+                    "excludedOrigins": {
+                      "anyOf": [
+                        {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -34758,6 +34808,7 @@
                     "name",
                     "description",
                     "scope",
+                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -35243,6 +35294,22 @@
                         "ORGANIZATION"
                       ]
                     },
+                    "excludedOrigins": {
+                      "anyOf": [
+                        {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -35264,6 +35331,7 @@
                     "name",
                     "description",
                     "scope",
+                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -35685,7 +35753,7 @@
             }
           }
         },
-        "description": "Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.",
+        "description": "Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).",
         "summary": "Update a dashboard",
         "tags": [
           "Dashboards"
@@ -35732,6 +35800,22 @@
                       {
                         "type": "string",
                         "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "excludedOrigins": {
+                    "anyOf": [
+                      {
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
                       },
                       {
                         "type": "null"
@@ -39719,6 +39803,22 @@
                               "ORGANIZATION"
                             ]
                           },
+                          "excludedOrigins": {
+                            "anyOf": [
+                              {
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "createdById": {
                             "type": [
                               "string",
@@ -39745,6 +39845,7 @@
                           "name",
                           "description",
                           "scope",
+                          "excludedOrigins",
                           "createdById",
                           "createdAt",
                           "updatedAt",
@@ -40158,6 +40259,22 @@
                         "ORGANIZATION"
                       ]
                     },
+                    "excludedOrigins": {
+                      "anyOf": [
+                        {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -40179,6 +40296,7 @@
                     "name",
                     "description",
                     "scope",
+                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -40680,6 +40798,22 @@
                               "ORGANIZATION"
                             ]
                           },
+                          "excludedOrigins": {
+                            "anyOf": [
+                              {
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "createdById": {
                             "type": [
                               "string",
@@ -40706,6 +40840,7 @@
                           "name",
                           "description",
                           "scope",
+                          "excludedOrigins",
                           "createdById",
                           "createdAt",
                           "updatedAt",
@@ -41120,6 +41255,22 @@
                         "ORGANIZATION"
                       ]
                     },
+                    "excludedOrigins": {
+                      "anyOf": [
+                        {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "createdById": {
                       "type": [
                         "string",
@@ -41141,6 +41292,7 @@
                     "name",
                     "description",
                     "scope",
+                    "excludedOrigins",
                     "createdById",
                     "createdAt",
                     "updatedAt",
@@ -49942,6 +50094,11 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     }
+                  },
+                  "concurrency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 24
                   }
                 }
               }
@@ -97257,7 +97414,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -97270,7 +97427,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -97886,7 +98043,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -97899,7 +98056,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -98302,7 +98459,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -98315,7 +98472,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",

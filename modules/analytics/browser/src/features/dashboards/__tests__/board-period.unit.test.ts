@@ -7,7 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   BOARD_PERIOD_RANGES,
+  boardExcludedOrigins,
   boardGrainFits,
+  boardIncludesLangy,
+  boardOriginsWithLangy,
   boardPeriodBounds,
   boardPeriodGranularity,
   boardWindowEnd,
@@ -132,5 +135,43 @@ describe("defaultBoardExcludedOrigins", () => {
     it("leaves out no origin", () => {
       expect(defaultBoardExcludedOrigins({ isPersonalProject: true })).toEqual([]);
     });
+  });
+});
+
+describe("boardExcludedOrigins", () => {
+  describe("given a board that stores no origins", () => {
+    /** @scenario "AC200 Langy setting: a board leaves Langy's conversations out until a member includes them" */
+    it("leaves out the project's default", () => {
+      expect(boardExcludedOrigins({ stored: null, isPersonalProject: false })).toEqual(["langy"]);
+    });
+
+    /** @scenario "AC200c Langy setting: a personal project's board still includes Langy by default" */
+    it("leaves out no origin in a personal project", () => {
+      expect(boardExcludedOrigins({ stored: null, isPersonalProject: true })).toEqual([]);
+    });
+  });
+
+  describe("given a board set to include Langy", () => {
+    /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+    it("leaves out what it stores, the empty list, wherever it is", () => {
+      expect(boardExcludedOrigins({ stored: [], isPersonalProject: false })).toEqual([]);
+      expect(boardIncludesLangy({ excluded: [] })).toBe(true);
+    });
+  });
+});
+
+describe("boardOriginsWithLangy", () => {
+  /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+  it("drops langy when the member includes it, and keeps other origins", () => {
+    expect(boardOriginsWithLangy({ excluded: ["langy"], includeLangy: true })).toEqual([]);
+    expect(boardOriginsWithLangy({ excluded: ["eval", "langy"], includeLangy: true })).toEqual([
+      "eval",
+    ]);
+  });
+
+  /** @scenario "AC200c Langy setting: a personal project's board still includes Langy by default" */
+  it("adds langy when the member leaves it out", () => {
+    expect(boardOriginsWithLangy({ excluded: [], includeLangy: false })).toEqual(["langy"]);
+    expect(boardIncludesLangy({ excluded: ["langy"] })).toBe(false);
   });
 });

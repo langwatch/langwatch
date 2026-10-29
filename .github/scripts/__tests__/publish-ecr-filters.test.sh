@@ -57,7 +57,7 @@ test_every_filter_rebuilds_on_a_dockerignore_change() {
 }
 
 # A wiring check, not a scenario binding: which tag nearest-ancestor-tag.sh
-# picks is proved by nearest-ancestor-tag.test.sh and publish-lambda-tag.test.sh.
+# picks is proved by nearest-ancestor-tag.test.sh and tools/ecrtag/lambda_test.go.
 # This only pins that the service-image re-tag calls it, and that its output,
 # not a mention in a comment, is what `previous` is set from.
 test_service_images_are_retagged_from_the_nearest_ancestor() {

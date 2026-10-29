@@ -5,13 +5,15 @@ name: publish-docker-ecr
 # OSS-built `git-<sha>` image instead of rebuilding this same source itself.
 #
 # Why a second workflow rather than extra steps in publish-docker-app.yml:
-#   - Different trigger surface. ECR also publishes on every merge to main, so
-#     SaaS always has a `git-<sha>` to pin. Docker Hub stays release/dispatch-only.
+#   - Different trigger surface. ECR publishes on every merge to main, so SaaS
+#     always has a `git-<sha>` to pin, and never on a release: a release build
+#     must not move a `git-<sha>` tag Cloud already uses. Docker Hub stays
+#     release/dispatch-only.
 #   - Different auth. GitHub OIDC role assumption into the artifacts account —
 #     no long-lived AWS keys in this public repository.
 #   - Different tag policy. This workflow NEVER pushes `:latest`, and nothing
 #     else writes it on these repositories. Their tags are immutable, so every
-#     push here checks first (.github/scripts/ecr-tag-published.sh). A default
+#     push here checks first (`go run ./cmd/ecrtag`, tools/ecrtag). A default
 #     `git-<short sha>` tag already there is skipped only when it records this
 #     commit's full sha as its org.opencontainers.image.revision; a custom
 #     `image_tag` already there fails the run, so the dispatcher picks a new one.
@@ -43,12 +45,12 @@ name: publish-docker-ecr
 #
 # The tags written here, and only these:
 #   - `git-<short-sha>`   always
-#   - `<version>`         additionally, on a `langwatch@v*` release
 #   - `<image_tag>`       instead of `git-<short-sha>`, on a manual dispatch
 #                         that supplies one
 #
 # The OIDC role (`langwatch-oss-ecr-push`, langwatch/langwatch-saas#486) trusts
-# exactly two subjects: `refs/heads/main` and `refs/tags/langwatch@v*`. There is
+# exactly two subjects: `refs/heads/main` and `refs/tags/langwatch@v*`. The
+# `meta` job runs only on main, so a dispatch on a tag ref does nothing. There is
 # deliberately no `pull_request` trigger — a PR-ref assume-role is denied by that
 # trust policy, so a PR-triggered run could only ever fail. End-to-end
 # verification happens on the first merge to main.
@@ -58,8 +60,6 @@ name: publish-docker-ecr
 # denied.
 
 on:
-  release:
-    types: [published]
   push:
     branches: [main]
   workflow_dispatch:
@@ -74,7 +74,7 @@ permissions:
 
 # Never cancel in flight: a superseded run may already have pushed per-arch layers.
 # Merges that land while one builds wait as one: each newer commit replaces the
-# waiting one, so a burst builds its first and its newest commit. A release has its own group.
+# waiting one, so a burst builds its first and its newest commit.
 concurrency:
   group: publish-docker-ecr-${{ github.ref }}
   cancel-in-progress: false
@@ -84,19 +84,12 @@ env:
 
 jobs:
   meta:
+    # Every other job needs meta, so a dispatch on any other ref stops here.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # Same release gate as publish-docker-app.yml. This repository cuts releases
-    # under several tag prefixes (sdk-python@, mcp@, ...) and only `langwatch@v*`
-    # describes these images — it is also the only tag shape the OIDC trust
-    # policy accepts.
-    if: >-
-      github.event_name != 'release'
-      || startsWith(github.event.release.tag_name, 'langwatch@')
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
       custom_tag: ${{ steps.meta.outputs.custom_tag }}
-      version: ${{ steps.meta.outputs.version }}
-      is_release: ${{ steps.meta.outputs.is_release }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -111,13 +104,10 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_HASH=$(git rev-parse --short HEAD)
-
-          VERSION=""
-          IS_RELEASE="false"
           IMAGE_TAG="git-${SHORT_HASH}"
 
-          # Both branches below turn external input into a Docker tag. Reject a
-          # malformed one here, where the run has cost nothing, rather than at
+          # The dispatch input below becomes a Docker tag. Reject a malformed
+          # one here, where the run has cost nothing, rather than at
           # the manifest step after eight images have already been pushed.
           #
           # `case` rather than `grep -E '^…$'`: grep matches line by line, so a
@@ -141,18 +131,7 @@ jobs:
             fi
           }
 
-          if [ "${EVENT_NAME}" = "release" ]; then
-            # The gate on this job accepts any `langwatch@` tag, including one
-            # without the `v`. The prefix strip below would then leave VERSION as
-            # the whole ref, and `@` is not a legal tag character.
-            case "${GITHUB_REF}" in
-              refs/tags/langwatch@v*) ;;
-              *) echo "::error::release ref ${GITHUB_REF} is not a langwatch@v* tag"; exit 1 ;;
-            esac
-            VERSION="${GITHUB_REF#refs/tags/langwatch@v}"
-            assert_docker_tag "release version" "${VERSION}"
-            IS_RELEASE="true"
-          elif [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${INPUT_IMAGE_TAG}" ]; then
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${INPUT_IMAGE_TAG}" ]; then
             assert_docker_tag "image_tag" "${INPUT_IMAGE_TAG}"
             IMAGE_TAG="${INPUT_IMAGE_TAG}"
           fi
@@ -166,14 +145,11 @@ jobs:
           {
             echo "image_tag=${IMAGE_TAG}"
             echo "custom_tag=${CUSTOM_TAG}"
-            echo "is_release=${IS_RELEASE}"
-            echo "version=${VERSION}"
           } >> "$GITHUB_OUTPUT"
 
   # On push:[main], skip the images a commit cannot have affected so a docs-only
-  # merge does not pay for every image build. Release and dispatch always
-  # build everything — those are the runs someone is waiting on a complete set
-  # from.
+  # merge does not pay for every image build. A dispatch always builds
+  # everything: that is the run someone is waiting on a complete set from.
   changes:
     runs-on: ubuntu-latest
     needs: meta
@@ -467,6 +443,12 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"
 
+      - name: Set up Go for cmd/ecrtag
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
       # The tags are immutable: a re-run skips a build whose push would be refused,
       # once the image there is shown to be this commit's (see the header).
       - name: Check whether ${{ matrix.image }} (${{ matrix.arch }}) is already published
@@ -475,11 +457,11 @@ jobs:
           IMAGE: ${{ matrix.image }}
           TAG: ${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
           CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
-          EXPECTED_REVISION: ${{ github.sha }}
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           set -euo pipefail
-          EXISTS=$(bash .github/scripts/ecr-tag-published.sh "${IMAGE}" "${TAG}" label)
+          EXISTS=$(go run ./cmd/ecrtag published -repository "${IMAGE}" -tag "${TAG}" \
+            -source label -revision "${GITHUB_SHA}" -custom="${CUSTOM_TAG}")
           if [ "${EXISTS}" = "true" ]; then
             echo "::notice::${IMAGE}:${TAG} is already in ECR; skipping the build"
           fi
@@ -503,8 +485,8 @@ jobs:
           # The Go images stamp this into main.Version, which every log line and
           # the OTel resource report; the other images ignore it.
           build-args: |
-            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
-            SERVICE_VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            VERSION=${{ needs.meta.outputs.image_tag }}
+            SERVICE_VERSION=${{ needs.meta.outputs.image_tag }}
             LANGWATCH_BUILD_COMMIT=${{ github.sha }}
           # Read back by the existence check above on a re-run.
           labels: |
@@ -559,7 +541,7 @@ jobs:
           cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
           outputs: type=local,dest=${{ runner.temp }}/cdn
           build-args: |
-            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            VERSION=${{ needs.meta.outputs.image_tag }}
             LANGWATCH_BUILD_COMMIT=${{ github.sha }}
 
       # Only assets/ goes up: index.html is rewritten and served by the pod, and
@@ -603,10 +585,14 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      # Full history, without old file contents: the existence check below
+      # finds the ancestor image a push run re-tagged as this commit's tag.
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -634,18 +620,26 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"
 
-      # See the same check in build-and-push. The manifest check below still runs.
+      - name: Set up Go for cmd/ecrtag
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # See the same check in build-and-push. A push run may have re-tagged an
+      # unchanged ancestor image as this commit's tag; that copy counts as
+      # published (-accept-retag). The manifest check below still runs.
       - name: Check whether ${{ matrix.image }} is already published
         id: exists
         env:
           IMAGE: ${{ matrix.image }}
           TAG: ${{ needs.meta.outputs.image_tag }}
           CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
-          EXPECTED_REVISION: ${{ github.sha }}
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           set -euo pipefail
-          EXISTS=$(bash .github/scripts/ecr-tag-published.sh "${IMAGE}" "${TAG}" label)
+          EXISTS=$(go run ./cmd/ecrtag published -repository "${IMAGE}" -tag "${TAG}" \
+            -source label -revision "${GITHUB_SHA}" -custom="${CUSTOM_TAG}" -accept-retag)
           if [ "${EXISTS}" = "true" ]; then
             echo "::notice::${IMAGE}:${TAG} is already in ECR; skipping the build"
           fi
@@ -666,7 +660,7 @@ jobs:
           cache-from: type=gha,scope=ecr-${{ matrix.image }}-arm64
           cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-arm64
           build-args: |
-            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            VERSION=${{ needs.meta.outputs.image_tag }}
             EVALUATOR=${{ matrix.evaluator }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
@@ -722,16 +716,30 @@ jobs:
       contents: read
       id-token: write # OIDC assume-role into the artifacts account
     steps:
-      # Only the publish scripts are read from the tree. The full commit
-      # history (without file contents) lets them re-tag only images built from
-      # the nearest ancestor of this commit.
+      # Only the publish scripts and the Go workspace cmd/ecrtag builds in are
+      # read from the tree. The full commit history (without file contents)
+      # lets them re-tag only images built from the nearest ancestor of this
+      # commit.
       - name: Checkout the publish scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/scripts
+            cmd
+            tools
+            pkg
+            services
+            sdks/go
+            infra/clickhouse-serverless
           fetch-depth: 0
           filter: blob:none
+
+      - name: Set up Go for cmd/ecrtag
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
@@ -762,9 +770,6 @@ jobs:
           BUILT: ${{ needs.changes.outputs.built }}
           IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
           CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
-          EXPECTED_REVISION: ${{ github.sha }}
-          IS_RELEASE: ${{ needs.meta.outputs.is_release }}
-          VERSION: ${{ needs.meta.outputs.version }}
           BUCKET: ${{ vars.FRONTEND_ASSETS_BUCKET }}
         run: |
           set -euo pipefail
@@ -799,7 +804,8 @@ jobs:
             # Published by an earlier run for this commit (the index records
             # it). Only "not found" goes on; a custom tag already there, another
             # commit's tag or a lookup error fails this image.
-            exists=$(bash .github/scripts/ecr-tag-published.sh "${image}" "${IMAGE_TAG}" annotation)
+            exists=$(go run ./cmd/ecrtag published -repository "${image}" -tag "${IMAGE_TAG}" \
+              -source annotation -revision "${GITHUB_SHA}" -custom="${CUSTOM_TAG}")
             if [ "${exists}" = "true" ]; then
               echo "${image}:${IMAGE_TAG} is already published; leaving it"
               echo "\`${image}:${IMAGE_TAG}\` was already published" >> "$GITHUB_STEP_SUMMARY"
@@ -847,13 +853,7 @@ jobs:
             local annotation="index:org.opencontainers.image.revision=${GITHUB_SHA}"
             docker buildx imagetools create --annotation "${annotation}" -t "${repo}:${IMAGE_TAG}" "${sources[@]}"
 
-            local tags="${IMAGE_TAG}"
-            if [ "${IS_RELEASE}" = "true" ]; then
-              docker buildx imagetools create --annotation "${annotation}" -t "${repo}:${VERSION}" "${sources[@]}"
-              tags="${tags}, ${VERSION}"
-            fi
-
-            echo "Published \`${image}\` to ECR with tags: ${tags}" >> "$GITHUB_STEP_SUMMARY"
+            echo "Published \`${image}\` to ECR with tags: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
           }
 
           FAILED=()
@@ -865,14 +865,15 @@ jobs:
             # status a condition tests, so a failed command would not stop it.
             set +e
             case "${IMAGE}" in
-              # Single manifests: see .github/scripts/publish-lambda-tag.sh.
+              # Single manifests: see tools/ecrtag/lambda.go.
               langwatch-nlp-lambda | langwatch-eval-*)
                 if printf '%s' "${BUILT}" | jq -e --arg i "${IMAGE}" 'index($i)' >/dev/null; then
                   LAMBDA_BUILT=true
                 else
                   LAMBDA_BUILT=false
                 fi
-                IMAGE_WAS_BUILT="${LAMBDA_BUILT}" bash .github/scripts/publish-lambda-tag.sh "${IMAGE}" ;;
+                go run ./cmd/ecrtag lambda -repository "${IMAGE}" -tag "${IMAGE_TAG}" \
+                  -revision "${GITHUB_SHA}" -built="${LAMBDA_BUILT}" -custom="${CUSTOM_TAG}" ;;
               *)
                 ( set -euo pipefail; publish "${IMAGE}" ) ;;
             esac

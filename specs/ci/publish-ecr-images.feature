@@ -3,11 +3,12 @@ Feature: Publish every deployable image to the artifacts registry
   I want every image built from this repository published to the artifacts registry under its commit tag
   So that the deployment pins one commit of this repository and builds nothing from its source itself
 
-  # These scenarios describe .github/workflows/publish-docker-ecr.yml. How a
-  # Lambda image gets its tag is .github/scripts/publish-lambda-tag.sh, bound
-  # by .github/scripts/__tests__/publish-lambda-tag.test.sh. The path filters
+  # These scenarios describe .github/workflows/publish-docker-ecr.yml, and the
+  # last one .github/workflows/publish-docker-private.yml. How a Lambda image
+  # gets its tag is cmd/ecrtag, bound by tools/ecrtag/lambda_test.go. The path filters
   # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, and where a Lambda
-  # image starts by tools/ciguard/lambdaworkdir_test.go. The rest is the
+  # image starts by tools/ciguard/lambdaworkdir_test.go. That a release
+  # publishes nothing is bound by tools/ciguard/publishshape_test.go. The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 
@@ -77,10 +78,10 @@ Feature: Publish every deployable image to the artifacts registry
     Then it fails instead of writing the commit tag
 
   @unit
-  Scenario: A release also tags each Lambda image with its version
-    Given a langwatch@v<version> release
-    When publish-docker-ecr publishes a Lambda image
-    Then the image also gets the <version> tag, naming the same manifest
+  Scenario: A release publishes nothing to the artifacts registry
+    Given a langwatch@v<version> release is published
+    Then publish-docker-ecr does not run
+    And no git-<sha> tag LangWatch Cloud already uses is rebuilt or moved
 
   @unit
   Scenario: A Lambda image starts in a directory Lambda's own user can enter
@@ -88,11 +89,10 @@ Feature: Publish every deployable image to the artifacts registry
     When the image's Dockerfile is checked
     Then its runtime stage sets a working directory outside every home directory
 
-  # The artifacts repositories' tags are immutable, so every push checks first.
-  # The lookup is .github/scripts/ecr-tag-exists.sh and the skip decision
-  # .github/scripts/ecr-tag-published.sh, bound by their tests under
-  # .github/scripts/__tests__/; the Lambda re-tag by publish-lambda-tag.test.sh.
-  # The build steps' gates are proved by a re-run.
+  # The artifacts repositories' tags are immutable, so every push checks first
+  # with cmd/ecrtag. The skip decision is bound by tools/ecrtag's tests, the
+  # Lambda re-tag by tools/ecrtag/lambda_test.go, and that every push is gated
+  # on the check by tools/ciguard/ecrskip_test.go.
 
   @unit
   Scenario: A re-run publishes nothing that is already there
@@ -107,14 +107,14 @@ Feature: Publish every deployable image to the artifacts registry
     Given an image already has the tag a dispatcher typed as image_tag
     When publish-docker-ecr is dispatched with that image_tag
     Then it fails and asks for a new tag, even if the tag names this commit's image
-    And it writes no tag
+    And it writes no tag to that image
 
   @unit
   Scenario: A commit tag already there for another commit fails the run
     Given another commit sharing this commit's short sha already published git-<short sha>
     When publish-docker-ecr publishes this commit
     Then it fails, naming both commits, instead of counting the image as published
-    And it writes no tag
+    And it writes no tag to that image
 
   @unit
   Scenario: A commit tag already there that records no commit fails the run
@@ -122,14 +122,14 @@ Feature: Publish every deployable image to the artifacts registry
     And it is not exactly the image a re-tag for this commit would copy
     When publish-docker-ecr publishes this commit
     Then it fails, because it cannot tell which commit the tag was published for
-    And it writes no tag
+    And it writes no tag to that image
 
   @unit
   Scenario: A lookup that does not answer whether a tag is there fails the run
     Given the registry answers a tag lookup with an error other than "image not found"
     When publish-docker-ecr checks whether a tag is already published
     Then it fails and shows the registry's error
-    And it writes no tag
+    And it writes no tag to that image
 
   @unit
   Scenario: A tag that already names another image fails the run
@@ -137,9 +137,9 @@ Feature: Publish every deployable image to the artifacts registry
     When publish-docker-ecr re-tags that image
     Then it fails, saying the tag cannot be moved, instead of counting the image as published
 
-  @unimplemented
+  @unit
   Scenario: A private build never reuses a custom tag
     Given publish-docker-private already published langwatch-app under a tag
     When it is dispatched again
-    Then with the default ref-<sha10> tag it skips the build and succeeds
-    And with a custom tag it fails and asks for a new ref- tag
+    Then with the default ref-<sha10> tag recording that commit it skips the build and succeeds
+    And with a custom tag, or a default tag recording another commit, it fails and asks for a new tag

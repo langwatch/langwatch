@@ -152,7 +152,7 @@ defer span.End()
 
   // Your OpenAI call remains unchanged!
   response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-  	Model: openai.ChatModelGPT5Mini,
+  	Model: "gpt-6-luna",
   	Messages: []openai.ChatCompletionMessageParamUnion{
   		openai.SystemMessage("You are a helpful assistant."),
   		openai.UserMessage("Hello, OpenAI!"),
@@ -210,7 +210,7 @@ func main() {
 
 	// Your OpenAI call remains unchanged!
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: openai.ChatModelGPT5Mini,
+		Model: "gpt-6-luna",
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage("You are a helpful assistant."),
 			openai.UserMessage("Hello, OpenAI!"),
@@ -373,8 +373,8 @@ span.
 	SetType(langwatch.SpanTypeLLM).
 	SetInput("What is the capital of France?").
 	SetOutput("The capital of France is Paris.").
-	SetRequestModel("gpt-5-mini").
-	SetResponseModel("gpt-5-mini-2025-08-07").
+	SetRequestModel("gpt-6-luna").
+	SetResponseModel("gpt-6-luna").
 	SetThreadID("conversation-123").
 	SetUserID("user-42").
 	SetLabels("production", "qa")

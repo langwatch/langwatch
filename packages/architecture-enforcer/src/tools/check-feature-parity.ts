@@ -260,6 +260,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  "tools/deployimpact",
+  "tools/operatornotes",
+  "tools/cachesweep",
   "tools/migrationorder",
   // The README link checker, for the same reason: specs/ci/readme-link-check.feature
   // describes what CI asserts about the README, and only these Go tests assert it.
@@ -267,6 +270,15 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The ECR chart push: which package it pushes and which digest it reports
   // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
   "tools/chartpush",
+  // The main-red Slack post (specs/ci/package-suite-integration-lane.feature).
+  "tools/slacknotify",
+  // Whether an immutable ECR tag may be skipped, and the Lambda re-tag
+  // (specs/ci/publish-ecr-images.feature).
+  "tools/ecrtag",
+  "tools/chartheap",
+  // How the package-suites weights are measured from main's job logs
+  // (specs/ci/package-suites-weights.feature).
+  "tools/suiteweights",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
