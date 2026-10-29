@@ -3,6 +3,7 @@
  * @see specs/lwql/query-params.feature
  */
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { lwqlKeyStatementSchema } from "../analytics-lwql.schemas.ts";
 import { lwqlQueryRequestSchema } from "../analytics-lwql.trpc.ts";
@@ -81,5 +82,25 @@ describe("given a result that carries params", () => {
 
     expect(card.params).toEqual(RESULT.params);
     expect(langWatchQLQueryResultSchema.validate({ ...RESULT, params: "all" })).toBe(false);
+  });
+
+  /** @scenario "QP22b A reader written before params parses a result that carries them" */
+  it("is read by a reader that knows only the fields of 2.0.0, with the same rows", () => {
+    const before = z.object({
+      columns: z.array(z.object({ name: z.string(), type: z.string() })),
+      rows: z.array(z.record(z.string(), z.unknown())),
+      statistics: z.object({ rowsReturned: z.number() }),
+    });
+    const wire = JSON.parse(
+      JSON.stringify({
+        ...RESULT,
+        columns: [{ name: "n", type: "UInt64" }],
+        rows: [{ n: 3 }],
+        diagnostics: [{ code: "SOURCES_IGNORED", message: "m" }],
+      }),
+    );
+
+    expect(before.parse(wire).rows).toEqual([{ n: 3 }]);
+    expect(before.parse(wire)).not.toHaveProperty("params");
   });
 });

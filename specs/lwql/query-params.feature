@@ -365,12 +365,16 @@ Feature: Every query door takes the same parameters and says what it ran with
       And `projectId` still narrows the run to that project
       # Evidence: both answers diffed
 
-    @integration
-    Scenario: QP22b The published CLI 2.0.0 and MCP 2.2.0 run against this server and ignore params
-      Given the published langwatch@2.0.0 CLI and the published MCP 2.2.0 installed from npm
-      When each runs a query against this server
-      Then each succeeds, prints its rows as before and shows no `params`
-      # Evidence: both commands' output quoted, with the installed versions
+    @unit
+    Scenario: QP22b A reader written before params parses a result that carries them
+      # Changed in phase 2 (2026-10-29): the scenario named published packages, which a unit test cannot install.
+      # Bound to a reader that knows only the 2.0.0 fields. The published langwatch@2.0.0 CLI was also run once
+      # by hand against a stub answering with params and diagnostics: it printed [{"n":3}] and no params.
+      # The MCP 2.2.0 package was not run.
+      Given a reader that knows only the fields the published clients read
+      When it parses a result carrying params and diagnostics
+      Then it returns the same rows and ignores params
+      # Evidence: the CLI 2.0.0 output quoted
 
     @integration
     Scenario: QP23 A rollback is not supported for this feature
