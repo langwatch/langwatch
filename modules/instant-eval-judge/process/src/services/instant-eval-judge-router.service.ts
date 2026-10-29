@@ -90,9 +90,9 @@ export class InstantEvalJudgeRouterService {
   }
 
   /**
-   * Every part's verdicts in the order asked. A kind whose run threw while another answered is a
-   * skip of that kind, so the paid parts stay billed; when none answered the throw is today's. On
-   * a caller's stop the error carries every part's paid spend, so the stopped batch bills it.
+   * Every part's verdicts in the order asked. A kind whose run threw is a skip of that kind, so the
+   * paid parts stay billed; when none answered and none paid, the throw is today's. On a caller's
+   * stop the error carries every part's paid spend, so the stopped batch bills it.
    */
   private async merged({
     questions,
@@ -108,7 +108,8 @@ export class InstantEvalJudgeRouterService {
     const failure = settled.find((part) => part.status === "rejected");
     if (!failure) return instantEvalMergedJudgementOf({ questions, parts: done });
     if (signal?.aborted) throw this.stopped({ settled, done, cause: failure.reason });
-    if (!done.some((part) => part.judgement.verdicts.length > 0)) throw failure.reason;
+    const isPaid = done.some((part) => part.judgement.inputTokens > 0);
+    if (!isPaid && !done.some((part) => part.judgement.verdicts.length > 0)) throw failure.reason;
     const failed = groupsThatThrew({ settled, kinds: kindsOf(questions) });
     const skips = failed.map((kind) => ({
       kind,

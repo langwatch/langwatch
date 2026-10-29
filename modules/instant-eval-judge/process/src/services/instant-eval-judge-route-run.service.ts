@@ -409,9 +409,12 @@ export class InstantEvalJudgeRouteRunService {
     );
   }
 
-  /** Nothing answered: the platform's skip reason, or today's throw when a channel threw. */
+  /**
+   * Nothing answered: the platform's skip reason, carrying any paid legs' spend. A channel's throw
+   * is rethrown, as an unrouted call does, only when nothing was paid.
+   */
   private nothingAnswered(leg: Extract<Leg, { outcome: "failed" }>): InstantEvalJudgement {
-    if (leg.error !== undefined) throw leg.error;
+    if (leg.error !== undefined && this.inputTokens <= 0) throw leg.error;
     return { ...instantEvalSkipped(leg.reason), ...this.spent(), routing: this.routing({}) };
   }
 

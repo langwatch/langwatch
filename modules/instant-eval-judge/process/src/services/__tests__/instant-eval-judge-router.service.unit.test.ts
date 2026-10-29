@@ -230,6 +230,21 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.costNanoUsd).toBe(100_000 + 100_000);
     });
 
+    /** @scenario "Nothing answered gives the last backend's skip reason" */
+    it("returns the paid leg's spend when the other leg of the pair throws", async () => {
+      const { classify } = harness({
+        decisions: () => {
+          throw new Error("socket closed");
+        },
+        jev: () => ({ ...instantEvalSkipped("classifier_rate_limited"), inputTokens: 2000 }),
+      });
+      const judgement = await classify(PAIRED);
+      expect(judgement.verdicts).toEqual([]);
+      expect(judgement.inputTokens).toBe(2000);
+      expect(judgement.costNanoUsd).toBe(100_000);
+      expect(judgement.routing?.flags).toContain("decision-a_failed:classifier_failed");
+    });
+
     /** @scenario "The confident pair keeps the more confident answer" */
     it("keeps the primary on a tie, and the other leg when one is down", async () => {
       const tie = harness({ decisions: () => judged(0.9), jev: () => judged(0.1) });
@@ -685,6 +700,22 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.05 }]);
       expect(judgement.inputTokens).toBe(2000);
       expect(judgement.routing?.flags).toContain("score:skipped:classifier_failed");
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("skips with the paid kind's spend when no kind answered and another kind threw", async () => {
+      const { classify } = harness({
+        table: noFallbackTable,
+        decisions: () => ({ ...instantEvalSkipped("classifier_rate_limited"), inputTokens: 1000 }),
+        jev: () => {
+          throw new Error("socket closed");
+        },
+      });
+      const judgement = await classify({ job: "scenario_judge", tokens: 500 }, [POLITE, Q]);
+      expect(judgement.verdicts).toEqual([]);
+      expect(judgement.skippedReason).toBe("classifier_rate_limited");
+      expect(judgement.inputTokens).toBe(1000);
+      expect(judgement.routing?.flags).toContain("boolean:skipped:classifier_failed");
     });
 
     /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
