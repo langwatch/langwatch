@@ -12,7 +12,6 @@ import type {
 import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { HttpInstantEvalDecisionModelChannel } from "../http/http.instant-eval-decision-model.channel.ts";
 import { HttpInstantEvalHostedDecisionsChannel } from "../http/http.instant-eval-hosted-decisions.channel.ts";
 import { HttpInstantEvalLlmJudgeChannel } from "../http/http.instant-eval-llm-judge.channel.ts";
 
@@ -296,8 +295,8 @@ describe("HttpInstantEvalHostedDecisionsChannel", () => {
         };
       });
     const channel = HttpInstantEvalHostedDecisionsChannel.create({
-      decisionModels: HttpInstantEvalDecisionModelChannel.create({ dispatcher: agent }),
       apiKey: "lw-decisions",
+      dispatcher: agent,
     });
 
     const judgement = await channel.classify({
@@ -311,5 +310,38 @@ describe("HttpInstantEvalHostedDecisionsChannel", () => {
     expect(authorization).toBe("Bearer lw-decisions");
     // The model is the table's, never a default the code holds.
     expect(body).toMatchObject({ model: "decision-model-a" });
+  });
+
+  /** @scenario "Decisions and LLM legs draw on the rate limiter too" */
+  it("sends once per call through a 429 and a 503, so each send is one the router paced", async () => {
+    let sends = 0;
+    const reply = (statusCode: number, body: unknown = {}) =>
+      agent
+        .get("https://api.openai.com")
+        .intercept({ path: "/v1/decisions", method: "POST" })
+        .reply(() => {
+          sends += 1;
+          return { statusCode, data: JSON.stringify(body) };
+        });
+    reply(429);
+    reply(503);
+    reply(200, {
+      answers: [{ type: "predicate", name: "upset", probability: 0.81 }],
+      usage: { input_tokens: 1000 },
+    });
+    const channel = HttpInstantEvalHostedDecisionsChannel.create({
+      apiKey: "lw-decisions",
+      dispatcher: agent,
+    });
+    const call = () =>
+      channel.classify({ text: "user: late", questions: [QUESTION], model: "decision-model-a" });
+
+    expect((await call()).skippedReason).toBeDefined();
+    expect(sends).toBe(1);
+    expect((await call()).skippedReason).toBe("classifier_provider_unavailable");
+    expect(sends).toBe(2);
+    const answered = await call();
+    expect(sends).toBe(3);
+    expect(answered.verdicts).toEqual([{ questionId: "upset", probability: 0.81 }]);
   });
 });

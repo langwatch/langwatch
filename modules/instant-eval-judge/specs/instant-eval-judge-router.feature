@@ -186,6 +186,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Given a routed call whose plan escalates two unsure questions to an LLM
     When it is judged
     Then the Decisions send and each LLM send wait on the rate limiter first
+    And the hosted Decisions leg sends once per permit, never retrying past it
     And each leg kind draws on its own per-project share under the deployment's global cap
 
   @unit

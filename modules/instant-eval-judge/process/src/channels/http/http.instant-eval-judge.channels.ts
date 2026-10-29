@@ -43,7 +43,7 @@ export class HttpInstantEvalJudgeChannels {
     const hostedDecisions = await secrets.into(hostedDecisionsApiKey, (secretKey) => {
       const key = cloudKey(secretKey);
       return key.available
-        ? HttpInstantEvalHostedDecisionsChannel.create({ decisionModels, apiKey: key.apiKey })
+        ? HttpInstantEvalHostedDecisionsChannel.create({ apiKey: key.apiKey })
         : void 0;
     });
     const anthropic = await secrets.into(llmJudgeAnthropicApiKey, (k) => cloudKey(k));

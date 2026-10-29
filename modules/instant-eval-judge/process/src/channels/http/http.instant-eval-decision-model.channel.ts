@@ -38,14 +38,23 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   private constructor(
     private readonly dispatcher: Dispatcher | undefined,
     private readonly sleep: Sleep,
+    private readonly maxAttempts: number,
   ) {}
 
-  /** `dispatcher` is a suite's stand-in for the socket; undici's global pool otherwise. */
+  /**
+   * `dispatcher` is a suite's stand-in for the socket; undici's global pool otherwise.
+   * `maxAttempts` is 1 for a caller that paces every send itself, as the router's hosted leg does.
+   */
   static create({
     dispatcher,
     sleep = abortableSleep,
-  }: { dispatcher?: Dispatcher; sleep?: Sleep } = {}): HttpInstantEvalDecisionModelChannel {
-    return new HttpInstantEvalDecisionModelChannel(dispatcher, sleep);
+    maxAttempts = MAX_ATTEMPTS,
+  }: {
+    dispatcher?: Dispatcher;
+    sleep?: Sleep;
+    maxAttempts?: number;
+  } = {}): HttpInstantEvalDecisionModelChannel {
+    return new HttpInstantEvalDecisionModelChannel(dispatcher, sleep, maxAttempts);
   }
 
   async classify(
@@ -66,7 +75,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     );
 
     let lastReason: InstantEvalSkipReason = "classifier_provider_unavailable";
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       const sent = await this.send({
         endpoint: decisionModel.endpoint,
         apiKey: decisionModel.apiKey,
@@ -94,7 +103,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
         });
       }
       lastReason = sent.kind === "failed" ? sent.failure.reason : "classifier_provider_unavailable";
-      if (attempt < MAX_ATTEMPTS)
+      if (attempt < this.maxAttempts)
         await this.sleep(waitMs({ attempt, retryAfter: sent.retryAfter }), signal);
     }
     return this.skip({ reason: lastReason, model: decisionModel.model });
