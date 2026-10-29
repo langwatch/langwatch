@@ -45,6 +45,7 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "APP_FUNCTION_UNRESOLVED_KEYS",
   "APP_FUNCTION_RESULT_TRUNCATED",
   "INSTANT_EVAL_SKIPPED",
+  "SHARE_WINDOW_LIMITED",
 ] as const;
 export const langWatchQLDiagnosticCodeSchema = z.enum(LWQL_DIAGNOSTIC_CODES);
 export type LangWatchQLDiagnosticCode = z.infer<typeof langWatchQLDiagnosticCodeSchema>;

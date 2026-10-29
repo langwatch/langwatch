@@ -20,6 +20,7 @@ export interface LangWatchQLQueryInput {
   parameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   timeWindow?: LangWatchQLTimeWindow;
   sources?: RunSources;
+  projects?: readonly string[];
 }
 
 const isoInstant = (epochMs: number): string =>

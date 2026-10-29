@@ -1,5 +1,7 @@
 import {
   DEFAULT_WIDGET_SOURCES,
+  type LangWatchQLDiagnostic,
+  type LangWatchQLMemberWindow,
   type LangWatchQLRunParams,
   type LangWatchQLTimeWindow,
   type RunSources,
@@ -52,4 +54,21 @@ export function buildRunParams({
       : { coarsenedFromSeconds: granularity.coarsenedFromSeconds }),
     parameters: { ...parameters },
   };
+}
+
+/**
+ * Says when a dated member's window cut this run's rows. It names no project and counts none:
+ * a reader who cannot read a member must not learn it exists (dashboards-v2 AC213, QP26, QP28).
+ */
+export function shareWindowDiagnostics(
+  memberWindows: readonly LangWatchQLMemberWindow[] | undefined,
+): LangWatchQLDiagnostic[] {
+  if (!memberWindows?.some((window) => window.from > 0)) return [];
+
+  return [
+    {
+      code: "SHARE_WINDOW_LIMITED",
+      message: "Some projects share data only from a date, so earlier rows are not included",
+    },
+  ];
 }

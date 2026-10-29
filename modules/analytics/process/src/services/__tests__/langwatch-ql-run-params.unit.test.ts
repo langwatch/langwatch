@@ -281,3 +281,43 @@ describe("given the params a run answers with", () => {
     expect(result.params).not.toHaveProperty("coarsenedFromSeconds");
   });
 });
+
+describe("given a run limited by a dated member's window", () => {
+  const DATED = [{ projectId: "project-1", from: Date.parse("2026-03-01T00:00:00.000Z") }];
+
+  /** @scenario "QP26 SHARE_WINDOW_LIMITED appears when a dated member's rows were cut by its window" */
+  it("adds SHARE_WINDOW_LIMITED, naming no project and counting none", async () => {
+    const { result } = await run({ sql: READS_NOTHING, memberWindows: DATED });
+
+    const found = result.diagnostics.filter(({ code }) => code === "SHARE_WINDOW_LIMITED");
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toBe(
+      "Some projects share data only from a date, so earlier rows are not included",
+    );
+    expect(JSON.stringify(found)).not.toMatch(/project-1|\d/);
+  });
+
+  /** @scenario "QP27 A run the server did not limit carries neither diagnostic" */
+  it("adds nothing when no member is dated", async () => {
+    const whole = await run({
+      sql: READS_NOTHING,
+      memberWindows: [{ projectId: "project-1", from: 0 }],
+    });
+    const plain = await run({ sql: READS_NOTHING });
+
+    for (const { result } of [whole, plain]) {
+      expect(result.diagnostics.map(({ code }) => code)).not.toContain("SHARE_WINDOW_LIMITED");
+      expect(result.diagnostics.map(({ code }) => code)).not.toContain("FIELDS_REDACTED");
+    }
+  });
+
+  /** @scenario "QP28 No limiting diagnostic names or counts a project the caller cannot read" */
+  it("holds no id, name or number in the diagnostic", async () => {
+    const { result } = await run({
+      sql: READS_NOTHING,
+      memberWindows: [...DATED, { projectId: "project-secret", from: 5 }],
+    });
+
+    expect(JSON.stringify(result.diagnostics)).not.toMatch(/project-|secret|\d/);
+  });
+});

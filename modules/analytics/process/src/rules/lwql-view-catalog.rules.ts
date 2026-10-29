@@ -6,8 +6,6 @@
  * @see specs/lwql/api.feature
  */
 
-import { KNOWN_TRACE_ORIGINS } from "@langwatch/analytics-contract";
-
 import { CLICKHOUSE_OVERRIDES } from "../features/lwql-catalogue/rules/lwql-clickhouse-overrides.rules.ts";
 import { CODING_TOOL_RESULTS } from "../features/lwql-catalogue/rules/lwql-coding-overrides.rules.ts";
 import { defineCatalogTable } from "../features/lwql-catalogue/rules/lwql-dataset-derivation.rules.ts";
@@ -31,13 +29,7 @@ import {
   type UngatedViewDefinition,
   withCatalogueGates,
 } from "./lwql-gate.rules.ts";
-
-/** A trace's source in SQL: a listed origin as itself, a missing one as application, else other. */
-function sourceOfOrigin(origin: string): string {
-  const listed = KNOWN_TRACE_ORIGINS.map((known) => `'${known}'`).join(", ");
-
-  return `multiIf(ifNull(${origin}, '') = '', 'application', ${origin} IN (${listed}), ${origin}, 'other')`;
-}
+import { sourceOfOrigin } from "./lwql-source-column.rules.ts";
 
 /**
  * How long after a write a row can be missing from these views. The projections are folded by

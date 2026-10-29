@@ -32,7 +32,11 @@ import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { buildRunParams, resolveRunSources } from "../rules/langwatch-ql-run-params.rules.ts";
+import {
+  buildRunParams,
+  resolveRunSources,
+  shareWindowDiagnostics,
+} from "../rules/langwatch-ql-run-params.rules.ts";
 import {
   langWatchQLMissingParameters,
   type ValidatedLangWatchQL,
@@ -409,8 +413,13 @@ export class LangWatchQLService {
       granularity,
       parameters,
     });
-    if (completeness.kind !== "reported") return { ...result, params };
-    return { ...result, params, completeness: completeness.completeness };
+    const limited = {
+      ...result,
+      params,
+      diagnostics: [...result.diagnostics, ...shareWindowDiagnostics(memberWindows)],
+    };
+    if (completeness.kind !== "reported") return limited;
+    return { ...limited, completeness: completeness.completeness };
   }
 }
 
