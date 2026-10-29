@@ -119,24 +119,27 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
   # lane and sheds rows while ClickHouse has CPU and memory to spare. The
   # server merges those rows into one flush anyway, so the client carries the
   # rows that wait for a slot together in one statement: the slots a burst
-  # needs follow the tables being written, not the rows.
+  # needs follow the tables being written, not the rows. Only inserts of one
+  # route (tenant, organisation, tenant set) share, and only those that turn
+  # async deduplication off explicitly: a deduplicated insert is known by its
+  # own data, which a shared statement would change.
   @unit
   Scenario: async inserts waiting for a slot go as one statement
     Given the insert lane has used every slot it may hold
-    When several async inserts into one table with the same settings are issued
+    When several async inserts of one route and table with the same settings are issued
     Then one statement carries all their rows once a slot frees
     And every caller learns the statement's outcome
 
   @unit
   Scenario: an async insert with a slot free goes at once, alone
     Given the insert lane has a free slot
-    When an async insert is issued
-    Then it starts at once with its own rows
+    When async inserts are issued in the same tick
+    Then each starts at once with its own rows
 
   @unit
   Scenario: only inserts that can share a statement share one
     Given the insert lane has used every slot it may hold
-    When inserts are issued into different tables, with different settings, or without waiting for the flush
+    When inserts are issued for different routes or tables, with different settings, with deduplication left on or tokened, or without waiting for the flush
     Then each that cannot share a statement goes in its own
 
   @unit
@@ -154,11 +157,20 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     And each caller counts as one shed statement
 
   @unit
-  Scenario: a coalesced statement that fails is retried caller by caller
+  Scenario: a coalesced statement whose rows are rejected is resent caller by caller
     Given async inserts went together as one statement
-    When the server rejects the statement
+    When the server rejects the statement's rows as unparsable before writing any
     Then each caller's rows are sent again in a statement of their own
     And only the caller whose rows the server rejects sees the failure
+
+  # A reset, a timeout or a lost answer may come after the server wrote the
+  # batch, and nothing deduplicates a resend, so the rows would land twice.
+  @unit
+  Scenario: a coalesced statement that may have written is never resent
+    Given async inserts went together as one statement
+    When the statement fails in a way that may have written its rows
+    Then every caller sees that failure
+    And no caller's rows are sent again
 
   @unit
   Scenario: coalesced inserts keep to the insert lane

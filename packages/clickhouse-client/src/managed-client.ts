@@ -10,7 +10,6 @@ import {
   type ClickHouseClientCreationInput,
   type ClickHouseCloseableClient,
 } from "./connection.ts";
-import { DEFAULT_INSERT_COALESCE_MAX_ROWS, InsertCoalescer } from "./insert-coalescing.ts";
 import type { AbortSignalLike } from "./query.ts";
 import {
   checkStatementTenantScope,
@@ -57,11 +56,15 @@ export interface ClickHouseVendorClientOptions {
   maxOpenConnections: number;
   requestTimeoutMs: number;
   idleSocketTtlMs: number;
-  driverSettings: Readonly<Record<string, string | number | boolean | undefined>>;
+  driverSettings: Readonly<
+    Record<string, string | number | boolean | undefined>
+  >;
   vendorLoggerClass?: unknown;
 }
 
-export abstract class ClickHouseVendorClientFactory<Client extends ClickHouseVendorClient> {
+export abstract class ClickHouseVendorClientFactory<
+  Client extends ClickHouseVendorClient,
+> {
   abstract create(options: ClickHouseVendorClientOptions): Client;
 }
 
@@ -95,9 +98,15 @@ export abstract class ClickHouseOverloadErrorFactory {
   abstract create(input: { cause: unknown }): unknown;
 }
 
-export type ClickHouseStatementOperation = "query" | "insert" | "command" | "exec";
+export type ClickHouseStatementOperation =
+  | "query"
+  | "insert"
+  | "command"
+  | "exec";
 
-export interface ClickHouseManagedClientOptions<Client extends ClickHouseVendorClient> {
+export interface ClickHouseManagedClientOptions<
+  Client extends ClickHouseVendorClient,
+> {
   vendorClientFactory: ClickHouseVendorClientFactory<Client>;
   defaultQuerySettings: Readonly<Record<string, unknown>>;
   resilience: VendorClientPolicy;
@@ -109,8 +118,6 @@ export interface ClickHouseManagedClientOptions<Client extends ClickHouseVendorC
   minimumStatementQueueDepth?: number | undefined;
   statementWaitTimeoutMs?: number | undefined;
   statementLaneReserveShare?: number | undefined;
-  /** Rows one coalesced async insert carries at most; 0 sends every insert alone. */
-  insertCoalesceMaxRows?: number | undefined;
   requestTimeoutMs?: number | undefined;
   idleSocketTtlMs?: number | undefined;
 }
@@ -123,7 +130,9 @@ export interface ClickHouseManagedClientOptions<Client extends ClickHouseVendorC
 export class ClickHouseManagedClientService<
   Client extends ClickHouseVendorClient,
 > extends ClickHouseClientFactory<Client> {
-  private constructor(private readonly options: ClickHouseManagedClientOptions<Client>) {
+  private constructor(
+    private readonly options: ClickHouseManagedClientOptions<Client>,
+  ) {
     super();
   }
 
@@ -139,8 +148,10 @@ export class ClickHouseManagedClientService<
       instance: input.instance,
       cluster: input.cluster,
       maxOpenConnections: input.maxOpenConnections,
-      requestTimeoutMs: this.options.requestTimeoutMs ?? DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS,
-      idleSocketTtlMs: this.options.idleSocketTtlMs ?? DEFAULT_CLICKHOUSE_IDLE_SOCKET_TTL_MS,
+      requestTimeoutMs:
+        this.options.requestTimeoutMs ?? DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS,
+      idleSocketTtlMs:
+        this.options.idleSocketTtlMs ?? DEFAULT_CLICKHOUSE_IDLE_SOCKET_TTL_MS,
       driverSettings: { date_time_input_format: "best_effort" },
       ...(this.options.vendorLoggerClass === undefined
         ? {}
@@ -161,7 +172,6 @@ export class ClickHouseManagedClientService<
       minimumStatementQueueDepth: this.options.minimumStatementQueueDepth,
       statementWaitTimeoutMs: this.options.statementWaitTimeoutMs,
       statementLaneReserveShare: this.options.statementLaneReserveShare,
-      insertCoalesceMaxRows: this.options.insertCoalesceMaxRows,
     });
     const defaulted = withClickHouseDefaultQuerySettings(
       limited,
@@ -180,7 +190,9 @@ export class ClickHouseManagedClientService<
  * must not run never spends a slot or a socket. The refusal is a plain `Error`: a bug in a
  * query we wrote, logged with table and statement head.
  */
-export function withClickHouseTenantScope<Client extends ClickHouseVendorClient>({
+export function withClickHouseTenantScope<
+  Client extends ClickHouseVendorClient,
+>({
   client,
   instance,
   logger,
@@ -218,7 +230,9 @@ export function withClickHouseTenantScope<Client extends ClickHouseVendorClient>
   });
 }
 
-export interface ClickHouseStatementLimitOptions<Client extends ClickHouseVendorClient> {
+export interface ClickHouseStatementLimitOptions<
+  Client extends ClickHouseVendorClient,
+> {
   client: Client;
   input: ClickHouseClientCreationInput;
   telemetry: ClickHouseManagedClientTelemetry;
@@ -228,8 +242,6 @@ export interface ClickHouseStatementLimitOptions<Client extends ClickHouseVendor
   minimumStatementQueueDepth?: number | undefined;
   statementWaitTimeoutMs?: number | undefined;
   statementLaneReserveShare?: number | undefined;
-  /** Rows one coalesced async insert carries at most; 0 sends every insert alone. */
-  insertCoalesceMaxRows?: number | undefined;
 }
 
 export interface ClickHouseStatementAdmissionOptions {
@@ -261,22 +273,31 @@ export class ClickHouseStatementAdmission {
     this.maxQueued = Math.max(
       options.minimumStatementQueueDepth ?? DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
       options.maxConcurrent *
-        (options.statementQueueDepthPerSlot ?? DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT),
+        (options.statementQueueDepthPerSlot ??
+          DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT),
     );
-    this.timeoutMs = options.statementWaitTimeoutMs ?? DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
+    this.timeoutMs =
+      options.statementWaitTimeoutMs ?? DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
     this.total = new ConcurrencyLimiter({
       maxConcurrent: options.maxConcurrent,
       maxQueued: this.maxQueued,
     });
     const caps = statementLaneCaps({
       maxConcurrent: options.maxConcurrent,
-      reserveShare: options.reserveShare ?? DEFAULT_STATEMENT_LANE_RESERVE_SHARE,
+      reserveShare:
+        options.reserveShare ?? DEFAULT_STATEMENT_LANE_RESERVE_SHARE,
     });
     this.reserve = caps?.reserve ?? 0;
     // Each lane queue holds half the single-queue bound, so together they equal it.
     this.lanes =
       caps === null
-        ? [statementLane({ lane: "all", capMax: options.maxConcurrent, maxQueued: null })]
+        ? [
+            statementLane({
+              lane: "all",
+              capMax: options.maxConcurrent,
+              maxQueued: null,
+            }),
+          ]
         : (["insert", "read"] as const).map((lane) =>
             statementLane({
               lane,
@@ -303,7 +324,8 @@ export class ClickHouseStatementAdmission {
   /** Per lane: what it runs on the driver, and all that waits behind its cap or the total. */
   laneStats(): ClickHouseLaneStats[] {
     return this.lanes.map(({ lane, cap, running }) => {
-      if (cap === null) return { lane, inFlight: running, queued: this.total.stats().queued };
+      if (cap === null)
+        return { lane, inFlight: running, queued: this.total.stats().queued };
       const { inFlight, queued } = cap.stats();
       return { lane, inFlight: running, queued: queued + inFlight - running };
     });
@@ -312,7 +334,7 @@ export class ClickHouseStatementAdmission {
   /**
    * Runs `task` once its lane and the total grant a slot, or refuses it as overloaded. A refusal
    * counts one shed per caller the statement carries: `callers`, read at the refusal, for an
-   * insert that carries several (insert-coalescing.ts), else one.
+   * insert that carries several (insert-coalescing.ts, ClickHouseQueryClient), else one.
    */
   async run<T>({
     operation,
@@ -361,8 +383,23 @@ export class ClickHouseStatementAdmission {
     }
   }
 
+  /**
+   * Whether a statement of `operation` would be granted a slot now: its lane and the total each
+   * have one free, and nothing is waiting ahead of it.
+   */
+  admitsNow(operation: ClickHouseStatementOperation): boolean {
+    const lane = this.laneFor(operation);
+    const total = this.total.stats();
+    if (total.queued > 0 || total.inFlight >= this.options.maxConcurrent)
+      return false;
+    if (lane.cap === null) return true;
+    const capped = lane.cap.stats();
+    return capped.queued === 0 && capped.inFlight < lane.capMax;
+  }
+
   private laneFor(operation: ClickHouseStatementOperation): StatementLane {
-    const wanted: ClickHouseStatementLane = operation === "insert" ? "insert" : "read";
+    const wanted: ClickHouseStatementLane =
+      operation === "insert" ? "insert" : "read";
     return this.lanes.find(({ lane }) => lane === wanted) ?? this.lanes[0]!;
   }
 
@@ -466,7 +503,10 @@ function statementLane({
     lane,
     capMax,
     running: 0,
-    cap: maxQueued === null ? null : new ConcurrencyLimiter({ maxConcurrent: capMax, maxQueued }),
+    cap:
+      maxQueued === null
+        ? null
+        : new ConcurrencyLimiter({ maxConcurrent: capMax, maxQueued }),
   };
 }
 
@@ -493,18 +533,19 @@ function boundStatementMethod({
 }): ((params: unknown) => Promise<unknown>)[] {
   const operation = STATEMENT_METHODS.find((name) => name === property);
   if (operation === undefined) return [];
-  const method: ((params: unknown) => Promise<unknown>) | undefined = target[operation];
+  const method: ((params: unknown) => Promise<unknown>) | undefined =
+    target[operation];
   if (method === undefined) return [];
-  return [(params: unknown) => run({ operation, params, task: () => method.call(target, params) })];
+  return [
+    (params: unknown) =>
+      run({ operation, params, task: () => method.call(target, params) }),
+  ];
 }
 
-/**
- * Bounds every vendor statement method while preserving the caller's cancellation signal. Async
- * inserts that wait for a slot together go as one statement (insert-coalescing.ts).
- */
-export function withClickHouseStatementLimit<Client extends ClickHouseVendorClient>(
-  options: ClickHouseStatementLimitOptions<Client>,
-): Client {
+/** Bounds every vendor statement method while preserving the caller's cancellation signal. */
+export function withClickHouseStatementLimit<
+  Client extends ClickHouseVendorClient,
+>(options: ClickHouseStatementLimitOptions<Client>): Client {
   const { client, input, telemetry } = options;
   const admission = new ClickHouseStatementAdmission({
     instance: input.instance,
@@ -531,25 +572,17 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
     operation: ClickHouseStatementOperation;
     params: unknown;
     task: () => Promise<unknown>;
-  }): Promise<unknown> => admission.run({ operation, signal: signalOf(params), task });
-  const coalescer = new InsertCoalescer(
-    {
-      admit: (task, callers) => admission.run({ operation: "insert", task, callers }),
-      insert: (params) => client.insert(params),
-    },
-    options.insertCoalesceMaxRows ?? DEFAULT_INSERT_COALESCE_MAX_ROWS,
-  );
+  }): Promise<unknown> =>
+    admission.run({ operation, signal: signalOf(params), task });
 
   let closePromise: Promise<void> | undefined;
   return new Proxy(client, {
     get(target, property) {
       const [statement] = boundStatementMethod({ target, property, run });
-      if (property === "insert" && statement) {
-        return (params: unknown) => coalescer.submit(params) ?? statement(params);
-      }
       if (statement) return statement;
       const ping = target.ping;
-      if (property === "ping" && ping !== undefined) return () => ping.call(target);
+      if (property === "ping" && ping !== undefined)
+        return () => ping.call(target);
       if (property === "close") {
         return () => {
           closePromise ??= closeClient();
@@ -573,10 +606,9 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
  * Adds process-selected query defaults without changing insert, command, exec or lifecycle
  * calls.
  */
-export function withClickHouseDefaultQuerySettings<Client extends ClickHouseVendorClient>(
-  client: Client,
-  defaults: Readonly<Record<string, unknown>>,
-): Client {
+export function withClickHouseDefaultQuerySettings<
+  Client extends ClickHouseVendorClient,
+>(client: Client, defaults: Readonly<Record<string, unknown>>): Client {
   return new Proxy(client, {
     get(target, property) {
       if (property !== "query") return Reflect.get(target, property, target);
@@ -593,7 +625,9 @@ export function withClickHouseDefaultQuerySettings<Client extends ClickHouseVend
 }
 
 /** Applies the shared retry, reporting and in-band result policy to an existing vendor client. */
-export function createResilientVendorClient<Client extends ClickHouseVendorClient>({
+export function createResilientVendorClient<
+  Client extends ClickHouseVendorClient,
+>({
   client,
   cluster,
   policy,
@@ -617,7 +651,8 @@ export function createResilientVendorClient<Client extends ClickHouseVendorClien
       if (property === "exec" && exec !== undefined)
         return (params: unknown) => exec.call(client, params);
       const ping = client.ping;
-      if (property === "ping" && ping !== undefined) return () => ping.call(client);
+      if (property === "ping" && ping !== undefined)
+        return () => ping.call(client);
       return Reflect.get(target, property, target);
     },
   });

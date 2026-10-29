@@ -4,7 +4,13 @@
  * sits outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
-import { hasIdBound, type IdBound, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
+import {
+  hasIdBound,
+  type IdBound,
+  idBoundOf,
+  IdIndexRegistry,
+  readIdBound,
+} from "./idBound.ts";
 import {
   type IdIndexBounds,
   type IdIndexDeclaration,
@@ -17,12 +23,31 @@ import type {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
 } from "./managed-client.ts";
-import { CLICKHOUSE_COLUMNS_QUERY, ClickHouseColumns } from "./present-columns.ts";
-import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
+import {
+  coalesceKeyOf,
+  DEFAULT_INSERT_COALESCE_MAX_ROWS,
+  InsertCoalescer,
+} from "./insert-coalescing.ts";
+import {
+  CLICKHOUSE_COLUMNS_QUERY,
+  ClickHouseColumns,
+} from "./present-columns.ts";
+import type {
+  InsertRequest,
+  QueryDriver,
+  QueryRequest,
+  QueryResult,
+} from "./query.ts";
 import { TRANSIENT_NETWORK_CODES } from "./resilience.ts";
 import type { RetryPolicy } from "./retry.ts";
-import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
-import { ID_BOUND_PARAM_PREFIX, StatementScopeError } from "./statementScopeError.ts";
+import type {
+  StatementOperation,
+  StatementReporter,
+} from "./statementReporting.ts";
+import {
+  ID_BOUND_PARAM_PREFIX,
+  StatementScopeError,
+} from "./statementScopeError.ts";
 import { extractQueryType, extractTableName } from "./statementShape.ts";
 import type { PrivateRouteVariable } from "./tenancy.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
@@ -51,6 +76,11 @@ export interface ClickHouseQueryClientOptions {
   unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
   /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
   overloadErrorFactory?: ClickHouseOverloadErrorFactory | undefined;
+  /**
+   * Rows one coalesced async insert carries at most (ADR-187); 0 sends every insert alone.
+   * Coalescing needs a limiter: with none, nothing ever waits for a slot.
+   */
+  insertCoalesceMaxRows?: number | undefined;
 }
 
 /** The handled refusal for a read whose server did not answer once retries ran out. */
@@ -61,7 +91,11 @@ export abstract class ClickHouseUnavailableErrorFactory {
 /** A connection that failed or dropped (`socket hang up` is ECONNRESET), never a server error. */
 function isConnectionFailure(error: unknown): error is Error {
   const code = (error as { code?: unknown } | null)?.code;
-  return error instanceof Error && typeof code === "string" && TRANSIENT_NETWORK_CODES.has(code);
+  return (
+    error instanceof Error &&
+    typeof code === "string" &&
+    TRANSIENT_NETWORK_CODES.has(code)
+  );
 }
 
 /** ClickHouse's own overload refusal: TOO_MANY_SIMULTANEOUS_QUERIES (202). */
@@ -69,7 +103,11 @@ const SERVER_OVERLOAD_CODES: ReadonlySet<string> = new Set(["202"]);
 
 function isServerOverload(error: unknown): error is Error {
   const code = (error as { code?: unknown } | null)?.code;
-  return error instanceof Error && typeof code === "string" && SERVER_OVERLOAD_CODES.has(code);
+  return (
+    error instanceof Error &&
+    typeof code === "string" &&
+    SERVER_OVERLOAD_CODES.has(code)
+  );
 }
 
 const now = (): number => globalThis.performance.now();
@@ -99,11 +137,14 @@ export class ClickHouseQueryClient {
   private readonly reporter: StatementReporter | undefined;
   private readonly routes: ReadonlyMap<string, string>;
   private readonly routeVariables: readonly PrivateRouteVariable[];
-  private readonly organizationOf: ((tenantId: string) => Promise<string>) | undefined;
+  private readonly organizationOf:
+    | ((tenantId: string) => Promise<string>)
+    | undefined;
   private readonly columnLists = new Map<string, ClickHouseColumns>();
   private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
   private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
   private readonly idIndexRegistry: IdIndexRegistry;
+  private readonly coalescer: InsertCoalescer<InsertRequest> | undefined;
 
   constructor({
     driver,
@@ -117,6 +158,7 @@ export class ClickHouseQueryClient {
     unavailableErrorFactory,
     overloadErrorFactory,
     organizationOf,
+    insertCoalesceMaxRows,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
@@ -130,13 +172,30 @@ export class ClickHouseQueryClient {
     this.overloaded = overloadErrorFactory;
     this.organizationOf = organizationOf;
     this.idIndexRegistry = new IdIndexRegistry(this);
+    this.coalescer =
+      limiter === undefined
+        ? undefined
+        : new InsertCoalescer<InsertRequest>(
+            {
+              admitsNow: () => limiter.admitsNow("insert"),
+              admit: (task, callers) =>
+                limiter.run({ operation: "insert", task, callers }),
+              send: (requests) => this.sendInsert(coalescedRequest(requests)),
+              alone: (request) => this.insertAlone(request),
+            },
+            insertCoalesceMaxRows ?? DEFAULT_INSERT_COALESCE_MAX_ROWS,
+          );
   }
 
   /**
    * Declares id indexes once, at composition: from then on a statement's `{{idBound}}` marker
    * over one of them is bounded by it, and its readiness is checked on every target.
    */
-  declareIdIndexes({ indexes }: { indexes: readonly IdIndexDeclaration[] }): void {
+  declareIdIndexes({
+    indexes,
+  }: {
+    indexes: readonly IdIndexDeclaration[];
+  }): void {
     this.idIndexRegistry.declare({ indexes });
   }
 
@@ -152,10 +211,14 @@ export class ClickHouseQueryClient {
   async targetOf({ tenantId }: { tenantId: string }): Promise<string> {
     if (this.routes.size === 0) return SHARED_CLICKHOUSE_TARGET;
     if (this.organizationOf === undefined) {
-      throw new Error("A client with private routes cannot name a tenant's target without them.");
+      throw new Error(
+        "A client with private routes cannot name a tenant's target without them.",
+      );
     }
     const organizationId = await this.organizationOf(tenantId);
-    return this.routes.has(organizationId) ? organizationId : SHARED_CLICKHOUSE_TARGET;
+    return this.routes.has(organizationId)
+      ? organizationId
+      : SHARED_CLICKHOUSE_TARGET;
   }
 
   /**
@@ -180,10 +243,15 @@ export class ClickHouseQueryClient {
     const tenants =
       tenantIds === undefined
         ? { params: { tenantId } }
-        : { params: { [`${ID_BOUND_PARAM_PREFIX}_tenants`]: [...tenantIds] }, tenantIds };
+        : {
+            params: { [`${ID_BOUND_PARAM_PREFIX}_tenants`]: [...tenantIds] },
+            tenantIds,
+          };
     const result = await this.statement<unknown>({
       tenantId,
-      ...(tenants.tenantIds === undefined ? {} : { tenantIds: tenants.tenantIds }),
+      ...(tenants.tenantIds === undefined
+        ? {}
+        : { tenantIds: tenants.tenantIds }),
       sql: statement.sql,
       params: { ...statement.params, ...tenants.params },
       table: lookup.index,
@@ -262,7 +330,8 @@ export class ClickHouseQueryClient {
       indexBounds: (lookup) =>
         this.indexBounds({ tenantId, tenantIds: request.tenantIds, ...lookup }),
       options: request.idBound,
-      run: async ({ sql, params }) => (await this.statement<Row>({ ...request, sql, params })).rows,
+      run: async ({ sql, params }) =>
+        (await this.statement<Row>({ ...request, sql, params })).rows,
     });
     return { rows };
   }
@@ -272,7 +341,9 @@ export class ClickHouseQueryClient {
    * bottom per the class order. Each step is a plain call rather than a
    * wrap, so an absent policy is a skipped line, not a hole in a chain.
    */
-  private async statement<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
+  private async statement<Row>(
+    request: QueryRequest,
+  ): Promise<QueryResult<Row>> {
     this.tenantGuard.assert(request);
     refuseUnexpandedIdBound({ request });
 
@@ -298,7 +369,11 @@ export class ClickHouseQueryClient {
     const withSlot = () =>
       this.limiter === undefined
         ? withReport()
-        : this.limiter.run({ operation: "query", task: withReport, signal: request.signal });
+        : this.limiter.run({
+            operation: "query",
+            task: withReport,
+            signal: request.signal,
+          });
 
     try {
       return await (this.tracer === undefined
@@ -308,7 +383,8 @@ export class ClickHouseQueryClient {
       if (this.overloaded !== undefined && isServerOverload(error)) {
         throw this.overloaded.create({ cause: error });
       }
-      if (this.unavailable === undefined || !isConnectionFailure(error)) throw error;
+      if (this.unavailable === undefined || !isConnectionFailure(error))
+        throw error;
       throw this.unavailable.create({ cause: error });
     }
   }
@@ -343,7 +419,11 @@ export class ClickHouseQueryClient {
         : this.retries.run(runOnce, { signal: request.signal, request });
 
     if (this.limiter === undefined) return withRetries();
-    await this.limiter.run({ operation: "command", task: withRetries, signal: request.signal });
+    await this.limiter.run({
+      operation: "command",
+      task: withRetries,
+      signal: request.signal,
+    });
   }
 
   /**
@@ -355,6 +435,24 @@ export class ClickHouseQueryClient {
     this.tenantGuard.assertInsert(request);
     if (request.rows.length === 0) return;
 
+    // An async insert that would wait for a slot joins others of its route and table (ADR-187).
+    const coalesced = this.coalescer?.submit(request, coalesceKeyOf(request));
+    if (coalesced !== undefined && coalesced !== null) return coalesced;
+    return this.insertAlone(request);
+  }
+
+  /** One insert in a statement of its own, under its own slot. */
+  private async insertAlone(request: InsertRequest): Promise<void> {
+    if (this.limiter === undefined) return this.sendInsert(request);
+    await this.limiter.run({
+      operation: "insert",
+      task: () => this.sendInsert(request),
+      signal: request.signal,
+    });
+  }
+
+  /** One insert statement under the slot already held: retried only when refused, and reported. */
+  private sendInsert(request: InsertRequest): Promise<void> {
     const runOnce = () => this.driver.insert(request);
     const refusedOnly = async (): Promise<void> => {
       try {
@@ -380,11 +478,11 @@ export class ClickHouseQueryClient {
         throw error instanceof InsertNotRetriedInPlace ? error.failure : error;
       }
     };
-    const withReport = () =>
-      this.reported({ operation: "insert", params: { table: request.table }, task: withRetries });
-
-    if (this.limiter === undefined) return withReport();
-    await this.limiter.run({ operation: "insert", task: withReport, signal: request.signal });
+    return this.reported({
+      operation: "insert",
+      params: { table: request.table },
+      task: withRetries,
+    });
   }
 
   /** One statement's outcome, reported the way the vendor client policy reports it. */
@@ -400,7 +498,8 @@ export class ClickHouseQueryClient {
     const reporter = this.reporter;
     if (reporter === undefined) return task();
 
-    const queryType = operation === "insert" ? "INSERT" : extractQueryType(params);
+    const queryType =
+      operation === "insert" ? "INSERT" : extractQueryType(params);
     const table = extractTableName(params);
     const start = now();
     try {
@@ -418,7 +517,20 @@ export class ClickHouseQueryClient {
   }
 }
 
+/**
+ * One statement carrying every request's rows. They share a coalescing key, so the route, the
+ * tenant set and the settings are the first's; each request passed the tenant guard on its own.
+ */
+function coalescedRequest(requests: readonly InsertRequest[]): InsertRequest {
+  const [first, ...rest] = requests;
+  if (first === undefined)
+    throw new Error("A coalesced insert carries at least one request.");
+  if (rest.length === 0) return first;
+  return { ...first, rows: requests.flatMap((request) => request.rows) };
+}
+
 /** The last check before a statement leaves: an unexpanded marker never reaches the server. */
 function refuseUnexpandedIdBound({ request }: { request: QueryRequest }): void {
-  if (hasIdBound(request)) throw new StatementScopeError({ kind: "unexpanded-id-bound" });
+  if (hasIdBound(request))
+    throw new StatementScopeError({ kind: "unexpanded-id-bound" });
 }

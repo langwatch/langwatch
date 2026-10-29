@@ -29,29 +29,39 @@ buffer's key.
 
 ## Decision
 
-We will coalesce, at the statement bound, the async inserts that wait for a
-slot together:
+We will coalesce, in the query client's insert (`ClickHouseQueryClient.insert`,
+the path every process member's write takes), the async inserts that wait for
+a slot together:
 
-1. An insert coalesces when its parameters are only `table`, `values` (an
-   array), `format` and `clickhouse_settings`, and its settings turn on both
-   `async_insert` and `wait_for_async_insert`. Its batch key is the table, the
-   format and its settings in sorted order. An insert with anything else (an
-   abort signal, a query id, a stream of values, or no wait for the flush) goes
-   alone, as before.
-2. The first insert of a key opens a batch and asks the insert lane for a slot.
-   Later inserts of the same key join the open batch. When the slot is granted
-   the batch closes, and one statement carries every member's rows in order.
-   With a slot free the batch holds one insert and adds no wait; that insert is
-   sent with its own parameters, untouched.
+1. An insert coalesces when it carries rows and no abort signal, and its
+   settings turn on `async_insert` and `wait_for_async_insert` and turn
+   `async_insert_deduplicate` off explicitly, with no
+   `insert_deduplication_token`. Its batch key is its route (tenant,
+   organisation, declared tenant set, tenant-check skip), its table and its
+   settings in sorted order, so a batch is routed and guarded exactly as each
+   member would have been; each member passes the tenant guard on its own
+   first. Any other insert goes alone, as before.
+2. An insert opens a batch only when the insert lane would make it wait: with
+   a slot free, and nothing queued, it goes at once with its own request,
+   untouched. Later inserts of the same key join the open batch. When the slot
+   is granted the batch closes, and one statement carries every member's rows
+   in order, under the same in-place retry rule as any insert (only a refused
+   connection is retried).
 3. A batch carries at most `insertCoalesceMaxRows` rows (default 5,000). An
-   insert that would pass the cap opens a new batch; an insert larger than the
-   cap travels alone. Zero turns coalescing off.
+   insert that would pass the cap opens a new batch; an insert as large as the
+   cap travels alone. Every member brings a row, so the cap bounds the callers
+   a batch holds too. Zero turns coalescing off.
 4. A batch refused for want of a slot refuses every member with the overload
    error, and counts one shed statement per member, so the shed count still
    counts callers.
-5. A batch that fails after admission, with more than one member, sends each
-   member's rows again alone, through the same admission. An async insert
-   fails as a whole, so one caller's bad row must not fail the others.
+5. A batch that fails after admission sends each member's rows again alone
+   only when the server rejected the rows unwritten: a parse or conversion
+   code (`CANNOT_PARSE_*`, `TYPE_MISMATCH`, `INCORRECT_DATA` and the like).
+   A batch under `max_insert_block_size` is one block and one async insert
+   entry, so such a refusal wrote none of it, and one caller's bad row must
+   not fail the others. Any other failure (a reset, a timeout, a lost answer,
+   a server fault) may have written the batch; every member gets that failure
+   and nothing is sent again, as an insert alone would have had it.
 
 ## Rationale / Trade-offs
 
@@ -67,19 +77,33 @@ process may hold. Under load the statements in flight are bounded by the
 tables being written times the flush time, not by the row rate. The server
 does the same work: it would have merged these rows in its buffer anyway.
 
-Two costs are accepted. A member that joins late inherits the batch's wait
-start, so it may be refused sooner than if it had waited alone. A failed batch
-is followed by one statement per member, which is what those callers would
-have sent without coalescing.
+Deduplication is why only an insert that turns it off may share. A
+deduplicated insert is known by its data or its token; a batch would change
+that identity, so two identical inserts that the server would collapse into
+one would both land, and a retry would find different neighbours and no
+longer match its first attempt. Async deduplication is off by default before
+ClickHouse 26.2, but the client cannot see the server's default, so an insert
+must say so itself.
+
+Three costs are accepted. A member that joins late inherits the batch's wait
+start, so it may be refused sooner than if it had waited alone. A batch whose
+rows are rejected is followed by one statement per member, which is what
+those callers would have sent without coalescing. A batch that fails in a way
+that may have written fails every member, where alone some of them might have
+succeeded; resending would risk writing their rows twice.
 
 ## Consequences
 
-Single-row async writers no longer shed under bursts the server can absorb.
-No infrastructure setting changes. A coalesced statement's result is shared by
+The event log's appends, which set the async settings themselves and now
+turn async deduplication off (the server's default today; the log collapses
+repeats by idempotency key), no longer shed under bursts the server can
+absorb. Writers that rely on the server profile's async default, and set
+nothing, are unchanged until they say so. No infrastructure setting changes. A coalesced statement's result is shared by
 its members; the routing driver discards it. Shed counts and lane statistics
 keep their meaning: one shed per refused caller, one in-flight per statement.
 
 ## References
 
 - `packages/clickhouse-client/src/insert-coalescing.ts`
+- `packages/clickhouse-client/src/client.ts` (`ClickHouseQueryClient.insert`)
 - `specs/clickhouse/single-client-access.feature`

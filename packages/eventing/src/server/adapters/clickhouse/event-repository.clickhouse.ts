@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 
-import { ConfigurationError, EventNotFoundError } from "../../../services/errorHandling.ts";
+import {
+  ConfigurationError,
+  EventNotFoundError,
+} from "../../../services/errorHandling.ts";
 import type {
   EventOccurredAtWindow,
   EventRecord,
@@ -11,14 +14,24 @@ import type {
   EventingClickHouseClientResolver,
 } from "../../clickhouse-client-resolver.ts";
 import type { EventingRetentionConfiguration } from "../../eventing-server-runtime.ts";
-import { type EventLogIdIndex, eventLogOccurredRange } from "../../tables/event-log-id-index.ts";
-import { EventLogAppendFold, type EventLogInsert } from "./event-log-append-fold.ts";
+import {
+  type EventLogIdIndex,
+  eventLogOccurredRange,
+} from "../../tables/event-log-id-index.ts";
+import {
+  EventLogAppendFold,
+  type EventLogInsert,
+} from "./event-log-append-fold.ts";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 
 /** Converts numeric strings to numbers, leaving JSON-encoded content as strings. */
 function normalizeNumericString(value: string): unknown {
-  if (value.length === 0 || value.length >= 32 || !NUMERIC_STRING_REGEX.test(value)) {
+  if (
+    value.length === 0 ||
+    value.length >= 32 ||
+    !NUMERIC_STRING_REGEX.test(value)
+  ) {
     return value;
   }
   const numberValue = Number(value);
@@ -62,7 +75,8 @@ const EVENT_LOG_COLUMNS = [
   "IdempotencyKey",
 ] as const;
 
-export const EVENT_LOG_SELECT_COLUMNS = EVENT_LOG_COLUMNS.join(",\n            ");
+export const EVENT_LOG_SELECT_COLUMNS =
+  EVENT_LOG_COLUMNS.join(",\n            ");
 
 /** Raw `event_log` row shape shared by every read query and the mapper. */
 interface EventLogRow {
@@ -99,7 +113,9 @@ export function mapEventLogRows({
     EventId: row.EventId,
     EventTimestamp: row.EventTimestamp,
     EventOccurredAt:
-      row.EventOccurredAt != null && row.EventOccurredAt > 0 ? row.EventOccurredAt : null,
+      row.EventOccurredAt != null && row.EventOccurredAt > 0
+        ? row.EventOccurredAt
+        : null,
     EventType: row.EventType,
     EventVersion: row.EventVersion,
     EventPayload: normalizePayloadValue(row.EventPayload),
@@ -137,7 +153,9 @@ const EVENT_LOG_FOLD_MAX_ROWS = 1_000;
  * /server/clickhouse/migrations/00002_create_event_log.sql.
  */
 export class EventingClickHouseEventRepository implements EventRepository {
-  private readonly logger = createLogger("langwatch:trace-processing:event-repository:clickhouse");
+  private readonly logger = createLogger(
+    "langwatch:trace-processing:event-repository:clickhouse",
+  );
 
   private readonly appendFold: EventLogAppendFold;
 
@@ -145,7 +163,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
   /** Absent on a reads-only repository, which refuses to insert. */
   private readonly retention: EventingRetentionConfiguration | undefined;
   /** The organisation a tenant's rows are written for; absent, every append inserts alone. */
-  private readonly organizationOf: ((tenantId: string) => Promise<string | null>) | undefined;
+  private readonly organizationOf:
+    | ((tenantId: string) => Promise<string | null>)
+    | undefined;
   /** Bounds an aggregate's reads once its pipeline's flag is on; absent, reads stay as today. */
   private readonly eventLogIndex: EventLogIdIndex | undefined;
 
@@ -170,10 +190,15 @@ export class EventingClickHouseEventRepository implements EventRepository {
   static createForEventReads(options: {
     resolveClient: EventingClickHouseClientResolver;
     eventLogIndex?: EventLogIdIndex;
-  }): Pick<EventRepository, "getEventRecord" | "getEventRecords" | "findEventRecordsOfAggregates"> {
+  }): Pick<
+    EventRepository,
+    "getEventRecord" | "getEventRecords" | "findEventRecordsOfAggregates"
+  > {
     return new EventingClickHouseEventRepository({
       resolveClient: options.resolveClient,
-      ...(options.eventLogIndex === undefined ? {} : { eventLogIndex: options.eventLogIndex }),
+      ...(options.eventLogIndex === undefined
+        ? {}
+        : { eventLogIndex: options.eventLogIndex }),
     });
   }
 
@@ -204,7 +229,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
     occurredAtFromMs: number | undefined;
   }): Promise<number | undefined> {
     // The caller's own lower bound already prunes: no index round trip on the fold's hot path.
-    if (occurredAtFromMs !== undefined && occurredAtFromMs > 0) return occurredAtFromMs;
+    if (occurredAtFromMs !== undefined && occurredAtFromMs > 0)
+      return occurredAtFromMs;
     const range = await eventLogOccurredRange({
       index: this.eventLogIndex,
       read: "aggregate",
@@ -244,8 +270,11 @@ export class EventingClickHouseEventRepository implements EventRepository {
         }),
       ),
     );
-    if (ranges.length === 0 || ranges.some((range) => range === null)) return undefined;
-    return Math.min(...ranges.flatMap((range) => (range === null ? [] : [range.fromMs])));
+    if (ranges.length === 0 || ranges.some((range) => range === null))
+      return undefined;
+    return Math.min(
+      ...ranges.flatMap((range) => (range === null ? [] : [range.fromMs])),
+    );
   }
 
   private async getClient(tenantId: string): Promise<EventingClickHouseClient> {
@@ -293,7 +322,12 @@ export class EventingClickHouseEventRepository implements EventRepository {
       format: "JSONEachRow",
     });
     const rows = await result.json<EventLogRow>();
-    const records = mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
+    const records = mapEventLogRows({
+      rows,
+      tenantId,
+      aggregateType,
+      aggregateId,
+    });
 
     const record = records[0];
     if (!record) {
@@ -333,7 +367,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
       // cold-scanning S3. Rows with unknown occurred time (0) are always kept
       // so the bound can never drop an event; the partition key is monotonic
       // in EventOccurredAt so the predicate actually prunes.
-      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const hasLowerBound =
+        typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
       const occurredAtFilter = hasLowerBound
         ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
         : "";
@@ -384,7 +419,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
     aggregateType: string;
   }): Promise<EventRecord[]> {
     const tenantIds = [...new Set(aggregates.map(({ tenantId }) => tenantId))];
-    const aggregateIds = [...new Set(aggregates.map(({ aggregateId }) => String(aggregateId)))];
+    const aggregateIds = [
+      ...new Set(aggregates.map(({ aggregateId }) => String(aggregateId))),
+    ];
     const [resolvingTenantId] = tenantIds;
     if (resolvingTenantId === void 0) return [];
     try {
@@ -392,7 +429,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
         aggregates,
         aggregateType,
       });
-      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const hasLowerBound =
+        typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
       const occurredAtFilter = hasLowerBound
         ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
         : "";
@@ -421,9 +459,13 @@ export class EventingClickHouseEventRepository implements EventRepository {
         // Unbounded, each aggregate's whole history by its key, as in `getEventRecords`.
         ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
       });
-      const rows = await result.json<EventLogRow & { TenantId: string; AggregateId: string }>();
+      const rows = await result.json<
+        EventLogRow & { TenantId: string; AggregateId: string }
+      >();
       const asked = new Set(
-        aggregates.map(({ tenantId, aggregateId }) => `${tenantId}\n${aggregateId}`),
+        aggregates.map(
+          ({ tenantId, aggregateId }) => `${tenantId}\n${aggregateId}`,
+        ),
       );
       return rows
         .filter((row) => asked.has(`${row.TenantId}\n${row.AggregateId}`))
@@ -457,7 +499,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
     upToEventId: string;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
-    const { tenantId, aggregateType, aggregateId, upToTimestamp, upToEventId } = request;
+    const { tenantId, aggregateType, aggregateId, upToTimestamp, upToEventId } =
+      request;
     try {
       const occurredAtFromMs = await this.occurredAtFloor({
         tenantId,
@@ -471,7 +514,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
       // table is PARTITION BY toYearWeek(EventOccurredAt), so ONLY an
       // EventOccurredAt predicate prunes. Without one this walks every weekly
       // partition ever written, including the cold tier on S3.
-      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const hasLowerBound =
+        typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
       const occurredAtFilter = hasLowerBound
         ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
         : "";
@@ -581,7 +625,11 @@ export class EventingClickHouseEventRepository implements EventRepository {
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
     occurredAtFromMs?: number;
-  }): { query: string; query_params: Record<string, unknown>; declaresFullScan: boolean } {
+  }): {
+    query: string;
+    query_params: Record<string, unknown>;
+    declaresFullScan: boolean;
+  } {
     const {
       tenantId,
       aggregateType,
@@ -603,7 +651,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
       : "";
     // The cursor and the upper bound are both on EventTimestamp, which is NOT
     // the partition key — so neither prunes. Only EventOccurredAt does.
-    const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    const hasLowerBound =
+      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
     const occurredAtFilter = hasLowerBound
       ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
       : "";
@@ -634,7 +683,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
         upToTimestamp,
         upToEventId,
         ...(hasLowerBound ? { occurredAtFromMs } : {}),
-        ...(after ? { afterTimestamp: after.timestamp, afterEventId: after.eventId } : {}),
+        ...(after
+          ? { afterTimestamp: after.timestamp, afterEventId: after.eventId }
+          : {}),
         limit,
       },
       declaresFullScan: !hasLowerBound,
@@ -734,7 +785,11 @@ export class EventingClickHouseEventRepository implements EventRepository {
       if (organizationId === undefined || organizationId === null) {
         await this.insertEventLog({ tenantId, rows: stampedRecords });
       } else {
-        await this.appendFold.append({ organizationId, tenantId, rows: stampedRecords });
+        await this.appendFold.append({
+          organizationId,
+          tenantId,
+          rows: stampedRecords,
+        });
       }
     } catch (error) {
       this.logger.debug(
@@ -750,14 +805,26 @@ export class EventingClickHouseEventRepository implements EventRepository {
     }
   }
 
-  /** One insert, flushed before it answers; a folded one declares its tenant set. */
-  private async insertEventLog({ tenantId, rows, tenantIds }: EventLogInsert): Promise<void> {
+  /**
+   * One insert, flushed before it answers; a folded one declares its tenant set. Async
+   * deduplication is off, as the server's default before 26.2 has it: the log collapses repeats
+   * by IdempotencyKey itself, and an insert with it off may share a statement (ADR-187).
+   */
+  private async insertEventLog({
+    tenantId,
+    rows,
+    tenantIds,
+  }: EventLogInsert): Promise<void> {
     const client = await this.getClient(tenantId);
     await client.insert({
       table: "event_log",
       values: rows,
       format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      clickhouse_settings: {
+        async_insert: 1,
+        wait_for_async_insert: 1,
+        async_insert_deduplicate: 0,
+      },
       ...(tenantIds === undefined ? {} : { tenantIds }),
     });
   }

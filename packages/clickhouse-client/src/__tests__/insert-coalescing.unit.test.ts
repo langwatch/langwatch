@@ -1,20 +1,21 @@
 /**
- * Async inserts that wait for a statement slot together go as one statement: the slots a
- * burst needs follow the tables being written, not the rows. A holding driver stands in for
- * the vendor client and records what each statement carried.
+ * Async inserts that wait for a statement slot together go as one statement (ADR-187). The query
+ * client runs over a holding driver, which records each statement, and a real admission.
+ * Spec: specs/clickhouse/single-client-access.feature
  */
 import type { LimiterStats } from "@langwatch/limiter";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
-import type { ClickHouseClientCreationInput } from "../connection.ts";
+import { ClickHouseQueryClient } from "../client.ts";
 import { coalesceKeyOf } from "../insert-coalescing.ts";
 import {
   ClickHouseManagedClientTelemetry,
   ClickHouseOverloadErrorFactory,
-  withClickHouseStatementLimit,
+  ClickHouseStatementAdmission,
   type ClickHouseStatementOperation,
-  type ClickHouseVendorClient,
 } from "../managed-client.ts";
+import type { InsertRequest, QueryDriver } from "../query.ts";
+import { TenantGuard } from "../tenantGuard.ts";
 
 class OverloadedError extends Error {
   constructor(readonly cause: unknown) {
@@ -31,235 +32,339 @@ class OverloadFactory extends ClickHouseOverloadErrorFactory {
 
 class CountingTelemetry extends ClickHouseManagedClientTelemetry {
   readonly shed: ClickHouseStatementOperation[] = [];
-  registerLimiter(_input: { instance: string; stats: () => LimiterStats }): void {}
+  registerLimiter(_input: {
+    instance: string;
+    stats: () => LimiterStats;
+  }): void {}
   unregisterLimiter(_instance: string): void {}
   observeStatementWait(): void {}
-  incrementStatementsShed(input: { operation: ClickHouseStatementOperation }): void {
+  incrementStatementsShed(input: {
+    operation: ClickHouseStatementOperation;
+  }): void {
     this.shed.push(input.operation);
   }
 }
-
-const input = (maxOpenConnections: number): ClickHouseClientCreationInput => ({
-  url: "http://clickhouse.test:8123",
-  instance: `test-${Math.random().toString(36).slice(2)}`,
-  cluster: "test",
-  maxOpenConnections,
-});
 
 /** A budget of four: a reserve of one, so each lane caps at three. */
 const SPLIT_BUDGET = 4;
 const LANE_CAP = 3;
 
-const ASYNC = { async_insert: 1, wait_for_async_insert: 1 } as const;
+/** How event_log is written: async, waiting for the flush, async deduplication off. */
+const SHARED = {
+  async_insert: 1,
+  wait_for_async_insert: 1,
+  async_insert_deduplicate: 0,
+} as const;
 
-/** An insert the server buffers and the caller waits on, as single-row writers send it. */
+type Row = { TenantId: string; n: number; poisoned?: true };
+
+/** An insert that may share a statement, as the event log sends it. */
 const asyncInsert = (
   table: string,
-  values: unknown[],
-  settings: Record<string, unknown> = ASYNC,
-) => ({ table, values, format: "JSONEachRow", clickhouse_settings: settings });
+  rows: Row[],
+  extra: Partial<InsertRequest> = {},
+): InsertRequest => ({
+  tenantId: "project_a",
+  table,
+  rows,
+  settings: { ...SHARED },
+  ...extra,
+});
+
+const row = (n: number, tenantId = "project_a"): Row => ({
+  TenantId: tenantId,
+  n,
+});
 
 /** An insert that can share no statement: it sets no async settings. */
-const plainInsert = (table: string) => ({ table, values: [{ plain: true }] });
+const plainInsert = (table: string): InsertRequest => ({
+  tenantId: "project_a",
+  table,
+  rows: [row(0)],
+});
 
-/** A driver whose statements finish only when the test says so, failing on a poisoned row. */
-function holdingClient() {
+/** A ClickHouse server answer with its code, as the vendor client throws it. */
+const serverError = (code: string, message: string) =>
+  Object.assign(new Error(message), { code });
+
+/**
+ * A driver whose statements finish only when the test says so. A poisoned row fails its
+ * statement with `failure`, by default the server's parse refusal.
+ */
+function holdingDriver(
+  failure: () => unknown = () => serverError("27", "Cannot parse input"),
+) {
   const pending: (() => void)[] = [];
-  const inserts: Record<string, unknown>[] = [];
-
+  const inserts: InsertRequest[] = [];
+  let reads = 0;
   const hold = () => new Promise<void>((resolve) => pending.push(resolve));
 
-  const client = {
-    query: vi.fn(async () => {
+  const driver: QueryDriver = {
+    async execute() {
+      reads += 1;
       await hold();
-      return { ok: true };
-    }),
-    insert: vi.fn(async (params: unknown) => {
-      const record = params as Record<string, unknown>;
-      inserts.push(record);
+      return { rows: [] };
+    },
+    async insert(request) {
+      inserts.push(request);
       await hold();
-      const values = (record.values ?? []) as { poisoned?: boolean }[];
-      if (values.some((row) => row.poisoned === true)) throw new Error("Cannot parse input");
-      return { executed: true };
-    }),
-    close: vi.fn(async () => undefined),
-  } satisfies ClickHouseVendorClient;
+      if (request.rows.some((each) => (each as Row).poisoned === true))
+        throw failure();
+    },
+    async command() {},
+  };
 
   return {
-    client,
+    driver,
     inserts,
+    reads: () => reads,
     releaseAll() {
       for (const resolve of pending.splice(0)) resolve();
     },
   };
 }
 
+type Holding = ReturnType<typeof holdingDriver>;
+
 /** Lets queued microtasks run so an admitted statement can actually start. */
 const settleMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
 
-async function drain(driver: ReturnType<typeof holdingClient>, rounds = 6) {
+async function drain(holding: Holding, rounds = 6) {
   for (let round = 0; round < rounds; round += 1) {
-    driver.releaseAll();
+    holding.releaseAll();
     await settleMicrotasks();
   }
 }
 
-function limit(
-  driver: ReturnType<typeof holdingClient>,
-  options: { insertCoalesceMaxRows?: number; statementWaitTimeoutMs?: number } = {},
+function clientOver(
+  holding: Holding,
+  options: {
+    insertCoalesceMaxRows?: number;
+    statementWaitTimeoutMs?: number;
+  } = {},
 ) {
   const telemetry = new CountingTelemetry();
-  const limited = withClickHouseStatementLimit({
-    client: driver.client,
-    input: input(SPLIT_BUDGET),
+  const limiter = new ClickHouseStatementAdmission({
+    instance: `test-${Math.random().toString(36).slice(2)}`,
+    maxConcurrent: SPLIT_BUDGET,
     telemetry,
     overloadErrorFactory: new OverloadFactory(),
-    ...options,
+    statementWaitTimeoutMs: options.statementWaitTimeoutMs,
   });
-  return { limited, telemetry };
+  const client = new ClickHouseQueryClient({
+    driver: holding.driver,
+    tenantGuard: new TenantGuard(),
+    limiter,
+    insertCoalesceMaxRows: options.insertCoalesceMaxRows,
+  });
+  return { client, telemetry };
 }
 
 /** Fills the insert lane with inserts that can share nothing, so whatever follows waits. */
-async function saturateInsertLane(limited: ClickHouseVendorClient) {
+async function saturateInsertLane(client: ClickHouseQueryClient) {
   const holders = Array.from({ length: LANE_CAP }, (_, n) =>
-    limited.insert(plainInsert(`holder_${n}`)),
+    client.insert(plainInsert(`holder_${n}`)),
   );
   await settleMicrotasks();
   return holders;
 }
 
-const rowsOf = (params: Record<string, unknown>) => params.values as unknown[];
+const rowsOf = (request: InsertRequest) => request.rows;
+const outcome = (write: Promise<void>) =>
+  write.then(
+    () => "written",
+    (error: unknown) => error,
+  );
 
 describe("given the insert lane has used every slot it may hold", () => {
-  describe("when several async inserts into one table with the same settings are issued", () => {
-    let driver: ReturnType<typeof holdingClient>;
-    let limited: ClickHouseVendorClient;
-    let holders: Promise<unknown>[];
+  describe("when several async inserts of one route, table and settings are issued", () => {
+    let holding: Holding;
+    let client: ClickHouseQueryClient;
+    let holders: Promise<void>[];
 
     beforeEach(async () => {
-      driver = holdingClient();
-      ({ limited } = limit(driver));
-      holders = await saturateInsertLane(limited);
+      holding = holdingDriver();
+      ({ client } = clientOver(holding));
+      holders = await saturateInsertLane(client);
     });
 
     /** @scenario async inserts waiting for a slot go as one statement */
     it("sends one statement carrying all their rows once a slot frees", async () => {
       const writes = [1, 2, 3, 4, 5].map((n) =>
-        limited.insert(asyncInsert("billable_events", [{ n }])),
+        client.insert(asyncInsert("event_log", [row(n)])),
       );
       await settleMicrotasks();
-      expect(driver.inserts).toHaveLength(LANE_CAP);
+      expect(holding.inserts).toHaveLength(LANE_CAP);
 
-      await drain(driver);
-      const results = await Promise.all(writes);
-      await Promise.all(holders);
+      await drain(holding);
+      await Promise.all([...writes, ...holders]);
 
-      const coalesced = driver.inserts.slice(LANE_CAP);
+      const coalesced = holding.inserts.slice(LANE_CAP);
       expect(coalesced).toHaveLength(1);
       expect(coalesced[0]).toEqual(
-        asyncInsert("billable_events", [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }, { n: 5 }]),
+        asyncInsert(
+          "event_log",
+          [1, 2, 3, 4, 5].map((n) => row(n)),
+        ),
       );
-      expect(results).toEqual(Array.from({ length: 5 }, () => ({ executed: true })));
     });
 
     /** @scenario async inserts waiting for a slot go as one statement */
     it("starts a new statement for inserts that arrive after the first has started", async () => {
-      const early = limited.insert(asyncInsert("billable_events", [{ n: 1 }]));
-      driver.releaseAll();
+      const early = client.insert(asyncInsert("event_log", [row(1)]));
+      holding.releaseAll();
       await settleMicrotasks();
-      expect(driver.inserts).toHaveLength(LANE_CAP + 1);
+      expect(holding.inserts).toHaveLength(LANE_CAP + 1);
 
-      const late = limited.insert(asyncInsert("billable_events", [{ n: 2 }]));
-      await drain(driver);
+      const late = client.insert(asyncInsert("event_log", [row(2)]));
+      await drain(holding);
       await Promise.all([early, late, ...holders]);
 
-      expect(driver.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([[{ n: 1 }], [{ n: 2 }]]);
+      expect(holding.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([
+        [row(1)],
+        [row(2)],
+      ]);
     });
   });
 
   describe("when inserts are issued that cannot share a statement", () => {
     /** @scenario only inserts that can share a statement share one */
     it("sends each in its own statement", async () => {
-      const driver = holdingClient();
-      const { limited } = limit(driver);
-      const holders = await saturateInsertLane(limited);
+      const holding = holdingDriver();
+      const { client } = clientOver(holding);
+      const holders = await saturateInsertLane(client);
+      const signal = new AbortController().signal;
 
       const writes = [
-        limited.insert(asyncInsert("billable_events", [{ n: 1 }])),
-        limited.insert(asyncInsert("event_log", [{ n: 2 }])),
-        limited.insert(asyncInsert("billable_events", [{ n: 3 }], { ...ASYNC, insert_quorum: 2 })),
-        limited.insert(asyncInsert("billable_events", [{ n: 4 }], { async_insert: 1 })),
-        limited.insert({ ...asyncInsert("billable_events", [{ n: 5 }]), query_id: "mine" }),
+        client.insert(asyncInsert("event_log", [row(1)])),
+        client.insert(asyncInsert("billable_events", [row(2)])),
+        client.insert(
+          asyncInsert("event_log", [row(3, "project_b")], {
+            tenantId: "project_b",
+          }),
+        ),
+        client.insert(
+          asyncInsert("event_log", [row(4)], {
+            organizationId: "organization_1",
+          }),
+        ),
+        client.insert(
+          asyncInsert("event_log", [row(5)], {
+            settings: { ...SHARED, insert_quorum: 2 },
+          }),
+        ),
+        client.insert(
+          asyncInsert("event_log", [row(6)], {
+            settings: { async_insert: 1, wait_for_async_insert: 1 },
+          }),
+        ),
+        client.insert(
+          asyncInsert("event_log", [row(7)], {
+            settings: { ...SHARED, async_insert_deduplicate: 1 },
+          }),
+        ),
+        client.insert(
+          asyncInsert("event_log", [row(8)], {
+            settings: { ...SHARED, insert_deduplication_token: "mine" },
+          }),
+        ),
+        client.insert(asyncInsert("event_log", [row(9)], { signal })),
       ];
-      await drain(driver);
+      await drain(holding);
       await Promise.all([...writes, ...holders]);
 
-      expect(driver.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([
-        [{ n: 1 }],
-        [{ n: 2 }],
-        [{ n: 3 }],
-        [{ n: 4 }],
-        [{ n: 5 }],
-      ]);
+      expect(holding.inserts.slice(LANE_CAP).map(rowsOf)).toEqual(
+        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [
+          row(n, n === 3 ? "project_b" : "project_a"),
+        ]),
+      );
     });
   });
 
   describe("when more rows wait for one table than one statement may carry", () => {
     /** @scenario a coalesced statement never exceeds its row cap */
     it("splits them at the cap and sends a larger insert on its own", async () => {
-      const driver = holdingClient();
-      const { limited } = limit(driver, { insertCoalesceMaxRows: 3 });
-      const holders = await saturateInsertLane(limited);
+      const holding = holdingDriver();
+      const { client } = clientOver(holding, { insertCoalesceMaxRows: 3 });
+      const holders = await saturateInsertLane(client);
 
       const writes = [
-        ...[1, 2, 3, 4].map((n) => limited.insert(asyncInsert("billable_events", [{ n }]))),
-        limited.insert(
+        ...[1, 2, 3, 4].map((n) =>
+          client.insert(asyncInsert("event_log", [row(n)])),
+        ),
+        client.insert(
           asyncInsert(
-            "billable_events",
-            [5, 6, 7, 8].map((n) => ({ n })),
+            "event_log",
+            [5, 6, 7, 8].map((n) => row(n)),
           ),
         ),
       ];
-      await drain(driver);
+      await drain(holding);
       await Promise.all([...writes, ...holders]);
 
-      const sizes = driver.inserts.slice(LANE_CAP).map((params) => rowsOf(params).length);
-      expect(sizes).toEqual([3, 1, 4]);
+      const sizes = holding.inserts
+        .slice(LANE_CAP)
+        .map((request) => request.rows.length);
+      expect(sizes.toSorted()).toEqual([1, 3, 4]);
+    });
+  });
+
+  describe("when many empty inserts are issued", () => {
+    it("answers them at once and holds none of them", async () => {
+      const holding = holdingDriver();
+      const { client } = clientOver(holding);
+      const holders = await saturateInsertLane(client);
+
+      await Promise.all(
+        Array.from({ length: 1_000 }, () =>
+          client.insert(asyncInsert("event_log", [])),
+        ),
+      );
+
+      expect(holding.inserts).toHaveLength(LANE_CAP);
+      await drain(holding);
+      await Promise.all(holders);
     });
   });
 });
 
 describe("given the insert lane has a free slot", () => {
-  describe("when an async insert is issued", () => {
+  describe("when async inserts are issued in the same tick", () => {
     /** @scenario an async insert with a slot free goes at once, alone */
-    it("starts it at once with its own parameters, untouched", async () => {
-      const driver = holdingClient();
-      const { limited } = limit(driver);
-      const params = asyncInsert("billable_events", [{ n: 1 }]);
+    it("starts each at once with its own request, untouched", async () => {
+      const holding = holdingDriver();
+      const { client } = clientOver(holding);
+      const requests = [1, 2, 3].map((n) => asyncInsert("event_log", [row(n)]));
 
-      const write = limited.insert(params);
+      const writes = requests.map((request) => client.insert(request));
       await settleMicrotasks();
 
-      expect(driver.inserts).toEqual([params]);
-      expect(driver.inserts[0]).toBe(params);
+      expect(holding.inserts).toHaveLength(3);
+      for (const [at, request] of requests.entries())
+        expect(holding.inserts[at]).toBe(request);
 
-      await drain(driver);
-      await write;
+      await drain(holding);
+      await Promise.all(writes);
     });
   });
 
   describe("when coalescing is turned off", () => {
     /** @scenario only inserts that can share a statement share one */
     it("sends every insert alone", async () => {
-      const driver = holdingClient();
-      const { limited } = limit(driver, { insertCoalesceMaxRows: 0 });
-      const holders = await saturateInsertLane(limited);
+      const holding = holdingDriver();
+      const { client } = clientOver(holding, { insertCoalesceMaxRows: 0 });
+      const holders = await saturateInsertLane(client);
 
-      const writes = [1, 2].map((n) => limited.insert(asyncInsert("billable_events", [{ n }])));
-      await drain(driver);
+      const writes = [1, 2].map((n) =>
+        client.insert(asyncInsert("event_log", [row(n)])),
+      );
+      await drain(holding);
       await Promise.all([...writes, ...holders]);
 
-      expect(driver.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([[{ n: 1 }], [{ n: 2 }]]);
+      expect(holding.inserts.slice(LANE_CAP).map(rowsOf)).toEqual([
+        [row(1)],
+        [row(2)],
+      ]);
     });
   });
 });
@@ -268,61 +373,102 @@ describe("given async inserts are waiting together for a slot that never frees",
   describe("when the wait bound elapses", () => {
     /** @scenario a refused coalesced statement refuses and counts every caller */
     it("refuses every caller as overloaded and counts each as shed", async () => {
-      const driver = holdingClient();
-      const { limited, telemetry } = limit(driver, { statementWaitTimeoutMs: 20 });
-      const holders = await saturateInsertLane(limited);
+      const holding = holdingDriver();
+      const { client, telemetry } = clientOver(holding, {
+        statementWaitTimeoutMs: 20,
+      });
+      const holders = await saturateInsertLane(client);
 
-      const writes = [1, 2, 3].map((n) =>
-        limited.insert(asyncInsert("billable_events", [{ n }])).catch((error: unknown) => error),
+      const outcomes = await Promise.all(
+        [1, 2, 3].map((n) =>
+          outcome(client.insert(asyncInsert("event_log", [row(n)]))),
+        ),
       );
-      const outcomes = await Promise.all(writes);
 
-      expect(outcomes.every((outcome) => outcome instanceof OverloadedError)).toBe(true);
+      expect(outcomes.every((each) => each instanceof OverloadedError)).toBe(
+        true,
+      );
       expect(telemetry.shed).toEqual(["insert", "insert", "insert"]);
-      expect(driver.inserts).toHaveLength(LANE_CAP);
+      expect(holding.inserts).toHaveLength(LANE_CAP);
 
-      await drain(driver);
+      await drain(holding);
       await Promise.all(holders);
     });
   });
 });
 
 describe("given async inserts went together as one statement", () => {
-  describe("when the server rejects the statement", () => {
-    /** @scenario a coalesced statement that fails is retried caller by caller */
+  /** Three callers waiting together, the second with a row the server cannot take. */
+  async function coalescedWithPoison(failure?: () => unknown) {
+    const holding = holdingDriver(failure);
+    const { client } = clientOver(holding);
+    const holders = await saturateInsertLane(client);
+    const writes = [row(1), { ...row(2), poisoned: true as const }, row(3)].map(
+      (each) => outcome(client.insert(asyncInsert("event_log", [each]))),
+    );
+    await drain(holding);
+    await Promise.all(holders);
+    return { holding, outcomes: await Promise.all(writes) };
+  }
+
+  describe("when the server rejects the rows unwritten", () => {
+    /** @scenario a coalesced statement whose rows are rejected is resent caller by caller */
     it("resends each caller alone, so only the caller with the bad row fails", async () => {
-      const driver = holdingClient();
-      const { limited } = limit(driver);
+      const { holding, outcomes } = await coalescedWithPoison();
 
-      const [good, bad, alsoGood] = [{ n: 1 }, { n: 2, poisoned: true }, { n: 3 }].map((row) =>
-        limited.insert(asyncInsert("billable_events", [row])).then(
-          () => "written",
-          (error: unknown) => (error as Error).message,
-        ),
-      );
-      await drain(driver);
-
-      expect(await Promise.all([good, bad, alsoGood])).toEqual([
-        "written",
-        "Cannot parse input",
-        "written",
-      ]);
-      expect(driver.inserts.map((params) => rowsOf(params).length)).toEqual([3, 1, 1, 1]);
+      expect(outcomes[0]).toBe("written");
+      expect((outcomes[1] as Error).message).toBe("Cannot parse input");
+      expect(outcomes[2]).toBe("written");
+      expect(
+        holding.inserts.slice(LANE_CAP).map((request) => request.rows.length),
+      ).toEqual([3, 1, 1, 1]);
     });
   });
 
-  describe("when the statement fails for a single caller", () => {
+  describe.each([
+    {
+      name: "the connection resets",
+      failure: () => serverError("ECONNRESET", "socket hang up"),
+    },
+    {
+      name: "the request times out",
+      failure: () => new Error("Timeout error."),
+    },
+    {
+      name: "the server times out",
+      failure: () => serverError("159", "Timeout exceeded: elapsed 30 seconds"),
+    },
+    {
+      name: "the server is overloaded",
+      failure: () => serverError("202", "Too many simultaneous queries"),
+    },
+  ])("when $name, which may have written the batch", ({ failure }) => {
+    /** @scenario a coalesced statement that may have written is never resent */
+    it("fails every caller with that failure and sends nothing again", async () => {
+      const failed = failure();
+      const { holding, outcomes } = await coalescedWithPoison(() => failed);
+
+      expect(outcomes).toEqual([failed, failed, failed]);
+      expect(holding.inserts).toHaveLength(LANE_CAP + 1);
+    });
+  });
+
+  describe("when the statement carried one caller only", () => {
     it("fails that caller without sending again", async () => {
-      const driver = holdingClient();
-      const { limited } = limit(driver);
+      const holding = holdingDriver();
+      const { client } = clientOver(holding);
+      const holders = await saturateInsertLane(client);
 
-      const write = limited
-        .insert(asyncInsert("billable_events", [{ poisoned: true }]))
-        .catch((error: unknown) => (error as Error).message);
-      await drain(driver);
+      const write = outcome(
+        client.insert(
+          asyncInsert("event_log", [{ ...row(1), poisoned: true }]),
+        ),
+      );
+      await drain(holding);
+      await Promise.all(holders);
 
-      expect(await write).toBe("Cannot parse input");
-      expect(driver.inserts).toHaveLength(1);
+      expect(((await write) as Error).message).toBe("Cannot parse input");
+      expect(holding.inserts).toHaveLength(LANE_CAP + 1);
     });
   });
 });
@@ -331,18 +477,25 @@ describe("given async inserts are waiting together for a slot", () => {
   describe("when a read is issued", () => {
     /** @scenario coalesced inserts keep to the insert lane */
     it("starts the read at once", async () => {
-      const driver = holdingClient();
-      const { limited } = limit(driver);
-      const holders = await saturateInsertLane(limited);
-      const writes = [1, 2].map((n) => limited.insert(asyncInsert("billable_events", [{ n }])));
+      const holding = holdingDriver();
+      const { client } = clientOver(holding);
+      const holders = await saturateInsertLane(client);
+      const writes = [1, 2].map((n) =>
+        client.insert(asyncInsert("event_log", [row(n)])),
+      );
 
-      const read = limited.query({ query: "SELECT 1" });
+      const read = client.query({
+        tenantId: "",
+        sql: "SELECT 1",
+        // A constant probe that reads no table, so it names no tenant.
+        SKIP_TENANT_CHECK: true,
+      });
       await settleMicrotasks();
 
-      expect(driver.client.query).toHaveBeenCalledTimes(1);
-      expect(driver.inserts).toHaveLength(LANE_CAP);
+      expect(holding.reads()).toBe(1);
+      expect(holding.inserts).toHaveLength(LANE_CAP);
 
-      await drain(driver);
+      await drain(holding);
       await Promise.all([read, ...writes, ...holders]);
     });
   });
@@ -352,18 +505,25 @@ describe("given the read lane is saturated", () => {
   describe("when async inserts are issued", () => {
     /** @scenario coalesced inserts keep to the insert lane */
     it("starts them at once", async () => {
-      const driver = holdingClient();
-      const { limited } = limit(driver);
-      const reads = [0, 1, 2, 3].map((n) => limited.query({ query: `SELECT ${n}` }));
+      const holding = holdingDriver();
+      const { client } = clientOver(holding);
+      const reads = [0, 1, 2, 3].map((n) =>
+        client.query({
+          tenantId: "",
+          sql: `SELECT ${n}`,
+          // A constant probe that reads no table, so it names no tenant.
+          SKIP_TENANT_CHECK: true,
+        }),
+      );
       await settleMicrotasks();
-      expect(driver.client.query).toHaveBeenCalledTimes(LANE_CAP);
+      expect(holding.reads()).toBe(LANE_CAP);
 
-      const write = limited.insert(asyncInsert("billable_events", [{ n: 1 }]));
+      const write = client.insert(asyncInsert("event_log", [row(1)]));
       await settleMicrotasks();
 
-      expect(driver.inserts).toHaveLength(1);
+      expect(holding.inserts).toHaveLength(1);
 
-      await drain(driver);
+      await drain(holding);
       await Promise.all([write, ...reads]);
     });
   });
@@ -372,29 +532,62 @@ describe("given the read lane is saturated", () => {
 describe("coalesceKeyOf", () => {
   describe("given settings in a different order", () => {
     it("gives the same key", () => {
-      expect(
-        coalesceKeyOf(asyncInsert("t", [], { wait_for_async_insert: 1, async_insert: 1, x: "a" })),
-      ).toBe(
-        coalesceKeyOf(asyncInsert("t", [], { async_insert: 1, x: "a", wait_for_async_insert: 1 })),
-      );
+      const ordered = asyncInsert("t", [row(1)], {
+        settings: {
+          wait_for_async_insert: 1,
+          async_insert: 1,
+          async_insert_deduplicate: 0,
+          x: 1,
+        },
+      });
+      const shuffled = asyncInsert("t", [row(1)], {
+        settings: {
+          async_insert_deduplicate: 0,
+          x: 1,
+          async_insert: 1,
+          wait_for_async_insert: 1,
+        },
+      });
+      expect(coalesceKeyOf(ordered)).toBe(coalesceKeyOf(shuffled));
     });
   });
 
   describe.each([
-    { name: "no settings", params: { table: "t", values: [], format: "JSONEachRow" } },
+    { name: "no settings", request: plainInsert("t") },
     {
       name: "async off",
-      params: asyncInsert("t", [], { async_insert: 0, wait_for_async_insert: 1 }),
+      request: asyncInsert("t", [row(1)], {
+        settings: { ...SHARED, async_insert: 0 },
+      }),
     },
     {
       name: "no wait for the flush",
-      params: asyncInsert("t", [], { async_insert: 1, wait_for_async_insert: 0 }),
+      request: asyncInsert("t", [row(1)], {
+        settings: { ...SHARED, wait_for_async_insert: 0 },
+      }),
     },
-    { name: "a stream of values", params: { ...asyncInsert("t", []), values: "a stream" } },
-    { name: "an abort signal", params: { ...asyncInsert("t", []), abort_signal: {} } },
-  ])("given $name", ({ params }) => {
+    {
+      name: "async deduplication left to the server",
+      request: asyncInsert("t", [row(1)], {
+        settings: { async_insert: 1, wait_for_async_insert: 1 },
+      }),
+    },
+    {
+      name: "a deduplication token",
+      request: asyncInsert("t", [row(1)], {
+        settings: { ...SHARED, insert_deduplication_token: "x" },
+      }),
+    },
+    { name: "no rows", request: asyncInsert("t", []) },
+    {
+      name: "an abort signal",
+      request: asyncInsert("t", [row(1)], {
+        signal: new AbortController().signal,
+      }),
+    },
+  ])("given $name", ({ request }) => {
     it("cannot coalesce", () => {
-      expect(coalesceKeyOf(params)).toBeNull();
+      expect(coalesceKeyOf(request)).toBeNull();
     });
   });
 });
