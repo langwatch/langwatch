@@ -110,6 +110,13 @@ Feature: Publish every deployable image to the artifacts registry
     And it writes no tag to that image
 
   @unit
+  Scenario: A dispatch with a new custom tag over a published commit writes that tag
+    Given an earlier run published the git-<short sha> tags of a commit
+    When publish-docker-ecr is dispatched for that commit with an image_tag not yet in the registry
+    Then it checks and writes that image_tag on every image
+    And the git-<short sha> tags already there do not stop it
+
+  @unit
   Scenario: A commit tag already there for another commit fails the run
     Given another commit sharing this commit's short sha already published git-<short sha>
     When publish-docker-ecr publishes this commit

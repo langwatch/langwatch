@@ -53,9 +53,7 @@ func jobSkipGates(rel, job string, j ciscan.Job) []string {
 	exempt := rel == ImagesWorkflow && job == manifestJob
 	for i := range j.Steps {
 		step := &j.Steps[i]
-		if strings.Contains(step.Run, "cmd/ecrtag") && !strings.Contains(step.Run, "-custom=") {
-			problems = append(problems, fmt.Sprintf("%s job %s: step %q calls cmd/ecrtag without -custom=", rel, job, step.Name))
-		}
+		problems = append(problems, customProblems(rel, job, step)...)
 		checked = checked || (step.ID == "exists" && strings.Contains(step.Run, ecrtagPublished))
 		if pushes(step, exempt) && (!checked || !gated(step.If)) {
 			problems = append(problems, fmt.Sprintf("%s job %s: %q pushes without an earlier `id: exists` step running %q and %#q as a top-level && term of its if:", rel, job, step.Name, ecrtagPublished, skipGate))
@@ -63,6 +61,14 @@ func jobSkipGates(rel, job string, j ciscan.Job) []string {
 	}
 
 	return problems
+}
+
+func customProblems(rel, job string, step *ciscan.Step) []string {
+	if strings.Contains(step.Run, "cmd/ecrtag") && !strings.Contains(step.Run, "-custom=") {
+		return []string{fmt.Sprintf("%s job %s: step %q calls cmd/ecrtag without -custom=", rel, job, step.Name)}
+	}
+
+	return nil
 }
 
 // pushes is a build whose push: is anything but literally false, or a run

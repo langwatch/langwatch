@@ -123,6 +123,10 @@ func TestEveryECRPushAsksEcrtagFirst(t *testing.T) {
 		"a gate diluted by ||": func(s string) string {
 			return strings.Replace(s, "if: steps.exists.outputs.exists != 'true'", "if: always() || steps.exists.outputs.exists != 'true'", 1)
 		},
+		"a quoted push: \"true\" with no gate": func(s string) string {
+			s = strings.Replace(s, "        if: steps.exists.outputs.exists != 'true'\n", "", 1)
+			return strings.Replace(s, "          push: true\n", "          push: \"true\"\n", 1)
+		},
 		"push: ${{ true }} with no gate": func(s string) string {
 			s = strings.Replace(s, "        if: steps.exists.outputs.exists != 'true'\n", "", 1)
 			return strings.Replace(s, "          push: true\n", "          push: ${{ true }}\n", 1)

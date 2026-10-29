@@ -150,3 +150,14 @@ func TestARetagNeverOffersTheTagItself(t *testing.T) {
 	assert.Equal(t, "sha256:mid", digest)
 	assert.NotContains(t, anc.offered, "git-1111111")
 }
+
+// @scenario "A dispatch with a new custom tag over a published commit writes that tag"
+func TestANewCustomTagOverAPublishedCommitIsWritten(t *testing.T) {
+	c := check("hotfix-2", ecrtag.Annotation)
+	c.Custom = true
+
+	done, err := published(t, c) // git-1111111 is already there for this commit
+
+	require.NoError(t, err)
+	assert.False(t, done, "the custom tag is not there, so it is written")
+}
