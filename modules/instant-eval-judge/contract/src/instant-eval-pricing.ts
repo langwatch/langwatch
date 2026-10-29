@@ -38,7 +38,8 @@ const TOKENS_PER_MILLION = 1_000_000;
 /** The ledger keeps integer nano-USD, so amounts round to nine decimals. */
 export const NANO_USD_PER_USD = 1_000_000_000;
 
-function toNanoUsdPrecision(usd: number): number {
+/** A dollar amount rounded to the ledger's nano-USD unit, with no float noise past it. */
+export function toNanoUsdPrecision(usd: number): number {
   return Math.round(usd * NANO_USD_PER_USD) / NANO_USD_PER_USD;
 }
 

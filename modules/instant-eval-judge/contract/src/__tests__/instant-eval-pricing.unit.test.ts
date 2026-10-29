@@ -9,6 +9,7 @@ import {
   INSTANT_EVAL_PRICING,
   instantEvalCostUsd,
   instantEvalPriceUsd,
+  toNanoUsdPrecision,
 } from "../instant-eval-pricing.ts";
 
 describe("given a response from the classifier", () => {
@@ -56,6 +57,12 @@ describe("given a judgement whose raw product carries float noise", () => {
       expect(costUsd).toBe(0.008892534);
       expect(priceUsd).toBe(0.011560294);
       expect(String(priceUsd)).not.toMatch(/0000000\d$/);
+    });
+
+    /** @scenario "A priced amount is rounded to nano-USD precision" */
+    it("rounds a summed amount the same way, for a caller that adds costs", () => {
+      expect(toNanoUsdPrecision(0.1 + 0.2)).toBe(0.3);
+      expect(toNanoUsdPrecision(0.0000000014)).toBe(0.000000001);
     });
   });
 });

@@ -11,7 +11,7 @@ import {
   INSTANT_EVAL_PROJECTION_VERSIONS,
   type InstantEvalProcessingEvent,
 } from "@langwatch/instant-eval-contract";
-import { NANO_USD_PER_USD } from "@langwatch/instant-eval-judge-contract";
+import { NANO_USD_PER_USD, toNanoUsdPrecision } from "@langwatch/instant-eval-judge-contract";
 
 import type { InstantEvalStoredStatus } from "../rules/instant-eval-run-status.rules.ts";
 
@@ -102,7 +102,7 @@ export function applyInstantEvalRunEvent(
         skipped: state.skipped + event.data.skipped,
         tokens: state.tokens + event.data.inputTokens,
         // A routed run's cost so far, so the page budget check reads it; finish sets the total.
-        costUsd: nanoUsdRounded(state.costUsd + event.data.costNanoUsd / NANO_USD_PER_USD),
+        costUsd: toNanoUsdPrecision(state.costUsd + event.data.costNanoUsd / NANO_USD_PER_USD),
         startedAtMs: state.startedAtMs ?? event.occurredAt,
       };
 
@@ -146,8 +146,4 @@ export function createInstantEvalRunProjection(deps: {
     // row is one run.
     key: (event) => String(event.aggregateId),
   };
-}
-
-function nanoUsdRounded(usd: number): number {
-  return Math.round(usd * NANO_USD_PER_USD) / NANO_USD_PER_USD;
 }
