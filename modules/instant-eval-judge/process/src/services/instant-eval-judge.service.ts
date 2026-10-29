@@ -99,10 +99,11 @@ export class InstantEvalJudgeService {
       return this.deps.decisionModels.classify({ text, questions, decisionModel }, ...signalArgs);
     }
     const { classifier, limiter, router } = this.deps;
-    if (!classifier) return instantEvalSkipped("classifier_not_configured");
+    // The router skips a missing classifier itself, and its table may never reach it.
     if (route) {
       return router.classify({ projectId, text, questions, route, ...(signal ? { signal } : {}) });
     }
+    if (!classifier) return instantEvalSkipped("classifier_not_configured");
     return classifier.classify({ projectId, text, questions, limiter }, ...signalArgs);
   }
 
@@ -111,8 +112,9 @@ export class InstantEvalJudgeService {
     if (decisionModel) {
       return { outcome: "judged", judgement: await this.classifyOnce(call), priceUsd: 0 };
     }
-    // Off cloud nothing judges, so the project's placement is never the reason to give.
-    if (!this.deps.isCloud || !this.deps.classifier) {
+    // Off cloud nothing judges, so the project's placement is never the reason to give. A routed
+    // call needs no hosted classifier key: boot checks the keys its table can reach.
+    if (!this.deps.isCloud || (!this.deps.classifier && !call.route)) {
       return refused({ code: "classifier_not_configured", message: NOT_CONFIGURED_MESSAGE });
     }
     const placement = await this.deps.repositories.projects.getPlacement({ projectId });

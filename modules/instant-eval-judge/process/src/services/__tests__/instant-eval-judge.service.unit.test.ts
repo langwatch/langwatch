@@ -106,7 +106,7 @@ function harness({
   const router = InstantEvalJudgeRouterService.create({
     table: syntheticRouteTable(),
     pricing: routePricing,
-    classifier,
+    classifier: hasClassifier ? classifier : undefined,
     hostedDecisions: ScriptedInstantEvalHostedDecisionsChannel.create({
       answer: () => ({
         verdicts: [{ questionId: QUESTION.id, probability: 0.05 }],
@@ -556,6 +556,28 @@ describe("given a judge call that carries a route", () => {
     });
   });
 
+  /** @scenario "A routed call needs the hosted classifier key only when its table reaches it" */
+  it("judges a routed call through the router when no hosted classifier key is set", async () => {
+    const { service, recorded, seed } = harness({ hasClassifier: false });
+    await seed();
+
+    const answer = await service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
+
+    expect(answer).toMatchObject({ outcome: "judged", priceUsd: INSTANT_EVAL_PRICING.markup });
+    expect(recorded[0]).toMatchObject({ model: "langwatch-judge", costNanoUsd: 1_000_000_000 });
+  });
+
+  /** @scenario "A routed call needs the hosted classifier key only when its table reaches it" */
+  it("still refuses a call with no route as not configured when no hosted classifier key is set", async () => {
+    const { service, recorded, seed } = harness({ hasClassifier: false });
+    await seed();
+
+    const answer = await service.judge(call);
+
+    expect(answer).toMatchObject({ outcome: "refused", code: "classifier_not_configured" });
+    expect(recorded).toEqual([]);
+  });
+
   /** @scenario "A call with no route keeps today's single classifier call" */
   it("keeps today's single classifier call and token price when no route is sent", async () => {
     const { service, classifier, recorded, seed } = harness();
@@ -712,6 +734,21 @@ describe("given the unmetered classify the Api and the judge call share", () => 
       expect(classifier.classify).not.toHaveBeenCalled();
       expect(judgement.costNanoUsd).toBe(1_000_000_000);
       expect(recorded).toEqual([]);
+    });
+  });
+
+  describe("when no classifier is configured but the call carries a route", () => {
+    /** @scenario "A routed call needs the hosted classifier key only when its table reaches it" */
+    it("asks the router, which answers from the backends it can reach", async () => {
+      const { service } = harness({ hasClassifier: false });
+
+      const judgement = await service.classifyOnce({
+        ...call,
+        route: { job: "llm_judge", tokens: 100 },
+      });
+
+      expect(judgement.skippedReason).toBeUndefined();
+      expect(judgement.costNanoUsd).toBe(1_000_000_000);
     });
   });
 

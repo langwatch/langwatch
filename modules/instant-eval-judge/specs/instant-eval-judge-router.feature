@@ -47,6 +47,13 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And an escalation's fallbacks never ask the primary again
 
   @unit
+  Scenario: A routed call needs the hosted classifier key only when its table reaches it
+    Given a deployment with no hosted classifier key, whose route table never reaches it
+    When a routed call is judged
+    Then the router answers it from the backends it can reach
+    And a call with no route is still refused as not configured
+
+  @unit
   Scenario: A pair names decision models only
     Given a route table pairing an LLM backend, or a pair member whose fallback is an LLM
     When the deployment boots
