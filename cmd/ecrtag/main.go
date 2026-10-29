@@ -13,8 +13,8 @@
 // prints {"base": tag, "rebuild": [repository]} (tools/ecrtag.DiffBase): where
 // a push run's change set starts, "" when no repository has an image to
 // re-tag, and the repositories it must rebuild whatever the diff says. -registry is
-// the registry host; -refuse-retag and lambda read git history from the
-// working directory. -refuse-retag fails on a tag naming the image a push
+// the registry host; -refuse-retag, lambda and diffbase read the first-parent
+// git history from the working directory. -refuse-retag fails on a tag naming the image a push
 // run's re-tag would copy; -built-from is the per-arch tag an index must name.
 //
 // Spec: specs/ci/publish-ecr-images.feature

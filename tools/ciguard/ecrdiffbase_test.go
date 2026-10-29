@@ -65,6 +65,14 @@ func TestTheImagesChangeSetStartsAtTheLastPublishedCommit(t *testing.T) {
 		"a select step that drops the rebuild list": func(s string) string {
 			return strings.Replace(s, "               + $rebuild | unique')", "               | unique')", 1)
 		},
+		"a base step that writes an empty rebuild list": func(s string) string {
+			return strings.Replace(s, `jq -c '.rebuild')`, `jq -c '[]')`, 1)
+		},
+		"a rebuild list added only where no base filters": func(s string) string {
+			s = strings.Replace(s, "               + $rebuild | unique')", "               | unique')", 1)
+
+			return strings.Replace(s, "              '[$all[].image, $lambdas[].image] | unique')", "              --argjson rebuild \"${REBUILD}\" '[$all[].image, $lambdas[].image] + $rebuild | unique')", 1)
+		},
 	} {
 		t.Run(name+" fails", func(t *testing.T) {
 			broken := breakIt(workflow)

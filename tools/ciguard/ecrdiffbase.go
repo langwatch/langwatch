@@ -20,8 +20,11 @@ const (
 	filteredWhen   = "${{ steps.base.outputs.sha != '' }}"
 	rebuildOutput  = "${{ steps.base.outputs.rebuild }}"
 	rebuildWritten = `echo "rebuild=${REBUILD}"`
+	rebuildRead    = `REBUILD=$(printf '%s' "${BASE}" | jq -c '.rebuild')`
 	rebuildArg     = `--argjson rebuild "${REBUILD}"`
 	rebuildAdded   = "+ $rebuild | unique"
+	filteredIf     = `if [ "${FILTERED}" = "true" ]; then`
+	filteredElse   = "else"
 )
 
 // manifestLoop is the list of images create-manifest tags, one per pass.
@@ -76,8 +79,8 @@ func diffBaseSteps(j ciscan.Job) (base, filter *ciscan.Step) {
 // every image diffbase forces, so a revert hidden by the diff still rebuilds.
 func selectProblems(base *ciscan.Step, j ciscan.Job) []string {
 	var problems []string
-	if !strings.Contains(base.Run, rebuildWritten) {
-		problems = append(problems, fmt.Sprintf("%s job %s: the base step must write diffbase's rebuild list as an output (%s)", ImagesWorkflow, changesJob, rebuildWritten))
+	if !hasLine(base.Run, rebuildRead) || !strings.Contains(base.Run, rebuildWritten) {
+		problems = append(problems, fmt.Sprintf("%s job %s: the base step must read diffbase's rebuild list (%s) and write it as an output (%s)", ImagesWorkflow, changesJob, rebuildRead, rebuildWritten))
 	}
 	var sel *ciscan.Step
 	for i := range j.Steps {
@@ -88,11 +91,30 @@ func selectProblems(base *ciscan.Step, j ciscan.Job) []string {
 	if sel == nil || strings.TrimSpace(sel.Env["FILTERED"]) != filteredWhen {
 		problems = append(problems, fmt.Sprintf("%s job %s: the select step must set FILTERED: %s; any other gate either filters with no base or builds nothing", ImagesWorkflow, changesJob, filteredWhen))
 	}
-	if sel == nil || strings.TrimSpace(sel.Env["REBUILD"]) != rebuildOutput || !containsAll(sel.Run, []string{rebuildArg, rebuildAdded}) {
-		problems = append(problems, fmt.Sprintf("%s job %s: the select step must take REBUILD: %s and add it to the filter's images (%s ... %s)", ImagesWorkflow, changesJob, rebuildOutput, rebuildArg, rebuildAdded))
+	if sel == nil || strings.TrimSpace(sel.Env["REBUILD"]) != rebuildOutput || !containsAll(filteredBranch(sel.Run), []string{rebuildArg, rebuildAdded}) {
+		problems = append(problems, fmt.Sprintf("%s job %s: the select step must take REBUILD: %s and add it to the filter's images (%s ... %s) in the branch %#q selects", ImagesWorkflow, changesJob, rebuildOutput, rebuildArg, rebuildAdded, filteredIf))
 	}
 
 	return problems
+}
+
+// filteredBranch is the select script between `if FILTERED` and its `else`.
+func filteredBranch(run string) string {
+	start := strings.Index(run, filteredIf)
+	if start < 0 {
+		return ""
+	}
+	branch := run[start+len(filteredIf):]
+	if end := strings.Index(branch, "\n"+filteredElse+"\n"); end >= 0 {
+		return branch[:end]
+	}
+
+	return ""
+}
+
+// hasLine holds when one of run's lines, trimmed, is exactly line.
+func hasLine(run, line string) bool {
+	return slices.ContainsFunc(strings.Split(run, "\n"), func(l string) bool { return strings.TrimSpace(l) == line })
 }
 
 func manifestImages(j ciscan.Job) []string {
