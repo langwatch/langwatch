@@ -275,7 +275,7 @@ await it("captions each response example briefly and keeps the full description 
   });
 });
 
-/** @scenario "Render nested objects and union options as connected groups" */
+/** @scenario "Open a nested disclosure in the browser" */
 await it("names a disclosure's next action and hangs its children from a left rule, in the API reference and in authored pages", async () => {
   await withPreviewBrowser({
     outDir,

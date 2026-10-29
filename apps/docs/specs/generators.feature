@@ -47,10 +47,14 @@ Feature: Generate documentation data from authored sources
     Given a response field holds child attributes or a union of object shapes
     When the response reference is rendered
     Then the field's disclosure is a quiet text control that counts what it opens, as "Show 3 child attributes" or "Show 2 variants"
-    And it reads "Hide" in place of "Show" while open
-    And the opened children hang from a left rule under their parent
     And a union option is named by the constant that tells it apart, as kind: "categorical"
-    And an authored Expandable, as in the Python reference, uses the same quiet Show and Hide control
+
+  @e2e
+  Scenario: Open a nested disclosure in the browser
+    Given a built page with a nested field disclosure, in the API reference or an authored Expandable as in the Python reference
+    When the reader opens it
+    Then it reads "Hide" in place of "Show" while open
+    And the opened children hang from a left rule under their parent
 
   @integration
   Scenario: Render code spans in API descriptions
