@@ -304,6 +304,14 @@ export class UpgradeLedgerRepository {
     return rows.map((row) => upgradeTargetSchema.parse(row));
   }
 
+  /** Every target with at least one row, whatever its status. */
+  async findRecordedTargets(): Promise<string[]> {
+    const { rows } = await this.query<{ target: string }>(
+      (t) => `SELECT DISTINCT "target" FROM ${t.target} ORDER BY "target"`,
+    );
+    return rows.map((row) => row.target);
+  }
+
   /** Every ClickHouse step a target has not applied yet: a held private target's backlog. */
   async findTargetsBehind(): Promise<UpgradeTarget[]> {
     const { rows } = await this.query<object>(

@@ -114,6 +114,13 @@ function clickhouseTargets({ environment }: Pick<ImageUpgradeInputs, "environmen
   return { config, targets };
 }
 
+/** The ledger name of every ClickHouse target the environment configures, shared first. */
+export function configuredClickHouseTargets({
+  environment,
+}: Pick<ImageUpgradeInputs, "environment">): string[] {
+  return clickhouseTargets({ environment }).targets.map((target) => target.name);
+}
+
 /** Postgres left alone because no DATABASE_URL is set: a failed target. */
 function prismaMissing(): SchemaTargetReport {
   const error = "DATABASE_URL is required to apply the Postgres schema";
@@ -563,6 +570,7 @@ export async function withImageUpgradeRunner<Result>({
         stepTo: stepSchemaTo({ inputs }),
         say: writeUpgradeLine,
       }),
+      clickhouseTargets: targets.map((target) => target.name),
       reconcilers: reconcilers({ inputs }),
       ...(inputs.onBlockingDone ? { onBlockingDone: inputs.onBlockingDone } : {}),
       identity: { image: release ?? "unreleased", host: hostname() },
