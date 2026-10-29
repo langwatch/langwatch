@@ -49,7 +49,7 @@ export function llmsDirectory({ nav }: { nav: DirectoryNav }) {
 }
 
 const DIRECTORY_SUMMARY =
-  "LangWatch is the open-source platform to trace, evaluate, test and optimise LLM apps and AI agents.";
+  "LangWatch is the open-source platform to trace, evaluate, test and optimize LLM apps and AI agents.";
 
 /* Carried over from the llms.txt the current docs publish, so agents keep the same instructions. */
 const AGENT_GUIDANCE = [

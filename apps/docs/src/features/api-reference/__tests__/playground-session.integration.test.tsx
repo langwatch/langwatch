@@ -276,7 +276,7 @@ describe("when the reader cancels the request in the frame", () => {
     await send();
     fromFrame({ kind: "failed", id: sends()[0]?.message.id, reason: "declined" });
     await settle();
-    expect(liveResponse()).toMatch(/cancelled this request in the LangWatch frame/);
+    expect(liveResponse()).toMatch(/canceled this request in the LangWatch frame/);
   });
 
   /** @scenario "Say so when the reader declines a request in the frame" */

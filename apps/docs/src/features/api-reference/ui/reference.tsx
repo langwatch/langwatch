@@ -176,7 +176,7 @@ export function EndpointReference({
   return (
     <TypeRegion mode="productive" className="docs-api-reference">
       {operation.schemes.length > 0 ? (
-        <Section title="Authorisation">
+        <Section title="Authorization">
           {operation.schemes.map((scheme) => (
             <DocsField
               key={scheme.id}
