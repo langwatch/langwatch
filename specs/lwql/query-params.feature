@@ -231,20 +231,20 @@ Feature: Every query door takes the same parameters and says what it ran with
     @unit @integration
     Scenario: QP15 A caller cannot supply a reserved parameter in its own parameters
       When a run's parameters name dashboard_context_sources or dashboard_context_projects
-      Then it is refused with the code "reserved_parameter_supplied" and the message names the typed field `sources` or `projects`
+      Then it is refused with the code "lwql_reserved_parameter_supplied" and the message names the typed field `sources` or `projects`
       # Evidence: the four refusals quoted
 
     @unit @integration
     Scenario: QP15b SQL that assigns or aliases a reserved name is refused at every door
       When a statement has "SET param_dashboard_context_projects = 'C'", "WITH 'C' AS dashboard_context_projects", or a CTE named dashboard_context_sources
-      Then it is refused with the code "reserved_parameter_supplied" at tRPC, REST, MCP and the CLI
+      Then it is refused with the code "lwql_reserved_parameter_supplied" at tRPC, REST, MCP and the CLI
       And a statement that declares {dashboard_context_projects:Array(String)} and reads it is accepted
       # Evidence: the four refusals quoted for each of the three shapes
 
     @unit
     Scenario: QP16 A statement declaring a reserved parameter with another type is refused
       When a statement declares {dashboard_context_projects:String}
-      Then it is refused with the code "reserved_parameter_type" and the message names "Array(String)"
+      Then it is refused with the code "lwql_reserved_parameter_type" and the message names "Array(String)"
       # Evidence: the REST answer quoted
 
   Rule: params names every input the run depended on, and no other key
@@ -275,7 +275,8 @@ Feature: Every query door takes the same parameters and says what it ran with
     Scenario: QP19 The CLI sends the parameters and prints the params
       When `langwatch query run --sources application,langy --projects A,B` succeeds
       Then the request carries sources and projects
-      And the JSON the command prints holds `params` beside the rows
+      And with a machine format the rows stay the only thing on stdout, and `params` is one JSON line on stderr
+      And with the table format a line under the table says what the run was bound to
       # Evidence: the command's output quoted
 
     @unit @integration
@@ -284,11 +285,14 @@ Feature: Every query door takes the same parameters and says what it ran with
       Then the tool result holds `params`
       # Evidence: the tool result quoted
 
-    @integration
-    Scenario: QP21 The insight gate's run equals the card run
-      Given a widget query run by its card and by the insight gate for the same board, period and project
-      Then the two return the same rows and the same params
-      # Evidence: the insight run's stored result and the card's tRPC answer for the same query, quoted and diffed
+    @unit
+    Scenario: QP21 The insight gate validates a stored statement with the same binder, and refuses what the card refuses
+      Given a finding whose statement reads {dashboard_context_sources:Array(String)}, and findings whose statements assign a reserved name or declare it as String
+      When the insight gate checks them for the run's person
+      Then the first is kept as written
+      And the others are dropped, and their findings are filed without a statement
+      # The gate only validates; the replay is the card's own run, so rows and params are the card's
+      # Evidence: the gate's kept and dropped findings, quoted
 
   Rule: A run the server limited says so, without naming what it hid
 
