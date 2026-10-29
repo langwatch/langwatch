@@ -1,6 +1,9 @@
 /**
- * What an Instant Eval costs us and what it costs the customer; only input
- * tokens are priced. @see modules/instant-eval-judge/specs/instant-eval-judge-pricing.feature
+ * What an Instant Eval costs us and what it costs the customer. An unrouted judgement is priced
+ * from its input tokens at the classifier's published rate; a routed one from the summed cost of
+ * its calls (input and output tokens at per-backend prices), at the same markup.
+ * @see dev/docs/adr/190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md
+ * @see modules/instant-eval-judge/specs/instant-eval-judge-pricing.feature
  */
 
 import type { InstantEvalJudgeRoutePricing } from "./instant-eval-judge-route.ts";

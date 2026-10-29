@@ -7,7 +7,8 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   Yes-or-no questions are always routed; score and category questions only when the table routes
   their kind (each kind reads an answer's sureness its own way), else they take today's call.
 
-  The router is a synchronous step inside the judge leaf (ROUTER-PLACEMENT option a). A call with
+  The router is a synchronous step inside the judge leaf, priced as ADR-190 records
+  (dev/docs/adr/190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md). A call with
   no route takes today's single hosted classifier call. The public route table sends every slot
   to the hosted classifier; the real table and prices are deploy-time configuration.
 
@@ -229,7 +230,6 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When the hosted classifier answers it
     Then the judgement carries the classifier's cost at its routed price
     And a run whose calls all carry a route never prices some of its tokens at zero
-    And the caller resolves the route once per run, so a run routes every call or none
 
   @unit
   Scenario: A page event without a routed cost still reads and prices from tokens

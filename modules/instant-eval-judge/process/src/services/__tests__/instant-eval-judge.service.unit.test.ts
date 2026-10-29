@@ -611,7 +611,7 @@ describe("given a judge call that carries a route", () => {
     });
   });
 
-  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  /** @scenario "A routed judgement with a cost of zero is still routed" */
   it("prices a routed call that cost nothing at zero, under the router's model and rate", async () => {
     const { service, recorded, seed } = harness({ isRouted: true, routeUsdPerMillion: 0 });
     await seed();
@@ -628,7 +628,7 @@ describe("given a judge call that carries a route", () => {
     });
   });
 
-  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  /** @scenario "Routed and unrouted tokens are billed separately" */
   it("bills a mixed run's unrouted tokens at the published rate on top of its routed cost", async () => {
     const { service, recorded } = harness({ isRouted: true });
 

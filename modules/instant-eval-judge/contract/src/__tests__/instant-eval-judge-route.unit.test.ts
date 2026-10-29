@@ -7,7 +7,11 @@ import {
   instantEvalJudgeRouteTableSchema,
 } from "../instant-eval-judge-route.ts";
 import { instantEvalJudgeConfig } from "../instant-eval-judge.config.ts";
-import { instantEvalCostUsd, instantEvalSpentCostUsd } from "../instant-eval-pricing.ts";
+import {
+  instantEvalCostUsd,
+  instantEvalSpentCostUsd,
+  instantEvalSpentPriceUsd,
+} from "../instant-eval-pricing.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({
@@ -231,17 +235,16 @@ describe("spent cost", () => {
   });
 
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
-  it("takes the routed cost when one was recorded", () => {
-    expect(
-      instantEvalSpentCostUsd({
-        inputTokens: 1_000_000,
-        costNanoUsd: 2_500,
-        routedInputTokens: 1_000_000,
-      }),
-    ).toBe(0.0000025);
+  /** @scenario "A routed judgement is priced from its summed cost, not its tokens" */
+  it("takes the routed cost when one was recorded, and prices it at the markup", () => {
+    const spent = { inputTokens: 1_000_000, costNanoUsd: 3_000_000, routedInputTokens: 1_000_000 };
+
+    expect(instantEvalSpentCostUsd(spent)).toBe(0.003);
+    // $0.003 at the published 1.3 markup.
+    expect(instantEvalSpentPriceUsd(spent)).toBe(0.0039);
   });
 
-  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  /** @scenario "Routed and unrouted tokens are billed separately" */
   it("adds the unrouted tokens of a mixed run at the published rate", () => {
     const costUsd = instantEvalSpentCostUsd({
       inputTokens: 1_000_000,
@@ -251,7 +254,7 @@ describe("spent cost", () => {
     expect(costUsd).toBe(0.121);
   });
 
-  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  /** @scenario "A routed judgement with a cost of zero is still routed" */
   it("prices routed tokens that cost nothing at zero, not at the published rate", () => {
     const costUsd = instantEvalSpentCostUsd({
       inputTokens: 20_000,

@@ -1,7 +1,7 @@
 /**
- * The judge router (ROUTER-PLACEMENT option a): takes the place of the one hosted classifier
- * call when a call carries a route. Plans each question kind the table routes and runs the plans
- * side by side; a kind the table does not route takes today's classifier call.
+ * The judge router: takes the place of the one hosted classifier call when a call carries a route.
+ * Plans each question kind the table routes; a kind it does not route takes today's classifier.
+ * @see dev/docs/adr/190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
