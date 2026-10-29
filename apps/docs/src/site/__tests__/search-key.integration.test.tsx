@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { composeDocument, themeScript } from "../document.ts";
 
+/** The theme script's source, without its known <script> wrapper. */
+const themeSource = themeScript.slice("<script>".length, -"</script>".length);
+
 function press({
   key,
   meta = false,
@@ -35,7 +38,7 @@ describe("a search shortcut pressed while the page loads", () => {
   /** @scenario "Open search from the first shortcut, even one pressed while the page loads" */
   it("is noted by the page's inline listener, with the browser's own shortcut suppressed", () => {
     const element = document.createElement("script");
-    element.textContent = themeScript.replace(/^<script>|<\/script>$/g, "");
+    element.textContent = themeSource;
     document.head.append(element);
     expect(press({ key: "k" }).defaultPrevented).toBe(false);
     expect(noted()).toBe("undefined");
@@ -72,7 +75,7 @@ describe("when the browser refuses to read the stored theme", () => {
     run(`window.matchMedia = () => ({ matches: true });
       Object.defineProperty(window, "localStorage", { configurable: true, get() { throw new DOMException("denied", "SecurityError"); } });`);
     document.documentElement.className = "";
-    run(themeScript.slice("<script>".length, -"</script>".length));
+    run(themeSource);
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     run("delete window.matchMedia; delete window.localStorage;");
   });
