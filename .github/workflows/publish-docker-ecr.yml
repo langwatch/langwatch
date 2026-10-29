@@ -337,15 +337,15 @@ jobs:
           # arm64 only — see the header. Docker Hub still ships both arches for
           # the community; this registry serves one all-Graviton consumer.
           #
-          # Runner labels mirror publish-docker-app.yml: the app's build needs
-          # the 32GB larger runner for the pnpm/vite bundle, everything else
-          # fits on the standard hosted arm runner.
+          # Runner labels mirror publish-docker-app.yml: every image, the app
+          # included, builds on the standard hosted arm runner. The app bundle
+          # caps Node's heap at 4 GiB (infra/docker/Dockerfile), well inside it.
           #
           # langwatch-docs (static files under /site, not meant to run) takes the
           # same service shape, so the re-tag fallback in create-manifest holds for it.
           ALL=$(cat <<'JSON'
           [
-            {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"arm64-runner-32gb"},
+            {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
