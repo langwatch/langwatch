@@ -67,7 +67,7 @@ export interface DrawerContentProps extends Omit<
 }
 
 /** A wide screen floats the drawer by `value`, or the default 2; a phone sheet reaches the edge. */
-function floatMargin({ value, phone = "0px" }:{ value?: MarginValue; phone?: MarginValue }) {
+function floatMargin({ value, phone = "0px" }: { value?: MarginValue; phone?: MarginValue }) {
   return { base: phone, md: value ?? 2 };
 }
 

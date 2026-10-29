@@ -62,6 +62,10 @@ describe("given the Langy panel is open and docked on a wide screen", () => {
 });
 
 describe("given the Langy panel is minimised", () => {
+  beforeEach(() => {
+    langy.setState({ isOpen: false, panelMode: "sidebar" });
+  });
+
   it("the trace drawer keeps the right edge", async () => {
     const drawer = await renderTraceDrawer();
 
