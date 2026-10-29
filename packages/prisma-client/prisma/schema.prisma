@@ -2112,6 +2112,8 @@ model Monitor {
   threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @default(now()) @updatedAt
+  autoPausedAt      DateTime? // Set when the monitor paused itself because its evaluations mostly errored
+  autoPausedReason  String? // Why it paused itself; cleared with autoPausedAt when enabled again
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -2316,21 +2318,24 @@ model DashboardFavourite {
 /// made before the split were copied here with their ids, so stars and insight
 /// pointers still name them. No relation, per the database rule.
 model DashboardsV2 {
-  id             String         @id @default(nanoid())
+  id              String         @id @default(nanoid())
   /// The project that owns the board; only there can it be edited.
-  projectId      String
-  name           String
+  projectId       String
+  name            String
   /// Free text under the board's name; null until a member writes one.
-  description    String?
+  description     String?
   /// The member who created it; null for boards that predate authorship.
-  createdById    String?
+  createdById     String?
   /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
-  scope          DashboardScope @default(PROJECT)
+  scope           DashboardScope @default(PROJECT)
   /// The owning project's organization, stamped when the board is first set to
   /// ORGANIZATION; null before.
-  organizationId String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @default(now()) @updatedAt
+  organizationId  String?
+  /// Deprecated: unused since each widget query names its own sources (dashboards-v2 AC200,
+  /// 2026-10-28); dropped in a later migration, once no serving release reads it.
+  excludedOrigins Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
 
   @@index([projectId])
   @@index([organizationId, scope])
@@ -4769,6 +4774,11 @@ model ApiKey {
   /// and revokes, and lets an ownerless run key act as the system. Never set
   /// by a customer create; rows before the column stay false.
   isSystemManaged Boolean @default(false)
+
+  /// The browser session that minted a docs session key (ADR-185), so signing
+  /// out of that session revokes it. NULL for every other key. Unindexed:
+  /// sign-out filters by the indexed `userId` first.
+  createdByBrowserSessionId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt

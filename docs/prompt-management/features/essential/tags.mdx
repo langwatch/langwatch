@@ -71,7 +71,7 @@ curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
 
 Use `platform_get_prompt` with the `tag` parameter to fetch a specific tagged version:
 
-```
+```typescript
 platform_get_prompt({ idOrHandle: "pizza-prompt", tag: "production" })
 ```
 
@@ -191,7 +191,7 @@ You can assign tags when creating or updating prompts, so the version is tagged 
 await langwatch.prompts.create({
   handle: "my-prompt",
   messages: [{ role: "system", content: "You are a helpful assistant." }],
-  model: "gpt-5-mini",
+  model: "gpt-6-luna",
   tags: ["staging"],
 });
 
@@ -225,13 +225,13 @@ langwatch.prompts.update(
 
 Tags can also be assigned during prompt creation and updates via MCP:
 
-```
+```typescript
 // Create with tags
 platform_create_prompt({
   name: "My Prompt",
   handle: "my-prompt",
   messages: [...],
-  model: "gpt-5-mini",
+  model: "gpt-6-luna",
   tags: ["staging"]
 })
 

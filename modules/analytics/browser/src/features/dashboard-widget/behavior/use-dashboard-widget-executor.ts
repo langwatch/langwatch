@@ -62,8 +62,6 @@ export interface DashboardWidgetExecutorOverrides {
   readonly timeWindow?: { start: number; end: number };
   /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
-  /** Trace origins the dashboard leaves out; keep the reference stable, a new one re-runs. */
-  readonly excludeOrigins?: readonly string[];
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splits would scatter closured state.
@@ -83,7 +81,6 @@ export function useDashboardWidgetExecutor(
   const pageWindow = overrides?.timeWindow ?? mountWindow;
   const granularitySeconds: LangWatchQLAcceptedGranularityStep =
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
-  const excludeOrigins = overrides?.excludeOrigins;
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({
@@ -102,7 +99,7 @@ export function useDashboardWidgetExecutor(
 
   const runValidated = useCallback(
     async (
-      query: Pick<DashboardWidgetQuery, "sql">,
+      query: Pick<DashboardWidgetQuery, "sql" | "sources">,
       params: Readonly<Record<string, LangWatchQLParameterValue>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
@@ -112,7 +109,8 @@ export function useDashboardWidgetExecutor(
           parameters: params,
           timeWindow: pageWindow,
           granularitySeconds,
-          ...(excludeOrigins ? { excludeOrigins } : {}),
+          // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
+          sources: query.sources ?? null,
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.
@@ -120,7 +118,7 @@ export function useDashboardWidgetExecutor(
       );
       return toChartQueryResult(result);
     },
-    [execute, pageWindow, granularitySeconds, excludeOrigins],
+    [execute, pageWindow, granularitySeconds],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(

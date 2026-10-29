@@ -429,7 +429,7 @@ Answers at `/api/projects/:id`, `/api/v1/projects/:id`; also, undocumented, `/ap
 interface Params {
   id: string;
 }
-// Response: projectRestDetailSchema, ../contract/src/project.responses.ts:110
+// Response: projectRestDetailSchema, ../contract/src/project.responses.ts:112
 interface Response {
   id: string;
   name: string;
@@ -461,7 +461,7 @@ interface Body {
   teamId?: string;
   piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
 }
-type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:110
+type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:112
 ```
 
 #### `DELETE /:id` · `archiveProject`
@@ -474,7 +474,7 @@ Answers at `/api/projects/:id`, `/api/v1/projects/:id`; also, undocumented, `/ap
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
-// Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:125
+// Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:127
 interface Response {
   id: string;
   name: string;
@@ -517,13 +517,14 @@ type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/
 
 ### `project`
 
-Contract `../contract/src/project.trpc.ts:28`, router `src/transport/project.trpc.ts:80`.
+Contract `../contract/src/project.trpc.ts:30`, router `src/transport/project.trpc.ts:95`.
 
 | Procedure                           | Kind     | Gate                                                                                                                                                                                                                                                                | Input                                         | Output                                   |
 | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------- |
 | `project.create`                    | mutation | Service-authorized: project:create, organization:manage; creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed | `projectCreateInputSchema`                    | `projectProvisionedSchema`               |
 | `project.getHasFirstMessage`        | query    | Permission `project:view`                                                                                                                                                                                                                                           | `projectScopeSchema`                          | `projectFirstMessageSchema`              |
 | `project.getLegacyKeyStatus`        | query    | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`                          | `projectLegacyKeyStatusSchema`           |
+| `project.legacyKeys`                | query    | Service-authorized: project:manage; the organisation-wide read asks project:manage of every project it found holding a live legacy key, which is only knowable after the read                                                                                       | `projectLegacyKeysInputSchema`                | `projectLegacyKeysSchema`                |
 | `project.revokeProjectApiKey`       | mutation | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`                          | `projectApiKeyRevokedSchema`             |
 | `project.update`                    | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectUpdateInputSchema`                    | `projectSettingsSavedSchema`             |
 | `project.archiveById`               | mutation | Permission `project:delete`                                                                                                                                                                                                                                         | `projectArchiveByIdInputSchema`               | `projectArchivedSchema`                  |
@@ -551,14 +552,28 @@ interface Output {
 
 // project.getLegacyKeyStatus
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:15
-// Output: projectLegacyKeyStatusSchema, ../contract/src/project.responses.ts:65
+// Output: projectLegacyKeyStatusSchema, ../contract/src/project.responses.ts:67
 interface Output {
   present: boolean;
+  lastUsedAt: unknown | null;
 }
+
+// project.legacyKeys
+// Input: projectLegacyKeysInputSchema, ../contract/src/project-trpc.schemas.ts:106
+interface Input {
+  organizationId: string;
+}
+// Output: projectLegacyKeysSchema, ../contract/src/project.responses.ts:160
+type Output = {
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+  lastUsedAt: unknown | null;
+}[];
 
 // project.revokeProjectApiKey
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:15
-// Output: projectApiKeyRevokedSchema, ../contract/src/project.responses.ts:74
+// Output: projectApiKeyRevokedSchema, ../contract/src/project.responses.ts:76
 interface Output {
   revoked: true;
 }
@@ -577,7 +592,7 @@ interface Input {
   projectId: string;
   projectToArchiveId: string;
 }
-// Output: projectArchivedSchema, ../contract/src/project.responses.ts:82
+// Output: projectArchivedSchema, ../contract/src/project.responses.ts:84
 interface Output {
   success: true;
   alreadyArchived: boolean;
@@ -585,7 +600,7 @@ interface Output {
 
 // project.updateAggregateRule
 type Input = z.infer<typeof projectUpdateAggregateRuleInputSchema>; // ../contract/src/project-trpc.schemas.ts:97
-// Output: projectAggregateRuleUpdatedSchema, ../contract/src/project.responses.ts:136
+// Output: projectAggregateRuleUpdatedSchema, ../contract/src/project.responses.ts:138
 interface Output {
   success: true;
   members: {
@@ -598,11 +613,11 @@ interface Output {
 }
 
 // project.aggregateMemberCandidates
-// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:108
+// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:117
 interface Input {
   organizationId: string;
 }
-// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:145
+// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:169
 type Output = {
   id: string;
   name: string;

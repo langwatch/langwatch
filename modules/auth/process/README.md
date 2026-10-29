@@ -782,11 +782,11 @@ type Input = Record<string, unknown>;
 // Output: browserSessionInventoryEntrySchema.array() (inline, ../contract/src/auth.trpc.ts:93)
 
 // auth.endBrowserSession
-// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:126
+// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:128
 interface Input {
   sessionId: string;
 }
-// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:136
+// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:138
 interface Output {
   ended: number;
 }

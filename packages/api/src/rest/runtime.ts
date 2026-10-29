@@ -55,6 +55,7 @@ import {
   UnsupportedMediaTypeError,
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
@@ -414,6 +415,13 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
         for (const scope of scopes) app.use(scope, middleware);
       }
 
+      // Ahead of every bare route and guard, so a refusal or a 404 there says so too.
+      const successor = declaration.bareDeprecated ? canonicalV1Path(basePath) : null;
+      if (successor) app.use(`${basePath}/*`, deprecatedAlias({ successor }));
+
+      // Ahead of the routes: a date no route names is the version, never a `/:id` it matches.
+      if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, contexts });
+
       const served = mountFamilyRoutes({
         app,
         basePath,
@@ -425,8 +433,6 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
       });
 
       mountMethodGuards({ app, served });
-
-      if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, contexts });
 
       app.onError(withRetryAfter(protocolRefusals(withLegacyError(options.onError))));
 
@@ -1589,6 +1595,8 @@ function handlerMiddleware<Api>({
         scope: resolved,
         context,
         run: async () => {
+          // Before the click, so a context that refuses never shows a card or spends a click.
+          const resolvedContexts = await resolveContexts({ route, contexts, context, input });
           // After every permission check and inside the trail, so a refusal is recorded too.
           const receipt = await confirmMarkedRequest({
             mark: route.confirmation,
@@ -1618,7 +1626,7 @@ function handlerMiddleware<Api>({
                   session: sessionOf({ route, credential, caller }),
                   key: keyOf({ route, credential, request: context.req.raw }),
                 }),
-                ...(await resolveContexts({ route, contexts, context, input })),
+                ...resolvedContexts,
               ),
           });
         },
@@ -2610,7 +2618,9 @@ function respond({
   if (route.answers) return respondDeclared({ context, route, answers: route.answers, result });
 
   const validation = route.output.safeParse(result);
+  let answer: unknown = validation.data;
 
+  // A refused answer is logged and still sent, cut to the keys the schema names.
   if (!validation.success) {
     outputLogger.error(
       {
@@ -2622,16 +2632,19 @@ function respond({
       "REST handler response did not match its declared output schema",
     );
 
-    throw new Error(
-      `REST ${context.req.method} ${context.req.path} answered a value its declared output schema refuses`,
-    );
+    answer = withoutUndeclaredKeys(route.output as z.ZodType, result);
+  }
+
+  // A refused answer the schema left nothing of keeps the route's own status.
+  if (answer === undefined && !validation.success) {
+    return context.body(null, (route.status ?? 200) as ContentfulStatusCode);
   }
 
   // Reachable only for a `z.void()` output: a route that declared no answer
   // always takes this branch, and every other route never does.
-  if (validation.data === undefined) return context.body(null, route.status ?? 204);
+  if (answer === undefined) return context.body(null, route.status ?? 204);
 
-  return context.json(validation.data as never, route.status ?? 200);
+  return context.json(answer as never, route.status ?? 200);
 }
 
 /**
@@ -2834,17 +2847,20 @@ function respondDeclared({
       },
       "REST handler response did not match the answer its declaration named",
     );
-
-    throw new Error(
-      `REST ${route.operation} answered a body its declared ${String(status)} schema refuses`,
-    );
   }
 
   // The declared status IS the answer, whatever its class, so the request
   // record reads as one rather than as a server fault.
   context.set(DECLARED_ANSWER, true);
 
-  return context.json(validation.data as never, status as ContentfulStatusCode);
+  // A refused body is logged above and still sent, cut to the keys the schema names.
+  const body = validation.success
+    ? validation.data
+    : withoutUndeclaredKeys(schema as z.ZodType, answer.body);
+
+  if (body === undefined) return context.body(null, status as ContentfulStatusCode);
+
+  return context.json(body as never, status as ContentfulStatusCode);
 }
 
 /**
@@ -2870,7 +2886,9 @@ function mountVersionGuards<Api>({
   const namespace = VERSION_NAMESPACE;
   const fallback = dateFallback({ basePath, declaration, ports, options, contexts });
   const notFound: MiddlewareHandler = async (context, next) =>
-    anotherFamilyServesTheVersion(context) ? next() : context.notFound();
+    anotherFamilyServesTheVersion(context) || aMethodGuardFollows(context)
+      ? next()
+      : context.notFound();
 
   for (const guard of [namespace, `${namespace}/*`]) {
     const handlers: [MiddlewareHandler, ...MiddlewareHandler[]] = [fallback, notFound];
@@ -2978,6 +2996,22 @@ function anotherFamilyServesTheVersion(context: Context): boolean {
   return later.some(
     (route) => servesAtVersion({ route, position, requested }) || fallbackServes(context, route),
   );
+}
+
+/**
+ * A method guard of the very version asked for follows, so a method no route of that version
+ * serves answers 405 there; one of a dynamic segment standing in for the version does not count.
+ */
+function aMethodGuardFollows(context: Context): boolean {
+  const position = versionPosition(context.req.routePath);
+  const requested = versionAsked(context, context.req.routePath);
+
+  return matchedRoutes(context)
+    .slice(context.req.routeIndex + 1)
+    .some(
+      (route) =>
+        methodGuards.has(handlerOf(route)) && route.path.split("/")[position] === requested,
+    );
 }
 
 /** A route declared at the very version asked for, not a dynamic segment standing in for it. */

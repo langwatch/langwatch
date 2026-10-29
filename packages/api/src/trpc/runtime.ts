@@ -88,6 +88,7 @@ import {
 } from "../access/input-permission.ts";
 import { promoteStoreFailure } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import {
   auditScopeId,
   auditScopeIds,
@@ -277,6 +278,21 @@ function headerValue(value: string | readonly string[] | undefined): string | nu
 export const browserSessionContext = defineMiddlewareContext(
   "browserSession",
   z.string().nullable(),
+);
+
+/**
+ * The same browser session with its window: when it began and when it ends, as ISO instants.
+ * A credential minted for the session reads it to end no later than the session does.
+ */
+export const browserSessionWindowContext = defineMiddlewareContext(
+  "browserSessionWindow",
+  z
+    .object({
+      id: z.string(),
+      startedAt: z.iso.datetime().nullable(),
+      expiresAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
 );
 
 /** Where the request came from, as the process's own mount reads the address. */
@@ -1675,7 +1691,8 @@ async function authorized<TContext extends object>({
 
 /**
  * Parses an answer with its declared schema. One the schema refuses is logged
- * and raised as a plain Error (a 500); the raw value is never sent.
+ * and still answered, with every key the schema does not name dropped: a shape
+ * drift is not worth a 500, and the raw value is never sent.
  */
 function validateDeclaredOutput({
   procedure,
@@ -1699,7 +1716,7 @@ function validateDeclaredOutput({
     "tRPC handler response did not match its declared output schema",
   );
 
-  throw new Error(`tRPC ${procedure} answered a value its declared output schema refuses`);
+  return withoutUndeclaredKeys(schema, value);
 }
 
 /**
@@ -1727,7 +1744,8 @@ function guardOutput({
   };
 
   if (!output) {
-    return async (opts: ResolverOptions) => voidOutput({ procedure, value: await invoke(opts) });
+    return async (opts: ResolverOptions) =>
+      voidOutput({ procedure, kind, value: await invoke(opts) });
   }
 
   if (kind === "subscription") {
@@ -1746,8 +1764,19 @@ function guardOutput({
     validateDeclaredOutput({ procedure, schema: output, value: await invoke(opts) });
 }
 
-/** A procedure that declared no output answers nothing; any value is a 500 (Alex, 2026-10-01). */
-function voidOutput({ procedure, value }: { procedure: string; value: unknown }): unknown {
+/**
+ * A procedure that declared no output answers nothing; a value is logged, then dropped. A
+ * subscription has no nothing to answer, so one without an output stays a 500.
+ */
+function voidOutput({
+  procedure,
+  kind,
+  value,
+}: {
+  procedure: string;
+  kind: TrpcContractMember["kind"];
+  value: unknown;
+}): unknown {
   if (value === undefined) return value;
 
   outputLogger.error(
@@ -1759,7 +1788,11 @@ function voidOutput({ procedure, value }: { procedure: string; value: unknown })
     "tRPC handler response did not match its declared output schema",
   );
 
-  throw new Error(`tRPC ${procedure} answered a value but declares no output schema`);
+  if (kind === "subscription") {
+    throw new Error(`tRPC ${procedure} streams values but declares no output schema`);
+  }
+
+  return undefined;
 }
 
 /** The handler's own arguments, and the middleware context that follows them. */

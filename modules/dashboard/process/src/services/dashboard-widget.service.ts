@@ -27,9 +27,13 @@ import type {
   DashboardWidgetLayoutsInput,
 } from "#repositories/dashboard-widget.repository";
 
+import { mergeQuerySources, withNewQuerySources } from "../rules/widget-query-sources.rules.ts";
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
+
+/** A widget addressed under one board's path: on any other board, or none, it is not found. */
+type OnBoard = Readonly<{ onDashboardId?: string }>;
 
 /** An update's code and queries, each optional; the repository merges them into the stored half. */
 const definitionUpdateSchema = dashboardWidgetDefinitionSchema.partial();
@@ -74,7 +78,7 @@ export class DashboardWidgetService {
     return rows.map((row) => this.#present(row));
   }
 
-  async getById(input: DashboardWidgetScope & Viewed): Promise<DashboardWidget> {
+  async getById(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
     return this.#present(await this.#visibleRow(input));
   }
@@ -82,7 +86,12 @@ export class DashboardWidgetService {
   async createWidget(
     input: Omit<CreateDashboardWidgetInput, "id"> & Viewed,
   ): Promise<DashboardWidget> {
-    const { viewer, ...fields } = input;
+    const { viewer, ...given } = input;
+    // A new widget's unset query stores application (AC200o).
+    const fields = {
+      ...given,
+      input: { ...given.input, queries: withNewQuerySources(given.input.queries) },
+    };
     await this.#assertEnabled(fields);
     if (fields.dashboardId !== undefined) {
       await this.#assertBoardWritable({ ...fields, dashboardId: fields.dashboardId, viewer });
@@ -98,13 +107,26 @@ export class DashboardWidgetService {
     return this.#present(await this.#repository.createWidget({ ...fields, id }));
   }
 
-  /** The repository merges the halves given into the stored half, which it parses first. */
-  async updateWidget(input: UpdateDashboardWidgetInput & Viewed): Promise<DashboardWidget> {
-    const { viewer: _viewer, ...fields } = input;
+  /**
+   * The repository merges the halves given into the stored half. Queries come with their
+   * sources already merged over the stored ones, so a query sent without a list keeps its own.
+   * The read and the write are two steps: like every other widget field, the last write wins.
+   */
+  async updateWidget(
+    input: UpdateDashboardWidgetInput & Viewed & OnBoard,
+  ): Promise<DashboardWidget> {
+    const { viewer: _viewer, onDashboardId: _onBoard, ...fields } = input;
     await this.#assertEnabled(fields);
-    await this.#visibleRow(input);
+    const row = await this.#visibleRow(input);
     this.#assertWritable(input.id, definitionUpdateSchema.safeParse(input.input));
-    return this.#present(await this.#repository.updateWidget(fields));
+    const sent = fields.input.queries;
+    const queries =
+      sent === undefined
+        ? undefined
+        : mergeQuerySources({ sent, stored: this.#present(row).definition.queries });
+    const merged =
+      queries === undefined ? fields : { ...fields, input: { ...fields.input, queries } };
+    return this.#present(await this.#repository.updateWidget(merged));
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput & Viewed): Promise<DashboardWidget> {
@@ -115,7 +137,7 @@ export class DashboardWidgetService {
     return this.#present(await this.#repository.assignToDashboard(fields));
   }
 
-  async deleteWidget(input: DashboardWidgetScope & Viewed): Promise<void> {
+  async deleteWidget(input: DashboardWidgetScope & Viewed & OnBoard): Promise<void> {
     await this.#assertEnabled(input);
     await this.#visibleRow(input);
     return this.#repository.deleteWidget({ projectId: input.projectId, id: input.id });
@@ -149,9 +171,12 @@ export class DashboardWidgetService {
     return rows.filter((row) => row.dashboardId === input.dashboardId);
   }
 
-  async #visibleRow(input: DashboardWidgetScope & Viewed): Promise<DashboardWidgetRow> {
+  async #visibleRow(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidgetRow> {
     const row = await this.#repository.getById({ projectId: input.projectId, id: input.id });
     const onBoard = row.dashboardId;
+    if (input.onDashboardId !== undefined && onBoard !== input.onDashboardId) {
+      throw new DashboardWidgetNotFoundError();
+    }
     const hidden =
       onBoard !== null &&
       (await this.#boards.isHidden({
@@ -176,7 +201,7 @@ export class DashboardWidgetService {
     input: { projectId: string; dashboardId: string } & Viewed,
   ): Promise<void> {
     const found = await this.#boards.findReadable(input);
-    if (!found) throw new DashboardWidgetNotFoundError();
+    if (!found) throw new DashboardNotFoundError(input.projectId);
     if (found.standing === "guest") throw new DashboardReadOnlyHereError(input.projectId);
   }
 

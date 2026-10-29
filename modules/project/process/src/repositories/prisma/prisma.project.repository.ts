@@ -6,6 +6,7 @@ import {
   NEVER_LANDED_ON_PROJECT_KINDS,
   NON_DESTINATION_PROJECT_KINDS,
   PROJECT_KIND,
+  UNMANAGED_PROJECT_KEY_KINDS,
   ProjectNotFoundError,
   aggregateRuleSchema,
   type AggregateMemberCandidate,
@@ -40,7 +41,12 @@ import {
 } from "@langwatch/project-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
+import {
+  isLegacyKeyRevoked,
+  REVOKED_LEGACY_KEY_PREFIX,
+} from "../../rules/legacy-project-key.rules.ts";
 import type {
+  LiveLegacyKey,
   ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
@@ -814,6 +820,51 @@ export class PrismaProjectRepository
       where: { id: input.projectId },
       data: { legacyApiKeyLastUsedAt: toDate(input.at) },
     });
+  }
+
+  async findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
+    const row = await this.prisma.project.findUnique({
+      where: { id: input.projectId },
+      select: { legacyApiKeyLastUsedAt: true },
+    });
+    return row?.legacyApiKeyLastUsedAt ? fromDate(row.legacyApiKeyLastUsedAt) : null;
+  }
+
+  /**
+   * Ordered by name so the screen's rows do not reshuffle between reads. The
+   * stored-prefix filter is a narrowing only: every row is still put to the
+   * rule, which is the one place that decides what a revoked key looks like.
+   */
+  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]> {
+    const projects = await this.prisma.project.findMany({
+      where: {
+        archivedAt: null,
+        team: { organizationId: input.organizationId },
+        kind: { notIn: [...UNMANAGED_PROJECT_KEY_KINDS] },
+        apiKey: { not: { startsWith: REVOKED_LEGACY_KEY_PREFIX } },
+      },
+      select: {
+        id: true,
+        teamId: true,
+        name: true,
+        slug: true,
+        apiKey: true,
+        legacyApiKeyLastUsedAt: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return projects
+      .filter((project) => !isLegacyKeyRevoked(project.apiKey))
+      .map((project) => ({
+        projectId: project.id,
+        teamId: project.teamId,
+        projectName: project.name,
+        projectSlug: project.slug,
+        lastUsedAt: project.legacyApiKeyLastUsedAt
+          ? fromDate(project.legacyApiKeyLastUsedAt)
+          : null,
+      }));
   }
 
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {

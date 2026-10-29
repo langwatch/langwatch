@@ -28,6 +28,7 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
+import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import {
   langWatchQLMissingParameters,
@@ -276,6 +277,8 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       awaitingTimeWindow: validation.awaitingTimeWindow,
     });
+    // A pass is not scoped, so the FINAL/SAMPLE refusal runs here too.
+    assertNoUnsupportedTableModifiers({ sql, views: this.views, database: this.deps.database });
 
     const { executor } = this.deps;
     if (!executor) {
@@ -314,7 +317,7 @@ export class LangWatchQLService {
     timeWindow,
     granularitySeconds,
     onBudgetOverflow,
-    excludeOrigins = [],
+    sources,
     memberWindows,
     isInstantEvalsEnabled,
     signal,
@@ -367,7 +370,7 @@ export class LangWatchQLService {
       validation,
       granularity,
       tenantCapability,
-      excludeOrigins,
+      sources,
       ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
@@ -379,7 +382,7 @@ export class LangWatchQLService {
       validation,
       database: this.deps.database,
       views: this.views,
-      excludeOrigins,
+      sources,
       ...(memberWindows ? { memberWindows } : {}),
       timeWindow: followedWindow,
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,

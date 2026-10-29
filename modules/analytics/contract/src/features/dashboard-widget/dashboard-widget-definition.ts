@@ -7,6 +7,7 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { traceSourcesSchema } from "../lwql/analytics.lwql.ts";
 import { MAX_LWQL_LENGTH } from "../lwql/langwatch-ql-limits.ts";
 
 /** The version this build writes, and the only one it reads. */
@@ -127,6 +128,11 @@ const dashboardWidgetQuerySchemaDefinition = z.object({
     ),
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
   parameters: z.array(queryParameterDeclarationSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
+  /**
+   * The trace origins the query counts (dashboards-v2 AC200); an empty list counts nothing.
+   * Unset (absent, or `null` on a write) counts `DEFAULT_WIDGET_SOURCES`.
+   */
+  sources: traceSourcesSchema.nullish(),
 });
 export interface DashboardWidgetQuerySchema extends Named<
   typeof dashboardWidgetQuerySchemaDefinition

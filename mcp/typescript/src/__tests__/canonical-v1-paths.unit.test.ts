@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { initConfig } from "../config.ts";
-import { listDashboards } from "../langwatch-api-dashboards.ts";
+import { listAnalyticsReports } from "../langwatch-api-analytics-reports.ts";
 
 const SERVER_SRC = resolve(__dirname, "..");
 
@@ -68,7 +68,7 @@ describe("given the request paths the MCP server builds", () => {
     });
   });
 
-  describe("when the dashboards tool lists dashboards", () => {
+  describe("when the dashboards tool lists the Analytics Reports dashboards", () => {
     const originalFetch = globalThis.fetch;
 
     beforeEach(() => {
@@ -80,15 +80,15 @@ describe("given the request paths the MCP server builds", () => {
     });
 
     /** @scenario "A dashboard list goes out at the canonical address" */
-    it("requests the canonical /api/v1/dashboards address", async () => {
+    it("requests the canonical /api/v1/analytics/reports address", async () => {
       const fetchSpy = vi
         .fn()
         .mockResolvedValue(new Response(JSON.stringify({ dashboards: [] }), { status: 200 }));
       globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
-      await listDashboards();
+      await listAnalyticsReports();
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://app.example.com/api/v1/dashboards");
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://app.example.com/api/v1/analytics/reports");
     });
   });
 });

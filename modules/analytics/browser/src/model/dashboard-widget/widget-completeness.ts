@@ -51,6 +51,11 @@ export function recordQueryFailure({
   return { ...records, [queryName]: { ...record, failure: { error, attempts } } };
 }
 
+/** No query has answered since the frame (re)started, so the card has nothing to draw yet. */
+export function awaitsFirstAnswer(records: WidgetQueryRecords): boolean {
+  return !Object.values(records).some((record) => record.hasResult);
+}
+
 /** What all of a widget's queries together say about their data. */
 export interface WidgetCompleteness {
   /** The worst state over the queries that saw traffic; no_traffic only when none did. */
