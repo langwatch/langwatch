@@ -73,6 +73,13 @@ const NOTE_FLAG_HELP =
 /** Help for the `--test-suite` flag on the scenario write commands. */
 const TEST_SUITE_FLAG_HELP = "The test suite to file this scenario in, named by ID or by name.";
 
+/** How a caller of `scenario create` picks the suite; Langy reads `--help`, not only the skill. */
+const SCENARIO_CREATE_SUITE_PICK =
+  "Run `langwatch test-suite list` first and file the scenario in the suite that fits; if none fits, ask the user which suite (or whether to make a new one).";
+
+/** Help for `--test-suite` on `scenario create`: steers the pick before the write. */
+const SCENARIO_CREATE_TEST_SUITE_FLAG_HELP = `The test suite to file this scenario in, by ID or name. ${SCENARIO_CREATE_SUITE_PICK}`;
+
 /**
  * Help for the four scope flags of `run-plan run`. They answer one question,
  * so exactly one of them must be given.
@@ -3646,11 +3653,11 @@ function registerScenarioCommands(program: Command): void {
   emitsResult(
     scenarioCmd
       .command("create <name>")
-      .description("Create a new scenario")
+      .description(`Create a new scenario. ${SCENARIO_CREATE_SUITE_PICK}`)
       .requiredOption("--situation <situation>", "The situation/context for the scenario")
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
-      .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
+      .option("--test-suite <test-suite>", SCENARIO_CREATE_TEST_SUITE_FLAG_HELP)
       .option("--field <pair>", SCENARIO_FIELD_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
