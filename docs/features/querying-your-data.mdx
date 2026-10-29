@@ -84,7 +84,7 @@ WHERE OccurredAt >= subtractDays(now(), 7)
 GROUP BY day ORDER BY day" --projects <project id>
 ```
 
-A key for an organization, a team or a person must name the projects to read with `--projects` (the `projects` field over REST and in `run_query`); without them the run is refused with `projects_required` (422): "Name the projects to query: send `projects`, a list of project ids". A project API key reads its own project and needs none.
+A key that reaches several projects must name the projects to read with `--projects` (the `projects` field over REST and in `run_query`); without them the run is refused with `projects_required` (422): "Name the projects to query: send `projects`, a list of project ids". A project API key, or any key that can read exactly one project, reads that project and needs none.
 
 Every REST answer carries `params`: each placeholder the statement declares, by its SQL name, with the value it ran with (for example `dashboard_context_sources` and `dashboard_context_projects`), plus the `period` it followed. The CLI returns the same `params` and the `diagnostics` beside the rows in `-o json` and `--format json` (one object with `rows`, `params` and `diagnostics`). For CSV and JSON lines it prints `params` as one JSON line on stderr, and the table format adds a line under the table.
 

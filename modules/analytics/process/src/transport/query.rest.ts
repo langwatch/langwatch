@@ -71,7 +71,7 @@ const HEADER_RULE =
 
 /** The run door's own rule: a key for several projects names the ones to read. */
 const RUN_HEADER_RULE =
-  "A project API key reads its own project. A key for an organization, a team or a person must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.";
+  "A project API key, or any key that can read exactly one project, reads that project and needs none. A key that reaches several must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.";
 
 /** How the run door names its projects and sources, and what it answers with. */
 const PROJECT_NARROWING =

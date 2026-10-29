@@ -262,6 +262,21 @@ describe("given a run that names one project", () => {
       });
     });
 
+    /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+    it("refuses the same project when asked whether a write may store it", async () => {
+      const { service } = scopeOver({
+        projects: [project("a"), project("b")],
+        grants: { a: ["analytics:view"], b: ["cost:view"] },
+      });
+
+      await expect(
+        service.assertReadableByKey({ reach: KEY, projectIds: ["a"] }),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.assertReadableByKey({ reach: KEY, projectIds: ["a", "b"] }),
+      ).rejects.toMatchObject({ code: "project_not_found" });
+    });
+
     it("refuses a project outside its organization exactly like one that does not exist", async () => {
       const { service } = scopeOver({
         projects: [project("a")],
@@ -338,6 +353,18 @@ describe("given a run that names projects", () => {
       reach: { kind: "project", projectId: "a" },
       requireProjects: true,
     });
+
+    expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
+  });
+
+  /** @scenario "QP03 A project key reads its own project by default" */
+  it("lets a key whose scope is exactly one project read it without naming it", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("b")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    const scope = await service.resolve({ reach: KEY, requireProjects: true });
 
     expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
   });

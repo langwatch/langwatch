@@ -880,10 +880,18 @@ export class AnalyticsModule
   }
 
   async assertProjectsReadable(input: {
-    userId: string;
+    userId?: string;
+    reach?: LangWatchQLKeyReach;
     projectIds: readonly string[];
   }): Promise<void> {
-    await this.#queryScope.readableByMember(input);
+    const { userId, reach, projectIds } = input;
+    if (reach !== undefined) {
+      await this.#queryScope.assertReadableByKey({ reach, projectIds });
+    } else if (userId !== undefined) {
+      await this.#queryScope.readableByMember({ userId, projectIds });
+    } else {
+      throw new LangWatchQLProjectNotFoundError();
+    }
   }
 
   /**

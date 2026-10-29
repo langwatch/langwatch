@@ -666,7 +666,10 @@ describe("given a query whose SQL never reads the sources parameter", () => {
     },
   };
 
-  /** @scenario "AC204b Sources: the editor's sources row is disabled, with a reason, while the SQL ignores the parameter" */
+  /**
+   * @scenario "AC204 Sources: SQL that does not read the parameter counts every origin and says so"
+   * @scenario "AC204b Sources: the editor's sources row is disabled, with a reason, while the SQL ignores the parameter"
+   */
   it("keeps the pills as stored and disables Add source with the reason", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     openBoard({ widgets: [ignoring] });
@@ -682,6 +685,38 @@ describe("given a query whose SQL never reads the sources parameter", () => {
     expect(within(row).getByTestId("sources-ignored-reason").textContent).toBe(
       "The SQL does not read {dashboard_context_sources}",
     );
+  });
+});
+
+describe("given a query that names the sources parameter only in a comment", () => {
+  /** @scenario "AC204c Sources: a placeholder only in a comment or a literal does not count as reading the parameter" */
+  it("says the SQL does not read it, as for a query that never names it", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    openBoard({
+      widgets: [
+        {
+          ...WIDGET,
+          graph: {
+            ...GRAPH,
+            queries: [
+              {
+                name: "main",
+                sql: "SELECT count() AS n FROM trace_metrics -- {dashboard_context_sources:Array(String)}",
+                sources: ["langy"],
+              },
+            ],
+          },
+        },
+      ],
+    });
+    await screen.findByTestId("sandboxed-frame");
+
+    const drawer = await openEditor(user);
+
+    expect(
+      within(within(drawer).getByTestId("query-sources")).getByTestId("sources-ignored-reason")
+        .textContent,
+    ).toBe("The SQL does not read {dashboard_context_sources}");
   });
 });
 

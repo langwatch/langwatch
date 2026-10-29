@@ -26,6 +26,7 @@ import type {
   DashboardWidgetQuery,
   DashboardWidgetSource,
 } from "./features/dashboard-widget/dashboard-widget-definition.ts";
+import type { LangWatchQLKeyReach } from "./features/lwql/analytics-lwql.schemas.ts";
 import type {
   LangWatchQLCaller,
   LangWatchQLExecuteInput,
@@ -187,7 +188,12 @@ export interface AnalyticsApi {
    * stores a project its writer could not read.
    * @throws LangWatchQLProjectNotFoundError with no id, for any that does not.
    */
-  assertProjectsReadable(input: { userId: string; projectIds: readonly string[] }): Promise<void>;
+  assertProjectsReadable(input: {
+    userId?: string;
+    /** The API key writing, whose reach a run would apply. It decides over `userId`. */
+    reach?: LangWatchQLKeyReach;
+    projectIds: readonly string[];
+  }): Promise<void>;
   /**
    * Re-validates the statement with the full policy, eval gate taken from the caller's
    * answer, then runs it inside the fixed wrapper its pass names: an instant-eval read.

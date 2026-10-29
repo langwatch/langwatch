@@ -1974,7 +1974,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a stored widget query storing ["application"] whose SQL has no {dashboard_context_sources:Array(String)}
     When the card runs
     Then the query counts every origin, with no hidden filter
-    And the editor warns on that query: "This query ignores sources"
+    # Changed in phase 2: the wording is the one the editor shows, as the reason its Add source menu is disabled.
+    And the editor says on that query: "The SQL does not read {dashboard_context_sources}"
     And the card line reads "Sources: all sources"
     And the run answers a SOURCES_IGNORED diagnostic
     # Why: the owner called a filter the SQL does not show a confusing surprise (2026-10-29)
@@ -1991,7 +1992,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC204c Sources: a placeholder only in a comment or a literal does not count as reading the parameter
     Given a query whose SQL names {dashboard_context_sources:Array(String)} only in a comment or in a string literal
     When it runs
-    Then the run answers a SOURCES_IGNORED diagnostic and the editor warns "This query ignores sources"
+    Then the run answers a SOURCES_IGNORED diagnostic and the editor says "The SQL does not read {dashboard_context_sources}"
     # Evidence: the answer's params quoted for both shapes
 
   @unit
@@ -2054,7 +2055,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Changed after the security review (2026-10-29): a member's list is proven readable one project at a
     # time, so the cap is LWQL_MAX_MEMBER_PROJECTS, 100, not the key door's 10,000.
     When a widget's query, or a card run, names more projects than LWQL_MAX_MEMBER_PROJECTS
-    Then the write is refused with the code "dashboard_widget_definition_refused" (422) and the message "This dashboard widget's definition is invalid."
+    # Changed in phase 2: the REST door checks the body's shape first, so a write of 101 ids answers
+    # "validation_error" (422) naming the field queries.0.projects. The service keeps the same cap
+    # as a second guard, which answers "dashboard_widget_definition_refused" to a caller that skips the door.
+    Then a write over the REST door is refused with the code "validation_error" (422), naming the field "queries.0.projects"
     And a card run over the tRPC door is refused by the schema, with the message "projects holds at most 100 ids"
     And a write of 101 ids is refused so
     And the editor offers no further project once the maximum is picked

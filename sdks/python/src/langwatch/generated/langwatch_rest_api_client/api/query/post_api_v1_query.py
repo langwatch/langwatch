@@ -141,10 +141,10 @@ def sync_detailed(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    A project API key reads its own project. A key for an organization, a team or a person must name the
-    projects to read in `projects`, each one it can read `analytics:view` on; without them the run is
-    refused with `projects_required` (422). Rows from more than one project come back flagged with the
-    `MULTI_PROJECT_RESULT` diagnostic.
+    A project API key, or any key that can read exactly one project, reads that project and needs none.
+    A key that reaches several must name the projects to read in `projects`, each one it can read
+    `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more
+    than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -221,10 +221,10 @@ def sync(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    A project API key reads its own project. A key for an organization, a team or a person must name the
-    projects to read in `projects`, each one it can read `analytics:view` on; without them the run is
-    refused with `projects_required` (422). Rows from more than one project come back flagged with the
-    `MULTI_PROJECT_RESULT` diagnostic.
+    A project API key, or any key that can read exactly one project, reads that project and needs none.
+    A key that reaches several must name the projects to read in `projects`, each one it can read
+    `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more
+    than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -295,10 +295,10 @@ async def asyncio_detailed(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    A project API key reads its own project. A key for an organization, a team or a person must name the
-    projects to read in `projects`, each one it can read `analytics:view` on; without them the run is
-    refused with `projects_required` (422). Rows from more than one project come back flagged with the
-    `MULTI_PROJECT_RESULT` diagnostic.
+    A project API key, or any key that can read exactly one project, reads that project and needs none.
+    A key that reaches several must name the projects to read in `projects`, each one it can read
+    `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more
+    than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
@@ -373,10 +373,10 @@ async def asyncio(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    A project API key reads its own project. A key for an organization, a team or a person must name the
-    projects to read in `projects`, each one it can read `analytics:view` on; without them the run is
-    refused with `projects_required` (422). Rows from more than one project come back flagged with the
-    `MULTI_PROJECT_RESULT` diagnostic.
+    A project API key, or any key that can read exactly one project, reads that project and needs none.
+    A key that reaches several must name the projects to read in `projects`, each one it can read
+    `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more
+    than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
 
     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
     works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of

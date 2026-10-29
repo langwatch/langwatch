@@ -42,7 +42,9 @@ Feature: Every query door takes the same parameters and says what it ran with
 
     @unit @integration
     Scenario: QP03 A project key reads its own project by default
-      Given a project API key for project "A"
+      # Changed in phase 2 (owner: "default to the current project"): any key whose scope is exactly one
+      # project reads that project by default, an organization key restricted to one project included.
+      Given a project API key for project "A", or a key of any kind that can read project "A" alone
       When it runs a statement with no projects at REST, MCP or the CLI
       Then params.dashboard_context_projects is ["A"] where the statement reads it
       # Evidence: three answers quoted
@@ -50,6 +52,7 @@ Feature: Every query door takes the same parameters and says what it ran with
     @unit @integration
     Scenario: QP03b An organization, team or personal key that names no project is refused with a 422 naming the field
       Given an organization key that reads projects "A" and "B"
+      # Still held for the owner's answer on what a key that reaches several projects defaults to.
       When it runs a statement with no `projects` and no `projectId`, at REST, MCP or the CLI
       Then it is refused with the status 422 and the code "projects_required"
       And the message is "Name the projects to query: send `projects`, a list of project ids"

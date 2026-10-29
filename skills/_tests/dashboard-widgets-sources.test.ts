@@ -41,6 +41,11 @@ describe("the dashboard-widgets skill on projects and params", () => {
     expect(rendered).toContain("{dashboard_context_sources:Array(String)}");
     expect(rendered).toContain("{dashboard_context_projects:Array(String)}");
     expect(rendered).toContain("`SOURCES_IGNORED` means the query counts every origin");
+    expect(rendered).toContain("`SHARE_WINDOW_LIMITED` means");
+    expect(rendered).toContain(
+      'the editor says "The SQL does not read {dashboard_context_sources}"',
+    );
+    expect(rendered).not.toContain("This query ignores sources");
     expect(rendered).toContain("--projects A,B");
     expect(rendered).toContain("`SET param_…`");
   });

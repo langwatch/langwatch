@@ -212,6 +212,39 @@ describe("given a query's projects", () => {
     await expect(other).resolves.toMatchObject({ code: "project_not_found" });
   });
 
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("judges a key's write by the key's reach, not by its owner's grants", async () => {
+    const asked: unknown[] = [];
+    const analytics = createDashboardTestAnalytics({
+      assertProjectsReadable: async (input) => {
+        asked.push(input);
+        if (input.reach !== undefined && input.projectIds.includes("secret")) {
+          throw new LangWatchQLProjectNotFoundError();
+        }
+      },
+    });
+    const { repository, service } = setUp(analytics);
+    const keyReach = {
+      kind: "apiKey",
+      apiKeyId: "key-1",
+      userId: "user-1",
+      organizationId: "org-1",
+    } as const;
+
+    const refusal = await service
+      .createWidget({
+        ...scope,
+        viewer: { userId: "user-1" },
+        keyReach,
+        input: { name: "Traces", code: CODE, queries: [{ ...QUERY, projects: ["secret"] }] },
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(asked).toEqual([{ reach: keyReach, projectIds: ["secret"] }]);
+    expect(await repository.findAll(scope)).toEqual([]);
+  });
+
   /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
   it("refuses more projects than a member's list may hold", async () => {
     const { service } = setUp();

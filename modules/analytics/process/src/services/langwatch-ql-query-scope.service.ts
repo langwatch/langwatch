@@ -65,13 +65,19 @@ export class LangWatchQLQueryScopeService {
     requireProjects?: boolean;
   }): Promise<LangWatchQLQueryScope> {
     const named = projects === undefined ? undefined : dedupeInOrder(projects);
-    if (requireProjects && named === undefined && reach.kind !== "project") {
-      throw new LangWatchQLProjectsRequiredError();
-    }
     const readable =
       reach.kind === "project"
         ? [await this.ownProject({ projectId: reach.projectId, requested: named })]
         : await this.readableProjects({ reach, only: named });
+    // A key that reads exactly one project defaults to it; one that reads several must say which.
+    if (
+      requireProjects &&
+      named === undefined &&
+      reach.kind !== "project" &&
+      readable.length !== 1
+    ) {
+      throw new LangWatchQLProjectsRequiredError();
+    }
     // One project at a time: each answer is several grant reads, and fanning an organization's
     // worth out at once is what exhausts the connection pool.
     const protections: LangWatchQLProtections[] = [];
@@ -85,6 +91,26 @@ export class LangWatchQLQueryScopeService {
       projects: readable.map(({ project }) => ({ id: project.id, lwqlKey: project.lwqlKey })),
       protections: strictestLangWatchQLProtections(protections),
     };
+  }
+
+  /**
+   * The named projects, each proven readable by this key as a run would: a project key reads
+   * its own project alone, an API key those it holds `analytics:view` on.
+   * @throws {LangWatchQLProjectNotFoundError} for any that is not, with no id in the answer.
+   */
+  async assertReadableByKey({
+    reach,
+    projectIds,
+  }: {
+    reach: LangWatchQLKeyReach;
+    projectIds: readonly string[];
+  }): Promise<void> {
+    const named = dedupeInOrder(projectIds);
+    if (reach.kind === "project") {
+      await this.ownProject({ projectId: reach.projectId, requested: named });
+      return;
+    }
+    await this.readableProjects({ reach, only: named });
   }
 
   /**

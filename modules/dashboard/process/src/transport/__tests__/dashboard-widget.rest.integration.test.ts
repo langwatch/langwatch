@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
 import {
-  dashboardWidgetCallerSource,
+  dashboardWidgetCaller,
   dashboardWidgetRest,
   dashboardWidgetUrl,
 } from "../dashboard-widget.rest.ts";
@@ -57,7 +57,7 @@ function mountKey({
     app: () => app,
     middlewareContext: [
       bindMiddlewareContext(dashboardWidgetUrl, () => "https://app.langwatch.test/dashboards"),
-      bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+      bindMiddlewareContext(dashboardWidgetCaller, () => ({ source: { kind: "api" as const } })),
     ],
     onError: canonicalErrorResponse,
   });

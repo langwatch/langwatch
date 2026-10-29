@@ -22,7 +22,7 @@ import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts
 import { boardProjectRest } from "../board-project.rest.ts";
 import { boardRest, boardsReleased, releasedOrRefused } from "../board.rest.ts";
 import {
-  dashboardWidgetCallerSource,
+  dashboardWidgetCaller,
   dashboardWidgetRest,
   dashboardWidgetUrl,
 } from "../dashboard-widget.rest.ts";
@@ -99,7 +99,7 @@ async function projectWithBothBoards({
         bindMiddlewareContext(dashboardWidgetUrl, () =>
           app.dashboardWidgetPlatformUrl({ projectSlug: "project-one" }),
         ),
-        bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+        bindMiddlewareContext(dashboardWidgetCaller, () => ({ source: { kind: "api" as const } })),
         bindMiddlewareContext(boardsReleased, () =>
           released === "unreadable"
             ? Promise.reject(new Error("flag service down"))

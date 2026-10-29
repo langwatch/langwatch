@@ -1,6 +1,7 @@
 import {
   DashboardWidgetDefinitionInvalidError,
   DashboardWidgetNotFoundError,
+  type LangWatchQLKeyReach,
   LangWatchQLProjectNotFoundError,
   type AnalyticsApi,
   type DashboardWidget,
@@ -37,6 +38,9 @@ import {
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
+
+/** The API key a write arrives with, when it is one. */
+type Keyed = Readonly<{ keyReach?: LangWatchQLKeyReach | undefined }>;
 
 /** A widget addressed under one board's path: on any other board, or none, it is not found. */
 type OnBoard = Readonly<{ onDashboardId?: string }>;
@@ -90,9 +94,9 @@ export class DashboardWidgetService {
   }
 
   async createWidget(
-    input: Omit<CreateDashboardWidgetInput, "id"> & Viewed,
+    input: Omit<CreateDashboardWidgetInput, "id"> & Viewed & Keyed,
   ): Promise<DashboardWidget> {
-    const { viewer, ...given } = input;
+    const { viewer, keyReach, ...given } = input;
     // A new widget's unset query stores application (AC200o).
     const fields = {
       ...given,
@@ -114,6 +118,7 @@ export class DashboardWidgetService {
       projectId: fields.projectId,
       queries: fields.input.queries,
       viewer,
+      keyReach,
     });
     return this.#present(await this.#repository.createWidget({ ...fields, id }));
   }
@@ -124,9 +129,9 @@ export class DashboardWidgetService {
    * The read and the write are two steps: like every other widget field, the last write wins.
    */
   async updateWidget(
-    input: UpdateDashboardWidgetInput & Viewed & OnBoard,
+    input: UpdateDashboardWidgetInput & Viewed & Keyed & OnBoard,
   ): Promise<DashboardWidget> {
-    const { viewer, onDashboardId: _onBoard, ...fields } = input;
+    const { viewer, keyReach, onDashboardId: _onBoard, ...fields } = input;
     await this.#assertEnabled(fields);
     const row = await this.#visibleRow(input);
     this.#assertWritable(input.id, definitionUpdateSchema.safeParse(input.input));
@@ -134,6 +139,7 @@ export class DashboardWidgetService {
       projectId: fields.projectId,
       queries: fields.input.queries ?? [],
       viewer,
+      keyReach,
     });
     const sent = fields.input.queries;
     const queries =
@@ -178,13 +184,19 @@ export class DashboardWidgetService {
     projectId,
     queries,
     viewer,
+    keyReach,
   }: {
     projectId: string;
-  } & Viewed & {
+  } & Viewed &
+    Keyed & {
       queries: readonly DashboardWidgetQuery[];
     }): Promise<void> {
     const named = projectsNamedBy(queries);
     if (named.length === 0) return;
+    if (keyReach?.kind === "apiKey") {
+      await this.#analytics.assertProjectsReadable({ reach: keyReach, projectIds: named });
+      return;
+    }
     if (viewer === undefined) {
       if (named.some((id) => id !== projectId)) throw new LangWatchQLProjectNotFoundError();
       return;
