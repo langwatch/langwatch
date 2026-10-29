@@ -368,7 +368,12 @@ export const reservedSpanParamsSchema: ReservedSpanParamsSchema =
 
 export type ReservedSpanParams = z.infer<typeof reservedSpanParamsSchema>;
 
-const spanParamsSchemaDefinition = reservedSpanParamsSchema.and(z.record(z.string(), z.any()));
+/**
+ * A span's attributes, unflattened by dot. A sender's own namespace can share a name with a
+ * {@link reservedSpanParamsSchema} param (`user.id`: OTel semconv) at another type, so the
+ * reserved types are not enforced: a span read never fails on its own attributes.
+ */
+const spanParamsSchemaDefinition = z.record(z.string(), z.any());
 export interface SpanParamsSchema extends Named<typeof spanParamsSchemaDefinition> {}
 export const spanParamsSchema: SpanParamsSchema = spanParamsSchemaDefinition;
 
