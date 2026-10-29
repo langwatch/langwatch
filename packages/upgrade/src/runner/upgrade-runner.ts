@@ -1145,10 +1145,7 @@ export class UpgradeRunnerService {
     if (unrecorded.length === 0) return;
     const ids = [...this.shippedIds].filter(isGoose).toSorted();
     for (const target of unrecorded) {
-      for (const id of ids) {
-        const version = id.slice("clickhouse:".length);
-        await this.ledger.upsertTarget({ stepId: id, target, status: "pending", version });
-      }
+      await this.ledger.seedTargetSteps({ target, stepIds: ids });
       this.narrate.info(`ClickHouse target ${target} is new and behind; this run catches it up`, {
         phase: "preflight",
         target,
