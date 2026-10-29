@@ -12,7 +12,6 @@ import {
   type InstantEvalJudgeRouteTable,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
-  type InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
 import type { Logger } from "@langwatch/observability";
 
@@ -34,11 +33,11 @@ import {
   type InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
 import {
-  findInstantEvalLlmVerdicts,
   instantEvalVerdictSurenessOf,
   isUnsureAnswer,
 } from "../rules/instant-eval-judge-sureness.rules.ts";
 import { InstantEvalJudgeLegDeadlineService } from "./instant-eval-judge-leg-deadline.service.ts";
+import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
 
 export type InstantEvalJudgeRouteRunDeps = Readonly<{
   table: InstantEvalJudgeRouteTable;
@@ -88,13 +87,24 @@ export class InstantEvalJudgeRouteRunService {
     return new InstantEvalJudgeRouteRunService(input);
   }
 
-  /** A caller's stop after paid legs carries their spend, so the stopped batch still bills it. */
+  /**
+   * A caller's stop after paid legs carries their spend, so the stopped batch still bills it; any
+   * other throw after paid legs is a skip carrying that spend, so a merged call bills it too.
+   */
   async judge(questions: readonly InstantEvalQuestion[]): Promise<InstantEvalJudgement> {
     try {
       return await this.judgeLegs(questions);
     } catch (error) {
-      if (!this.signal?.aborted || this.inputTokens <= 0) throw error;
-      throw new InstantEvalJudgeStoppedError({ ...this.spent(), cause: error });
+      if (this.inputTokens <= 0) throw error;
+      if (this.signal?.aborted) {
+        throw new InstantEvalJudgeStoppedError({ ...this.spent(), cause: error });
+      }
+      this.logger.error({ error }, "Instant Evals routed run failed after paid legs");
+      return {
+        ...instantEvalSkipped("classifier_failed"),
+        ...this.spent(),
+        routing: this.routing({}),
+      };
     }
   }
 
@@ -354,48 +364,20 @@ export class InstantEvalJudgeRouteRunService {
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
-    const text = this.plan.fullText;
-    const answers = await Promise.all(
-      questions.map(async (question) => {
-        // Each question is a send of the full text, so each one draws on the limiter.
-        await this.deps.limiter.acquire(
-          instantEvalJudgeLegPermitOf({
-            projectId: this.projectId,
-            pool: "llm",
-            text,
-            questions: [question],
-          }),
-          this.signal,
-        );
-        const answer = await this.deps.llmJudge.judge(
-          { wire, model, job: this.plan.job, question, text, timeoutMs },
-          ...(this.signal ? [this.signal] : []),
-        );
-        // Billed as it arrives, so a stop while a sibling is in flight still bills this one.
-        this.paid({ backend, inputTokens: answer.inputTokens, outputTokens: answer.outputTokens });
-        return answer;
-      }),
-    );
-    const read = new Map<string, InstantEvalJudgeRoutedAnswer>();
-    let reason: InstantEvalSkipReason = "classifier_provider_unavailable";
-    answers.forEach((answer, at) => {
-      if (answer.outcome !== "answered") {
-        reason = answer.reason;
-        return;
-      }
-      const question = questions[at]!;
-      const [verdict] = findInstantEvalLlmVerdicts({ question, value: answer });
-      if (verdict) read.set(question.id, { verdict, sureness: 1 });
-      else reason = "classifier_failed";
+    const { llmJudge, limiter } = this.deps;
+    const leg = InstantEvalJudgeLlmLegService.create({
+      llmJudge,
+      limiter,
+      projectId: this.projectId,
+      job: this.plan.job,
+      text: this.plan.fullText,
+      signal: this.signal,
+      logger: this.logger,
+      paid: (spend) => this.paid({ backend, ...spend }),
     });
-    if (read.size === 0) return { outcome: "failed", reason };
-    return {
-      outcome: "answered",
-      backend,
-      answers: read,
-      isTextTruncated: false,
-      limiterWaitMs: 0,
-    };
+    const { answers, reason } = await leg.ask({ call: { wire, model, timeoutMs }, questions });
+    if (answers.size === 0) return { outcome: "failed", reason };
+    return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
   }
 
   private paid({

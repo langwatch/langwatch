@@ -56,7 +56,10 @@ const llmSays = (verdict: boolean): InstantEvalLlmJudgeAnswer => ({
   outputTokens: 100,
 });
 
-type Script = (signal?: AbortSignal) => InstantEvalJudgement | Promise<InstantEvalJudgement>;
+type Script = (
+  signal?: AbortSignal,
+  questions?: readonly InstantEvalQuestion[],
+) => InstantEvalJudgement | Promise<InstantEvalJudgement>;
 
 function harness({
   decisions = () => judged(0.05),
@@ -87,7 +90,7 @@ function harness({
       jevCalls += 1;
       jevTexts.push(request.text);
       await request.limiter.acquire({ tokens: 10, tenantId: request.projectId }, signal);
-      return jev(signal);
+      return jev(signal, request.questions);
     },
   });
   const router = InstantEvalJudgeRouterService.create({
@@ -171,6 +174,22 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.routing?.escalated).toBe(0);
     });
 
+    /** @scenario "An LLM leg that fails keeps the primary verdict, flagged" */
+    it("keeps the unsure primary verdict when the LLM channel throws", async () => {
+      const { classify } = harness({
+        decisions: () => judged(0.4),
+        llm: () => {
+          throw new Error("boom");
+        },
+      });
+      const judgement = await classify(SHORT);
+      expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.4 }]);
+      expect(judgement.routing?.flags).toEqual(
+        expect.arrayContaining(["escalation_failed", "llm-b_failed:classifier_failed"]),
+      );
+      expect(judgement.inputTokens).toBe(1000);
+    });
+
     it("escalates every question when the primary and its fallback are down", async () => {
       const { classify } = harness({
         decisions: () => instantEvalSkipped("classifier_rate_limited"),
@@ -234,6 +253,27 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.2 }]);
       expect(judgement.routing?.flags).toEqual(
         expect.arrayContaining(["decision-a_unavailable", "fallback:decision-a->decision-b"]),
+      );
+    });
+
+    /** @scenario "A backend that is down falls back to its configured fallback" */
+    it("falls back from an LLM primary whose channel throws", async () => {
+      const table = syntheticRouteTable({
+        backends: {
+          "llm-b": { kind: "openai_responses", model: "llm-model-b", fallbacks: ["decision-a"] },
+        },
+      });
+      const { classify } = harness({
+        table,
+        decisions: () => judged(0.05),
+        llm: () => {
+          throw new Error("boom");
+        },
+      });
+      const judgement = await classify({ ...SHORT, mode: "accurate" });
+      expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.05 }]);
+      expect(judgement.routing?.flags).toEqual(
+        expect.arrayContaining(["llm-b_failed:classifier_failed", "fallback:llm-b->decision-a"]),
       );
     });
 
@@ -626,6 +666,24 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.05 }]);
       expect(judgement.skippedReason).toBeUndefined();
       expect(judgement.inputTokens).toBe(1000);
+      expect(judgement.routing?.flags).toContain("score:skipped:classifier_failed");
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("keeps the spend of a kind whose run threw after a paid leg", async () => {
+      // The score's Decisions primary is paid and skips; its classifier fallback throws.
+      const { classify } = harness({
+        table,
+        decisions: () => ({ ...instantEvalSkipped("classifier_rate_limited"), inputTokens: 1000 }),
+        jev: (_signal, asked) => {
+          if (asked?.some((question) => question.kind === "score"))
+            throw new Error("socket closed");
+          return judged(0.05);
+        },
+      });
+      const judgement = await classify({ job: "scenario_judge", tokens: 500 }, [POLITE, Q]);
+      expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.05 }]);
+      expect(judgement.inputTokens).toBe(2000);
       expect(judgement.routing?.flags).toContain("score:skipped:classifier_failed");
     });
 
