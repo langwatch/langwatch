@@ -268,6 +268,23 @@ describe("given a sign-in fails for a reason the person has to act on", () => {
   });
 });
 
+describe("given an identity provider that refused the person", () => {
+  /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+  it("says it was cancelled or refused, and when to ask their IT administrator", () => {
+    expect(signInErrorMayCross("access_denied")).toBe(true);
+
+    renderError("access_denied");
+
+    expect(screen.getByText("Sign-in was refused")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The sign-in was cancelled, or your identity provider refused it. If you sign in through your company, ask your IT administrator to give you access to the LangWatch app.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+});
+
 describe("given a sign-in whose state no longer matches this browser", () => {
   /** @scenario "A sign-in that expired or started elsewhere crosses with its own code" */
   it("crosses as itself and offers to start again from the sign-in page", () => {

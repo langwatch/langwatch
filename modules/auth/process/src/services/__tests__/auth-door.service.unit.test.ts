@@ -365,6 +365,39 @@ describe("AuthDoorService", () => {
     });
   });
 
+  describe("when an identity provider refuses the person with access_denied", () => {
+    /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+    it("keeps only the code on the redirect and logs it at warn without the description", async () => {
+      loggerSpies.warn.mockClear();
+      loggerSpies.error.mockClear();
+      const world = door({
+        betterAuth: async () => ({
+          handler: async () =>
+            new Response(null, {
+              status: 302,
+              headers: {
+                location: `${BASE_URL}/auth/error?error=access_denied&error_description=User+is+not+assigned`,
+              },
+            }),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/sso/callback/conn_1?code=c`),
+      );
+
+      const location = new URL(answered.headers.get("location") ?? "");
+      expect(location.searchParams.get("error")).toBe("access_denied");
+      expect(location.searchParams.has("error_description")).toBe(false);
+      expect(loggerSpies.error).not.toHaveBeenCalled();
+      expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
+      const [fields] = loggerSpies.warn.mock.calls[0] ?? [];
+      expect(Object.keys(fields ?? {}).toSorted()).toEqual(["code", "traceId"]);
+      expect(fields).toMatchObject({ code: "access_denied" });
+      expect(JSON.stringify(loggerSpies.warn.mock.calls)).not.toContain("not assigned");
+    });
+  });
+
   describe("when an auth route that is not a callback fails on the server", () => {
     /** @scenario "A server error on an auth route that is not a callback keeps its status" */
     it("answers with the server error itself", async () => {
