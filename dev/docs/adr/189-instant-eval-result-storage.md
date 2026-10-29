@@ -61,12 +61,15 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     SpanId String DEFAULT '' CODEC(ZSTD(1)),
     ThreadId String DEFAULT '' CODEC(ZSTD(1)),
 
-    -- What was asked. QuestionHash is sha256 of the normalised text, kind and category options.
+    -- What was asked. QuestionHash: sha256 of the normalised kind, text, criteria, range and categories (not the column alias).
+    -- JudgeModel: the resolved decision model (ADR-182): the own model id, or the hosted classifier id and version.
+    -- InputHash: sha256 of the judged column name and its text; for a monitor, of {input, output, contexts} as canonical JSON.
     QuestionHash String CODEC(ZSTD(1)),
     Question String CODEC(ZSTD(3)),
     Kind LowCardinality(String) CODEC(ZSTD(1)),
     JudgeModel LowCardinality(String) CODEC(ZSTD(1)),
-    InputHash String DEFAULT '' CODEC(ZSTD(1)),
+    InputHash String CODEC(ZSTD(1)),
+    KeyVersion UInt16 CODEC(ZSTD(1)),  -- recall reads only the current version
 
     -- Who asked: ask, run, dashboard or monitor, and the id of that query, run, widget or monitor.
     Source LowCardinality(String) CODEC(ZSTD(1)),
@@ -91,15 +94,17 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(OccurredAt)
-ORDER BY (TenantId, TraceId, SpanId, QuestionHash, JudgeModel, SourceId)
+ORDER BY (TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash, SourceId, JudgedAt)
 TTL IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 ```
 
 Why this shape:
 
-- **The sort key leads with the trace.** `(TenantId, TraceId, SpanId, QuestionHash, JudgeModel)` is the recall key and the trace page's read. Both are prefix reads.
-- **`SourceId` ends the key.** A redelivered page re-inserts the same `SourceId`, so the replacing merge collapses it, as 00097 does for `RunId` today. A new ask, run or "judge again" has a new `SourceId`, so it adds a row. That is how the table stays append-only and safe to redeliver at once.
+- **The sort key leads with the trace.** `(TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash)` is the recall key, and its first three columns are the trace page's read. Both are prefix reads.
+- **`InputHash` is in the key.** `eval(input, 'q')` and `eval(output, 'q')` on one trace are two rows, and recall serves each its own verdict.
+- **`SourceId, JudgedAt` end the key.** Every judgment is kept: a rerun, a "judge again" or a monitor re-evaluating the same trace adds a row. An exact retry of one insert has the same `JudgedAt`, so the replacing merge collapses it. Recall never keys on `SourceId`, so a wrong or forged source cannot serve another source's verdict.
+- **`KeyVersion`** is the recall epoch. Recall reads only rows with the current version. Rows written before recall is on, or under a key bug, are never served; a version bump retires them.
 - **The partition and TTL anchor on `OccurredAt`**, the trace's time. `trace_summaries` uses the same anchor (`ttl.reconciler.ts:139-145`) and the same `toYearWeek` partition (00002 line 179). So a result expires with its trace.
 - **The TTL clause** is what `buildRetentionTTLExpression` emits for a `TABLE_TTL_CONFIG` entry with `retentionTTLColumn: "OccurredAt"` (`ttl.reconciler.ts:327-331`). The reconciler then finds it correct and issues no ALTER.
 - **The bloom filter on `SourceId`** serves a run's results page, which reads by run, not by trace. The pattern is the `idx_trace_id` bloom filter on `evaluation_runs` (00002).
@@ -110,7 +115,13 @@ The migration is one new goose file with the next free number, created with `IF 
 
 ### 2. Append-only, recall first
 
-Before judging, the service looks up the rows that match trace, span, question hash, judge model and input hash. It reuses a match. It judges only the misses, then writes them in one bulk insert.
+Before judging, the service looks up the rows that match tenant, trace, span, question hash, judge model, input hash and the current `KeyVersion`, with `Status = judged`. It reuses a match. It judges only the misses, then writes them in one bulk insert. A recall adds no row.
+
+- **Only judged rows are reused.** A failed or skipped row never blocks a retry.
+- **Recall splits a unit.** A text is judged only for its missed questions; a unit with no misses is dropped. The budget check runs on what is left.
+- **Trace and span keys only.** A thread-keyed or text-keyed `eval()` has no single trace, so it is judged as today and not stored.
+- **Every read filters `TenantId` first** and carries an `OccurredAt` window, so the cold-scan detector stays quiet.
+- **Flags.** Writes sit behind `release_instant_evals`. Recall and the drawer section, on every path including monitors, sit behind a new flag, `release_instant_eval_results`.
 
 - **A recall makes no judge call**, so it is free, and every viewer sees the same number.
 - **The table is the cache.** There is no separate cache with its own expiry.
@@ -151,7 +162,9 @@ The rule: every Instant Evals judgment is a row in `eval_results`, whoever asked
 - **A monitor on any other judge** (another LLM, a built-in check) is not touched. It writes `evaluation_runs` only.
 - **Nothing moves out of `evaluation_runs`.** There is no phase 2. The monitor lifecycle, charts, filters and triggers stay with the evaluation module.
 - **The trace page reads two stores** and labels the source. A `Source = monitor` row in `eval_results` has its twin in `evaluation_runs`, so the drawer shows it once: from `evaluation_runs`, and skips `monitor` rows from `eval_results`.
-- **Ownership.** `eval_results` stays with instant-eval. The evaluation module reaches it only through the instant-eval API; the exact seam (judge call or `InstantEvalApi`) goes to the build PLAN.
+- **Ownership.** `eval_results` stays with instant-eval. The evaluation module binds `InstantEvalApi` in a channel (precedent: `analytics.channels.ts`) and calls one recall-or-write method. A binding is not a peer edge, so ADR-174 decision 13 holds.
+- **Keys.** The trace id and the raw judgement are passed through `EvaluationJudgingService.answer`. `SpanId` is empty. `InputHash` covers `{input, output, contexts}`. A recalled verdict still goes through `augmentResult` with the current dropped categories.
+- **Never fails the run.** Guardrail calls and calls with no trace skip recall and write. The recall read and the insert run under a named timeout (`EVAL_RESULTS_MONITOR_TIMEOUT_MS`, 300 ms). An error is logged and the monitor run goes on. Cost: one prefix read per evaluation on the Instant Evals judge.
 
 ## Alternatives considered
 
