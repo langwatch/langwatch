@@ -15,7 +15,9 @@ const (
 	changesJob   = "changes"
 	ecrtagSelect = "go run ./cmd/ecrtag select"
 	selectImages = `-images "${IMAGES}"`
-	inputsLabel  = ecrtag.InputsKey + "=${{ matrix.inputs }}"
+	// selectWorkflow makes the build steps every image's input.
+	selectWorkflow = "-workflow " + ImagesWorkflow
+	inputsLabel    = ecrtag.InputsKey + "=${{ matrix.inputs }}"
 )
 
 // buildJobs push the images the select step plans to build.
@@ -74,12 +76,12 @@ func selectStep(wf *ciscan.Workflow) (*ciscan.Step, []string) {
 	steps := wf.Jobs[changesJob].Steps
 	for i := range steps {
 		step := &steps[i]
-		if step.ID == "select" && strings.Contains(step.Run, ecrtagSelect+" ") && strings.Contains(step.Run, selectImages) {
+		if step.ID == "select" && strings.Contains(step.Run, ecrtagSelect+" ") && strings.Contains(step.Run, selectImages) && strings.Contains(step.Run, selectWorkflow) {
 			return step, nil
 		}
 	}
 
-	return nil, []string{fmt.Sprintf("%s job %s needs an `id: select` step running %#q with %s", ImagesWorkflow, changesJob, ecrtagSelect, selectImages)}
+	return nil, []string{fmt.Sprintf("%s job %s needs an `id: select` step running %#q with %s and %s", ImagesWorkflow, changesJob, ecrtagSelect, selectImages, selectWorkflow)}
 }
 
 // labelProblems: every build records its inputs, which the next commit's

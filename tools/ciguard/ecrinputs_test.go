@@ -40,6 +40,9 @@ func TestEveryImageIsPlannedFromItsInputs(t *testing.T) {
 		"a select step that does not plan with cmd/ecrtag": func(s string) string {
 			return strings.Replace(s, "go run ./cmd/ecrtag select", "go run ./cmd/ecrtag plan", 1)
 		},
+		"a select step that leaves the build steps out": func(s string) string {
+			return strings.Replace(s, "-workflow .github/workflows/publish-docker-ecr.yml ", "", 1)
+		},
 		"a build table missing an image create-manifest tags": func(s string) string {
 			return strings.Replace(s, `{"image":"langwatch-eval-ragas",`, `{"name":"langwatch-eval-ragas",`, 1)
 		},

@@ -16,7 +16,8 @@ import (
 const InputsKey = "org.langwatch.inputs"
 
 // inputsVersion is part of every hash. Bump it to rebuild every image once,
-// for a build change the inputs cannot see (a build argument, a platform).
+// for a change neither the files, the build table nor the workflow's build
+// steps show, such as how this package reads them.
 const inputsVersion = "langwatch-image-inputs/1"
 
 // Tree is a commit's files, each path to its git blob id.
@@ -32,7 +33,10 @@ type GoDeps func(ctx context.Context, dir, pkg string) ([]string, error)
 // of the packages that build compiles and the modules' go.mod and go.sum, so
 // a change to a package the binary does not import builds nothing.
 type Inputs struct {
-	Tree Tree
+	// Build is how the workflow builds images (BuildSteps), hashed into
+	// every image; "" leaves it out.
+	Build string
+	Tree  Tree
 	// Read returns a file's content at the commit Tree lists.
 	Read   func(path string) (string, error)
 	GoDeps GoDeps
@@ -52,7 +56,7 @@ func (in Inputs) Hash(ctx context.Context, img ImageSpec) (string, error) {
 		return "", err
 	}
 	h := sha256.New()
-	fmt.Fprintf(h, "%s\nrow %s\n", inputsVersion, img.Row)
+	fmt.Fprintf(h, "%s\nrow %s\nbuild %s\n", inputsVersion, img.Row, in.Build)
 	for _, f := range files {
 		fmt.Fprintf(h, "%s %s\n", in.Tree[f], f)
 	}

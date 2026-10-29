@@ -5,7 +5,7 @@
 //
 //	go run ./cmd/ecrtag published -repository R -tag T -source label|annotation -revision SHA [-custom] [-refuse-retag] [-built-from TAG]
 //	go run ./cmd/ecrtag lambda -repository R -tag T -revision SHA [-built] [-custom]
-//	go run ./cmd/ecrtag select -images JSON -tag T -revision SHA [-all] [-custom]
+//	go run ./cmd/ecrtag select -images JSON -workflow W -tag T -revision SHA [-all] [-custom]
 //
 // published prints "true" when the tag is already there for this commit (skip
 // the push) and "false" when it is not there (push it); any other state fails.
@@ -39,6 +39,7 @@ const ancestorScript = ".github/scripts/nearest-ancestor-tag.sh"
 type options struct {
 	repository, tag, source, revision, host, head, builtFrom string
 	images                                                   []ecrtag.ImageSpec
+	workflow                                                 string
 	custom, built, refuseRetag, all                          bool
 }
 
@@ -80,6 +81,7 @@ func parse(command string, args []string) (options, error) {
 	fs.StringVar(&o.builtFrom, "built-from", "", "published: the per-arch tag this run built, which an index tag must name")
 	images := fs.String("images", "", `select: a JSON array of {"image", "dockerfile"}`)
 	fs.BoolVar(&o.all, "all", false, "select: build every image, as a dispatch does")
+	fs.StringVar(&o.workflow, "workflow", "", "select: the workflow whose build steps every image's inputs include")
 	if err := fs.Parse(args); err != nil {
 		return o, err
 	}
@@ -178,8 +180,8 @@ func selectOptions(o *options, images string) error {
 	if err := checkImages(o.images); err != nil {
 		return err
 	}
-	if o.revision == "" || (!o.all && o.tag == "") {
-		return errors.New("select: -revision, and -tag unless -all, are required")
+	if o.revision == "" || o.workflow == "" || (!o.all && o.tag == "") {
+		return errors.New("select: -revision, -workflow, and -tag unless -all, are required")
 	}
 	if o.head == "" {
 		o.head = o.revision
@@ -204,9 +206,13 @@ func selectImages(ctx context.Context, o options) error {
 	if err != nil {
 		return err
 	}
+	build, err := ecrtag.BuildSteps(".", o.workflow)
+	if err != nil {
+		return err
+	}
 	plans, err := ecrtag.Select{
 		Registry: o.registry(), Ancestry: ancestry(),
-		Inputs: ecrtag.Inputs{Tree: tree, Read: ecrtag.ReadFile("."), GoDeps: ecrtag.GoList(ecrtag.Run, ".")},
+		Inputs: ecrtag.Inputs{Build: build, Tree: tree, Read: ecrtag.ReadFile("."), GoDeps: ecrtag.GoList(ecrtag.Run, ".")},
 		Tag:    o.tag, Head: o.head, All: o.all,
 	}.Plan(ctx, o.images)
 	if err != nil {

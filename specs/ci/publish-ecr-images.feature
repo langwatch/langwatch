@@ -43,7 +43,8 @@ Feature: Publish every deployable image to the artifacts registry
 
   # An image's inputs are the files its Dockerfile copies or bind-mounts from
   # the build context, its Dockerfile and .dockerignore, read from the
-  # Dockerfile itself. Their git blob ids hash to the org.langwatch.inputs
+  # Dockerfile itself. Their git blob ids, with the image's row of the build
+  # table and the workflow's build steps, hash to the org.langwatch.inputs
   # label every build records; the commit tag and the revision label stay the
   # image's identity.
 
@@ -76,6 +77,13 @@ Feature: Publish every deployable image to the artifacts registry
     Given a merge to main changes .dockerignore
     When publish-docker-ecr selects the images to build
     Then every image is rebuilt, because every build reads the repository root as its context
+
+  @unit
+  Scenario: A change to how the workflow builds rebuilds every image
+    Given a merge to main adds a build argument to, or changes the platform of, a docker/build-push-action step that pushes
+    When publish-docker-ecr selects the images to build
+    Then every image is rebuilt, with no version to bump by hand
+    And an edit to the workflow outside its pushing build steps rebuilds nothing
 
   @unit
   Scenario: An image whose inputs cannot be read is rebuilt

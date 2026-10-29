@@ -264,7 +264,8 @@ jobs:
           if [ "${PUSH}" != "true" ]; then
             SCOPE=(-all)
           fi
-          PLANS=$(go run ./cmd/ecrtag select -images "${IMAGES}" -revision "${GITHUB_SHA}" \
+          # The build steps below are inputs too: a new build argument rebuilds.
+          PLANS=$(go run ./cmd/ecrtag select -images "${IMAGES}" -workflow .github/workflows/publish-docker-ecr.yml -revision "${GITHUB_SHA}" \
             -custom="${CUSTOM_TAG}" "${SCOPE[@]}")
 
           BUILT=$(printf '%s' "${PLANS}" | jq -c '[.[] | select(.build) | .image]')

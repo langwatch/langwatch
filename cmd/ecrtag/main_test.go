@@ -90,7 +90,7 @@ func TestPublishedWithoutRefuseRetagReadsNoAncestor(t *testing.T) {
 
 func TestParseSelect(t *testing.T) {
 	images := `[{"image":"langwatch-app","dockerfile":"infra/docker/Dockerfile"}]`
-	o, err := parse("select", []string{"-images", images, "-tag", "git-abc", "-revision", "abc"})
+	o, err := parse("select", []string{"-images", images, "-workflow", "w.yml", "-tag", "git-abc", "-revision", "abc"})
 	require.NoError(t, err)
 	assert.Equal(t, []ecrtag.ImageSpec{{
 		Image: "langwatch-app", Dockerfile: "infra/docker/Dockerfile",
@@ -98,10 +98,10 @@ func TestParseSelect(t *testing.T) {
 	}}, o.images)
 	assert.Equal(t, "abc", o.head)
 
-	_, err = parse("select", []string{"-images", images, "-revision", "abc", "-all"})
+	_, err = parse("select", []string{"-images", images, "-workflow", "w.yml", "-revision", "abc", "-all"})
 	require.NoError(t, err, "a dispatch needs no commit tag to compare with")
 
-	o, err = parse("select", []string{"-images", images, "-tag", "release", "-revision", "abc", "-custom=true"})
+	o, err = parse("select", []string{"-images", images, "-workflow", "w.yml", "-tag", "release", "-revision", "abc", "-custom=true"})
 	require.NoError(t, err)
 	assert.True(t, o.all, "a custom tag is a dispatch, which builds every image")
 
@@ -109,8 +109,9 @@ func TestParseSelect(t *testing.T) {
 		{"-tag", "git-abc", "-revision", "abc"},
 		{"-images", "[]", "-tag", "git-abc", "-revision", "abc"},
 		{"-images", `[{"image":"r"}]`, "-tag", "git-abc", "-revision", "abc"},
-		{"-images", images, "-revision", "abc"},
+		{"-images", images, "-workflow", "w.yml", "-revision", "abc"},
 		{"-images", images, "-tag", "git-abc"},
+		{"-images", images, "-tag", "git-abc", "-revision", "abc"},
 	} {
 		_, err := parse("select", args)
 		assert.Error(t, err, args)
