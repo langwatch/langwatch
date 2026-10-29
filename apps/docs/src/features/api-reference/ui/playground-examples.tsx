@@ -4,7 +4,7 @@ import { FileCode } from "lucide-react";
 import { usePreference, writePreference } from "../../../lib/storage.ts";
 import { type CodeSource, languageFamily } from "../../code/model.ts";
 import { CodeBar, CodeBody, CopyAction } from "../../code/ui.ts";
-import { readingTabList, readingTabTrigger } from "../../content/ui.ts";
+import { readingTabList, readingTabTrigger, TextWithCode } from "../../content/ui.ts";
 import { exampleFromSchema } from "../model/codegen.ts";
 import { EXAMPLE_LANGUAGES } from "../model/operation.ts";
 import type { Operation } from "../model/operation.ts";
@@ -158,30 +158,50 @@ function responseExampleData({ response }: { response: Operation["responses"][nu
     example === void 0 || example === null || JSON.stringify(example) === "{}"
       ? ""
       : JSON.stringify(example, null, 2);
-  let exampleLabel = "Response fields are not specified";
-  if (exampleCode) exampleLabel = declared !== void 0 ? "Declared example" : "Example from schema";
+  let exampleLabel = "No fields specified";
+  if (exampleCode) exampleLabel = declared !== void 0 ? "Example" : "Generated from schema";
   return { chosen, chosenContent, exampleCode, exampleLabel };
 }
 
+/* The full description sits under Responses in the reference; here it is a two-line caption. */
 function ResponseExampleBody({ response }: { response: Operation["responses"][number] }) {
   const { chosen, chosenContent, exampleCode, exampleLabel } = responseExampleData({ response });
   return (
     <>
-      <Box paddingX="4" paddingTop="3" fontSize="12px" lineHeight="18px" color="fg.muted">
-        <Text margin="0">{chosen?.description}</Text>
+      <Box paddingX="4" paddingTop="3" paddingBottom="3">
+        {chosen?.description ? (
+          <Text
+            margin="0"
+            fontSize="13px"
+            lineHeight="20px"
+            color="docs.body"
+            lineClamp="2"
+            title={chosen.description.replaceAll("`", "")}
+          >
+            <TextWithCode text={chosen.description} />
+          </Text>
+        ) : null}
         {chosenContent ? (
-          <Text margin="0">
-            {exampleLabel} · {chosenContent.type}
+          <Text
+            margin="0"
+            marginTop={chosen?.description ? "1.5" : "0"}
+            fontSize="12px"
+            lineHeight="16px"
+            color="fg.muted"
+          >
+            <Box as="span" fontFamily="mono">
+              {chosenContent.type}
+            </Box>
+            {" · "}
+            {exampleLabel}
           </Text>
         ) : null}
       </Box>
       {exampleCode ? (
-        <Box marginTop="3" bg="bg.nested" borderTopWidth="1px" borderColor="border.nested">
+        <Box bg="bg.nested" borderTopWidth="1px" borderColor="border.nested">
           <CodeBody source={plainSource({ code: exampleCode })} />
         </Box>
-      ) : (
-        <Box height="3" />
-      )}
+      ) : null}
     </>
   );
 }

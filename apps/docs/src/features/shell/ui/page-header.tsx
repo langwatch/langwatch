@@ -1,6 +1,7 @@
 import { Badge, Box, Button, Flex, Heading, Text } from "@langwatch/design-system/primitives";
 import { Copy } from "lucide-react";
 
+import { TextWithCode } from "../../content/ui.ts";
 import type { ContextualOption } from "../../navigation/model.ts";
 import { PageMenu } from "./page-menu.tsx";
 
@@ -135,7 +136,7 @@ export function PageHeader({
             color="docs.lede"
             maxWidth="60ch"
           >
-            {description}
+            <TextWithCode text={description} />
           </Text>
         ) : null}
       </Box>

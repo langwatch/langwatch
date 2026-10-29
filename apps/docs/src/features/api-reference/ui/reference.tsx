@@ -2,7 +2,7 @@ import { Box, Button, Flex, Text, chakra } from "@langwatch/design-system/primit
 import { ChevronDown, Play } from "lucide-react";
 
 import { TypeRegion } from "../../../lib/type-mode.tsx";
-import { DocsField } from "../../content/ui.ts";
+import { DocsField, TextWithCode } from "../../content/ui.ts";
 import type { Operation } from "../model/operation.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { MethodBadge } from "./method-badge.tsx";
@@ -134,7 +134,7 @@ export function Responses({ operation }: { operation: Operation }) {
               {response.status}
             </Box>
             <Text margin="0" fontSize="14px" lineHeight="22px" color="docs.body">
-              {response.description}
+              <TextWithCode text={response.description} />
             </Text>
             <ChevronDown size={16} aria-hidden="true" />
           </Flex>
@@ -185,7 +185,11 @@ export function EndpointReference({
               location={scheme.in ?? "header"}
               required
             >
-              {scheme.description ? <p>{scheme.description}</p> : null}
+              {scheme.description ? (
+                <p>
+                  <TextWithCode text={scheme.description} />
+                </p>
+              ) : null}
             </DocsField>
           ))}
         </Section>
