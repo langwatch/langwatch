@@ -37,7 +37,7 @@ The brief is the whole input. It holds the facts of this run and nothing else:
 Read each listed widget in these steps, over the brief's window:
 
 1. `langwatch dashboard widget get <dashboard id> <widget id>` shows the widget's stored queries.
-2. `langwatch query "<query>" --start <start> --end <end>` runs one over a window. The two flags fill `{dashboard_context_period_start:DateTime}` and `{dashboard_context_period_end:DateTime}`: leave both in the query, and write no date and no database name into it.
+2. `langwatch query "<query>" --projects <the brief's project id> --start <start> --end <end>` runs one over a window. A query must name its project with `--projects`. The two flags fill `{dashboard_context_period_start:DateTime}` and `{dashboard_context_period_end:DateTime}`: leave both in the query, and write no date and no database name into it.
 3. No flag fills `{dashboard_context_granularity_seconds:UInt32}`. In the copy you run, and only there, write the brief's step in its place.
 4. Write the query on one line, with a space where the stored query breaks a line. A query that holds the two characters `\n` fails.
 

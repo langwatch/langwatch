@@ -81,8 +81,18 @@ the offending field and the fields that exist.
 langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
 FROM analytics.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
-GROUP BY day ORDER BY day"
+GROUP BY day ORDER BY day" --projects <project id>
 ```
+
+A key for an organization, a team or a person must name the projects to read with
+`--projects` (the `projects` field over REST and in `run_query`); without them the
+run is refused with `projects_required` (422): "Name the projects to query: send
+`projects`, a list of project ids". A project API key reads its own project and
+needs none. Every run answers with `params`: the `sources` and `projects` it was
+bound to, and `followsSources`, which is false when the statement does not read
+`{dashboard_context_sources:Array(String)}` and so counts every origin. `--sources`
+(`sources`) sets the origins that parameter is bound to; the default is
+`application`.
 
 The statement runs exactly as submitted. Filter on the dataset's time column, as
 every example does: without that predicate the read touches every partition your
@@ -93,7 +103,7 @@ parameter the statement declares, and `--start` with `--end` fills the reserved
 period parameters.
 
 ```bash
-langwatch query --sql-file report.sql --param days=30 -f json
+langwatch query --sql-file report.sql --param days=30 --projects <project id> -f json
 ```
 
 ## Exporting rows
@@ -103,7 +113,7 @@ back into real values, which is the shape a training-data reader expects.
 `--format csv` writes a header row with RFC 4180 escaping. `--out` writes to a file.
 
 ```bash
-langwatch query --sql-file export.sql --format jsonl --out train.jsonl
+langwatch query --sql-file export.sql --projects <project id> --format jsonl --out train.jsonl
 ```
 
 The query endpoint has no cursor of its own, so a result larger than one
@@ -121,7 +131,7 @@ LIMIT 1000
 ```
 
 ```bash
-langwatch query --sql-file export.sql --page-by keyset --format jsonl --out train.jsonl
+langwatch query --sql-file export.sql --projects <project id> --page-by keyset --format jsonl --out train.jsonl
 ```
 
 ## From an MCP client

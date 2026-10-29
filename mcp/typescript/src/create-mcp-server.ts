@@ -28,7 +28,7 @@ import {
   triggerActionSchema,
   validateActionParamsForAction,
 } from "./schemas/triggers.ts";
-import { widgetSourcesInput } from "./schemas/widget-sources.ts";
+import { widgetProjectsInput, widgetSourcesInput } from "./schemas/widget-sources.ts";
 import { handleExperimentResults } from "./tools/get-experiment-results.ts";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.ts";
 import { handleExperimentList } from "./tools/list-experiments.ts";
@@ -247,6 +247,19 @@ function registerObservabilityTools(server: McpServer): void {
         .optional()
         .describe(
           'Values for the parameters the statement declares, e.g. {"days": 7} for {days:UInt32}',
+        ),
+      projects: z
+        .array(z.string().min(1))
+        .min(1)
+        .optional()
+        .describe(
+          "The project ids to read. A key for an organization or a team must name them; a project key reads its own project",
+        ),
+      sources: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "The trace sources {dashboard_context_sources:Array(String)} is bound to (default application). Only a statement that reads that parameter is kept to them; the answer's params.followsSources says which",
         ),
     },
     withToolLogging("run_query", async (params) => {
@@ -1460,6 +1473,7 @@ function registerDashboardTools(server: McpServer): void {
           "The widget's named LangWatchQL queries: either {name: sql} or an array of {name, sql}. Max 8. Validate each statement with run_query first.",
         ),
       sources: widgetSourcesInput,
+      projects: widgetProjectsInput,
     },
     withToolLogging("add_dashboard_widget", async (params) => {
       requireApiKey();
@@ -1504,6 +1518,7 @@ function registerDashboardTools(server: McpServer): void {
         .optional()
         .describe("What the widget's info tip says: a sentence or two"),
       sources: widgetSourcesInput,
+      projects: widgetProjectsInput,
     },
     withToolLogging("update_dashboard_widget", async (params) => {
       requireApiKey();

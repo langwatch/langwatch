@@ -413,3 +413,44 @@ describe("a widget's sources through the MCP widget tools", () => {
     expect(parse("update_dashboard_widget", { ...update, sources: null })).not.toThrow();
   });
 });
+
+describe("a widget's projects through the MCP widget tools", () => {
+  const QUERY = { name: "turns", sql: "SELECT count() FROM traces" };
+
+  /** @scenario "AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources" */
+  it("creates a widget whose every query reads the projects the agent names", async () => {
+    await handleAddDashboardWidget({
+      dashboardId: "dash_1",
+      name: "Two projects",
+      code: "export default () => null;",
+      queries: { turns: QUERY.sql },
+      projects: ["A", "B"],
+    });
+
+    expect(mockCreateWidgetOnDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({ queries: [{ ...QUERY, projects: ["A", "B"] }] }),
+    );
+  });
+
+  /** @scenario "AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources" */
+  it("clears the projects with null, sending the stored queries back", async () => {
+    mockGetWidgetOnDashboard.mockResolvedValue({
+      ...sampleWidget,
+      dashboardId: "dash_1",
+      definition: { ...sampleWidget.definition, queries: [{ ...QUERY, projects: ["A"] }] },
+    });
+    mockUpdateWidgetOnDashboard.mockResolvedValue({ ...sampleWidget, dashboardId: "dash_1" });
+
+    await handleUpdateDashboardWidget({
+      dashboardId: "dash_1",
+      widgetId: "widget_1",
+      projects: null,
+    });
+
+    expect(mockUpdateWidgetOnDashboard).toHaveBeenCalledWith({
+      dashboardId: "dash_1",
+      widgetId: "widget_1",
+      queries: [{ ...QUERY, projects: null }],
+    });
+  });
+});

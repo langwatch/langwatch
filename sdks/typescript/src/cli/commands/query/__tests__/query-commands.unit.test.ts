@@ -389,3 +389,57 @@ describe("runQueryCommand across projects", () => {
     });
   });
 });
+
+describe("runQueryCommand with --projects and --sources", () => {
+  /** @scenario "QP19 The CLI sends the parameters and prints the params" */
+  it("sends the named projects and sources as lists", async () => {
+    await runQueryCommand("SELECT 1", { projects: "A, B", sources: "application,langy" });
+
+    expect(mockQuery).toHaveBeenCalledWith({
+      sql: "SELECT 1",
+      projects: ["A", "B"],
+      sources: ["application", "langy"],
+    });
+  });
+
+  /** @scenario "QP19 The CLI sends the parameters and prints the params" */
+  it("prints what the run was bound to under the table", async () => {
+    mockQuery.mockResolvedValue({
+      ...RESULT,
+      params: {
+        sources: ["application"],
+        followsSources: false,
+        projects: ["A"],
+        parameters: {},
+      },
+    });
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+    (result as { table: () => void }).table();
+
+    const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+    expect(printed).toContain("sources: all (the SQL ignores sources); projects: A");
+  });
+
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("tells the user to pass --projects when the platform asks for them", async () => {
+    mockQuery.mockRejectedValue(
+      Object.assign(
+        new Error("Name the projects to query: send `projects`, a list of project ids"),
+        {
+          code: "projects_required",
+          kind: "projects_required",
+          httpStatus: 422,
+          meta: {},
+          isHandled: true,
+        },
+      ),
+    );
+
+    await expect(runQueryCommand("SELECT 1", {})).rejects.toThrow(ProcessExitError);
+
+    const printed = vi.mocked(console.error).mock.calls.flat().join("\n");
+    expect(printed).toContain("Name the projects to query: pass --projects <id,id>");
+    expect(printed).not.toMatch(/project_[a-z0-9]+/);
+  });
+});

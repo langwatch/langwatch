@@ -14,6 +14,7 @@ import {
 } from "@/client-sdk/services/query/query-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
+import { readCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
@@ -56,6 +57,43 @@ export interface QueryRunOptions {
   pageBy?: string;
   out?: string;
   project?: string;
+  projects?: string;
+  sources?: string;
+}
+
+/** The trace sources and projects a run names, as the request carries them. */
+interface RunReach {
+  projectId?: string;
+  projects?: string[];
+  sources?: string[];
+}
+
+/** What the CLI tells a person whose key names no project (the platform's `projects_required`). */
+const PROJECTS_REQUIRED_MESSAGE = "Name the projects to query: pass --projects <id,id>";
+
+/** A comma list as an array, with blanks dropped. */
+function splitList(value: string | undefined): string[] | undefined {
+  if (value === undefined) return undefined;
+  const items = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "");
+  return items.length === 0 ? undefined : items;
+}
+
+/** Turns the platform's `projects_required` into the flag that fixes it. */
+function explainProjectsRequired(error: unknown): void {
+  if (readCommandError(error).code === "projects_required") refuse(PROJECTS_REQUIRED_MESSAGE);
+}
+
+/** One line saying what the run was bound to, printed after a table. */
+function paramsLine(result: QueryRunResult): string {
+  const { params } = result;
+  if (!params) return "";
+  const sources = params.followsSources
+    ? params.sources.join(",")
+    : "all (the SQL ignores sources)";
+  return chalk.dim(`Ran with sources: ${sources}; projects: ${params.projects.join(",")}`);
 }
 
 /** Where the next page of a keyset walk starts. */
@@ -122,7 +160,7 @@ async function walkKeyset({
   sql,
   parameters,
   timeWindow,
-  projectId,
+  reach,
   limit,
   onPage,
 }: {
@@ -130,7 +168,7 @@ async function walkKeyset({
   sql: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
-  projectId?: string;
+  reach: RunReach;
   limit?: number;
   onPage: (page: QueryRunResult, rows: readonly QueryRow[]) => void;
 }): Promise<{ pages: number; rows: number }> {
@@ -150,7 +188,7 @@ async function walkKeyset({
       sql,
       parameters: { ...parameters, ...cursor },
       ...(timeWindow ? { timeWindow } : {}),
-      ...(projectId === undefined ? {} : { projectId }),
+      ...reach,
     });
     pages += 1;
     if (page.rows.length === 0) break;
@@ -176,7 +214,7 @@ async function runKeysetWalk({
   statement,
   parameters,
   timeWindow,
-  projectId,
+  reach,
   limit,
   format,
   output,
@@ -185,7 +223,7 @@ async function runKeysetWalk({
   statement: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
-  projectId?: string;
+  reach: RunReach;
   limit?: number;
   format: QueryOutputFormat;
   output?: string;
@@ -199,7 +237,7 @@ async function runKeysetWalk({
       sql: statement,
       parameters,
       timeWindow,
-      projectId,
+      reach,
       limit,
       onPage: (page, rows) => {
         columns = page.columns;
@@ -216,6 +254,7 @@ async function runKeysetWalk({
       `Read ${walked.rows} row${walked.rows !== 1 ? "s" : ""} over ${walked.pages} page${walked.pages !== 1 ? "s" : ""}`,
     );
   } catch (error) {
+    explainProjectsRequired(error);
     failSpinner({ spinner, error, action: "run statement" });
     process.exit(1);
   }
@@ -227,7 +266,7 @@ async function runSinglePage({
   statement,
   parameters,
   timeWindow,
-  projectId,
+  reach,
   limit,
   format,
   output,
@@ -236,7 +275,7 @@ async function runSinglePage({
   statement: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
-  projectId?: string;
+  reach: RunReach;
   limit?: number;
   format: QueryOutputFormat;
   output?: string;
@@ -248,9 +287,10 @@ async function runSinglePage({
       sql: statement,
       ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
-      ...(projectId === undefined ? {} : { projectId }),
+      ...reach,
     });
   } catch (error) {
+    explainProjectsRequired(error);
     failSpinner({ spinner, error, action: "run statement" });
     process.exit(1);
   }
@@ -278,7 +318,11 @@ async function runSinglePage({
   // through the table and the spinner line, not through the machine payload.
   return {
     data: rows,
-    table: () => printTable({ ...result, rows }),
+    table: () => {
+      printTable({ ...result, rows });
+      const line = paramsLine(result);
+      if (line !== "") console.log(line);
+    },
   };
 }
 
@@ -309,9 +353,16 @@ export const runQueryCommand = async (
   // credential falls back to is not a project the user asked to read alone.
   const credentials = await resolveCredentials({ project: options.project });
   const projectId = options.project === undefined ? undefined : credentials.projectId;
+  const projects = splitList(options.projects);
+  const sources = splitList(options.sources);
+  const reach: RunReach = {
+    ...(projectId === undefined ? {} : { projectId }),
+    ...(projects ? { projects } : {}),
+    ...(sources ? { sources } : {}),
+  };
   const common = {
     ...resolved,
-    ...(projectId === undefined ? {} : { projectId }),
+    reach,
     service: new QueryApiService(),
   };
 

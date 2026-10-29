@@ -59,6 +59,26 @@ export const resolveSources = (flag: string | undefined): TraceSource[] | undefi
 };
 
 /**
+ * `--projects A,B`: the project ids every query of the widget reads, or undefined when the flag
+ * is absent, so each query keeps what it stores.
+ */
+export const resolveProjects = (flag: string | undefined): string[] | undefined => {
+  if (flag === undefined) return undefined;
+  const picked = [
+    ...new Set(
+      flag
+        .split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0),
+    ),
+  ];
+  if (picked.length === 0) {
+    throw new WidgetInputError("--projects: pass a comma list of project ids");
+  }
+  return picked;
+};
+
+/**
  * Resolves definition flags to { code, queries }, refusing partial
  * definitions (both source and queries required together).
  */

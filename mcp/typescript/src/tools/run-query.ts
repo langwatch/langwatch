@@ -5,16 +5,28 @@
  */
 
 import { runQuery } from "../langwatch-api-query.ts";
+import { LangWatchApiError } from "../langwatch-api.ts";
 import { markdownTable } from "../utils/markdown-table.ts";
 
 /** Rows the table prints. Beyond this, aggregate or export through the CLI. */
 export const RUN_QUERY_ROW_CAP = 50;
 
+/** What the tool tells an agent whose key names no project (the platform's `projects_required`). */
+const PROJECTS_REQUIRED_MESSAGE =
+  "Name the projects to query: pass `projects`, a list of project ids";
+
 export async function handleRunQuery(params: {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
+  projects?: string[];
+  sources?: string[];
 }): Promise<string> {
-  const result = await runQuery(params);
+  const result = await runQuery(params).catch((error: unknown) => {
+    if (error instanceof LangWatchApiError && error.code === "projects_required") {
+      throw new Error(PROJECTS_REQUIRED_MESSAGE);
+    }
+    throw error;
+  });
   const headers = result.columns.map((column) => column.name);
   const shown = result.rows.slice(0, RUN_QUERY_ROW_CAP);
 
@@ -43,5 +55,25 @@ export async function handleRunQuery(params: {
   for (const diagnostic of result.diagnostics) {
     lines.push(`${diagnostic.code}: ${diagnostic.message}`);
   }
+  if (result.params) lines.push("", describeParams(result.params));
   return lines.join("\n");
+}
+
+/**
+ * What the run was bound to, as one line plus the JSON: read `followsSources` before `sources`,
+ * since a statement that does not read the parameter counts every origin whatever `sources` says.
+ */
+function describeParams(
+  params: NonNullable<Awaited<ReturnType<typeof runQuery>>["params"]>,
+): string {
+  const sources = params.followsSources
+    ? params.sources.join(", ")
+    : "all sources (the SQL does not read {dashboard_context_sources})";
+
+  return [
+    `Ran with sources: ${sources}; projects: ${params.projects.join(", ")}.`,
+    "```json",
+    JSON.stringify({ params }, null, 2),
+    "```",
+  ].join("\n");
 }

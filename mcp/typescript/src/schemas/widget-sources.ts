@@ -31,3 +31,16 @@ export const widgetSourcesInput = z
   .describe(
     `The trace origins every query of the widget counts: any of ${WIDGET_SOURCES.join(", ")} (other = any origin not listed). A new widget counts ["application"]; add "langy" to count your own conversations, as a widget about Langy's requests needs. null makes it unset again, counting the default.`,
   );
+
+/**
+ * The tools' `projects` input: the project ids every query of the widget reads. Absent, a query
+ * keeps what it stores (a new widget reads its board's project); null makes it unset again.
+ */
+export const widgetProjectsInput = z
+  .array(z.string().min(1))
+  .min(1)
+  .nullable()
+  .optional()
+  .describe(
+    "The project ids every query of the widget reads, each one you can read. A new widget reads its board's project. null makes it unset again, reading the board's project.",
+  );

@@ -2222,6 +2222,10 @@ function registerDashboardCommands(program: Command): void {
       .option(
         "--sources <list>",
         "Comma list of the trace origins every query counts: application, simulation, evaluation, coding_agent, gateway, workflow, playground, langy, other",
+      )
+      .option(
+        "--projects <ids>",
+        "Comma list of the project ids every query reads (default: the board's project)",
       );
 
   emitsResult(
@@ -3143,7 +3147,15 @@ function registerQueryCommands(program: Command): void {
         "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
       )
       .option("--out <file>", "Write the result to a file instead of stdout")
-      .option("--project <idOrSlug>", QUERY_PROJECT_FLAG_HELP),
+      .option("--project <idOrSlug>", QUERY_PROJECT_FLAG_HELP)
+      .option(
+        "--projects <ids>",
+        "Project ids to read, comma separated. A login for an organization or a team must name them; a project key needs none",
+      )
+      .option(
+        "--sources <list>",
+        "Trace sources {dashboard_context_sources:Array(String)} is bound to, comma separated (default: application)",
+      ),
     async (sql: string | undefined, options: Record<string, string>) => {
       const { runQueryCommand: impl } = await import("./commands/query/run.js");
       return impl(sql, options);
