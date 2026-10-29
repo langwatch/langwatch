@@ -24,10 +24,14 @@ const rect = ({ x, y, size }: { x: number; y: number; size: number }) =>
 function stubMotion({ reduce }: { reduce: boolean }) {
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: reduce && query.includes("reduce") }));
   const animated: Element[] = [];
-  Element.prototype.animate = function (this: Element) {
-    animated.push(this);
-    return { finished: Promise.resolve() } as unknown as Animation;
-  };
+  /* jsdom has no Web Animations; each animation finishes at once. */
+  Object.defineProperty(Element.prototype, "animate", {
+    configurable: true,
+    value(this: Element) {
+      animated.push(this);
+      return { finished: Promise.resolve() };
+    },
+  });
   return animated;
 }
 

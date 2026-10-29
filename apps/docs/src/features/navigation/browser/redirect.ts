@@ -30,15 +30,7 @@ function shownPath() {
   }
 }
 
-function fillRail({
-  root,
-  pages,
-  shown,
-}: {
-  root: HTMLElement;
-  pages: Element | null;
-  shown: string;
-}) {
+function fillRail({ pages, shown }: { pages: Element | null; shown: string }) {
   const rail = document.querySelector<HTMLElement>("[data-nf-matches]");
   const list = rail?.querySelector("[data-nf-rail-matches]");
   if (rail && list && pages) {
@@ -84,7 +76,7 @@ function showScene({ root, path }: { root: HTMLElement; path: string }) {
   if (stage && content) stage.replaceChildren(content);
   if (stage && !content && pages.length)
     stage.querySelector(".docs-nf-picks")?.replaceWith(picks({ pages, label: "Closest pages" }));
-  fillRail({ root, pages: pages.length ? root.querySelector(".docs-nf-picks") : null, shown });
+  fillRail({ pages: pages.length ? root.querySelector(".docs-nf-picks") : null, shown });
   void arrive({ root });
 }
 
