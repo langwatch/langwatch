@@ -2,9 +2,9 @@
 
 **Date:** 2026-10-28
 
-**Status:** Proposed
+**Status:** Accepted (Drew, 2026-10-29)
 
-> One line: every eval result is a row in one ClickHouse table, `eval_results`, linked to its trace and tagged with its source (ask, run, dashboard, monitor). Before judging, we look up the same trace, question and judge model, and reuse the row if it exists. The table is append-only and follows the trace's retention. Monitors move in as phase 2; when is open for Drew.
+> One line: every eval result is a row in one ClickHouse table, `eval_results`, linked to its trace and tagged with its source (ask, run, dashboard, monitor). Before judging, we look up the same trace, question and judge model, and reuse the row if it exists. The table is append-only and follows the trace's retention. Monitors move in as phase 2.
 
 ## Context
 
@@ -143,7 +143,7 @@ Three changes make a result expire with its trace. Each follows a pattern alread
 
 Enrolment also adds the table to the storage meter (`PRODUCTION_STORAGE_METER_TABLES`, `retention-tables.ts:114-116`), which sums `_size_bytes`. We list `eval_results` in `TABLES_WITHOUT_SIZE_COLUMN` (`retention-tables.ts:107-112`), as the analytics tables are. A result holds no customer text, so the meter would count only small verdict rows.
 
-### 5. Monitors: phase 2, open for Drew
+### 5. Monitors: phase 2 (decided: later)
 
 Monitors write `evaluation_runs` today. Moving them into `eval_results` is the real goal: one table, one trace-page read, one filter word. It is phase 2, after instant evals land.
 
@@ -156,7 +156,7 @@ Monitors write `evaluation_runs` today. Moving them into `eval_results` is the r
 | Now         | One store from day one. No second read on the trace page.                   | Instant evals wait on a migration of charts, filters, triggers and the monitor lifecycle.       |
 | Later (rec) | Instant evals ship first. The phase 2 dual write is additive and reversible. | Two stores for a while. Two filter words (`evaluations.passed`, `eval:"q"`) until readers move. |
 
-Recommendation: later.
+Decided: later (Drew, 2026-10-29).
 
 ## Alternatives considered
 
@@ -189,10 +189,12 @@ From public documentation read on 2026-10-28. All four keep results beside the t
 | Phoenix   | Evaluations are span annotations keyed by `span_id`.                        | https://arize.com/docs/phoenix/tracing/how-to-tracing/feedback-and-annotations/llm-evaluations          |
 | Datadog   | Evaluations join on span and trace id and show on the span.                  | https://docs.datadoghq.com/llm_observability/evaluations/submit_evaluations/                            |
 
-## Open questions for Drew
+## Decisions on the open questions
 
-1. **Monitors into the one table: now or later?** Recommendation: later (section 5).
-2. **Does changed judged text count as "something changed"?** Recommendation: yes. The text is read anyway to judge, and a trace can gain spans after its first judgment. Without it, a recall can return a verdict on text that is no longer there.
+Drew accepted both on 2026-10-29 (Convoz ask 12563).
+
+1. **Monitors into the one table: now or later?** Later (section 5).
+2. **Does changed judged text count as "something changed"?** Yes. The text is read anyway to judge, and a trace can gain spans after its first judgment. Without it, a recall can return a verdict on text that is no longer there.
 
 ## Risks
 
