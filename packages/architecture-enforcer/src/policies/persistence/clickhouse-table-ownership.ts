@@ -671,7 +671,10 @@ function owners(access: readonly Access[]): Map<string, Access[]> {
 
 type Feeds = ReadonlyMap<string, readonly string[]>;
 
-/** A recorded table no migration creates, a module writing one, or a foreign read of a reserved one. */
+/**
+ * A recorded table no migration creates, a module writing one, or a foreign read
+ * of a reserved one.
+ */
 function recordFindings({
   tables,
   writers,
@@ -711,7 +714,10 @@ function recordFindings({
   });
 }
 
-/** A reserved table has a known owner, so a read by any other module is reported as for a written table. */
+/**
+ * A reserved table has a known owner, so a read by any other module is reported as for a
+ * written table.
+ */
 function reservedReads({
   record,
   context,
