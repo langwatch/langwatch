@@ -175,17 +175,27 @@ function schemaOnlyPath(
 }
 
 /**
- * The per-arm issues of a union failure: handles both Zod 3 `unionErrors` and
- * Zod 4 `errors` spellings.
+ * The per-arm issues of a union failure and the path they sit under: Zod 3's
+ * `unionErrors` carry absolute paths, Zod 4's `errors` paths relative to the
+ * union itself.
  */
-function unionBranches(issue: RawIssue): RawIssue[][] {
+function unionBranches(
+  issue: RawIssue,
+  at: readonly unknown[],
+): { branches: RawIssue[][]; base: readonly unknown[] } {
   if (Array.isArray(issue.unionErrors)) {
-    return issue.unionErrors.filter(hasIssues).map((nested) => nested.issues);
+    return {
+      branches: issue.unionErrors.filter(hasIssues).map((nested) => nested.issues),
+      base: [],
+    };
   }
   if (Array.isArray(issue.errors)) {
-    return issue.errors.filter((branch): branch is RawIssue[] => Array.isArray(branch));
+    return {
+      branches: issue.errors.filter((branch): branch is RawIssue[] => Array.isArray(branch)),
+      base: at,
+    };
   }
-  return [];
+  return { branches: [], base: at };
 }
 
 /**
@@ -212,9 +222,9 @@ function collectIssues({
     counter.total += 1;
     if (into.length < maxIssues) into.push(metaForIssue(issue, privacy, base));
 
-    const at = [...base, ...pathSegments(issue)];
-    for (const branch of unionBranches(issue)) {
-      collectIssues({ issues: branch, into, counter, maxIssues, privacy, base: at });
+    const union = unionBranches(issue, [...base, ...pathSegments(issue)]);
+    for (const branch of union.branches) {
+      collectIssues({ issues: branch, into, counter, maxIssues, privacy, base: union.base });
     }
   }
 }

@@ -36904,12 +36904,12 @@ type TraceSpans0 struct {
 		ReasoningTokens          *float32 `json:"reasoning_tokens,omitempty"`
 		TokensEstimated          *bool    `json:"tokens_estimated,omitempty"`
 	} `json:"metrics,omitempty"`
-	Model      *string                 `json:"model,omitempty"`
-	Name       *string                 `json:"name,omitempty"`
-	Output     *Trace_Spans_0_Output   `json:"output,omitempty"`
-	Params     *map[string]interface{} `json:"params,omitempty"`
-	ParentId   *string                 `json:"parent_id,omitempty"`
-	SpanId     string                  `json:"span_id"`
+	Model      *string               `json:"model,omitempty"`
+	Name       *string               `json:"name,omitempty"`
+	Output     *Trace_Spans_0_Output `json:"output,omitempty"`
+	Params     *Trace_Spans_0_Params `json:"params,omitempty"`
+	ParentId   *string               `json:"parent_id,omitempty"`
+	SpanId     string                `json:"span_id"`
 	Timestamps struct {
 		FinishedAt              float32  `json:"finished_at"`
 		FirstTokenAt            *float32 `json:"first_token_at,omitempty"`
@@ -37008,6 +37008,243 @@ type Trace_Spans_0_Output struct {
 	union json.RawMessage
 }
 
+// TraceSpans0ParamsFrequencyPenalty0 defines model for .
+type TraceSpans0ParamsFrequencyPenalty0 = float32
+
+// TraceSpans0ParamsFrequencyPenalty1 defines model for .
+type TraceSpans0ParamsFrequencyPenalty1 = interface{}
+
+// Trace_Spans_0_Params_FrequencyPenalty defines model for Trace.Spans.0.Params.FrequencyPenalty.
+type Trace_Spans_0_Params_FrequencyPenalty struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsFunctions0 defines model for .
+type TraceSpans0ParamsFunctions0 = []map[string]interface{}
+
+// TraceSpans0ParamsFunctions1 defines model for .
+type TraceSpans0ParamsFunctions1 = interface{}
+
+// Trace_Spans_0_Params_Functions defines model for Trace.Spans.0.Params.Functions.
+type Trace_Spans_0_Params_Functions struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsLogitBias0 defines model for .
+type TraceSpans0ParamsLogitBias0 map[string]float32
+
+// TraceSpans0ParamsLogitBias1 defines model for .
+type TraceSpans0ParamsLogitBias1 = interface{}
+
+// Trace_Spans_0_Params_LogitBias defines model for Trace.Spans.0.Params.LogitBias.
+type Trace_Spans_0_Params_LogitBias struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsLogprobs0 defines model for .
+type TraceSpans0ParamsLogprobs0 = bool
+
+// TraceSpans0ParamsLogprobs1 defines model for .
+type TraceSpans0ParamsLogprobs1 = interface{}
+
+// Trace_Spans_0_Params_Logprobs defines model for Trace.Spans.0.Params.Logprobs.
+type Trace_Spans_0_Params_Logprobs struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsMaxTokens0 defines model for .
+type TraceSpans0ParamsMaxTokens0 = float32
+
+// TraceSpans0ParamsMaxTokens1 defines model for .
+type TraceSpans0ParamsMaxTokens1 = interface{}
+
+// Trace_Spans_0_Params_MaxTokens defines model for Trace.Spans.0.Params.MaxTokens.
+type Trace_Spans_0_Params_MaxTokens struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsN0 defines model for .
+type TraceSpans0ParamsN0 = float32
+
+// TraceSpans0ParamsN1 defines model for .
+type TraceSpans0ParamsN1 = interface{}
+
+// Trace_Spans_0_Params_N defines model for Trace.Spans.0.Params.N.
+type Trace_Spans_0_Params_N struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsParallelToolCalls0 defines model for .
+type TraceSpans0ParamsParallelToolCalls0 = bool
+
+// TraceSpans0ParamsParallelToolCalls1 defines model for .
+type TraceSpans0ParamsParallelToolCalls1 = interface{}
+
+// Trace_Spans_0_Params_ParallelToolCalls defines model for Trace.Spans.0.Params.ParallelToolCalls.
+type Trace_Spans_0_Params_ParallelToolCalls struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsPresencePenalty0 defines model for .
+type TraceSpans0ParamsPresencePenalty0 = float32
+
+// TraceSpans0ParamsPresencePenalty1 defines model for .
+type TraceSpans0ParamsPresencePenalty1 = interface{}
+
+// Trace_Spans_0_Params_PresencePenalty defines model for Trace.Spans.0.Params.PresencePenalty.
+type Trace_Spans_0_Params_PresencePenalty struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsReasoningEffort0 defines model for .
+type TraceSpans0ParamsReasoningEffort0 = string
+
+// TraceSpans0ParamsReasoningEffort1 defines model for .
+type TraceSpans0ParamsReasoningEffort1 = interface{}
+
+// Trace_Spans_0_Params_ReasoningEffort defines model for Trace.Spans.0.Params.ReasoningEffort.
+type Trace_Spans_0_Params_ReasoningEffort struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsSeed0 defines model for .
+type TraceSpans0ParamsSeed0 = float32
+
+// TraceSpans0ParamsSeed1 defines model for .
+type TraceSpans0ParamsSeed1 = interface{}
+
+// Trace_Spans_0_Params_Seed defines model for Trace.Spans.0.Params.Seed.
+type Trace_Spans_0_Params_Seed struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsStop0 defines model for .
+type TraceSpans0ParamsStop0 struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsStop00 defines model for .
+type TraceSpans0ParamsStop00 = string
+
+// TraceSpans0ParamsStop01 defines model for .
+type TraceSpans0ParamsStop01 = []string
+
+// TraceSpans0ParamsStop1 defines model for .
+type TraceSpans0ParamsStop1 = interface{}
+
+// Trace_Spans_0_Params_Stop defines model for Trace.Spans.0.Params.Stop.
+type Trace_Spans_0_Params_Stop struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsStream0 defines model for .
+type TraceSpans0ParamsStream0 = bool
+
+// TraceSpans0ParamsStream1 defines model for .
+type TraceSpans0ParamsStream1 = interface{}
+
+// Trace_Spans_0_Params_Stream defines model for Trace.Spans.0.Params.Stream.
+type Trace_Spans_0_Params_Stream struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsTemperature0 defines model for .
+type TraceSpans0ParamsTemperature0 = float32
+
+// TraceSpans0ParamsTemperature1 defines model for .
+type TraceSpans0ParamsTemperature1 = interface{}
+
+// Trace_Spans_0_Params_Temperature defines model for Trace.Spans.0.Params.Temperature.
+type Trace_Spans_0_Params_Temperature struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsToolChoice0 defines model for .
+type TraceSpans0ParamsToolChoice0 struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsToolChoice00 defines model for .
+type TraceSpans0ParamsToolChoice00 map[string]interface{}
+
+// TraceSpans0ParamsToolChoice01 defines model for .
+type TraceSpans0ParamsToolChoice01 = string
+
+// TraceSpans0ParamsToolChoice1 defines model for .
+type TraceSpans0ParamsToolChoice1 = interface{}
+
+// Trace_Spans_0_Params_ToolChoice defines model for Trace.Spans.0.Params.ToolChoice.
+type Trace_Spans_0_Params_ToolChoice struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsTools0 defines model for .
+type TraceSpans0ParamsTools0 = []map[string]interface{}
+
+// TraceSpans0ParamsTools1 defines model for .
+type TraceSpans0ParamsTools1 = interface{}
+
+// Trace_Spans_0_Params_Tools defines model for Trace.Spans.0.Params.Tools.
+type Trace_Spans_0_Params_Tools struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsTopLogprobs0 defines model for .
+type TraceSpans0ParamsTopLogprobs0 = float32
+
+// TraceSpans0ParamsTopLogprobs1 defines model for .
+type TraceSpans0ParamsTopLogprobs1 = interface{}
+
+// Trace_Spans_0_Params_TopLogprobs defines model for Trace.Spans.0.Params.TopLogprobs.
+type Trace_Spans_0_Params_TopLogprobs struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsTopP0 defines model for .
+type TraceSpans0ParamsTopP0 = float32
+
+// TraceSpans0ParamsTopP1 defines model for .
+type TraceSpans0ParamsTopP1 = interface{}
+
+// Trace_Spans_0_Params_TopP defines model for Trace.Spans.0.Params.TopP.
+type Trace_Spans_0_Params_TopP struct {
+	union json.RawMessage
+}
+
+// TraceSpans0ParamsUser0 defines model for .
+type TraceSpans0ParamsUser0 = string
+
+// TraceSpans0ParamsUser1 defines model for .
+type TraceSpans0ParamsUser1 = interface{}
+
+// Trace_Spans_0_Params_User defines model for Trace.Spans.0.Params.User.
+type Trace_Spans_0_Params_User struct {
+	union json.RawMessage
+}
+
+// Trace_Spans_0_Params defines model for Trace.Spans.0.Params.
+type Trace_Spans_0_Params struct {
+	FrequencyPenalty     *Trace_Spans_0_Params_FrequencyPenalty  `json:"frequency_penalty,omitempty"`
+	Functions            *Trace_Spans_0_Params_Functions         `json:"functions,omitempty"`
+	LogitBias            *Trace_Spans_0_Params_LogitBias         `json:"logit_bias,omitempty"`
+	Logprobs             *Trace_Spans_0_Params_Logprobs          `json:"logprobs,omitempty"`
+	MaxTokens            *Trace_Spans_0_Params_MaxTokens         `json:"max_tokens,omitempty"`
+	N                    *Trace_Spans_0_Params_N                 `json:"n,omitempty"`
+	ParallelToolCalls    *Trace_Spans_0_Params_ParallelToolCalls `json:"parallel_tool_calls,omitempty"`
+	PresencePenalty      *Trace_Spans_0_Params_PresencePenalty   `json:"presence_penalty,omitempty"`
+	ReasoningEffort      *Trace_Spans_0_Params_ReasoningEffort   `json:"reasoning_effort,omitempty"`
+	Seed                 *Trace_Spans_0_Params_Seed              `json:"seed,omitempty"`
+	Stop                 *Trace_Spans_0_Params_Stop              `json:"stop,omitempty"`
+	Stream               *Trace_Spans_0_Params_Stream            `json:"stream,omitempty"`
+	Temperature          *Trace_Spans_0_Params_Temperature       `json:"temperature,omitempty"`
+	ToolChoice           *Trace_Spans_0_Params_ToolChoice        `json:"tool_choice,omitempty"`
+	Tools                *Trace_Spans_0_Params_Tools             `json:"tools,omitempty"`
+	TopLogprobs          *Trace_Spans_0_Params_TopLogprobs       `json:"top_logprobs,omitempty"`
+	TopP                 *Trace_Spans_0_Params_TopP              `json:"top_p,omitempty"`
+	User                 *Trace_Spans_0_Params_User              `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}                  `json:"-"`
+}
+
 // TraceSpans0Type defines model for Trace.Spans.0.Type.
 type TraceSpans0Type string
 
@@ -37033,11 +37270,11 @@ type TraceSpans1 struct {
 		ReasoningTokens          *float32 `json:"reasoning_tokens,omitempty"`
 		TokensEstimated          *bool    `json:"tokens_estimated,omitempty"`
 	} `json:"metrics,omitempty"`
-	Name       *string                 `json:"name,omitempty"`
-	Output     *Trace_Spans_1_Output   `json:"output,omitempty"`
-	Params     *map[string]interface{} `json:"params,omitempty"`
-	ParentId   *string                 `json:"parent_id,omitempty"`
-	SpanId     string                  `json:"span_id"`
+	Name       *string               `json:"name,omitempty"`
+	Output     *Trace_Spans_1_Output `json:"output,omitempty"`
+	Params     *Trace_Spans_1_Params `json:"params,omitempty"`
+	ParentId   *string               `json:"parent_id,omitempty"`
+	SpanId     string                `json:"span_id"`
 	Timestamps struct {
 		FinishedAt              float32  `json:"finished_at"`
 		FirstTokenAt            *float32 `json:"first_token_at,omitempty"`
@@ -37149,6 +37386,243 @@ type Trace_Spans_1_Output struct {
 	union json.RawMessage
 }
 
+// TraceSpans1ParamsFrequencyPenalty0 defines model for .
+type TraceSpans1ParamsFrequencyPenalty0 = float32
+
+// TraceSpans1ParamsFrequencyPenalty1 defines model for .
+type TraceSpans1ParamsFrequencyPenalty1 = interface{}
+
+// Trace_Spans_1_Params_FrequencyPenalty defines model for Trace.Spans.1.Params.FrequencyPenalty.
+type Trace_Spans_1_Params_FrequencyPenalty struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsFunctions0 defines model for .
+type TraceSpans1ParamsFunctions0 = []map[string]interface{}
+
+// TraceSpans1ParamsFunctions1 defines model for .
+type TraceSpans1ParamsFunctions1 = interface{}
+
+// Trace_Spans_1_Params_Functions defines model for Trace.Spans.1.Params.Functions.
+type Trace_Spans_1_Params_Functions struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsLogitBias0 defines model for .
+type TraceSpans1ParamsLogitBias0 map[string]float32
+
+// TraceSpans1ParamsLogitBias1 defines model for .
+type TraceSpans1ParamsLogitBias1 = interface{}
+
+// Trace_Spans_1_Params_LogitBias defines model for Trace.Spans.1.Params.LogitBias.
+type Trace_Spans_1_Params_LogitBias struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsLogprobs0 defines model for .
+type TraceSpans1ParamsLogprobs0 = bool
+
+// TraceSpans1ParamsLogprobs1 defines model for .
+type TraceSpans1ParamsLogprobs1 = interface{}
+
+// Trace_Spans_1_Params_Logprobs defines model for Trace.Spans.1.Params.Logprobs.
+type Trace_Spans_1_Params_Logprobs struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsMaxTokens0 defines model for .
+type TraceSpans1ParamsMaxTokens0 = float32
+
+// TraceSpans1ParamsMaxTokens1 defines model for .
+type TraceSpans1ParamsMaxTokens1 = interface{}
+
+// Trace_Spans_1_Params_MaxTokens defines model for Trace.Spans.1.Params.MaxTokens.
+type Trace_Spans_1_Params_MaxTokens struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsN0 defines model for .
+type TraceSpans1ParamsN0 = float32
+
+// TraceSpans1ParamsN1 defines model for .
+type TraceSpans1ParamsN1 = interface{}
+
+// Trace_Spans_1_Params_N defines model for Trace.Spans.1.Params.N.
+type Trace_Spans_1_Params_N struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsParallelToolCalls0 defines model for .
+type TraceSpans1ParamsParallelToolCalls0 = bool
+
+// TraceSpans1ParamsParallelToolCalls1 defines model for .
+type TraceSpans1ParamsParallelToolCalls1 = interface{}
+
+// Trace_Spans_1_Params_ParallelToolCalls defines model for Trace.Spans.1.Params.ParallelToolCalls.
+type Trace_Spans_1_Params_ParallelToolCalls struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsPresencePenalty0 defines model for .
+type TraceSpans1ParamsPresencePenalty0 = float32
+
+// TraceSpans1ParamsPresencePenalty1 defines model for .
+type TraceSpans1ParamsPresencePenalty1 = interface{}
+
+// Trace_Spans_1_Params_PresencePenalty defines model for Trace.Spans.1.Params.PresencePenalty.
+type Trace_Spans_1_Params_PresencePenalty struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsReasoningEffort0 defines model for .
+type TraceSpans1ParamsReasoningEffort0 = string
+
+// TraceSpans1ParamsReasoningEffort1 defines model for .
+type TraceSpans1ParamsReasoningEffort1 = interface{}
+
+// Trace_Spans_1_Params_ReasoningEffort defines model for Trace.Spans.1.Params.ReasoningEffort.
+type Trace_Spans_1_Params_ReasoningEffort struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsSeed0 defines model for .
+type TraceSpans1ParamsSeed0 = float32
+
+// TraceSpans1ParamsSeed1 defines model for .
+type TraceSpans1ParamsSeed1 = interface{}
+
+// Trace_Spans_1_Params_Seed defines model for Trace.Spans.1.Params.Seed.
+type Trace_Spans_1_Params_Seed struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsStop0 defines model for .
+type TraceSpans1ParamsStop0 struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsStop00 defines model for .
+type TraceSpans1ParamsStop00 = string
+
+// TraceSpans1ParamsStop01 defines model for .
+type TraceSpans1ParamsStop01 = []string
+
+// TraceSpans1ParamsStop1 defines model for .
+type TraceSpans1ParamsStop1 = interface{}
+
+// Trace_Spans_1_Params_Stop defines model for Trace.Spans.1.Params.Stop.
+type Trace_Spans_1_Params_Stop struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsStream0 defines model for .
+type TraceSpans1ParamsStream0 = bool
+
+// TraceSpans1ParamsStream1 defines model for .
+type TraceSpans1ParamsStream1 = interface{}
+
+// Trace_Spans_1_Params_Stream defines model for Trace.Spans.1.Params.Stream.
+type Trace_Spans_1_Params_Stream struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsTemperature0 defines model for .
+type TraceSpans1ParamsTemperature0 = float32
+
+// TraceSpans1ParamsTemperature1 defines model for .
+type TraceSpans1ParamsTemperature1 = interface{}
+
+// Trace_Spans_1_Params_Temperature defines model for Trace.Spans.1.Params.Temperature.
+type Trace_Spans_1_Params_Temperature struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsToolChoice0 defines model for .
+type TraceSpans1ParamsToolChoice0 struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsToolChoice00 defines model for .
+type TraceSpans1ParamsToolChoice00 map[string]interface{}
+
+// TraceSpans1ParamsToolChoice01 defines model for .
+type TraceSpans1ParamsToolChoice01 = string
+
+// TraceSpans1ParamsToolChoice1 defines model for .
+type TraceSpans1ParamsToolChoice1 = interface{}
+
+// Trace_Spans_1_Params_ToolChoice defines model for Trace.Spans.1.Params.ToolChoice.
+type Trace_Spans_1_Params_ToolChoice struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsTools0 defines model for .
+type TraceSpans1ParamsTools0 = []map[string]interface{}
+
+// TraceSpans1ParamsTools1 defines model for .
+type TraceSpans1ParamsTools1 = interface{}
+
+// Trace_Spans_1_Params_Tools defines model for Trace.Spans.1.Params.Tools.
+type Trace_Spans_1_Params_Tools struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsTopLogprobs0 defines model for .
+type TraceSpans1ParamsTopLogprobs0 = float32
+
+// TraceSpans1ParamsTopLogprobs1 defines model for .
+type TraceSpans1ParamsTopLogprobs1 = interface{}
+
+// Trace_Spans_1_Params_TopLogprobs defines model for Trace.Spans.1.Params.TopLogprobs.
+type Trace_Spans_1_Params_TopLogprobs struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsTopP0 defines model for .
+type TraceSpans1ParamsTopP0 = float32
+
+// TraceSpans1ParamsTopP1 defines model for .
+type TraceSpans1ParamsTopP1 = interface{}
+
+// Trace_Spans_1_Params_TopP defines model for Trace.Spans.1.Params.TopP.
+type Trace_Spans_1_Params_TopP struct {
+	union json.RawMessage
+}
+
+// TraceSpans1ParamsUser0 defines model for .
+type TraceSpans1ParamsUser0 = string
+
+// TraceSpans1ParamsUser1 defines model for .
+type TraceSpans1ParamsUser1 = interface{}
+
+// Trace_Spans_1_Params_User defines model for Trace.Spans.1.Params.User.
+type Trace_Spans_1_Params_User struct {
+	union json.RawMessage
+}
+
+// Trace_Spans_1_Params defines model for Trace.Spans.1.Params.
+type Trace_Spans_1_Params struct {
+	FrequencyPenalty     *Trace_Spans_1_Params_FrequencyPenalty  `json:"frequency_penalty,omitempty"`
+	Functions            *Trace_Spans_1_Params_Functions         `json:"functions,omitempty"`
+	LogitBias            *Trace_Spans_1_Params_LogitBias         `json:"logit_bias,omitempty"`
+	Logprobs             *Trace_Spans_1_Params_Logprobs          `json:"logprobs,omitempty"`
+	MaxTokens            *Trace_Spans_1_Params_MaxTokens         `json:"max_tokens,omitempty"`
+	N                    *Trace_Spans_1_Params_N                 `json:"n,omitempty"`
+	ParallelToolCalls    *Trace_Spans_1_Params_ParallelToolCalls `json:"parallel_tool_calls,omitempty"`
+	PresencePenalty      *Trace_Spans_1_Params_PresencePenalty   `json:"presence_penalty,omitempty"`
+	ReasoningEffort      *Trace_Spans_1_Params_ReasoningEffort   `json:"reasoning_effort,omitempty"`
+	Seed                 *Trace_Spans_1_Params_Seed              `json:"seed,omitempty"`
+	Stop                 *Trace_Spans_1_Params_Stop              `json:"stop,omitempty"`
+	Stream               *Trace_Spans_1_Params_Stream            `json:"stream,omitempty"`
+	Temperature          *Trace_Spans_1_Params_Temperature       `json:"temperature,omitempty"`
+	ToolChoice           *Trace_Spans_1_Params_ToolChoice        `json:"tool_choice,omitempty"`
+	Tools                *Trace_Spans_1_Params_Tools             `json:"tools,omitempty"`
+	TopLogprobs          *Trace_Spans_1_Params_TopLogprobs       `json:"top_logprobs,omitempty"`
+	TopP                 *Trace_Spans_1_Params_TopP              `json:"top_p,omitempty"`
+	User                 *Trace_Spans_1_Params_User              `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}                  `json:"-"`
+}
+
 // TraceSpans1Type defines model for Trace.Spans.1.Type.
 type TraceSpans1Type string
 
@@ -37169,11 +37643,11 @@ type TraceSpans2 struct {
 		ReasoningTokens          *float32 `json:"reasoning_tokens,omitempty"`
 		TokensEstimated          *bool    `json:"tokens_estimated,omitempty"`
 	} `json:"metrics,omitempty"`
-	Name       *string                 `json:"name,omitempty"`
-	Output     *Trace_Spans_2_Output   `json:"output,omitempty"`
-	Params     *map[string]interface{} `json:"params,omitempty"`
-	ParentId   *string                 `json:"parent_id,omitempty"`
-	SpanId     string                  `json:"span_id"`
+	Name       *string               `json:"name,omitempty"`
+	Output     *Trace_Spans_2_Output `json:"output,omitempty"`
+	Params     *Trace_Spans_2_Params `json:"params,omitempty"`
+	ParentId   *string               `json:"parent_id,omitempty"`
+	SpanId     string                `json:"span_id"`
 	Timestamps struct {
 		FinishedAt              float32  `json:"finished_at"`
 		FirstTokenAt            *float32 `json:"first_token_at,omitempty"`
@@ -37269,6 +37743,243 @@ type Trace_Spans_2_Output_1_Value struct {
 // Trace_Spans_2_Output defines model for Trace.Spans.2.Output.
 type Trace_Spans_2_Output struct {
 	union json.RawMessage
+}
+
+// TraceSpans2ParamsFrequencyPenalty0 defines model for .
+type TraceSpans2ParamsFrequencyPenalty0 = float32
+
+// TraceSpans2ParamsFrequencyPenalty1 defines model for .
+type TraceSpans2ParamsFrequencyPenalty1 = interface{}
+
+// Trace_Spans_2_Params_FrequencyPenalty defines model for Trace.Spans.2.Params.FrequencyPenalty.
+type Trace_Spans_2_Params_FrequencyPenalty struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsFunctions0 defines model for .
+type TraceSpans2ParamsFunctions0 = []map[string]interface{}
+
+// TraceSpans2ParamsFunctions1 defines model for .
+type TraceSpans2ParamsFunctions1 = interface{}
+
+// Trace_Spans_2_Params_Functions defines model for Trace.Spans.2.Params.Functions.
+type Trace_Spans_2_Params_Functions struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsLogitBias0 defines model for .
+type TraceSpans2ParamsLogitBias0 map[string]float32
+
+// TraceSpans2ParamsLogitBias1 defines model for .
+type TraceSpans2ParamsLogitBias1 = interface{}
+
+// Trace_Spans_2_Params_LogitBias defines model for Trace.Spans.2.Params.LogitBias.
+type Trace_Spans_2_Params_LogitBias struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsLogprobs0 defines model for .
+type TraceSpans2ParamsLogprobs0 = bool
+
+// TraceSpans2ParamsLogprobs1 defines model for .
+type TraceSpans2ParamsLogprobs1 = interface{}
+
+// Trace_Spans_2_Params_Logprobs defines model for Trace.Spans.2.Params.Logprobs.
+type Trace_Spans_2_Params_Logprobs struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsMaxTokens0 defines model for .
+type TraceSpans2ParamsMaxTokens0 = float32
+
+// TraceSpans2ParamsMaxTokens1 defines model for .
+type TraceSpans2ParamsMaxTokens1 = interface{}
+
+// Trace_Spans_2_Params_MaxTokens defines model for Trace.Spans.2.Params.MaxTokens.
+type Trace_Spans_2_Params_MaxTokens struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsN0 defines model for .
+type TraceSpans2ParamsN0 = float32
+
+// TraceSpans2ParamsN1 defines model for .
+type TraceSpans2ParamsN1 = interface{}
+
+// Trace_Spans_2_Params_N defines model for Trace.Spans.2.Params.N.
+type Trace_Spans_2_Params_N struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsParallelToolCalls0 defines model for .
+type TraceSpans2ParamsParallelToolCalls0 = bool
+
+// TraceSpans2ParamsParallelToolCalls1 defines model for .
+type TraceSpans2ParamsParallelToolCalls1 = interface{}
+
+// Trace_Spans_2_Params_ParallelToolCalls defines model for Trace.Spans.2.Params.ParallelToolCalls.
+type Trace_Spans_2_Params_ParallelToolCalls struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsPresencePenalty0 defines model for .
+type TraceSpans2ParamsPresencePenalty0 = float32
+
+// TraceSpans2ParamsPresencePenalty1 defines model for .
+type TraceSpans2ParamsPresencePenalty1 = interface{}
+
+// Trace_Spans_2_Params_PresencePenalty defines model for Trace.Spans.2.Params.PresencePenalty.
+type Trace_Spans_2_Params_PresencePenalty struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsReasoningEffort0 defines model for .
+type TraceSpans2ParamsReasoningEffort0 = string
+
+// TraceSpans2ParamsReasoningEffort1 defines model for .
+type TraceSpans2ParamsReasoningEffort1 = interface{}
+
+// Trace_Spans_2_Params_ReasoningEffort defines model for Trace.Spans.2.Params.ReasoningEffort.
+type Trace_Spans_2_Params_ReasoningEffort struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsSeed0 defines model for .
+type TraceSpans2ParamsSeed0 = float32
+
+// TraceSpans2ParamsSeed1 defines model for .
+type TraceSpans2ParamsSeed1 = interface{}
+
+// Trace_Spans_2_Params_Seed defines model for Trace.Spans.2.Params.Seed.
+type Trace_Spans_2_Params_Seed struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsStop0 defines model for .
+type TraceSpans2ParamsStop0 struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsStop00 defines model for .
+type TraceSpans2ParamsStop00 = string
+
+// TraceSpans2ParamsStop01 defines model for .
+type TraceSpans2ParamsStop01 = []string
+
+// TraceSpans2ParamsStop1 defines model for .
+type TraceSpans2ParamsStop1 = interface{}
+
+// Trace_Spans_2_Params_Stop defines model for Trace.Spans.2.Params.Stop.
+type Trace_Spans_2_Params_Stop struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsStream0 defines model for .
+type TraceSpans2ParamsStream0 = bool
+
+// TraceSpans2ParamsStream1 defines model for .
+type TraceSpans2ParamsStream1 = interface{}
+
+// Trace_Spans_2_Params_Stream defines model for Trace.Spans.2.Params.Stream.
+type Trace_Spans_2_Params_Stream struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsTemperature0 defines model for .
+type TraceSpans2ParamsTemperature0 = float32
+
+// TraceSpans2ParamsTemperature1 defines model for .
+type TraceSpans2ParamsTemperature1 = interface{}
+
+// Trace_Spans_2_Params_Temperature defines model for Trace.Spans.2.Params.Temperature.
+type Trace_Spans_2_Params_Temperature struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsToolChoice0 defines model for .
+type TraceSpans2ParamsToolChoice0 struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsToolChoice00 defines model for .
+type TraceSpans2ParamsToolChoice00 map[string]interface{}
+
+// TraceSpans2ParamsToolChoice01 defines model for .
+type TraceSpans2ParamsToolChoice01 = string
+
+// TraceSpans2ParamsToolChoice1 defines model for .
+type TraceSpans2ParamsToolChoice1 = interface{}
+
+// Trace_Spans_2_Params_ToolChoice defines model for Trace.Spans.2.Params.ToolChoice.
+type Trace_Spans_2_Params_ToolChoice struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsTools0 defines model for .
+type TraceSpans2ParamsTools0 = []map[string]interface{}
+
+// TraceSpans2ParamsTools1 defines model for .
+type TraceSpans2ParamsTools1 = interface{}
+
+// Trace_Spans_2_Params_Tools defines model for Trace.Spans.2.Params.Tools.
+type Trace_Spans_2_Params_Tools struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsTopLogprobs0 defines model for .
+type TraceSpans2ParamsTopLogprobs0 = float32
+
+// TraceSpans2ParamsTopLogprobs1 defines model for .
+type TraceSpans2ParamsTopLogprobs1 = interface{}
+
+// Trace_Spans_2_Params_TopLogprobs defines model for Trace.Spans.2.Params.TopLogprobs.
+type Trace_Spans_2_Params_TopLogprobs struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsTopP0 defines model for .
+type TraceSpans2ParamsTopP0 = float32
+
+// TraceSpans2ParamsTopP1 defines model for .
+type TraceSpans2ParamsTopP1 = interface{}
+
+// Trace_Spans_2_Params_TopP defines model for Trace.Spans.2.Params.TopP.
+type Trace_Spans_2_Params_TopP struct {
+	union json.RawMessage
+}
+
+// TraceSpans2ParamsUser0 defines model for .
+type TraceSpans2ParamsUser0 = string
+
+// TraceSpans2ParamsUser1 defines model for .
+type TraceSpans2ParamsUser1 = interface{}
+
+// Trace_Spans_2_Params_User defines model for Trace.Spans.2.Params.User.
+type Trace_Spans_2_Params_User struct {
+	union json.RawMessage
+}
+
+// Trace_Spans_2_Params defines model for Trace.Spans.2.Params.
+type Trace_Spans_2_Params struct {
+	FrequencyPenalty     *Trace_Spans_2_Params_FrequencyPenalty  `json:"frequency_penalty,omitempty"`
+	Functions            *Trace_Spans_2_Params_Functions         `json:"functions,omitempty"`
+	LogitBias            *Trace_Spans_2_Params_LogitBias         `json:"logit_bias,omitempty"`
+	Logprobs             *Trace_Spans_2_Params_Logprobs          `json:"logprobs,omitempty"`
+	MaxTokens            *Trace_Spans_2_Params_MaxTokens         `json:"max_tokens,omitempty"`
+	N                    *Trace_Spans_2_Params_N                 `json:"n,omitempty"`
+	ParallelToolCalls    *Trace_Spans_2_Params_ParallelToolCalls `json:"parallel_tool_calls,omitempty"`
+	PresencePenalty      *Trace_Spans_2_Params_PresencePenalty   `json:"presence_penalty,omitempty"`
+	ReasoningEffort      *Trace_Spans_2_Params_ReasoningEffort   `json:"reasoning_effort,omitempty"`
+	Seed                 *Trace_Spans_2_Params_Seed              `json:"seed,omitempty"`
+	Stop                 *Trace_Spans_2_Params_Stop              `json:"stop,omitempty"`
+	Stream               *Trace_Spans_2_Params_Stream            `json:"stream,omitempty"`
+	Temperature          *Trace_Spans_2_Params_Temperature       `json:"temperature,omitempty"`
+	ToolChoice           *Trace_Spans_2_Params_ToolChoice        `json:"tool_choice,omitempty"`
+	Tools                *Trace_Spans_2_Params_Tools             `json:"tools,omitempty"`
+	TopLogprobs          *Trace_Spans_2_Params_TopLogprobs       `json:"top_logprobs,omitempty"`
+	TopP                 *Trace_Spans_2_Params_TopP              `json:"top_p,omitempty"`
+	User                 *Trace_Spans_2_Params_User              `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}                  `json:"-"`
 }
 
 // TraceSpans2Type0 defines model for Trace.Spans.2.Type.0.
@@ -39210,7 +39921,7 @@ type GetApiTraceId200JSONResponseBodySpans0 struct {
 	Model      *string                                          `json:"model,omitempty"`
 	Name       *string                                          `json:"name,omitempty"`
 	Output     *GetApiTraceId200JSONResponseBody_Spans_0_Output `json:"output,omitempty"`
-	Params     *map[string]interface{}                          `json:"params,omitempty"`
+	Params     *GetApiTraceId200JSONResponseBody_Spans_0_Params `json:"params,omitempty"`
 	ParentId   *string                                          `json:"parent_id,omitempty"`
 	SpanId     string                                           `json:"span_id"`
 	Timestamps struct {
@@ -39311,6 +40022,243 @@ type GetApiTraceId200JSONResponseBody_Spans_0_Output struct {
 	union json.RawMessage
 }
 
+// GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0 = []map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0 map[string]float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsN0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsN0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsN1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsN1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_N defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_N struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0 = string
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsSeed0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsSeed0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsSeed1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsSeed1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsStop0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsStop0 struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsStop00 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsStop00 = string
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsStop01 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsStop01 = []string
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsStop1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsStop1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsStream0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsStream0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsStream1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsStream1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00 map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01 = string
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsTools0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsTools0 = []map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsTools1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsTools1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsTopP0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsTopP0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsTopP1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsTopP1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsUser0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsUser0 = string
+
+// GetApiTraceId200JSONResponseBodySpans0ParamsUser1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans0ParamsUser1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params_User defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params_User struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBody_Spans_0_Params defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_0_Params struct {
+	FrequencyPenalty     *GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty  `json:"frequency_penalty,omitempty"`
+	Functions            *GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions         `json:"functions,omitempty"`
+	LogitBias            *GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias         `json:"logit_bias,omitempty"`
+	Logprobs             *GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs          `json:"logprobs,omitempty"`
+	MaxTokens            *GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens         `json:"max_tokens,omitempty"`
+	N                    *GetApiTraceId200JSONResponseBody_Spans_0_Params_N                 `json:"n,omitempty"`
+	ParallelToolCalls    *GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls `json:"parallel_tool_calls,omitempty"`
+	PresencePenalty      *GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty   `json:"presence_penalty,omitempty"`
+	ReasoningEffort      *GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort   `json:"reasoning_effort,omitempty"`
+	Seed                 *GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed              `json:"seed,omitempty"`
+	Stop                 *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop              `json:"stop,omitempty"`
+	Stream               *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream            `json:"stream,omitempty"`
+	Temperature          *GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature       `json:"temperature,omitempty"`
+	ToolChoice           *GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice        `json:"tool_choice,omitempty"`
+	Tools                *GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools             `json:"tools,omitempty"`
+	TopLogprobs          *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs       `json:"top_logprobs,omitempty"`
+	TopP                 *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP              `json:"top_p,omitempty"`
+	User                 *GetApiTraceId200JSONResponseBody_Spans_0_Params_User              `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}                                             `json:"-"`
+}
+
 // GetApiTraceId200JSONResponseBodySpans0Type defines parameters for GetApiTraceId.
 type GetApiTraceId200JSONResponseBodySpans0Type string
 
@@ -39338,7 +40286,7 @@ type GetApiTraceId200JSONResponseBodySpans1 struct {
 	} `json:"metrics,omitempty"`
 	Name       *string                                          `json:"name,omitempty"`
 	Output     *GetApiTraceId200JSONResponseBody_Spans_1_Output `json:"output,omitempty"`
-	Params     *map[string]interface{}                          `json:"params,omitempty"`
+	Params     *GetApiTraceId200JSONResponseBody_Spans_1_Params `json:"params,omitempty"`
 	ParentId   *string                                          `json:"parent_id,omitempty"`
 	SpanId     string                                           `json:"span_id"`
 	Timestamps struct {
@@ -39452,6 +40400,243 @@ type GetApiTraceId200JSONResponseBody_Spans_1_Output struct {
 	union json.RawMessage
 }
 
+// GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0 = []map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0 map[string]float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsN0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsN0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsN1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsN1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_N defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_N struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0 = string
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsSeed0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsSeed0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsSeed1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsSeed1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsStop0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsStop0 struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsStop00 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsStop00 = string
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsStop01 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsStop01 = []string
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsStop1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsStop1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsStream0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsStream0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsStream1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsStream1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00 map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01 = string
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsTools0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsTools0 = []map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsTools1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsTools1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsTopP0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsTopP0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsTopP1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsTopP1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsUser0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsUser0 = string
+
+// GetApiTraceId200JSONResponseBodySpans1ParamsUser1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans1ParamsUser1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params_User defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params_User struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBody_Spans_1_Params defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_1_Params struct {
+	FrequencyPenalty     *GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty  `json:"frequency_penalty,omitempty"`
+	Functions            *GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions         `json:"functions,omitempty"`
+	LogitBias            *GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias         `json:"logit_bias,omitempty"`
+	Logprobs             *GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs          `json:"logprobs,omitempty"`
+	MaxTokens            *GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens         `json:"max_tokens,omitempty"`
+	N                    *GetApiTraceId200JSONResponseBody_Spans_1_Params_N                 `json:"n,omitempty"`
+	ParallelToolCalls    *GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls `json:"parallel_tool_calls,omitempty"`
+	PresencePenalty      *GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty   `json:"presence_penalty,omitempty"`
+	ReasoningEffort      *GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort   `json:"reasoning_effort,omitempty"`
+	Seed                 *GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed              `json:"seed,omitempty"`
+	Stop                 *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop              `json:"stop,omitempty"`
+	Stream               *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream            `json:"stream,omitempty"`
+	Temperature          *GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature       `json:"temperature,omitempty"`
+	ToolChoice           *GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice        `json:"tool_choice,omitempty"`
+	Tools                *GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools             `json:"tools,omitempty"`
+	TopLogprobs          *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs       `json:"top_logprobs,omitempty"`
+	TopP                 *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP              `json:"top_p,omitempty"`
+	User                 *GetApiTraceId200JSONResponseBody_Spans_1_Params_User              `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}                                             `json:"-"`
+}
+
 // GetApiTraceId200JSONResponseBodySpans1Type defines parameters for GetApiTraceId.
 type GetApiTraceId200JSONResponseBodySpans1Type string
 
@@ -39474,7 +40659,7 @@ type GetApiTraceId200JSONResponseBodySpans2 struct {
 	} `json:"metrics,omitempty"`
 	Name       *string                                          `json:"name,omitempty"`
 	Output     *GetApiTraceId200JSONResponseBody_Spans_2_Output `json:"output,omitempty"`
-	Params     *map[string]interface{}                          `json:"params,omitempty"`
+	Params     *GetApiTraceId200JSONResponseBody_Spans_2_Params `json:"params,omitempty"`
 	ParentId   *string                                          `json:"parent_id,omitempty"`
 	SpanId     string                                           `json:"span_id"`
 	Timestamps struct {
@@ -39572,6 +40757,243 @@ type GetApiTraceId200JSONResponseBody_Spans_2_Output_1_Value struct {
 // GetApiTraceId200JSONResponseBody_Spans_2_Output defines parameters for GetApiTraceId.
 type GetApiTraceId200JSONResponseBody_Spans_2_Output struct {
 	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0 = []map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0 map[string]float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsN0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsN0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsN1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsN1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_N defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_N struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0 = string
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsSeed0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsSeed0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsSeed1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsSeed1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsStop0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsStop0 struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsStop00 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsStop00 = string
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsStop01 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsStop01 = []string
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsStop1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsStop1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsStream0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsStream0 = bool
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsStream1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsStream1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00 map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01 = string
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsTools0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsTools0 = []map[string]interface{}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsTools1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsTools1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsTopP0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsTopP0 = float32
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsTopP1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsTopP1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsUser0 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsUser0 = string
+
+// GetApiTraceId200JSONResponseBodySpans2ParamsUser1 defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBodySpans2ParamsUser1 = interface{}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params_User defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params_User struct {
+	union json.RawMessage
+}
+
+// GetApiTraceId200JSONResponseBody_Spans_2_Params defines parameters for GetApiTraceId.
+type GetApiTraceId200JSONResponseBody_Spans_2_Params struct {
+	FrequencyPenalty     *GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty  `json:"frequency_penalty,omitempty"`
+	Functions            *GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions         `json:"functions,omitempty"`
+	LogitBias            *GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias         `json:"logit_bias,omitempty"`
+	Logprobs             *GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs          `json:"logprobs,omitempty"`
+	MaxTokens            *GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens         `json:"max_tokens,omitempty"`
+	N                    *GetApiTraceId200JSONResponseBody_Spans_2_Params_N                 `json:"n,omitempty"`
+	ParallelToolCalls    *GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls `json:"parallel_tool_calls,omitempty"`
+	PresencePenalty      *GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty   `json:"presence_penalty,omitempty"`
+	ReasoningEffort      *GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort   `json:"reasoning_effort,omitempty"`
+	Seed                 *GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed              `json:"seed,omitempty"`
+	Stop                 *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop              `json:"stop,omitempty"`
+	Stream               *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream            `json:"stream,omitempty"`
+	Temperature          *GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature       `json:"temperature,omitempty"`
+	ToolChoice           *GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice        `json:"tool_choice,omitempty"`
+	Tools                *GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools             `json:"tools,omitempty"`
+	TopLogprobs          *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs       `json:"top_logprobs,omitempty"`
+	TopP                 *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP              `json:"top_p,omitempty"`
+	User                 *GetApiTraceId200JSONResponseBody_Spans_2_Params_User              `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}                                             `json:"-"`
 }
 
 // GetApiTraceId200JSONResponseBodySpans2Type0 defines parameters for GetApiTraceId.
@@ -56179,6 +57601,975 @@ func (a SearchRequest_Filters) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for Trace_Spans_0_Params. Returns the specified
+// element and whether it was found
+func (a Trace_Spans_0_Params) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for Trace_Spans_0_Params
+func (a *Trace_Spans_0_Params) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for Trace_Spans_0_Params to handle AdditionalProperties
+func (a *Trace_Spans_0_Params) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["frequency_penalty"]; found {
+		err = json.Unmarshal(raw, &a.FrequencyPenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'frequency_penalty': %w", err)
+		}
+		delete(object, "frequency_penalty")
+	}
+
+	if raw, found := object["functions"]; found {
+		err = json.Unmarshal(raw, &a.Functions)
+		if err != nil {
+			return fmt.Errorf("error reading 'functions': %w", err)
+		}
+		delete(object, "functions")
+	}
+
+	if raw, found := object["logit_bias"]; found {
+		err = json.Unmarshal(raw, &a.LogitBias)
+		if err != nil {
+			return fmt.Errorf("error reading 'logit_bias': %w", err)
+		}
+		delete(object, "logit_bias")
+	}
+
+	if raw, found := object["logprobs"]; found {
+		err = json.Unmarshal(raw, &a.Logprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'logprobs': %w", err)
+		}
+		delete(object, "logprobs")
+	}
+
+	if raw, found := object["max_tokens"]; found {
+		err = json.Unmarshal(raw, &a.MaxTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'max_tokens': %w", err)
+		}
+		delete(object, "max_tokens")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["parallel_tool_calls"]; found {
+		err = json.Unmarshal(raw, &a.ParallelToolCalls)
+		if err != nil {
+			return fmt.Errorf("error reading 'parallel_tool_calls': %w", err)
+		}
+		delete(object, "parallel_tool_calls")
+	}
+
+	if raw, found := object["presence_penalty"]; found {
+		err = json.Unmarshal(raw, &a.PresencePenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'presence_penalty': %w", err)
+		}
+		delete(object, "presence_penalty")
+	}
+
+	if raw, found := object["reasoning_effort"]; found {
+		err = json.Unmarshal(raw, &a.ReasoningEffort)
+		if err != nil {
+			return fmt.Errorf("error reading 'reasoning_effort': %w", err)
+		}
+		delete(object, "reasoning_effort")
+	}
+
+	if raw, found := object["seed"]; found {
+		err = json.Unmarshal(raw, &a.Seed)
+		if err != nil {
+			return fmt.Errorf("error reading 'seed': %w", err)
+		}
+		delete(object, "seed")
+	}
+
+	if raw, found := object["stop"]; found {
+		err = json.Unmarshal(raw, &a.Stop)
+		if err != nil {
+			return fmt.Errorf("error reading 'stop': %w", err)
+		}
+		delete(object, "stop")
+	}
+
+	if raw, found := object["stream"]; found {
+		err = json.Unmarshal(raw, &a.Stream)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream': %w", err)
+		}
+		delete(object, "stream")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["tool_choice"]; found {
+		err = json.Unmarshal(raw, &a.ToolChoice)
+		if err != nil {
+			return fmt.Errorf("error reading 'tool_choice': %w", err)
+		}
+		delete(object, "tool_choice")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if raw, found := object["top_logprobs"]; found {
+		err = json.Unmarshal(raw, &a.TopLogprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_logprobs': %w", err)
+		}
+		delete(object, "top_logprobs")
+	}
+
+	if raw, found := object["top_p"]; found {
+		err = json.Unmarshal(raw, &a.TopP)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_p': %w", err)
+		}
+		delete(object, "top_p")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for Trace_Spans_0_Params to handle AdditionalProperties
+func (a Trace_Spans_0_Params) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.FrequencyPenalty != nil {
+		object["frequency_penalty"], err = json.Marshal(a.FrequencyPenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'frequency_penalty': %w", err)
+		}
+	}
+
+	if a.Functions != nil {
+		object["functions"], err = json.Marshal(a.Functions)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'functions': %w", err)
+		}
+	}
+
+	if a.LogitBias != nil {
+		object["logit_bias"], err = json.Marshal(a.LogitBias)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logit_bias': %w", err)
+		}
+	}
+
+	if a.Logprobs != nil {
+		object["logprobs"], err = json.Marshal(a.Logprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logprobs': %w", err)
+		}
+	}
+
+	if a.MaxTokens != nil {
+		object["max_tokens"], err = json.Marshal(a.MaxTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
+		}
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.ParallelToolCalls != nil {
+		object["parallel_tool_calls"], err = json.Marshal(a.ParallelToolCalls)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'parallel_tool_calls': %w", err)
+		}
+	}
+
+	if a.PresencePenalty != nil {
+		object["presence_penalty"], err = json.Marshal(a.PresencePenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'presence_penalty': %w", err)
+		}
+	}
+
+	if a.ReasoningEffort != nil {
+		object["reasoning_effort"], err = json.Marshal(a.ReasoningEffort)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reasoning_effort': %w", err)
+		}
+	}
+
+	if a.Seed != nil {
+		object["seed"], err = json.Marshal(a.Seed)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seed': %w", err)
+		}
+	}
+
+	if a.Stop != nil {
+		object["stop"], err = json.Marshal(a.Stop)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stop': %w", err)
+		}
+	}
+
+	if a.Stream != nil {
+		object["stream"], err = json.Marshal(a.Stream)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.ToolChoice != nil {
+		object["tool_choice"], err = json.Marshal(a.ToolChoice)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tool_choice': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	if a.TopLogprobs != nil {
+		object["top_logprobs"], err = json.Marshal(a.TopLogprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_logprobs': %w", err)
+		}
+	}
+
+	if a.TopP != nil {
+		object["top_p"], err = json.Marshal(a.TopP)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for Trace_Spans_1_Params. Returns the specified
+// element and whether it was found
+func (a Trace_Spans_1_Params) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for Trace_Spans_1_Params
+func (a *Trace_Spans_1_Params) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for Trace_Spans_1_Params to handle AdditionalProperties
+func (a *Trace_Spans_1_Params) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["frequency_penalty"]; found {
+		err = json.Unmarshal(raw, &a.FrequencyPenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'frequency_penalty': %w", err)
+		}
+		delete(object, "frequency_penalty")
+	}
+
+	if raw, found := object["functions"]; found {
+		err = json.Unmarshal(raw, &a.Functions)
+		if err != nil {
+			return fmt.Errorf("error reading 'functions': %w", err)
+		}
+		delete(object, "functions")
+	}
+
+	if raw, found := object["logit_bias"]; found {
+		err = json.Unmarshal(raw, &a.LogitBias)
+		if err != nil {
+			return fmt.Errorf("error reading 'logit_bias': %w", err)
+		}
+		delete(object, "logit_bias")
+	}
+
+	if raw, found := object["logprobs"]; found {
+		err = json.Unmarshal(raw, &a.Logprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'logprobs': %w", err)
+		}
+		delete(object, "logprobs")
+	}
+
+	if raw, found := object["max_tokens"]; found {
+		err = json.Unmarshal(raw, &a.MaxTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'max_tokens': %w", err)
+		}
+		delete(object, "max_tokens")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["parallel_tool_calls"]; found {
+		err = json.Unmarshal(raw, &a.ParallelToolCalls)
+		if err != nil {
+			return fmt.Errorf("error reading 'parallel_tool_calls': %w", err)
+		}
+		delete(object, "parallel_tool_calls")
+	}
+
+	if raw, found := object["presence_penalty"]; found {
+		err = json.Unmarshal(raw, &a.PresencePenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'presence_penalty': %w", err)
+		}
+		delete(object, "presence_penalty")
+	}
+
+	if raw, found := object["reasoning_effort"]; found {
+		err = json.Unmarshal(raw, &a.ReasoningEffort)
+		if err != nil {
+			return fmt.Errorf("error reading 'reasoning_effort': %w", err)
+		}
+		delete(object, "reasoning_effort")
+	}
+
+	if raw, found := object["seed"]; found {
+		err = json.Unmarshal(raw, &a.Seed)
+		if err != nil {
+			return fmt.Errorf("error reading 'seed': %w", err)
+		}
+		delete(object, "seed")
+	}
+
+	if raw, found := object["stop"]; found {
+		err = json.Unmarshal(raw, &a.Stop)
+		if err != nil {
+			return fmt.Errorf("error reading 'stop': %w", err)
+		}
+		delete(object, "stop")
+	}
+
+	if raw, found := object["stream"]; found {
+		err = json.Unmarshal(raw, &a.Stream)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream': %w", err)
+		}
+		delete(object, "stream")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["tool_choice"]; found {
+		err = json.Unmarshal(raw, &a.ToolChoice)
+		if err != nil {
+			return fmt.Errorf("error reading 'tool_choice': %w", err)
+		}
+		delete(object, "tool_choice")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if raw, found := object["top_logprobs"]; found {
+		err = json.Unmarshal(raw, &a.TopLogprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_logprobs': %w", err)
+		}
+		delete(object, "top_logprobs")
+	}
+
+	if raw, found := object["top_p"]; found {
+		err = json.Unmarshal(raw, &a.TopP)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_p': %w", err)
+		}
+		delete(object, "top_p")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for Trace_Spans_1_Params to handle AdditionalProperties
+func (a Trace_Spans_1_Params) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.FrequencyPenalty != nil {
+		object["frequency_penalty"], err = json.Marshal(a.FrequencyPenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'frequency_penalty': %w", err)
+		}
+	}
+
+	if a.Functions != nil {
+		object["functions"], err = json.Marshal(a.Functions)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'functions': %w", err)
+		}
+	}
+
+	if a.LogitBias != nil {
+		object["logit_bias"], err = json.Marshal(a.LogitBias)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logit_bias': %w", err)
+		}
+	}
+
+	if a.Logprobs != nil {
+		object["logprobs"], err = json.Marshal(a.Logprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logprobs': %w", err)
+		}
+	}
+
+	if a.MaxTokens != nil {
+		object["max_tokens"], err = json.Marshal(a.MaxTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
+		}
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.ParallelToolCalls != nil {
+		object["parallel_tool_calls"], err = json.Marshal(a.ParallelToolCalls)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'parallel_tool_calls': %w", err)
+		}
+	}
+
+	if a.PresencePenalty != nil {
+		object["presence_penalty"], err = json.Marshal(a.PresencePenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'presence_penalty': %w", err)
+		}
+	}
+
+	if a.ReasoningEffort != nil {
+		object["reasoning_effort"], err = json.Marshal(a.ReasoningEffort)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reasoning_effort': %w", err)
+		}
+	}
+
+	if a.Seed != nil {
+		object["seed"], err = json.Marshal(a.Seed)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seed': %w", err)
+		}
+	}
+
+	if a.Stop != nil {
+		object["stop"], err = json.Marshal(a.Stop)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stop': %w", err)
+		}
+	}
+
+	if a.Stream != nil {
+		object["stream"], err = json.Marshal(a.Stream)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.ToolChoice != nil {
+		object["tool_choice"], err = json.Marshal(a.ToolChoice)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tool_choice': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	if a.TopLogprobs != nil {
+		object["top_logprobs"], err = json.Marshal(a.TopLogprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_logprobs': %w", err)
+		}
+	}
+
+	if a.TopP != nil {
+		object["top_p"], err = json.Marshal(a.TopP)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for Trace_Spans_2_Params. Returns the specified
+// element and whether it was found
+func (a Trace_Spans_2_Params) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for Trace_Spans_2_Params
+func (a *Trace_Spans_2_Params) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for Trace_Spans_2_Params to handle AdditionalProperties
+func (a *Trace_Spans_2_Params) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["frequency_penalty"]; found {
+		err = json.Unmarshal(raw, &a.FrequencyPenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'frequency_penalty': %w", err)
+		}
+		delete(object, "frequency_penalty")
+	}
+
+	if raw, found := object["functions"]; found {
+		err = json.Unmarshal(raw, &a.Functions)
+		if err != nil {
+			return fmt.Errorf("error reading 'functions': %w", err)
+		}
+		delete(object, "functions")
+	}
+
+	if raw, found := object["logit_bias"]; found {
+		err = json.Unmarshal(raw, &a.LogitBias)
+		if err != nil {
+			return fmt.Errorf("error reading 'logit_bias': %w", err)
+		}
+		delete(object, "logit_bias")
+	}
+
+	if raw, found := object["logprobs"]; found {
+		err = json.Unmarshal(raw, &a.Logprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'logprobs': %w", err)
+		}
+		delete(object, "logprobs")
+	}
+
+	if raw, found := object["max_tokens"]; found {
+		err = json.Unmarshal(raw, &a.MaxTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'max_tokens': %w", err)
+		}
+		delete(object, "max_tokens")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["parallel_tool_calls"]; found {
+		err = json.Unmarshal(raw, &a.ParallelToolCalls)
+		if err != nil {
+			return fmt.Errorf("error reading 'parallel_tool_calls': %w", err)
+		}
+		delete(object, "parallel_tool_calls")
+	}
+
+	if raw, found := object["presence_penalty"]; found {
+		err = json.Unmarshal(raw, &a.PresencePenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'presence_penalty': %w", err)
+		}
+		delete(object, "presence_penalty")
+	}
+
+	if raw, found := object["reasoning_effort"]; found {
+		err = json.Unmarshal(raw, &a.ReasoningEffort)
+		if err != nil {
+			return fmt.Errorf("error reading 'reasoning_effort': %w", err)
+		}
+		delete(object, "reasoning_effort")
+	}
+
+	if raw, found := object["seed"]; found {
+		err = json.Unmarshal(raw, &a.Seed)
+		if err != nil {
+			return fmt.Errorf("error reading 'seed': %w", err)
+		}
+		delete(object, "seed")
+	}
+
+	if raw, found := object["stop"]; found {
+		err = json.Unmarshal(raw, &a.Stop)
+		if err != nil {
+			return fmt.Errorf("error reading 'stop': %w", err)
+		}
+		delete(object, "stop")
+	}
+
+	if raw, found := object["stream"]; found {
+		err = json.Unmarshal(raw, &a.Stream)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream': %w", err)
+		}
+		delete(object, "stream")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["tool_choice"]; found {
+		err = json.Unmarshal(raw, &a.ToolChoice)
+		if err != nil {
+			return fmt.Errorf("error reading 'tool_choice': %w", err)
+		}
+		delete(object, "tool_choice")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if raw, found := object["top_logprobs"]; found {
+		err = json.Unmarshal(raw, &a.TopLogprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_logprobs': %w", err)
+		}
+		delete(object, "top_logprobs")
+	}
+
+	if raw, found := object["top_p"]; found {
+		err = json.Unmarshal(raw, &a.TopP)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_p': %w", err)
+		}
+		delete(object, "top_p")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for Trace_Spans_2_Params to handle AdditionalProperties
+func (a Trace_Spans_2_Params) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.FrequencyPenalty != nil {
+		object["frequency_penalty"], err = json.Marshal(a.FrequencyPenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'frequency_penalty': %w", err)
+		}
+	}
+
+	if a.Functions != nil {
+		object["functions"], err = json.Marshal(a.Functions)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'functions': %w", err)
+		}
+	}
+
+	if a.LogitBias != nil {
+		object["logit_bias"], err = json.Marshal(a.LogitBias)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logit_bias': %w", err)
+		}
+	}
+
+	if a.Logprobs != nil {
+		object["logprobs"], err = json.Marshal(a.Logprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logprobs': %w", err)
+		}
+	}
+
+	if a.MaxTokens != nil {
+		object["max_tokens"], err = json.Marshal(a.MaxTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
+		}
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.ParallelToolCalls != nil {
+		object["parallel_tool_calls"], err = json.Marshal(a.ParallelToolCalls)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'parallel_tool_calls': %w", err)
+		}
+	}
+
+	if a.PresencePenalty != nil {
+		object["presence_penalty"], err = json.Marshal(a.PresencePenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'presence_penalty': %w", err)
+		}
+	}
+
+	if a.ReasoningEffort != nil {
+		object["reasoning_effort"], err = json.Marshal(a.ReasoningEffort)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reasoning_effort': %w", err)
+		}
+	}
+
+	if a.Seed != nil {
+		object["seed"], err = json.Marshal(a.Seed)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seed': %w", err)
+		}
+	}
+
+	if a.Stop != nil {
+		object["stop"], err = json.Marshal(a.Stop)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stop': %w", err)
+		}
+	}
+
+	if a.Stream != nil {
+		object["stream"], err = json.Marshal(a.Stream)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.ToolChoice != nil {
+		object["tool_choice"], err = json.Marshal(a.ToolChoice)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tool_choice': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	if a.TopLogprobs != nil {
+		object["top_logprobs"], err = json.Marshal(a.TopLogprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_logprobs': %w", err)
+		}
+	}
+
+	if a.TopP != nil {
+		object["top_p"], err = json.Marshal(a.TopP)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for GetApiGatewayV1SpendEvents200JSONResponseBody_Data_Data. Returns the specified
 // element and whether it was found
 func (a GetApiGatewayV1SpendEvents200JSONResponseBody_Data_Data) Get(fieldName string) (value interface{}, found bool) {
@@ -56841,6 +59232,975 @@ func (a ScimReplaceUserApplicationScimPlusJSONBody_UrnIetfParamsScimSchemasExten
 		object["costCenter"], err = json.Marshal(a.CostCenter)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'costCenter': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GetApiTraceId200JSONResponseBody_Spans_0_Params. Returns the specified
+// element and whether it was found
+func (a GetApiTraceId200JSONResponseBody_Spans_0_Params) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GetApiTraceId200JSONResponseBody_Spans_0_Params
+func (a *GetApiTraceId200JSONResponseBody_Spans_0_Params) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GetApiTraceId200JSONResponseBody_Spans_0_Params to handle AdditionalProperties
+func (a *GetApiTraceId200JSONResponseBody_Spans_0_Params) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["frequency_penalty"]; found {
+		err = json.Unmarshal(raw, &a.FrequencyPenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'frequency_penalty': %w", err)
+		}
+		delete(object, "frequency_penalty")
+	}
+
+	if raw, found := object["functions"]; found {
+		err = json.Unmarshal(raw, &a.Functions)
+		if err != nil {
+			return fmt.Errorf("error reading 'functions': %w", err)
+		}
+		delete(object, "functions")
+	}
+
+	if raw, found := object["logit_bias"]; found {
+		err = json.Unmarshal(raw, &a.LogitBias)
+		if err != nil {
+			return fmt.Errorf("error reading 'logit_bias': %w", err)
+		}
+		delete(object, "logit_bias")
+	}
+
+	if raw, found := object["logprobs"]; found {
+		err = json.Unmarshal(raw, &a.Logprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'logprobs': %w", err)
+		}
+		delete(object, "logprobs")
+	}
+
+	if raw, found := object["max_tokens"]; found {
+		err = json.Unmarshal(raw, &a.MaxTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'max_tokens': %w", err)
+		}
+		delete(object, "max_tokens")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["parallel_tool_calls"]; found {
+		err = json.Unmarshal(raw, &a.ParallelToolCalls)
+		if err != nil {
+			return fmt.Errorf("error reading 'parallel_tool_calls': %w", err)
+		}
+		delete(object, "parallel_tool_calls")
+	}
+
+	if raw, found := object["presence_penalty"]; found {
+		err = json.Unmarshal(raw, &a.PresencePenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'presence_penalty': %w", err)
+		}
+		delete(object, "presence_penalty")
+	}
+
+	if raw, found := object["reasoning_effort"]; found {
+		err = json.Unmarshal(raw, &a.ReasoningEffort)
+		if err != nil {
+			return fmt.Errorf("error reading 'reasoning_effort': %w", err)
+		}
+		delete(object, "reasoning_effort")
+	}
+
+	if raw, found := object["seed"]; found {
+		err = json.Unmarshal(raw, &a.Seed)
+		if err != nil {
+			return fmt.Errorf("error reading 'seed': %w", err)
+		}
+		delete(object, "seed")
+	}
+
+	if raw, found := object["stop"]; found {
+		err = json.Unmarshal(raw, &a.Stop)
+		if err != nil {
+			return fmt.Errorf("error reading 'stop': %w", err)
+		}
+		delete(object, "stop")
+	}
+
+	if raw, found := object["stream"]; found {
+		err = json.Unmarshal(raw, &a.Stream)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream': %w", err)
+		}
+		delete(object, "stream")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["tool_choice"]; found {
+		err = json.Unmarshal(raw, &a.ToolChoice)
+		if err != nil {
+			return fmt.Errorf("error reading 'tool_choice': %w", err)
+		}
+		delete(object, "tool_choice")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if raw, found := object["top_logprobs"]; found {
+		err = json.Unmarshal(raw, &a.TopLogprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_logprobs': %w", err)
+		}
+		delete(object, "top_logprobs")
+	}
+
+	if raw, found := object["top_p"]; found {
+		err = json.Unmarshal(raw, &a.TopP)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_p': %w", err)
+		}
+		delete(object, "top_p")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GetApiTraceId200JSONResponseBody_Spans_0_Params to handle AdditionalProperties
+func (a GetApiTraceId200JSONResponseBody_Spans_0_Params) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.FrequencyPenalty != nil {
+		object["frequency_penalty"], err = json.Marshal(a.FrequencyPenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'frequency_penalty': %w", err)
+		}
+	}
+
+	if a.Functions != nil {
+		object["functions"], err = json.Marshal(a.Functions)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'functions': %w", err)
+		}
+	}
+
+	if a.LogitBias != nil {
+		object["logit_bias"], err = json.Marshal(a.LogitBias)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logit_bias': %w", err)
+		}
+	}
+
+	if a.Logprobs != nil {
+		object["logprobs"], err = json.Marshal(a.Logprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logprobs': %w", err)
+		}
+	}
+
+	if a.MaxTokens != nil {
+		object["max_tokens"], err = json.Marshal(a.MaxTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
+		}
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.ParallelToolCalls != nil {
+		object["parallel_tool_calls"], err = json.Marshal(a.ParallelToolCalls)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'parallel_tool_calls': %w", err)
+		}
+	}
+
+	if a.PresencePenalty != nil {
+		object["presence_penalty"], err = json.Marshal(a.PresencePenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'presence_penalty': %w", err)
+		}
+	}
+
+	if a.ReasoningEffort != nil {
+		object["reasoning_effort"], err = json.Marshal(a.ReasoningEffort)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reasoning_effort': %w", err)
+		}
+	}
+
+	if a.Seed != nil {
+		object["seed"], err = json.Marshal(a.Seed)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seed': %w", err)
+		}
+	}
+
+	if a.Stop != nil {
+		object["stop"], err = json.Marshal(a.Stop)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stop': %w", err)
+		}
+	}
+
+	if a.Stream != nil {
+		object["stream"], err = json.Marshal(a.Stream)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.ToolChoice != nil {
+		object["tool_choice"], err = json.Marshal(a.ToolChoice)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tool_choice': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	if a.TopLogprobs != nil {
+		object["top_logprobs"], err = json.Marshal(a.TopLogprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_logprobs': %w", err)
+		}
+	}
+
+	if a.TopP != nil {
+		object["top_p"], err = json.Marshal(a.TopP)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GetApiTraceId200JSONResponseBody_Spans_1_Params. Returns the specified
+// element and whether it was found
+func (a GetApiTraceId200JSONResponseBody_Spans_1_Params) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GetApiTraceId200JSONResponseBody_Spans_1_Params
+func (a *GetApiTraceId200JSONResponseBody_Spans_1_Params) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GetApiTraceId200JSONResponseBody_Spans_1_Params to handle AdditionalProperties
+func (a *GetApiTraceId200JSONResponseBody_Spans_1_Params) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["frequency_penalty"]; found {
+		err = json.Unmarshal(raw, &a.FrequencyPenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'frequency_penalty': %w", err)
+		}
+		delete(object, "frequency_penalty")
+	}
+
+	if raw, found := object["functions"]; found {
+		err = json.Unmarshal(raw, &a.Functions)
+		if err != nil {
+			return fmt.Errorf("error reading 'functions': %w", err)
+		}
+		delete(object, "functions")
+	}
+
+	if raw, found := object["logit_bias"]; found {
+		err = json.Unmarshal(raw, &a.LogitBias)
+		if err != nil {
+			return fmt.Errorf("error reading 'logit_bias': %w", err)
+		}
+		delete(object, "logit_bias")
+	}
+
+	if raw, found := object["logprobs"]; found {
+		err = json.Unmarshal(raw, &a.Logprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'logprobs': %w", err)
+		}
+		delete(object, "logprobs")
+	}
+
+	if raw, found := object["max_tokens"]; found {
+		err = json.Unmarshal(raw, &a.MaxTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'max_tokens': %w", err)
+		}
+		delete(object, "max_tokens")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["parallel_tool_calls"]; found {
+		err = json.Unmarshal(raw, &a.ParallelToolCalls)
+		if err != nil {
+			return fmt.Errorf("error reading 'parallel_tool_calls': %w", err)
+		}
+		delete(object, "parallel_tool_calls")
+	}
+
+	if raw, found := object["presence_penalty"]; found {
+		err = json.Unmarshal(raw, &a.PresencePenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'presence_penalty': %w", err)
+		}
+		delete(object, "presence_penalty")
+	}
+
+	if raw, found := object["reasoning_effort"]; found {
+		err = json.Unmarshal(raw, &a.ReasoningEffort)
+		if err != nil {
+			return fmt.Errorf("error reading 'reasoning_effort': %w", err)
+		}
+		delete(object, "reasoning_effort")
+	}
+
+	if raw, found := object["seed"]; found {
+		err = json.Unmarshal(raw, &a.Seed)
+		if err != nil {
+			return fmt.Errorf("error reading 'seed': %w", err)
+		}
+		delete(object, "seed")
+	}
+
+	if raw, found := object["stop"]; found {
+		err = json.Unmarshal(raw, &a.Stop)
+		if err != nil {
+			return fmt.Errorf("error reading 'stop': %w", err)
+		}
+		delete(object, "stop")
+	}
+
+	if raw, found := object["stream"]; found {
+		err = json.Unmarshal(raw, &a.Stream)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream': %w", err)
+		}
+		delete(object, "stream")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["tool_choice"]; found {
+		err = json.Unmarshal(raw, &a.ToolChoice)
+		if err != nil {
+			return fmt.Errorf("error reading 'tool_choice': %w", err)
+		}
+		delete(object, "tool_choice")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if raw, found := object["top_logprobs"]; found {
+		err = json.Unmarshal(raw, &a.TopLogprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_logprobs': %w", err)
+		}
+		delete(object, "top_logprobs")
+	}
+
+	if raw, found := object["top_p"]; found {
+		err = json.Unmarshal(raw, &a.TopP)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_p': %w", err)
+		}
+		delete(object, "top_p")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GetApiTraceId200JSONResponseBody_Spans_1_Params to handle AdditionalProperties
+func (a GetApiTraceId200JSONResponseBody_Spans_1_Params) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.FrequencyPenalty != nil {
+		object["frequency_penalty"], err = json.Marshal(a.FrequencyPenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'frequency_penalty': %w", err)
+		}
+	}
+
+	if a.Functions != nil {
+		object["functions"], err = json.Marshal(a.Functions)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'functions': %w", err)
+		}
+	}
+
+	if a.LogitBias != nil {
+		object["logit_bias"], err = json.Marshal(a.LogitBias)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logit_bias': %w", err)
+		}
+	}
+
+	if a.Logprobs != nil {
+		object["logprobs"], err = json.Marshal(a.Logprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logprobs': %w", err)
+		}
+	}
+
+	if a.MaxTokens != nil {
+		object["max_tokens"], err = json.Marshal(a.MaxTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
+		}
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.ParallelToolCalls != nil {
+		object["parallel_tool_calls"], err = json.Marshal(a.ParallelToolCalls)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'parallel_tool_calls': %w", err)
+		}
+	}
+
+	if a.PresencePenalty != nil {
+		object["presence_penalty"], err = json.Marshal(a.PresencePenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'presence_penalty': %w", err)
+		}
+	}
+
+	if a.ReasoningEffort != nil {
+		object["reasoning_effort"], err = json.Marshal(a.ReasoningEffort)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reasoning_effort': %w", err)
+		}
+	}
+
+	if a.Seed != nil {
+		object["seed"], err = json.Marshal(a.Seed)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seed': %w", err)
+		}
+	}
+
+	if a.Stop != nil {
+		object["stop"], err = json.Marshal(a.Stop)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stop': %w", err)
+		}
+	}
+
+	if a.Stream != nil {
+		object["stream"], err = json.Marshal(a.Stream)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.ToolChoice != nil {
+		object["tool_choice"], err = json.Marshal(a.ToolChoice)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tool_choice': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	if a.TopLogprobs != nil {
+		object["top_logprobs"], err = json.Marshal(a.TopLogprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_logprobs': %w", err)
+		}
+	}
+
+	if a.TopP != nil {
+		object["top_p"], err = json.Marshal(a.TopP)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GetApiTraceId200JSONResponseBody_Spans_2_Params. Returns the specified
+// element and whether it was found
+func (a GetApiTraceId200JSONResponseBody_Spans_2_Params) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GetApiTraceId200JSONResponseBody_Spans_2_Params
+func (a *GetApiTraceId200JSONResponseBody_Spans_2_Params) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GetApiTraceId200JSONResponseBody_Spans_2_Params to handle AdditionalProperties
+func (a *GetApiTraceId200JSONResponseBody_Spans_2_Params) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["frequency_penalty"]; found {
+		err = json.Unmarshal(raw, &a.FrequencyPenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'frequency_penalty': %w", err)
+		}
+		delete(object, "frequency_penalty")
+	}
+
+	if raw, found := object["functions"]; found {
+		err = json.Unmarshal(raw, &a.Functions)
+		if err != nil {
+			return fmt.Errorf("error reading 'functions': %w", err)
+		}
+		delete(object, "functions")
+	}
+
+	if raw, found := object["logit_bias"]; found {
+		err = json.Unmarshal(raw, &a.LogitBias)
+		if err != nil {
+			return fmt.Errorf("error reading 'logit_bias': %w", err)
+		}
+		delete(object, "logit_bias")
+	}
+
+	if raw, found := object["logprobs"]; found {
+		err = json.Unmarshal(raw, &a.Logprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'logprobs': %w", err)
+		}
+		delete(object, "logprobs")
+	}
+
+	if raw, found := object["max_tokens"]; found {
+		err = json.Unmarshal(raw, &a.MaxTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'max_tokens': %w", err)
+		}
+		delete(object, "max_tokens")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["parallel_tool_calls"]; found {
+		err = json.Unmarshal(raw, &a.ParallelToolCalls)
+		if err != nil {
+			return fmt.Errorf("error reading 'parallel_tool_calls': %w", err)
+		}
+		delete(object, "parallel_tool_calls")
+	}
+
+	if raw, found := object["presence_penalty"]; found {
+		err = json.Unmarshal(raw, &a.PresencePenalty)
+		if err != nil {
+			return fmt.Errorf("error reading 'presence_penalty': %w", err)
+		}
+		delete(object, "presence_penalty")
+	}
+
+	if raw, found := object["reasoning_effort"]; found {
+		err = json.Unmarshal(raw, &a.ReasoningEffort)
+		if err != nil {
+			return fmt.Errorf("error reading 'reasoning_effort': %w", err)
+		}
+		delete(object, "reasoning_effort")
+	}
+
+	if raw, found := object["seed"]; found {
+		err = json.Unmarshal(raw, &a.Seed)
+		if err != nil {
+			return fmt.Errorf("error reading 'seed': %w", err)
+		}
+		delete(object, "seed")
+	}
+
+	if raw, found := object["stop"]; found {
+		err = json.Unmarshal(raw, &a.Stop)
+		if err != nil {
+			return fmt.Errorf("error reading 'stop': %w", err)
+		}
+		delete(object, "stop")
+	}
+
+	if raw, found := object["stream"]; found {
+		err = json.Unmarshal(raw, &a.Stream)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream': %w", err)
+		}
+		delete(object, "stream")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["tool_choice"]; found {
+		err = json.Unmarshal(raw, &a.ToolChoice)
+		if err != nil {
+			return fmt.Errorf("error reading 'tool_choice': %w", err)
+		}
+		delete(object, "tool_choice")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if raw, found := object["top_logprobs"]; found {
+		err = json.Unmarshal(raw, &a.TopLogprobs)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_logprobs': %w", err)
+		}
+		delete(object, "top_logprobs")
+	}
+
+	if raw, found := object["top_p"]; found {
+		err = json.Unmarshal(raw, &a.TopP)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_p': %w", err)
+		}
+		delete(object, "top_p")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GetApiTraceId200JSONResponseBody_Spans_2_Params to handle AdditionalProperties
+func (a GetApiTraceId200JSONResponseBody_Spans_2_Params) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.FrequencyPenalty != nil {
+		object["frequency_penalty"], err = json.Marshal(a.FrequencyPenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'frequency_penalty': %w", err)
+		}
+	}
+
+	if a.Functions != nil {
+		object["functions"], err = json.Marshal(a.Functions)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'functions': %w", err)
+		}
+	}
+
+	if a.LogitBias != nil {
+		object["logit_bias"], err = json.Marshal(a.LogitBias)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logit_bias': %w", err)
+		}
+	}
+
+	if a.Logprobs != nil {
+		object["logprobs"], err = json.Marshal(a.Logprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'logprobs': %w", err)
+		}
+	}
+
+	if a.MaxTokens != nil {
+		object["max_tokens"], err = json.Marshal(a.MaxTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
+		}
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.ParallelToolCalls != nil {
+		object["parallel_tool_calls"], err = json.Marshal(a.ParallelToolCalls)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'parallel_tool_calls': %w", err)
+		}
+	}
+
+	if a.PresencePenalty != nil {
+		object["presence_penalty"], err = json.Marshal(a.PresencePenalty)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'presence_penalty': %w", err)
+		}
+	}
+
+	if a.ReasoningEffort != nil {
+		object["reasoning_effort"], err = json.Marshal(a.ReasoningEffort)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reasoning_effort': %w", err)
+		}
+	}
+
+	if a.Seed != nil {
+		object["seed"], err = json.Marshal(a.Seed)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seed': %w", err)
+		}
+	}
+
+	if a.Stop != nil {
+		object["stop"], err = json.Marshal(a.Stop)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stop': %w", err)
+		}
+	}
+
+	if a.Stream != nil {
+		object["stream"], err = json.Marshal(a.Stream)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.ToolChoice != nil {
+		object["tool_choice"], err = json.Marshal(a.ToolChoice)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tool_choice': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	if a.TopLogprobs != nil {
+		object["top_logprobs"], err = json.Marshal(a.TopLogprobs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_logprobs': %w", err)
+		}
+	}
+
+	if a.TopP != nil {
+		object["top_p"], err = json.Marshal(a.TopP)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
 		}
 	}
 
@@ -68710,6 +72070,1246 @@ func (t *Trace_Spans_0_Output) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsTraceSpans0ParamsFrequencyPenalty0 returns the union data inside the Trace_Spans_0_Params_FrequencyPenalty as a TraceSpans0ParamsFrequencyPenalty0
+func (t Trace_Spans_0_Params_FrequencyPenalty) AsTraceSpans0ParamsFrequencyPenalty0() (TraceSpans0ParamsFrequencyPenalty0, error) {
+	var body TraceSpans0ParamsFrequencyPenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsFrequencyPenalty0 overwrites any union data inside the Trace_Spans_0_Params_FrequencyPenalty as the provided TraceSpans0ParamsFrequencyPenalty0
+func (t *Trace_Spans_0_Params_FrequencyPenalty) FromTraceSpans0ParamsFrequencyPenalty0(v TraceSpans0ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsFrequencyPenalty0 performs a merge with any union data inside the Trace_Spans_0_Params_FrequencyPenalty, using the provided TraceSpans0ParamsFrequencyPenalty0
+func (t *Trace_Spans_0_Params_FrequencyPenalty) MergeTraceSpans0ParamsFrequencyPenalty0(v TraceSpans0ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsFrequencyPenalty1 returns the union data inside the Trace_Spans_0_Params_FrequencyPenalty as a TraceSpans0ParamsFrequencyPenalty1
+func (t Trace_Spans_0_Params_FrequencyPenalty) AsTraceSpans0ParamsFrequencyPenalty1() (TraceSpans0ParamsFrequencyPenalty1, error) {
+	var body TraceSpans0ParamsFrequencyPenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsFrequencyPenalty1 overwrites any union data inside the Trace_Spans_0_Params_FrequencyPenalty as the provided TraceSpans0ParamsFrequencyPenalty1
+func (t *Trace_Spans_0_Params_FrequencyPenalty) FromTraceSpans0ParamsFrequencyPenalty1(v TraceSpans0ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsFrequencyPenalty1 performs a merge with any union data inside the Trace_Spans_0_Params_FrequencyPenalty, using the provided TraceSpans0ParamsFrequencyPenalty1
+func (t *Trace_Spans_0_Params_FrequencyPenalty) MergeTraceSpans0ParamsFrequencyPenalty1(v TraceSpans0ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_FrequencyPenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_FrequencyPenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsFunctions0 returns the union data inside the Trace_Spans_0_Params_Functions as a TraceSpans0ParamsFunctions0
+func (t Trace_Spans_0_Params_Functions) AsTraceSpans0ParamsFunctions0() (TraceSpans0ParamsFunctions0, error) {
+	var body TraceSpans0ParamsFunctions0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsFunctions0 overwrites any union data inside the Trace_Spans_0_Params_Functions as the provided TraceSpans0ParamsFunctions0
+func (t *Trace_Spans_0_Params_Functions) FromTraceSpans0ParamsFunctions0(v TraceSpans0ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsFunctions0 performs a merge with any union data inside the Trace_Spans_0_Params_Functions, using the provided TraceSpans0ParamsFunctions0
+func (t *Trace_Spans_0_Params_Functions) MergeTraceSpans0ParamsFunctions0(v TraceSpans0ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsFunctions1 returns the union data inside the Trace_Spans_0_Params_Functions as a TraceSpans0ParamsFunctions1
+func (t Trace_Spans_0_Params_Functions) AsTraceSpans0ParamsFunctions1() (TraceSpans0ParamsFunctions1, error) {
+	var body TraceSpans0ParamsFunctions1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsFunctions1 overwrites any union data inside the Trace_Spans_0_Params_Functions as the provided TraceSpans0ParamsFunctions1
+func (t *Trace_Spans_0_Params_Functions) FromTraceSpans0ParamsFunctions1(v TraceSpans0ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsFunctions1 performs a merge with any union data inside the Trace_Spans_0_Params_Functions, using the provided TraceSpans0ParamsFunctions1
+func (t *Trace_Spans_0_Params_Functions) MergeTraceSpans0ParamsFunctions1(v TraceSpans0ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_Functions) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_Functions) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsLogitBias0 returns the union data inside the Trace_Spans_0_Params_LogitBias as a TraceSpans0ParamsLogitBias0
+func (t Trace_Spans_0_Params_LogitBias) AsTraceSpans0ParamsLogitBias0() (TraceSpans0ParamsLogitBias0, error) {
+	var body TraceSpans0ParamsLogitBias0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsLogitBias0 overwrites any union data inside the Trace_Spans_0_Params_LogitBias as the provided TraceSpans0ParamsLogitBias0
+func (t *Trace_Spans_0_Params_LogitBias) FromTraceSpans0ParamsLogitBias0(v TraceSpans0ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsLogitBias0 performs a merge with any union data inside the Trace_Spans_0_Params_LogitBias, using the provided TraceSpans0ParamsLogitBias0
+func (t *Trace_Spans_0_Params_LogitBias) MergeTraceSpans0ParamsLogitBias0(v TraceSpans0ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsLogitBias1 returns the union data inside the Trace_Spans_0_Params_LogitBias as a TraceSpans0ParamsLogitBias1
+func (t Trace_Spans_0_Params_LogitBias) AsTraceSpans0ParamsLogitBias1() (TraceSpans0ParamsLogitBias1, error) {
+	var body TraceSpans0ParamsLogitBias1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsLogitBias1 overwrites any union data inside the Trace_Spans_0_Params_LogitBias as the provided TraceSpans0ParamsLogitBias1
+func (t *Trace_Spans_0_Params_LogitBias) FromTraceSpans0ParamsLogitBias1(v TraceSpans0ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsLogitBias1 performs a merge with any union data inside the Trace_Spans_0_Params_LogitBias, using the provided TraceSpans0ParamsLogitBias1
+func (t *Trace_Spans_0_Params_LogitBias) MergeTraceSpans0ParamsLogitBias1(v TraceSpans0ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_LogitBias) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_LogitBias) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsLogprobs0 returns the union data inside the Trace_Spans_0_Params_Logprobs as a TraceSpans0ParamsLogprobs0
+func (t Trace_Spans_0_Params_Logprobs) AsTraceSpans0ParamsLogprobs0() (TraceSpans0ParamsLogprobs0, error) {
+	var body TraceSpans0ParamsLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsLogprobs0 overwrites any union data inside the Trace_Spans_0_Params_Logprobs as the provided TraceSpans0ParamsLogprobs0
+func (t *Trace_Spans_0_Params_Logprobs) FromTraceSpans0ParamsLogprobs0(v TraceSpans0ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsLogprobs0 performs a merge with any union data inside the Trace_Spans_0_Params_Logprobs, using the provided TraceSpans0ParamsLogprobs0
+func (t *Trace_Spans_0_Params_Logprobs) MergeTraceSpans0ParamsLogprobs0(v TraceSpans0ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsLogprobs1 returns the union data inside the Trace_Spans_0_Params_Logprobs as a TraceSpans0ParamsLogprobs1
+func (t Trace_Spans_0_Params_Logprobs) AsTraceSpans0ParamsLogprobs1() (TraceSpans0ParamsLogprobs1, error) {
+	var body TraceSpans0ParamsLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsLogprobs1 overwrites any union data inside the Trace_Spans_0_Params_Logprobs as the provided TraceSpans0ParamsLogprobs1
+func (t *Trace_Spans_0_Params_Logprobs) FromTraceSpans0ParamsLogprobs1(v TraceSpans0ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsLogprobs1 performs a merge with any union data inside the Trace_Spans_0_Params_Logprobs, using the provided TraceSpans0ParamsLogprobs1
+func (t *Trace_Spans_0_Params_Logprobs) MergeTraceSpans0ParamsLogprobs1(v TraceSpans0ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_Logprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_Logprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsMaxTokens0 returns the union data inside the Trace_Spans_0_Params_MaxTokens as a TraceSpans0ParamsMaxTokens0
+func (t Trace_Spans_0_Params_MaxTokens) AsTraceSpans0ParamsMaxTokens0() (TraceSpans0ParamsMaxTokens0, error) {
+	var body TraceSpans0ParamsMaxTokens0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsMaxTokens0 overwrites any union data inside the Trace_Spans_0_Params_MaxTokens as the provided TraceSpans0ParamsMaxTokens0
+func (t *Trace_Spans_0_Params_MaxTokens) FromTraceSpans0ParamsMaxTokens0(v TraceSpans0ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsMaxTokens0 performs a merge with any union data inside the Trace_Spans_0_Params_MaxTokens, using the provided TraceSpans0ParamsMaxTokens0
+func (t *Trace_Spans_0_Params_MaxTokens) MergeTraceSpans0ParamsMaxTokens0(v TraceSpans0ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsMaxTokens1 returns the union data inside the Trace_Spans_0_Params_MaxTokens as a TraceSpans0ParamsMaxTokens1
+func (t Trace_Spans_0_Params_MaxTokens) AsTraceSpans0ParamsMaxTokens1() (TraceSpans0ParamsMaxTokens1, error) {
+	var body TraceSpans0ParamsMaxTokens1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsMaxTokens1 overwrites any union data inside the Trace_Spans_0_Params_MaxTokens as the provided TraceSpans0ParamsMaxTokens1
+func (t *Trace_Spans_0_Params_MaxTokens) FromTraceSpans0ParamsMaxTokens1(v TraceSpans0ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsMaxTokens1 performs a merge with any union data inside the Trace_Spans_0_Params_MaxTokens, using the provided TraceSpans0ParamsMaxTokens1
+func (t *Trace_Spans_0_Params_MaxTokens) MergeTraceSpans0ParamsMaxTokens1(v TraceSpans0ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_MaxTokens) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_MaxTokens) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsN0 returns the union data inside the Trace_Spans_0_Params_N as a TraceSpans0ParamsN0
+func (t Trace_Spans_0_Params_N) AsTraceSpans0ParamsN0() (TraceSpans0ParamsN0, error) {
+	var body TraceSpans0ParamsN0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsN0 overwrites any union data inside the Trace_Spans_0_Params_N as the provided TraceSpans0ParamsN0
+func (t *Trace_Spans_0_Params_N) FromTraceSpans0ParamsN0(v TraceSpans0ParamsN0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsN0 performs a merge with any union data inside the Trace_Spans_0_Params_N, using the provided TraceSpans0ParamsN0
+func (t *Trace_Spans_0_Params_N) MergeTraceSpans0ParamsN0(v TraceSpans0ParamsN0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsN1 returns the union data inside the Trace_Spans_0_Params_N as a TraceSpans0ParamsN1
+func (t Trace_Spans_0_Params_N) AsTraceSpans0ParamsN1() (TraceSpans0ParamsN1, error) {
+	var body TraceSpans0ParamsN1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsN1 overwrites any union data inside the Trace_Spans_0_Params_N as the provided TraceSpans0ParamsN1
+func (t *Trace_Spans_0_Params_N) FromTraceSpans0ParamsN1(v TraceSpans0ParamsN1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsN1 performs a merge with any union data inside the Trace_Spans_0_Params_N, using the provided TraceSpans0ParamsN1
+func (t *Trace_Spans_0_Params_N) MergeTraceSpans0ParamsN1(v TraceSpans0ParamsN1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_N) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_N) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsParallelToolCalls0 returns the union data inside the Trace_Spans_0_Params_ParallelToolCalls as a TraceSpans0ParamsParallelToolCalls0
+func (t Trace_Spans_0_Params_ParallelToolCalls) AsTraceSpans0ParamsParallelToolCalls0() (TraceSpans0ParamsParallelToolCalls0, error) {
+	var body TraceSpans0ParamsParallelToolCalls0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsParallelToolCalls0 overwrites any union data inside the Trace_Spans_0_Params_ParallelToolCalls as the provided TraceSpans0ParamsParallelToolCalls0
+func (t *Trace_Spans_0_Params_ParallelToolCalls) FromTraceSpans0ParamsParallelToolCalls0(v TraceSpans0ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsParallelToolCalls0 performs a merge with any union data inside the Trace_Spans_0_Params_ParallelToolCalls, using the provided TraceSpans0ParamsParallelToolCalls0
+func (t *Trace_Spans_0_Params_ParallelToolCalls) MergeTraceSpans0ParamsParallelToolCalls0(v TraceSpans0ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsParallelToolCalls1 returns the union data inside the Trace_Spans_0_Params_ParallelToolCalls as a TraceSpans0ParamsParallelToolCalls1
+func (t Trace_Spans_0_Params_ParallelToolCalls) AsTraceSpans0ParamsParallelToolCalls1() (TraceSpans0ParamsParallelToolCalls1, error) {
+	var body TraceSpans0ParamsParallelToolCalls1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsParallelToolCalls1 overwrites any union data inside the Trace_Spans_0_Params_ParallelToolCalls as the provided TraceSpans0ParamsParallelToolCalls1
+func (t *Trace_Spans_0_Params_ParallelToolCalls) FromTraceSpans0ParamsParallelToolCalls1(v TraceSpans0ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsParallelToolCalls1 performs a merge with any union data inside the Trace_Spans_0_Params_ParallelToolCalls, using the provided TraceSpans0ParamsParallelToolCalls1
+func (t *Trace_Spans_0_Params_ParallelToolCalls) MergeTraceSpans0ParamsParallelToolCalls1(v TraceSpans0ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_ParallelToolCalls) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_ParallelToolCalls) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsPresencePenalty0 returns the union data inside the Trace_Spans_0_Params_PresencePenalty as a TraceSpans0ParamsPresencePenalty0
+func (t Trace_Spans_0_Params_PresencePenalty) AsTraceSpans0ParamsPresencePenalty0() (TraceSpans0ParamsPresencePenalty0, error) {
+	var body TraceSpans0ParamsPresencePenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsPresencePenalty0 overwrites any union data inside the Trace_Spans_0_Params_PresencePenalty as the provided TraceSpans0ParamsPresencePenalty0
+func (t *Trace_Spans_0_Params_PresencePenalty) FromTraceSpans0ParamsPresencePenalty0(v TraceSpans0ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsPresencePenalty0 performs a merge with any union data inside the Trace_Spans_0_Params_PresencePenalty, using the provided TraceSpans0ParamsPresencePenalty0
+func (t *Trace_Spans_0_Params_PresencePenalty) MergeTraceSpans0ParamsPresencePenalty0(v TraceSpans0ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsPresencePenalty1 returns the union data inside the Trace_Spans_0_Params_PresencePenalty as a TraceSpans0ParamsPresencePenalty1
+func (t Trace_Spans_0_Params_PresencePenalty) AsTraceSpans0ParamsPresencePenalty1() (TraceSpans0ParamsPresencePenalty1, error) {
+	var body TraceSpans0ParamsPresencePenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsPresencePenalty1 overwrites any union data inside the Trace_Spans_0_Params_PresencePenalty as the provided TraceSpans0ParamsPresencePenalty1
+func (t *Trace_Spans_0_Params_PresencePenalty) FromTraceSpans0ParamsPresencePenalty1(v TraceSpans0ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsPresencePenalty1 performs a merge with any union data inside the Trace_Spans_0_Params_PresencePenalty, using the provided TraceSpans0ParamsPresencePenalty1
+func (t *Trace_Spans_0_Params_PresencePenalty) MergeTraceSpans0ParamsPresencePenalty1(v TraceSpans0ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_PresencePenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_PresencePenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsReasoningEffort0 returns the union data inside the Trace_Spans_0_Params_ReasoningEffort as a TraceSpans0ParamsReasoningEffort0
+func (t Trace_Spans_0_Params_ReasoningEffort) AsTraceSpans0ParamsReasoningEffort0() (TraceSpans0ParamsReasoningEffort0, error) {
+	var body TraceSpans0ParamsReasoningEffort0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsReasoningEffort0 overwrites any union data inside the Trace_Spans_0_Params_ReasoningEffort as the provided TraceSpans0ParamsReasoningEffort0
+func (t *Trace_Spans_0_Params_ReasoningEffort) FromTraceSpans0ParamsReasoningEffort0(v TraceSpans0ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsReasoningEffort0 performs a merge with any union data inside the Trace_Spans_0_Params_ReasoningEffort, using the provided TraceSpans0ParamsReasoningEffort0
+func (t *Trace_Spans_0_Params_ReasoningEffort) MergeTraceSpans0ParamsReasoningEffort0(v TraceSpans0ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsReasoningEffort1 returns the union data inside the Trace_Spans_0_Params_ReasoningEffort as a TraceSpans0ParamsReasoningEffort1
+func (t Trace_Spans_0_Params_ReasoningEffort) AsTraceSpans0ParamsReasoningEffort1() (TraceSpans0ParamsReasoningEffort1, error) {
+	var body TraceSpans0ParamsReasoningEffort1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsReasoningEffort1 overwrites any union data inside the Trace_Spans_0_Params_ReasoningEffort as the provided TraceSpans0ParamsReasoningEffort1
+func (t *Trace_Spans_0_Params_ReasoningEffort) FromTraceSpans0ParamsReasoningEffort1(v TraceSpans0ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsReasoningEffort1 performs a merge with any union data inside the Trace_Spans_0_Params_ReasoningEffort, using the provided TraceSpans0ParamsReasoningEffort1
+func (t *Trace_Spans_0_Params_ReasoningEffort) MergeTraceSpans0ParamsReasoningEffort1(v TraceSpans0ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_ReasoningEffort) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_ReasoningEffort) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsSeed0 returns the union data inside the Trace_Spans_0_Params_Seed as a TraceSpans0ParamsSeed0
+func (t Trace_Spans_0_Params_Seed) AsTraceSpans0ParamsSeed0() (TraceSpans0ParamsSeed0, error) {
+	var body TraceSpans0ParamsSeed0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsSeed0 overwrites any union data inside the Trace_Spans_0_Params_Seed as the provided TraceSpans0ParamsSeed0
+func (t *Trace_Spans_0_Params_Seed) FromTraceSpans0ParamsSeed0(v TraceSpans0ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsSeed0 performs a merge with any union data inside the Trace_Spans_0_Params_Seed, using the provided TraceSpans0ParamsSeed0
+func (t *Trace_Spans_0_Params_Seed) MergeTraceSpans0ParamsSeed0(v TraceSpans0ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsSeed1 returns the union data inside the Trace_Spans_0_Params_Seed as a TraceSpans0ParamsSeed1
+func (t Trace_Spans_0_Params_Seed) AsTraceSpans0ParamsSeed1() (TraceSpans0ParamsSeed1, error) {
+	var body TraceSpans0ParamsSeed1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsSeed1 overwrites any union data inside the Trace_Spans_0_Params_Seed as the provided TraceSpans0ParamsSeed1
+func (t *Trace_Spans_0_Params_Seed) FromTraceSpans0ParamsSeed1(v TraceSpans0ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsSeed1 performs a merge with any union data inside the Trace_Spans_0_Params_Seed, using the provided TraceSpans0ParamsSeed1
+func (t *Trace_Spans_0_Params_Seed) MergeTraceSpans0ParamsSeed1(v TraceSpans0ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_Seed) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_Seed) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsStop00 returns the union data inside the TraceSpans0ParamsStop0 as a TraceSpans0ParamsStop00
+func (t TraceSpans0ParamsStop0) AsTraceSpans0ParamsStop00() (TraceSpans0ParamsStop00, error) {
+	var body TraceSpans0ParamsStop00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsStop00 overwrites any union data inside the TraceSpans0ParamsStop0 as the provided TraceSpans0ParamsStop00
+func (t *TraceSpans0ParamsStop0) FromTraceSpans0ParamsStop00(v TraceSpans0ParamsStop00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsStop00 performs a merge with any union data inside the TraceSpans0ParamsStop0, using the provided TraceSpans0ParamsStop00
+func (t *TraceSpans0ParamsStop0) MergeTraceSpans0ParamsStop00(v TraceSpans0ParamsStop00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsStop01 returns the union data inside the TraceSpans0ParamsStop0 as a TraceSpans0ParamsStop01
+func (t TraceSpans0ParamsStop0) AsTraceSpans0ParamsStop01() (TraceSpans0ParamsStop01, error) {
+	var body TraceSpans0ParamsStop01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsStop01 overwrites any union data inside the TraceSpans0ParamsStop0 as the provided TraceSpans0ParamsStop01
+func (t *TraceSpans0ParamsStop0) FromTraceSpans0ParamsStop01(v TraceSpans0ParamsStop01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsStop01 performs a merge with any union data inside the TraceSpans0ParamsStop0, using the provided TraceSpans0ParamsStop01
+func (t *TraceSpans0ParamsStop0) MergeTraceSpans0ParamsStop01(v TraceSpans0ParamsStop01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TraceSpans0ParamsStop0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TraceSpans0ParamsStop0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsStop0 returns the union data inside the Trace_Spans_0_Params_Stop as a TraceSpans0ParamsStop0
+func (t Trace_Spans_0_Params_Stop) AsTraceSpans0ParamsStop0() (TraceSpans0ParamsStop0, error) {
+	var body TraceSpans0ParamsStop0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsStop0 overwrites any union data inside the Trace_Spans_0_Params_Stop as the provided TraceSpans0ParamsStop0
+func (t *Trace_Spans_0_Params_Stop) FromTraceSpans0ParamsStop0(v TraceSpans0ParamsStop0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsStop0 performs a merge with any union data inside the Trace_Spans_0_Params_Stop, using the provided TraceSpans0ParamsStop0
+func (t *Trace_Spans_0_Params_Stop) MergeTraceSpans0ParamsStop0(v TraceSpans0ParamsStop0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsStop1 returns the union data inside the Trace_Spans_0_Params_Stop as a TraceSpans0ParamsStop1
+func (t Trace_Spans_0_Params_Stop) AsTraceSpans0ParamsStop1() (TraceSpans0ParamsStop1, error) {
+	var body TraceSpans0ParamsStop1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsStop1 overwrites any union data inside the Trace_Spans_0_Params_Stop as the provided TraceSpans0ParamsStop1
+func (t *Trace_Spans_0_Params_Stop) FromTraceSpans0ParamsStop1(v TraceSpans0ParamsStop1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsStop1 performs a merge with any union data inside the Trace_Spans_0_Params_Stop, using the provided TraceSpans0ParamsStop1
+func (t *Trace_Spans_0_Params_Stop) MergeTraceSpans0ParamsStop1(v TraceSpans0ParamsStop1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_Stop) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_Stop) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsStream0 returns the union data inside the Trace_Spans_0_Params_Stream as a TraceSpans0ParamsStream0
+func (t Trace_Spans_0_Params_Stream) AsTraceSpans0ParamsStream0() (TraceSpans0ParamsStream0, error) {
+	var body TraceSpans0ParamsStream0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsStream0 overwrites any union data inside the Trace_Spans_0_Params_Stream as the provided TraceSpans0ParamsStream0
+func (t *Trace_Spans_0_Params_Stream) FromTraceSpans0ParamsStream0(v TraceSpans0ParamsStream0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsStream0 performs a merge with any union data inside the Trace_Spans_0_Params_Stream, using the provided TraceSpans0ParamsStream0
+func (t *Trace_Spans_0_Params_Stream) MergeTraceSpans0ParamsStream0(v TraceSpans0ParamsStream0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsStream1 returns the union data inside the Trace_Spans_0_Params_Stream as a TraceSpans0ParamsStream1
+func (t Trace_Spans_0_Params_Stream) AsTraceSpans0ParamsStream1() (TraceSpans0ParamsStream1, error) {
+	var body TraceSpans0ParamsStream1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsStream1 overwrites any union data inside the Trace_Spans_0_Params_Stream as the provided TraceSpans0ParamsStream1
+func (t *Trace_Spans_0_Params_Stream) FromTraceSpans0ParamsStream1(v TraceSpans0ParamsStream1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsStream1 performs a merge with any union data inside the Trace_Spans_0_Params_Stream, using the provided TraceSpans0ParamsStream1
+func (t *Trace_Spans_0_Params_Stream) MergeTraceSpans0ParamsStream1(v TraceSpans0ParamsStream1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_Stream) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_Stream) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsTemperature0 returns the union data inside the Trace_Spans_0_Params_Temperature as a TraceSpans0ParamsTemperature0
+func (t Trace_Spans_0_Params_Temperature) AsTraceSpans0ParamsTemperature0() (TraceSpans0ParamsTemperature0, error) {
+	var body TraceSpans0ParamsTemperature0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsTemperature0 overwrites any union data inside the Trace_Spans_0_Params_Temperature as the provided TraceSpans0ParamsTemperature0
+func (t *Trace_Spans_0_Params_Temperature) FromTraceSpans0ParamsTemperature0(v TraceSpans0ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsTemperature0 performs a merge with any union data inside the Trace_Spans_0_Params_Temperature, using the provided TraceSpans0ParamsTemperature0
+func (t *Trace_Spans_0_Params_Temperature) MergeTraceSpans0ParamsTemperature0(v TraceSpans0ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsTemperature1 returns the union data inside the Trace_Spans_0_Params_Temperature as a TraceSpans0ParamsTemperature1
+func (t Trace_Spans_0_Params_Temperature) AsTraceSpans0ParamsTemperature1() (TraceSpans0ParamsTemperature1, error) {
+	var body TraceSpans0ParamsTemperature1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsTemperature1 overwrites any union data inside the Trace_Spans_0_Params_Temperature as the provided TraceSpans0ParamsTemperature1
+func (t *Trace_Spans_0_Params_Temperature) FromTraceSpans0ParamsTemperature1(v TraceSpans0ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsTemperature1 performs a merge with any union data inside the Trace_Spans_0_Params_Temperature, using the provided TraceSpans0ParamsTemperature1
+func (t *Trace_Spans_0_Params_Temperature) MergeTraceSpans0ParamsTemperature1(v TraceSpans0ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_Temperature) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_Temperature) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsToolChoice00 returns the union data inside the TraceSpans0ParamsToolChoice0 as a TraceSpans0ParamsToolChoice00
+func (t TraceSpans0ParamsToolChoice0) AsTraceSpans0ParamsToolChoice00() (TraceSpans0ParamsToolChoice00, error) {
+	var body TraceSpans0ParamsToolChoice00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsToolChoice00 overwrites any union data inside the TraceSpans0ParamsToolChoice0 as the provided TraceSpans0ParamsToolChoice00
+func (t *TraceSpans0ParamsToolChoice0) FromTraceSpans0ParamsToolChoice00(v TraceSpans0ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsToolChoice00 performs a merge with any union data inside the TraceSpans0ParamsToolChoice0, using the provided TraceSpans0ParamsToolChoice00
+func (t *TraceSpans0ParamsToolChoice0) MergeTraceSpans0ParamsToolChoice00(v TraceSpans0ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsToolChoice01 returns the union data inside the TraceSpans0ParamsToolChoice0 as a TraceSpans0ParamsToolChoice01
+func (t TraceSpans0ParamsToolChoice0) AsTraceSpans0ParamsToolChoice01() (TraceSpans0ParamsToolChoice01, error) {
+	var body TraceSpans0ParamsToolChoice01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsToolChoice01 overwrites any union data inside the TraceSpans0ParamsToolChoice0 as the provided TraceSpans0ParamsToolChoice01
+func (t *TraceSpans0ParamsToolChoice0) FromTraceSpans0ParamsToolChoice01(v TraceSpans0ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsToolChoice01 performs a merge with any union data inside the TraceSpans0ParamsToolChoice0, using the provided TraceSpans0ParamsToolChoice01
+func (t *TraceSpans0ParamsToolChoice0) MergeTraceSpans0ParamsToolChoice01(v TraceSpans0ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TraceSpans0ParamsToolChoice0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TraceSpans0ParamsToolChoice0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsToolChoice0 returns the union data inside the Trace_Spans_0_Params_ToolChoice as a TraceSpans0ParamsToolChoice0
+func (t Trace_Spans_0_Params_ToolChoice) AsTraceSpans0ParamsToolChoice0() (TraceSpans0ParamsToolChoice0, error) {
+	var body TraceSpans0ParamsToolChoice0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsToolChoice0 overwrites any union data inside the Trace_Spans_0_Params_ToolChoice as the provided TraceSpans0ParamsToolChoice0
+func (t *Trace_Spans_0_Params_ToolChoice) FromTraceSpans0ParamsToolChoice0(v TraceSpans0ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsToolChoice0 performs a merge with any union data inside the Trace_Spans_0_Params_ToolChoice, using the provided TraceSpans0ParamsToolChoice0
+func (t *Trace_Spans_0_Params_ToolChoice) MergeTraceSpans0ParamsToolChoice0(v TraceSpans0ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsToolChoice1 returns the union data inside the Trace_Spans_0_Params_ToolChoice as a TraceSpans0ParamsToolChoice1
+func (t Trace_Spans_0_Params_ToolChoice) AsTraceSpans0ParamsToolChoice1() (TraceSpans0ParamsToolChoice1, error) {
+	var body TraceSpans0ParamsToolChoice1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsToolChoice1 overwrites any union data inside the Trace_Spans_0_Params_ToolChoice as the provided TraceSpans0ParamsToolChoice1
+func (t *Trace_Spans_0_Params_ToolChoice) FromTraceSpans0ParamsToolChoice1(v TraceSpans0ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsToolChoice1 performs a merge with any union data inside the Trace_Spans_0_Params_ToolChoice, using the provided TraceSpans0ParamsToolChoice1
+func (t *Trace_Spans_0_Params_ToolChoice) MergeTraceSpans0ParamsToolChoice1(v TraceSpans0ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_ToolChoice) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_ToolChoice) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsTools0 returns the union data inside the Trace_Spans_0_Params_Tools as a TraceSpans0ParamsTools0
+func (t Trace_Spans_0_Params_Tools) AsTraceSpans0ParamsTools0() (TraceSpans0ParamsTools0, error) {
+	var body TraceSpans0ParamsTools0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsTools0 overwrites any union data inside the Trace_Spans_0_Params_Tools as the provided TraceSpans0ParamsTools0
+func (t *Trace_Spans_0_Params_Tools) FromTraceSpans0ParamsTools0(v TraceSpans0ParamsTools0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsTools0 performs a merge with any union data inside the Trace_Spans_0_Params_Tools, using the provided TraceSpans0ParamsTools0
+func (t *Trace_Spans_0_Params_Tools) MergeTraceSpans0ParamsTools0(v TraceSpans0ParamsTools0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsTools1 returns the union data inside the Trace_Spans_0_Params_Tools as a TraceSpans0ParamsTools1
+func (t Trace_Spans_0_Params_Tools) AsTraceSpans0ParamsTools1() (TraceSpans0ParamsTools1, error) {
+	var body TraceSpans0ParamsTools1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsTools1 overwrites any union data inside the Trace_Spans_0_Params_Tools as the provided TraceSpans0ParamsTools1
+func (t *Trace_Spans_0_Params_Tools) FromTraceSpans0ParamsTools1(v TraceSpans0ParamsTools1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsTools1 performs a merge with any union data inside the Trace_Spans_0_Params_Tools, using the provided TraceSpans0ParamsTools1
+func (t *Trace_Spans_0_Params_Tools) MergeTraceSpans0ParamsTools1(v TraceSpans0ParamsTools1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_Tools) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_Tools) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsTopLogprobs0 returns the union data inside the Trace_Spans_0_Params_TopLogprobs as a TraceSpans0ParamsTopLogprobs0
+func (t Trace_Spans_0_Params_TopLogprobs) AsTraceSpans0ParamsTopLogprobs0() (TraceSpans0ParamsTopLogprobs0, error) {
+	var body TraceSpans0ParamsTopLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsTopLogprobs0 overwrites any union data inside the Trace_Spans_0_Params_TopLogprobs as the provided TraceSpans0ParamsTopLogprobs0
+func (t *Trace_Spans_0_Params_TopLogprobs) FromTraceSpans0ParamsTopLogprobs0(v TraceSpans0ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsTopLogprobs0 performs a merge with any union data inside the Trace_Spans_0_Params_TopLogprobs, using the provided TraceSpans0ParamsTopLogprobs0
+func (t *Trace_Spans_0_Params_TopLogprobs) MergeTraceSpans0ParamsTopLogprobs0(v TraceSpans0ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsTopLogprobs1 returns the union data inside the Trace_Spans_0_Params_TopLogprobs as a TraceSpans0ParamsTopLogprobs1
+func (t Trace_Spans_0_Params_TopLogprobs) AsTraceSpans0ParamsTopLogprobs1() (TraceSpans0ParamsTopLogprobs1, error) {
+	var body TraceSpans0ParamsTopLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsTopLogprobs1 overwrites any union data inside the Trace_Spans_0_Params_TopLogprobs as the provided TraceSpans0ParamsTopLogprobs1
+func (t *Trace_Spans_0_Params_TopLogprobs) FromTraceSpans0ParamsTopLogprobs1(v TraceSpans0ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsTopLogprobs1 performs a merge with any union data inside the Trace_Spans_0_Params_TopLogprobs, using the provided TraceSpans0ParamsTopLogprobs1
+func (t *Trace_Spans_0_Params_TopLogprobs) MergeTraceSpans0ParamsTopLogprobs1(v TraceSpans0ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_TopLogprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_TopLogprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsTopP0 returns the union data inside the Trace_Spans_0_Params_TopP as a TraceSpans0ParamsTopP0
+func (t Trace_Spans_0_Params_TopP) AsTraceSpans0ParamsTopP0() (TraceSpans0ParamsTopP0, error) {
+	var body TraceSpans0ParamsTopP0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsTopP0 overwrites any union data inside the Trace_Spans_0_Params_TopP as the provided TraceSpans0ParamsTopP0
+func (t *Trace_Spans_0_Params_TopP) FromTraceSpans0ParamsTopP0(v TraceSpans0ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsTopP0 performs a merge with any union data inside the Trace_Spans_0_Params_TopP, using the provided TraceSpans0ParamsTopP0
+func (t *Trace_Spans_0_Params_TopP) MergeTraceSpans0ParamsTopP0(v TraceSpans0ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsTopP1 returns the union data inside the Trace_Spans_0_Params_TopP as a TraceSpans0ParamsTopP1
+func (t Trace_Spans_0_Params_TopP) AsTraceSpans0ParamsTopP1() (TraceSpans0ParamsTopP1, error) {
+	var body TraceSpans0ParamsTopP1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsTopP1 overwrites any union data inside the Trace_Spans_0_Params_TopP as the provided TraceSpans0ParamsTopP1
+func (t *Trace_Spans_0_Params_TopP) FromTraceSpans0ParamsTopP1(v TraceSpans0ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsTopP1 performs a merge with any union data inside the Trace_Spans_0_Params_TopP, using the provided TraceSpans0ParamsTopP1
+func (t *Trace_Spans_0_Params_TopP) MergeTraceSpans0ParamsTopP1(v TraceSpans0ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_TopP) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_TopP) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans0ParamsUser0 returns the union data inside the Trace_Spans_0_Params_User as a TraceSpans0ParamsUser0
+func (t Trace_Spans_0_Params_User) AsTraceSpans0ParamsUser0() (TraceSpans0ParamsUser0, error) {
+	var body TraceSpans0ParamsUser0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsUser0 overwrites any union data inside the Trace_Spans_0_Params_User as the provided TraceSpans0ParamsUser0
+func (t *Trace_Spans_0_Params_User) FromTraceSpans0ParamsUser0(v TraceSpans0ParamsUser0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsUser0 performs a merge with any union data inside the Trace_Spans_0_Params_User, using the provided TraceSpans0ParamsUser0
+func (t *Trace_Spans_0_Params_User) MergeTraceSpans0ParamsUser0(v TraceSpans0ParamsUser0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans0ParamsUser1 returns the union data inside the Trace_Spans_0_Params_User as a TraceSpans0ParamsUser1
+func (t Trace_Spans_0_Params_User) AsTraceSpans0ParamsUser1() (TraceSpans0ParamsUser1, error) {
+	var body TraceSpans0ParamsUser1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans0ParamsUser1 overwrites any union data inside the Trace_Spans_0_Params_User as the provided TraceSpans0ParamsUser1
+func (t *Trace_Spans_0_Params_User) FromTraceSpans0ParamsUser1(v TraceSpans0ParamsUser1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans0ParamsUser1 performs a merge with any union data inside the Trace_Spans_0_Params_User, using the provided TraceSpans0ParamsUser1
+func (t *Trace_Spans_0_Params_User) MergeTraceSpans0ParamsUser1(v TraceSpans0ParamsUser1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_0_Params_User) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_0_Params_User) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsTraceSpans1ContextsContent0 returns the union data inside the Trace_Spans_1_Contexts_Content as a TraceSpans1ContextsContent0
 func (t Trace_Spans_1_Contexts_Content) AsTraceSpans1ContextsContent0() (TraceSpans1ContextsContent0, error) {
 	var body TraceSpans1ContextsContent0
@@ -69326,6 +73926,1246 @@ func (t *Trace_Spans_1_Output) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsTraceSpans1ParamsFrequencyPenalty0 returns the union data inside the Trace_Spans_1_Params_FrequencyPenalty as a TraceSpans1ParamsFrequencyPenalty0
+func (t Trace_Spans_1_Params_FrequencyPenalty) AsTraceSpans1ParamsFrequencyPenalty0() (TraceSpans1ParamsFrequencyPenalty0, error) {
+	var body TraceSpans1ParamsFrequencyPenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsFrequencyPenalty0 overwrites any union data inside the Trace_Spans_1_Params_FrequencyPenalty as the provided TraceSpans1ParamsFrequencyPenalty0
+func (t *Trace_Spans_1_Params_FrequencyPenalty) FromTraceSpans1ParamsFrequencyPenalty0(v TraceSpans1ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsFrequencyPenalty0 performs a merge with any union data inside the Trace_Spans_1_Params_FrequencyPenalty, using the provided TraceSpans1ParamsFrequencyPenalty0
+func (t *Trace_Spans_1_Params_FrequencyPenalty) MergeTraceSpans1ParamsFrequencyPenalty0(v TraceSpans1ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsFrequencyPenalty1 returns the union data inside the Trace_Spans_1_Params_FrequencyPenalty as a TraceSpans1ParamsFrequencyPenalty1
+func (t Trace_Spans_1_Params_FrequencyPenalty) AsTraceSpans1ParamsFrequencyPenalty1() (TraceSpans1ParamsFrequencyPenalty1, error) {
+	var body TraceSpans1ParamsFrequencyPenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsFrequencyPenalty1 overwrites any union data inside the Trace_Spans_1_Params_FrequencyPenalty as the provided TraceSpans1ParamsFrequencyPenalty1
+func (t *Trace_Spans_1_Params_FrequencyPenalty) FromTraceSpans1ParamsFrequencyPenalty1(v TraceSpans1ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsFrequencyPenalty1 performs a merge with any union data inside the Trace_Spans_1_Params_FrequencyPenalty, using the provided TraceSpans1ParamsFrequencyPenalty1
+func (t *Trace_Spans_1_Params_FrequencyPenalty) MergeTraceSpans1ParamsFrequencyPenalty1(v TraceSpans1ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_FrequencyPenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_FrequencyPenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsFunctions0 returns the union data inside the Trace_Spans_1_Params_Functions as a TraceSpans1ParamsFunctions0
+func (t Trace_Spans_1_Params_Functions) AsTraceSpans1ParamsFunctions0() (TraceSpans1ParamsFunctions0, error) {
+	var body TraceSpans1ParamsFunctions0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsFunctions0 overwrites any union data inside the Trace_Spans_1_Params_Functions as the provided TraceSpans1ParamsFunctions0
+func (t *Trace_Spans_1_Params_Functions) FromTraceSpans1ParamsFunctions0(v TraceSpans1ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsFunctions0 performs a merge with any union data inside the Trace_Spans_1_Params_Functions, using the provided TraceSpans1ParamsFunctions0
+func (t *Trace_Spans_1_Params_Functions) MergeTraceSpans1ParamsFunctions0(v TraceSpans1ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsFunctions1 returns the union data inside the Trace_Spans_1_Params_Functions as a TraceSpans1ParamsFunctions1
+func (t Trace_Spans_1_Params_Functions) AsTraceSpans1ParamsFunctions1() (TraceSpans1ParamsFunctions1, error) {
+	var body TraceSpans1ParamsFunctions1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsFunctions1 overwrites any union data inside the Trace_Spans_1_Params_Functions as the provided TraceSpans1ParamsFunctions1
+func (t *Trace_Spans_1_Params_Functions) FromTraceSpans1ParamsFunctions1(v TraceSpans1ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsFunctions1 performs a merge with any union data inside the Trace_Spans_1_Params_Functions, using the provided TraceSpans1ParamsFunctions1
+func (t *Trace_Spans_1_Params_Functions) MergeTraceSpans1ParamsFunctions1(v TraceSpans1ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_Functions) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_Functions) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsLogitBias0 returns the union data inside the Trace_Spans_1_Params_LogitBias as a TraceSpans1ParamsLogitBias0
+func (t Trace_Spans_1_Params_LogitBias) AsTraceSpans1ParamsLogitBias0() (TraceSpans1ParamsLogitBias0, error) {
+	var body TraceSpans1ParamsLogitBias0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsLogitBias0 overwrites any union data inside the Trace_Spans_1_Params_LogitBias as the provided TraceSpans1ParamsLogitBias0
+func (t *Trace_Spans_1_Params_LogitBias) FromTraceSpans1ParamsLogitBias0(v TraceSpans1ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsLogitBias0 performs a merge with any union data inside the Trace_Spans_1_Params_LogitBias, using the provided TraceSpans1ParamsLogitBias0
+func (t *Trace_Spans_1_Params_LogitBias) MergeTraceSpans1ParamsLogitBias0(v TraceSpans1ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsLogitBias1 returns the union data inside the Trace_Spans_1_Params_LogitBias as a TraceSpans1ParamsLogitBias1
+func (t Trace_Spans_1_Params_LogitBias) AsTraceSpans1ParamsLogitBias1() (TraceSpans1ParamsLogitBias1, error) {
+	var body TraceSpans1ParamsLogitBias1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsLogitBias1 overwrites any union data inside the Trace_Spans_1_Params_LogitBias as the provided TraceSpans1ParamsLogitBias1
+func (t *Trace_Spans_1_Params_LogitBias) FromTraceSpans1ParamsLogitBias1(v TraceSpans1ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsLogitBias1 performs a merge with any union data inside the Trace_Spans_1_Params_LogitBias, using the provided TraceSpans1ParamsLogitBias1
+func (t *Trace_Spans_1_Params_LogitBias) MergeTraceSpans1ParamsLogitBias1(v TraceSpans1ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_LogitBias) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_LogitBias) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsLogprobs0 returns the union data inside the Trace_Spans_1_Params_Logprobs as a TraceSpans1ParamsLogprobs0
+func (t Trace_Spans_1_Params_Logprobs) AsTraceSpans1ParamsLogprobs0() (TraceSpans1ParamsLogprobs0, error) {
+	var body TraceSpans1ParamsLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsLogprobs0 overwrites any union data inside the Trace_Spans_1_Params_Logprobs as the provided TraceSpans1ParamsLogprobs0
+func (t *Trace_Spans_1_Params_Logprobs) FromTraceSpans1ParamsLogprobs0(v TraceSpans1ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsLogprobs0 performs a merge with any union data inside the Trace_Spans_1_Params_Logprobs, using the provided TraceSpans1ParamsLogprobs0
+func (t *Trace_Spans_1_Params_Logprobs) MergeTraceSpans1ParamsLogprobs0(v TraceSpans1ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsLogprobs1 returns the union data inside the Trace_Spans_1_Params_Logprobs as a TraceSpans1ParamsLogprobs1
+func (t Trace_Spans_1_Params_Logprobs) AsTraceSpans1ParamsLogprobs1() (TraceSpans1ParamsLogprobs1, error) {
+	var body TraceSpans1ParamsLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsLogprobs1 overwrites any union data inside the Trace_Spans_1_Params_Logprobs as the provided TraceSpans1ParamsLogprobs1
+func (t *Trace_Spans_1_Params_Logprobs) FromTraceSpans1ParamsLogprobs1(v TraceSpans1ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsLogprobs1 performs a merge with any union data inside the Trace_Spans_1_Params_Logprobs, using the provided TraceSpans1ParamsLogprobs1
+func (t *Trace_Spans_1_Params_Logprobs) MergeTraceSpans1ParamsLogprobs1(v TraceSpans1ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_Logprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_Logprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsMaxTokens0 returns the union data inside the Trace_Spans_1_Params_MaxTokens as a TraceSpans1ParamsMaxTokens0
+func (t Trace_Spans_1_Params_MaxTokens) AsTraceSpans1ParamsMaxTokens0() (TraceSpans1ParamsMaxTokens0, error) {
+	var body TraceSpans1ParamsMaxTokens0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsMaxTokens0 overwrites any union data inside the Trace_Spans_1_Params_MaxTokens as the provided TraceSpans1ParamsMaxTokens0
+func (t *Trace_Spans_1_Params_MaxTokens) FromTraceSpans1ParamsMaxTokens0(v TraceSpans1ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsMaxTokens0 performs a merge with any union data inside the Trace_Spans_1_Params_MaxTokens, using the provided TraceSpans1ParamsMaxTokens0
+func (t *Trace_Spans_1_Params_MaxTokens) MergeTraceSpans1ParamsMaxTokens0(v TraceSpans1ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsMaxTokens1 returns the union data inside the Trace_Spans_1_Params_MaxTokens as a TraceSpans1ParamsMaxTokens1
+func (t Trace_Spans_1_Params_MaxTokens) AsTraceSpans1ParamsMaxTokens1() (TraceSpans1ParamsMaxTokens1, error) {
+	var body TraceSpans1ParamsMaxTokens1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsMaxTokens1 overwrites any union data inside the Trace_Spans_1_Params_MaxTokens as the provided TraceSpans1ParamsMaxTokens1
+func (t *Trace_Spans_1_Params_MaxTokens) FromTraceSpans1ParamsMaxTokens1(v TraceSpans1ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsMaxTokens1 performs a merge with any union data inside the Trace_Spans_1_Params_MaxTokens, using the provided TraceSpans1ParamsMaxTokens1
+func (t *Trace_Spans_1_Params_MaxTokens) MergeTraceSpans1ParamsMaxTokens1(v TraceSpans1ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_MaxTokens) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_MaxTokens) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsN0 returns the union data inside the Trace_Spans_1_Params_N as a TraceSpans1ParamsN0
+func (t Trace_Spans_1_Params_N) AsTraceSpans1ParamsN0() (TraceSpans1ParamsN0, error) {
+	var body TraceSpans1ParamsN0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsN0 overwrites any union data inside the Trace_Spans_1_Params_N as the provided TraceSpans1ParamsN0
+func (t *Trace_Spans_1_Params_N) FromTraceSpans1ParamsN0(v TraceSpans1ParamsN0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsN0 performs a merge with any union data inside the Trace_Spans_1_Params_N, using the provided TraceSpans1ParamsN0
+func (t *Trace_Spans_1_Params_N) MergeTraceSpans1ParamsN0(v TraceSpans1ParamsN0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsN1 returns the union data inside the Trace_Spans_1_Params_N as a TraceSpans1ParamsN1
+func (t Trace_Spans_1_Params_N) AsTraceSpans1ParamsN1() (TraceSpans1ParamsN1, error) {
+	var body TraceSpans1ParamsN1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsN1 overwrites any union data inside the Trace_Spans_1_Params_N as the provided TraceSpans1ParamsN1
+func (t *Trace_Spans_1_Params_N) FromTraceSpans1ParamsN1(v TraceSpans1ParamsN1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsN1 performs a merge with any union data inside the Trace_Spans_1_Params_N, using the provided TraceSpans1ParamsN1
+func (t *Trace_Spans_1_Params_N) MergeTraceSpans1ParamsN1(v TraceSpans1ParamsN1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_N) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_N) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsParallelToolCalls0 returns the union data inside the Trace_Spans_1_Params_ParallelToolCalls as a TraceSpans1ParamsParallelToolCalls0
+func (t Trace_Spans_1_Params_ParallelToolCalls) AsTraceSpans1ParamsParallelToolCalls0() (TraceSpans1ParamsParallelToolCalls0, error) {
+	var body TraceSpans1ParamsParallelToolCalls0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsParallelToolCalls0 overwrites any union data inside the Trace_Spans_1_Params_ParallelToolCalls as the provided TraceSpans1ParamsParallelToolCalls0
+func (t *Trace_Spans_1_Params_ParallelToolCalls) FromTraceSpans1ParamsParallelToolCalls0(v TraceSpans1ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsParallelToolCalls0 performs a merge with any union data inside the Trace_Spans_1_Params_ParallelToolCalls, using the provided TraceSpans1ParamsParallelToolCalls0
+func (t *Trace_Spans_1_Params_ParallelToolCalls) MergeTraceSpans1ParamsParallelToolCalls0(v TraceSpans1ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsParallelToolCalls1 returns the union data inside the Trace_Spans_1_Params_ParallelToolCalls as a TraceSpans1ParamsParallelToolCalls1
+func (t Trace_Spans_1_Params_ParallelToolCalls) AsTraceSpans1ParamsParallelToolCalls1() (TraceSpans1ParamsParallelToolCalls1, error) {
+	var body TraceSpans1ParamsParallelToolCalls1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsParallelToolCalls1 overwrites any union data inside the Trace_Spans_1_Params_ParallelToolCalls as the provided TraceSpans1ParamsParallelToolCalls1
+func (t *Trace_Spans_1_Params_ParallelToolCalls) FromTraceSpans1ParamsParallelToolCalls1(v TraceSpans1ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsParallelToolCalls1 performs a merge with any union data inside the Trace_Spans_1_Params_ParallelToolCalls, using the provided TraceSpans1ParamsParallelToolCalls1
+func (t *Trace_Spans_1_Params_ParallelToolCalls) MergeTraceSpans1ParamsParallelToolCalls1(v TraceSpans1ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_ParallelToolCalls) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_ParallelToolCalls) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsPresencePenalty0 returns the union data inside the Trace_Spans_1_Params_PresencePenalty as a TraceSpans1ParamsPresencePenalty0
+func (t Trace_Spans_1_Params_PresencePenalty) AsTraceSpans1ParamsPresencePenalty0() (TraceSpans1ParamsPresencePenalty0, error) {
+	var body TraceSpans1ParamsPresencePenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsPresencePenalty0 overwrites any union data inside the Trace_Spans_1_Params_PresencePenalty as the provided TraceSpans1ParamsPresencePenalty0
+func (t *Trace_Spans_1_Params_PresencePenalty) FromTraceSpans1ParamsPresencePenalty0(v TraceSpans1ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsPresencePenalty0 performs a merge with any union data inside the Trace_Spans_1_Params_PresencePenalty, using the provided TraceSpans1ParamsPresencePenalty0
+func (t *Trace_Spans_1_Params_PresencePenalty) MergeTraceSpans1ParamsPresencePenalty0(v TraceSpans1ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsPresencePenalty1 returns the union data inside the Trace_Spans_1_Params_PresencePenalty as a TraceSpans1ParamsPresencePenalty1
+func (t Trace_Spans_1_Params_PresencePenalty) AsTraceSpans1ParamsPresencePenalty1() (TraceSpans1ParamsPresencePenalty1, error) {
+	var body TraceSpans1ParamsPresencePenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsPresencePenalty1 overwrites any union data inside the Trace_Spans_1_Params_PresencePenalty as the provided TraceSpans1ParamsPresencePenalty1
+func (t *Trace_Spans_1_Params_PresencePenalty) FromTraceSpans1ParamsPresencePenalty1(v TraceSpans1ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsPresencePenalty1 performs a merge with any union data inside the Trace_Spans_1_Params_PresencePenalty, using the provided TraceSpans1ParamsPresencePenalty1
+func (t *Trace_Spans_1_Params_PresencePenalty) MergeTraceSpans1ParamsPresencePenalty1(v TraceSpans1ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_PresencePenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_PresencePenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsReasoningEffort0 returns the union data inside the Trace_Spans_1_Params_ReasoningEffort as a TraceSpans1ParamsReasoningEffort0
+func (t Trace_Spans_1_Params_ReasoningEffort) AsTraceSpans1ParamsReasoningEffort0() (TraceSpans1ParamsReasoningEffort0, error) {
+	var body TraceSpans1ParamsReasoningEffort0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsReasoningEffort0 overwrites any union data inside the Trace_Spans_1_Params_ReasoningEffort as the provided TraceSpans1ParamsReasoningEffort0
+func (t *Trace_Spans_1_Params_ReasoningEffort) FromTraceSpans1ParamsReasoningEffort0(v TraceSpans1ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsReasoningEffort0 performs a merge with any union data inside the Trace_Spans_1_Params_ReasoningEffort, using the provided TraceSpans1ParamsReasoningEffort0
+func (t *Trace_Spans_1_Params_ReasoningEffort) MergeTraceSpans1ParamsReasoningEffort0(v TraceSpans1ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsReasoningEffort1 returns the union data inside the Trace_Spans_1_Params_ReasoningEffort as a TraceSpans1ParamsReasoningEffort1
+func (t Trace_Spans_1_Params_ReasoningEffort) AsTraceSpans1ParamsReasoningEffort1() (TraceSpans1ParamsReasoningEffort1, error) {
+	var body TraceSpans1ParamsReasoningEffort1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsReasoningEffort1 overwrites any union data inside the Trace_Spans_1_Params_ReasoningEffort as the provided TraceSpans1ParamsReasoningEffort1
+func (t *Trace_Spans_1_Params_ReasoningEffort) FromTraceSpans1ParamsReasoningEffort1(v TraceSpans1ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsReasoningEffort1 performs a merge with any union data inside the Trace_Spans_1_Params_ReasoningEffort, using the provided TraceSpans1ParamsReasoningEffort1
+func (t *Trace_Spans_1_Params_ReasoningEffort) MergeTraceSpans1ParamsReasoningEffort1(v TraceSpans1ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_ReasoningEffort) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_ReasoningEffort) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsSeed0 returns the union data inside the Trace_Spans_1_Params_Seed as a TraceSpans1ParamsSeed0
+func (t Trace_Spans_1_Params_Seed) AsTraceSpans1ParamsSeed0() (TraceSpans1ParamsSeed0, error) {
+	var body TraceSpans1ParamsSeed0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsSeed0 overwrites any union data inside the Trace_Spans_1_Params_Seed as the provided TraceSpans1ParamsSeed0
+func (t *Trace_Spans_1_Params_Seed) FromTraceSpans1ParamsSeed0(v TraceSpans1ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsSeed0 performs a merge with any union data inside the Trace_Spans_1_Params_Seed, using the provided TraceSpans1ParamsSeed0
+func (t *Trace_Spans_1_Params_Seed) MergeTraceSpans1ParamsSeed0(v TraceSpans1ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsSeed1 returns the union data inside the Trace_Spans_1_Params_Seed as a TraceSpans1ParamsSeed1
+func (t Trace_Spans_1_Params_Seed) AsTraceSpans1ParamsSeed1() (TraceSpans1ParamsSeed1, error) {
+	var body TraceSpans1ParamsSeed1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsSeed1 overwrites any union data inside the Trace_Spans_1_Params_Seed as the provided TraceSpans1ParamsSeed1
+func (t *Trace_Spans_1_Params_Seed) FromTraceSpans1ParamsSeed1(v TraceSpans1ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsSeed1 performs a merge with any union data inside the Trace_Spans_1_Params_Seed, using the provided TraceSpans1ParamsSeed1
+func (t *Trace_Spans_1_Params_Seed) MergeTraceSpans1ParamsSeed1(v TraceSpans1ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_Seed) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_Seed) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsStop00 returns the union data inside the TraceSpans1ParamsStop0 as a TraceSpans1ParamsStop00
+func (t TraceSpans1ParamsStop0) AsTraceSpans1ParamsStop00() (TraceSpans1ParamsStop00, error) {
+	var body TraceSpans1ParamsStop00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsStop00 overwrites any union data inside the TraceSpans1ParamsStop0 as the provided TraceSpans1ParamsStop00
+func (t *TraceSpans1ParamsStop0) FromTraceSpans1ParamsStop00(v TraceSpans1ParamsStop00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsStop00 performs a merge with any union data inside the TraceSpans1ParamsStop0, using the provided TraceSpans1ParamsStop00
+func (t *TraceSpans1ParamsStop0) MergeTraceSpans1ParamsStop00(v TraceSpans1ParamsStop00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsStop01 returns the union data inside the TraceSpans1ParamsStop0 as a TraceSpans1ParamsStop01
+func (t TraceSpans1ParamsStop0) AsTraceSpans1ParamsStop01() (TraceSpans1ParamsStop01, error) {
+	var body TraceSpans1ParamsStop01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsStop01 overwrites any union data inside the TraceSpans1ParamsStop0 as the provided TraceSpans1ParamsStop01
+func (t *TraceSpans1ParamsStop0) FromTraceSpans1ParamsStop01(v TraceSpans1ParamsStop01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsStop01 performs a merge with any union data inside the TraceSpans1ParamsStop0, using the provided TraceSpans1ParamsStop01
+func (t *TraceSpans1ParamsStop0) MergeTraceSpans1ParamsStop01(v TraceSpans1ParamsStop01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TraceSpans1ParamsStop0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TraceSpans1ParamsStop0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsStop0 returns the union data inside the Trace_Spans_1_Params_Stop as a TraceSpans1ParamsStop0
+func (t Trace_Spans_1_Params_Stop) AsTraceSpans1ParamsStop0() (TraceSpans1ParamsStop0, error) {
+	var body TraceSpans1ParamsStop0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsStop0 overwrites any union data inside the Trace_Spans_1_Params_Stop as the provided TraceSpans1ParamsStop0
+func (t *Trace_Spans_1_Params_Stop) FromTraceSpans1ParamsStop0(v TraceSpans1ParamsStop0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsStop0 performs a merge with any union data inside the Trace_Spans_1_Params_Stop, using the provided TraceSpans1ParamsStop0
+func (t *Trace_Spans_1_Params_Stop) MergeTraceSpans1ParamsStop0(v TraceSpans1ParamsStop0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsStop1 returns the union data inside the Trace_Spans_1_Params_Stop as a TraceSpans1ParamsStop1
+func (t Trace_Spans_1_Params_Stop) AsTraceSpans1ParamsStop1() (TraceSpans1ParamsStop1, error) {
+	var body TraceSpans1ParamsStop1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsStop1 overwrites any union data inside the Trace_Spans_1_Params_Stop as the provided TraceSpans1ParamsStop1
+func (t *Trace_Spans_1_Params_Stop) FromTraceSpans1ParamsStop1(v TraceSpans1ParamsStop1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsStop1 performs a merge with any union data inside the Trace_Spans_1_Params_Stop, using the provided TraceSpans1ParamsStop1
+func (t *Trace_Spans_1_Params_Stop) MergeTraceSpans1ParamsStop1(v TraceSpans1ParamsStop1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_Stop) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_Stop) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsStream0 returns the union data inside the Trace_Spans_1_Params_Stream as a TraceSpans1ParamsStream0
+func (t Trace_Spans_1_Params_Stream) AsTraceSpans1ParamsStream0() (TraceSpans1ParamsStream0, error) {
+	var body TraceSpans1ParamsStream0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsStream0 overwrites any union data inside the Trace_Spans_1_Params_Stream as the provided TraceSpans1ParamsStream0
+func (t *Trace_Spans_1_Params_Stream) FromTraceSpans1ParamsStream0(v TraceSpans1ParamsStream0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsStream0 performs a merge with any union data inside the Trace_Spans_1_Params_Stream, using the provided TraceSpans1ParamsStream0
+func (t *Trace_Spans_1_Params_Stream) MergeTraceSpans1ParamsStream0(v TraceSpans1ParamsStream0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsStream1 returns the union data inside the Trace_Spans_1_Params_Stream as a TraceSpans1ParamsStream1
+func (t Trace_Spans_1_Params_Stream) AsTraceSpans1ParamsStream1() (TraceSpans1ParamsStream1, error) {
+	var body TraceSpans1ParamsStream1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsStream1 overwrites any union data inside the Trace_Spans_1_Params_Stream as the provided TraceSpans1ParamsStream1
+func (t *Trace_Spans_1_Params_Stream) FromTraceSpans1ParamsStream1(v TraceSpans1ParamsStream1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsStream1 performs a merge with any union data inside the Trace_Spans_1_Params_Stream, using the provided TraceSpans1ParamsStream1
+func (t *Trace_Spans_1_Params_Stream) MergeTraceSpans1ParamsStream1(v TraceSpans1ParamsStream1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_Stream) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_Stream) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsTemperature0 returns the union data inside the Trace_Spans_1_Params_Temperature as a TraceSpans1ParamsTemperature0
+func (t Trace_Spans_1_Params_Temperature) AsTraceSpans1ParamsTemperature0() (TraceSpans1ParamsTemperature0, error) {
+	var body TraceSpans1ParamsTemperature0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsTemperature0 overwrites any union data inside the Trace_Spans_1_Params_Temperature as the provided TraceSpans1ParamsTemperature0
+func (t *Trace_Spans_1_Params_Temperature) FromTraceSpans1ParamsTemperature0(v TraceSpans1ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsTemperature0 performs a merge with any union data inside the Trace_Spans_1_Params_Temperature, using the provided TraceSpans1ParamsTemperature0
+func (t *Trace_Spans_1_Params_Temperature) MergeTraceSpans1ParamsTemperature0(v TraceSpans1ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsTemperature1 returns the union data inside the Trace_Spans_1_Params_Temperature as a TraceSpans1ParamsTemperature1
+func (t Trace_Spans_1_Params_Temperature) AsTraceSpans1ParamsTemperature1() (TraceSpans1ParamsTemperature1, error) {
+	var body TraceSpans1ParamsTemperature1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsTemperature1 overwrites any union data inside the Trace_Spans_1_Params_Temperature as the provided TraceSpans1ParamsTemperature1
+func (t *Trace_Spans_1_Params_Temperature) FromTraceSpans1ParamsTemperature1(v TraceSpans1ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsTemperature1 performs a merge with any union data inside the Trace_Spans_1_Params_Temperature, using the provided TraceSpans1ParamsTemperature1
+func (t *Trace_Spans_1_Params_Temperature) MergeTraceSpans1ParamsTemperature1(v TraceSpans1ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_Temperature) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_Temperature) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsToolChoice00 returns the union data inside the TraceSpans1ParamsToolChoice0 as a TraceSpans1ParamsToolChoice00
+func (t TraceSpans1ParamsToolChoice0) AsTraceSpans1ParamsToolChoice00() (TraceSpans1ParamsToolChoice00, error) {
+	var body TraceSpans1ParamsToolChoice00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsToolChoice00 overwrites any union data inside the TraceSpans1ParamsToolChoice0 as the provided TraceSpans1ParamsToolChoice00
+func (t *TraceSpans1ParamsToolChoice0) FromTraceSpans1ParamsToolChoice00(v TraceSpans1ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsToolChoice00 performs a merge with any union data inside the TraceSpans1ParamsToolChoice0, using the provided TraceSpans1ParamsToolChoice00
+func (t *TraceSpans1ParamsToolChoice0) MergeTraceSpans1ParamsToolChoice00(v TraceSpans1ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsToolChoice01 returns the union data inside the TraceSpans1ParamsToolChoice0 as a TraceSpans1ParamsToolChoice01
+func (t TraceSpans1ParamsToolChoice0) AsTraceSpans1ParamsToolChoice01() (TraceSpans1ParamsToolChoice01, error) {
+	var body TraceSpans1ParamsToolChoice01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsToolChoice01 overwrites any union data inside the TraceSpans1ParamsToolChoice0 as the provided TraceSpans1ParamsToolChoice01
+func (t *TraceSpans1ParamsToolChoice0) FromTraceSpans1ParamsToolChoice01(v TraceSpans1ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsToolChoice01 performs a merge with any union data inside the TraceSpans1ParamsToolChoice0, using the provided TraceSpans1ParamsToolChoice01
+func (t *TraceSpans1ParamsToolChoice0) MergeTraceSpans1ParamsToolChoice01(v TraceSpans1ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TraceSpans1ParamsToolChoice0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TraceSpans1ParamsToolChoice0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsToolChoice0 returns the union data inside the Trace_Spans_1_Params_ToolChoice as a TraceSpans1ParamsToolChoice0
+func (t Trace_Spans_1_Params_ToolChoice) AsTraceSpans1ParamsToolChoice0() (TraceSpans1ParamsToolChoice0, error) {
+	var body TraceSpans1ParamsToolChoice0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsToolChoice0 overwrites any union data inside the Trace_Spans_1_Params_ToolChoice as the provided TraceSpans1ParamsToolChoice0
+func (t *Trace_Spans_1_Params_ToolChoice) FromTraceSpans1ParamsToolChoice0(v TraceSpans1ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsToolChoice0 performs a merge with any union data inside the Trace_Spans_1_Params_ToolChoice, using the provided TraceSpans1ParamsToolChoice0
+func (t *Trace_Spans_1_Params_ToolChoice) MergeTraceSpans1ParamsToolChoice0(v TraceSpans1ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsToolChoice1 returns the union data inside the Trace_Spans_1_Params_ToolChoice as a TraceSpans1ParamsToolChoice1
+func (t Trace_Spans_1_Params_ToolChoice) AsTraceSpans1ParamsToolChoice1() (TraceSpans1ParamsToolChoice1, error) {
+	var body TraceSpans1ParamsToolChoice1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsToolChoice1 overwrites any union data inside the Trace_Spans_1_Params_ToolChoice as the provided TraceSpans1ParamsToolChoice1
+func (t *Trace_Spans_1_Params_ToolChoice) FromTraceSpans1ParamsToolChoice1(v TraceSpans1ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsToolChoice1 performs a merge with any union data inside the Trace_Spans_1_Params_ToolChoice, using the provided TraceSpans1ParamsToolChoice1
+func (t *Trace_Spans_1_Params_ToolChoice) MergeTraceSpans1ParamsToolChoice1(v TraceSpans1ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_ToolChoice) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_ToolChoice) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsTools0 returns the union data inside the Trace_Spans_1_Params_Tools as a TraceSpans1ParamsTools0
+func (t Trace_Spans_1_Params_Tools) AsTraceSpans1ParamsTools0() (TraceSpans1ParamsTools0, error) {
+	var body TraceSpans1ParamsTools0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsTools0 overwrites any union data inside the Trace_Spans_1_Params_Tools as the provided TraceSpans1ParamsTools0
+func (t *Trace_Spans_1_Params_Tools) FromTraceSpans1ParamsTools0(v TraceSpans1ParamsTools0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsTools0 performs a merge with any union data inside the Trace_Spans_1_Params_Tools, using the provided TraceSpans1ParamsTools0
+func (t *Trace_Spans_1_Params_Tools) MergeTraceSpans1ParamsTools0(v TraceSpans1ParamsTools0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsTools1 returns the union data inside the Trace_Spans_1_Params_Tools as a TraceSpans1ParamsTools1
+func (t Trace_Spans_1_Params_Tools) AsTraceSpans1ParamsTools1() (TraceSpans1ParamsTools1, error) {
+	var body TraceSpans1ParamsTools1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsTools1 overwrites any union data inside the Trace_Spans_1_Params_Tools as the provided TraceSpans1ParamsTools1
+func (t *Trace_Spans_1_Params_Tools) FromTraceSpans1ParamsTools1(v TraceSpans1ParamsTools1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsTools1 performs a merge with any union data inside the Trace_Spans_1_Params_Tools, using the provided TraceSpans1ParamsTools1
+func (t *Trace_Spans_1_Params_Tools) MergeTraceSpans1ParamsTools1(v TraceSpans1ParamsTools1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_Tools) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_Tools) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsTopLogprobs0 returns the union data inside the Trace_Spans_1_Params_TopLogprobs as a TraceSpans1ParamsTopLogprobs0
+func (t Trace_Spans_1_Params_TopLogprobs) AsTraceSpans1ParamsTopLogprobs0() (TraceSpans1ParamsTopLogprobs0, error) {
+	var body TraceSpans1ParamsTopLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsTopLogprobs0 overwrites any union data inside the Trace_Spans_1_Params_TopLogprobs as the provided TraceSpans1ParamsTopLogprobs0
+func (t *Trace_Spans_1_Params_TopLogprobs) FromTraceSpans1ParamsTopLogprobs0(v TraceSpans1ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsTopLogprobs0 performs a merge with any union data inside the Trace_Spans_1_Params_TopLogprobs, using the provided TraceSpans1ParamsTopLogprobs0
+func (t *Trace_Spans_1_Params_TopLogprobs) MergeTraceSpans1ParamsTopLogprobs0(v TraceSpans1ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsTopLogprobs1 returns the union data inside the Trace_Spans_1_Params_TopLogprobs as a TraceSpans1ParamsTopLogprobs1
+func (t Trace_Spans_1_Params_TopLogprobs) AsTraceSpans1ParamsTopLogprobs1() (TraceSpans1ParamsTopLogprobs1, error) {
+	var body TraceSpans1ParamsTopLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsTopLogprobs1 overwrites any union data inside the Trace_Spans_1_Params_TopLogprobs as the provided TraceSpans1ParamsTopLogprobs1
+func (t *Trace_Spans_1_Params_TopLogprobs) FromTraceSpans1ParamsTopLogprobs1(v TraceSpans1ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsTopLogprobs1 performs a merge with any union data inside the Trace_Spans_1_Params_TopLogprobs, using the provided TraceSpans1ParamsTopLogprobs1
+func (t *Trace_Spans_1_Params_TopLogprobs) MergeTraceSpans1ParamsTopLogprobs1(v TraceSpans1ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_TopLogprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_TopLogprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsTopP0 returns the union data inside the Trace_Spans_1_Params_TopP as a TraceSpans1ParamsTopP0
+func (t Trace_Spans_1_Params_TopP) AsTraceSpans1ParamsTopP0() (TraceSpans1ParamsTopP0, error) {
+	var body TraceSpans1ParamsTopP0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsTopP0 overwrites any union data inside the Trace_Spans_1_Params_TopP as the provided TraceSpans1ParamsTopP0
+func (t *Trace_Spans_1_Params_TopP) FromTraceSpans1ParamsTopP0(v TraceSpans1ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsTopP0 performs a merge with any union data inside the Trace_Spans_1_Params_TopP, using the provided TraceSpans1ParamsTopP0
+func (t *Trace_Spans_1_Params_TopP) MergeTraceSpans1ParamsTopP0(v TraceSpans1ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsTopP1 returns the union data inside the Trace_Spans_1_Params_TopP as a TraceSpans1ParamsTopP1
+func (t Trace_Spans_1_Params_TopP) AsTraceSpans1ParamsTopP1() (TraceSpans1ParamsTopP1, error) {
+	var body TraceSpans1ParamsTopP1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsTopP1 overwrites any union data inside the Trace_Spans_1_Params_TopP as the provided TraceSpans1ParamsTopP1
+func (t *Trace_Spans_1_Params_TopP) FromTraceSpans1ParamsTopP1(v TraceSpans1ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsTopP1 performs a merge with any union data inside the Trace_Spans_1_Params_TopP, using the provided TraceSpans1ParamsTopP1
+func (t *Trace_Spans_1_Params_TopP) MergeTraceSpans1ParamsTopP1(v TraceSpans1ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_TopP) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_TopP) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans1ParamsUser0 returns the union data inside the Trace_Spans_1_Params_User as a TraceSpans1ParamsUser0
+func (t Trace_Spans_1_Params_User) AsTraceSpans1ParamsUser0() (TraceSpans1ParamsUser0, error) {
+	var body TraceSpans1ParamsUser0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsUser0 overwrites any union data inside the Trace_Spans_1_Params_User as the provided TraceSpans1ParamsUser0
+func (t *Trace_Spans_1_Params_User) FromTraceSpans1ParamsUser0(v TraceSpans1ParamsUser0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsUser0 performs a merge with any union data inside the Trace_Spans_1_Params_User, using the provided TraceSpans1ParamsUser0
+func (t *Trace_Spans_1_Params_User) MergeTraceSpans1ParamsUser0(v TraceSpans1ParamsUser0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans1ParamsUser1 returns the union data inside the Trace_Spans_1_Params_User as a TraceSpans1ParamsUser1
+func (t Trace_Spans_1_Params_User) AsTraceSpans1ParamsUser1() (TraceSpans1ParamsUser1, error) {
+	var body TraceSpans1ParamsUser1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans1ParamsUser1 overwrites any union data inside the Trace_Spans_1_Params_User as the provided TraceSpans1ParamsUser1
+func (t *Trace_Spans_1_Params_User) FromTraceSpans1ParamsUser1(v TraceSpans1ParamsUser1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans1ParamsUser1 performs a merge with any union data inside the Trace_Spans_1_Params_User, using the provided TraceSpans1ParamsUser1
+func (t *Trace_Spans_1_Params_User) MergeTraceSpans1ParamsUser1(v TraceSpans1ParamsUser1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_1_Params_User) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_1_Params_User) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsTraceSpans2Input1Type0 returns the union data inside the Trace_Spans_2_Input_1_Type as a TraceSpans2Input1Type0
 func (t Trace_Spans_2_Input_1_Type) AsTraceSpans2Input1Type0() (TraceSpans2Input1Type0, error) {
 	var body TraceSpans2Input1Type0
@@ -69850,6 +75690,1246 @@ func (t Trace_Spans_2_Output) MarshalJSON() ([]byte, error) {
 }
 
 func (t *Trace_Spans_2_Output) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsFrequencyPenalty0 returns the union data inside the Trace_Spans_2_Params_FrequencyPenalty as a TraceSpans2ParamsFrequencyPenalty0
+func (t Trace_Spans_2_Params_FrequencyPenalty) AsTraceSpans2ParamsFrequencyPenalty0() (TraceSpans2ParamsFrequencyPenalty0, error) {
+	var body TraceSpans2ParamsFrequencyPenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsFrequencyPenalty0 overwrites any union data inside the Trace_Spans_2_Params_FrequencyPenalty as the provided TraceSpans2ParamsFrequencyPenalty0
+func (t *Trace_Spans_2_Params_FrequencyPenalty) FromTraceSpans2ParamsFrequencyPenalty0(v TraceSpans2ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsFrequencyPenalty0 performs a merge with any union data inside the Trace_Spans_2_Params_FrequencyPenalty, using the provided TraceSpans2ParamsFrequencyPenalty0
+func (t *Trace_Spans_2_Params_FrequencyPenalty) MergeTraceSpans2ParamsFrequencyPenalty0(v TraceSpans2ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsFrequencyPenalty1 returns the union data inside the Trace_Spans_2_Params_FrequencyPenalty as a TraceSpans2ParamsFrequencyPenalty1
+func (t Trace_Spans_2_Params_FrequencyPenalty) AsTraceSpans2ParamsFrequencyPenalty1() (TraceSpans2ParamsFrequencyPenalty1, error) {
+	var body TraceSpans2ParamsFrequencyPenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsFrequencyPenalty1 overwrites any union data inside the Trace_Spans_2_Params_FrequencyPenalty as the provided TraceSpans2ParamsFrequencyPenalty1
+func (t *Trace_Spans_2_Params_FrequencyPenalty) FromTraceSpans2ParamsFrequencyPenalty1(v TraceSpans2ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsFrequencyPenalty1 performs a merge with any union data inside the Trace_Spans_2_Params_FrequencyPenalty, using the provided TraceSpans2ParamsFrequencyPenalty1
+func (t *Trace_Spans_2_Params_FrequencyPenalty) MergeTraceSpans2ParamsFrequencyPenalty1(v TraceSpans2ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_FrequencyPenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_FrequencyPenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsFunctions0 returns the union data inside the Trace_Spans_2_Params_Functions as a TraceSpans2ParamsFunctions0
+func (t Trace_Spans_2_Params_Functions) AsTraceSpans2ParamsFunctions0() (TraceSpans2ParamsFunctions0, error) {
+	var body TraceSpans2ParamsFunctions0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsFunctions0 overwrites any union data inside the Trace_Spans_2_Params_Functions as the provided TraceSpans2ParamsFunctions0
+func (t *Trace_Spans_2_Params_Functions) FromTraceSpans2ParamsFunctions0(v TraceSpans2ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsFunctions0 performs a merge with any union data inside the Trace_Spans_2_Params_Functions, using the provided TraceSpans2ParamsFunctions0
+func (t *Trace_Spans_2_Params_Functions) MergeTraceSpans2ParamsFunctions0(v TraceSpans2ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsFunctions1 returns the union data inside the Trace_Spans_2_Params_Functions as a TraceSpans2ParamsFunctions1
+func (t Trace_Spans_2_Params_Functions) AsTraceSpans2ParamsFunctions1() (TraceSpans2ParamsFunctions1, error) {
+	var body TraceSpans2ParamsFunctions1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsFunctions1 overwrites any union data inside the Trace_Spans_2_Params_Functions as the provided TraceSpans2ParamsFunctions1
+func (t *Trace_Spans_2_Params_Functions) FromTraceSpans2ParamsFunctions1(v TraceSpans2ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsFunctions1 performs a merge with any union data inside the Trace_Spans_2_Params_Functions, using the provided TraceSpans2ParamsFunctions1
+func (t *Trace_Spans_2_Params_Functions) MergeTraceSpans2ParamsFunctions1(v TraceSpans2ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_Functions) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_Functions) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsLogitBias0 returns the union data inside the Trace_Spans_2_Params_LogitBias as a TraceSpans2ParamsLogitBias0
+func (t Trace_Spans_2_Params_LogitBias) AsTraceSpans2ParamsLogitBias0() (TraceSpans2ParamsLogitBias0, error) {
+	var body TraceSpans2ParamsLogitBias0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsLogitBias0 overwrites any union data inside the Trace_Spans_2_Params_LogitBias as the provided TraceSpans2ParamsLogitBias0
+func (t *Trace_Spans_2_Params_LogitBias) FromTraceSpans2ParamsLogitBias0(v TraceSpans2ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsLogitBias0 performs a merge with any union data inside the Trace_Spans_2_Params_LogitBias, using the provided TraceSpans2ParamsLogitBias0
+func (t *Trace_Spans_2_Params_LogitBias) MergeTraceSpans2ParamsLogitBias0(v TraceSpans2ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsLogitBias1 returns the union data inside the Trace_Spans_2_Params_LogitBias as a TraceSpans2ParamsLogitBias1
+func (t Trace_Spans_2_Params_LogitBias) AsTraceSpans2ParamsLogitBias1() (TraceSpans2ParamsLogitBias1, error) {
+	var body TraceSpans2ParamsLogitBias1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsLogitBias1 overwrites any union data inside the Trace_Spans_2_Params_LogitBias as the provided TraceSpans2ParamsLogitBias1
+func (t *Trace_Spans_2_Params_LogitBias) FromTraceSpans2ParamsLogitBias1(v TraceSpans2ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsLogitBias1 performs a merge with any union data inside the Trace_Spans_2_Params_LogitBias, using the provided TraceSpans2ParamsLogitBias1
+func (t *Trace_Spans_2_Params_LogitBias) MergeTraceSpans2ParamsLogitBias1(v TraceSpans2ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_LogitBias) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_LogitBias) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsLogprobs0 returns the union data inside the Trace_Spans_2_Params_Logprobs as a TraceSpans2ParamsLogprobs0
+func (t Trace_Spans_2_Params_Logprobs) AsTraceSpans2ParamsLogprobs0() (TraceSpans2ParamsLogprobs0, error) {
+	var body TraceSpans2ParamsLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsLogprobs0 overwrites any union data inside the Trace_Spans_2_Params_Logprobs as the provided TraceSpans2ParamsLogprobs0
+func (t *Trace_Spans_2_Params_Logprobs) FromTraceSpans2ParamsLogprobs0(v TraceSpans2ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsLogprobs0 performs a merge with any union data inside the Trace_Spans_2_Params_Logprobs, using the provided TraceSpans2ParamsLogprobs0
+func (t *Trace_Spans_2_Params_Logprobs) MergeTraceSpans2ParamsLogprobs0(v TraceSpans2ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsLogprobs1 returns the union data inside the Trace_Spans_2_Params_Logprobs as a TraceSpans2ParamsLogprobs1
+func (t Trace_Spans_2_Params_Logprobs) AsTraceSpans2ParamsLogprobs1() (TraceSpans2ParamsLogprobs1, error) {
+	var body TraceSpans2ParamsLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsLogprobs1 overwrites any union data inside the Trace_Spans_2_Params_Logprobs as the provided TraceSpans2ParamsLogprobs1
+func (t *Trace_Spans_2_Params_Logprobs) FromTraceSpans2ParamsLogprobs1(v TraceSpans2ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsLogprobs1 performs a merge with any union data inside the Trace_Spans_2_Params_Logprobs, using the provided TraceSpans2ParamsLogprobs1
+func (t *Trace_Spans_2_Params_Logprobs) MergeTraceSpans2ParamsLogprobs1(v TraceSpans2ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_Logprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_Logprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsMaxTokens0 returns the union data inside the Trace_Spans_2_Params_MaxTokens as a TraceSpans2ParamsMaxTokens0
+func (t Trace_Spans_2_Params_MaxTokens) AsTraceSpans2ParamsMaxTokens0() (TraceSpans2ParamsMaxTokens0, error) {
+	var body TraceSpans2ParamsMaxTokens0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsMaxTokens0 overwrites any union data inside the Trace_Spans_2_Params_MaxTokens as the provided TraceSpans2ParamsMaxTokens0
+func (t *Trace_Spans_2_Params_MaxTokens) FromTraceSpans2ParamsMaxTokens0(v TraceSpans2ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsMaxTokens0 performs a merge with any union data inside the Trace_Spans_2_Params_MaxTokens, using the provided TraceSpans2ParamsMaxTokens0
+func (t *Trace_Spans_2_Params_MaxTokens) MergeTraceSpans2ParamsMaxTokens0(v TraceSpans2ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsMaxTokens1 returns the union data inside the Trace_Spans_2_Params_MaxTokens as a TraceSpans2ParamsMaxTokens1
+func (t Trace_Spans_2_Params_MaxTokens) AsTraceSpans2ParamsMaxTokens1() (TraceSpans2ParamsMaxTokens1, error) {
+	var body TraceSpans2ParamsMaxTokens1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsMaxTokens1 overwrites any union data inside the Trace_Spans_2_Params_MaxTokens as the provided TraceSpans2ParamsMaxTokens1
+func (t *Trace_Spans_2_Params_MaxTokens) FromTraceSpans2ParamsMaxTokens1(v TraceSpans2ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsMaxTokens1 performs a merge with any union data inside the Trace_Spans_2_Params_MaxTokens, using the provided TraceSpans2ParamsMaxTokens1
+func (t *Trace_Spans_2_Params_MaxTokens) MergeTraceSpans2ParamsMaxTokens1(v TraceSpans2ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_MaxTokens) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_MaxTokens) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsN0 returns the union data inside the Trace_Spans_2_Params_N as a TraceSpans2ParamsN0
+func (t Trace_Spans_2_Params_N) AsTraceSpans2ParamsN0() (TraceSpans2ParamsN0, error) {
+	var body TraceSpans2ParamsN0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsN0 overwrites any union data inside the Trace_Spans_2_Params_N as the provided TraceSpans2ParamsN0
+func (t *Trace_Spans_2_Params_N) FromTraceSpans2ParamsN0(v TraceSpans2ParamsN0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsN0 performs a merge with any union data inside the Trace_Spans_2_Params_N, using the provided TraceSpans2ParamsN0
+func (t *Trace_Spans_2_Params_N) MergeTraceSpans2ParamsN0(v TraceSpans2ParamsN0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsN1 returns the union data inside the Trace_Spans_2_Params_N as a TraceSpans2ParamsN1
+func (t Trace_Spans_2_Params_N) AsTraceSpans2ParamsN1() (TraceSpans2ParamsN1, error) {
+	var body TraceSpans2ParamsN1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsN1 overwrites any union data inside the Trace_Spans_2_Params_N as the provided TraceSpans2ParamsN1
+func (t *Trace_Spans_2_Params_N) FromTraceSpans2ParamsN1(v TraceSpans2ParamsN1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsN1 performs a merge with any union data inside the Trace_Spans_2_Params_N, using the provided TraceSpans2ParamsN1
+func (t *Trace_Spans_2_Params_N) MergeTraceSpans2ParamsN1(v TraceSpans2ParamsN1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_N) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_N) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsParallelToolCalls0 returns the union data inside the Trace_Spans_2_Params_ParallelToolCalls as a TraceSpans2ParamsParallelToolCalls0
+func (t Trace_Spans_2_Params_ParallelToolCalls) AsTraceSpans2ParamsParallelToolCalls0() (TraceSpans2ParamsParallelToolCalls0, error) {
+	var body TraceSpans2ParamsParallelToolCalls0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsParallelToolCalls0 overwrites any union data inside the Trace_Spans_2_Params_ParallelToolCalls as the provided TraceSpans2ParamsParallelToolCalls0
+func (t *Trace_Spans_2_Params_ParallelToolCalls) FromTraceSpans2ParamsParallelToolCalls0(v TraceSpans2ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsParallelToolCalls0 performs a merge with any union data inside the Trace_Spans_2_Params_ParallelToolCalls, using the provided TraceSpans2ParamsParallelToolCalls0
+func (t *Trace_Spans_2_Params_ParallelToolCalls) MergeTraceSpans2ParamsParallelToolCalls0(v TraceSpans2ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsParallelToolCalls1 returns the union data inside the Trace_Spans_2_Params_ParallelToolCalls as a TraceSpans2ParamsParallelToolCalls1
+func (t Trace_Spans_2_Params_ParallelToolCalls) AsTraceSpans2ParamsParallelToolCalls1() (TraceSpans2ParamsParallelToolCalls1, error) {
+	var body TraceSpans2ParamsParallelToolCalls1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsParallelToolCalls1 overwrites any union data inside the Trace_Spans_2_Params_ParallelToolCalls as the provided TraceSpans2ParamsParallelToolCalls1
+func (t *Trace_Spans_2_Params_ParallelToolCalls) FromTraceSpans2ParamsParallelToolCalls1(v TraceSpans2ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsParallelToolCalls1 performs a merge with any union data inside the Trace_Spans_2_Params_ParallelToolCalls, using the provided TraceSpans2ParamsParallelToolCalls1
+func (t *Trace_Spans_2_Params_ParallelToolCalls) MergeTraceSpans2ParamsParallelToolCalls1(v TraceSpans2ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_ParallelToolCalls) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_ParallelToolCalls) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsPresencePenalty0 returns the union data inside the Trace_Spans_2_Params_PresencePenalty as a TraceSpans2ParamsPresencePenalty0
+func (t Trace_Spans_2_Params_PresencePenalty) AsTraceSpans2ParamsPresencePenalty0() (TraceSpans2ParamsPresencePenalty0, error) {
+	var body TraceSpans2ParamsPresencePenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsPresencePenalty0 overwrites any union data inside the Trace_Spans_2_Params_PresencePenalty as the provided TraceSpans2ParamsPresencePenalty0
+func (t *Trace_Spans_2_Params_PresencePenalty) FromTraceSpans2ParamsPresencePenalty0(v TraceSpans2ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsPresencePenalty0 performs a merge with any union data inside the Trace_Spans_2_Params_PresencePenalty, using the provided TraceSpans2ParamsPresencePenalty0
+func (t *Trace_Spans_2_Params_PresencePenalty) MergeTraceSpans2ParamsPresencePenalty0(v TraceSpans2ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsPresencePenalty1 returns the union data inside the Trace_Spans_2_Params_PresencePenalty as a TraceSpans2ParamsPresencePenalty1
+func (t Trace_Spans_2_Params_PresencePenalty) AsTraceSpans2ParamsPresencePenalty1() (TraceSpans2ParamsPresencePenalty1, error) {
+	var body TraceSpans2ParamsPresencePenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsPresencePenalty1 overwrites any union data inside the Trace_Spans_2_Params_PresencePenalty as the provided TraceSpans2ParamsPresencePenalty1
+func (t *Trace_Spans_2_Params_PresencePenalty) FromTraceSpans2ParamsPresencePenalty1(v TraceSpans2ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsPresencePenalty1 performs a merge with any union data inside the Trace_Spans_2_Params_PresencePenalty, using the provided TraceSpans2ParamsPresencePenalty1
+func (t *Trace_Spans_2_Params_PresencePenalty) MergeTraceSpans2ParamsPresencePenalty1(v TraceSpans2ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_PresencePenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_PresencePenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsReasoningEffort0 returns the union data inside the Trace_Spans_2_Params_ReasoningEffort as a TraceSpans2ParamsReasoningEffort0
+func (t Trace_Spans_2_Params_ReasoningEffort) AsTraceSpans2ParamsReasoningEffort0() (TraceSpans2ParamsReasoningEffort0, error) {
+	var body TraceSpans2ParamsReasoningEffort0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsReasoningEffort0 overwrites any union data inside the Trace_Spans_2_Params_ReasoningEffort as the provided TraceSpans2ParamsReasoningEffort0
+func (t *Trace_Spans_2_Params_ReasoningEffort) FromTraceSpans2ParamsReasoningEffort0(v TraceSpans2ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsReasoningEffort0 performs a merge with any union data inside the Trace_Spans_2_Params_ReasoningEffort, using the provided TraceSpans2ParamsReasoningEffort0
+func (t *Trace_Spans_2_Params_ReasoningEffort) MergeTraceSpans2ParamsReasoningEffort0(v TraceSpans2ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsReasoningEffort1 returns the union data inside the Trace_Spans_2_Params_ReasoningEffort as a TraceSpans2ParamsReasoningEffort1
+func (t Trace_Spans_2_Params_ReasoningEffort) AsTraceSpans2ParamsReasoningEffort1() (TraceSpans2ParamsReasoningEffort1, error) {
+	var body TraceSpans2ParamsReasoningEffort1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsReasoningEffort1 overwrites any union data inside the Trace_Spans_2_Params_ReasoningEffort as the provided TraceSpans2ParamsReasoningEffort1
+func (t *Trace_Spans_2_Params_ReasoningEffort) FromTraceSpans2ParamsReasoningEffort1(v TraceSpans2ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsReasoningEffort1 performs a merge with any union data inside the Trace_Spans_2_Params_ReasoningEffort, using the provided TraceSpans2ParamsReasoningEffort1
+func (t *Trace_Spans_2_Params_ReasoningEffort) MergeTraceSpans2ParamsReasoningEffort1(v TraceSpans2ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_ReasoningEffort) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_ReasoningEffort) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsSeed0 returns the union data inside the Trace_Spans_2_Params_Seed as a TraceSpans2ParamsSeed0
+func (t Trace_Spans_2_Params_Seed) AsTraceSpans2ParamsSeed0() (TraceSpans2ParamsSeed0, error) {
+	var body TraceSpans2ParamsSeed0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsSeed0 overwrites any union data inside the Trace_Spans_2_Params_Seed as the provided TraceSpans2ParamsSeed0
+func (t *Trace_Spans_2_Params_Seed) FromTraceSpans2ParamsSeed0(v TraceSpans2ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsSeed0 performs a merge with any union data inside the Trace_Spans_2_Params_Seed, using the provided TraceSpans2ParamsSeed0
+func (t *Trace_Spans_2_Params_Seed) MergeTraceSpans2ParamsSeed0(v TraceSpans2ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsSeed1 returns the union data inside the Trace_Spans_2_Params_Seed as a TraceSpans2ParamsSeed1
+func (t Trace_Spans_2_Params_Seed) AsTraceSpans2ParamsSeed1() (TraceSpans2ParamsSeed1, error) {
+	var body TraceSpans2ParamsSeed1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsSeed1 overwrites any union data inside the Trace_Spans_2_Params_Seed as the provided TraceSpans2ParamsSeed1
+func (t *Trace_Spans_2_Params_Seed) FromTraceSpans2ParamsSeed1(v TraceSpans2ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsSeed1 performs a merge with any union data inside the Trace_Spans_2_Params_Seed, using the provided TraceSpans2ParamsSeed1
+func (t *Trace_Spans_2_Params_Seed) MergeTraceSpans2ParamsSeed1(v TraceSpans2ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_Seed) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_Seed) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsStop00 returns the union data inside the TraceSpans2ParamsStop0 as a TraceSpans2ParamsStop00
+func (t TraceSpans2ParamsStop0) AsTraceSpans2ParamsStop00() (TraceSpans2ParamsStop00, error) {
+	var body TraceSpans2ParamsStop00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsStop00 overwrites any union data inside the TraceSpans2ParamsStop0 as the provided TraceSpans2ParamsStop00
+func (t *TraceSpans2ParamsStop0) FromTraceSpans2ParamsStop00(v TraceSpans2ParamsStop00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsStop00 performs a merge with any union data inside the TraceSpans2ParamsStop0, using the provided TraceSpans2ParamsStop00
+func (t *TraceSpans2ParamsStop0) MergeTraceSpans2ParamsStop00(v TraceSpans2ParamsStop00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsStop01 returns the union data inside the TraceSpans2ParamsStop0 as a TraceSpans2ParamsStop01
+func (t TraceSpans2ParamsStop0) AsTraceSpans2ParamsStop01() (TraceSpans2ParamsStop01, error) {
+	var body TraceSpans2ParamsStop01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsStop01 overwrites any union data inside the TraceSpans2ParamsStop0 as the provided TraceSpans2ParamsStop01
+func (t *TraceSpans2ParamsStop0) FromTraceSpans2ParamsStop01(v TraceSpans2ParamsStop01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsStop01 performs a merge with any union data inside the TraceSpans2ParamsStop0, using the provided TraceSpans2ParamsStop01
+func (t *TraceSpans2ParamsStop0) MergeTraceSpans2ParamsStop01(v TraceSpans2ParamsStop01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TraceSpans2ParamsStop0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TraceSpans2ParamsStop0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsStop0 returns the union data inside the Trace_Spans_2_Params_Stop as a TraceSpans2ParamsStop0
+func (t Trace_Spans_2_Params_Stop) AsTraceSpans2ParamsStop0() (TraceSpans2ParamsStop0, error) {
+	var body TraceSpans2ParamsStop0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsStop0 overwrites any union data inside the Trace_Spans_2_Params_Stop as the provided TraceSpans2ParamsStop0
+func (t *Trace_Spans_2_Params_Stop) FromTraceSpans2ParamsStop0(v TraceSpans2ParamsStop0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsStop0 performs a merge with any union data inside the Trace_Spans_2_Params_Stop, using the provided TraceSpans2ParamsStop0
+func (t *Trace_Spans_2_Params_Stop) MergeTraceSpans2ParamsStop0(v TraceSpans2ParamsStop0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsStop1 returns the union data inside the Trace_Spans_2_Params_Stop as a TraceSpans2ParamsStop1
+func (t Trace_Spans_2_Params_Stop) AsTraceSpans2ParamsStop1() (TraceSpans2ParamsStop1, error) {
+	var body TraceSpans2ParamsStop1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsStop1 overwrites any union data inside the Trace_Spans_2_Params_Stop as the provided TraceSpans2ParamsStop1
+func (t *Trace_Spans_2_Params_Stop) FromTraceSpans2ParamsStop1(v TraceSpans2ParamsStop1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsStop1 performs a merge with any union data inside the Trace_Spans_2_Params_Stop, using the provided TraceSpans2ParamsStop1
+func (t *Trace_Spans_2_Params_Stop) MergeTraceSpans2ParamsStop1(v TraceSpans2ParamsStop1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_Stop) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_Stop) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsStream0 returns the union data inside the Trace_Spans_2_Params_Stream as a TraceSpans2ParamsStream0
+func (t Trace_Spans_2_Params_Stream) AsTraceSpans2ParamsStream0() (TraceSpans2ParamsStream0, error) {
+	var body TraceSpans2ParamsStream0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsStream0 overwrites any union data inside the Trace_Spans_2_Params_Stream as the provided TraceSpans2ParamsStream0
+func (t *Trace_Spans_2_Params_Stream) FromTraceSpans2ParamsStream0(v TraceSpans2ParamsStream0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsStream0 performs a merge with any union data inside the Trace_Spans_2_Params_Stream, using the provided TraceSpans2ParamsStream0
+func (t *Trace_Spans_2_Params_Stream) MergeTraceSpans2ParamsStream0(v TraceSpans2ParamsStream0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsStream1 returns the union data inside the Trace_Spans_2_Params_Stream as a TraceSpans2ParamsStream1
+func (t Trace_Spans_2_Params_Stream) AsTraceSpans2ParamsStream1() (TraceSpans2ParamsStream1, error) {
+	var body TraceSpans2ParamsStream1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsStream1 overwrites any union data inside the Trace_Spans_2_Params_Stream as the provided TraceSpans2ParamsStream1
+func (t *Trace_Spans_2_Params_Stream) FromTraceSpans2ParamsStream1(v TraceSpans2ParamsStream1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsStream1 performs a merge with any union data inside the Trace_Spans_2_Params_Stream, using the provided TraceSpans2ParamsStream1
+func (t *Trace_Spans_2_Params_Stream) MergeTraceSpans2ParamsStream1(v TraceSpans2ParamsStream1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_Stream) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_Stream) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsTemperature0 returns the union data inside the Trace_Spans_2_Params_Temperature as a TraceSpans2ParamsTemperature0
+func (t Trace_Spans_2_Params_Temperature) AsTraceSpans2ParamsTemperature0() (TraceSpans2ParamsTemperature0, error) {
+	var body TraceSpans2ParamsTemperature0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsTemperature0 overwrites any union data inside the Trace_Spans_2_Params_Temperature as the provided TraceSpans2ParamsTemperature0
+func (t *Trace_Spans_2_Params_Temperature) FromTraceSpans2ParamsTemperature0(v TraceSpans2ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsTemperature0 performs a merge with any union data inside the Trace_Spans_2_Params_Temperature, using the provided TraceSpans2ParamsTemperature0
+func (t *Trace_Spans_2_Params_Temperature) MergeTraceSpans2ParamsTemperature0(v TraceSpans2ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsTemperature1 returns the union data inside the Trace_Spans_2_Params_Temperature as a TraceSpans2ParamsTemperature1
+func (t Trace_Spans_2_Params_Temperature) AsTraceSpans2ParamsTemperature1() (TraceSpans2ParamsTemperature1, error) {
+	var body TraceSpans2ParamsTemperature1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsTemperature1 overwrites any union data inside the Trace_Spans_2_Params_Temperature as the provided TraceSpans2ParamsTemperature1
+func (t *Trace_Spans_2_Params_Temperature) FromTraceSpans2ParamsTemperature1(v TraceSpans2ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsTemperature1 performs a merge with any union data inside the Trace_Spans_2_Params_Temperature, using the provided TraceSpans2ParamsTemperature1
+func (t *Trace_Spans_2_Params_Temperature) MergeTraceSpans2ParamsTemperature1(v TraceSpans2ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_Temperature) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_Temperature) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsToolChoice00 returns the union data inside the TraceSpans2ParamsToolChoice0 as a TraceSpans2ParamsToolChoice00
+func (t TraceSpans2ParamsToolChoice0) AsTraceSpans2ParamsToolChoice00() (TraceSpans2ParamsToolChoice00, error) {
+	var body TraceSpans2ParamsToolChoice00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsToolChoice00 overwrites any union data inside the TraceSpans2ParamsToolChoice0 as the provided TraceSpans2ParamsToolChoice00
+func (t *TraceSpans2ParamsToolChoice0) FromTraceSpans2ParamsToolChoice00(v TraceSpans2ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsToolChoice00 performs a merge with any union data inside the TraceSpans2ParamsToolChoice0, using the provided TraceSpans2ParamsToolChoice00
+func (t *TraceSpans2ParamsToolChoice0) MergeTraceSpans2ParamsToolChoice00(v TraceSpans2ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsToolChoice01 returns the union data inside the TraceSpans2ParamsToolChoice0 as a TraceSpans2ParamsToolChoice01
+func (t TraceSpans2ParamsToolChoice0) AsTraceSpans2ParamsToolChoice01() (TraceSpans2ParamsToolChoice01, error) {
+	var body TraceSpans2ParamsToolChoice01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsToolChoice01 overwrites any union data inside the TraceSpans2ParamsToolChoice0 as the provided TraceSpans2ParamsToolChoice01
+func (t *TraceSpans2ParamsToolChoice0) FromTraceSpans2ParamsToolChoice01(v TraceSpans2ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsToolChoice01 performs a merge with any union data inside the TraceSpans2ParamsToolChoice0, using the provided TraceSpans2ParamsToolChoice01
+func (t *TraceSpans2ParamsToolChoice0) MergeTraceSpans2ParamsToolChoice01(v TraceSpans2ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TraceSpans2ParamsToolChoice0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TraceSpans2ParamsToolChoice0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsToolChoice0 returns the union data inside the Trace_Spans_2_Params_ToolChoice as a TraceSpans2ParamsToolChoice0
+func (t Trace_Spans_2_Params_ToolChoice) AsTraceSpans2ParamsToolChoice0() (TraceSpans2ParamsToolChoice0, error) {
+	var body TraceSpans2ParamsToolChoice0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsToolChoice0 overwrites any union data inside the Trace_Spans_2_Params_ToolChoice as the provided TraceSpans2ParamsToolChoice0
+func (t *Trace_Spans_2_Params_ToolChoice) FromTraceSpans2ParamsToolChoice0(v TraceSpans2ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsToolChoice0 performs a merge with any union data inside the Trace_Spans_2_Params_ToolChoice, using the provided TraceSpans2ParamsToolChoice0
+func (t *Trace_Spans_2_Params_ToolChoice) MergeTraceSpans2ParamsToolChoice0(v TraceSpans2ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsToolChoice1 returns the union data inside the Trace_Spans_2_Params_ToolChoice as a TraceSpans2ParamsToolChoice1
+func (t Trace_Spans_2_Params_ToolChoice) AsTraceSpans2ParamsToolChoice1() (TraceSpans2ParamsToolChoice1, error) {
+	var body TraceSpans2ParamsToolChoice1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsToolChoice1 overwrites any union data inside the Trace_Spans_2_Params_ToolChoice as the provided TraceSpans2ParamsToolChoice1
+func (t *Trace_Spans_2_Params_ToolChoice) FromTraceSpans2ParamsToolChoice1(v TraceSpans2ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsToolChoice1 performs a merge with any union data inside the Trace_Spans_2_Params_ToolChoice, using the provided TraceSpans2ParamsToolChoice1
+func (t *Trace_Spans_2_Params_ToolChoice) MergeTraceSpans2ParamsToolChoice1(v TraceSpans2ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_ToolChoice) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_ToolChoice) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsTools0 returns the union data inside the Trace_Spans_2_Params_Tools as a TraceSpans2ParamsTools0
+func (t Trace_Spans_2_Params_Tools) AsTraceSpans2ParamsTools0() (TraceSpans2ParamsTools0, error) {
+	var body TraceSpans2ParamsTools0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsTools0 overwrites any union data inside the Trace_Spans_2_Params_Tools as the provided TraceSpans2ParamsTools0
+func (t *Trace_Spans_2_Params_Tools) FromTraceSpans2ParamsTools0(v TraceSpans2ParamsTools0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsTools0 performs a merge with any union data inside the Trace_Spans_2_Params_Tools, using the provided TraceSpans2ParamsTools0
+func (t *Trace_Spans_2_Params_Tools) MergeTraceSpans2ParamsTools0(v TraceSpans2ParamsTools0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsTools1 returns the union data inside the Trace_Spans_2_Params_Tools as a TraceSpans2ParamsTools1
+func (t Trace_Spans_2_Params_Tools) AsTraceSpans2ParamsTools1() (TraceSpans2ParamsTools1, error) {
+	var body TraceSpans2ParamsTools1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsTools1 overwrites any union data inside the Trace_Spans_2_Params_Tools as the provided TraceSpans2ParamsTools1
+func (t *Trace_Spans_2_Params_Tools) FromTraceSpans2ParamsTools1(v TraceSpans2ParamsTools1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsTools1 performs a merge with any union data inside the Trace_Spans_2_Params_Tools, using the provided TraceSpans2ParamsTools1
+func (t *Trace_Spans_2_Params_Tools) MergeTraceSpans2ParamsTools1(v TraceSpans2ParamsTools1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_Tools) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_Tools) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsTopLogprobs0 returns the union data inside the Trace_Spans_2_Params_TopLogprobs as a TraceSpans2ParamsTopLogprobs0
+func (t Trace_Spans_2_Params_TopLogprobs) AsTraceSpans2ParamsTopLogprobs0() (TraceSpans2ParamsTopLogprobs0, error) {
+	var body TraceSpans2ParamsTopLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsTopLogprobs0 overwrites any union data inside the Trace_Spans_2_Params_TopLogprobs as the provided TraceSpans2ParamsTopLogprobs0
+func (t *Trace_Spans_2_Params_TopLogprobs) FromTraceSpans2ParamsTopLogprobs0(v TraceSpans2ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsTopLogprobs0 performs a merge with any union data inside the Trace_Spans_2_Params_TopLogprobs, using the provided TraceSpans2ParamsTopLogprobs0
+func (t *Trace_Spans_2_Params_TopLogprobs) MergeTraceSpans2ParamsTopLogprobs0(v TraceSpans2ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsTopLogprobs1 returns the union data inside the Trace_Spans_2_Params_TopLogprobs as a TraceSpans2ParamsTopLogprobs1
+func (t Trace_Spans_2_Params_TopLogprobs) AsTraceSpans2ParamsTopLogprobs1() (TraceSpans2ParamsTopLogprobs1, error) {
+	var body TraceSpans2ParamsTopLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsTopLogprobs1 overwrites any union data inside the Trace_Spans_2_Params_TopLogprobs as the provided TraceSpans2ParamsTopLogprobs1
+func (t *Trace_Spans_2_Params_TopLogprobs) FromTraceSpans2ParamsTopLogprobs1(v TraceSpans2ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsTopLogprobs1 performs a merge with any union data inside the Trace_Spans_2_Params_TopLogprobs, using the provided TraceSpans2ParamsTopLogprobs1
+func (t *Trace_Spans_2_Params_TopLogprobs) MergeTraceSpans2ParamsTopLogprobs1(v TraceSpans2ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_TopLogprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_TopLogprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsTopP0 returns the union data inside the Trace_Spans_2_Params_TopP as a TraceSpans2ParamsTopP0
+func (t Trace_Spans_2_Params_TopP) AsTraceSpans2ParamsTopP0() (TraceSpans2ParamsTopP0, error) {
+	var body TraceSpans2ParamsTopP0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsTopP0 overwrites any union data inside the Trace_Spans_2_Params_TopP as the provided TraceSpans2ParamsTopP0
+func (t *Trace_Spans_2_Params_TopP) FromTraceSpans2ParamsTopP0(v TraceSpans2ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsTopP0 performs a merge with any union data inside the Trace_Spans_2_Params_TopP, using the provided TraceSpans2ParamsTopP0
+func (t *Trace_Spans_2_Params_TopP) MergeTraceSpans2ParamsTopP0(v TraceSpans2ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsTopP1 returns the union data inside the Trace_Spans_2_Params_TopP as a TraceSpans2ParamsTopP1
+func (t Trace_Spans_2_Params_TopP) AsTraceSpans2ParamsTopP1() (TraceSpans2ParamsTopP1, error) {
+	var body TraceSpans2ParamsTopP1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsTopP1 overwrites any union data inside the Trace_Spans_2_Params_TopP as the provided TraceSpans2ParamsTopP1
+func (t *Trace_Spans_2_Params_TopP) FromTraceSpans2ParamsTopP1(v TraceSpans2ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsTopP1 performs a merge with any union data inside the Trace_Spans_2_Params_TopP, using the provided TraceSpans2ParamsTopP1
+func (t *Trace_Spans_2_Params_TopP) MergeTraceSpans2ParamsTopP1(v TraceSpans2ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_TopP) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_TopP) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTraceSpans2ParamsUser0 returns the union data inside the Trace_Spans_2_Params_User as a TraceSpans2ParamsUser0
+func (t Trace_Spans_2_Params_User) AsTraceSpans2ParamsUser0() (TraceSpans2ParamsUser0, error) {
+	var body TraceSpans2ParamsUser0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsUser0 overwrites any union data inside the Trace_Spans_2_Params_User as the provided TraceSpans2ParamsUser0
+func (t *Trace_Spans_2_Params_User) FromTraceSpans2ParamsUser0(v TraceSpans2ParamsUser0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsUser0 performs a merge with any union data inside the Trace_Spans_2_Params_User, using the provided TraceSpans2ParamsUser0
+func (t *Trace_Spans_2_Params_User) MergeTraceSpans2ParamsUser0(v TraceSpans2ParamsUser0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTraceSpans2ParamsUser1 returns the union data inside the Trace_Spans_2_Params_User as a TraceSpans2ParamsUser1
+func (t Trace_Spans_2_Params_User) AsTraceSpans2ParamsUser1() (TraceSpans2ParamsUser1, error) {
+	var body TraceSpans2ParamsUser1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTraceSpans2ParamsUser1 overwrites any union data inside the Trace_Spans_2_Params_User as the provided TraceSpans2ParamsUser1
+func (t *Trace_Spans_2_Params_User) FromTraceSpans2ParamsUser1(v TraceSpans2ParamsUser1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTraceSpans2ParamsUser1 performs a merge with any union data inside the Trace_Spans_2_Params_User, using the provided TraceSpans2ParamsUser1
+func (t *Trace_Spans_2_Params_User) MergeTraceSpans2ParamsUser1(v TraceSpans2ParamsUser1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Trace_Spans_2_Params_User) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Trace_Spans_2_Params_User) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -72170,6 +79250,1246 @@ func (t *GetApiTraceId200JSONResponseBody_Spans_0_Output) UnmarshalJSON(b []byte
 	return err
 }
 
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty as a GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty) AsGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0() (GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty as the provided GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty) FromGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0(v GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty) MergeGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0(v GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty as a GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty) AsGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1() (GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty as the provided GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty) FromGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1(v GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty) MergeGetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1(v GetApiTraceId200JSONResponseBodySpans0ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_FrequencyPenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsFunctions0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions as a GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions) AsGetApiTraceId200JSONResponseBodySpans0ParamsFunctions0() (GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsFunctions0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions as the provided GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions) FromGetApiTraceId200JSONResponseBodySpans0ParamsFunctions0(v GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsFunctions0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions) MergeGetApiTraceId200JSONResponseBodySpans0ParamsFunctions0(v GetApiTraceId200JSONResponseBodySpans0ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsFunctions1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions as a GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions) AsGetApiTraceId200JSONResponseBodySpans0ParamsFunctions1() (GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsFunctions1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions as the provided GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions) FromGetApiTraceId200JSONResponseBodySpans0ParamsFunctions1(v GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsFunctions1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions) MergeGetApiTraceId200JSONResponseBodySpans0ParamsFunctions1(v GetApiTraceId200JSONResponseBodySpans0ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Functions) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias as a GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias) AsGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0() (GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias as the provided GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias) FromGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0(v GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias) MergeGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0(v GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias as a GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias) AsGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1() (GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias as the provided GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias) FromGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1(v GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias) MergeGetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1(v GetApiTraceId200JSONResponseBodySpans0ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_LogitBias) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs as a GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs) AsGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0() (GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs as the provided GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs) FromGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0(v GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs) MergeGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0(v GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs as a GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs) AsGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1() (GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs as the provided GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs) FromGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1(v GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs) MergeGetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1(v GetApiTraceId200JSONResponseBodySpans0ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Logprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens as a GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens) AsGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0() (GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens as the provided GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens) FromGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0(v GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens) MergeGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0(v GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens as a GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens) AsGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1() (GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens as the provided GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens) FromGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1(v GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens) MergeGetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1(v GetApiTraceId200JSONResponseBodySpans0ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_MaxTokens) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsN0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_N as a GetApiTraceId200JSONResponseBodySpans0ParamsN0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_N) AsGetApiTraceId200JSONResponseBodySpans0ParamsN0() (GetApiTraceId200JSONResponseBodySpans0ParamsN0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsN0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsN0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_N as the provided GetApiTraceId200JSONResponseBodySpans0ParamsN0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_N) FromGetApiTraceId200JSONResponseBodySpans0ParamsN0(v GetApiTraceId200JSONResponseBodySpans0ParamsN0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsN0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_N, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsN0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_N) MergeGetApiTraceId200JSONResponseBodySpans0ParamsN0(v GetApiTraceId200JSONResponseBodySpans0ParamsN0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsN1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_N as a GetApiTraceId200JSONResponseBodySpans0ParamsN1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_N) AsGetApiTraceId200JSONResponseBodySpans0ParamsN1() (GetApiTraceId200JSONResponseBodySpans0ParamsN1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsN1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsN1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_N as the provided GetApiTraceId200JSONResponseBodySpans0ParamsN1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_N) FromGetApiTraceId200JSONResponseBodySpans0ParamsN1(v GetApiTraceId200JSONResponseBodySpans0ParamsN1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsN1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_N, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsN1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_N) MergeGetApiTraceId200JSONResponseBodySpans0ParamsN1(v GetApiTraceId200JSONResponseBodySpans0ParamsN1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_N) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_N) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls as a GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls) AsGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0() (GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls as the provided GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls) FromGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0(v GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls) MergeGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0(v GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls as a GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls) AsGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1() (GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls as the provided GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls) FromGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1(v GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls) MergeGetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1(v GetApiTraceId200JSONResponseBodySpans0ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ParallelToolCalls) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty as a GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty) AsGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0() (GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty as the provided GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty) FromGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0(v GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty) MergeGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0(v GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty as a GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty) AsGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1() (GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty as the provided GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty) FromGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1(v GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty) MergeGetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1(v GetApiTraceId200JSONResponseBodySpans0ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_PresencePenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort as a GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort) AsGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0() (GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort as the provided GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort) FromGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0(v GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort) MergeGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0(v GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort as a GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort) AsGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1() (GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort as the provided GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort) FromGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1(v GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort) MergeGetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1(v GetApiTraceId200JSONResponseBodySpans0ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ReasoningEffort) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsSeed0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed as a GetApiTraceId200JSONResponseBodySpans0ParamsSeed0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed) AsGetApiTraceId200JSONResponseBodySpans0ParamsSeed0() (GetApiTraceId200JSONResponseBodySpans0ParamsSeed0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsSeed0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsSeed0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed as the provided GetApiTraceId200JSONResponseBodySpans0ParamsSeed0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed) FromGetApiTraceId200JSONResponseBodySpans0ParamsSeed0(v GetApiTraceId200JSONResponseBodySpans0ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsSeed0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsSeed0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed) MergeGetApiTraceId200JSONResponseBodySpans0ParamsSeed0(v GetApiTraceId200JSONResponseBodySpans0ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsSeed1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed as a GetApiTraceId200JSONResponseBodySpans0ParamsSeed1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed) AsGetApiTraceId200JSONResponseBodySpans0ParamsSeed1() (GetApiTraceId200JSONResponseBodySpans0ParamsSeed1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsSeed1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsSeed1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed as the provided GetApiTraceId200JSONResponseBodySpans0ParamsSeed1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed) FromGetApiTraceId200JSONResponseBodySpans0ParamsSeed1(v GetApiTraceId200JSONResponseBodySpans0ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsSeed1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsSeed1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed) MergeGetApiTraceId200JSONResponseBodySpans0ParamsSeed1(v GetApiTraceId200JSONResponseBodySpans0ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Seed) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsStop00 returns the union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsStop0 as a GetApiTraceId200JSONResponseBodySpans0ParamsStop00
+func (t GetApiTraceId200JSONResponseBodySpans0ParamsStop0) AsGetApiTraceId200JSONResponseBodySpans0ParamsStop00() (GetApiTraceId200JSONResponseBodySpans0ParamsStop00, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsStop00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsStop00 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsStop0 as the provided GetApiTraceId200JSONResponseBodySpans0ParamsStop00
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsStop0) FromGetApiTraceId200JSONResponseBodySpans0ParamsStop00(v GetApiTraceId200JSONResponseBodySpans0ParamsStop00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsStop00 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsStop0, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsStop00
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsStop0) MergeGetApiTraceId200JSONResponseBodySpans0ParamsStop00(v GetApiTraceId200JSONResponseBodySpans0ParamsStop00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsStop01 returns the union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsStop0 as a GetApiTraceId200JSONResponseBodySpans0ParamsStop01
+func (t GetApiTraceId200JSONResponseBodySpans0ParamsStop0) AsGetApiTraceId200JSONResponseBodySpans0ParamsStop01() (GetApiTraceId200JSONResponseBodySpans0ParamsStop01, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsStop01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsStop01 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsStop0 as the provided GetApiTraceId200JSONResponseBodySpans0ParamsStop01
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsStop0) FromGetApiTraceId200JSONResponseBodySpans0ParamsStop01(v GetApiTraceId200JSONResponseBodySpans0ParamsStop01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsStop01 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsStop0, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsStop01
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsStop0) MergeGetApiTraceId200JSONResponseBodySpans0ParamsStop01(v GetApiTraceId200JSONResponseBodySpans0ParamsStop01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBodySpans0ParamsStop0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsStop0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsStop0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop as a GetApiTraceId200JSONResponseBodySpans0ParamsStop0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop) AsGetApiTraceId200JSONResponseBodySpans0ParamsStop0() (GetApiTraceId200JSONResponseBodySpans0ParamsStop0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsStop0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsStop0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop as the provided GetApiTraceId200JSONResponseBodySpans0ParamsStop0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop) FromGetApiTraceId200JSONResponseBodySpans0ParamsStop0(v GetApiTraceId200JSONResponseBodySpans0ParamsStop0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsStop0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsStop0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop) MergeGetApiTraceId200JSONResponseBodySpans0ParamsStop0(v GetApiTraceId200JSONResponseBodySpans0ParamsStop0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsStop1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop as a GetApiTraceId200JSONResponseBodySpans0ParamsStop1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop) AsGetApiTraceId200JSONResponseBodySpans0ParamsStop1() (GetApiTraceId200JSONResponseBodySpans0ParamsStop1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsStop1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsStop1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop as the provided GetApiTraceId200JSONResponseBodySpans0ParamsStop1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop) FromGetApiTraceId200JSONResponseBodySpans0ParamsStop1(v GetApiTraceId200JSONResponseBodySpans0ParamsStop1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsStop1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsStop1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop) MergeGetApiTraceId200JSONResponseBodySpans0ParamsStop1(v GetApiTraceId200JSONResponseBodySpans0ParamsStop1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stop) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsStream0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream as a GetApiTraceId200JSONResponseBodySpans0ParamsStream0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream) AsGetApiTraceId200JSONResponseBodySpans0ParamsStream0() (GetApiTraceId200JSONResponseBodySpans0ParamsStream0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsStream0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsStream0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream as the provided GetApiTraceId200JSONResponseBodySpans0ParamsStream0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream) FromGetApiTraceId200JSONResponseBodySpans0ParamsStream0(v GetApiTraceId200JSONResponseBodySpans0ParamsStream0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsStream0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsStream0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream) MergeGetApiTraceId200JSONResponseBodySpans0ParamsStream0(v GetApiTraceId200JSONResponseBodySpans0ParamsStream0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsStream1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream as a GetApiTraceId200JSONResponseBodySpans0ParamsStream1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream) AsGetApiTraceId200JSONResponseBodySpans0ParamsStream1() (GetApiTraceId200JSONResponseBodySpans0ParamsStream1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsStream1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsStream1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream as the provided GetApiTraceId200JSONResponseBodySpans0ParamsStream1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream) FromGetApiTraceId200JSONResponseBodySpans0ParamsStream1(v GetApiTraceId200JSONResponseBodySpans0ParamsStream1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsStream1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsStream1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream) MergeGetApiTraceId200JSONResponseBodySpans0ParamsStream1(v GetApiTraceId200JSONResponseBodySpans0ParamsStream1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Stream) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsTemperature0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature as a GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature) AsGetApiTraceId200JSONResponseBodySpans0ParamsTemperature0() (GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsTemperature0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature as the provided GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature) FromGetApiTraceId200JSONResponseBodySpans0ParamsTemperature0(v GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsTemperature0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature) MergeGetApiTraceId200JSONResponseBodySpans0ParamsTemperature0(v GetApiTraceId200JSONResponseBodySpans0ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsTemperature1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature as a GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature) AsGetApiTraceId200JSONResponseBodySpans0ParamsTemperature1() (GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsTemperature1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature as the provided GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature) FromGetApiTraceId200JSONResponseBodySpans0ParamsTemperature1(v GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsTemperature1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature) MergeGetApiTraceId200JSONResponseBodySpans0ParamsTemperature1(v GetApiTraceId200JSONResponseBodySpans0ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Temperature) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00 returns the union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 as a GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00
+func (t GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) AsGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00() (GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 as the provided GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) FromGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00(v GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) MergeGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00(v GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01 returns the union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 as a GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01
+func (t GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) AsGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01() (GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 as the provided GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) FromGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01(v GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) MergeGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01(v GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice as a GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice) AsGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0() (GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice as the provided GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice) FromGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0(v GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice) MergeGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0(v GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice as a GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice) AsGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1() (GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice as the provided GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice) FromGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1(v GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice) MergeGetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1(v GetApiTraceId200JSONResponseBodySpans0ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_ToolChoice) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsTools0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools as a GetApiTraceId200JSONResponseBodySpans0ParamsTools0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools) AsGetApiTraceId200JSONResponseBodySpans0ParamsTools0() (GetApiTraceId200JSONResponseBodySpans0ParamsTools0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsTools0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsTools0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools as the provided GetApiTraceId200JSONResponseBodySpans0ParamsTools0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools) FromGetApiTraceId200JSONResponseBodySpans0ParamsTools0(v GetApiTraceId200JSONResponseBodySpans0ParamsTools0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsTools0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsTools0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools) MergeGetApiTraceId200JSONResponseBodySpans0ParamsTools0(v GetApiTraceId200JSONResponseBodySpans0ParamsTools0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsTools1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools as a GetApiTraceId200JSONResponseBodySpans0ParamsTools1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools) AsGetApiTraceId200JSONResponseBodySpans0ParamsTools1() (GetApiTraceId200JSONResponseBodySpans0ParamsTools1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsTools1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsTools1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools as the provided GetApiTraceId200JSONResponseBodySpans0ParamsTools1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools) FromGetApiTraceId200JSONResponseBodySpans0ParamsTools1(v GetApiTraceId200JSONResponseBodySpans0ParamsTools1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsTools1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsTools1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools) MergeGetApiTraceId200JSONResponseBodySpans0ParamsTools1(v GetApiTraceId200JSONResponseBodySpans0ParamsTools1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_Tools) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs as a GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs) AsGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0() (GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs as the provided GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs) FromGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0(v GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs) MergeGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0(v GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs as a GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs) AsGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1() (GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs as the provided GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs) FromGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1(v GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs) MergeGetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1(v GetApiTraceId200JSONResponseBodySpans0ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopLogprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsTopP0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP as a GetApiTraceId200JSONResponseBodySpans0ParamsTopP0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP) AsGetApiTraceId200JSONResponseBodySpans0ParamsTopP0() (GetApiTraceId200JSONResponseBodySpans0ParamsTopP0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsTopP0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsTopP0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP as the provided GetApiTraceId200JSONResponseBodySpans0ParamsTopP0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP) FromGetApiTraceId200JSONResponseBodySpans0ParamsTopP0(v GetApiTraceId200JSONResponseBodySpans0ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsTopP0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsTopP0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP) MergeGetApiTraceId200JSONResponseBodySpans0ParamsTopP0(v GetApiTraceId200JSONResponseBodySpans0ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsTopP1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP as a GetApiTraceId200JSONResponseBodySpans0ParamsTopP1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP) AsGetApiTraceId200JSONResponseBodySpans0ParamsTopP1() (GetApiTraceId200JSONResponseBodySpans0ParamsTopP1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsTopP1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsTopP1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP as the provided GetApiTraceId200JSONResponseBodySpans0ParamsTopP1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP) FromGetApiTraceId200JSONResponseBodySpans0ParamsTopP1(v GetApiTraceId200JSONResponseBodySpans0ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsTopP1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsTopP1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP) MergeGetApiTraceId200JSONResponseBodySpans0ParamsTopP1(v GetApiTraceId200JSONResponseBodySpans0ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_TopP) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsUser0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_User as a GetApiTraceId200JSONResponseBodySpans0ParamsUser0
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_User) AsGetApiTraceId200JSONResponseBodySpans0ParamsUser0() (GetApiTraceId200JSONResponseBodySpans0ParamsUser0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsUser0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsUser0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_User as the provided GetApiTraceId200JSONResponseBodySpans0ParamsUser0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_User) FromGetApiTraceId200JSONResponseBodySpans0ParamsUser0(v GetApiTraceId200JSONResponseBodySpans0ParamsUser0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsUser0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_User, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsUser0
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_User) MergeGetApiTraceId200JSONResponseBodySpans0ParamsUser0(v GetApiTraceId200JSONResponseBodySpans0ParamsUser0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans0ParamsUser1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_User as a GetApiTraceId200JSONResponseBodySpans0ParamsUser1
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_User) AsGetApiTraceId200JSONResponseBodySpans0ParamsUser1() (GetApiTraceId200JSONResponseBodySpans0ParamsUser1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans0ParamsUser1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans0ParamsUser1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_User as the provided GetApiTraceId200JSONResponseBodySpans0ParamsUser1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_User) FromGetApiTraceId200JSONResponseBodySpans0ParamsUser1(v GetApiTraceId200JSONResponseBodySpans0ParamsUser1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans0ParamsUser1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_0_Params_User, using the provided GetApiTraceId200JSONResponseBodySpans0ParamsUser1
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_User) MergeGetApiTraceId200JSONResponseBodySpans0ParamsUser1(v GetApiTraceId200JSONResponseBodySpans0ParamsUser1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_0_Params_User) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_0_Params_User) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGetApiTraceId200JSONResponseBodySpans1ContextsContent0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Contexts_Content as a GetApiTraceId200JSONResponseBodySpans1ContextsContent0
 func (t GetApiTraceId200JSONResponseBody_Spans_1_Contexts_Content) AsGetApiTraceId200JSONResponseBodySpans1ContextsContent0() (GetApiTraceId200JSONResponseBodySpans1ContextsContent0, error) {
 	var body GetApiTraceId200JSONResponseBodySpans1ContextsContent0
@@ -72786,6 +81106,1246 @@ func (t *GetApiTraceId200JSONResponseBody_Spans_1_Output) UnmarshalJSON(b []byte
 	return err
 }
 
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty as a GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty) AsGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0() (GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty as the provided GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty) FromGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0(v GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty) MergeGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0(v GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty as a GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty) AsGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1() (GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty as the provided GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty) FromGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1(v GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty) MergeGetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1(v GetApiTraceId200JSONResponseBodySpans1ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_FrequencyPenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsFunctions0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions as a GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions) AsGetApiTraceId200JSONResponseBodySpans1ParamsFunctions0() (GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsFunctions0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions as the provided GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions) FromGetApiTraceId200JSONResponseBodySpans1ParamsFunctions0(v GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsFunctions0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions) MergeGetApiTraceId200JSONResponseBodySpans1ParamsFunctions0(v GetApiTraceId200JSONResponseBodySpans1ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsFunctions1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions as a GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions) AsGetApiTraceId200JSONResponseBodySpans1ParamsFunctions1() (GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsFunctions1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions as the provided GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions) FromGetApiTraceId200JSONResponseBodySpans1ParamsFunctions1(v GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsFunctions1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions) MergeGetApiTraceId200JSONResponseBodySpans1ParamsFunctions1(v GetApiTraceId200JSONResponseBodySpans1ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Functions) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias as a GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias) AsGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0() (GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias as the provided GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias) FromGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0(v GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias) MergeGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0(v GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias as a GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias) AsGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1() (GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias as the provided GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias) FromGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1(v GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias) MergeGetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1(v GetApiTraceId200JSONResponseBodySpans1ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_LogitBias) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs as a GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs) AsGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0() (GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs as the provided GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs) FromGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0(v GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs) MergeGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0(v GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs as a GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs) AsGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1() (GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs as the provided GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs) FromGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1(v GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs) MergeGetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1(v GetApiTraceId200JSONResponseBodySpans1ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Logprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens as a GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens) AsGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0() (GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens as the provided GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens) FromGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0(v GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens) MergeGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0(v GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens as a GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens) AsGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1() (GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens as the provided GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens) FromGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1(v GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens) MergeGetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1(v GetApiTraceId200JSONResponseBodySpans1ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_MaxTokens) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsN0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_N as a GetApiTraceId200JSONResponseBodySpans1ParamsN0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_N) AsGetApiTraceId200JSONResponseBodySpans1ParamsN0() (GetApiTraceId200JSONResponseBodySpans1ParamsN0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsN0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsN0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_N as the provided GetApiTraceId200JSONResponseBodySpans1ParamsN0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_N) FromGetApiTraceId200JSONResponseBodySpans1ParamsN0(v GetApiTraceId200JSONResponseBodySpans1ParamsN0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsN0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_N, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsN0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_N) MergeGetApiTraceId200JSONResponseBodySpans1ParamsN0(v GetApiTraceId200JSONResponseBodySpans1ParamsN0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsN1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_N as a GetApiTraceId200JSONResponseBodySpans1ParamsN1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_N) AsGetApiTraceId200JSONResponseBodySpans1ParamsN1() (GetApiTraceId200JSONResponseBodySpans1ParamsN1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsN1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsN1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_N as the provided GetApiTraceId200JSONResponseBodySpans1ParamsN1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_N) FromGetApiTraceId200JSONResponseBodySpans1ParamsN1(v GetApiTraceId200JSONResponseBodySpans1ParamsN1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsN1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_N, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsN1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_N) MergeGetApiTraceId200JSONResponseBodySpans1ParamsN1(v GetApiTraceId200JSONResponseBodySpans1ParamsN1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_N) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_N) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls as a GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls) AsGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0() (GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls as the provided GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls) FromGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0(v GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls) MergeGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0(v GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls as a GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls) AsGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1() (GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls as the provided GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls) FromGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1(v GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls) MergeGetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1(v GetApiTraceId200JSONResponseBodySpans1ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ParallelToolCalls) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty as a GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty) AsGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0() (GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty as the provided GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty) FromGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0(v GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty) MergeGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0(v GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty as a GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty) AsGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1() (GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty as the provided GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty) FromGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1(v GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty) MergeGetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1(v GetApiTraceId200JSONResponseBodySpans1ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_PresencePenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort as a GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort) AsGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0() (GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort as the provided GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort) FromGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0(v GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort) MergeGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0(v GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort as a GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort) AsGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1() (GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort as the provided GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort) FromGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1(v GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort) MergeGetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1(v GetApiTraceId200JSONResponseBodySpans1ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ReasoningEffort) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsSeed0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed as a GetApiTraceId200JSONResponseBodySpans1ParamsSeed0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed) AsGetApiTraceId200JSONResponseBodySpans1ParamsSeed0() (GetApiTraceId200JSONResponseBodySpans1ParamsSeed0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsSeed0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsSeed0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed as the provided GetApiTraceId200JSONResponseBodySpans1ParamsSeed0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed) FromGetApiTraceId200JSONResponseBodySpans1ParamsSeed0(v GetApiTraceId200JSONResponseBodySpans1ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsSeed0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsSeed0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed) MergeGetApiTraceId200JSONResponseBodySpans1ParamsSeed0(v GetApiTraceId200JSONResponseBodySpans1ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsSeed1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed as a GetApiTraceId200JSONResponseBodySpans1ParamsSeed1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed) AsGetApiTraceId200JSONResponseBodySpans1ParamsSeed1() (GetApiTraceId200JSONResponseBodySpans1ParamsSeed1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsSeed1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsSeed1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed as the provided GetApiTraceId200JSONResponseBodySpans1ParamsSeed1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed) FromGetApiTraceId200JSONResponseBodySpans1ParamsSeed1(v GetApiTraceId200JSONResponseBodySpans1ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsSeed1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsSeed1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed) MergeGetApiTraceId200JSONResponseBodySpans1ParamsSeed1(v GetApiTraceId200JSONResponseBodySpans1ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Seed) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsStop00 returns the union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsStop0 as a GetApiTraceId200JSONResponseBodySpans1ParamsStop00
+func (t GetApiTraceId200JSONResponseBodySpans1ParamsStop0) AsGetApiTraceId200JSONResponseBodySpans1ParamsStop00() (GetApiTraceId200JSONResponseBodySpans1ParamsStop00, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsStop00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsStop00 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsStop0 as the provided GetApiTraceId200JSONResponseBodySpans1ParamsStop00
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsStop0) FromGetApiTraceId200JSONResponseBodySpans1ParamsStop00(v GetApiTraceId200JSONResponseBodySpans1ParamsStop00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsStop00 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsStop0, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsStop00
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsStop0) MergeGetApiTraceId200JSONResponseBodySpans1ParamsStop00(v GetApiTraceId200JSONResponseBodySpans1ParamsStop00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsStop01 returns the union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsStop0 as a GetApiTraceId200JSONResponseBodySpans1ParamsStop01
+func (t GetApiTraceId200JSONResponseBodySpans1ParamsStop0) AsGetApiTraceId200JSONResponseBodySpans1ParamsStop01() (GetApiTraceId200JSONResponseBodySpans1ParamsStop01, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsStop01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsStop01 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsStop0 as the provided GetApiTraceId200JSONResponseBodySpans1ParamsStop01
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsStop0) FromGetApiTraceId200JSONResponseBodySpans1ParamsStop01(v GetApiTraceId200JSONResponseBodySpans1ParamsStop01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsStop01 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsStop0, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsStop01
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsStop0) MergeGetApiTraceId200JSONResponseBodySpans1ParamsStop01(v GetApiTraceId200JSONResponseBodySpans1ParamsStop01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBodySpans1ParamsStop0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsStop0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsStop0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop as a GetApiTraceId200JSONResponseBodySpans1ParamsStop0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop) AsGetApiTraceId200JSONResponseBodySpans1ParamsStop0() (GetApiTraceId200JSONResponseBodySpans1ParamsStop0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsStop0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsStop0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop as the provided GetApiTraceId200JSONResponseBodySpans1ParamsStop0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop) FromGetApiTraceId200JSONResponseBodySpans1ParamsStop0(v GetApiTraceId200JSONResponseBodySpans1ParamsStop0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsStop0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsStop0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop) MergeGetApiTraceId200JSONResponseBodySpans1ParamsStop0(v GetApiTraceId200JSONResponseBodySpans1ParamsStop0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsStop1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop as a GetApiTraceId200JSONResponseBodySpans1ParamsStop1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop) AsGetApiTraceId200JSONResponseBodySpans1ParamsStop1() (GetApiTraceId200JSONResponseBodySpans1ParamsStop1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsStop1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsStop1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop as the provided GetApiTraceId200JSONResponseBodySpans1ParamsStop1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop) FromGetApiTraceId200JSONResponseBodySpans1ParamsStop1(v GetApiTraceId200JSONResponseBodySpans1ParamsStop1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsStop1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsStop1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop) MergeGetApiTraceId200JSONResponseBodySpans1ParamsStop1(v GetApiTraceId200JSONResponseBodySpans1ParamsStop1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stop) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsStream0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream as a GetApiTraceId200JSONResponseBodySpans1ParamsStream0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream) AsGetApiTraceId200JSONResponseBodySpans1ParamsStream0() (GetApiTraceId200JSONResponseBodySpans1ParamsStream0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsStream0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsStream0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream as the provided GetApiTraceId200JSONResponseBodySpans1ParamsStream0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream) FromGetApiTraceId200JSONResponseBodySpans1ParamsStream0(v GetApiTraceId200JSONResponseBodySpans1ParamsStream0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsStream0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsStream0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream) MergeGetApiTraceId200JSONResponseBodySpans1ParamsStream0(v GetApiTraceId200JSONResponseBodySpans1ParamsStream0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsStream1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream as a GetApiTraceId200JSONResponseBodySpans1ParamsStream1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream) AsGetApiTraceId200JSONResponseBodySpans1ParamsStream1() (GetApiTraceId200JSONResponseBodySpans1ParamsStream1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsStream1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsStream1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream as the provided GetApiTraceId200JSONResponseBodySpans1ParamsStream1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream) FromGetApiTraceId200JSONResponseBodySpans1ParamsStream1(v GetApiTraceId200JSONResponseBodySpans1ParamsStream1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsStream1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsStream1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream) MergeGetApiTraceId200JSONResponseBodySpans1ParamsStream1(v GetApiTraceId200JSONResponseBodySpans1ParamsStream1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Stream) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsTemperature0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature as a GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature) AsGetApiTraceId200JSONResponseBodySpans1ParamsTemperature0() (GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsTemperature0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature as the provided GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature) FromGetApiTraceId200JSONResponseBodySpans1ParamsTemperature0(v GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsTemperature0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature) MergeGetApiTraceId200JSONResponseBodySpans1ParamsTemperature0(v GetApiTraceId200JSONResponseBodySpans1ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsTemperature1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature as a GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature) AsGetApiTraceId200JSONResponseBodySpans1ParamsTemperature1() (GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsTemperature1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature as the provided GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature) FromGetApiTraceId200JSONResponseBodySpans1ParamsTemperature1(v GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsTemperature1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature) MergeGetApiTraceId200JSONResponseBodySpans1ParamsTemperature1(v GetApiTraceId200JSONResponseBodySpans1ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Temperature) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00 returns the union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 as a GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00
+func (t GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) AsGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00() (GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 as the provided GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) FromGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00(v GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) MergeGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00(v GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01 returns the union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 as a GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01
+func (t GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) AsGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01() (GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 as the provided GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) FromGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01(v GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) MergeGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01(v GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice as a GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice) AsGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0() (GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice as the provided GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice) FromGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0(v GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice) MergeGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0(v GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice as a GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice) AsGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1() (GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice as the provided GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice) FromGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1(v GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice) MergeGetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1(v GetApiTraceId200JSONResponseBodySpans1ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_ToolChoice) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsTools0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools as a GetApiTraceId200JSONResponseBodySpans1ParamsTools0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools) AsGetApiTraceId200JSONResponseBodySpans1ParamsTools0() (GetApiTraceId200JSONResponseBodySpans1ParamsTools0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsTools0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsTools0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools as the provided GetApiTraceId200JSONResponseBodySpans1ParamsTools0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools) FromGetApiTraceId200JSONResponseBodySpans1ParamsTools0(v GetApiTraceId200JSONResponseBodySpans1ParamsTools0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsTools0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsTools0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools) MergeGetApiTraceId200JSONResponseBodySpans1ParamsTools0(v GetApiTraceId200JSONResponseBodySpans1ParamsTools0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsTools1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools as a GetApiTraceId200JSONResponseBodySpans1ParamsTools1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools) AsGetApiTraceId200JSONResponseBodySpans1ParamsTools1() (GetApiTraceId200JSONResponseBodySpans1ParamsTools1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsTools1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsTools1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools as the provided GetApiTraceId200JSONResponseBodySpans1ParamsTools1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools) FromGetApiTraceId200JSONResponseBodySpans1ParamsTools1(v GetApiTraceId200JSONResponseBodySpans1ParamsTools1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsTools1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsTools1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools) MergeGetApiTraceId200JSONResponseBodySpans1ParamsTools1(v GetApiTraceId200JSONResponseBodySpans1ParamsTools1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_Tools) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs as a GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs) AsGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0() (GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs as the provided GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs) FromGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0(v GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs) MergeGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0(v GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs as a GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs) AsGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1() (GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs as the provided GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs) FromGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1(v GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs) MergeGetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1(v GetApiTraceId200JSONResponseBodySpans1ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopLogprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsTopP0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP as a GetApiTraceId200JSONResponseBodySpans1ParamsTopP0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP) AsGetApiTraceId200JSONResponseBodySpans1ParamsTopP0() (GetApiTraceId200JSONResponseBodySpans1ParamsTopP0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsTopP0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsTopP0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP as the provided GetApiTraceId200JSONResponseBodySpans1ParamsTopP0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP) FromGetApiTraceId200JSONResponseBodySpans1ParamsTopP0(v GetApiTraceId200JSONResponseBodySpans1ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsTopP0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsTopP0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP) MergeGetApiTraceId200JSONResponseBodySpans1ParamsTopP0(v GetApiTraceId200JSONResponseBodySpans1ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsTopP1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP as a GetApiTraceId200JSONResponseBodySpans1ParamsTopP1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP) AsGetApiTraceId200JSONResponseBodySpans1ParamsTopP1() (GetApiTraceId200JSONResponseBodySpans1ParamsTopP1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsTopP1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsTopP1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP as the provided GetApiTraceId200JSONResponseBodySpans1ParamsTopP1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP) FromGetApiTraceId200JSONResponseBodySpans1ParamsTopP1(v GetApiTraceId200JSONResponseBodySpans1ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsTopP1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsTopP1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP) MergeGetApiTraceId200JSONResponseBodySpans1ParamsTopP1(v GetApiTraceId200JSONResponseBodySpans1ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_TopP) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsUser0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_User as a GetApiTraceId200JSONResponseBodySpans1ParamsUser0
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_User) AsGetApiTraceId200JSONResponseBodySpans1ParamsUser0() (GetApiTraceId200JSONResponseBodySpans1ParamsUser0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsUser0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsUser0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_User as the provided GetApiTraceId200JSONResponseBodySpans1ParamsUser0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_User) FromGetApiTraceId200JSONResponseBodySpans1ParamsUser0(v GetApiTraceId200JSONResponseBodySpans1ParamsUser0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsUser0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_User, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsUser0
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_User) MergeGetApiTraceId200JSONResponseBodySpans1ParamsUser0(v GetApiTraceId200JSONResponseBodySpans1ParamsUser0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans1ParamsUser1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_User as a GetApiTraceId200JSONResponseBodySpans1ParamsUser1
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_User) AsGetApiTraceId200JSONResponseBodySpans1ParamsUser1() (GetApiTraceId200JSONResponseBodySpans1ParamsUser1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans1ParamsUser1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans1ParamsUser1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_User as the provided GetApiTraceId200JSONResponseBodySpans1ParamsUser1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_User) FromGetApiTraceId200JSONResponseBodySpans1ParamsUser1(v GetApiTraceId200JSONResponseBodySpans1ParamsUser1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans1ParamsUser1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_1_Params_User, using the provided GetApiTraceId200JSONResponseBodySpans1ParamsUser1
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_User) MergeGetApiTraceId200JSONResponseBodySpans1ParamsUser1(v GetApiTraceId200JSONResponseBodySpans1ParamsUser1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_1_Params_User) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_1_Params_User) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGetApiTraceId200JSONResponseBodySpans2Input1Type0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Input_1_Type as a GetApiTraceId200JSONResponseBodySpans2Input1Type0
 func (t GetApiTraceId200JSONResponseBody_Spans_2_Input_1_Type) AsGetApiTraceId200JSONResponseBodySpans2Input1Type0() (GetApiTraceId200JSONResponseBodySpans2Input1Type0, error) {
 	var body GetApiTraceId200JSONResponseBodySpans2Input1Type0
@@ -73310,6 +82870,1246 @@ func (t GetApiTraceId200JSONResponseBody_Spans_2_Output) MarshalJSON() ([]byte, 
 }
 
 func (t *GetApiTraceId200JSONResponseBody_Spans_2_Output) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty as a GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty) AsGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0() (GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty as the provided GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty) FromGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0(v GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty) MergeGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0(v GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty as a GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty) AsGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1() (GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty as the provided GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty) FromGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1(v GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty) MergeGetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1(v GetApiTraceId200JSONResponseBodySpans2ParamsFrequencyPenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_FrequencyPenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsFunctions0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions as a GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions) AsGetApiTraceId200JSONResponseBodySpans2ParamsFunctions0() (GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsFunctions0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions as the provided GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions) FromGetApiTraceId200JSONResponseBodySpans2ParamsFunctions0(v GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsFunctions0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions) MergeGetApiTraceId200JSONResponseBodySpans2ParamsFunctions0(v GetApiTraceId200JSONResponseBodySpans2ParamsFunctions0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsFunctions1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions as a GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions) AsGetApiTraceId200JSONResponseBodySpans2ParamsFunctions1() (GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsFunctions1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions as the provided GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions) FromGetApiTraceId200JSONResponseBodySpans2ParamsFunctions1(v GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsFunctions1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions) MergeGetApiTraceId200JSONResponseBodySpans2ParamsFunctions1(v GetApiTraceId200JSONResponseBodySpans2ParamsFunctions1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Functions) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias as a GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias) AsGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0() (GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias as the provided GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias) FromGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0(v GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias) MergeGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0(v GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias as a GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias) AsGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1() (GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias as the provided GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias) FromGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1(v GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias) MergeGetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1(v GetApiTraceId200JSONResponseBodySpans2ParamsLogitBias1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_LogitBias) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs as a GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs) AsGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0() (GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs as the provided GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs) FromGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0(v GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs) MergeGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0(v GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs as a GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs) AsGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1() (GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs as the provided GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs) FromGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1(v GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs) MergeGetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1(v GetApiTraceId200JSONResponseBodySpans2ParamsLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Logprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens as a GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens) AsGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0() (GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens as the provided GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens) FromGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0(v GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens) MergeGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0(v GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens as a GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens) AsGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1() (GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens as the provided GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens) FromGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1(v GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens) MergeGetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1(v GetApiTraceId200JSONResponseBodySpans2ParamsMaxTokens1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_MaxTokens) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsN0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_N as a GetApiTraceId200JSONResponseBodySpans2ParamsN0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_N) AsGetApiTraceId200JSONResponseBodySpans2ParamsN0() (GetApiTraceId200JSONResponseBodySpans2ParamsN0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsN0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsN0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_N as the provided GetApiTraceId200JSONResponseBodySpans2ParamsN0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_N) FromGetApiTraceId200JSONResponseBodySpans2ParamsN0(v GetApiTraceId200JSONResponseBodySpans2ParamsN0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsN0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_N, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsN0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_N) MergeGetApiTraceId200JSONResponseBodySpans2ParamsN0(v GetApiTraceId200JSONResponseBodySpans2ParamsN0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsN1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_N as a GetApiTraceId200JSONResponseBodySpans2ParamsN1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_N) AsGetApiTraceId200JSONResponseBodySpans2ParamsN1() (GetApiTraceId200JSONResponseBodySpans2ParamsN1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsN1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsN1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_N as the provided GetApiTraceId200JSONResponseBodySpans2ParamsN1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_N) FromGetApiTraceId200JSONResponseBodySpans2ParamsN1(v GetApiTraceId200JSONResponseBodySpans2ParamsN1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsN1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_N, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsN1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_N) MergeGetApiTraceId200JSONResponseBodySpans2ParamsN1(v GetApiTraceId200JSONResponseBodySpans2ParamsN1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_N) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_N) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls as a GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls) AsGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0() (GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls as the provided GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls) FromGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0(v GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls) MergeGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0(v GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls as a GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls) AsGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1() (GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls as the provided GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls) FromGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1(v GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls) MergeGetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1(v GetApiTraceId200JSONResponseBodySpans2ParamsParallelToolCalls1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ParallelToolCalls) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty as a GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty) AsGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0() (GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty as the provided GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty) FromGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0(v GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty) MergeGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0(v GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty as a GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty) AsGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1() (GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty as the provided GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty) FromGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1(v GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty) MergeGetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1(v GetApiTraceId200JSONResponseBodySpans2ParamsPresencePenalty1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_PresencePenalty) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort as a GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort) AsGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0() (GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort as the provided GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort) FromGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0(v GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort) MergeGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0(v GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort as a GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort) AsGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1() (GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort as the provided GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort) FromGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1(v GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort) MergeGetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1(v GetApiTraceId200JSONResponseBodySpans2ParamsReasoningEffort1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ReasoningEffort) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsSeed0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed as a GetApiTraceId200JSONResponseBodySpans2ParamsSeed0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed) AsGetApiTraceId200JSONResponseBodySpans2ParamsSeed0() (GetApiTraceId200JSONResponseBodySpans2ParamsSeed0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsSeed0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsSeed0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed as the provided GetApiTraceId200JSONResponseBodySpans2ParamsSeed0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed) FromGetApiTraceId200JSONResponseBodySpans2ParamsSeed0(v GetApiTraceId200JSONResponseBodySpans2ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsSeed0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsSeed0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed) MergeGetApiTraceId200JSONResponseBodySpans2ParamsSeed0(v GetApiTraceId200JSONResponseBodySpans2ParamsSeed0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsSeed1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed as a GetApiTraceId200JSONResponseBodySpans2ParamsSeed1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed) AsGetApiTraceId200JSONResponseBodySpans2ParamsSeed1() (GetApiTraceId200JSONResponseBodySpans2ParamsSeed1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsSeed1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsSeed1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed as the provided GetApiTraceId200JSONResponseBodySpans2ParamsSeed1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed) FromGetApiTraceId200JSONResponseBodySpans2ParamsSeed1(v GetApiTraceId200JSONResponseBodySpans2ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsSeed1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsSeed1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed) MergeGetApiTraceId200JSONResponseBodySpans2ParamsSeed1(v GetApiTraceId200JSONResponseBodySpans2ParamsSeed1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Seed) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsStop00 returns the union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsStop0 as a GetApiTraceId200JSONResponseBodySpans2ParamsStop00
+func (t GetApiTraceId200JSONResponseBodySpans2ParamsStop0) AsGetApiTraceId200JSONResponseBodySpans2ParamsStop00() (GetApiTraceId200JSONResponseBodySpans2ParamsStop00, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsStop00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsStop00 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsStop0 as the provided GetApiTraceId200JSONResponseBodySpans2ParamsStop00
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsStop0) FromGetApiTraceId200JSONResponseBodySpans2ParamsStop00(v GetApiTraceId200JSONResponseBodySpans2ParamsStop00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsStop00 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsStop0, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsStop00
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsStop0) MergeGetApiTraceId200JSONResponseBodySpans2ParamsStop00(v GetApiTraceId200JSONResponseBodySpans2ParamsStop00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsStop01 returns the union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsStop0 as a GetApiTraceId200JSONResponseBodySpans2ParamsStop01
+func (t GetApiTraceId200JSONResponseBodySpans2ParamsStop0) AsGetApiTraceId200JSONResponseBodySpans2ParamsStop01() (GetApiTraceId200JSONResponseBodySpans2ParamsStop01, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsStop01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsStop01 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsStop0 as the provided GetApiTraceId200JSONResponseBodySpans2ParamsStop01
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsStop0) FromGetApiTraceId200JSONResponseBodySpans2ParamsStop01(v GetApiTraceId200JSONResponseBodySpans2ParamsStop01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsStop01 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsStop0, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsStop01
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsStop0) MergeGetApiTraceId200JSONResponseBodySpans2ParamsStop01(v GetApiTraceId200JSONResponseBodySpans2ParamsStop01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBodySpans2ParamsStop0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsStop0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsStop0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop as a GetApiTraceId200JSONResponseBodySpans2ParamsStop0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop) AsGetApiTraceId200JSONResponseBodySpans2ParamsStop0() (GetApiTraceId200JSONResponseBodySpans2ParamsStop0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsStop0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsStop0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop as the provided GetApiTraceId200JSONResponseBodySpans2ParamsStop0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop) FromGetApiTraceId200JSONResponseBodySpans2ParamsStop0(v GetApiTraceId200JSONResponseBodySpans2ParamsStop0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsStop0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsStop0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop) MergeGetApiTraceId200JSONResponseBodySpans2ParamsStop0(v GetApiTraceId200JSONResponseBodySpans2ParamsStop0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsStop1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop as a GetApiTraceId200JSONResponseBodySpans2ParamsStop1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop) AsGetApiTraceId200JSONResponseBodySpans2ParamsStop1() (GetApiTraceId200JSONResponseBodySpans2ParamsStop1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsStop1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsStop1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop as the provided GetApiTraceId200JSONResponseBodySpans2ParamsStop1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop) FromGetApiTraceId200JSONResponseBodySpans2ParamsStop1(v GetApiTraceId200JSONResponseBodySpans2ParamsStop1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsStop1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsStop1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop) MergeGetApiTraceId200JSONResponseBodySpans2ParamsStop1(v GetApiTraceId200JSONResponseBodySpans2ParamsStop1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stop) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsStream0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream as a GetApiTraceId200JSONResponseBodySpans2ParamsStream0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream) AsGetApiTraceId200JSONResponseBodySpans2ParamsStream0() (GetApiTraceId200JSONResponseBodySpans2ParamsStream0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsStream0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsStream0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream as the provided GetApiTraceId200JSONResponseBodySpans2ParamsStream0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream) FromGetApiTraceId200JSONResponseBodySpans2ParamsStream0(v GetApiTraceId200JSONResponseBodySpans2ParamsStream0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsStream0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsStream0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream) MergeGetApiTraceId200JSONResponseBodySpans2ParamsStream0(v GetApiTraceId200JSONResponseBodySpans2ParamsStream0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsStream1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream as a GetApiTraceId200JSONResponseBodySpans2ParamsStream1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream) AsGetApiTraceId200JSONResponseBodySpans2ParamsStream1() (GetApiTraceId200JSONResponseBodySpans2ParamsStream1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsStream1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsStream1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream as the provided GetApiTraceId200JSONResponseBodySpans2ParamsStream1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream) FromGetApiTraceId200JSONResponseBodySpans2ParamsStream1(v GetApiTraceId200JSONResponseBodySpans2ParamsStream1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsStream1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsStream1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream) MergeGetApiTraceId200JSONResponseBodySpans2ParamsStream1(v GetApiTraceId200JSONResponseBodySpans2ParamsStream1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Stream) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsTemperature0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature as a GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature) AsGetApiTraceId200JSONResponseBodySpans2ParamsTemperature0() (GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsTemperature0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature as the provided GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature) FromGetApiTraceId200JSONResponseBodySpans2ParamsTemperature0(v GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsTemperature0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature) MergeGetApiTraceId200JSONResponseBodySpans2ParamsTemperature0(v GetApiTraceId200JSONResponseBodySpans2ParamsTemperature0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsTemperature1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature as a GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature) AsGetApiTraceId200JSONResponseBodySpans2ParamsTemperature1() (GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsTemperature1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature as the provided GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature) FromGetApiTraceId200JSONResponseBodySpans2ParamsTemperature1(v GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsTemperature1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature) MergeGetApiTraceId200JSONResponseBodySpans2ParamsTemperature1(v GetApiTraceId200JSONResponseBodySpans2ParamsTemperature1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Temperature) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00 returns the union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 as a GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00
+func (t GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) AsGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00() (GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 as the provided GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) FromGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00(v GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) MergeGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00(v GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01 returns the union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 as a GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01
+func (t GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) AsGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01() (GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01 overwrites any union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 as the provided GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) FromGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01(v GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01 performs a merge with any union data inside the GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) MergeGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01(v GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice as a GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice) AsGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0() (GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice as the provided GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice) FromGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0(v GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice) MergeGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0(v GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice as a GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice) AsGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1() (GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice as the provided GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice) FromGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1(v GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice) MergeGetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1(v GetApiTraceId200JSONResponseBodySpans2ParamsToolChoice1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_ToolChoice) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsTools0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools as a GetApiTraceId200JSONResponseBodySpans2ParamsTools0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools) AsGetApiTraceId200JSONResponseBodySpans2ParamsTools0() (GetApiTraceId200JSONResponseBodySpans2ParamsTools0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsTools0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsTools0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools as the provided GetApiTraceId200JSONResponseBodySpans2ParamsTools0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools) FromGetApiTraceId200JSONResponseBodySpans2ParamsTools0(v GetApiTraceId200JSONResponseBodySpans2ParamsTools0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsTools0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsTools0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools) MergeGetApiTraceId200JSONResponseBodySpans2ParamsTools0(v GetApiTraceId200JSONResponseBodySpans2ParamsTools0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsTools1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools as a GetApiTraceId200JSONResponseBodySpans2ParamsTools1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools) AsGetApiTraceId200JSONResponseBodySpans2ParamsTools1() (GetApiTraceId200JSONResponseBodySpans2ParamsTools1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsTools1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsTools1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools as the provided GetApiTraceId200JSONResponseBodySpans2ParamsTools1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools) FromGetApiTraceId200JSONResponseBodySpans2ParamsTools1(v GetApiTraceId200JSONResponseBodySpans2ParamsTools1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsTools1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsTools1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools) MergeGetApiTraceId200JSONResponseBodySpans2ParamsTools1(v GetApiTraceId200JSONResponseBodySpans2ParamsTools1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_Tools) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs as a GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs) AsGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0() (GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs as the provided GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs) FromGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0(v GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs) MergeGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0(v GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs as a GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs) AsGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1() (GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs as the provided GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs) FromGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1(v GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs) MergeGetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1(v GetApiTraceId200JSONResponseBodySpans2ParamsTopLogprobs1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopLogprobs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsTopP0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP as a GetApiTraceId200JSONResponseBodySpans2ParamsTopP0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP) AsGetApiTraceId200JSONResponseBodySpans2ParamsTopP0() (GetApiTraceId200JSONResponseBodySpans2ParamsTopP0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsTopP0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsTopP0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP as the provided GetApiTraceId200JSONResponseBodySpans2ParamsTopP0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP) FromGetApiTraceId200JSONResponseBodySpans2ParamsTopP0(v GetApiTraceId200JSONResponseBodySpans2ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsTopP0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsTopP0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP) MergeGetApiTraceId200JSONResponseBodySpans2ParamsTopP0(v GetApiTraceId200JSONResponseBodySpans2ParamsTopP0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsTopP1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP as a GetApiTraceId200JSONResponseBodySpans2ParamsTopP1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP) AsGetApiTraceId200JSONResponseBodySpans2ParamsTopP1() (GetApiTraceId200JSONResponseBodySpans2ParamsTopP1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsTopP1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsTopP1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP as the provided GetApiTraceId200JSONResponseBodySpans2ParamsTopP1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP) FromGetApiTraceId200JSONResponseBodySpans2ParamsTopP1(v GetApiTraceId200JSONResponseBodySpans2ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsTopP1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsTopP1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP) MergeGetApiTraceId200JSONResponseBodySpans2ParamsTopP1(v GetApiTraceId200JSONResponseBodySpans2ParamsTopP1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_TopP) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsUser0 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_User as a GetApiTraceId200JSONResponseBodySpans2ParamsUser0
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_User) AsGetApiTraceId200JSONResponseBodySpans2ParamsUser0() (GetApiTraceId200JSONResponseBodySpans2ParamsUser0, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsUser0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsUser0 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_User as the provided GetApiTraceId200JSONResponseBodySpans2ParamsUser0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_User) FromGetApiTraceId200JSONResponseBodySpans2ParamsUser0(v GetApiTraceId200JSONResponseBodySpans2ParamsUser0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsUser0 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_User, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsUser0
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_User) MergeGetApiTraceId200JSONResponseBodySpans2ParamsUser0(v GetApiTraceId200JSONResponseBodySpans2ParamsUser0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTraceId200JSONResponseBodySpans2ParamsUser1 returns the union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_User as a GetApiTraceId200JSONResponseBodySpans2ParamsUser1
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_User) AsGetApiTraceId200JSONResponseBodySpans2ParamsUser1() (GetApiTraceId200JSONResponseBodySpans2ParamsUser1, error) {
+	var body GetApiTraceId200JSONResponseBodySpans2ParamsUser1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTraceId200JSONResponseBodySpans2ParamsUser1 overwrites any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_User as the provided GetApiTraceId200JSONResponseBodySpans2ParamsUser1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_User) FromGetApiTraceId200JSONResponseBodySpans2ParamsUser1(v GetApiTraceId200JSONResponseBodySpans2ParamsUser1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTraceId200JSONResponseBodySpans2ParamsUser1 performs a merge with any union data inside the GetApiTraceId200JSONResponseBody_Spans_2_Params_User, using the provided GetApiTraceId200JSONResponseBodySpans2ParamsUser1
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_User) MergeGetApiTraceId200JSONResponseBodySpans2ParamsUser1(v GetApiTraceId200JSONResponseBodySpans2ParamsUser1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTraceId200JSONResponseBody_Spans_2_Params_User) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTraceId200JSONResponseBody_Spans_2_Params_User) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

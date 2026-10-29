@@ -79,6 +79,7 @@ describe("TraceLegacySpanMappingService.mapNormalizedSpanToSpan", () => {
     // Prod 2026-10-29: Strands spans carried the customer's own `user.*` attributes, so
     // `params.user` was an object where OpenAI's `user` param is a string, and the trace's
     // spans did not match the declared output.
+    /** @scenario "A span whose own attributes share a name with a request param still reads" */
     it("answers a span whose own attributes share a name with a request param", () => {
       const span = makeSpan({
         spanAttributes: {

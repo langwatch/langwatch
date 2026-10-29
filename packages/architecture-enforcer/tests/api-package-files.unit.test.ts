@@ -22,6 +22,8 @@ const TARGET_FILES = new Set([
   "json-text-field.ts",
   // What a transport answers when a handler's value breaks its output schema.
   "output-salvage.ts",
+  // How that failure's issue path is logged: declared keys only.
+  "output-issue-path.ts",
   "ports.ts",
   "schema.ts",
   "websocket.ts",

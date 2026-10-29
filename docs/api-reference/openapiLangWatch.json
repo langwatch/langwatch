@@ -677,8 +677,246 @@
                       "anyOf": [
                         {
                           "type": "object",
-                          "propertyNames": {
-                            "type": "string"
+                          "properties": {
+                            "frequency_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logit_bias": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "max_tokens": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "n": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "presence_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "seed": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stop": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stream": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "temperature": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_p": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tools": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tool_choice": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "propertyNames": {
+                                        "type": "string"
+                                      },
+                                      "additionalProperties": {}
+                                    },
+                                    {
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "parallel_tool_calls": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "functions": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "user": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "reasoning_effort": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            }
                           },
                           "additionalProperties": {}
                         },
@@ -979,8 +1217,246 @@
                       "anyOf": [
                         {
                           "type": "object",
-                          "propertyNames": {
-                            "type": "string"
+                          "properties": {
+                            "frequency_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logit_bias": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "max_tokens": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "n": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "presence_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "seed": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stop": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stream": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "temperature": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_p": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tools": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tool_choice": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "propertyNames": {
+                                        "type": "string"
+                                      },
+                                      "additionalProperties": {}
+                                    },
+                                    {
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "parallel_tool_calls": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "functions": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "user": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "reasoning_effort": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            }
                           },
                           "additionalProperties": {}
                         },
@@ -1379,8 +1855,246 @@
                       "anyOf": [
                         {
                           "type": "object",
-                          "propertyNames": {
-                            "type": "string"
+                          "properties": {
+                            "frequency_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logit_bias": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_logprobs": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "max_tokens": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "n": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "presence_penalty": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "seed": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stop": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "stream": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "temperature": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "top_p": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tools": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "tool_choice": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "propertyNames": {
+                                        "type": "string"
+                                      },
+                                      "additionalProperties": {}
+                                    },
+                                    {
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "parallel_tool_calls": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "functions": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "user": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            },
+                            "reasoning_effort": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {}
+                              ]
+                            }
                           },
                           "additionalProperties": {}
                         },
@@ -113876,8 +114590,246 @@
                                 "anyOf": [
                                   {
                                     "type": "object",
-                                    "propertyNames": {
-                                      "type": "string"
+                                    "properties": {
+                                      "frequency_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logit_bias": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "propertyNames": {
+                                              "type": "string"
+                                            },
+                                            "additionalProperties": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "max_tokens": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "n": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "presence_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "seed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stop": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stream": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "temperature": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_p": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tools": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tool_choice": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "propertyNames": {
+                                                  "type": "string"
+                                                },
+                                                "additionalProperties": {}
+                                              },
+                                              {
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "parallel_tool_calls": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "functions": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "user": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "reasoning_effort": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      }
                                     },
                                     "additionalProperties": {}
                                   },
@@ -114178,8 +115130,246 @@
                                 "anyOf": [
                                   {
                                     "type": "object",
-                                    "propertyNames": {
-                                      "type": "string"
+                                    "properties": {
+                                      "frequency_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logit_bias": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "propertyNames": {
+                                              "type": "string"
+                                            },
+                                            "additionalProperties": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "max_tokens": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "n": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "presence_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "seed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stop": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stream": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "temperature": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_p": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tools": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tool_choice": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "propertyNames": {
+                                                  "type": "string"
+                                                },
+                                                "additionalProperties": {}
+                                              },
+                                              {
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "parallel_tool_calls": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "functions": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "user": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "reasoning_effort": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      }
                                     },
                                     "additionalProperties": {}
                                   },
@@ -114578,8 +115768,246 @@
                                 "anyOf": [
                                   {
                                     "type": "object",
-                                    "propertyNames": {
-                                      "type": "string"
+                                    "properties": {
+                                      "frequency_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logit_bias": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "propertyNames": {
+                                              "type": "string"
+                                            },
+                                            "additionalProperties": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_logprobs": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "max_tokens": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "n": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "presence_penalty": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "seed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stop": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "stream": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "temperature": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "top_p": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tools": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "tool_choice": {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "propertyNames": {
+                                                  "type": "string"
+                                                },
+                                                "additionalProperties": {}
+                                              },
+                                              {
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "parallel_tool_calls": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "functions": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "propertyNames": {
+                                                "type": "string"
+                                              },
+                                              "additionalProperties": {}
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "user": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      },
+                                      "reasoning_effort": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {}
+                                        ]
+                                      }
                                     },
                                     "additionalProperties": {}
                                   },

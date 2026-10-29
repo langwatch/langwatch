@@ -81,7 +81,10 @@ function keyIn(schema: z.ZodType, key: unknown): { next?: z.ZodType; declared: b
     : { declared: false };
 }
 
-/** Where one segment leads, and whether a schema there names it. */
+/**
+ * Where one segment leads, and whether a schema there names it: a key the shape declares, or an
+ * index into an array or tuple. A number anywhere else (a map's key, one under `any`) is content.
+ */
 function step(schemas: z.ZodType[], segment: unknown): { next: z.ZodType[]; declared: boolean } {
   const next: z.ZodType[] = [];
   let declared = false;
@@ -89,7 +92,7 @@ function step(schemas: z.ZodType[], segment: unknown): { next: z.ZodType[]; decl
   for (const schema of concrete(schemas)) {
     const found =
       typeof segment === "number"
-        ? { next: indexIn(schema, segment), declared: false }
+        ? { next: indexIn(schema, segment), declared: indexes(schema) }
         : keyIn(schema, segment);
     if (found.next) next.push(found.next);
     declared ||= found.declared;
@@ -98,25 +101,40 @@ function step(schemas: z.ZodType[], segment: unknown): { next: z.ZodType[]; decl
   return { next, declared };
 }
 
-/** `[3].params.user`: `path` read through `schema`, each undeclared key as `<key>`. */
+function indexes(schema: z.ZodType): boolean {
+  return schema instanceof z.ZodArray || schema instanceof z.ZodTuple;
+}
+
+/** What a path says when reading it through the schema fails: nothing of the caller's. */
+const UNREADABLE_PATH = "<redacted>";
+
+/**
+ * `[3].params.user`: `path` read through `schema`, each undeclared key as `<key>`. Never throws: a
+ * schema that cannot be opened (a lazy getter that throws) gives `<redacted>`, so the issue is
+ * still logged.
+ */
 export function declaredPath(schema: z.ZodType, path: readonly unknown[]): string {
   if (path.length === 0) return "<root>";
 
-  let schemas: z.ZodType[] = [schema];
-  let out = "";
+  try {
+    let schemas: z.ZodType[] = [schema];
+    let out = "";
 
-  for (const segment of path) {
-    const { next, declared } = step(schemas, segment);
-    schemas = next;
+    for (const segment of path) {
+      const { next, declared } = step(schemas, segment);
+      schemas = next;
 
-    if (typeof segment === "number") {
-      out += `[${segment}]`;
-      continue;
+      if (typeof segment === "number") {
+        out += declared ? `[${segment}]` : `[${UNDECLARED_KEY}]`;
+        continue;
+      }
+
+      const name = declared && typeof segment === "string" ? segment : UNDECLARED_KEY;
+      out += out === "" ? name : `.${name}`;
     }
 
-    const name = declared && typeof segment === "string" ? segment : UNDECLARED_KEY;
-    out += out === "" ? name : `.${name}`;
+    return out;
+  } catch {
+    return UNREADABLE_PATH;
   }
-
-  return out;
 }

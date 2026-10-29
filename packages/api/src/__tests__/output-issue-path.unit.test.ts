@@ -29,6 +29,7 @@ describe("declaredPath", () => {
   describe("when a span's own attributes collide with a named param", () => {
     // Prod 2026-10-29: `user.*` attributes made `params.user` an object, and every path was
     // logged as `<redacted>`, so nothing said which field failed.
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
     it("names the field, through the union arm, from the root of the answer", () => {
       const meta = logged([
         { span_id: "a", type: "tool" },
@@ -42,18 +43,46 @@ describe("declaredPath", () => {
   });
 
   describe("when a path passes through a key the schema does not declare", () => {
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
     it("replaces the key and keeps the rest of the path", () => {
       const schema = z.object({ params: z.record(z.string(), z.object({ id: z.string() })) });
 
       expect(declaredPath(schema, ["params", "customer-key", "id"])).toBe("params.<key>.id");
     });
 
+    /** @scenario "A refused answer's log names the failing field without the caller's keys" */
     it("replaces every key below an any", () => {
       const schema = z.object({ params: z.record(z.string(), z.any()) });
 
       expect(declaredPath(schema, ["params", "customer", "nested", 2])).toBe(
-        "params.<key>.<key>[2]",
+        "params.<key>.<key>[<key>]",
       );
+    });
+  });
+
+  describe("when a number on the path is not an index", () => {
+    it("replaces a map's numeric key and a number below an any, keeps array and tuple indices", () => {
+      const schema = z.object({
+        byId: z.map(z.number(), z.string()),
+        list: z.array(z.tuple([z.string(), z.number()])),
+        open: z.any(),
+      });
+
+      expect(declaredPath(schema, ["byId", 8_675_309])).toBe("byId[<key>]");
+      expect(declaredPath(schema, ["list", 2, 1])).toBe("list[2][1]");
+      expect(declaredPath(schema, ["open", 42])).toBe("open[<key>]");
+    });
+  });
+
+  describe("when the schema cannot be opened", () => {
+    it("redacts the path rather than throwing", () => {
+      const schema = z.object({
+        broken: z.lazy((): z.ZodString => {
+          throw new Error("lazy getter failed");
+        }),
+      });
+
+      expect(declaredPath(schema, ["broken", "inner"])).toBe("<redacted>");
     });
   });
 
