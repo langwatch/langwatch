@@ -2084,6 +2084,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the alert or the report runs
     Then the run is refused with the code "project_not_found" and reads nothing from "C"
     And the refusal is reported as AC187 reports a board the owner cannot open
+    # Alerts and reports watch chart-builder graphs today, not widget queries. The rule binds the
+    # member resolver any such run uses: an owner without read access gets project_not_found.
     # Evidence: the refusal quoted from the alert's run history
 
   @unit @integration

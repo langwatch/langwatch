@@ -75,6 +75,24 @@ export const lwqlValidationResultSchema: LwqlValidationResultSchema =
 
 export type LangWatchQLValidationResult = z.infer<typeof lwqlValidationResultSchema>;
 
+/** A project the member may name on a card's query: its id and the name the picker shows. */
+const lwqlReadableProjectSchemaDefinition = z.object({ id: z.string(), name: z.string() });
+export interface LwqlReadableProjectSchema extends Named<
+  typeof lwqlReadableProjectSchemaDefinition
+> {}
+export const lwqlReadableProjectSchema: LwqlReadableProjectSchema =
+  lwqlReadableProjectSchemaDefinition;
+export type LangWatchQLReadableProject = z.infer<typeof lwqlReadableProjectSchema>;
+
+const lwqlReadableProjectsSchemaDefinition = z.object({
+  projects: z.array(lwqlReadableProjectSchema),
+});
+export interface LwqlReadableProjectsSchema extends Named<
+  typeof lwqlReadableProjectsSchemaDefinition
+> {}
+export const lwqlReadableProjectsSchema: LwqlReadableProjectsSchema =
+  lwqlReadableProjectsSchemaDefinition;
+
 export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   // Separate from `schema` because the catalog is answerable without an
   // executor, so a deployment with no LangWatchQL identity would describe a
@@ -92,6 +110,11 @@ export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   .query("validate")
   .withInput(lwqlRunRequestSchema)
   .withOutput(lwqlValidationResultSchema)
+
+  /** The projects of the organization this member may read, for the editor's project picker. */
+  .query("readableProjects")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(lwqlReadableProjectsSchema)
 
   .mutation("query")
   .withInput(lwqlQueryRequestSchema)

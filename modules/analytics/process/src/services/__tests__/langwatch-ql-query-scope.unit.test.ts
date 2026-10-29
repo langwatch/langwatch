@@ -497,4 +497,13 @@ describe("given a member's card that names projects", () => {
       { id: "c", lwqlKey: "lwql-c" },
     ]);
   });
+
+  /** @scenario "AC208c Project: an alert or a scheduled report never reads a project its owner cannot" */
+  it("refuses a run as an owner without read access, reading nothing from the project", async () => {
+    const { service } = scopeOver({ projects: [project("a"), project("c")], grants: {} });
+
+    await expect(
+      service.resolveMemberProjects({ userId: "owner-1", projectIds: ["c"] }),
+    ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
+  });
 });

@@ -11,6 +11,7 @@ import {
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
   type LangWatchQLProtections,
+  type LangWatchQLReadableProject,
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
   type LangWatchQLTimeWindow,
@@ -48,6 +49,11 @@ export interface AnalyticsLwqlApi {
     projectId: string;
     protections: LangWatchQLProtections;
   }): Promise<LangWatchQLSchema>;
+  /** The organization's live projects this member holds `analytics:view` on. */
+  listReadableProjects(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<LangWatchQLReadableProject[]>;
   /** The statement's refusals for this member with their positions; nothing is run. */
   diagnoseLangWatchQL(input: {
     projectId: string;
@@ -106,6 +112,12 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
       ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
     });
   })
+
+  .procedure("readableProjects")
+  .withPermission("analytics:view")
+  .handle(async ({ app, input, actor }) => ({
+    projects: await app.listReadableProjects({ projectId: input.projectId, userId: actor.id }),
+  }))
 
   .procedure("query")
   .withPermission("analytics:view")

@@ -60,7 +60,12 @@ const BOARD = {
   isStarred: false,
   updatedAt: new Date("2026-01-01"),
 };
-type StoredQuery = { name: string; sql: string; sources?: string[] | null };
+type StoredQuery = {
+  name: string;
+  sql: string;
+  sources?: string[] | null;
+  projects?: string[] | null;
+};
 /** A stored widget's definition; its query stores no sources, as one saved before them. */
 const GRAPH: { version: 1; code: string; queries: StoredQuery[] } = {
   version: 1,
@@ -109,10 +114,23 @@ function langyTurnRows(input: { sql: string; sources?: readonly string[] | null 
 
 /** A query as the server stores an update: absent keeps the stored list, null drops it. */
 function storedQuery(sent: StoredQuery, held: readonly StoredQuery[]): StoredQuery {
-  const { sources, ...query } = sent;
-  const kept = sources === undefined ? held.find((h) => h.name === query.name)?.sources : sources;
-  return kept === undefined || kept === null ? query : { ...query, sources: kept };
+  const { sources, projects, ...query } = sent;
+  const before = held.find((h) => h.name === query.name);
+  const keptSources = sources === undefined ? before?.sources : sources;
+  const keptProjects = projects === undefined ? before?.projects : projects;
+  return {
+    ...query,
+    ...(keptSources === undefined || keptSources === null ? {} : { sources: keptSources }),
+    ...(keptProjects === undefined || keptProjects === null ? {} : { projects: keptProjects }),
+  };
 }
+
+/** The organization's projects the member may read; "proj-c" exists and is not among them. */
+const READABLE_PROJECTS = [
+  { id: HOME_BOARD.projectId, name: "Test Project" },
+  { id: "proj-a", name: "Alpha" },
+  { id: "proj-b", name: "Beta" },
+];
 
 /**
  * One stored board with its widgets, and a query door that answers no rows; calls are kept.
@@ -150,6 +168,8 @@ function boardServer({ widgets = [WIDGET] }: { widgets?: readonly (typeof WIDGET
         }
         return Promise.resolve({ success: true });
       }
+      case "analytics.lwql.readableProjects":
+        return Promise.resolve({ projects: READABLE_PROJECTS });
       case "analytics.lwql.query":
         return Promise.resolve({
           columns: [{ name: "n", type: "UInt64" }],
@@ -171,6 +191,7 @@ function boardServer({ widgets = [WIDGET] }: { widgets?: readonly (typeof WIDGET
             input as {
               sql: string;
               sources?: unknown;
+              projects?: unknown;
               excludeOrigins?: unknown;
               granularitySeconds?: number;
               timeWindow?: { start: string; end: string };
@@ -379,7 +400,9 @@ describe("given a stored widget whose query stores no sources", () => {
     await user.keyboard("{Control>}a{/Control}Renamed{Enter}");
     await save(user, drawer);
 
-    expect(server.updates()[0]?.queries).toEqual([{ ...GRAPH.queries[0], sources: null }]);
+    expect(server.updates()[0]?.queries).toEqual([
+      { ...GRAPH.queries[0], sources: null, projects: null },
+    ]);
   });
 });
 
@@ -607,5 +630,121 @@ describe("given a board set to the last 30 days at one bucket per day", () => {
     expect(bound.every(({ granularitySeconds }) => granularitySeconds === 86_400)).toBe(true);
     expect(bound.every(({ start, end }) => end - start === 30 * 86_400_000)).toBe(true);
     expect(contexts).toEqual(bound);
+  });
+});
+
+/** The projects row of the editor's first query. */
+const projectsRow = (drawer: HTMLElement) => within(drawer).getByTestId("query-projects");
+
+/** Adds one project through the row's "Add project" menu. */
+async function addProject(
+  user: ReturnType<typeof userEvent.setup>,
+  drawer: HTMLElement,
+  name: string,
+) {
+  await user.click(within(projectsRow(drawer)).getByRole("button", { name: /Add project/ }));
+  await user.click(await screen.findByRole("menuitem", { name }));
+}
+
+describe("given a query whose SQL never reads the sources parameter", () => {
+  const ignoring = {
+    ...WIDGET,
+    graph: {
+      ...GRAPH,
+      queries: [
+        { name: "main", sql: "SELECT count() AS n FROM trace_metrics", sources: ["langy"] },
+      ],
+    },
+  };
+
+  /** @scenario "AC204b Sources: the editor's sources row is disabled, with a reason, while the SQL ignores the parameter" */
+  it("keeps the pills as stored and disables Add source with the reason", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    openBoard({ widgets: [ignoring] });
+    await screen.findByTestId("sandboxed-frame");
+
+    const drawer = await openEditor(user);
+    const row = within(drawer).getByTestId("query-sources");
+
+    expect(pickedSources(drawer)).toEqual(["langy"]);
+    expect(
+      (within(row).getByRole("button", { name: /Add source/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(within(row).getByTestId("sources-ignored-reason").textContent).toBe(
+      "The SQL does not read {dashboard_context_sources}",
+    );
+  });
+});
+
+describe("given a member who reads Alpha and Beta and not Gamma", () => {
+  /** @scenario "AC207 Project: the editor offers only the projects the member can read" */
+  it("offers the readable projects, none twice, and names the board's project while none is picked", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    openBoard();
+    await screen.findByTestId("sandboxed-frame");
+    const drawer = await openEditor(user);
+
+    expect(projectsRow(drawer).textContent).toContain("Test Project (the board's project)");
+    await user.click(within(projectsRow(drawer)).getByRole("button", { name: /Add project/ }));
+    const offered = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+    expect(offered).toEqual(["Test Project", "Alpha", "Beta"]);
+
+    await user.click(screen.getByRole("menuitem", { name: "Beta" }));
+    await user.click(within(projectsRow(drawer)).getByRole("button", { name: /Add project/ }));
+    const again = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+    expect(again).toEqual(["Test Project", "Alpha"]);
+  });
+
+  /** @scenario "AC208b Project: an editor sees the hidden project as a count and removes it by position" */
+  it("shows the hidden project as a count and drops it by position, nothing else", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const hidden = {
+      ...WIDGET,
+      graph: { ...GRAPH, queries: [{ ...GRAPH.queries[0]!, projects: ["proj-a", "proj-c"] }] },
+    };
+    const server = openBoard({ widgets: [hidden] });
+    await screen.findByTestId("sandboxed-frame");
+    const drawer = await openEditor(user);
+
+    const row = projectsRow(drawer);
+    expect(row.textContent).toContain("Alpha");
+    expect(row.textContent).toContain("1 project you can't read");
+    expect(row.textContent).not.toContain("proj-c");
+
+    await user.click(within(row).getByRole("button", { name: "Remove 1 project you can't read" }));
+    await save(user, drawer);
+
+    expect(server.updates()[0]?.queries[0]?.projects).toEqual(["proj-a"]);
+  });
+});
+
+describe("given a member changes a query's projects in the editor", () => {
+  /** @scenario "AC209 Params: changing a parameter runs the preview again, and Undo puts the old value back" */
+  it("runs the preview again before saving, and Undo clears what the query did not store", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const server = openBoard();
+    await screen.findByTestId("sandboxed-frame");
+    const drawer = await openEditor(user);
+    const before = await within(drawer).findByTestId("sandboxed-frame");
+    await frameRuns({ frame: before, queryName: "main" });
+
+    await addProject(user, drawer, "Beta");
+    const after = await vi.waitFor(() => {
+      const frame = within(drawer).getByTestId("sandboxed-frame");
+      if (frame === before) throw new Error("the preview has not run again yet");
+      return frame;
+    });
+    await frameRuns({ frame: after, queryName: "main" });
+
+    expect(server.runs().at(-1)?.projects).toEqual(["proj-b"]);
+    expect(server.updates()).toEqual([]);
+
+    await save(user, drawer);
+    await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
+    await user.click(await screen.findByRole("button", { name: "Undo" }));
+    await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
+
+    expect(server.updates()[0]?.queries[0]?.projects).toEqual(["proj-b"]);
+    expect(server.updates()[1]?.queries[0]?.projects).toBeNull();
   });
 });

@@ -451,3 +451,50 @@ describe("given a card run in a group project", () => {
     );
   });
 });
+
+describe("given a key for a group project", () => {
+  const MEMBER_SQL =
+    "SELECT count() AS n FROM analytics.trace_metrics WHERE TenantId IN {dashboard_context_projects:Array(String)} LIMIT 1";
+
+  /** @scenario "QP03c A key for a group project reads the group's members by default" */
+  it("reads every member from where its grant opens, and echoes them in order", async () => {
+    const from = Date.parse("2026-03-01T00:00:00.000Z");
+    const { request, result } = await run({
+      sql: MEMBER_SQL,
+      projects: [
+        { id: "A", lwqlKey: "ka" },
+        { id: "B", lwqlKey: "kb" },
+      ],
+      memberWindows: [
+        { projectId: "A", from: 0 },
+        { projectId: "B", from },
+      ],
+    });
+
+    expect(result.params?.dashboard_context_projects).toEqual(["A", "B"]);
+    expect(request?.sql).toContain(`TenantId = 'B' AND OccurredAt >= fromUnixTimestamp64Milli`);
+    expect(request?.sql).toContain(`TenantId IN ('A')`);
+  });
+});
+
+describe("given a statement that compares TenantId with a project it may not read", () => {
+  /**
+   * @scenario "QP14 A statement widening its reach with TenantId still reads nothing it may not"
+   * The reach is the capability built from the readable projects' keys, never from the SQL;
+   * the row policy that enforces it is proved by tenant-column-isolation.integration.test.ts.
+   */
+  it("sends the capability of the readable project only, whatever the SQL names", async () => {
+    const { request } = await run({
+      sql: "SELECT count() AS n FROM analytics.trace_metrics WHERE TenantId = 'C' LIMIT 1",
+      projects: [{ id: "A", lwqlKey: "ka" }],
+    });
+    const asked = await run({
+      sql: "SELECT count() AS n FROM analytics.trace_metrics WHERE TenantId = 'A' LIMIT 1",
+      projects: [{ id: "A", lwqlKey: "ka" }],
+    });
+
+    expect(request?.tenantCapability).toBe(asked.request?.tenantCapability);
+    expect(request?.tenantCapability).not.toContain("kc");
+    expect(request?.tenantCapability.split(",")).toHaveLength(1);
+  });
+});

@@ -45,6 +45,7 @@ import {
   type AnalyticsEvaluationRow,
   type LangWatchQLTimeWindow,
   type LangWatchQLValidationResult,
+  type LangWatchQLReadableProject,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
@@ -120,6 +121,7 @@ import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
+import { LangWatchQLReadableProjectsService } from "../services/langwatch-ql-readable-projects.service.ts";
 import { LangWatchQLValidationReportService } from "../services/langwatch-ql-validation-report.service.ts";
 import {
   DEFAULT_LWQL_DATABASE,
@@ -539,6 +541,7 @@ export class AnalyticsModule
   #widgetAccess: DashboardWidgetAccessService;
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
+  #readableProjects: LangWatchQLReadableProjectsService;
   #aggregateScope: LangWatchQLAggregateScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
@@ -546,6 +549,7 @@ export class AnalyticsModule
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
+    this.#readableProjects = LangWatchQLReadableProjectsService.create(dependencies);
     this.#aggregateScope = LangWatchQLAggregateScopeService.create({
       projects: dependencies.projects,
       ...(dependencies.lwqlAggregateMaxMembers === undefined
@@ -953,6 +957,14 @@ export class AnalyticsModule
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  /** The projects a card's editor may offer this member. */
+  listReadableProjects(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<LangWatchQLReadableProject[]> {
+    return this.#readableProjects.listFor(input);
   }
 
   /** A member's statement judged for the editor's markers; never executed. */

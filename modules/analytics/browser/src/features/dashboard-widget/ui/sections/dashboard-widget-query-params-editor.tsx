@@ -11,6 +11,10 @@ import {
   RESERVED_PARAMETERS,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
+import { useReadableProjects } from "../../../../behavior/use-readable-projects.ts";
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { readsSourcesParameter } from "../../../dashboards/model/sources-parameter.ts";
+import { queryProjectsView, withoutProjectAt } from "../../model/query-projects.ts";
 import {
   type QueryParameterRowVM,
   QueryParametersPanel,
@@ -97,20 +101,42 @@ interface DashboardWidgetQueryParamsEditorProps {
   sources: readonly TraceSource[] | null | undefined;
   /** Any change stores the list, the default included once a pill is touched. */
   onSourcesChange: (sources: TraceSource[]) => void;
+  /** The query's SQL: a statement that never reads the sources parameter ignores the list. */
+  sql: string;
+  /** The projects the query names; unset, it reads the board's project. */
+  projects: readonly string[] | null | undefined;
+  onProjectsChange: (projects: string[] | null) => void;
 }
+
+/** Why the sources row is off while the SQL ignores the parameter (AC204b). */
+export const SOURCES_IGNORED_REASON = "The SQL does not read {dashboard_context_sources}";
 
 export function DashboardWidgetQueryParamsEditor({
   params,
   onChange,
   sources,
   onSourcesChange,
+  sql,
+  projects,
+  onProjectsChange,
 }: DashboardWidgetQueryParamsEditorProps) {
+  const host = useAnalyticsHost();
+  const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
+  const picked = projects ?? [];
+
   return (
     <QueryParametersPanel
       sources={{
         picked: effectiveSources(sources),
         all: TRACE_SOURCES,
         onChange: onSourcesChange,
+        ...(readsSourcesParameter(sql) ? {} : { disabledReason: SOURCES_IGNORED_REASON }),
+      }}
+      projects={{
+        view: queryProjectsView({ picked: projects, readable }),
+        boardProjectName: host.project()?.name ?? "this project",
+        onAdd: (projectId) => onProjectsChange([...picked, projectId]),
+        onRemove: (index) => onProjectsChange(withoutProjectAt({ picked, index })),
       }}
       reserved={RESERVED_PARAMETERS}
       typeOptions={TYPE_OPTIONS}

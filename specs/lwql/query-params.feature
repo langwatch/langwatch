@@ -230,6 +230,8 @@ Feature: Every query door takes the same parameters and says what it ran with
       Given an API key that reads "A" and not "C"
       When a statement run with projects ["A"] compares TenantId with "C"
       Then it returns no row of "C", by the row policy
+      # The unit test proves the capability sent holds the readable project's key only; the row
+      # policy itself is proved by tenant-column-isolation.integration.test.ts (needs a container).
       # Evidence: the REST answer quoted
 
     @unit @integration

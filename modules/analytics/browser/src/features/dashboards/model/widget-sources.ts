@@ -29,13 +29,18 @@ export function picksNoSources(queries: readonly Sourced[]): boolean {
 }
 
 /**
- * The queries as an update writes them: an unset query says so with `null`, since the server
- * keeps the stored list of a query sent without one. So Undo leaves an unset query unset (AC200k).
+ * The queries as an update writes them: an unset list says so with `null`, since the server
+ * keeps the stored list of a query sent without one. So Undo leaves an unset query unset, its
+ * sources and its projects alike (AC200k, AC209).
  */
 export function withStoredSources(
   queries: readonly DashboardWidgetQuery[],
 ): DashboardWidgetQuery[] {
-  return queries.map((query) => ({ ...query, sources: query.sources ?? null }));
+  return queries.map((query) => ({
+    ...query,
+    sources: query.sources ?? null,
+    projects: query.projects ?? null,
+  }));
 }
 
 /**
