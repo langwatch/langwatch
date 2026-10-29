@@ -367,16 +367,18 @@ export class InstantEvalJudgeRouteRunService {
           }),
           this.signal,
         );
-        return this.deps.llmJudge.judge(
+        const answer = await this.deps.llmJudge.judge(
           { wire, model, job: this.plan.job, question, text, timeoutMs },
           ...(this.signal ? [this.signal] : []),
         );
+        // Billed as it arrives, so a stop while a sibling is in flight still bills this one.
+        this.paid({ backend, inputTokens: answer.inputTokens, outputTokens: answer.outputTokens });
+        return answer;
       }),
     );
     const read = new Map<string, InstantEvalJudgeRoutedAnswer>();
     let reason: InstantEvalSkipReason = "classifier_provider_unavailable";
     answers.forEach((answer, at) => {
-      this.paid({ backend, inputTokens: answer.inputTokens, outputTokens: answer.outputTokens });
       if (answer.outcome !== "answered") {
         reason = answer.reason;
         return;

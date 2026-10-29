@@ -7,8 +7,10 @@
 import {
   INSTANT_EVAL_FREE_BUDGET_USD,
   InstantEvalFreeBudgetExhaustedError,
+  InstantEvalJudgeStoppedError,
   type InstantEvalJudgeAnswer,
   type InstantEvalJudgeCall,
+  type InstantEvalJudgement,
   type InstantEvalJudgeRefusalCode,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeSpendPricedEventData,
@@ -117,14 +119,13 @@ export class InstantEvalJudgeService {
     }
 
     const { router } = this.deps;
+    const spend = { organizationId, projectId, requestKey };
     const judgement =
       route && router
-        ? await router.classify({
-            projectId,
-            text,
-            questions,
-            route,
-            ...(signal ? { signal } : {}),
+        ? await this.routed({
+            router,
+            spend,
+            call: { projectId, text, questions, route, ...(signal ? { signal } : {}) },
           })
         : await classifier.classify(
             { projectId, text, questions, limiter: this.deps.limiter },
@@ -133,6 +134,46 @@ export class InstantEvalJudgeService {
     // A skip billed nothing, so it records nothing.
     if (judgement.inputTokens <= 0) return { outcome: "judged", judgement, priceUsd: 0 };
 
+    const { inputTokens, costNanoUsd } = judgement;
+    const priceUsd = await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
+    return { outcome: "judged", judgement, priceUsd };
+  }
+
+  /** A routed call. A stop after paid legs records what they spent, then is rethrown. */
+  private async routed({
+    router,
+    spend,
+    call,
+  }: {
+    router: InstantEvalJudgeRouterService;
+    spend: Readonly<{ organizationId: string; projectId: string; requestKey?: string | undefined }>;
+    call: Parameters<InstantEvalJudgeRouterService["classify"]>[0];
+  }): Promise<InstantEvalJudgement> {
+    try {
+      return await router.classify(call);
+    } catch (error) {
+      if (error instanceof InstantEvalJudgeStoppedError) {
+        const { inputTokens, costNanoUsd } = error;
+        await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
+      }
+      throw error;
+    }
+  }
+
+  /** One paid call, priced and recorded. The router prices all it returns: a cost marks routed. */
+  private async priceAndRecord({
+    organizationId,
+    projectId,
+    requestKey,
+    inputTokens,
+    costNanoUsd,
+  }: {
+    organizationId: string;
+    projectId: string;
+    requestKey?: string | undefined;
+    inputTokens: number;
+    costNanoUsd: number | undefined;
+  }): Promise<number> {
     const { priceUsd, fact } = instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
@@ -140,17 +181,16 @@ export class InstantEvalJudgeService {
         requestKey,
         mint: this.deps.mintRequestId,
       }),
-      inputTokens: judgement.inputTokens,
+      inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
       ...this.pricing(),
-      // The router prices every judgement it returns, zero included: a cost marks it routed.
       routed: this.routedOf({
-        costNanoUsd: judgement.costNanoUsd ?? 0,
-        routedInputTokens: judgement.costNanoUsd === undefined ? 0 : judgement.inputTokens,
+        costNanoUsd: costNanoUsd ?? 0,
+        routedInputTokens: costNanoUsd === undefined ? 0 : inputTokens,
       }),
     });
     await this.record({ fact });
-    return { outcome: "judged", judgement, priceUsd };
+    return priceUsd;
   }
 
   /**

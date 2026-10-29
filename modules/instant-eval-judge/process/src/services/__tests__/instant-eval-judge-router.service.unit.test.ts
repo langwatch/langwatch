@@ -358,6 +358,26 @@ describe("InstantEvalJudgeRouterService", () => {
     expect(error).toMatchObject({ name: "AbortError", inputTokens: 1000, costNanoUsd: 100_000 });
   });
 
+  /** @scenario "A caller's stop keeps the legs already paid billed" */
+  it("bills the LLM answers already received when the caller stops mid-escalation", async () => {
+    const stop = new AbortController();
+    let sends = 0;
+    const { classify } = harness({
+      decisions: () => judged(0.4),
+      llm: (signal) => {
+        sends += 1;
+        if (sends === 1) return llmSays(true);
+        setTimeout(() => stop.abort(new DOMException("stopped", "AbortError")), 5);
+        return hangUntilAborted(signal);
+      },
+    });
+    const both = [Q, yesNo("q2", "is the user confused")];
+    const error = await classify(SHORT, both, stop.signal).catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
+    // decision-a's 1000 tokens, plus the 2000 of the one LLM answer that came back.
+    expect(error).toMatchObject({ inputTokens: 3000, costNanoUsd: 100_000 + 2_500_000 });
+  });
+
   describe("given a text-view plan", () => {
     /** @scenario "A text view the caller did not render judges the full text, flagged" */
     it("judges the full text and names the missing view", async () => {

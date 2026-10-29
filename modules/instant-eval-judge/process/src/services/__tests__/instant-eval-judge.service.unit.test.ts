@@ -5,6 +5,7 @@
  */
 import {
   INSTANT_EVAL_PRICING,
+  InstantEvalJudgeStoppedError,
   type InstantEvalJudgement,
   type InstantEvalJudgeSpendPricedEventData,
   type InstantEvalQuestion,
@@ -584,6 +585,29 @@ describe("given a judge call that carries a route", () => {
       costNanoUsd: 500,
       priceNanoUsd: Math.round(500 * INSTANT_EVAL_PRICING.markup),
       model: "langwatch-judge",
+    });
+  });
+
+  /** @scenario "A caller's stop keeps the legs already paid billed" */
+  it("records what a stopped routed call's paid legs spent, then rethrows the stop", async () => {
+    const { service, router, recorded, seed } = harness({ isRouted: true });
+    await seed();
+    const stop = new InstantEvalJudgeStoppedError({
+      inputTokens: 1000,
+      costNanoUsd: 5000,
+      cause: new DOMException("stopped", "AbortError"),
+    });
+    vi.spyOn(router, "classify").mockRejectedValue(stop);
+
+    const judging = service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
+
+    await expect(judging).rejects.toBe(stop);
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({
+      model: "langwatch-judge",
+      inputTokens: 1000,
+      costNanoUsd: 5000,
+      priceNanoUsd: 5000 * INSTANT_EVAL_PRICING.markup,
     });
   });
 
