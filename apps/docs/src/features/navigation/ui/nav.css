@@ -23,3 +23,17 @@
 [aria-expanded="true"] > .docs-nav-chevron {
   transform: rotate(90deg);
 }
+
+/* A title never wraps or scrolls its row sideways: it trims to one line, the full text in its title. */
+.docs-nav-label {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.docs-nav-tree a {
+  min-width: 0;
+  max-width: 100%;
+}
