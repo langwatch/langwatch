@@ -367,7 +367,7 @@ Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:78`, router `src/
 interface Input {
   projectId: string;
 }
-// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:505
+// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:508
 interface Output {
   available: boolean;
   reason?: "disabled" | "unprovisioned";
