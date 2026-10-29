@@ -2294,29 +2294,35 @@ body {
   }
 }
 
-/* Number-key hints on the tab group a pointer or keyboard is in; keys 1 to 9 pick a tab. */
+/* Number-key hints on the tab group a pointer or keyboard is in; keys 1 to 9 pick a tab.
+   Each hint sits in its tab's top corner, out of flow, so showing it never moves a label. */
 @media (hover: hover) and (pointer: fine) {
   [role="tablist"] {
     counter-reset: docs-tab;
   }
   [role="tablist"] [role="tab"] {
+    position: relative;
     counter-increment: docs-tab;
   }
   [data-scope="tabs"][data-part="root"]:is(:hover, :focus-within)
     [role="tablist"]
     > [role="tab"]:nth-child(-n + 9)::after {
     content: counter(docs-tab);
-    margin-inline-start: 6px;
-    padding-inline: 4px;
-    min-width: 16px;
+    position: absolute;
+    top: 3px;
+    inset-inline-end: 1px;
+    min-width: 13px;
+    padding-inline: 2px;
     border: 1px solid var(--chakra-colors-border);
-    border-radius: 4px;
+    border-radius: 3px;
+    background: var(--chakra-colors-bg-panel);
     color: var(--chakra-colors-fg-muted);
     font-family: var(--chakra-fonts-mono);
-    font-size: 10px;
-    line-height: 14px;
+    font-size: 9px;
+    line-height: 11px;
     font-weight: 500;
     text-align: center;
+    pointer-events: none;
     animation: docs-hint-in 160ms ease-out both;
   }
 }
