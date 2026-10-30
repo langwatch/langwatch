@@ -384,6 +384,30 @@ Feature: Scenario run hooks: setup and teardown
       Then no request is sent and the hook fails naming the missing secret
 
     @unit
+    Scenario: A new hooks URL on another origin is refused when it would take a stored credential
+      Given a saved HTTP agent with stored authentication
+      When an update adds a hooks URL on another origin and leaves the authentication blank
+      Then the update is refused for sending stored credentials to another origin
+
+    @unit
+    Scenario: A new hooks URL on another origin is refused when it would take the stored signing secret
+      Given a saved HTTP agent with a stored hooks signing secret
+      When an update adds a hooks URL on another origin and leaves the signing secret blank
+      Then the update is refused for sending stored credentials to another origin
+
+    @unit
+    Scenario: A first hooks URL on the turn URL's origin keeps the stored credentials
+      Given a saved HTTP agent with stored authentication and no hooks URL
+      When an update adds a hooks URL on the origin of the turn URL and leaves the authentication blank
+      Then the update is allowed
+
+    @unit
+    Scenario: A hooks URL on another origin is allowed when every credential is typed again
+      Given a saved HTTP agent with stored authentication and a stored hooks signing secret
+      When an update moves the hooks URL to another origin and supplies new values for all of them
+      Then the update is allowed
+
+    @unit
     Scenario: An HTTP hook call carries the run's idempotency key
       When the setup hook of the run "run_1" is called
       Then it carries "Idempotency-Key: run_1:setup"
