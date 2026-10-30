@@ -5,6 +5,7 @@
 declare const URL: new (input: string) => {
   protocol: string;
   username: string;
+  password: string;
   host: string;
   origin: string;
 };
@@ -34,10 +35,10 @@ type Destination = { parses: true; key: string; origin: string } | { parses: fal
 function destination(hooksUrl: string, placeholder: string): Destination {
   try {
     const url = new URL(hooksUrl.replace(TEMPLATE, placeholder));
-    // Scheme, user and host: what a template must not choose.
+    // Scheme, user, password and host: what a template must not choose.
     return {
       parses: true,
-      key: `${url.protocol}//${url.username}@${url.host}`,
+      key: `${url.protocol}//${url.username}:${url.password}@${url.host}`,
       origin: url.origin,
     };
   } catch {
