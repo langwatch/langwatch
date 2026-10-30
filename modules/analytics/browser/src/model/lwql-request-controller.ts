@@ -44,7 +44,7 @@ export interface LangWatchQLExecuteRequest {
   /** The projects a dashboard query reads (AC207); the board's project when absent. */
   readonly projects?: readonly string[];
   /** The widget a run is for, for its log line only; absent on the workbench. */
-  readonly telemetry?: LangWatchQLRunTelemetryRequest;
+  readonly telemetry?: LangWatchQLRunTelemetryRequest | undefined;
 }
 
 /** How a submission reaches the server. */

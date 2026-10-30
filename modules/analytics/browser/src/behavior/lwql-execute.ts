@@ -22,7 +22,7 @@ export interface LangWatchQLQueryInput {
   timeWindow?: LangWatchQLTimeWindow;
   sources?: TraceSource[] | null;
   projects?: string[];
-  telemetry?: LangWatchQLRunTelemetryRequest;
+  telemetry?: LangWatchQLRunTelemetryRequest | undefined;
 }
 
 const isoInstant = (epochMs: number): string =>

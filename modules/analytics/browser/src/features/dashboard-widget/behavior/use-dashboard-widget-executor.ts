@@ -139,7 +139,7 @@ export function useDashboardWidgetExecutor(
           // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
           sources: query.sources ?? null,
           ...(query.projects ? { projects: query.projects } : {}),
-          ...(telemetry ? { telemetry } : {}),
+          telemetry,
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.

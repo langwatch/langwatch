@@ -118,6 +118,7 @@ import {
 } from "../services/langwatch-ql-query-scope.service.ts";
 import { LangWatchQLReadableProjectsService } from "../services/langwatch-ql-readable-projects.service.ts";
 import { LangWatchQLRunScopeService } from "../services/langwatch-ql-run-scope.service.ts";
+import { LangWatchQLRunTelemetryService } from "../services/langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLValidationReportService } from "../services/langwatch-ql-validation-report.service.ts";
 import {
   DEFAULT_LWQL_DATABASE,
@@ -138,6 +139,9 @@ import type {
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
+/** Counts and logs every LangWatchQL run that does not answer, at whichever gate it stopped. */
+const lwqlRunTelemetry = LangWatchQLRunTelemetryService.create();
+
 const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
 
 /** Waiting analytics reads per tenant; only a tenant flooding the process is refused. */
@@ -748,6 +752,19 @@ export class AnalyticsModule
       { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
+    try {
+      return await this.#runLangWatchQLForKey(input);
+    } catch (error) {
+      lwqlRunTelemetry.recordFailed({ telemetry: { caller: "rest_api" }, sql: input.sql, error });
+      throw error;
+    }
+  }
+
+  async #runLangWatchQLForKey(
+    input: Readonly<
+      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
+    >,
+  ): Promise<LangWatchQLQueryResult> {
     const { reach, projectId, projects: asked, sql, parameters, timeWindow } = input;
     const { granularitySeconds, sources, signal } = input;
     const { named: wanted, all } = this.#runScope.select({ projectId, projects: asked });
@@ -850,6 +867,19 @@ export class AnalyticsModule
    * keys, each from where its grant opens, and is still counted once, against the aggregate.
    */
   async executeLangWatchQL(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLQueryResult> {
+    try {
+      return await this.#executeLangWatchQL(input);
+    } catch (error) {
+      // Every refusal on the way counts, the window and the project scope included, not only
+      // the database's: a gate that turns most widget runs away is the failure worth an alert.
+      lwqlRunTelemetry.recordFailed({ telemetry: input.telemetry, sql: input.sql, error });
+      throw error;
+    }
+  }
+
+  async #executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
     const { authorization, project, projects: asked, userId, ...run } = input;

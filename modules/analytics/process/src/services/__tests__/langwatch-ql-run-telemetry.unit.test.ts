@@ -4,11 +4,21 @@
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 import type { LangWatchQLRunTelemetry } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type * as Observability from "@langwatch/observability";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
 } from "@langwatch/observability/metrics/testing";
+import { resolveRequestBound } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const logged = vi.hoisted(() => ({ info: [] as { fields: unknown; message: string }[] }));
@@ -26,10 +36,12 @@ vi.mock("@langwatch/observability", async (importActual) => {
   };
 });
 
+import { AnalyticsModule } from "../../app/analytics.app.ts";
 import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
+import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { langWatchQLQueryHash } from "../../rules/langwatch-ql-run-telemetry.rules.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
@@ -83,6 +95,65 @@ async function run({
     sql,
     ...(telemetry ? { telemetry } : {}),
   });
+}
+
+/**
+ * One run through the app's member door, as the workbench and widget routes call it, with no
+ * LangWatchQL identity provisioned. Resolves the code it was refused with.
+ */
+async function refusedAtTheDoor({
+  sql,
+  telemetry,
+  projects,
+}: {
+  sql: string;
+  telemetry: LangWatchQLRunTelemetry;
+  projects?: string;
+}): Promise<string> {
+  const app = await AnalyticsModule.create({
+    dependencies: {
+      featureFlags: createApiFixture<FeatureFlagApi>(),
+      authz: createApiFixture<AuthzApi>(),
+      dataPrivacy: createApiFixture<DataPrivacyApi>(),
+      projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org-1" }),
+      plans: createApiFixture<EntitlementApi>({
+        requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "ENTERPRISE")),
+      }),
+      traces: createApiFixture<TraceApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
+    },
+    channels: { judge: createApiFixture<InstantEvalApi>() },
+    repositories: MemoryAnalyticsRepositories.create(),
+    config: {
+      langwatchQl: {
+        url: void 0,
+        username: void 0,
+        database: void 0,
+        tenantSetting: void 0,
+        postgresHost: void 0,
+        accessModelMode: void 0,
+        sqlSingleNode: void 0,
+        clickhouseCluster: void 0,
+        aggregateMaxMembers: void 0,
+      },
+      tenantAnalyticsConcurrency: 4,
+      publicBaseUrl: "https://app.langwatch.test",
+    },
+    resources: { own: () => void 0, ownService: () => void 0 },
+    secrets: {} as never,
+  });
+  const run = app.executeLangWatchQL({
+    project: { id: "project-1", lwqlKey: "key-1" },
+    protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+    sql,
+    telemetry,
+    // A stray value, as a browser could send it: the run scope refuses it with a 422.
+    ...(projects === undefined ? {} : { projects: projects as never, userId: "member-1" }),
+  });
+  return run.then(
+    () => "answered",
+    (error: unknown) => (error as { code: string }).code,
+  );
 }
 
 function lineNamed(message: string): Record<string, unknown> {
@@ -158,26 +229,37 @@ describe("LangWatchQL run telemetry", () => {
     });
   });
 
-  describe("given a run the policy refuses", () => {
+  describe("given a run the policy refuses at the member door", () => {
     /** @scenario "Telemetry: a failed query is logged and counted with its error code" */
     it("logs the caller, the hash and the error code, and counts it under that code", async () => {
       const refused = "SELECT * FROM system.tables";
 
-      const error = (await run({ sql: refused, telemetry: { caller: "workbench" } }).then(
-        () => ({ code: "answered" }),
-        (thrown: unknown) => thrown,
-      )) as { code: string };
+      const code = await refusedAtTheDoor({ sql: refused, telemetry: { caller: "workbench" } });
 
-      const line = lineNamed("LangWatchQL failed");
-      expect(line).toMatchObject({
+      expect(code).toMatch(/^lwql_/);
+      expect(lineNamed("LangWatchQL failed")).toMatchObject({
         caller: "workbench",
         queryHash: langWatchQLQueryHash(refused),
-        outcome: error.code,
+        outcome: code,
       });
-      expect(error.code).toMatch(/^lwql_/);
+      expect(metrics.valueOf("lwql_queries_total", { caller: "workbench", outcome: code })).toBe(1);
+    });
+  });
+
+  describe("given a widget's run whose projects the run scope refuses", () => {
+    /** @scenario "Telemetry: a failed query is logged and counted with its error code" */
+    it("counts the refusal under the widget's caller, before any statement runs", async () => {
+      const code = await refusedAtTheDoor({ sql: SQL, telemetry: WIDGET_RUN, projects: "al" });
+
+      expect(lineNamed("LangWatchQL failed")).toMatchObject({
+        caller: "dashboard_widget",
+        widgetId: "widget-1",
+        outcome: code,
+      });
       expect(
-        metrics.valueOf("lwql_queries_total", { caller: "workbench", outcome: error.code }),
+        metrics.valueOf("lwql_queries_total", { caller: "dashboard_widget", outcome: code }),
       ).toBe(1);
+      expect(logged.info.some(({ message }) => message === "LangWatchQL executed")).toBe(false);
     });
   });
 

@@ -383,20 +383,7 @@ export class LangWatchQLService {
   }
 
   /** The same, over every project in the set — an API key's readable projects. */
-  async executeForProjects(
-    input: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate & LangWatchQLMemberScope,
-  ): Promise<LangWatchQLQueryResult> {
-    try {
-      return await this.#executeForProjects(input);
-    } catch (error) {
-      // Every refusal on the way counts, not only the database's: a gate that turns most widget
-      // runs away is the failure worth an alert.
-      lwqlRunTelemetry.recordFailed({ telemetry: input.telemetry, sql: input.sql, error });
-      throw error;
-    }
-  }
-
-  async #executeForProjects({
+  async executeForProjects({
     projects,
     protections,
     sql,
