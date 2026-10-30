@@ -66,6 +66,7 @@ function harness({
   usageBilled,
   spentNanoUsd = 0n,
   routeUsdPerMillion = 1,
+  mint,
 }: {
   isCloud?: boolean;
   hasClassifier?: boolean;
@@ -76,6 +77,8 @@ function harness({
   spentNanoUsd?: bigint;
   /** The Decisions backend's price; zero is a valid, self-hosted price. */
   routeUsdPerMillion?: number;
+  /** Stands in for the request id source; a counter otherwise. */
+  mint?: () => string;
 } = {}) {
   const repositories = {
     ...MemoryInstantEvalJudgeRepositories.create(),
@@ -138,7 +141,7 @@ function harness({
         occurredAtMs: fact.occurredAt,
       });
     },
-    mintRequestId: () => `minted-${++minted}`,
+    mintRequestId: mint ?? (() => `minted-${++minted}`),
     now: () => Temporal.Instant.fromEpochMilliseconds(NOW),
     logger,
   });
@@ -690,6 +693,33 @@ describe("given a judge call that carries a route", () => {
     expect(spendNanoUsd).toBe(
       BigInt(5000 * INSTANT_EVAL_PRICING.markup + 1_000_000_000 * INSTANT_EVAL_PRICING.markup),
     );
+  });
+
+  /** @scenario "A caller's stop keeps the legs already paid billed" */
+  it("rethrows the stop, never the write error, when a stopped call's spend cannot be written", async () => {
+    const { service, router, lines, seed } = harness({
+      mint: () => {
+        throw new Error("the request id source is away");
+      },
+    });
+    await seed();
+    const stop = new InstantEvalJudgeStoppedError({
+      inputTokens: 1000,
+      costNanoUsd: 5000,
+      cause: new DOMException("stopped", "AbortError"),
+    });
+    vi.spyOn(router, "classify").mockRejectedValue(stop);
+
+    const judging = service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
+
+    await expect(judging).rejects.toBe(stop);
+    // The paid legs could not be billed, so the log names what they spent for a replay.
+    expect(lines.findLine("error", "stopped")).toMatchObject({
+      organizationId: ORGANIZATION_ID,
+      projectId: PROJECT_ID,
+      inputTokens: 1000,
+      costNanoUsd: 5000,
+    });
   });
 
   /** @scenario "A routed judgement with a cost of zero is still routed" */
