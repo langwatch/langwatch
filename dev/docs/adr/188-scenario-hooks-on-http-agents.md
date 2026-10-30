@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-22
 
-**Status:** Draft
+**Status:** Accepted (owner, 2026-10-30)
 
 ## Context
 
