@@ -194,8 +194,66 @@ describe("default test lanes", () => {
       ]);
     });
 
-    /** @scenario "A split test and test:unit are each checked for what they run" */
-    it("checks the test lane for containers when test:unit does not run vitest", () => {
+    /** @scenario "A test:unit lane that collects a scenario suite is reported" */
+    it("reports a scenario suite that test:unit collects while test stays clean", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: clean, "test:unit": "vitest run" },
+        }),
+        "tools/probe/_tests/live.scenario.test.ts": "",
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test:unit` lane collects _tests/live.scenario.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A test:unit lane that collects a scenario suite is reported" */
+    it("reports a timeout that test:unit sets above two minutes", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "vitest run --config vitest.unit.config.ts" },
+        }),
+        "tools/probe/vitest.unit.config.ts": "export default { test: { testTimeout: 3_600_000 } };",
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test:unit` lane waits 3600000"),
+      ]);
+    });
+
+    /** @scenario "A test:unit lane that collects a scenario suite is reported" */
+    it("reports a scenario suite once when test and test:unit run the same lane", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "vitest run" },
+        }),
+        "tools/probe/_tests/live.scenario.test.ts": "",
+      });
+
+      expect(lint()).toHaveLength(1);
+    });
+
+    /** @scenario "A script that only hands off to another is read as that script" */
+    it("reads a test script that hands off to a vitest test:unit as test:unit", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "pnpm run test:unit", "test:unit": "vitest run" },
+        }),
+        "tools/probe/_tests/live.scenario.test.ts": "",
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test:unit` lane collects _tests/live.scenario.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A script that only hands off to another is read as that script" */
+    it("checks the test lane for containers when test:unit hands off to it", () => {
       workspace({
         "tools/probe/package.json": JSON.stringify({
           name: "@langwatch/probe",
@@ -207,6 +265,19 @@ describe("default test lanes", () => {
       expect(lint().map((violation) => violation.message)).toEqual([
         expect.stringContaining("`test` lane collects src/store.integration.test.ts"),
       ]);
+    });
+
+    /** @scenario "A CI lane that is not vitest is not checked for containers" */
+    it("reports no container when test:unit runs another runner, even if test is vitest", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "node --test" },
+        }),
+        "tools/probe/src/store.integration.test.ts": starter,
+      });
+
+      expect(lint()).toEqual([]);
     });
   });
 
