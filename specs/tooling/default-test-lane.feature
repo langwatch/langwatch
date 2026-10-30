@@ -4,11 +4,12 @@ Feature: The default test lane finishes without live services
   scenario suite drives live services and may wait an hour; in the `test` lane
   it looks exactly like a hung run and holds a parallel slot while it waits.
 
-  Rule: `default-test-lane` refuses a package whose `test` vitest lane
+  Rule: `default-test-lane` refuses a package whose vitest lane (`test`, and `test:unit` if declared)
     collects a `*.scenario.test.*` file or waits more than two minutes per test.
     It also refuses one whose lane the package suites job runs (`test:unit` if declared, else `test`)
-    collects a file that starts a container
-    (specs/ci/package-suite-integration-lane.feature).
+    collects a file that starts a container (specs/ci/package-suite-integration-lane.feature).
+    A script that only runs `pnpm test` or `pnpm test:unit` is read as that script. A lane that
+    is not vitest is skipped, with no fallback to `test`.
 
   @unit
   Scenario: A default test lane that collects a scenario suite is reported
@@ -52,6 +53,25 @@ Feature: The default test lane finishes without live services
     Given a package whose `test` lane collects a scenario suite while `test:unit` is clean
     And a package whose `test:unit` lane collects a file that starts a container while `test` is clean
     And a package whose `test:unit` is empty and whose `test` lane collects such a file
-    And a package whose `test:unit` does not run vitest and whose `test` lane collects such a file
     When the default-test-lane policy runs
     Then it reports the scenario file, and the container files naming the lane read
+
+  @unit
+  Scenario: A test:unit lane that collects a scenario suite is reported
+    Given a package whose vitest `test:unit` lane collects a scenario suite or sets a timeout above two minutes
+    And its `test` lane is clean
+    When the default-test-lane policy runs
+    Then it reports the file or timeout naming `test:unit`, once when `test` runs the same lane
+
+  @unit
+  Scenario: A script that only hands off to another is read as that script
+    Given a package whose `test` script runs `pnpm run test:unit`, a vitest lane that collects a scenario suite
+    And a package whose `test:unit` script runs `pnpm test`, a vitest lane that collects a file that starts a container
+    When the default-test-lane policy runs
+    Then it reports the scenario file naming `test:unit`, and the container file naming `test`
+
+  @unit
+  Scenario: A CI lane that is not vitest is not checked for containers
+    Given a package whose `test:unit` runs `node --test` and whose vitest `test` collects a file that starts a container
+    When the default-test-lane policy runs
+    Then it reports nothing
