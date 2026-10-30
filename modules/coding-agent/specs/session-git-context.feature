@@ -18,6 +18,16 @@ Rule: Every agent that can emit the event joins on the same terms
     When the session fold runs
     Then the session carries the repository, branch and worktree from the event
 
+  # Parked 2026-10-30: ADR-188 is accepted and pi has no row in
+  # SESSION_CONTEXT_AGENTS, so no context event ever declares the pi agent. It
+  # binds with that row. The rest of this file stays enforced.
+  # becomes @unit
+  @unimplemented
+  Scenario: A session context event from pi folds its git identity
+    Given an admitted session context event declaring the pi agent
+    When the session fold runs
+    Then the session carries the repository, branch and worktree from the event
+
 Rule: The session context event joins the fold honestly
 
   @unit
@@ -49,7 +59,7 @@ Rule: Git identity folds as the present tense, last write wins
 
   # The session row answers where the session is NOW. A resumed session moves
   # between branches, worktrees and even repositories, and per-branch history
-  # lives on the fact rows, so nothing is lost by letting the scalars move —
+  # lives on the fact rows, so nothing is lost by letting the scalars move,
   # while a row frozen on its first repository can never be found by the
   # repository the session works in today.
 
