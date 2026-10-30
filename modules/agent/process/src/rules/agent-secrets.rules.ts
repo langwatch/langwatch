@@ -70,19 +70,44 @@ export function agentConfigWithoutSecrets(agent: Agent): Agent["config"] {
   return agent.type === "http" ? httpConfigWithoutSecrets(agent.config) : agent.config;
 }
 
-type HttpDestination = HttpSecrets & { url: string };
+type HttpDestination = HttpSecrets &
+  Pick<HttpAgentConfig, "hooksSigningSecret" | "hooksUrl"> & { url: string };
+
+function fillsStoredSigningSecret(input: {
+  stored: HttpDestination;
+  incoming: HttpDestination;
+}): boolean {
+  const { stored, incoming } = input;
+
+  return stored.hooksSigningSecret !== undefined && !incoming.hooksSigningSecret;
+}
+
+/** Hook calls go where credentials were trusted: the stored hooks URL, else the turn URL. */
+function movesStoredSecretsToHooksUrl(input: {
+  stored: HttpDestination;
+  incoming: HttpDestination;
+}): boolean {
+  const { stored, incoming } = input;
+  if (!incoming.hooksUrl) return false;
+  const trusted = stored.hooksUrl || stored.url;
+  if (isSameOrigin({ requested: incoming.hooksUrl, saved: trusted })) return false;
+
+  return fillsStoredSecrets(input) || fillsStoredSigningSecret(input);
+}
 
 /**
  * Whether a write's blank credentials would carry stored values to another origin than the saved
- * one.
+ * one, for the turn URL or the hooks URL.
  */
 export function movesStoredSecrets(input: {
   stored: HttpDestination;
   incoming: HttpDestination;
 }): boolean {
-  if (isSameOrigin({ requested: input.incoming.url, saved: input.stored.url })) return false;
+  const movesToTurnUrl =
+    !isSameOrigin({ requested: input.incoming.url, saved: input.stored.url }) &&
+    fillsStoredSecrets(input);
 
-  return fillsStoredSecrets(input);
+  return movesToTurnUrl || movesStoredSecretsToHooksUrl(input);
 }
 
 /**
