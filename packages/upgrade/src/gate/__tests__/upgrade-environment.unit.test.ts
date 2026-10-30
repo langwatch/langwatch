@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { configuredClickHouseTargets } from "../../runner/image-upgrade.ts";
-import { gateClickHouseTargets, upgradeEnvironmentOver } from "../serving-upgrade-gate.ts";
+import { upgradeEnvironmentOver } from "../serving-upgrade-gate.ts";
 
 const SHARED_URL = "http://clickhouse:8123/langwatch";
 
@@ -43,25 +43,21 @@ describe("upgradeEnvironmentOver", () => {
     });
 
     /** @scenario "The gate reads its ClickHouse targets from the environment the upgrade runs under" */
-    it("counts the gate's targets over that environment, not the one it was handed", () => {
-      expect(gateClickHouseTargets({ environment, databaseUrl, clickhouse: SHARED_URL })).toEqual([
-        "shared",
-      ]);
-    });
-
-    /** @scenario "The gate reads its ClickHouse targets from the environment the upgrade runs under" */
     it("counts a route at another URL as its own private target", () => {
       const privateEnvironment = {
         CLICKHOUSE_URL__acme__org_1: "http://private-clickhouse:8123/langwatch",
       };
 
-      expect(
-        gateClickHouseTargets({
-          environment: privateEnvironment,
-          databaseUrl,
-          clickhouse: SHARED_URL,
-        }),
-      ).toEqual(["shared", "private:org_1"]);
+      const upgradeEnvironment = upgradeEnvironmentOver({
+        environment: privateEnvironment,
+        databaseUrl,
+        clickhouse: SHARED_URL,
+      });
+
+      expect(configuredClickHouseTargets({ environment: upgradeEnvironment })).toEqual([
+        "shared",
+        "private:org_1",
+      ]);
     });
   });
 });

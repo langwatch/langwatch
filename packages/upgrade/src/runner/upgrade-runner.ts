@@ -94,6 +94,8 @@ type TargetStatus = Extract<UpgradeStepStatus, "done" | "failed" | "pending">;
 
 const isPrisma = (id: string) => id.startsWith("prisma:");
 const isGoose = (id: string) => id.startsWith("clickhouse:");
+/** The ledger `version` of a ClickHouse step: the goose version its step id carries. */
+const gooseVersion = (id: string) => id.slice("clickhouse:".length);
 const describeError = (error: unknown) =>
   redactSecrets(error instanceof Error ? error.message : String(error));
 
@@ -969,7 +971,7 @@ export class UpgradeRunnerService {
       const status = targetStatus({ target, id, blamed });
       blamed ||= status === "failed";
       const lastError = status === "failed" ? target.error : null;
-      const version = id.slice("clickhouse:".length);
+      const version = gooseVersion(id);
       await this.ledger.upsertTarget({
         stepId: id,
         target: target.target,
@@ -1144,8 +1146,9 @@ export class UpgradeRunnerService {
     );
     if (unrecorded.length === 0) return;
     const ids = [...this.shippedIds].filter(isGoose).toSorted();
+    const steps = ids.map((id) => ({ stepId: id, version: gooseVersion(id) }));
     for (const target of unrecorded) {
-      await this.ledger.seedTargetSteps({ target, stepIds: ids });
+      await this.ledger.seedTargetSteps({ target, steps });
       this.narrate.info(`ClickHouse target ${target} is new and behind; this run catches it up`, {
         phase: "preflight",
         target,
