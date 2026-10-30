@@ -232,3 +232,37 @@ Feature: Langy conversations are an event-sourced projection
     When I rename it or toggle sharing
     Then a "conversation_metadata_updated" event is recorded
     And the operational projection reflects the new title or sharing state
+
+  # ============================================================================
+  # Turn admission under concurrent sends
+  # ============================================================================
+
+  @unit
+  Scenario: A send that races another send is still admitted
+    Given another send races mine for the same conversation
+    When my send loses the race
+    Then my turn is still admitted
+
+  @unit
+  Scenario: A send that clashes with an already committed copy replays it
+    Given a copy of my send raced mine and has already been committed
+    When my send is submitted
+    Then I get that committed turn back instead of an error
+
+  @unit
+  Scenario: A send that clashes with a copy still being prepared is held as pending
+    Given a copy of my send raced mine and is still being prepared
+    When my send is submitted
+    Then my send is answered as pending instead of failing
+
+  @unit
+  Scenario: A send that cannot get through a burst of sends is told Langy is unavailable
+    Given many sends race mine and none lets it through
+    When my send keeps losing
+    Then I am told Langy is unavailable with the "langy_agent_unavailable" error
+
+  @unit
+  Scenario: A turn send that fails for another reason is surfaced without retry
+    Given my send fails for a reason unrelated to a race
+    When my send is submitted
+    Then I see that failure straight away and the send is not attempted again
