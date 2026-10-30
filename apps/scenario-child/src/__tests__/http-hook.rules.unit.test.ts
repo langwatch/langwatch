@@ -144,12 +144,15 @@ describe("hooksUrlRefusal()", () => {
   );
 
   /** @scenario "An HTTP hooks URL must use https" */
-  it.each(["http://shop.example.com/hooks", "http://10.0.0.5/hooks", "ftp://shop.example.com"])(
-    "refuses %s",
-    (url) => {
-      expect(hooksUrlRefusal(url)).toMatch(/https/);
-    },
-  );
+  it.each([
+    "http://shop.example.com/hooks",
+    "http://10.0.0.5/hooks",
+    "ftp://shop.example.com",
+    "http://127.evil.com/hooks",
+    "http://127.0.0.1.nip.io/h",
+  ])("refuses %s", (url) => {
+    expect(hooksUrlRefusal(url)).toMatch(/https/);
+  });
 
   it("refuses a value that is not a URL", () => {
     expect(hooksUrlRefusal("not a url")).toMatch(/not a valid URL/);
