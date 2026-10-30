@@ -105,11 +105,11 @@ describe("a hooks signing secret typed into an HTTP agent", () => {
       hooksSigningSecret: "{{ secrets.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET }}",
     });
 
-    const rotated = await app.update(withHooks("whsec_rotated"));
+    const rotated = await app.update(withHooks("whsec_rotated_0123456789"));
     expect(rotated.config).toMatchObject({
       hooksSigningSecret: "{{ secrets.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET_2 }}",
     });
-    expect(values.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET_2).toBe("whsec_rotated");
+    expect(values.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET_2).toBe("whsec_rotated_0123456789");
   });
 
   /** @scenario Rotating the hooks signing secret deletes the old one */

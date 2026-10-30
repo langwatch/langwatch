@@ -47,7 +47,12 @@ const httpAgentConfigSchemaDefinition = z.object({
   /** The hooks a scenario run calls; only a checked one is called. */
   hooks: agentHooksSchema.optional(),
   /** Signs every hook call. Saved as a project secret, so the config keeps its reference. */
-  hooksSigningSecret: z.string().optional(),
+  // Blank keeps the stored reference; a typed one is at least 16 characters so redaction of it
+  // cannot wreck unrelated text. Generated ones are `whsec_` + 64 hex.
+  hooksSigningSecret: z
+    .string()
+    .refine((value) => value === "" || value.length >= 16, "must be at least 16 characters")
+    .optional(),
   devTunnel: z
     .object({
       previousUrl: z.string().optional(),
