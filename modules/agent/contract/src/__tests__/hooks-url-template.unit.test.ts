@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readHooksOrigin, templatesHooksOrigin } from "../hooks-url.ts";
+import { readHooksOrigin, templatesHooksOrigin } from "../config/http.ts";
 
 describe("templatesHooksOrigin", () => {
   it.each([
