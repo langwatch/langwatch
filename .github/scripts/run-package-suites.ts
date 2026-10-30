@@ -180,10 +180,9 @@ export interface ShardLoad {
 const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, integration: 0, browser: 0 };
 
 /**
- * A shard's wall time, which the split balances: heavy packages run alone and add
- * all their weight; light suites share `concurrency` slots, but the integration and
- * browser lanes run one suite of either at a time, so the light part takes the
- * longer of the shared slots and the two lanes back to back.
+ * A shard's wall time, which the split balances. Heavy packages run alone.
+ * Light suites share the slots; integration and browser suites run back to back.
+ * The light part takes the longer of the two.
  */
 export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency: number }) =>
   load.alone + Math.max(load.shared / concurrency, load.integration + load.browser);
@@ -321,9 +320,8 @@ export interface SuiteJob {
 }
 
 /**
- * The lanes that may not overlap across packages. Integration files run
- * serially against one shared datastore; a browser lane installs Chromium
- * through apt, which holds a machine-wide lock. Everything else is `shared`.
+ * Lanes that may not overlap across packages. Integration files share one datastore;
+ * browser suites install Chromium under a machine-wide apt lock. Everything else is `shared`.
  * The two lanes may not overlap each other either: see keysOf.
  */
 const LANES: Record<string, "integration" | "browser"> = {
@@ -462,10 +460,9 @@ export const runJobs = async ({
 };
 
 /**
- * The key the integration and browser lanes share. An integration suite starts
- * containers in CI, and each one adds a network interface to the runner; Chromium
- * aborts every in-flight request with ERR_NETWORK_CHANGED when that happens, and
- * has no switch to ignore it, so a browser suite loading its modules then fails.
+ * Integration suites start containers in CI, and each adds a network interface.
+ * Chromium aborts in-flight requests with ERR_NETWORK_CHANGED and has no switch
+ * to ignore it, so browser suites fail while loading modules.
  */
 const SERIAL_LANES_KEY = "integration-or-browser";
 
