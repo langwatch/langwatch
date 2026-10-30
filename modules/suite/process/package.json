@@ -23,7 +23,7 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test": "vitest run --fsModuleCache --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
@@ -53,8 +53,10 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@clickhouse/client": "catalog:",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

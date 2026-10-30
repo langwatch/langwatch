@@ -12,6 +12,16 @@ import { Temporal, type Instant } from "@langwatch/time";
 
 import type { IssuedLicenseRecord } from "../repositories/issued-license.repository.ts";
 
+/** Where our own test licences go: our domains, and the names reserved for testing (RFC 2606). */
+export const INTERNAL_LICENSE_EMAIL_SUFFIXES: readonly string[] = [
+  "@langwatch.ai",
+  "@langwatch.com",
+  ".test",
+  ".example",
+  ".invalid",
+  ".localhost",
+];
+
 /** Revoked wins over superseded, which wins over the term. */
 export function statusOfIssuedLicense(
   row: Pick<IssuedLicenseRecord, "revokedAt" | "supersededAt" | "expiresAt">,

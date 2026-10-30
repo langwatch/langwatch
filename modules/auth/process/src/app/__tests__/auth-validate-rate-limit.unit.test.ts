@@ -54,6 +54,7 @@ function withRateLimits(
   return {
     sessions: memory.sessions,
     cliSessions: memory.cliSessions,
+    cliRotations: memory.cliRotations,
     signUpTokens: memory.signUpTokens,
     signInLocks: memory.signInLocks,
     rateLimits,
@@ -127,12 +128,12 @@ describe("given the token check behind the registry's per-IP ceiling", () => {
 
       for (let probe = 0; probe < CEILING; probe += 1) {
         await expect(
-          app.validateProjectAuthToken({ token: "tok", forwardedFor: "1.2.3.4" }),
+          app.validateProjectAuthToken({ token: "tok", callerAddress: "1.2.3.4" }),
         ).resolves.toEqual({ projectSlug: "acme" });
       }
 
       const refusal = await app
-        .validateProjectAuthToken({ token: "tok", forwardedFor: "1.2.3.4" })
+        .validateProjectAuthToken({ token: "tok", callerAddress: "1.2.3.4" })
         .catch((error: unknown) => error);
 
       expect(refusal).toBeInstanceOf(AuthValidateRateLimitedError);
@@ -148,23 +149,23 @@ describe("given the token check behind the registry's per-IP ceiling", () => {
 
       for (let probe = 0; probe <= CEILING; probe += 1) {
         await app
-          .validateProjectAuthToken({ token: "tok", forwardedFor: "1.2.3.4" })
+          .validateProjectAuthToken({ token: "tok", callerAddress: "1.2.3.4" })
           .catch(() => null);
       }
 
       await expect(
-        app.validateProjectAuthToken({ token: "tok", forwardedFor: "5.6.7.8" }),
+        app.validateProjectAuthToken({ token: "tok", callerAddress: "5.6.7.8" }),
       ).resolves.toEqual({ projectSlug: "acme" });
     });
   });
 
-  describe("when a call names no forwarding hop", () => {
+  describe("when the door resolved no address for the call", () => {
     it("still counts it, under the one unknown caller", async () => {
       const { rateLimiter, windows } = countingLimiter();
       const app = await appFor(rateLimiter);
 
       await expect(
-        app.validateProjectAuthToken({ token: "tok", forwardedFor: undefined }),
+        app.validateProjectAuthToken({ token: "tok", callerAddress: null }),
       ).resolves.toEqual({ projectSlug: "acme" });
 
       expect(windows).toHaveLength(1);

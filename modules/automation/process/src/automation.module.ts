@@ -9,6 +9,7 @@ import { automationChannels } from "./channels/automation-channels.registry.ts";
 import { automationsEventing } from "./eventing/automations.pipeline.ts";
 import { slackClaimReconcileCursorSchema } from "./features/slack/services/automation-slack-claim-reconcile.service.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
+import { triggerJsonTextCheckpointSchema } from "./services/trigger-json-text-unwrap.service.ts";
 import { SlackAlertTask } from "./tasks/slack-alert.task.ts";
 import { createAutomationRest } from "./transport/automation.rest.ts";
 import { automationTrpcTransport } from "./transport/automation.trpc.ts";
@@ -88,6 +89,25 @@ export const automationProcessModule: PublishedProcessModule<
             signal,
             onPage: ({ cursor }) =>
               dryRun ? Promise.resolve() : checkpoint.save({ report: cursor }),
+          });
+          return { ...counts, dryRun };
+        },
+      }),
+      defineMigrationStep({
+        id: "automation:unwrap-trigger-json-text",
+        kind: "data",
+        mode: "background",
+        description:
+          "Rewrites automation filters and action settings an earlier release saved as quoted JSON text into JSON objects; text that is not a JSON object is left as it is.",
+        // An older image still saves these columns as text: run once none serves.
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = triggerJsonTextCheckpointSchema.safeParse(checkpoint.resumeFrom);
+          const counts = await app.unwrapTriggerJsonText({
+            ...(resumed.success ? { from: resumed.data } : {}),
+            dryRun,
+            signal,
+            onPage: (report) => checkpoint.save({ report }),
           });
           return { ...counts, dryRun };
         },

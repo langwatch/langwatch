@@ -3,7 +3,10 @@ import type { MigrationPassSummary } from "@langwatch/system-migrations";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { SystemMigrationsServiceDependencies } from "../../../../rules/system-migration-support.rules.ts";
+import type {
+  SystemMigrationStateReader,
+  SystemMigrationsServiceDependencies,
+} from "../../../../rules/system-migration-support.rules.ts";
 import { SystemMigrationsService } from "../system-migrations.service.ts";
 
 const PASS: MigrationPassSummary = {
@@ -22,7 +25,14 @@ function latched(runPass: SystemMigrationsServiceDependencies["runPass"]) {
   const hasTenantAwaitingRedrive = vi.fn(async () => false);
   const service = SystemMigrationsService.create(
     createApiFixture<SystemMigrationsServiceDependencies>(
-      { hasTenantAwaitingRedrive, runPass },
+      {
+        hasTenantAwaitingRedrive,
+        runPass,
+        state: createApiFixture<SystemMigrationStateReader>(
+          { findRecordsByStatus: async () => [] },
+          "system migration state",
+        ),
+      },
       "system migration deps",
     ),
   );
@@ -59,6 +69,20 @@ describe("SystemMigrationsService.executePass", () => {
       await service.executePass({ redrive: true });
 
       expect(runPass).toHaveBeenCalledTimes(2);
+      expect(hasTenantAwaitingRedrive).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a wake that is not due", () => {
+    /** @scenario "A wake that is not due still gives a worker its first pass after boot" */
+    it("runs the process's first pass ungated, and nothing on later wakes", async () => {
+      const runPass = vi.fn(async () => PASS);
+      const { service, hasTenantAwaitingRedrive } = latched(runPass);
+
+      await service.executePass({ redrive: true, due: false });
+      await service.executePass({ redrive: true, due: false });
+
+      expect(runPass).toHaveBeenCalledOnce();
       expect(hasTenantAwaitingRedrive).not.toHaveBeenCalled();
     });
   });

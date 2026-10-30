@@ -37,9 +37,6 @@ const logger = createLogger("langwatch:ops:system-migrations");
 const PASSES_PER_RUN = 25;
 const PASS_GAP_MS = 5_000;
 
-/** How long the one follow-up pass waits, so the folds a held tenant waits on land first. */
-const FOLLOW_UP_PASS_DELAY_MS = 60_000;
-
 /** How many tenant rows one `listTenants` page holds when the caller names no limit. */
 const TENANT_PAGE_LIMIT = 50;
 
@@ -63,7 +60,7 @@ export class SystemMigrationsService {
   /**
    * Per migration: the status rollup, plus the tenants needing attention - held (`migrated`,
    * parity disagreements in the report) and `parked` (errored, retried next pass). Finalized
-   * tenants are a count, not a listing, and neither are rolled-back ones.
+   * tenants are a count, not a listing, and neither are rolled-back ones or those held on a person.
    */
   async getOverview(): Promise<MigrationOverview[]> {
     const isSaaS = this.deps.isSaaS();
@@ -81,14 +78,17 @@ export class SystemMigrationsService {
         const enrolledCount = enrolledByMigration?.get(migration.name) ?? 0;
         // Together, not one after the other: the page polls this, and the
         // rollup does not feed the listing.
-        const [counts, attention] = await Promise.all([
+        const [counts, attention, waitingOnPerson] = await Promise.all([
           this.deps.state.findStatusCounts({ migrationName: migration.name }),
           this.deps.state.findRecordsByStatus({
             migrationName: migration.name,
             // A step whose `migrated` is its steady state holds nobody; only parked rows count.
             statuses: migration.migratedIsSteady ? ["parked"] : ["migrated", "parked"],
+            // Waits on the user proving the account or an operator lifting a pin: counted apart.
+            exceptHeldReason: "person",
             limit: ATTENTION_LIMIT,
           }),
+          this.deps.state.countHeld({ migrationName: migration.name, heldReason: "person" }),
         ]);
 
         return {
@@ -101,6 +101,7 @@ export class SystemMigrationsService {
           tenant: migration.tenant ?? "organization",
           migratedIsSteady: migration.migratedIsSteady ?? false,
           counts,
+          waitingOnPerson,
           // Null for a migration that admits every organization automatically:
           // the gauge would describe rows that decide nothing. That is what
           // `MigrationOverview.enrollment` documents, and the guard was lost in
@@ -202,22 +203,19 @@ export class SystemMigrationsService {
   private passCompletedInProcess = false;
 
   /**
-   * Passes on the worker while each advances something; kicks and a first re-drive always run
-   * (Alex, 2026-10-09). A run that newly holds a tenant asks for ONE follow-up pass a minute on,
-   * and that follow-up never asks for another (Alex, 2026-10-11).
+   * Passes while each advances something; kicks and a process's first pass always run. A run
+   * leaving work pending tells the process, whose next wake runs another; tenants waiting on an
+   * operator are not pending, so the short cadence ends (Alex, 2026-10-09, 2026-10-13).
    */
-  async executePass({
-    redrive,
-    followUp = false,
-  }: {
-    redrive: boolean;
-    followUp?: boolean;
-  }): Promise<void> {
-    if (redrive && this.passCompletedInProcess && !(await this.deps.hasTenantAwaitingRedrive())) {
-      logger.debug(
-        "no parked, held or undiscovered tenant; skipping the system migration re-drive",
-      );
-      return;
+  async executePass({ redrive, due = true }: { redrive: boolean; due?: boolean }): Promise<void> {
+    if (redrive && this.passCompletedInProcess) {
+      if (!due) return;
+      if (!(await this.deps.hasTenantAwaitingRedrive())) {
+        logger.debug(
+          "no parked, held or undiscovered tenant; skipping the system migration re-drive",
+        );
+        return;
+      }
     }
     let summary = await this.deps.runPass({});
     this.passCompletedInProcess = true;
@@ -227,12 +225,23 @@ export class SystemMigrationsService {
       summary = await this.deps.runPass({});
       advancedInRun ||= summary.advanced > 0;
     }
-    logger.info({ summary, redrive, followUp }, "system migration pass complete");
-    if (followUp || !advancedInRun || summary.held === 0) return;
-    await this.deps.requestPass({
-      actorUserId: SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER,
-      delayMs: FOLLOW_UP_PASS_DELAY_MS,
+    const pending = (advancedInRun && summary.held > 0) || (await this.hasHeldForPendingWork());
+    logger.info({ summary, redrive, due, pending }, "system migration pass complete");
+    if (!pending) return;
+    await this.deps.requestPass({ actorUserId: SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER });
+  }
+
+  /**
+   * A tenant held while its queued work drains moves by itself, so it is pending, not stuck. Asked
+   * of the store, so no number of other holds can crowd it out of a page.
+   */
+  private async hasHeldForPendingWork(): Promise<boolean> {
+    const held = await this.deps.state.findRecordsByStatus({
+      statuses: ["migrated"],
+      heldReason: "pending",
+      limit: 1,
     });
+    return held.length > 0;
   }
 
   /** One pass of the startup convergence the tasks process drives, stopping at `signal`. */

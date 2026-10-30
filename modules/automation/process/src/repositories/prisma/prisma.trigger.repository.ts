@@ -8,11 +8,15 @@ import {
 } from "@langwatch/automation-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import type { AutomationClock } from "../automation.repositories.ts";
 import {
   TriggerRepository,
   type ReportScheduleTarget,
+  type TriggerJsonColumn,
+  type TriggerJsonText,
+  type TriggerJsonTextOutcome,
   type TriggerSecretCipher,
 } from "../trigger.repository.ts";
 import { mapTriggerRow } from "./prisma.trigger.mapper.ts";
@@ -42,10 +46,26 @@ function toPrismaJsonObject(value: Record<string, unknown>): Prisma.InputJsonObj
 }
 
 /**
+ * Postgres's data-exception class (SQLSTATE 22xxx), which Prisma 7 raises for raw SQL as P2010
+ * with the SQLSTATE on the driver adapter's cause: here, text the jsonb parser refuses.
+ */
+const dataExceptionSchema = z.object({
+  meta: z.object({
+    driverAdapterError: z.object({
+      cause: z.object({ originalCode: z.string().regex(/^22[0-9A-Z]{3}$/) }),
+    }),
+  }),
+});
+
+function isDataException(error: unknown): boolean {
+  return dataExceptionSchema.validate(error);
+}
+
+/**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type TriggerDatabase = Pick<PrismaClient, "trigger" | "triggerSent" | "$queryRaw">;
+type TriggerDatabase = Pick<PrismaClient, "trigger" | "triggerSent" | "$queryRaw" | "$executeRaw">;
 
 export class PrismaTriggerRepository extends TriggerRepository {
   private constructor(
@@ -242,6 +262,74 @@ export class PrismaTriggerRepository extends TriggerRepository {
     });
     return count === 1;
   }
+  findJsonTextPage({
+    after,
+    limit,
+  }: {
+    after?: string;
+    limit: number;
+  }): Promise<TriggerJsonText[]> {
+    return this.database.$queryRaw<TriggerJsonText[]>`
+			SELECT "id", "projectId",
+			  CASE WHEN jsonb_typeof("filters") = 'string' THEN "filters" #>> '{}' END AS "filters",
+			  CASE WHEN jsonb_typeof("actionParams") = 'string' THEN "actionParams" #>> '{}' END AS "actionParams"
+			FROM "Trigger"
+			WHERE (jsonb_typeof("filters") = 'string' OR jsonb_typeof("actionParams") = 'string')
+			  AND (${after ?? null}::text IS NULL OR "id" > ${after ?? null}::text)
+			ORDER BY "id" ASC
+			LIMIT ${limit}
+			${skipTenantCheck({
+        // Stored-JSON-text unwrap cross-tenant sweep (upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
+		`;
+  }
+
+  /** Postgres parses the text, so numbers keep the precision they were written with. */
+  async unwrapJsonText({
+    triggerId,
+    projectId,
+    column,
+    text,
+  }: {
+    triggerId: string;
+    projectId: string;
+    column: TriggerJsonColumn;
+    text: string;
+  }): Promise<TriggerJsonTextOutcome> {
+    try {
+      const updated = await this.unwrapColumn({ triggerId, projectId, column, text });
+      return updated === 1 ? "unwrapped" : "changed";
+    } catch (error) {
+      if (isDataException(error)) return "unparseable";
+      throw error;
+    }
+  }
+
+  private unwrapColumn({
+    triggerId,
+    projectId,
+    column,
+    text,
+  }: {
+    triggerId: string;
+    projectId: string;
+    column: TriggerJsonColumn;
+    text: string;
+  }): Promise<number> {
+    return column === "filters"
+      ? this.database.$executeRaw`
+			UPDATE "Trigger" SET "filters" = ("filters" #>> '{}')::jsonb
+			WHERE "id" = ${triggerId} AND "projectId" = ${projectId}
+			  AND "filters" = to_jsonb(${text}::text)
+		`
+      : this.database.$executeRaw`
+			UPDATE "Trigger" SET "actionParams" = ("actionParams" #>> '{}')::jsonb
+			WHERE "id" = ${triggerId} AND "projectId" = ${projectId}
+			  AND "actionParams" = to_jsonb(${text}::text)
+		`;
+  }
+
   async findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;

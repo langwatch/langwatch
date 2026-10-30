@@ -1,10 +1,12 @@
 import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
+import { TRUNCATED_ATTRIBUTES_KEY } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   capOversizedAttributes,
   hasOversizedAttribute,
+  readTruncatedAttributes,
   valueExceeds,
 } from "../trace-attribute-cap.rules.ts";
 
@@ -524,5 +526,79 @@ describe("capOversizedAttributes on a message history", () => {
     capOversizedAttributes(span, null);
 
     expect(span.attributes[0]!.value.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
+  });
+});
+
+describe("capOversizedAttributes truncation marker", () => {
+  const big = "q".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+  const markerOf = (span: OtlpSpan) =>
+    readTruncatedAttributes(
+      span.attributes.find((attr) => attr.key === TRUNCATED_ATTRIBUTES_KEY)?.value.stringValue ??
+        undefined,
+    );
+
+  describe("given a span with oversized values on the span, an event and the resource", () => {
+    /** @scenario "A value over the record cap is cut and the span names it" */
+    it("names each cut attribute with its original size and surface", () => {
+      const span = makeSpan([{ key: "gen_ai.input.messages", value: { stringValue: big } }]);
+      span.events = [
+        {
+          timeUnixNano: { low: 0, high: 0 },
+          name: "gen_ai.content",
+          attributes: [{ key: "gen_ai.output.messages", value: { stringValue: big } }],
+        },
+      ];
+      const resource: OtlpResource = {
+        attributes: [{ key: "process.command_line", value: { stringValue: big } }],
+      };
+
+      capOversizedAttributes(span, resource);
+
+      const bytes = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1;
+      expect(markerOf(span)).toEqual([
+        { key: "gen_ai.input.messages", bytes },
+        { key: "gen_ai.output.messages", bytes, on: "event" },
+        { key: "process.command_line", bytes, on: "resource" },
+      ]);
+    });
+  });
+
+  describe("given a span that already names a cut attribute", () => {
+    it("appends the new cut to the existing list", () => {
+      const span = makeSpan([
+        {
+          key: TRUNCATED_ATTRIBUTES_KEY,
+          value: { stringValue: JSON.stringify([{ key: "earlier", bytes: 9 }]) },
+        },
+        { key: "later", value: { stringValue: big } },
+      ]);
+
+      capOversizedAttributes(span, null);
+
+      expect(markerOf(span)).toEqual([
+        { key: "earlier", bytes: 9 },
+        { key: "later", bytes: DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1 },
+      ]);
+      expect(span.attributes.filter((attr) => attr.key === TRUNCATED_ATTRIBUTES_KEY)).toHaveLength(
+        1,
+      );
+    });
+  });
+
+  describe("given a span with nothing over the cap", () => {
+    it("adds no marker", () => {
+      const span = makeSpan([{ key: "small", value: { stringValue: "ok" } }]);
+
+      capOversizedAttributes(span, null);
+
+      expect(span.attributes.map((attr) => attr.key)).toEqual(["small"]);
+    });
+  });
+
+  describe("given a malformed marker value", () => {
+    it("reads it as naming nothing", () => {
+      expect(readTruncatedAttributes("not json")).toEqual([]);
+      expect(readTruncatedAttributes(JSON.stringify([{ key: 1 }]))).toEqual([]);
+    });
   });
 });

@@ -47,6 +47,10 @@ const DesignSystemService = "design-system"
 // Its lane is called mail-room too.
 const MailRoomService = "mail-room"
 
+// DocsService is the public docs site (apps/docs), built and mounted by haven
+// at app.<slug>.langwatch.localhost/docs and docs.<slug>. Its lane is called docs too.
+const DocsService = "docs"
+
 // LangevalsService is the Python evaluator service (services/langevals) the
 // app calls for monitors and evaluations. Off by default: its import alone
 // holds gigabytes. Routed at langevals.<slug>.langwatch.localhost.
@@ -94,6 +98,11 @@ const LambdaService = "lambda"
 // github.<slug>.langwatch.localhost. Opt-in: it replaces the GitHub App the
 // stack talks to, so a developer must never get it by surprise.
 const GithubService = "github"
+
+// McpService is the MCP client stand-in (services/sims/mcpsim) that drives
+// LangWatch's hosted MCP endpoint the way Claude Desktop, Claude Code and
+// Cursor do, routed at mcp.<slug>.langwatch.localhost. Opt-in like github.
+const McpService = "mcp"
 
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the

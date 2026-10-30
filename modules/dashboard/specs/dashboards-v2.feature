@@ -100,6 +100,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Decision: Live overrides the refresh choice without changing it; the member's own choice
     # applies again on any other range
 
+  @unit @integration
+  Scenario: AC19d A fixed range moves its end to now on each refresh
+    Given a board on a fixed range such as 24h
+    When the board refreshes, on its interval or from Refresh now
+    Then every widget reads the same length of range, now ending at the minute of the refresh
+    And a trace that arrived since the board opened shows
+    # Decision: the end rounds up to the minute, as Live does, so a re-render does not refetch
+
   # ---------------------------------------------------------------------------
   # Bring-your-own-AI
   # ---------------------------------------------------------------------------
@@ -120,6 +128,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the tool returns an error naming the dashboard id
     And no new widget is left in the project
     # Evidence: the MCP call output and the widget count before and after
+
+  @unit
+  Scenario: AC8c An agent reads a Dashboards board by its id
+    Given a project with a Dashboards board and an Analytics Report
+    When an agent reads the board by its id with the get_dashboard tool or `langwatch dashboard get`
+    Then it receives the board's name, id and link from /api/v1/dashboards
+    And the Analytics Report's id there fails with the not found error, with no second request
+    When it reads the report with platform_get_analytics_report or `langwatch analytics-report get`
+    Then it reads only /api/v1/analytics/reports, and a Dashboards board's id there is not found
+    # Evidence: the unit tests for get_dashboard and dashboard get
 
   @unit @unimplemented
   Scenario: AC9 The docs explain how to build boards from an agent
@@ -182,6 +200,17 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       whether its source sent data in the last 90 days
     And the widget runs that query only when its own queries return nothing
     # A trace field such as a conversation id is named by the query's completeness report instead
+
+  @unit @integration
+  Scenario: AC13d Several empty widgets offer to ask Langy to set them up
+    Given a board with Langy enabled and the member may start a conversation
+    And a project that has never received a trace
+    When two or more of its widgets show no data
+    Then the board says how many widgets have no data and offers "Ask Langy to set this up"
+    And it drafts a prompt naming those widgets, ready to send and not sent
+    And with one empty widget, without Langy, or in a project that has received traces, the board offers no such button
+    # A quiet period is not a setup step (AC13)
+    # Evidence: a new project's board with the banner and Langy's drafted prompt
 
   @unit
   Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
@@ -740,12 +769,20 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the member picks Move up on a board in the sidebar
     Then that board swaps with the one above it and the new order is saved
 
+  @unit @integration
+  Scenario: AC155b Stars the section does not show keep their place in the star order
+    Given the member's star order holds a star the Starred section does not show, such as My dashboard
+    When the member moves a board in the Starred section
+    Then only the two boards that swapped change place
+    And the star it does not show keeps its position in the saved order
+
   @unit
   Scenario: AC156 No board is starred unless the member stars it
     Given a member creates a board, duplicates one, or adds one from a template
     When the board is made
     Then it is starred for nobody, its creator included
     # My dashboard is the one exception: it starts starred for its maker (AC160b)
+    # The LLM Ops sidebar's "+" stars its new board for its maker (product-sidebars.feature)
 
   @unit
   Scenario: AC157 Stars are per member
@@ -774,8 +811,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC171 Scope: an Only me board exists for its author alone
     Given a board its author set to Only me
     When another member of the project, or a project credential, lists the boards or the
-      starred boards, opens the board by its id, renames, deletes, reorders, stars or copies it,
-      or reads, adds, edits, moves or deletes a widget, graph or saved chart on it
+      starred boards, opens the board by its id, renames, deletes, stars or copies it,
+      or reads, adds, edits, moves or deletes a widget on it
     Then every one of these answers as it does for a board that does not exist
     And the author lists it, opens it and edits it as before
     And a LangWatchQL query reads neither the board nor what is placed on it, for any caller:
@@ -931,8 +968,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit
   Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
     Given a project where Dashboards is switched off
-    When a member's My dashboard is made there
-    Then its scope is Project, since nothing there offers the scope to widen it
+    When a member or a project credential makes or deletes a Dashboards board there
+    Then it is refused as dashboards_not_enabled, My dashboard included
     When a member or a project credential of that project lists or opens an Organization board
       another project owns
     Then every answer is the one a board that does not exist gets
@@ -943,10 +980,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC196 Scope: a key that names a person reads and writes as that person over REST
-    Given a board its author set to Only me, with a widget, a graph and a saved chart on it
+    Given a board its author set to Only me, with a widget on it
     When a REST call arrives with the author's own API key or access token
-    Then it lists the board, opens it, and reads and edits what is placed on it
-    And a board made with that key records them as its author
+    Then it lists, reads and edits the widget placed on it
     When a REST call arrives with another person's key
     Then every route answers as it does for a board that does not exist
     # Why: a scheduled Langy run holds its person's key and must read that person's own board
@@ -956,8 +992,275 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a legacy project key, a service key or the key of an unattended run
     When it calls a dashboards, graphs, widgets or saved charts route
     Then it reads Project boards, an Organization board by its id, and never an Only me board
-    And a board it makes has no recorded author and the scope Project
+    And a board it makes is a Reports board, with no recorded author and the scope Project
     And no REST route changes a board's scope, whichever key calls it
+
+  # Dashboards and Analytics Reports keep their boards apart (owner, 2026-10-15). A Dashboards
+  # board lives in DashboardsV2 with its widgets in DashboardWidget; a Reports board stays in
+  # Dashboard with its charts in CustomGraph. The split migration copies each existing board by
+  # what it holds and changes no Reports row, so a board made before it can sit in both areas,
+  # under the same id. Its srcdoc rows left in CustomGraph are stale copies that only a delete in
+  # Dashboards removes.
+
+  @unit @integration
+  Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards
+    Given a board that holds only charts made in Analytics Reports
+    And a board that holds only widgets
+    And a mixed board that holds widgets and a saved workbench chart
+    When a member lists the boards or reads their starred boards in the Dashboards area
+    Then the board made in Analytics Reports is in neither list
+    And opened by its Dashboards address it is not available, so no delete is offered there
+    And the widgets board and the mixed board are listed, read from DashboardsV2
+    When the member lists the boards in Analytics Reports
+    Then the board made there and the mixed board are listed, read from Dashboard
+    And the widgets board is not, since it holds no chart made in Reports
+
+  @unit @integration
+  Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart
+    Given a mixed board, in both areas under one id, whose Reports chart carries an alert
+      that has been sent
+    When a member deletes the board from the Dashboards area
+    Then its DashboardsV2 board, its DashboardWidget rows and the stars on it are deleted
+    And its stale srcdoc rows in CustomGraph are deleted with it
+    And the Reports board, its charts, their Trigger and their TriggerSent rows are unchanged
+    When a member deletes from the Dashboards area a board that holds no chart made in Reports
+    Then its stale Dashboard row is deleted too, so Reports does not list an empty copy
+    When a member deletes from the Dashboards area the id of a board only Reports holds
+    Then it is not available, and that board and its charts are kept
+
+  @unit @integration
+  Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports
+    Given a board made in Analytics Reports, a Dashboards board copied from an empty one
+      and a Dashboards board holding widgets
+    When a member opens "Save to dashboard" on a chart Langy drew
+    Then only the Reports list is offered: the board made in Analytics Reports, with "New dashboard"
+    And no Dashboards board is offered, since a builder chart has no place on one
+
+  @unit @integration
+  Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged
+    Given a mixed board, in both areas under one id, with widgets and stars in Dashboards
+    And a board made in Analytics Reports
+    When a member deletes either board from Analytics Reports
+    Then the Dashboard row and its charts are deleted, as before
+    And every DashboardsV2, DashboardWidget and DashboardFavourite row is unchanged,
+      the mixed board's Dashboards copy included
+
+  @integration
+  Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds
+    Given boards made before the split, one of each class below
+    When the split migration runs
+    Then each lands as follows:
+      | the board holds                                                   | Dashboards | Reports |
+      | widgets only                                                      | yes        | no      |
+      | charts made in Reports only (builder)                             | no         | yes     |
+      | saved workbench charts only                                       | no         | yes     |
+      | widgets and a chart made in Reports                               | yes        | yes     |
+      | charts made in Reports and a star                                 | yes        | yes     |
+      | nothing, and a star                                               | yes        | no      |
+      | nothing, at Only me                                               | yes        | no      |
+      | nothing, with an author, in a project with a widget or a star     | yes        | no      |
+      | nothing, with an author, in a project with neither                | no         | yes     |
+      | nothing, with no author and no Dashboards sign                    | no         | yes     |
+    And a description, a scope other than Project or an organization counts as a star does
+    And every widget is copied to DashboardWidget, placed or not, and no chart made in Reports is
+    And no Dashboard or CustomGraph row is changed or deleted
+    When it runs a second time
+    Then nothing changes: a copy edited since is kept as it is and no row is added
+    # "Reports: no" means Reports hides it: it is in DashboardsV2 and holds no chart made there.
+
+  @integration
+  Scenario: AC199f Split: a copied board and widget keep their ids
+    Given a board and a widget made before the split, a star on the board, an insight pointing
+      at the board and a daily schedule for it
+    When the split migration copies them
+    Then the DashboardsV2 board and the DashboardWidget keep the ids, fields and placement they had
+    And the star, the insight and the schedule still name the board, with no row rewritten
+
+  @unit
+  Scenario: AC199h Split: the LangWatchQL views leave out the stale copies
+    Given a stale srcdoc row in CustomGraph and a board in DashboardsV2 that holds no Reports chart
+    When a member queries the custom_graphs or the dashboards view in LangWatchQL
+    Then custom_graphs leaves out every srcdoc row
+    And dashboards leaves out that board, and lists a mixed board once
+
+  @unit
+  Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me
+    Given Dashboards is switched on for the project
+    When a member makes a board in Analytics Reports, named "My dashboard" or not
+    Then it is made at the scope Project with no star
+    And only a board made in the Dashboards area starts starred and at Only me (AC160b, AC170)
+
+  @unit
+  Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds
+    Given a board in DashboardsV2 whose legacy Dashboard row holds no chart made in Reports
+    When any caller renames, deletes or reorders that id through Analytics Reports or its REST routes
+    Then it is not available, as for a board that does not exist
+    And opening the Reports area never lands on that board as its first board
+
+  @unit
+  Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board
+    Given a board made in Analytics Reports and a board only Dashboards holds
+    When a member places a saved workbench chart on either
+    Then the Reports board takes it
+    And the Dashboards board is not available to it, as for a board that does not exist
+
+  @unit @integration
+  Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards
+    Given a board made in Analytics Reports and a Dashboards board holding a widget
+    And Dashboards is switched on for the API key's project
+    When the key lists the boards at /api/v1/dashboards, with no project id in the path
+    Then only the Dashboards board is listed, with its widget count and the address it opens at
+    And reading the Reports board's id there is not found
+    And /api/v1/analytics/reports lists only the Reports board
+    When the key creates a widget at /api/v1/dashboards/{dashboardId}/widgets for either board
+    Then the Dashboards board takes it, and the Reports board is not found
+    When the CLI reads a board by id with only an API key, so no project is in scope
+    Then it reads the board under the project the key belongs to
+
+  @unit @integration
+  Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden
+    Given a mixed board one member made at Only me before the split, holding a chart made in Reports
+      and a saved workbench chart
+    When another member or a project credential lists, opens or writes the Reports boards, their
+      charts or the saved workbench charts
+    Then that board and its charts are not there, as for a board that does not exist
+    And the member who made it lists, opens and writes it as before
+    And once that member is erased the board is there for nobody
+
+  @integration
+  Scenario: AC199n Split: the public API creates, renames and deletes Dashboards boards
+    Given an API key with analytics:create, analytics:update and analytics:delete
+    And Dashboards is switched on for the key's project
+    When it creates a board at /api/v1/dashboards
+    Then it answers 201 with the board, the board is listed with no widgets and no author
+    When the key renames the board at /api/v1/dashboards/{dashboardId}
+    Then it answers with the new name
+    When the key deletes the board
+    Then it answers with the board's id and name, and the board and its widgets are gone
+    And reading or deleting the board again is not found
+    And deleting a Reports board, another project's board or a member's Only me board is not found
+
+  @integration
+  Scenario: AC199o Split: a member's REST create follows the board scope rules
+    Given a member signed in with analytics:create
+    When they create a board named "My dashboard" at /api/v1/dashboards
+    Then they are recorded as its author, it is at Only me and it is starred for them
+
+  @integration
+  Scenario: AC199p Split: a board's widgets are a sub-resource of the board
+    Given a Dashboards board holding a widget, and a second Dashboards board
+    When an API key lists /api/v1/dashboards/{dashboardId}/widgets
+    Then only the widgets on that board are listed
+    When the key creates a widget at /api/v1/dashboards/{dashboardId}/widgets
+    Then it answers 201 with the widget, placed on that board
+    And the key reads, updates and deletes it at /api/v1/dashboards/{dashboardId}/widgets/{widgetId}
+    And a widget read, updated or deleted through the other board's path is not found
+    And a Langy session key deleting it through the other board's path is shown no card for it
+    And a widget created under a Reports board, another project's board or a missing board is
+      refused with dashboard_not_found
+
+  @integration
+  Scenario: AC199q Split: /api/v1/dashboards is not there while Dashboards is off
+    Given Dashboards is switched off for the API key's project
+    When the key calls any /api/v1/dashboards route, its widget routes included
+    Then it answers 404, and nothing is read or written
+    And a Langy session key deleting a board or a widget there gets the same 404, before any
+      confirmation card is shown or any board name is read
+
+  @integration
+  Scenario: Split: /api/v1/dashboards stays shut when the Dashboards flag cannot be read
+    Given a Dashboards board, and the release_dashboards lookup for the key's project fails
+    When the key calls /api/v1/dashboards or /api/dashboards, a board and its widgets included
+    Then each answers an error, 404 or 5xx, and never a Dashboards board
+
+  @integration
+  Scenario: AC199r Split: the Reports boards answer at /api/v1/analytics/reports
+    Given an API key whose project holds a board made in Analytics Reports
+    When it lists, creates, reorders, reads, renames or deletes Reports boards at
+      /api/v1/analytics/reports
+    Then they answer as /api/v1/dashboards did before Dashboards took that path, whether
+      Dashboards is on or off
+    And every answer carries Deprecation true and a successor-version Link to /api/v1/dashboards
+    And the published document marks each of those operations deprecated
+    And POST /api/v1/analytics still answers the timeseries query, with no Deprecation header
+    And the project-path dashboards read carries no Deprecation header
+
+  @integration
+  Scenario: AC199u Split: /api/v1/dashboards answers by the API version the caller names
+    Given a board made in Analytics Reports and a Dashboards board, with Dashboards switched on
+    When a key lists /api/v1/dashboards naming no version, or X-API-Version 2026-10-26
+    Then the Dashboards board is listed, as the Dashboards API answers it
+    When the key names X-API-Version 2026-08-07, or calls /api/v1/dashboards/2026-08-07
+    Then it answers 404, as for a date before the Dashboards API existed, and lists no board
+    And the Reports boards answer only at /api/v1/analytics/reports
+    When the key names an X-API-Version that is not a real date
+    Then it answers 400 invalid_api_version
+
+  @integration
+  Scenario: AC199v Split: /api/dashboards answers as /api/v1/dashboards, deprecated
+    Given a Dashboards board, with Dashboards switched on
+    When a key calls /api/dashboards, its dated and latest addresses or its widget routes
+    Then each answers as the same /api/v1/dashboards address does
+    And each answer carries Deprecation true and a successor-version Link to /api/v1/dashboards
+    And so does its 404 while Dashboards is switched off
+    And no /api/v1/dashboards answer carries a Deprecation header
+
+  @unit
+  Scenario: AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards
+    Given the langwatch CLI and the LangWatch MCP server
+    Then `langwatch dashboard` lists, reads, creates, renames and deletes dashboards over
+      /api/v1/dashboards
+    And `langwatch dashboard widget` lists, adds, reads, updates and deletes a dashboard's widgets
+    And the MCP tools list_dashboards, get_dashboard, create_dashboard, rename_dashboard,
+      delete_dashboard and list_dashboard_widgets do the same, naming the dashboard dashboardId
+    And `langwatch analytics-report` and the platform_*_analytics_report(s) MCP tools manage
+      Analytics Reports over /api/v1/analytics/reports
+    When the CLI or the MCP `list_dashboards` tool lists dashboards
+    Then it reads /api/v1/dashboards, and only that path
+    And a failure there, a 404 while Dashboards is off included, is reported as it is, with no
+      second request
+
+  @unit
+  Scenario: AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports
+    Given the TypeScript and Python SDKs
+    Then `client.dashboards` and `langwatch.dashboards` manage Dashboards over /api/v1/dashboards,
+      naming the dashboard dashboardId and dashboard_id
+    And `client.analyticsReports` and `langwatch.analytics_reports` manage Analytics Reports over
+      /api/v1/analytics/reports
+    And neither SDK has a `boards` name: `client.boards` and `langwatch.boards` are gone
+
+  @unit
+  Scenario: AC199x Names: the CLI has one dashboard tree and no old command names
+    Given the langwatch CLI
+    Then `langwatch dashboard` manages the Dashboards, with their widgets under
+      `langwatch dashboard widget`
+    And `langwatch analytics-report` manages the Analytics Reports
+    And there is no `langwatch dashboards`, `langwatch dashboard-widget` or
+      `langwatch analytics-reports` command
+
+  @integration
+  Scenario: AC199y Names: the project-path dashboards read answers at /analytics/dashboards
+    Given a Dashboards board, with Dashboards switched on
+    When an API key lists /api/v1/projects/{projectId}/analytics/dashboards or reads one by its id
+    Then it answers with the board, as /analytics/boards did, and carries no Deprecation header
+    And /api/v1/projects/{projectId}/analytics/boards answers the same, with Deprecation true and
+      a successor-version Link to the /analytics/dashboards path
+    And the published document marks the /analytics/boards operations deprecated
+
+  @unit
+  Scenario: AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports
+    Given Langy ran `langwatch dashboard` or `langwatch analytics-report` and shows its card
+    When the card links a dashboard by its id
+    Then a Dashboards dashboard opens at /<project>/dashboards/<id>
+    And an Analytics Report, a custom graph or a saved chart opens at
+      /<project>/analytics/reports?dashboard=<id>, labelled Open in Analytics Reports
+
+  @unit
+  Scenario: AC199t The MCP widget tools use only the board routes
+    Given the MCP tools `add_dashboard_widget` and `update_dashboard_widget`
+    Then they create and change the widget under /api/v1/dashboards/{dashboardId}/widgets, and
+      call no other path
+    And a 404 there is refused naming the dashboard id, and any other failure is reported as it is
 
   # ---------------------------------------------------------------------------
   # Sidebar, My dashboard, From LangWatch and the ask bar (langwatch/tasks#911)
@@ -1026,7 +1329,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: From LangWatch: the heading's (i) says what these boards are
     Given the Dashboards sidebar shows the From LangWatch group
     When the member hovers over the (i) beside its heading, or moves keyboard focus to it
-    Then it says "Boards LangWatch made for you. They are read-only and improve over time.
+    Then it says "Dashboards LangWatch made for you. They are read-only and improve over time.
       Duplicate one to make a copy you can edit."
     And the heading and its fold control stay exactly where they were
     # Owner list, 2026-10-08; the prototype uses the same words
@@ -1371,28 +1674,27 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # ---------------------------------------------------------------------------
   # Why: Langy's own turns trace into the member's project with origin "langy" (ADR-061).
   # Counted, they move volume, cost, latency and error widgets because the member used Langy.
-  # The project home and the Explorer already leave them out; Dashboards follow (owner, 2026-10-09).
-  # How: analytics ADR-003. This is the server half and the board's default. The built-in Source
-  # parameter that shows the default in the board header and lets the member change it comes next.
+  # How: analytics ADR-003. Each widget query names the origins it counts, its sources (AC200);
+  # a query that names none counts application traces, so Langy's turns stay out until a
+  # query's sources name "langy" (owner, 2026-10-28; the board-wide list is gone).
 
   @integration
-  Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default
+  Scenario: AC190 Sources: a run whose sources leave langy out counts none of Langy's traces or their rows
     Given a project with traces from its own agent and traces with origin "langy"
-    When a member opens any board, My dashboard and From LangWatch boards included
-    Then every widget counts only the traces whose origin is not "langy"
+    And a statement filtering the Source column with {dashboard_context_sources:Array(String)}, and its spans and evaluations through the TraceId of those traces
+    When it runs bound to sources that do not name "langy"
+    Then it counts only the traces whose origin is not "langy"
     And so do the spans, evaluations and other rows that belong to those traces
     And the widget editor's preview counts the same rows as the card
-    # Why one place: the board's query context sets it, so no widget can forget it, whether it
-    # comes from the catalogue, from Langy or from the code editor
-    # A personal project is the one exception: AC198
+    # Evidence: the card and the preview answers quoted with row counts over seeded traces, and a haven browser screenshot
 
   @unit @integration
   Scenario: AC191 Langy: a widget's own origin filter keeps its meaning
     Given a widget that already reads only production origins, such as Running costs
-    When it runs on a board that leaves out Langy's conversations
+    When it runs with sources that leave Langy's conversations out
     Then it reads the same rows it read before
-    # Why: the board removes Langy rows first; a row that passes still meets the widget's own
-    # filter, so the board never widens or reverses a deliberate filter
+    # Why: the sources remove rows first; a row that passes still meets the widget's own
+    # filter, so the sources never widen or reverse a deliberate filter
 
   @unit
   Scenario: AC192 Langy: data that is Langy's own is not filtered
@@ -1402,36 +1704,489 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Why: those rows are about Langy itself, not traces in the member's project
 
   @unit @integration
-  Scenario: AC193 Langy: the origins a board leaves out are a list a board parameter can set later
-    Given the context a board runs every query with
-    Then it names the origins it leaves out as a list, "langy" by default
-    And an empty list makes every widget read Langy's conversations too
-    # Why a list: the built-in Source parameter planned for the header can then show the default
-    # and pick origins without a new shape on the wire
+  Scenario: AC193 Sources: a run whose sources hold every origin reads every trace, Langy's included
+    Given a widget query whose sources hold all eleven sources and whose SQL reads the parameter
+    When it runs
+    Then it counts Langy's conversations too
+    # Evidence: the card answer quoted with row counts
 
   @unit
   Scenario: AC194 Langy: a query run outside a board is not scoped
-    Given a LangWatchQL statement run from anywhere but a board, such as the REST query API
-    When the run names no origins to leave out
-    Then the statement runs as written and reads Langy's conversations too
-    # Why: the rule is the board's alone. The Traces list keeps its own rule (ADR-061)
+    Given a LangWatchQL statement run from anywhere but a dashboard, such as the REST query API
+    When its SQL does not read {dashboard_context_sources:Array(String)}
+    Then it counts every origin, Langy's conversations included, and the run answers a SOURCES_IGNORED diagnostic
+    And when it reads the parameter and the run names no sources, the parameter is bound to ["application"]
+    # Why: the Traces list keeps its own rule (ADR-061)
+    # Evidence: two REST answers quoted with row counts
 
   @unit
   Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
     Given a widget that reads trace_metrics_by_minute or model_usage_by_minute
     When it runs on a board
-    Then it still counts Langy's spans
+    Then it still counts Langy's spans and the run answers a SOURCES_IGNORED diagnostic
+    And its card says "Sources don't apply: this widget reads a view that keeps no origin"
     # Known gap: the rollups are written per span before a trace's origin is known, so they
     # carry no origin; a follow-up would add one
+    # Evidence: a haven browser screenshot of the card text
+
+  # ---------------------------------------------------------------------------
+  # A widget query's sources
+  # ---------------------------------------------------------------------------
+  # Why: a widget meant to show Langy's failed or refused requests was always empty, since every
+  # board left Langy's conversations out with no way to change it (owner, 2026-10-27).
+  # Where: the setting is part of each query, so it is the first row of that query's
+  # parameters in the widget editor (owner, 2026-10-28; mock approved the same day).
+  # How: a query stores `sources`, a list of the origins it counts: application, simulation,
+  # evaluation, sample, coding_agent, ai_tool, gateway, workflow, playground, langy and other. An
+  # unstamped trace (origin empty or NULL) is application's; other is every origin not listed. A
+  # query that stores none counts application traces, the same as a new widget (owner,
+  # 2026-10-28). The board-wide list and its header control (#9099) are gone, column included.
 
   @unit @integration
-  Scenario: AC198 Langy: a board in a personal project shows Langy's conversations
-    Given a member's personal project, where Langy's conversations are the data
-    When they open a board there
-    Then the board leaves out no origin, so every widget counts Langy's conversations too
-    And a board in any other project still leaves out "langy" by default (AC190)
-    # Owner, 2026-10-10: Langy's traces will live in the person's Me project. The default is
-    # the board's own, read from the project; the server takes the list it is sent (AC193)
+  Scenario: AC200 Sources: each query shows its sources as pills, and the card names them
+    Given a stored widget on a board
+    When a member who may edit the board opens its editor on the Queries tab
+    Then each query's "Parameters" lead with a built-in "sources" row of pills, one per source it counts
+    And an "Add source" menu offers the sources it does not count yet
+    And "No parameters declared yet" does not show, while "Add parameter" still does
+    And under the widget's card a quiet line says "Sources: application, langy"
+    # The line names each query's own list when the queries differ
+
+  @unit @integration
+  Scenario: AC200b Sources: a query saved with picked sources counts only traces of those origins
+    Given a member has added "langy" to a query's sources in the editor
+    When they save the widget
+    Then the query stores "application" and "langy" as its sources
+    And its card runs with those sources, so it counts Langy's conversations too
+    And every other widget on the board keeps its own sources
+
+  @integration
+  Scenario: AC200d Sources: only a member who can edit the board changes them
+    Given a member who may read a board but not edit it
+    When they open it
+    Then each card shows its sources line
+    And no widget offers its editor, so the sources cannot be changed from there
+
+  @unit @integration
+  Scenario: AC200f Sources: a query that stores none counts application traces
+    Given a widget saved before queries carried sources, in any project, personal ones too
+    When its card or its editor's preview runs
+    Then the parameter is bound to ["application"]
+    And the editor shows "application" as the query's pills, the set bound to the parameter
+    And reading the widget, or saving another change to it, stores no sources on the query
+    # Evidence: a haven browser screenshot of the pills and the stored JSON before and after a save
+
+  @integration
+  Scenario: AC200g Sources: changing them runs the preview again
+    Given a member is editing a widget
+    When they add or remove a source
+    Then the preview runs again with the new sources, before anything is saved
+    And closing the editor without saving leaves the widget as it was stored
+
+  @integration
+  Scenario: AC200h Sources: a From LangWatch board's widgets count the sources their definitions declare
+    Given a From LangWatch board, whose curated widgets are read-only and never stored
+    When a member opens it
+    Then every widget is bound to the list its definition declares (AC202b), in a personal project too
+    # A catalogue widget added to a board keeps those sources
+    # Evidence: a haven browser screenshot of three cards' sources lines
+
+  @unit
+  Scenario: AC200i Sources: the dashboard-widgets skill tells Langy about a query's sources
+    Given Langy builds or edits a widget with the dashboard-widgets skill
+    Then the skill names every source, that a new widget's query counts "application"
+    And how `--sources` and the queries file set them
+    And to add an origin, such as "langy" or "simulation", when the question is about those traces
+    # The skill describes the field; it does not set sources on every widget (owner, 2026-10-28)
+
+  @unit @integration
+  Scenario: AC200j Sources: the API and the CLI read and write a query's sources
+    Given an API key that may edit a board's widgets
+    When it adds a widget whose query has "sources": ["langy", "other"]
+    Then the widget reads back that list on that query
+    And an update whose query names no "sources" keeps the list stored under the query's name
+    And an update whose query sends "sources": null clears it, so the query counts application traces
+    And `langwatch dashboard widget add` and `update` set every query's list with `--sources application,langy`
+
+  @unit @integration
+  Scenario: AC200k Sources: Undo puts a query's sources back, including back to none
+    Given a member saved a widget with only a query's sources changed
+    When they press Undo
+    Then the query has the sources it had before the save
+    And a query that stored none stores none again
+
+  @unit @integration
+  Scenario: AC200l Sources: other counts every origin outside the known ones
+    Given traces whose origin is missing, empty, NULL, one LangWatch does not list, and each listed one
+    When a statement filtering Source with {dashboard_context_sources:Array(String)} runs bound to ["application"], to ["other"] and to each listed origin
+    Then the missing, empty and NULL origins have Source "application"
+    And the unlisted origin has Source "other" and is counted only when "other" is bound
+    And each listed origin has its own name as Source
+    # Evidence: the three REST answers for application, other and one listed origin, quoted with row counts
+
+  @unit @integration
+  Scenario: AC200m Sources: a query with no source picked counts nothing and says so
+    Given a member removes the last pill from a query's sources
+    Then the query stores an empty list, which counts no trace where its SQL reads the parameter
+    And the editor's preview and the widget's card say "No sources picked" instead of drawing
+    # An empty list never falls back to the default: only a query that stores none does
+
+  @unit @integration
+  Scenario: AC200n Sources: an unknown source is refused at every door
+    When a widget's query names a source outside the list, over REST, tRPC or the CLI
+    Then the write is refused with a validation error that names the sources it takes
+    And the LangWatchQL query door refuses it the same way, so no unknown source reaches a statement
+
+  @unit @integration
+  Scenario: AC200o Sources: a new widget's query counts application traces
+    Given a widget made in the editor, through REST or tRPC, or with `langwatch dashboard widget add`
+    When one of its queries names no sources
+    Then the query is stored with "sources": ["application"]
+
+  # ---------------------------------------------------------------------------
+  # What a custom widget's queries read
+  # ---------------------------------------------------------------------------
+  # Why: a widget counting `TraceName = 'langy.turn'` drew no bars while the same SQL run
+  # directly returned rows (owner, 2026-10-28). Langy's turns are stored with the gateway as
+  # their source and "langy" as their origin, so a query must name "langy" in its sources.
+
+  @unit @integration
+  Scenario: AC201 Widget data: a query whose sources hold langy reads Langy's turns, the gateway-stored ones included
+    Given Langy's turns, stored with the gateway as their source and "langy" as their origin
+    And a widget whose named query counts the traces with TraceName "langy.turn" and whose sources hold "langy"
+    When the query runs
+    Then LangWatchQL returns those traces
+    And the same named query run through LW.useChartQuery returns the same rows on the card
+
+  @unit @integration
+  Scenario: AC201b Widget data: a query left at the default leaves Langy's turns out
+    Given the same widget, whose SQL reads the parameter and whose query stores no sources, in any project
+    When the query runs
+    Then the parameter is bound to ["application"]
+    And none of Langy's turns are read, the ones stored from the gateway included
+
+  @integration
+  Scenario: AC201c Widget data: every run is bound to the period and grain the board shows
+    Given a board set to the last 30 days at one bucket per day
+    When a widget's card or its editor's preview runs a query
+    Then the run carries the board's period start and end and a granularity of 86400 seconds
+    And the frame's dashboard context, which LW.useChartQuery binds from, carries the same values
+
+  @integration
+  Scenario: AC201d Widget data: a changed query never shows an earlier answer
+    Given a widget on a board whose query returned no rows
+    When its SQL changes, saved from the editor, by Langy or through the API
+    Then the card starts the widget over and runs the new SQL
+    And the earlier answer is not shown for the new query
+    # What a run is keyed by: widget id and its queries, their sources included, start the frame
+    # over; the period and grain re-run it through the dashboard context. Nothing else caches a
+    # result: analytics.lwql.query is a mutation, and the server keeps no LangWatchQL cache
+
+  # ---------------------------------------------------------------------------
+  # A widget query's parameters: sources and projects
+  # ---------------------------------------------------------------------------
+  # Why: sources are the first setting a query carries beside its SQL. The owner wants every
+  # such setting to be a parameter the query takes into account, with no hidden filter: "why
+  # have a hidden filter?", "all of the stock widgets should be updated to have specific
+  # sources set", "it can/should default to the current project" (owner, 2026-10-29).
+  # How: two reserved bound parameters join the period and the grain:
+  # {dashboard_context_sources:Array(String)} and {dashboard_context_projects:Array(String)}.
+  # The editor labels them "sources" and "project". A query is kept to its sources only where
+  # its SQL reads {dashboard_context_sources}; SQL that does not read it counts every origin and
+  # says so. Who may read what is not a parameter: the row policy, the share windows and the
+  # redaction come from the viewer's grants. Decided by the owner (2026-10-29): no hidden filter
+  # ("why have a hidden filter?", "Everything should be a param, and the query should take it
+  # into account"). AC190, AC193, AC194, AC195, AC200f, AC200h, AC200l, AC200m, AC201b, AC204
+  # and AC204b stand as written; the earlier text is in git at c5743d82.
+  # The helper (decided): a `Source` column the LWQL views expose, computed at read time from
+  # `Origin` (lwql-view-catalog.rules.ts sourceColumns); no ClickHouse migration. It reads: a missing, empty or NULL origin reads "application", an origin outside the ten
+  # listed reads "other", a listed origin reads as itself. A view keyed by TraceId is reached
+  # through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})`. A view with
+  # neither column carries no origin, so a query reading only such views stores no list (AC202f).
+
+  @unit
+  Scenario: AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter
+    # Changed in phase 2: the exemption is derived from the views a query names, not listed in a fixture.
+    Given the stock widgets of the catalogue
+    Then each stock query's parsed SQL reads {dashboard_context_sources:Array(String)} in an expression
+    And a query that names only views with no origin stores no list and shows "Sources don't apply"
+    And a placeholder that appears only in a comment or a string literal does not count
+    And the check names every stock query that fails, by widget and query name
+    # Evidence: the catalogue unit test output, and a call to POST /api/v1/query with a stock query's SQL showing no SOURCES_IGNORED diagnostic
+
+  @unit
+  Scenario: AC202b Stock widgets: each stock widget declares its own list of sources
+    # Changed in phase 2 (coordinator, 2026-10-29): a stock query whose SQL never reads the parameter
+    # stores no list, since a list the SQL ignores says what is not so.
+    Given the stock widgets of the catalogue
+    Then each query that reads the sources parameter stores its widget's non-empty list, with no list shared between widgets by a constant
+    And a query that reads only views with no origin stores no list
+    And a widget added from the picker or a template stores those lists
+    And the constant CATALOGUE_QUERY_SOURCES is not exported
+    # Evidence: the catalogue unit test output, and a screenshot of an added stock widget's sources pills in the editor
+
+  @unit
+  Scenario: AC202c Stock widgets: each widget family declares the list tasks#1025 names, and a change-table row carries any other
+    # Changed in phase 2: the scenario, gateway and coding-agent widgets read only views with no origin, so
+    # they store no list (AC202f); the change table lives in stock-widget-sources.unit.test.ts, not a fixture.
+    Given the stock widgets of the catalogue
+    Then every query that reads sources stores ["application"], except the change-table widgets
+    And "cost-by-source" stores every source, because it slices spend by origin
+    And "cost-waste", "voice-cost-per-call" and "ext-cost-per-doc" store ["application", "gateway"], the origins their SQL kept by hand before
+    And a stock query holds no hand-written Origin condition
+    # Evidence: the unit test output, and the SQL before and after for the four widgets, quoted
+
+  @integration
+  Scenario: AC202d Stock widgets: a widget whose list did not change returns the same rows
+    Given a From LangWatch board run over seeded traces of every origin before and after this change
+    When a widget's declared list equals the origins it counted before
+    Then its rows are byte-equal to the rows before
+    And a widget that changed differs only by rows of the origins its change-table row names
+    # Evidence: the same board run on the before and after builds over seeded traces, the two answers diffed, and a haven browser screenshot of the board
+
+  @integration
+  Scenario: AC202e Stock widgets: the Source column counts missing origins as application and unlisted ones as other
+    Given seeded traces whose origin is missing, empty, NULL, "mystery", and each listed one
+    When a statement with "WHERE Source IN {dashboard_context_sources:Array(String)}" runs bound to ["application"], then to ["other"], then to ["langy"]
+    Then the first counts the missing, empty and NULL traces and the application ones
+    And the second counts only the "mystery" traces
+    And the third counts only Langy's
+    # Evidence: three REST answers quoted with their row counts over the seeded traces
+
+  @unit
+  Scenario: AC202f Stock widgets: a widget that reads a view with no origin says that sources do not apply
+    Given a stock widget none of whose queries reads a view with an Origin or a TraceId, such as the per-minute rollups or simulations
+    Then its queries store no sources list
+    And its card reads "Sources don't apply: this widget reads a view that keeps no origin"
+    # Evidence: a haven browser screenshot of the card
+
+  @unit @integration
+  Scenario: AC203 Sources: a query reading the parameter is kept to the list it stores
+    Given a query whose SQL has "Origin IN {dashboard_context_sources:Array(String)}" and stores "application" and "langy"
+    When the card runs
+    Then the parameter is bound to ["application", "langy"] and the rows are those origins' only
+    And a query that stores no sources is bound to ["application"]
+    And a query that stores an empty list is bound to [] and returns no row
+    # Evidence: a haven browser screenshot of the card, and params from the same query run through POST /api/v1/query
+
+  @unit @integration
+  Scenario: AC204 Sources: SQL that does not read the parameter counts every origin and says so
+    Given a stored widget query storing ["application"] whose SQL has no {dashboard_context_sources:Array(String)}
+    When the card runs
+    Then the query counts every origin, with no hidden filter
+    # Changed in phase 2: the wording is the one the editor shows, as the reason its Add source menu is disabled.
+    And the editor says on that query: "The SQL does not read {dashboard_context_sources}"
+    And the card line reads "Sources: all sources"
+    And the run answers a SOURCES_IGNORED diagnostic
+    # Why: the owner called a filter the SQL does not show a confusing surprise (2026-10-29)
+    # Evidence: a haven browser screenshot of the editor warning and of the card line, and the answer's params from the same run
+
+  @unit
+  Scenario: AC204b Sources: the editor's sources row is disabled, with a reason, while the SQL ignores the parameter
+    Given a query whose SQL has no {dashboard_context_sources:Array(String)}
+    When a member opens its parameters
+    Then the sources pills stay as stored and the "Add source" menu is disabled with the reason "The SQL does not read {dashboard_context_sources}"
+    # Evidence: a haven browser screenshot of the disabled menu
+
+  @unit
+  Scenario: AC204c Sources: a placeholder only in a comment or a literal does not count as reading the parameter
+    Given a query whose SQL names {dashboard_context_sources:Array(String)} only in a comment or in a string literal
+    When it runs
+    Then the run answers a SOURCES_IGNORED diagnostic and the editor says "The SQL does not read {dashboard_context_sources}"
+    # Evidence: the answer's params quoted for both shapes
+
+  @unit
+  Scenario: AC205 Sources: a query declaring the parameter with another type is refused
+    When a query's SQL has {dashboard_context_sources:String}
+    Then the run is refused with the code "lwql_reserved_parameter_type" and the message names "Array(String)"
+    # Evidence: the answer of POST /api/v1/query for that SQL, quoted
+
+  @unit @integration
+  Scenario: AC205b Params: a query cannot assign or alias a reserved name
+    When a query's SQL has "SET param_dashboard_context_projects = 'C'", "WITH 'C' AS dashboard_context_projects", or a CTE named dashboard_context_sources
+    Then the run is refused with the code "lwql_reserved_parameter_supplied" at tRPC, REST, MCP, the CLI and the editor's preview
+    And declaring the typed placeholder {dashboard_context_projects:Array(String)} is allowed
+    # Evidence: the refusals quoted from one tRPC call, one POST /api/v1/query, one run_query call, one CLI run and one preview
+
+  @unit @integration
+  Scenario: AC206 Project: a card reads the board's project unless its query names others
+    Given a stored widget whose query stores no projects, on a board open in project "P"
+    When the card runs
+    Then the run reads project "P" alone and {dashboard_context_projects:Array(String)} is bound to ["P"]
+    And the card line reads "Project: " and the project's name
+    # Evidence: a haven browser screenshot of the card line, and the params of the same run
+
+  @unit @integration
+  Scenario: AC206b Project: a group project reads the members its grants share, each from its own date
+    Given a group project "G" whose grants share projects "A" and "B", "B" from a date
+    When a widget storing no projects runs in "G"
+    Then it reads "A" and "B", and "B" only from its date
+    And {dashboard_context_projects:Array(String)} is bound to ["A", "B"]
+    # Evidence: a haven browser screenshot of a group board, and the answer's params and rows around the date
+
+  @unit @integration
+  Scenario: AC206c Project: an organization board reads the project its Project chip names
+    Given an Organization board and a member viewing it from another project
+    When its widgets run
+    Then each widget storing no projects reads the project the chip names, not the viewer's own
+    # Evidence: two haven browser screenshots of one board opened from two projects
+
+  @unit @integration
+  Scenario: AC207 Project: the editor offers only the projects the member can read
+    Given a member who reads projects "A" and "B" and not "C", all in one organization, and an archived project "D" they can read
+    When they open a query's parameters and add a project
+    Then the menu offers "A" and "B" and does not list "C" or "D"
+    And a project already picked is not offered again
+    And the board's project is the one picked while the query stores none
+    # Evidence: a haven browser screenshot of the open menu
+
+  @unit @integration
+  Scenario: AC207b Project: a query saved with picked projects reads only those projects, in the order picked
+    Given a member has picked "B" then "A" on a query
+    When they save the widget
+    Then the query stores ["B", "A"] and its card runs over both
+    And the card line reads "Projects: " and the names in that order
+    And picking "A" twice stores it once
+    And every other query keeps its own projects
+    # Evidence: a haven browser screenshot of the card and the widget read back through GET /api/v1/dashboards
+
+  @unit
+  Scenario: AC207c Project: a query stores at most as many projects as a member's list may hold
+    # Changed after the security review (2026-10-29): a member's list is proven readable one project at a
+    # time, so the cap is LWQL_MAX_MEMBER_PROJECTS, 100, not the key door's 10,000.
+    When a widget's query, or a card run, names more projects than LWQL_MAX_MEMBER_PROJECTS
+    # Changed in phase 2: the REST door checks the body's shape first, so a write of 101 ids answers
+    # "validation_error" (422) naming the field queries.0.projects. The service keeps the same cap
+    # as a second guard, which answers "dashboard_widget_definition_refused" to a caller that skips the door.
+    Then a write over the REST door is refused with the code "validation_error" (422), naming the field "queries.0.projects"
+    And a card run over the tRPC door is refused by the schema, with the message "projects holds at most 100 ids"
+    And a write of 101 ids is refused so
+    And the editor offers no further project once the maximum is picked
+    # Evidence: the refusal quoted from one dashboard API write of 10,001 ids, with the body size
+
+  @integration
+  Scenario: AC207d Project: a project that gets read access later is read without a new save
+    Given a widget storing project "C", opened by a member who cannot read "C"
+    When that member is given access to "C" and reloads
+    Then the card draws "C"'s rows
+    # Evidence: two haven browser screenshots, before and after the grant
+
+  @unit @integration
+  Scenario: AC208 Project: a widget naming a project the viewer cannot read draws the no-access state, on that card only
+    Given a widget storing project "C" and a viewer who cannot read "C", whether "C" was revoked after the save, deleted or archived
+    When the viewer opens the board
+    Then the card draws nothing from "C" and says "You can't read a project this widget uses"
+    And the card never names "C", shows its rows or says whether "C" exists
+    And the board's other widgets draw as usual
+    And no statement of the card reached the store
+    # Why: a deliberate change from the tasks#1028 text, which named the project; naming it tells a
+    # reader that an id they cannot read exists (@advisor, 2026-10-29)
+    # Evidence: a haven browser screenshot as the viewer, the tRPC answer quoted, and the ClickHouse query log showing no statement for the card
+
+  @unit @integration
+  Scenario: AC208b Project: an editor sees the hidden project as a count and removes it by position
+    Given the viewer of AC208 may edit the board
+    When they open the card's editor
+    Then the project row shows the projects they can read plus "1 project you can't read"
+    And "Remove" on that entry drops it, and no other action changes it
+    # Evidence: a haven browser screenshot of the editor row
+
+  @unit @integration
+  Scenario: AC208c Project: an alert or a scheduled report never reads a project its owner cannot
+    Given a widget storing project "C" that the alert's owner cannot read
+    When the alert or the report runs
+    Then the run is refused with the code "project_not_found" and reads nothing from "C"
+    And the refusal is reported as AC187 reports a board the owner cannot open
+    # Alerts and reports watch chart-builder graphs today, not widget queries. The rule binds the
+    # member resolver any such run uses: an owner without read access gets project_not_found.
+    # Evidence: the refusal quoted from the alert's run history
+
+  @unit @integration
+  Scenario: AC208d Project: a crafted card run naming another organization's project is refused
+    Given a member of organization "X" and a project "Z" of organization "Y"
+    When a hand-made tRPC request to analytics.lwql.query names "Z" in projects
+    Then it is refused with the code "project_not_found" and the status 404
+    And the body is the one a missing id gets, byte for byte
+    # Evidence: two real curl answers for "Z" and for an id that does not exist, diffed
+
+  @unit @integration
+  Scenario: AC209 Params: changing a parameter runs the preview again, and Undo puts the old value back
+    Given a member changes a query's sources, or its projects, in the editor
+    Then the preview runs again with the new values, before anything is saved
+    And after saving, Undo puts back the sources and projects the query had, including none
+    # Evidence: a haven browser walk through change, preview, save and Undo
+
+  @unit @integration
+  Scenario: AC210 Compatibility: a widget saved before projects existed reads the board's project
+    Given a widget saved before this change, storing no projects, and, for a stock one, the list of the catalogue before it
+    When its card runs
+    Then it reads its board's project with the sources it stored, or ["application"] when it stored none
+    And reading it, or saving another change to it, stores no projects on the query
+    # Evidence: a haven browser screenshot of a seeded old widget, and its stored JSON before and after a save
+
+  @unit @integration
+  Scenario: AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources
+    Given an API key that may edit a board's widgets
+    When it adds a widget whose query has "projects": ["A", "B"] through REST, through `langwatch dashboard widget add --projects A,B`, or through the MCP widget tools
+    Then the widget reads back that list on that query at all three
+    And an update that names no "projects" keeps the list stored under the query's name
+    And an update that sends "projects": null clears it, so the query reads the board's project
+    And a widget stored without projects reads back without a "projects" key
+    # Evidence: the REST body, the CLI output and the MCP tool result for one widget, quoted
+
+  @unit @integration
+  Scenario: AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike
+    When a widget's query names such a project
+    Then the write is refused with the code "project_not_found" and the status 404, for all three
+    And the three bodies are equal byte for byte and name no project id
+    # Evidence: three real curl answers, diffed
+
+  @unit
+  Scenario: AC210e Compatibility: a project key cannot change the SQL of a widget whose stored query names other projects
+    # Own call (batch 12): intended. New SQL would read projects the key cannot, so the write
+    # judges the merged queries, stored projects included, and refuses it alike (AC210c).
+    Given a widget whose stored query names its own project and another
+    When a project key updates that query's SQL without sending projects
+    Then the write is refused with the code "project_not_found" and the status 404
+    And the stored definition is unchanged
+
+  @unit
+  Scenario: AC210f Compatibility: a member who is no admin cannot name an aggregate project in a widget
+    # Own call (batch 13): ADR-177 makes an aggregate project admin-only, and the batched grant
+    # read applies that gate, so the write refuses it with the id-free 404 of AC210c.
+    When a member who is not an organization admin saves a query naming an aggregate project
+    Then the write is refused with the code "project_not_found" and the status 404
+    And the body equals the body for a project that does not exist
+
+  @integration
+  Scenario: AC210d Rollback: a rollback is not supported for this feature
+    When the previous release reads a widget this release saved
+    Then it shows multi-project widgets for the board's project only
+    And the release notes say so
+    # Evidence: the release-notes line "Rolling back shows multi-project widgets for the board's project only"
+
+  @unit
+  Scenario: AC211 Insight: the daily insight gate validates a statement with the card's binder
+    Given a finding whose statement reads the sources parameter and one that assigns a reserved name
+    When the insight gate checks them
+    Then the first is kept and the second is dropped, as the card would refuse it
+    # The gate never runs the statement; the replay is the card's own run
+    # Evidence: the gate's kept and dropped findings, quoted
+
+  @unit
+  Scenario: AC213 Diagnostics: a card shows what the server limited as one (i) line
+    Given a card whose run answered SHARE_WINDOW_LIMITED, SOURCES_IGNORED or GRANULARITY_COARSENED
+    Then the card shows one (i) line holding the messages of those diagnostics
+    And a card whose run was not limited shows no such line
+    And the line names no project and counts none
+    # Evidence: a haven browser screenshot of a limited card and of an unlimited one
+
+  @unit
+  Scenario: AC212 Skill: the dashboard-widgets skill teaches projects, the reserved names and params
+    Given Langy builds or edits a widget with the dashboard-widgets skill
+    Then the skill names {dashboard_context_sources} and {dashboard_context_projects} as reserved, the type Array(String), that a query is kept to its sources only where its SQL reads the first, that `projects` defaults to the board's project, and that every run answers with params, a flat map of each declared placeholder by its SQL name, and diagnostics, which say when the server limited the run or ignored a setting (SHARE_WINDOW_LIMITED, SOURCES_IGNORED, GRANULARITY_COARSENED)
+    And it shows `--projects A,B` and the queries file's "projects"
+    # Evidence: the compiled skill text, quoted
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -1451,10 +2206,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 5: "The board uses a wide screen" → Scenario: AC5 The board uses a wide screen
   # AC 6: "Template tables are shorter than template charts" → Scenario: AC6 Template tables are shorter than template charts
   # AC 7: "The board shows data age and can refresh" (changed by langwatch/tasks#911: no data age; Refresh now moves into the period menu) → Scenario: AC7 Refresh sits inside the period menu
-  # AC 8: "An MCP agent adds a widget to a board" → Scenario: AC8 An MCP agent adds a widget to a board; Scenario: AC8b add_dashboard_widget rejects an unknown dashboard
+  # AC 8: "An MCP agent adds a widget to a board" → Scenario: AC8 An MCP agent adds a widget to a board; Scenario: AC8b add_dashboard_widget rejects an unknown dashboard; Scenario: AC8c An agent reads a Dashboards board by its id
   # AC 9: "The docs explain how to build boards from an agent" → Scenario: AC9 The docs explain how to build boards from an agent
   # AC 10: "A non-empty board still offers a way to add a widget" → Scenario: AC10 A non-empty board still offers a way to add a widget
-  # AC 19: "One control for range, grain and refresh, with Live" (added by langwatch/tasks#911: the refresh menu moves into the period control) → Scenario: AC19 One control sets the range, the grain and the refresh; Scenario: AC19b A grain that does not fit the range cannot be picked; Scenario: AC19c Live is the last hour, rolling, refreshed every minute
+  # AC 19: "One control for range, grain and refresh, with Live" (added by langwatch/tasks#911: the refresh menu moves into the period control) → Scenario: AC19 One control sets the range, the grain and the refresh; Scenario: AC19b A grain that does not fit the range cannot be picked; Scenario: AC19c Live is the last hour, rolling, refreshed every minute; Scenario: AC19d A fixed range moves its end to now on each refresh
   # AC 11: "Existing boards are unaffected" → Scenario: AC11 Existing boards are unaffected
   # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add takes the widget off again and does not seed Langy
   # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source
@@ -1480,14 +2235,17 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
   # AC 107c-107e: "Templates library: cards like the prototype" (changed by langwatch/tasks#911 on 2026-10-07: compact cards with no labels, so AC107e is gone; the finder's own scenarios are in dashboards-finder.feature) → Scenario: AC107c Templates library: each card reads like the prototype's; Scenario: AC107d Templates library: a card previews the template's real board
   # AC 107-109: "Sidebar menu" (changed by langwatch/tasks#911: stars replace sharing and the default board; Share and Set as default are gone, Move up/down added) → Scenario: AC107 Sidebar menu: each board offers its actions in order; Scenario: AC107b Sidebar menu: reorder is bounded by the Starred list's ends; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
-  # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing but My dashboard is starred automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC156 No board is starred unless the member stars it; Scenario: AC157 Stars are per member (AC159 "No sharing control appears anywhere" is retired by AC170-186)
+  # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing but My dashboard is starred automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC155b Stars the section does not show keep their place in the star order; Scenario: AC156 No board is starred unless the member stars it; Scenario: AC157 Stars are per member (AC159 "No sharing control appears anywhere" is retired by AC170-186)
   # AC 170-186: "Board scope: Only me, Project, Organization" (owner decisions, 2026-10-09) → Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me; Scenario: AC171 Scope: an Only me board exists for its author alone; Scenario: AC172 Scope: an Organization board is listed in every project of its organization; Scenario: AC173 Scope: an Organization board is read-only outside the project that owns it; Scenario: AC174 Scope: only the author changes a board's scope; Scenario: AC175 Scope: any board can be set to Only me, My dashboard like any other; Scenario: AC176 Scope: a narrower scope keeps other members' stars; Scenario: AC177 Scope control: the board header shows the scope beside the title; Scenario: AC178 Scope control: the sidebar menu offers the same three choices; Scenario: AC179 Scope change: it asks first only when someone loses the board; Scenario: AC180 Scope change: any other change is made at once and offers Undo; Scenario: AC181 Sidebar: scope marks and the organization's group; Scenario: AC182 Organization board: the Project chip says whose data it shows; Scenario: AC183 A board the reader may not open is not available; Scenario: AC184 View-only: a board the reader cannot edit offers no edit control; Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy; Scenario: AC186 Scope: the migration keeps today's audience
   # AC 187-189: "Board scope: what the access-control review closed" (2026-10-09: automation reads, archived projects, projects with Dashboards off) → Scenario: AC187 Scope: an alert or a scheduled report reads nothing from an Only me board; Scenario: AC188 Scope: an Organization board of an archived project is listed nowhere; Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
+  # AC 190-195: "Dashboards show your agent, not Langy's work for you" (owner, 2026-10-09; sources, owner, 2026-10-28) → Scenario: AC190 Sources: a run whose sources leave langy out counts none of Langy's traces or their rows; Scenario: AC191 Langy: a widget's own origin filter keeps its meaning; Scenario: AC192 Langy: data that is Langy's own is not filtered; Scenario: AC193 Sources: a run whose sources hold every origin reads every trace, Langy's included; Scenario: AC194 Langy: a query run outside a board is not scoped; Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
+  # AC 200: "A widget query's sources" (owner, 2026-10-28; replaces the board's Langy traces setting) → Scenario: AC200 Sources: each query shows its sources as pills, and the card names them; Scenario: AC200b Sources: a query saved with picked sources counts only traces of those origins; Scenario: AC200d Sources: only a member who can edit the board changes them; Scenario: AC200f Sources: a query that stores none counts application traces; Scenario: AC200g Sources: changing them runs the preview again; Scenario: AC200h Sources: a From LangWatch board's widgets count the sources their definitions declare; Scenario: AC200i Sources: the dashboard-widgets skill tells Langy about a query's sources; Scenario: AC200j Sources: the API and the CLI read and write a query's sources; Scenario: AC200k Sources: Undo puts a query's sources back, including back to none; Scenario: AC200l Sources: other counts every origin outside the known ones; Scenario: AC200m Sources: a query with no source picked counts nothing and says so; Scenario: AC200n Sources: an unknown source is refused at every door; Scenario: AC200o Sources: a new widget's query counts application traces
+  # AC 201: "A custom widget reads what its query asks for" (owner, 2026-10-28) → Scenario: AC201 Widget data: a query whose sources hold langy reads Langy's turns, the gateway-stored ones included; Scenario: AC201b Widget data: a query left at the default leaves Langy's turns out; Scenario: AC201c Widget data: every run is bound to the period and grain the board shows; Scenario: AC201d Widget data: a changed query never shows an earlier answer
+  # AC 202-213: "A widget query's parameters: sources and projects" (owner, 2026-10-29; langwatch/tasks#1025, #1028) → Scenario: AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter; Scenario: AC202b Stock widgets: each stock widget declares its own list of sources; Scenario: AC202c Stock widgets: each widget family declares the list tasks#1025 names, and a change-table row carries any other; Scenario: AC202d Stock widgets: a widget whose list did not change returns the same rows; Scenario: AC202e Stock widgets: the Source column counts missing origins as application and unlisted ones as other; Scenario: AC202f Stock widgets: a widget that reads a view with no origin says that sources do not apply; Scenario: AC203 Sources: a query reading the parameter is kept to the list it stores; Scenario: AC204 Sources: SQL that does not read the parameter counts every origin and says so; Scenario: AC204b Sources: the editor's sources row is disabled, with a reason, while the SQL ignores the parameter; Scenario: AC204c Sources: a placeholder only in a comment or a literal does not count as reading the parameter; Scenario: AC205 Sources: a query declaring the parameter with another type is refused; Scenario: AC205b Params: a query cannot assign or alias a reserved name; Scenario: AC206 Project: a card reads the board's project unless its query names others; Scenario: AC206b Project: a group project reads the members its grants share, each from its own date; Scenario: AC206c Project: an organization board reads the project its Project chip names; Scenario: AC207 Project: the editor offers only the projects the member can read; Scenario: AC207b Project: a query saved with picked projects reads only those projects, in the order picked; Scenario: AC207c Project: a query stores at most as many projects as a member's list may hold; Scenario: AC207d Project: a project that gets read access later is read without a new save; Scenario: AC208 Project: a widget naming a project the viewer cannot read draws the no-access state, on that card only; Scenario: AC208b Project: an editor sees the hidden project as a count and removes it by position; Scenario: AC208c Project: an alert or a scheduled report never reads a project its owner cannot; Scenario: AC208d Project: a crafted card run naming another organization's project is refused; Scenario: AC209 Params: changing a parameter runs the preview again, and Undo puts the old value back; Scenario: AC210 Compatibility: a widget saved before projects existed reads the board's project; Scenario: AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources; Scenario: AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike; Scenario: AC210e Compatibility: a project key cannot change the SQL of a widget whose stored query names other projects; Scenario: AC210f Compatibility: a member who is no admin cannot name an aggregate project in a widget; Scenario: AC210d Rollback: a rollback is not supported for this feature; Scenario: AC211 Insight: the daily insight gate validates a statement with the card's binder; Scenario: AC213 Diagnostics: a card shows what the server limited as one (i) line; Scenario: AC212 Skill: the dashboard-widgets skill teaches projects, the reserved names and params
   # AC 196-197: "Board scope over REST: a key stands where its person does" (owner, 2026-10-10) → Scenario: AC196 Scope: a key that names a person reads and writes as that person over REST; Scenario: AC197 Scope: a key that names no person stands where a project credential does
+  # AC 199: "Dashboards and Analytics Reports keep their boards apart" (changed on 2026-10-15: Dashboards v2 moves onto DashboardsV2 and DashboardWidget) → Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards; Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart; Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports; Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged; Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds; Scenario: AC199f Split: a copied board and widget keep their ids; Scenario: AC199h Split: the LangWatchQL views leave out the stale copies; Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me; Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds; Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board; Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards; Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden; Scenario: AC199n Split: the public API creates, renames and deletes Dashboards boards; Scenario: AC199o Split: a member's REST create follows the board scope rules; Scenario: AC199p Split: a board's widgets are a sub-resource of the board; Scenario: AC199q Split: /api/v1/dashboards is not there while Dashboards is off; Scenario: Split: /api/v1/dashboards stays shut when the Dashboards flag cannot be read; Scenario: AC199r Split: the Reports boards answer at /api/v1/analytics/reports; Scenario: AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards; Scenario: AC199t The MCP widget tools use only the board routes; Scenario: AC199u Split: /api/v1/dashboards answers by the API version the caller names; Scenario: AC199v Split: /api/dashboards answers as /api/v1/dashboards, deprecated; Scenario: AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports; Scenario: AC199x Names: the CLI has one dashboard tree and no old command names; Scenario: AC199y Names: the project-path dashboards read answers at /analytics/dashboards; Scenario: AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports
   # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts starred) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, starred for them; Scenario: AC160c A member who unstars My dashboard keeps it unstarred; Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name; Scenario: AC161c Starred shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
-  # AC 190-195: "Dashboards show your agent, not Langy's work for you" (owner, 2026-10-09) → Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default; Scenario: AC191 Langy: a widget's own origin filter keeps its meaning; Scenario: AC192 Langy: data that is Langy's own is not filtered; Scenario: AC193 Langy: the origins a board leaves out are a list a board parameter can set later; Scenario: AC194 Langy: a query run outside a board is not scoped; Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
-  # AC 198: "A personal project's boards show Langy" (owner, 2026-10-10) → Scenario: AC198 Langy: a board in a personal project shows Langy's conversations

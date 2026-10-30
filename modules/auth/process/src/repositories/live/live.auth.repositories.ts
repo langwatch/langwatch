@@ -15,6 +15,7 @@ import { RedisAuthRateLimitRepository } from "../redis/redis.auth-rate-limit.rep
 import { RedisAuthSessionCacheRepository } from "../redis/redis.auth-session-cache.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../redis/redis.better-auth-secondary-storage.repository.ts";
 import { RedisCliDeviceSessionRepository } from "../redis/redis.cli-device-session.repository.ts";
+import { RedisCliRotationReplayRepository } from "../redis/redis.cli-rotation-replay.repository.ts";
 
 /**
  * Auth's live stores: durable browser rows in Prisma and TTL'd CLI grants in Redis.
@@ -38,6 +39,7 @@ export class LiveAuthRepositories {
     return {
       ...PostgresAuthRepositories.create({ prisma }),
       cliSessions: RedisCliDeviceSessionRepository.create(redis),
+      cliRotations: RedisCliRotationReplayRepository.create({ redis, encryption }),
       rateLimits: RedisAuthRateLimitRepository.create({ limiter: rateLimiter }),
       betterAuthStorage: PrismaBetterAuthStorageRepository.create({ prisma, encryption }),
       betterAuthSecondaryStorage: redis

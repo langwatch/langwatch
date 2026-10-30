@@ -131,3 +131,9 @@ Feature: Fold read windows are declared, not hand-rolled
     When the fold is paired with the store the pipeline gives it
     Then the pairing is refused unless that store can report a row it refused
     And a refusal keeps the replay that a trusted absence skips
+
+  Scenario: a repository-backed fold store hands the declared window to its repository
+    Given a fold whose store wraps a projection repository
+    When the fold reads its state with a read window
+    Then the repository read carries the same window
+    And a read without a window reaches the repository without one

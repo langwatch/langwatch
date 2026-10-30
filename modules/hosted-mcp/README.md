@@ -19,7 +19,7 @@ The hosted MCP server, and the MCP OAuth flow that admits its clients.
 
 | Kind            | Name                        | Declared at                                                        |
 | --------------- | --------------------------- | ------------------------------------------------------------------ |
-| Stores required | encryption, redis           | `process/src/repositories/live/live.hosted-mcp.repositories.ts:16` |
+| Stores required | encryption, redis           | `process/src/repositories/live/live.hosted-mcp.repositories.ts:15` |
 | Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/hosted-mcp.config.ts:5`                              |
 
 Anything else hosted-mcp needs belongs to another module and is reached through its `*Api`.
@@ -29,6 +29,7 @@ Anything else hosted-mcp needs belongs to another module and is reached through 
 | Name            | Token               | Module                                                      |
 | --------------- | ------------------- | ----------------------------------------------------------- |
 | `authorization` | `AuthzApi`          | [authz](../authz/README.md)                                 |
+| `featureFlags`  | `FeatureFlagApi`    | [feature-flag](../feature-flag/README.md)                   |
 | `governance`    | `GovernanceRestApi` | [governance](../../enterprise/modules/governance/README.md) |
 | `projects`      | `ProjectApi`        | [project](../project/README.md)                             |
 | `sessions`      | `AuthApi`           | [auth](../auth/README.md)                                   |

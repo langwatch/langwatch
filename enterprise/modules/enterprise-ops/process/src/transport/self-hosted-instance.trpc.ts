@@ -21,4 +21,20 @@ export const selfHostedInstancesTrpcTransport: TrpcRouterDeclaration<
   .withMiddlewareContext(operatorContext)
   .withPermission("ops:view", STAFF)
   .handle(({ app, input }, operator) => app.getSelfHostedInstance({ ...input, operator }))
+
+  .procedure("summary")
+  .withMiddlewareContext(operatorContext)
+  .withPermission("ops:view", STAFF)
+  .handle(({ app }, operator) => app.summarizeSelfHostedInstances({ operator }))
+
+  .procedure("findDiagnostics")
+  .withMiddlewareContext(operatorContext)
+  .withPermission("ops:view", STAFF)
+  .handle(({ app, input }, operator) => app.findUpgradeDiagnostics({ ...input, operator }))
+
+  // A bundle may quote an install's internals: downloading one asks ops:manage.
+  .procedure("getDiagnosticsDownload")
+  .withMiddlewareContext(operatorContext)
+  .withPermission("ops:manage", STAFF)
+  .handle(({ app, input }, operator) => app.getUpgradeDiagnosticsDownload({ ...input, operator }))
   .build();

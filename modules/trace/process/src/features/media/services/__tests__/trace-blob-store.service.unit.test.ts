@@ -6,7 +6,6 @@
 import { Readable } from "node:stream";
 
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
@@ -14,6 +13,11 @@ import {
   type S3ClientResolver,
   S3TraceLegacySpoolChannel,
 } from "../../../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import type {
+  TraceSpoolDestinationKind,
+  TraceSpoolObjectAddress,
+  TraceSpoolObjectsRepository,
+} from "../../../../repositories/trace-spool-objects.repository.ts";
 import { StreamTooLargeError } from "../../../../services/trace-stream-buffer.service.ts";
 import { SPOOL_REF_V2 } from "../../../ingestion/rules/trace-spool-location.rules.ts";
 import {
@@ -24,27 +28,29 @@ import {
 } from "../trace-blob-store.service.ts";
 
 /**
- * In-memory stand-in for the stored-objects StorageRegistry, keyed by URI.
- * Records every URI it is asked for so the tests can assert on the location
+ * In-memory stand-in for the spool's object repository, keyed by project and key.
+ * Records every address it is asked for so the tests can assert on the location
  * the spool derived, not just on the bytes coming back.
  */
-function fakeObjectStore() {
+function fakeObjectStore(destination: TraceSpoolDestinationKind = "s3") {
   const objects = new Map<string, Buffer>();
-  const putUris: string[] = [];
-  const getUris: string[] = [];
-  const deleteUris: string[] = [];
-  return {
+  const putKeys: string[] = [];
+  const getKeys: string[] = [];
+  const deleteKeys: string[] = [];
+  const slot = (at: TraceSpoolObjectAddress) => `${at.projectId}:${at.key}`;
+  const store = {
     objects,
-    putUris,
-    getUris,
-    deleteUris,
-    put: vi.fn(async (uri: string, bytes: Buffer) => {
-      putUris.push(uri);
-      objects.set(uri, bytes);
+    putKeys,
+    getKeys,
+    deleteKeys,
+    destinationKind: vi.fn(async () => destination),
+    write: vi.fn(async (at: TraceSpoolObjectAddress, bytes: Buffer) => {
+      putKeys.push(slot(at));
+      objects.set(slot(at), bytes);
     }),
-    get: vi.fn(async (uri: string) => {
-      getUris.push(uri);
-      const stored = objects.get(uri);
+    read: vi.fn(async (at: TraceSpoolObjectAddress) => {
+      getKeys.push(slot(at));
+      const stored = objects.get(slot(at));
       if (!stored) {
         const err = new Error("NoSuchKey");
         err.name = "NoSuchKey";
@@ -52,20 +58,17 @@ function fakeObjectStore() {
       }
       return Readable.from([stored]);
     }),
-    delete: vi.fn(async (uri: string) => {
-      deleteUris.push(uri);
-      objects.delete(uri);
+    remove: vi.fn(async (at: TraceSpoolObjectAddress) => {
+      deleteKeys.push(slot(at));
+      objects.delete(slot(at));
     }),
   };
+  return store satisfies TraceSpoolObjectsRepository;
 }
 
-function spoolStorageFor(
-  store: ReturnType<typeof fakeObjectStore>,
-  destination: ProjectStorageDestination,
-): SpoolStorage {
+function spoolStorageFor(store: ReturnType<typeof fakeObjectStore>): SpoolStorage {
   return {
-    objectStoreFor: () => store,
-    resolveDestination: async () => destination,
+    objects: store,
     // Existing suites assert the write path, so they run as a deployment that
     // has provisioned retention. The refusal is covered on its own below.
     azureRetentionConfirmed: true,
@@ -117,54 +120,37 @@ const spoolCoords = {
   spanId: "span-1",
 };
 
-const S3_DESTINATION: ProjectStorageDestination = {
-  kind: "s3",
-  bucket: "test-bucket",
-};
-const AZURE_DESTINATION: ProjectStorageDestination = {
-  kind: "azure",
-  accountName: "acct",
-  container: "cont",
-};
-const FILE_DESTINATION: ProjectStorageDestination = {
-  kind: "file",
-  root: "/var/lib/langwatch/objects",
-};
+const S3_DESTINATION: TraceSpoolDestinationKind = "s3";
+const AZURE_DESTINATION: TraceSpoolDestinationKind = "azure";
+const FILE_DESTINATION: TraceSpoolDestinationKind = "file";
+/** Where the spool for `spoolCoords` lands: the project, then the lifecycle-prefixed key. */
+const SPOOL_SLOT = "orgA:trace-blobs/spool/orgA/trace-1/span-1";
 
 describe("putSpool — given each supported storage destination", () => {
   describe("when putSpool is called", () => {
     /** @scenario "The transient object path carries the lifecycle prefix first" */
     it.each([
-      {
-        name: "s3",
-        destination: S3_DESTINATION,
-        expectedUri: "s3://test-bucket/trace-blobs/spool/orgA/trace-1/span-1",
-      },
-      {
-        name: "azure",
-        destination: AZURE_DESTINATION,
-        expectedUri: "azure-blob://acct/cont/trace-blobs/spool/orgA/trace-1/span-1",
-      },
+      { name: "s3", destination: S3_DESTINATION },
+      { name: "azure", destination: AZURE_DESTINATION },
+      // The memory twin of the object-storage member, which the test tier runs on.
+      { name: "memory", destination: "memory" as const },
       // No local-filesystem row on purpose: the spool refuses that
       // destination, since a filesystem cannot express the lifecycle rule the
       // orphan bound depends on. Covered by its own case below.
-    ])(
-      "writes to the $name destination the deployment resolved",
-      async ({ destination, expectedUri }) => {
-        const objectStore = fakeObjectStore();
-        const store = TraceBlobStoreService.create({
-          legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-          spoolStorage: spoolStorageFor(objectStore, destination),
-        });
+    ])("writes to the $name destination the deployment resolved", async ({ destination }) => {
+      const objectStore = fakeObjectStore(destination);
+      const store = TraceBlobStoreService.create({
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
+        spoolStorage: spoolStorageFor(objectStore),
+      });
 
-        await store.putSpool({
-          ...spoolCoords,
-          body: Buffer.from("span payload data", "utf-8"),
-        });
+      await store.putSpool({
+        ...spoolCoords,
+        body: Buffer.from("span payload data", "utf-8"),
+      });
 
-        expect(objectStore.putUris).toEqual([expectedUri]);
-      },
-    );
+      expect(objectStore.putKeys).toEqual([SPOOL_SLOT]);
+    });
   });
 });
 
@@ -172,10 +158,10 @@ describe("putSpool — given a span payload body", () => {
   describe("when putSpool is called", () => {
     /** @scenario "The transient object path carries the lifecycle prefix first" */
     it("returns a reference carrying no storage location", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(AZURE_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       const spoolRef = await store.putSpool({
@@ -189,10 +175,10 @@ describe("putSpool — given a span payload body", () => {
     });
 
     it("issues exactly ONE write", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(S3_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       await store.putSpool({
@@ -200,7 +186,7 @@ describe("putSpool — given a span payload body", () => {
         body: Buffer.from("payload", "utf-8"),
       });
 
-      expect(objectStore.put).toHaveBeenCalledTimes(1);
+      expect(objectStore.write).toHaveBeenCalledTimes(1);
     });
   });
 });
@@ -209,10 +195,10 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
   describe("when putSpool is called", () => {
     /** @scenario "An id that is not a safe path segment is hashed, not escaped" */
     it("reduces the id to one path component so nothing can escape the prefix", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(S3_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       await store.putSpool({
@@ -226,8 +212,8 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
       // URI before touching the filesystem, which turned `..%2F..%2F` back
       // into `../../`. Unsafe ids become a hash, which cannot carry a
       // separator no matter what decodes it downstream.
-      const [uri] = objectStore.putUris;
-      const key = uri!.replace("s3://test-bucket/", "");
+      const [slot] = objectStore.putKeys;
+      const key = slot!.replace("orgA:", "");
       const segments = key.split("/");
       expect(segments.slice(0, 3)).toEqual(["trace-blobs", "spool", "orgA"]);
       expect(segments).toHaveLength(5);
@@ -241,10 +227,10 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
     });
 
     it("derives the same location on read and delete", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(S3_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
       const coords = { projectId: "orgA", traceId: "../../etc", spanId: "a/b" };
       const body = Buffer.from("payload", "utf-8");
@@ -263,12 +249,11 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
   describe("when putSpool is called", () => {
     /** @scenario "Azure refuses until the operator asserts the lifecycle rule" */
     it("refuses rather than writing an object no lifecycle rule will reap", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(AZURE_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: {
-          objectStoreFor: () => objectStore,
-          resolveDestination: async () => AZURE_DESTINATION,
+          objects: objectStore,
           // The default for any deployment that has not said otherwise.
           azureRetentionConfirmed: false,
         },
@@ -285,15 +270,14 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
           body: Buffer.from("payload", "utf-8"),
         }),
       ).rejects.toBeInstanceOf(SpoolDestinationUnsupportedError);
-      expect(objectStore.put).not.toHaveBeenCalled();
+      expect(objectStore.write).not.toHaveBeenCalled();
     });
 
     it("names the policy to create and the setting to flip", async () => {
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: {
-          objectStoreFor: () => fakeObjectStore(),
-          resolveDestination: async () => AZURE_DESTINATION,
+          objects: fakeObjectStore(AZURE_DESTINATION),
           azureRetentionConfirmed: false,
         },
       });
@@ -323,8 +307,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
     return TraceBlobStoreService.create({
       legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
       spoolStorage: {
-        objectStoreFor: () => objectStore,
-        resolveDestination: async () => AZURE_DESTINATION,
+        objects: objectStore,
         azureRetentionConfirmed: false,
       },
     });
@@ -333,11 +316,11 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
   describe("when the worker reads a span spooled before the flip", () => {
     /** @scenario "Azure refuses until the operator asserts the lifecycle rule" */
     it("still returns the payload", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(AZURE_DESTINATION);
       const body = Buffer.from("the full oversized payload", "utf-8");
       const spoolRef = await TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       }).putSpool({ ...spoolCoords, body });
 
       expect(
@@ -352,10 +335,10 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
   describe("when the worker deletes a span spooled before the flip", () => {
     /** @scenario "Azure refuses until the operator asserts the lifecycle rule" */
     it("still removes the object", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(AZURE_DESTINATION);
       const spoolRef = await TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       }).putSpool({
         ...spoolCoords,
         body: Buffer.from("payload", "utf-8"),
@@ -374,12 +357,11 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
 describe("putSpool — given S3 storage with retention unconfirmed", () => {
   describe("when putSpool is called", () => {
     it("still writes, because the flag scopes to Azure only", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(S3_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: {
-          objectStoreFor: () => objectStore,
-          resolveDestination: async () => S3_DESTINATION,
+          objects: objectStore,
           azureRetentionConfirmed: false,
         },
       });
@@ -392,7 +374,7 @@ describe("putSpool — given S3 storage with retention unconfirmed", () => {
         body: Buffer.from("payload", "utf-8"),
       });
 
-      expect(objectStore.put).toHaveBeenCalledTimes(1);
+      expect(objectStore.write).toHaveBeenCalledTimes(1);
     });
   });
 });
@@ -401,10 +383,10 @@ describe("putSpool — given the project's storage is the local filesystem", () 
   describe("when putSpool is called", () => {
     /** @scenario "A write refuses a destination that cannot reap an orphan" */
     it("refuses rather than writing an object nothing will ever reap", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(FILE_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, FILE_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       // A filesystem cannot express a lifecycle rule, so a crash between the
@@ -416,7 +398,7 @@ describe("putSpool — given the project's storage is the local filesystem", () 
           body: Buffer.from("payload", "utf-8"),
         }),
       ).rejects.toBeInstanceOf(SpoolDestinationUnsupportedError);
-      expect(objectStore.put).not.toHaveBeenCalled();
+      expect(objectStore.write).not.toHaveBeenCalled();
     });
   });
 });
@@ -441,10 +423,10 @@ describe("putSpool — given no spool storage is configured", () => {
 describe("getSpool — given a spool object written by putSpool", () => {
   describe("when getSpool is called with the command's own coordinates", () => {
     it("returns the exact bytes that were put", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(AZURE_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
       const originalBody = Buffer.from("exact span body bytes", "utf-8");
 
@@ -463,10 +445,10 @@ describe("getSpool — given a reference naming another tenant's object", () => 
   describe("when getSpool is called", () => {
     /** @scenario "The spool object path is derived from the command, never read from it" */
     it("reads the location derived from the command, ignoring the reference", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(S3_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
       const victimBytes = Buffer.from("another tenant's payload", "utf-8");
       await store.putSpool({
@@ -486,9 +468,7 @@ describe("getSpool — given a reference naming another tenant's object", () => 
       });
 
       expect(retrieved).toEqual(ownBytes);
-      expect(objectStore.getUris).toEqual([
-        "s3://test-bucket/trace-blobs/spool/orgA/trace-1/span-1",
-      ]);
+      expect(objectStore.getKeys).toEqual([SPOOL_SLOT]);
     });
   });
 });
@@ -505,7 +485,7 @@ describe("getSpool — given a v1-shaped reference naming another tenant", () =>
       );
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: resolverFor(fake) }),
-        spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
+        spoolStorage: spoolStorageFor(fakeObjectStore(S3_DESTINATION)),
       });
 
       await expect(store.getSpool({ spoolRef: victimKey, ...spoolCoords })).rejects.toThrow(
@@ -523,10 +503,10 @@ describe("getSpool — given a v1 reference written before this deployment", () 
       const legacyBytes = Buffer.from("queued before the deploy", "utf-8");
       fake.objects.set(`test-bucket/${legacyKey}`, legacyBytes);
 
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(AZURE_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: resolverFor(fake) }),
-        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       const retrieved = await store.getSpool({
@@ -535,7 +515,7 @@ describe("getSpool — given a v1 reference written before this deployment", () 
       });
 
       expect(retrieved).toEqual(legacyBytes);
-      expect(objectStore.get).not.toHaveBeenCalled();
+      expect(objectStore.read).not.toHaveBeenCalled();
     });
   });
 });
@@ -564,7 +544,7 @@ describe("getSpool — given a v1 object larger than the read cap", () => {
             s3Bucket: "test-bucket",
           }),
         }),
-        spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
+        spoolStorage: spoolStorageFor(fakeObjectStore(S3_DESTINATION)),
       });
 
       // The v1 path used to call transformToByteArray(), which buffers the
@@ -582,10 +562,10 @@ describe("getSpool — given an object larger than the read cap", () => {
   describe("when getSpool is called", () => {
     /** @scenario "A spool object larger than the cap is refused rather than buffered" */
     it("rejects instead of buffering it whole", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(S3_DESTINATION);
       // Emitted lazily in 1 MB chunks — the cap should trip long before
       // anything close to MAX_SPOOL_BYTES is actually resident.
-      objectStore.get.mockImplementationOnce(async () =>
+      objectStore.read.mockImplementationOnce(async () =>
         Readable.from(
           (function* () {
             for (let sent = 0; sent <= MAX_SPOOL_BYTES; sent += 1024 * 1024) {
@@ -596,7 +576,7 @@ describe("getSpool — given an object larger than the read cap", () => {
       );
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       await expect(store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords })).rejects.toThrow(
@@ -609,10 +589,10 @@ describe("getSpool — given an object larger than the read cap", () => {
 describe("getSpool — given the object is missing", () => {
   describe("when getSpool is called", () => {
     it("throws rather than returning an empty span", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(S3_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       await expect(store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords })).rejects.toThrow(
@@ -625,10 +605,10 @@ describe("getSpool — given the object is missing", () => {
 describe("deleteSpool — given an existing spool object", () => {
   describe("when deleteSpool is called", () => {
     it("deletes the object it wrote", async () => {
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(AZURE_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
       const spoolRef = await store.putSpool({
         ...spoolCoords,
@@ -637,9 +617,7 @@ describe("deleteSpool — given an existing spool object", () => {
 
       await store.deleteSpool({ spoolRef, ...spoolCoords });
 
-      expect(objectStore.deleteUris).toEqual([
-        "azure-blob://acct/cont/trace-blobs/spool/orgA/trace-1/span-1",
-      ]);
+      expect(objectStore.deleteKeys).toEqual([SPOOL_SLOT]);
       expect(objectStore.objects.size).toBe(0);
     });
   });
@@ -651,16 +629,16 @@ describe("deleteSpool — given a v1 reference", () => {
       const fake = fakeS3();
       const legacyKey = "trace-blobs/spool/orgA/trace-1/span-1";
       fake.objects.set(`test-bucket/${legacyKey}`, Buffer.from("old"));
-      const objectStore = fakeObjectStore();
+      const objectStore = fakeObjectStore(AZURE_DESTINATION);
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: resolverFor(fake) }),
-        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       await store.deleteSpool({ spoolRef: legacyKey, ...spoolCoords });
 
       expect(fake.objects.size).toBe(0);
-      expect(objectStore.delete).not.toHaveBeenCalled();
+      expect(objectStore.remove).not.toHaveBeenCalled();
     });
   });
 });
@@ -668,11 +646,11 @@ describe("deleteSpool — given a v1 reference", () => {
 describe("deleteSpool — given the storage backend rejects the delete", () => {
   describe("when deleteSpool is called", () => {
     it("does not throw (best-effort — the lifecycle rule is the safety net)", async () => {
-      const objectStore = fakeObjectStore();
-      objectStore.delete.mockRejectedValueOnce(new Error("AccessDenied"));
+      const objectStore = fakeObjectStore(S3_DESTINATION);
+      objectStore.remove.mockRejectedValueOnce(new Error("AccessDenied"));
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
-        spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+        spoolStorage: spoolStorageFor(objectStore),
       });
 
       await expect(
@@ -692,7 +670,7 @@ describe("deleteSpool — given a v1 reference naming another tenant", () => {
       const { logger, lines } = createTestLogger();
       const store = TraceBlobStoreService.create({
         legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: resolverFor(fake) }),
-        spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
+        spoolStorage: spoolStorageFor(fakeObjectStore(S3_DESTINATION)),
         logger,
       });
 

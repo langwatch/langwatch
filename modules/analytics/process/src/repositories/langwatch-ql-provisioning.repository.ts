@@ -21,6 +21,28 @@ export interface RunClickHouseStatementsResult {
   readonly skipped: SkippedProvisioningStatement[];
 }
 
+/** How loudly a failed statement is logged: `warn` where a later check retries it. */
+export type ProvisioningFailureLevel = "error" | "warn";
+
+/** The named tables, views and SQL functions the server holds now. */
+export interface LwqlClickHouseInventory {
+  /** Each named table or view present. */
+  readonly relations: readonly string[];
+  /** Each present relation's comment, by name; empty where it has none. */
+  readonly comments: Readonly<Record<string, string>>;
+  /** The named SQL user-defined functions present. */
+  readonly functions: readonly string[];
+}
+
+/** The PostgreSQL connection values a probe dials with, outside any named collection. */
+export interface LwqlPostgresCredentials {
+  readonly host: string;
+  readonly port: number;
+  readonly database: string;
+  readonly user: string;
+  readonly password: string;
+}
+
 /**
  * Untenanted statements on the shared server, restated from the stores' `clickhouseAdmin`
  * member so this module depends on no framework package (ADR-159).
@@ -40,7 +62,29 @@ export abstract class LangWatchQLProvisioningRepository {
   abstract runStatements(input: {
     statements: readonly string[];
     configStoreEntities?: readonly ConfigStoreLwqlEntity[];
+    failureLevel?: ProvisioningFailureLevel;
   }): Promise<RunClickHouseStatementsResult>;
+  /** Two catalog reads; throws when ClickHouse is unreachable. */
+  abstract readInventory(input: {
+    database: string;
+    relations: readonly string[];
+    functions: readonly string[];
+  }): Promise<LwqlClickHouseInventory>;
+  /**
+   * Reads through the `postgresql` table function, which dials with the collection's values as
+   * loaded now (never a table's cached pool); with `cluster`, on every replica. Throws on failure.
+   */
+  abstract probePostgresCollection(input: {
+    collection: string;
+    relation: string;
+    cluster: string | undefined;
+  }): Promise<void>;
+  /** The same read with explicit values; throws when they do not authenticate. */
+  abstract probePostgresCredentials(input: {
+    credentials: LwqlPostgresCredentials;
+    relation: string;
+    cluster: string | undefined;
+  }): Promise<void>;
   abstract inventoryConfigStore(input: {
     names: LwqlAccessModelIdentity;
   }): Promise<ConfigStoreLwqlEntity[]>;

@@ -29,6 +29,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
         deactivatedAt: true,
         pendingSsoSetup: true,
         signupConfirmationPending: true,
+        passwordResetRequiredAt: true,
         lastLoginAt: true,
       },
     });
@@ -38,6 +39,8 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
       ...user,
       deactivatedAt: user.deactivatedAt === null ? null : fromDate(user.deactivatedAt),
       lastLoginAt: user.lastLoginAt === null ? null : fromDate(user.lastLoginAt),
+      passwordResetRequiredAt:
+        user.passwordResetRequiredAt === null ? null : fromDate(user.passwordResetRequiredAt),
     };
   }
 
@@ -129,6 +132,13 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
     await this.prisma.user.update({
       where: { id: userId },
       data: { lastLoginAt: toDate(nowInstant()) },
+    });
+  }
+
+  async clearPasswordResetRequirement({ userId }: { userId: string }): Promise<void> {
+    await this.prisma.user.updateMany({
+      where: { id: userId, passwordResetRequiredAt: { not: null } },
+      data: { passwordResetRequiredAt: null },
     });
   }
 }

@@ -1,0 +1,18 @@
+{
+  "name": "D2: Edit with Langy changes that widget only",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the names it gives you (board.name, trace_name), never mention ids, facts or anything else from it. Write short, plain messages. In your first message, send exactly (with the real dashboard name): 'Edit my \"Traces this period\" widget on my \"<board.name>\" dashboard with me. Ask me what I want the widget to show, propose the change to its code and queries, and save it only when I agree.' When Langy asks what you want, say: 'Make it show the average trace duration in seconds for my traces named <trace_name>, instead of the count.' When Langy proposes the change, say: 'Yes, save it.'",
+  "criteria": [
+    "Code check: facts_now.target_widget.exists is true and facts_now.target_widget.same_id_changed is true: the same widget (same id) was changed, not replaced by a new one.",
+    "Code check: facts_now.other_widgets_unchanged is true, facts_now.board.added is empty and facts_now.created_off_board is empty.",
+    "Langy saves only after the user agrees: in facts_after_turn, every turn before the user's 'Yes, save it' shows target_widget.same_id_changed false."
+  ],
+  "labels": ["jobs"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "D2"
+    }
+  ],
+  "maxTurns": 4
+}

@@ -154,6 +154,14 @@ A peer's inbound Studio event, prepared the same way before it re-enters the gra
 enrichStudioEvent(input: { event: StudioClientEvent; projectId: string; principal?: WorkflowRunPrincipal | undefined; }): Promise<StudioClientEvent>;
 ```
 
+#### `executeStudioEventSync`
+
+One prepared Studio event run to completion on the project's engine. An engine refusal throws `WorkflowExecutionFailedError`; the run's own failure is in the answer's `error`.
+
+```typescript
+executeStudioEventSync(input: { projectId: string; event: StudioClientEvent; origin: WorkflowRunOrigin; causalityDepth?: number; parentTrace?: { traceId: string; parentSpanId: string }; }): Promise<WorkflowRunAnswer>;
+```
+
 #### `getFields`
 
 The evaluator-fields shape a peer's guard and run read off this workflow.
@@ -392,7 +400,7 @@ Answers at `/api/scenario/execute-sync`.
 ```typescript
 // Body: executeSyncRelayEventSchema, ../contract/src/workflow-rest.schemas.ts:210
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/workflow-execute-sync.rest.ts:27
+// Response: inline, src/transport/workflow-execute-sync.rest.ts:28
 type Response = unknown;
 ```
 
@@ -421,18 +429,14 @@ interface Params {
 }
 // Body: workflowRunRestBodySchema, ../contract/src/workflow-rest.schemas.ts:111
 type Body = Record<string, unknown>;
-// Response: workflowRunAnswerSchema, ../contract/src/workflow.ts:49
-interface Response {
-  result?: Record<string, unknown> | null;
-  status: "idle" | "waiting" | "running" | "success" | "error" | "skipped";
-}
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 #### `POST /api/workflows/:workflowId/run` · `postApiWorkflowsByWorkflowIdRun`
 
 Run a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:83`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:84`.
 
 Answers at `/api/workflows/:workflowId/run`, `/api/v1/workflows/:workflowId/run`.
 
@@ -442,21 +446,21 @@ interface Params {
   workflowId: string;
 }
 type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:111
-type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:49
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 #### `POST /api/workflows/:workflowId/:versionId/run` · `postApiWorkflowsByWorkflowIdByVersionIdRun`
 
 Run a specific workflow version
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:111`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:113`.
 
 Answers at `/api/workflows/:workflowId/:versionId/run`, `/api/v1/workflows/:workflowId/:versionId/run`.
 
 ```typescript
 type Params = z.infer<typeof workflowRunRestVersionedParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:130
 type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:111
-type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:49
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 ### `workflowStudioRest`
@@ -491,13 +495,13 @@ interface Response {
 
 #### `POST /api/workflows/post_event` · `postWorkflowStudioEvent`
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:37`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:38`.
 
 Answers at `/api/workflows/post_event`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:39)
-// Response: inline, src/transport/workflow-studio.rest.ts:46
+// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:41)
+// Response: inline, src/transport/workflow-studio.rest.ts:48
 type Response = unknown;
 ```
 
@@ -505,7 +509,7 @@ type Response = unknown;
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/workflow.rest.ts:67`        |
+| Declared at | `src/transport/workflow.rest.ts:69`        |
 | Base URL    | `/api/workflows`, twin `/api/v1/workflows` |
 | Addressing  | dated                                      |
 | Credential  | project                                    |
@@ -515,12 +519,12 @@ type Response = unknown;
 
 List all non-archived workflows for the project
 
-Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:72`.
+Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:74`.
 
 Answers at `/api/workflows`, `/api/v1/workflows`; also, undocumented, `/api/workflows/2026-08-07`, `/api/v1/workflows/2026-08-07`, `/api/workflows/latest`, `/api/v1/workflows/latest`.
 
 ```typescript
-// Response: inline, src/transport/workflow.rest.ts:74
+// Response: inline, src/transport/workflow.rest.ts:76
 type Response = {
   id: string;
   name: string;
@@ -538,7 +542,7 @@ type Response = {
 
 Get a workflow by its ID
 
-Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:87`.
+Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:89`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -565,7 +569,7 @@ interface Response {
 
 Update a workflow's metadata (name, icon, description)
 
-Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:105`.
+Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:107`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -584,7 +588,7 @@ type Response = z.infer<typeof workflowRestDetailSchema>; // ../contract/src/wor
 
 Archive (soft-delete) a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:126`.
+Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:129`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -738,7 +742,7 @@ interface Input {
   projectId: string;
   workflowId: string;
 }
-type Output = z.infer<typeof workflowWithVersionSchema>; // ../contract/src/workflow.ts:136
+type Output = z.infer<typeof workflowWithVersionSchema>; // ../contract/src/workflow.ts:149
 
 // workflow.getVersions
 // Input: workflowApiGetVersionsInputSchema, ../contract/src/workflow.trpc-schemas.ts:55
@@ -755,15 +759,15 @@ interface Input {
   projectId: string;
   versionId: string;
 }
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:89
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.autosave
 type Input = z.infer<typeof workflowApiAutosaveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:102
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:89
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.commitVersion
 type Input = z.infer<typeof workflowApiCommitVersionInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:114
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:89
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.publish
 // Input: workflowApiPublishInputSchema, ../contract/src/workflow.trpc-schemas.ts:125
@@ -772,11 +776,11 @@ interface Input {
   workflowId: string;
   versionId: string;
 }
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:71
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.unpublish
 type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:38
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:71
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.syncFromSource
 type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:38
@@ -813,7 +817,7 @@ type Output = z.infer<typeof workflowCascadeArchiveSchema>; // ../contract/src/w
 
 // workflow.archive
 type Input = z.infer<typeof workflowApiArchiveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:148
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:71
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.generateCommitMessage
 type Input = z.infer<typeof workflowApiGenerateCommitMessageInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:159
@@ -871,16 +875,16 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 ## Configuration
 
-| Kind   | Leaf                         | Environment variable                      | Declared at                             |
-| ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:498`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:499`           |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:500`           |
-| config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:82` |
-| config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:84` |
-| config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:85` |
-| config | `relayTurnCeilingMs`         | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/workflow.config.ts:87` |
-| config | `publicBaseUrl`              | `BASE_HOST`                               | `../contract/src/workflow.config.ts:89` |
-| config | `nlpCodeBlockTimeoutSeconds` | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/workflow.config.ts:91` |
+| Kind   | Leaf                         | Environment variable                      | Declared at                              |
+| ------ | ---------------------------- | ----------------------------------------- | ---------------------------------------- |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:502`            |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:503`            |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:504`            |
+| config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:123` |
+| config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:125` |
+| config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:126` |
+| config | `relayTurnCeilingMs`         | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/workflow.config.ts:128` |
+| config | `publicBaseUrl`              | `BASE_HOST`                               | `../contract/src/workflow.config.ts:130` |
+| config | `nlpCodeBlockTimeoutSeconds` | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/workflow.config.ts:132` |
 
 <!-- readme:generated:end -->

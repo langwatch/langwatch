@@ -57,23 +57,8 @@ const fallbackNameImplementation = {
 };
 
 /**
- * True when an Auth0 `sub` identifies a user who authenticated through a SAML
- * connection. Auth0 encodes the connection strategy as the first
- * pipe-delimited segment of `sub` (`{strategy}|{connection}|{id}`); SAML
- * users arrive as `samlp|…`. The trailing pipe is part of the prefix so a
- * hypothetical `samlpx` strategy never matches, and the prefix cannot be
- * forged from other connection types — a database user_id of `samlp|x`
- * yields the sub `auth0|samlp|x`.
- *
- * Used to mark SAML sign-ins as email-verified (ADR-096): Auth0 reports
- * `email_verified: false` for every SAML connection with no way to change
- * it, which would block BetterAuth from linking the sign-in to an existing
- * user. Trust boundary: this assumes every SAML connection in the Auth0
- * tenant maps `email` from an attribute the IdP controls — an operator who
- * points a SAML connection at an IdP with user-editable emails or open
- * registration re-opens the account-linking hole this flag closes.
- *
- * Exported for unit testing.
+ * True when an Auth0 `sub` (`{strategy}|{connection}|{id}`) names a SAML connection. The trailing
+ * pipe keeps a `samlpx` strategy out; a database user id of `samlp|x` arrives as `auth0|samlp|x`.
  */
 const samlSubjectImplementation = {
   execute(sub: unknown): boolean {
@@ -268,6 +253,12 @@ const oidcProviderImplementation = {
 
 type GenericOAuthBuildConfiguration = GenericOAuthConfiguration & { baseUrl: string };
 
+/** What a generic provider asks while a sign-in is in flight. */
+type GenericOAuthHooks = Readonly<{
+  /** Identity's answer for a brokered SAML subject (ADR-096); absent, no SAML address is verified. */
+  isBrokeredAddressProved?: (args: { subject: string; email: string }) => Promise<boolean>;
+}>;
+
 /**
  * Every generic-OAuth provider whose `redirectURI` is pinned to the legacy
  * `/api/auth/callback/<providerId>` path instead of the genericOAuth plugin's
@@ -325,6 +316,7 @@ function pinnedToStoredAccountsAndVerifiedTokens(
 const genericOAuthImplementation = {
   build(
     configuration: GenericOAuthBuildConfiguration,
+    hooks: GenericOAuthHooks,
   ): Parameters<typeof genericOAuth>[0]["config"] {
     const genericOAuthConfigs: Parameters<typeof genericOAuth>[0]["config"] = [];
 
@@ -357,24 +349,27 @@ const genericOAuthImplementation = {
             baseUrl: configuration.baseUrl,
             providerId: "auth0",
           }),
-          mapProfileToUser: (profile) => {
+          mapProfileToUser: async (profile) => {
             const mapped: {
               name: string;
               email: string | undefined;
               image: string | undefined;
-              emailVerified?: true;
+              emailVerified?: boolean;
             } = {
               name: BetterAuthSsoAdapter.fallbackName(profile),
               email: profile.email ?? undefined,
               image: pickProfilePicture(profile.picture),
             };
-            // SAML sign-ins count as verified: the email was asserted by the
-            // organization's own IdP, but Auth0 reports `email_verified: false`
-            // for every SAML connection, which would stop BetterAuth from
-            // linking to an existing user (ADR-096). Non-SAML profiles get no
-            // `emailVerified` key so the claim-derived value flows through.
-            if (BetterAuthSsoAdapter.isSamlSub(profile.sub)) {
-              mapped.emailVerified = true;
+            // Auth0 reports every SAML address unverified (ADR-096): one counts as verified only
+            // when the organization that proved its domain pins this subject's connection. Non-SAML
+            // profiles get no `emailVerified` key, so the claim-derived value flows through.
+            const subject = profile.sub;
+            if (typeof subject === "string" && BetterAuthSsoAdapter.isSamlSub(subject)) {
+              mapped.emailVerified = await brokeredAddressProved({
+                hooks,
+                subject,
+                email: mapped.email,
+              });
             }
             return mapped;
           },
@@ -424,6 +419,20 @@ const genericOAuthImplementation = {
   },
 };
 
+/** Fail closed: no address, or no identity answer composed, is not verified. */
+async function brokeredAddressProved({
+  hooks,
+  subject,
+  email,
+}: {
+  hooks: GenericOAuthHooks;
+  subject: string;
+  email: string | undefined;
+}): Promise<boolean> {
+  if (!email || !hooks.isBrokeredAddressProved) return false;
+  return hooks.isBrokeredAddressProved({ subject, email });
+}
+
 /** BetterAuth-specific Enterprise SSO configuration adapter. */
 export function fallbackName(profile: Record<string, unknown>): string {
   return fallbackNameImplementation.execute(profile);
@@ -465,8 +474,9 @@ function oidcProviderConfig(input: {
 
 export function buildGenericOAuthConfigs(
   configuration: GenericOAuthBuildConfiguration,
+  hooks: GenericOAuthHooks = {},
 ): Parameters<typeof genericOAuth>[0]["config"] {
-  return genericOAuthImplementation.build(configuration);
+  return genericOAuthImplementation.build(configuration, hooks);
 }
 
 const BetterAuthSsoAdapter = {

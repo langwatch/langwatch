@@ -34,7 +34,6 @@ import { StubNavigationHost } from "../../../testing.tsx";
 import { ShellTopBar } from "../shell-top-bar.tsx";
 
 const LONG_NAME = "A".repeat(300);
-const SHOTS = "/Users/lw/Source/github.com/langwatch/langwatch/.claude/tmp/long-names";
 const LONG_ORG = { id: "org_long", name: LONG_NAME, teams: [] };
 const OTHER_ORG = { id: "org_2", name: "ACME", teams: [] };
 const USER = { id: "user_1", name: "Ada", email: "ada@acme.test", image: null };
@@ -59,8 +58,9 @@ function renderBar({ organizations }: { organizations: (typeof LONG_ORG)[] }) {
         state={{
           status: "ready",
           user: USER,
-          project: undefined,
-          currentRoute: undefined,
+          // The Search pill draws on a project page that is not Home.
+          project: { id: "project_1", name: "Beacon", slug: "beacon" },
+          currentRoute: { path: "/[project]/traces", title: "Traces" },
           activeProductId: null,
           isSettingsRoute: true,
           seatRefusal: null,
@@ -88,7 +88,6 @@ describe("the top bar with a 300-character organization name", () => {
         search.getBoundingClientRect().left,
       );
       expect(picker).toHaveAttribute("title", LONG_NAME);
-      await page.screenshot({ path: `${SHOTS}/top-bar-multi-org.png` });
     });
 
     it("keeps the open switcher inside the viewport", async () => {
@@ -100,7 +99,6 @@ describe("the top bar with a 300-character organization name", () => {
       await waitFor(() => expect(item).toBeVisible());
 
       expect(item.getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth);
-      await page.screenshot({ path: `${SHOTS}/org-switcher-open.png` });
     });
   });
 
@@ -116,7 +114,6 @@ describe("the top bar with a 300-character organization name", () => {
         search.getBoundingClientRect().left,
       );
       expect(name).toHaveAttribute("title", LONG_NAME);
-      await page.screenshot({ path: `${SHOTS}/top-bar-single-org.png` });
     });
   });
 });

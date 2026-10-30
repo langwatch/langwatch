@@ -9,6 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 
+import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
   LangWatchQLProductionProvisioningService,
@@ -16,13 +17,26 @@ import {
 } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
+  type LwqlAppOwnedDrift,
+  type LwqlCollectionProbe,
+  type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
-import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
+import type {
+  LangWatchQLProvisioningRepository,
+  ProvisioningFailureLevel,
+  SkippedProvisioningStatement,
+} from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
-import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
+import { collectionUnconfirmedError } from "../rules/langwatch-ql-collection-probe.rules.ts";
+import {
+  clickHouseErrorCodeFields,
+  clickHouseErrorSummary,
+  postgresErrorCodeFields,
+  statementKind,
+} from "../rules/langwatch-ql-config-store.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
@@ -153,22 +167,27 @@ export function fillLwqlProjectKeys({
   });
 }
 
+/** The replica layout that decides whether a `CREATE FUNCTION` reaches every replica. */
+async function readAppFunctionLayout(repository: LangWatchQLProvisioningRepository) {
+  const [replicas, setting] = await Promise.all([
+    repository.queryRows(
+      "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
+    ),
+    repository.queryRows(
+      "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
+    ),
+  ]);
+  return {
+    maxTotalReplicas: Number(replicas[0]?.max_total_replicas ?? "0") || 0,
+    userDefinedZookeeperPath: typeof setting[0]?.value === "string" ? setting[0].value : "",
+  };
+}
+
 async function appFunctionsProvisionable(
   repository: LangWatchQLProvisioningRepository,
 ): Promise<boolean> {
   try {
-    const [replicas, setting] = await Promise.all([
-      repository.queryRows(
-        "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-      ),
-      repository.queryRows(
-        "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-      ),
-    ]);
-    const probe = {
-      maxTotalReplicas: Number(replicas[0]?.max_total_replicas ?? "0") || 0,
-      userDefinedZookeeperPath: typeof setting[0]?.value === "string" ? setting[0].value : "",
-    };
+    const probe = await readAppFunctionLayout(repository);
     if (canProvisionAppFunctions(probe)) return true;
     logger.error(
       { maxTotalReplicas: probe.maxTotalReplicas },
@@ -219,6 +238,110 @@ async function withSelfProvisionLock<T>({
   });
 }
 
+/** Whether both reads succeeded; when one failed, which read and its error. */
+type LwqlCollectionProbeResult =
+  | { readonly shown: true }
+  | { readonly shown: false; readonly read: string; readonly error: unknown };
+
+async function probeCollection({
+  repository,
+  probe,
+  cluster,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  probe: LwqlCollectionProbe;
+  cluster: string | undefined;
+}): Promise<LwqlCollectionProbeResult> {
+  const reads = {
+    collection: () =>
+      repository.probePostgresCollection({
+        collection: probe.collection,
+        relation: probe.relation,
+        cluster,
+      }),
+    appCredentials: () =>
+      repository.probePostgresCredentials({
+        credentials: probe.connection,
+        relation: probe.relation,
+        cluster,
+      }),
+  };
+  for (const [read, run] of Object.entries(reads)) {
+    try {
+      await run();
+    } catch (error) {
+      return { shown: false, read, error };
+    }
+  }
+  return { shown: true };
+}
+
+/** What the gate decided, and the present engine tables it left on their current pool. */
+interface LwqlEngineTableGate {
+  readonly collectionLoaded: boolean;
+  readonly only: readonly string[] | undefined;
+  readonly left?: { readonly read: string; readonly error: unknown; readonly tables: number };
+}
+
+/**
+ * Stamps the engine tables only once ClickHouse is shown to hold the app's collection values.
+ * Unshown, a check leaves each present engine table on its pool and a deploy replaces them
+ * unstamped, so a later check rebuilds them once the values load (#8858).
+ */
+async function gateEngineTables({
+  repository,
+  request,
+  names,
+  only,
+  cluster,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
+  names: LangWatchQLNames;
+  only: readonly string[] | undefined;
+  /** `CLICKHOUSE_CLUSTER`: set, both reads must pass on every replica. */
+  cluster: string | undefined;
+}): Promise<LwqlEngineTableGate> {
+  const engineTables = selfProvisioning.engineTablesIn({ only });
+  if (engineTables.length === 0) return { collectionLoaded: false, only };
+  const probe = selfProvisioning.collectionProbe({
+    names,
+    postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+  });
+  const result = await probeCollection({ repository, probe, cluster });
+  if (result.shown) return { collectionLoaded: true, only };
+  const { read, error } = result;
+  logger.warn(
+    { read, error: clickHouseErrorSummary(error), ...clickHouseErrorCodeFields(error) },
+    "lwql could not show that ClickHouse holds the app's PostgreSQL credentials in the named collection, so no engine table is rebuilt on them yet; the next check retries",
+  );
+  if (only === undefined) return { collectionLoaded: false, only };
+  const present = await repository.readInventory({
+    database: names.database,
+    relations: engineTables,
+    functions: [],
+  });
+  const left = only.filter((name) => present.relations.includes(name));
+  return {
+    collectionLoaded: false,
+    only: only.filter((name) => !left.includes(name)),
+    ...(left.length === 0 ? {} : { left: { read, error, tables: left.length } }),
+  };
+}
+
+function isNamedCollectionKind(kind: string): boolean {
+  return kind.endsWith("NAMED COLLECTION");
+}
+
+/** The position just past a batch's last named-collection statement; 0 when it has none. */
+function afterNamedCollection(statements: readonly string[]): number {
+  return statements.reduce(
+    (split, statement, index) =>
+      isNamedCollectionKind(statementKind(statement)) ? index + 1 : split,
+    0,
+  );
+}
+
 /** Inventory, app-function probe, SQL-mode guard, then the statements; the key map is a step's. */
 async function convergeClickHouse({
   repository,
@@ -226,12 +349,17 @@ async function convergeClickHouse({
   request,
   names,
   sourceDatabase,
+  failureLevel,
+  only,
 }: {
   repository: LangWatchQLProvisioningRepository;
   source: Readonly<Record<string, string | undefined>>;
   request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
   names: LangWatchQLNames;
   sourceDatabase: string;
+  failureLevel: ProvisioningFailureLevel;
+  /** The drifted objects alone; absent, the whole ClickHouse half. */
+  only: readonly string[] | undefined;
 }): Promise<void> {
   const configStoreEntities = await repository.inventoryConfigStore({ names });
   const includeAppFunctions = await appFunctionsProvisionable(repository);
@@ -239,22 +367,52 @@ async function convergeClickHouse({
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
   }
-  const result = await repository.runStatements({
-    configStoreEntities,
-    statements: selfProvisioning.clickHouseStatements({
+  const render = ({ collectionLoaded, only: drifted }: LwqlEngineTableGate) =>
+    selfProvisioning.clickHouseStatements({
       names,
       restrictedPassword: request.connection.password,
       sourceDatabase,
       postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
       includeAppFunctions,
       mode,
-    }),
-  });
-  if (result.skipped.length > 0) {
+      collectionLoaded,
+      ...(drifted === undefined ? {} : { only: drifted }),
+    });
+  const run = async (statements: readonly string[]) =>
+    (await repository.runStatements({ configStoreEntities, failureLevel, statements })).skipped;
+  const gateByProbe = () =>
+    gateEngineTables({
+      repository,
+      request,
+      names,
+      only,
+      cluster: source.CLICKHOUSE_CLUSTER || undefined,
+    });
+  let gate: LwqlEngineTableGate;
+  let skipped: SkippedProvisioningStatement[];
+  if (mode === "sql" && only === undefined) {
+    // A sql-mode deploy rewrites the collection before its engine tables: they stamp unprobed only
+    // once that ran. A check probes in either mode: it never rewrites the collection.
+    const unprobed: LwqlEngineTableGate = { collectionLoaded: true, only };
+    const statements = render(unprobed);
+    const split = afterNamedCollection(statements);
+    const head = await run(statements.slice(0, split));
+    gate = head.some((s) => isNamedCollectionKind(s.kind)) ? await gateByProbe() : unprobed;
+    skipped = [...head, ...(await run(render(gate).slice(split)))];
+  } else {
+    gate = await gateByProbe();
+    skipped = await run(render(gate));
+  }
+  if (skipped.length > 0) {
     logger.warn(
-      { skippedCount: result.skipped.length },
+      { skippedCount: skipped.length },
       "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
     );
+  }
+  // Raised after the rest converged, so the check's alerting sees tables left on old credentials.
+  if (gate.left) {
+    const { read, error, tables } = gate.left;
+    throw collectionUnconfirmedError({ read, engineTables: tables, cause: error });
   }
 }
 
@@ -266,26 +424,141 @@ export interface LwqlConvergencePlan {
   readonly sourceDatabase: () => string;
   readonly schema: string;
   readonly connectionLimit?: number;
-  /** `LWQL_ACCESS_MODEL_MODE` and `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE`. */
+  /** `LWQL_ACCESS_MODEL_MODE`, `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE` and `CLICKHOUSE_CLUSTER`. */
   readonly settings: Readonly<Record<string, string | undefined>>;
   readonly openRepository: () => LangWatchQLProvisioningRepository;
 }
 
+/** The PostgreSQL failure as log fields: Prisma's code and the server's SQLSTATE, redacted. */
+function postgresFailureFields({ error, secret }: { error: unknown; secret: string }) {
+  return {
+    ...postgresErrorCodeFields(error),
+    error: selfProvisioning.redactSecrets({
+      text: error instanceof Error ? error.message : String(error),
+      secrets: [secret],
+    }),
+  };
+}
+
+/** At warn the check logs its own alert, so a text-only alert must not match this line too. */
+const POSTGRES_FAILED_MESSAGES: Record<ProvisioningFailureLevel, string> = {
+  error: "lwql provisioning failed creating PostgreSQL objects",
+  warn: "lwql reconvergence statement failed",
+};
+
 /**
- * Every configured boot converges the whole model, and never throws: a server refusing
- * the DDL degrades to a loud log and a fail-closed endpoint, not a crashloop (ADR-159).
- * `failOnError` rethrows instead, so the upgrade run fails naming it (Alex, 2026-10-09).
+ * A deploy's whole half: every approved view, then the reader role with its revokes and grants.
+ * A check's gaps: only the absent views, then additive grants on each gap, never a revoke.
+ */
+function postgresStatements({
+  plan,
+  gaps,
+}: {
+  plan: LwqlConvergencePlan;
+  gaps: readonly LwqlPostgresGap[] | undefined;
+}): string[] {
+  const schema = plan.schema;
+  const readerRole = LWQL_POSTGRES_READER_ROLE;
+  if (gaps === undefined) {
+    return [
+      ...lwqlProvisioning.postgresApprovedViewStatements({ schema, readerRole }),
+      // After the views: the reader role's grants name them.
+      ...selfProvisioning.postgresReaderStatements({
+        readerPassword: plan.request.postgresReaderPassword,
+        schema,
+      }),
+    ];
+  }
+  const absent = gaps.filter((gap) => gap.absent).map((gap) => gap.view);
+  const views = (approvedViews: string[]) => selfProvisioning.postgresDatasets({ approvedViews });
+  return [
+    ...lwqlProvisioning.postgresApprovedViewStatements({
+      schema,
+      readerRole,
+      views: views(absent),
+    }),
+    ...lwqlProvisioning.postgresReaderGrantStatements({
+      schema,
+      role: readerRole,
+      views: views(gaps.map((gap) => gap.view)),
+    }),
+  ];
+}
+
+async function convergePostgres({
+  database,
+  plan,
+  failureLevel,
+  gaps,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: LwqlConvergencePlan;
+  failureLevel: ProvisioningFailureLevel;
+  gaps: readonly LwqlPostgresGap[] | undefined;
+}): Promise<unknown> {
+  try {
+    await runPostgresStatements({ database, statements: postgresStatements({ plan, gaps }) });
+    return undefined;
+  } catch (error) {
+    logger[failureLevel](
+      postgresFailureFields({ error, secret: plan.request.postgresReaderPassword }),
+      POSTGRES_FAILED_MESSAGES[failureLevel],
+    );
+    return error;
+  }
+}
+
+/** Both halves under the lock; a PostgreSQL failure is raised only once ClickHouse has run. */
+async function convergeLocked({
+  database,
+  plan,
+  only,
+  sourceDatabase,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: LwqlConvergencePlan;
+  only: LwqlAppOwnedDrift | undefined;
+  sourceDatabase: string;
+}): Promise<void> {
+  const failureLevel: ProvisioningFailureLevel = only ? "warn" : "error";
+  const gaps = only?.postgres === "unknown" ? [] : only?.postgres;
+  const postgresFailure =
+    gaps?.length === 0 ? undefined : await convergePostgres({ database, plan, failureLevel, gaps });
+  if (!only || only.clickHouse.length > 0) {
+    await withProvisioningRepository({
+      open: plan.openRepository,
+      fn: (repository) =>
+        convergeClickHouse({
+          repository,
+          source: plan.settings,
+          request: plan.request,
+          names: plan.names,
+          sourceDatabase,
+          failureLevel,
+          only: only?.clickHouse,
+        }),
+    });
+  }
+  if (postgresFailure !== undefined) throw postgresFailure;
+}
+
+/**
+ * Converges the whole model and never throws: a refusal is a loud log and a fail-closed endpoint
+ * (ADR-159). `failOnError` rethrows so the upgrade run fails (Alex, 2026-10-09); `only`, the
+ * reconvergence check's drift, converges just the objects it names and logs at warn.
  */
 export async function convergeLwqlAccessModel({
   database,
   plan,
   failOnError = false,
+  only,
 }: {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
   failOnError?: boolean;
+  only?: LwqlAppOwnedDrift;
 }): Promise<void> {
-  const { request, names, schema } = plan;
+  const { names } = plan;
   try {
     const sourceDatabase = plan.sourceDatabase();
     logger.info(
@@ -295,43 +568,100 @@ export async function convergeLwqlAccessModel({
     await withSelfProvisionLock({
       database,
       connectionLimit: plan.connectionLimit,
-      fn: async () => {
-        await runPostgresStatements({
-          database,
-          statements: [
-            ...lwqlProvisioning.postgresApprovedViewStatements({
-              schema,
-              readerRole: LWQL_POSTGRES_READER_ROLE,
-            }),
-            // After the views: the reader role's grants name them.
-            ...selfProvisioning.postgresReaderStatements({
-              readerPassword: request.postgresReaderPassword,
-              schema,
-            }),
-          ],
-        });
-
-        await withProvisioningRepository({
-          open: plan.openRepository,
-          fn: (repository) =>
-            convergeClickHouse({
-              repository,
-              source: plan.settings,
-              request,
-              names,
-              sourceDatabase,
-            }),
-        });
-      },
+      fn: () => convergeLocked({ database, plan, only, sourceDatabase }),
     });
     logger.info("LangWatchQL self-provisioning complete");
   } catch (error) {
-    logger.error(
-      { error: clickHouseErrorSummary(error) },
-      "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
-    );
+    if (only) {
+      logger.warn(
+        { error: clickHouseErrorSummary(error) },
+        "lwql self-provisioning failed; the reconvergence check retries in 5 minutes",
+      );
+    } else {
+      logger.error(
+        { error: clickHouseErrorSummary(error) },
+        "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
+      );
+    }
     if (failOnError) throw error;
   }
+}
+
+/** A PostgreSQL that cannot be read is `unknown`: never mistaken for a gap or for converged. */
+async function readPostgresGaps({
+  database,
+  schema,
+}: {
+  database: LwqlProvisioningDatabase;
+  schema: string;
+}): Promise<LwqlAppOwnedDrift["postgres"]> {
+  try {
+    const found = await PrismaLangWatchQLPostgresRepository.create(database).findApprovedViews({
+      schema,
+      role: LWQL_POSTGRES_READER_ROLE,
+      views: selfProvisioning.approvedPostgresViews(),
+    });
+    return selfProvisioning.findPostgresGaps({ found });
+  } catch (error) {
+    logger.warn(
+      { error: clickHouseErrorSummary(error), ...postgresErrorCodeFields(error) },
+      "lwql reconvergence check could not read the PostgreSQL catalog; it checks again in 5 minutes",
+    );
+    return "unknown";
+  }
+}
+
+/** App functions are expected only where a `CREATE FUNCTION` reaches every replica. */
+async function expectedAppFunctions({
+  repository,
+  held,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  held: readonly string[];
+}): Promise<readonly string[]> {
+  const declared = lwqlAppFunctionNames();
+  if (declared.every((name) => held.includes(name))) return declared;
+  return canProvisionAppFunctions(await readAppFunctionLayout(repository)) ? declared : [];
+}
+
+/**
+ * Which app-owned objects are absent, from catalog reads only (key map, engine tables, views,
+ * app functions; approved views and their grant). An engine table not stamped with the current
+ * credentials counts as absent; columns are never compared. Throws when ClickHouse is unreadable.
+ */
+export async function findLwqlAppOwnedDrift({
+  database,
+  plan,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: Pick<LwqlConvergencePlan, "request" | "names" | "schema" | "openRepository">;
+}): Promise<LwqlAppOwnedDrift> {
+  const { names, request } = plan;
+  const relations = selfProvisioning.appOwnedRelations({ names });
+  const credentialFingerprint = selfProvisioning.credentialFingerprint({
+    names,
+    postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+  });
+  const clickHouse = await withProvisioningRepository({
+    open: plan.openRepository,
+    fn: async (repository) => {
+      const found = await repository.readInventory({
+        database: names.database,
+        relations,
+        functions: lwqlAppFunctionNames(),
+      });
+      const functions = await expectedAppFunctions({ repository, held: found.functions });
+      return selfProvisioning.findDrift({
+        names,
+        relations,
+        functions,
+        found,
+        credentialFingerprint,
+      });
+    },
+  });
+  const postgres = await readPostgresGaps({ database, schema: plan.schema });
+  return { clickHouse: clickHouse.objects, postgres, isKeyMapMissing: clickHouse.isKeyMapMissing };
 }
 
 /** The pool size `DATABASE_URL` names, as plan fields: empty where it names none. */

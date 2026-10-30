@@ -129,6 +129,7 @@ type selectionFields struct {
 	// leaving them off rather than reading as a deliberate choice.
 	DesignSystem *bool `json:"design-system"`
 	MailRoom     *bool `json:"mail-room"`
+	Docs         *bool `json:"docs"`
 	Langevals    *bool `json:"langevals"`
 	Storage      *bool `json:"storage"`
 	Voice        *bool `json:"voice"`
@@ -142,6 +143,7 @@ type selectionFields struct {
 	Telemetry *bool `json:"telemetry"`
 	Lambda    *bool `json:"lambda"`
 	Github    *bool `json:"github"`
+	Mcp       *bool `json:"mcp"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
 	// when both are present; WriteSelection never writes it, so the next
@@ -163,6 +165,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Mail, nil, &sel.Mail},
 		{f.DesignSystem, f.LegacyDesignSystem, &sel.DesignSystem},
 		{f.MailRoom, nil, &sel.MailRoom},
+		{f.Docs, nil, &sel.Docs},
 		{f.Langevals, nil, &sel.Langevals},
 		{f.Storage, nil, &sel.Storage},
 		{f.Voice, nil, &sel.Voice},
@@ -173,6 +176,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Telemetry, nil, &sel.Telemetry},
 		{f.Lambda, nil, &sel.Lambda},
 		{f.Github, nil, &sel.Github},
+		{f.Mcp, nil, &sel.Mcp},
 	} {
 		switch {
 		case field.stated != nil:
@@ -225,6 +229,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Mail:         &sel.Mail,
 		DesignSystem: &sel.DesignSystem,
 		MailRoom:     &sel.MailRoom,
+		Docs:         &sel.Docs,
 		Langevals:    &sel.Langevals,
 		Storage:      &sel.Storage,
 		Voice:        &sel.Voice,
@@ -235,6 +240,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Telemetry:    &sel.Telemetry,
 		Lambda:       &sel.Lambda,
 		Github:       &sel.Github,
+		Mcp:          &sel.Mcp,
 	}}, "", "  ")
 	if err != nil {
 		return err

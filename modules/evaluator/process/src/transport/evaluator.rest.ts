@@ -172,7 +172,7 @@ export function createEvaluatorRest(): Readonly<{
       .withVersion(MANAGEMENT_API_VERSION)
 
       .get("/", "getApiEvaluators")
-      .withPermission("evaluations:view")
+      .withPermission("evaluations:view", { legacyKey: "legacy_project_key_evaluations" })
       .withOutput(z.array(evaluatorWireSchema))
       .withDocs({ description: "Get all evaluators for a project" })
       .withMiddlewareContext(projectRequestContext)
@@ -187,7 +187,7 @@ export function createEvaluatorRest(): Readonly<{
 
       .get("/:idOrSlug", "getApiEvaluatorsByIdOrSlug")
       .withParams(evaluatorIdOrSlugParamsSchema)
-      .withPermission("evaluations:view")
+      .withPermission("evaluations:view", { legacyKey: "legacy_project_key_evaluations" })
       .withOutput(evaluatorWireSchema)
       .withDocs({
         description: "Get a specific evaluator by ID or slug",
@@ -207,6 +207,7 @@ export function createEvaluatorRest(): Readonly<{
       // Creating asks for `evaluations:create`; `:manage` still implies it, so no
       // existing caller changes and a viewer is declined as before.
       .post("/", "postApiEvaluators")
+      .keepsRecords()
       .withAudit("evaluators.create")
       .withInput(createEvaluatorInputSchema)
       .withPermission("evaluations:create")
@@ -218,6 +219,7 @@ export function createEvaluatorRest(): Readonly<{
       )
 
       .put("/:id", "putApiEvaluatorsById")
+      .keepsRecords()
       .withAudit("evaluators.update")
       .withParams(evaluatorIdParamsSchema)
       .withInput(updateEvaluatorInputSchema)
@@ -237,6 +239,12 @@ export function createEvaluatorRest(): Readonly<{
       .withAudit("evaluators.delete")
       .withParams(evaluatorIdParamsSchema)
       .withPermission("evaluations:manage")
+      .withConfirmation({
+        resource: "evaluator",
+        action: "delete",
+        idParam: "id",
+        name: async ({ app, projectId, id }) => (await app.findById({ id, projectId }))?.name,
+      })
       .withOutput(archivedEvaluatorResponseSchema)
       .withDocs({
         description: "Archive (soft-delete) an evaluator",

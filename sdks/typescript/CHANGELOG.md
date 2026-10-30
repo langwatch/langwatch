@@ -1,5 +1,63 @@
 # Changelog
 
+## [2.0.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.20.0...typescript-sdk@v2.0.0) (2026-10-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk:** client.dashboards and langwatch.dashboards now address the new Dashboards API, not the old Reports; use client.analyticsReports / langwatch.analytics_reports for those. MCP Reports tools are renamed platform_*_analytics_report(s).
+
+### Features
+
+* **auth:** record each request's credential type and make legacy project keys ingestion-only ([#8962](https://github.com/langwatch/langwatch/issues/8962)) ([ec41367](https://github.com/langwatch/langwatch/commit/ec41367384ebda1e5cbe3d0ed16b1797b9769575))
+* **coding-agent:** copilot CLI and VS Code sessions become rows ([#8884](https://github.com/langwatch/langwatch/issues/8884)) ([e5c5e8c](https://github.com/langwatch/langwatch/commit/e5c5e8c3eb372ac02eed8ad7e5bd1810fc3c3be1))
+* **dashboard:** add REST create and delete for Dashboards boards ([#8896](https://github.com/langwatch/langwatch/issues/8896)) ([fbc1469](https://github.com/langwatch/langwatch/commit/fbc1469027d6ef59c920243f63e2ebaf2264bcf8))
+* **dashboards:** a per-dashboard Langy traces setting ([#9099](https://github.com/langwatch/langwatch/issues/9099)) ([821b467](https://github.com/langwatch/langwatch/commit/821b467e8a628e599951b42d3c871f0db454efd8))
+* **model-providers:** add Doubleword provider (strict layout) ([#8557](https://github.com/langwatch/langwatch/issues/8557)) ([4304116](https://github.com/langwatch/langwatch/commit/4304116811863d149b2eae9a114516df00778834))
+* **sdk:** one product per dashboards path; dashboards means the new product everywhere ([#9089](https://github.com/langwatch/langwatch/issues/9089)) ([552534d](https://github.com/langwatch/langwatch/commit/552534d24487441ac5395d91c1af69ed072a0c00))
+
+
+### Bug Fixes
+
+* **cli:** pin cloudflared 2026.10.5, verify it everywhere, drop the npm wrapper ([#9086](https://github.com/langwatch/langwatch/issues/9086)) ([0b1bad9](https://github.com/langwatch/langwatch/commit/0b1bad9b1887ec5a7e26955d917a4ddcaede0145))
+* **dashboards:** refresh moves fixed ranges, hidden stars keep their place, agents read boards by id ([#9048](https://github.com/langwatch/langwatch/issues/9048)) ([a5ea0ed](https://github.com/langwatch/langwatch/commit/a5ea0eda1d886635096da02bb76b2b99f9bed6f6))
+* **deps:** raise qs to 6.17.0 for CVE-2026-110910 ([#9100](https://github.com/langwatch/langwatch/issues/9100)) ([56fa502](https://github.com/langwatch/langwatch/commit/56fa502f86cf83867c4c2e3386fe5484284b4fdc))
+* **langevals:** judges reach a verdict on gpt-6 reasoning models ([#9102](https://github.com/langwatch/langwatch/issues/9102)) ([d7b6238](https://github.com/langwatch/langwatch/commit/d7b623874e55e0b6af4d81ce9671114d54dfb2cc))
+* **mcp:** repair main after the board-reading merge ([#9087](https://github.com/langwatch/langwatch/issues/9087)) ([96a4bf6](https://github.com/langwatch/langwatch/commit/96a4bf61c903ffb0f75b64e93cef7fd43d0897cd))
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+* **security:** raise JS security floors for the root workspace and SDK examples ([#6569](https://github.com/langwatch/langwatch/issues/6569)) ([2adf11f](https://github.com/langwatch/langwatch/commit/2adf11f42e98b42f8508a87e29be33c3264e07f3))
+
+
+### Miscellaneous
+
+* **deps:** bump ip-address ([864fe2b](https://github.com/langwatch/langwatch/commit/864fe2bb0bb6464bccac776b8eb42898690a9fcd))
+* **deps:** bump ip-address from 10.7.2 to 10.7.4 in /sdks/typescript/examples/mastra in the npm_and_yarn group across 1 directory ([#8973](https://github.com/langwatch/langwatch/issues/8973)) ([864fe2b](https://github.com/langwatch/langwatch/commit/864fe2bb0bb6464bccac776b8eb42898690a9fcd))
+
+## [1.20.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.19.0...typescript-sdk@v1.20.0) (2026-10-21)
+
+
+### Features
+
+* **dashboard:** move dashboards v2 onto its own tables ([#8707](https://github.com/langwatch/langwatch/issues/8707)) ([7f1f527](https://github.com/langwatch/langwatch/commit/7f1f527f85363fe97cdc93d300b7c469de4463eb))
+* **dashboards,insight:** dashboards and insights v1 ([#8545](https://github.com/langwatch/langwatch/issues/8545)) ([7b5e13d](https://github.com/langwatch/langwatch/commit/7b5e13dd84492d526f1442e3360005ff1ed08613))
+* **langy:** delete needs a confirmation click ([#7563](https://github.com/langwatch/langwatch/issues/7563)) ([a6ca678](https://github.com/langwatch/langwatch/commit/a6ca678d5dbde52f970df044cd27ae6f9627c450))
+* **members:** developer seat, a member who owns a personal project and nothing shared ([#8373](https://github.com/langwatch/langwatch/issues/8373)) ([30ff7ea](https://github.com/langwatch/langwatch/commit/30ff7ea74a4caba95afb76d59ca9a6906b6f613e))
+* **scenarios:** setup and teardown hooks for connected agents ([#8765](https://github.com/langwatch/langwatch/issues/8765)) ([b0949cd](https://github.com/langwatch/langwatch/commit/b0949cdd929d35f030ddeb2fc1c16b1f33328c0f))
+* **sdks:** send traces as gzipped OTLP/protobuf by default in every SDK ([#8592](https://github.com/langwatch/langwatch/issues/8592)) ([206c830](https://github.com/langwatch/langwatch/commit/206c830dc5653660348004fb10a267cc9d13e7b2))
+
+
+### Bug Fixes
+
+* 3.19.0 self-host dogfood findings (model id on Studio spans, mirror markers, Langy turns in CLI analytics) ([#8370](https://github.com/langwatch/langwatch/issues/8370)) ([5d70883](https://github.com/langwatch/langwatch/commit/5d708830634f2b63b0743970ddefa2a71b45e577))
+* **annotations:** serialize annotation commands per trace and 404 on unknown delete ([#8400](https://github.com/langwatch/langwatch/issues/8400)) ([7606bf6](https://github.com/langwatch/langwatch/commit/7606bf6a6641e03912b2e16bbafbe0021f681bb8))
+* dashboards and insights v1 follow-ups ([#8648](https://github.com/langwatch/langwatch/issues/8648)) ([127182a](https://github.com/langwatch/langwatch/commit/127182af50d2716f03ecf9f4092c90cebf89cf56))
+* follow-ups that missed the [#7536](https://github.com/langwatch/langwatch/issues/7536) merge (eventing leases, group-queue dead workers, upgrade pacing, upgradelab) ([#8580](https://github.com/langwatch/langwatch/issues/8580)) ([7aca052](https://github.com/langwatch/langwatch/commit/7aca0524747e37193b219add62a00b45b1e55ae7))
+* **image:** install the scenario child's build dependencies before building it ([#8702](https://github.com/langwatch/langwatch/issues/8702)) ([5520bdf](https://github.com/langwatch/langwatch/commit/5520bdffb039d3adce901a019e4ca91bd2476de7))
+* main's CI back to green, with the last strict-layout follow-ups ([#8598](https://github.com/langwatch/langwatch/issues/8598)) ([6791316](https://github.com/langwatch/langwatch/commit/6791316ad775a628d620d6315422b73ebeb4e15b))
+* **security:** pin Node to 24.22.1 for the October 2026 security releases ([#8933](https://github.com/langwatch/langwatch/issues/8933)) ([84b8925](https://github.com/langwatch/langwatch/commit/84b892544207ee63f7ed04e890820fb08f04a6d8))
+* **triggers:** refuse a different customGraphId on PATCH instead of ignoring it ([#8433](https://github.com/langwatch/langwatch/issues/8433)) ([0ad8ad2](https://github.com/langwatch/langwatch/commit/0ad8ad2e1ae6981c130c4c2877bbd5e2722e8dd6))
+* **ui:** restore the pre-refactor look across the shell, trace explorer, agent testing and settings ([#8588](https://github.com/langwatch/langwatch/issues/8588)) ([ed79ac9](https://github.com/langwatch/langwatch/commit/ed79ac93ecf2949eea6693e6539494cbc5682b17))
+
 ## [1.19.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.18.0...typescript-sdk@v1.19.0) (2026-09-30)
 
 

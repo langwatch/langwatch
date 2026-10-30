@@ -17,6 +17,8 @@ import { useLangWatchQLChartModel } from "../../../../behavior/use-langwatch-ql-
 import type { LangWatchQLVegaViewStatus } from "../../../../behavior/use-langwatch-ql-vega-view.ts";
 import { LangWatchQLChartFailure } from "../../../../ui/elements/langwatch-ql-chart-failure.tsx";
 
+import "./langwatch-ql-vega-lite-chart.css";
+
 /** The minimum a chart is given, so a refusal never collapses the pane. */
 const CHART_MIN_HEIGHT = "260px";
 
@@ -108,7 +110,12 @@ function LangWatchQLChartCanvas({
         data-testid="lwql-vega-chart-view"
         data-chart-status={status}
       >
-        <Box ref={containerRef} width="full" minHeight={CHART_MIN_HEIGHT} />
+        <Box
+          ref={containerRef}
+          width="full"
+          minHeight={CHART_MIN_HEIGHT}
+          data-lwql-chart-mount=""
+        />
       </Box>
       {isResultNoteHidden ? (
         <VisuallyHidden id={descriptionId}>{note}</VisuallyHidden>

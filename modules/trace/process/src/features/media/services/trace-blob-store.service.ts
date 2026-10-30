@@ -1,11 +1,19 @@
-import type { Readable } from "node:stream";
-
 import type { Logger } from "@langwatch/observability";
-import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
-import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 
 import type { TraceLegacySpool } from "../../../channels/trace-legacy-spool.channel.ts";
-import type { TracePayloadReaderRepository } from "../../../repositories/trace-payload-reader.repository.ts";
+import type {
+  OffloadRecallOutcome,
+  TracePayloadReaderRepository,
+} from "../../../repositories/trace-payload-reader.repository.ts";
+import type {
+  TraceSpoolDestinationKind,
+  TraceSpoolObjectAddress,
+  TraceSpoolObjectsRepository,
+} from "../../../repositories/trace-spool-objects.repository.ts";
+import {
+  type OffloadedFieldReference,
+  offloadedFieldKey,
+} from "../../../rules/trace-offload-recall.rules.ts";
 import { TraceStreamBufferService } from "../../../services/trace-stream-buffer.service.ts";
 import {
   assertLegacySpoolKeyBelongsTo,
@@ -22,24 +30,12 @@ import {
 export const MAX_SPOOL_BYTES = 50 * 1024 * 1024;
 
 /**
- * The slice of the stored-objects registry the spool needs. Declared here
- * rather than imported so this module depends on a shape, not on the registry
- * class — the registry satisfies it structurally.
- */
-interface SpoolObjectStore {
-  put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
-  get(uri: string): Promise<Readable>;
-  delete(uri: string): Promise<void>;
-}
-
-/**
  * Destination-agnostic storage for the trace spool, injected so `TraceBlobStoreService`
  * carries no env coupling and the tests run without members.
  */
 export interface SpoolStorage {
-  /** Per-project so BYOC tenants resolve their own bucket and credentials. */
-  objectStoreFor(projectId: string): SpoolObjectStore;
-  resolveDestination(projectId: string): Promise<ProjectStorageDestination>;
+  /** Per-project, so a BYOC tenant's spool lands in its own bucket under its own credentials. */
+  objects: TraceSpoolObjectsRepository;
   /**
    * The operator's assertion that the Azure container has the orphan-reaping
    * lifecycle rule. Injected rather than read from env here so this class keeps
@@ -49,7 +45,7 @@ export interface SpoolStorage {
 }
 
 /**
- * Thrown by `TraceBlobStoreService.getFromEventLog` when the requested row is not found or
+ * Thrown by an offloaded-field read when the requested row is not found or
  * the TenantId predicate returns no rows (including cross-tenant attempts).
  * ADR-022: TenantId in the WHERE clause structurally blocks cross-tenant reads.
  */
@@ -65,7 +61,7 @@ export class BlobNotFoundError extends Error {
 }
 
 /**
- * Thrown by `TraceBlobStoreService.getFromEventLog` when the requested `field` is not
+ * Thrown by an offloaded-field read when the requested `field` is not
  * present in the EventPayload. Indicates a corrupted event or a stale ref.
  */
 export class BlobFieldNotFoundError extends Error {
@@ -98,13 +94,13 @@ function assertDestinationCanHostSpool({
   destination,
   azureRetentionConfirmed,
 }: {
-  destination: ProjectStorageDestination;
+  destination: TraceSpoolDestinationKind;
   azureRetentionConfirmed: boolean;
 }): void {
   // The spool depends on something outside the store to stay bounded: eager delete after
   // event_log INSERT, plus a lifecycle rule reaping whatever a crash between the two leaves. A
   // filesystem has no such rule, so here an orphan is permanent.
-  if (destination.kind === "file") {
+  if (destination === "file") {
     throw new SpoolDestinationUnsupportedError(
       "The trace spool has no local-filesystem path: orphaned spool objects are reaped by a " +
         "bucket/container lifecycle rule, which a filesystem cannot express, so a crash between " +
@@ -118,7 +114,7 @@ function assertDestinationCanHostSpool({
   // the policy is a MANAGEMENT-plane resource this deployment's data-plane
   // key can't read. The operator asserts it at deploy time (default off);
   // enabling without provisioning retention degrades to inline payloads.
-  if (destination.kind === "azure" && !azureRetentionConfirmed) {
+  if (destination === "azure" && !azureRetentionConfirmed) {
     throw new SpoolDestinationUnsupportedError(
       "The trace spool is disabled on Azure Blob until orphan retention is provisioned. A crash " +
         "between the spool write and its delete leaves the object behind, and only a lifecycle " +
@@ -174,11 +170,11 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Re-derives the spool object's URI from server-trusted inputs, never a location out of the
-   * command. `purpose` gates the destination guards, a write-time rule only: applying them to a
-   * read would make in-flight spooled spans unreadable and manufacture the orphan they prevent.
+   * Re-derives the spool object's address from server-trusted inputs, never a location out of
+   * the command. `purpose` gates the destination guards, a write-time rule only: applying them to
+   * a read would make in-flight spooled spans unreadable and manufacture the orphan they prevent.
    */
-  private async mintSpoolUri({
+  private async locateSpool({
     projectId,
     traceId,
     spanId,
@@ -188,55 +184,51 @@ export class TraceBlobStoreService {
     traceId: string;
     spanId: string;
     purpose: "write" | "access";
-  }): Promise<{ uri: string; objectStore: SpoolObjectStore }> {
+  }): Promise<{ at: TraceSpoolObjectAddress; objects: TraceSpoolObjectsRepository }> {
     if (!this.spoolStorage) {
       throw new Error(
         "TraceBlobStoreService has no spool storage configured — cannot resolve the trace spool destination.",
       );
     }
 
-    const destination = await this.spoolStorage.resolveDestination(projectId);
-
     if (purpose === "write") {
       assertDestinationCanHostSpool({
-        destination,
+        destination: await this.spoolStorage.objects.destinationKind(projectId),
         azureRetentionConfirmed: this.spoolStorage.azureRetentionConfirmed,
       });
     }
 
     return {
-      uri: mintStoredObjectUri({
-        destination,
-        objectPath: buildSpoolObjectPath({ projectId, traceId, spanId }),
-      }),
-      objectStore: this.spoolStorage.objectStoreFor(projectId),
+      at: { projectId, key: buildSpoolObjectPath({ projectId, traceId, spanId }) },
+      objects: this.spoolStorage.objects,
     };
   }
 
   /**
-   * Fetches an offloaded field from the trace event that recorded it (ADR-022 read path), through
-   * trace's payload reader, tenant first. Arrow property (not a prototype method) so a test mock
-   * can assert on it unbound-safely.
+   * Recalls offloaded fields from the trace events that recorded them (ADR-022 read path), tenant
+   * first: one read per event, bounded, within a per-trace budget.
    */
-  getFromEventLog = async ({
-    eventId,
-    field,
+  async recallFromEventLog({
     tenantId,
-    aggregateId,
+    references,
+    concurrency,
   }: {
-    eventId: string;
-    field: string;
     tenantId: string;
-    aggregateId: string;
-  }): Promise<string> => {
+    references: readonly OffloadedFieldReference[];
+    concurrency?: number;
+  }): Promise<Map<string, OffloadRecallOutcome>> {
     if (!this.payloads) {
-      throw new Error(
+      // Every field keeps its preview, each answering why, as a failed read would.
+      const error = new Error(
         "No trace payload reader configured: cannot read an offloaded field (ADR-022)",
+      );
+      return new Map(
+        references.map((reference) => [offloadedFieldKey(reference), { ok: false, error }]),
       );
     }
 
-    return this.payloads.read({ tenantId, traceId: aggregateId, eventId, field });
-  };
+    return this.payloads.recall({ tenantId, references, ...(concurrency ? { concurrency } : {}) });
+  }
 
   /**
    * Location is re-derived from projectId/traceId/spanId (queue-authenticated), never spoolRef,
@@ -260,7 +252,7 @@ export class TraceBlobStoreService {
       return this.getLegacySpool(spoolRef, projectId);
     }
 
-    const { uri, objectStore } = await this.mintSpoolUri({
+    const { at, objects } = await this.locateSpool({
       projectId,
       traceId,
       spanId,
@@ -268,7 +260,7 @@ export class TraceBlobStoreService {
     });
 
     return TraceStreamBufferService.create().streamToBuffer(
-      await objectStore.get(uri),
+      await objects.read(at),
       MAX_SPOOL_BYTES,
     );
   }
@@ -303,13 +295,13 @@ export class TraceBlobStoreService {
     spanId: string;
     body: Buffer;
   }): Promise<string> {
-    const { uri, objectStore } = await this.mintSpoolUri({
+    const { at, objects } = await this.locateSpool({
       projectId,
       traceId,
       spanId,
       purpose: "write",
     });
-    await objectStore.put(uri, body, "application/octet-stream");
+    await objects.write(at, body);
 
     return SPOOL_REF_V2;
   }
@@ -350,13 +342,13 @@ export class TraceBlobStoreService {
         return;
       }
 
-      const { uri, objectStore } = await this.mintSpoolUri({
+      const { at, objects } = await this.locateSpool({
         projectId,
         traceId,
         spanId,
         purpose: "access",
       });
-      await objectStore.delete(uri);
+      await objects.remove(at);
     } catch {
       // Best-effort — swallow all errors; lifecycle policy is the safety net.
       return;

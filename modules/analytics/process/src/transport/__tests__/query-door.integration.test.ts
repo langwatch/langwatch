@@ -4,7 +4,11 @@
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
-import { lwqlResultSchema, type LangWatchQLProtections } from "@langwatch/analytics-contract";
+import {
+  lwqlResultSchema,
+  type LangWatchQLKeyReach,
+  type LangWatchQLProtections,
+} from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -47,15 +51,28 @@ class RecordingExecutor extends LangWatchQLExecutorRepository {
 }
 
 /** The door over the real service, with the gated fixture dataset beside the shipped catalogue. */
-function mountDoor({ protections = PERMITTED }: { protections?: LangWatchQLProtections } = {}) {
+function mountDoor({
+  protections = PERMITTED,
+  reach,
+}: {
+  protections?: LangWatchQLProtections;
+  reach?: () => LangWatchQLKeyReach;
+} = {}) {
   const executor = new RecordingExecutor();
   const service = LangWatchQLService.create({
     executor,
     database: DATABASE,
     views: [...LWQL_VIEW_CATALOG, GATED_DATASET],
     catalog: { ...LWQL_CATALOG, [GATED_DATASET.name]: LWQL_CATALOG.traces },
+    // A frozen clock, so hydration adds no wall time to the executor's elapsedMs.
+    stopwatch: () => 0,
   });
-  const door = mountQueryDoor({ tenant: () => TENANT, service: () => service, protections });
+  const door = mountQueryDoor({
+    tenant: () => TENANT,
+    service: () => service,
+    protections,
+    ...(reach ? { reach } : {}),
+  });
 
   const run = async (request: Record<string, unknown>) => {
     const response = await door.fetch("/api/v1/query", {
@@ -69,7 +86,13 @@ function mountDoor({ protections = PERMITTED }: { protections?: LangWatchQLProte
     return { status: response.status, body };
   };
 
-  return { executor, run };
+  const get = async (path: string) => {
+    const response = await door.fetch(path);
+
+    return { status: response.status, body: (await response.json()) as unknown };
+  };
+
+  return { executor, run, get, reaches: door.reaches };
 }
 
 /** The refusal envelope as the caller reads it: code plus the meta the scenarios inspect. */
@@ -197,6 +220,55 @@ describe("given the query door over the real service", () => {
       expect(withheld.executor.requests).toEqual([]);
       expect(read.status).toBe(200);
       expect(held.executor.requests).toHaveLength(1);
+    });
+  });
+
+  describe("when the key is one Langy minted for a chat session", () => {
+    const langyReach: LangWatchQLKeyReach = {
+      kind: "apiKey",
+      apiKeyId: "key-langy",
+      userId: "user-1",
+      organizationId: "org-1",
+      resolvedProject: { id: TENANT.id, teamId: "team-1" },
+      isLangySessionKey: true,
+    };
+
+    /** @scenario "A Langy session key runs a LangWatchQL query and reads its schema and reference" */
+    it("runs the query and reads the schema and reference, each with its own reach", async () => {
+      const { executor, reaches, run, get } = mountDoor({ reach: () => langyReach });
+
+      const query = await run({ sql: `SELECT TraceId FROM ${DATABASE}.traces LIMIT 5` });
+      const schema = await get("/api/v1/query/schema");
+      const reference = await get("/api/v1/query/reference");
+
+      expect([query.status, schema.status, reference.status]).toEqual([200, 200, 200]);
+      expect(executor.requests).toHaveLength(1);
+      expect(reaches).toEqual([langyReach, langyReach, langyReach]);
+    });
+  });
+
+  describe("when an organization key's credential carries no Langy flag", () => {
+    /** @scenario "An organization key whose credential carries no Langy flag still runs a query" */
+    it("runs the query whether the flag is absent or present as undefined", async () => {
+      const organizationReach = {
+        kind: "apiKey",
+        apiKeyId: "key-org",
+        userId: null,
+        organizationId: "org-1",
+      } as const;
+      const absent = mountDoor({ reach: () => organizationReach });
+      const undefinedValued = mountDoor({
+        reach: () => ({ ...organizationReach, isLangySessionKey: undefined }),
+      });
+      const sql = `SELECT TraceId FROM ${DATABASE}.traces LIMIT 5`;
+
+      const fromAbsent = await absent.run({ sql });
+      const fromUndefined = await undefinedValued.run({ sql });
+
+      expect([fromAbsent.status, fromUndefined.status]).toEqual([200, 200]);
+      expect(absent.reaches).toEqual([organizationReach]);
+      expect(undefinedValued.reaches).toEqual([organizationReach]);
+      expect(undefinedValued.executor.requests).toHaveLength(1);
     });
   });
 

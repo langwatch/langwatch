@@ -1237,6 +1237,14 @@
               "available": true
             },
             {
+              "name": "Source",
+              "type": "String",
+              "description": "The source the trace counts under: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list. Filter it with {dashboard_context_sources:Array(String)}.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "Models",
               "type": "Array(String)",
               "description": "Every model used anywhere in the trace.",
@@ -1756,6 +1764,14 @@
               "name": "Origin",
               "type": "Nullable(String)",
               "description": "Which product surface produced the evaluated trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Source",
+              "type": "String",
+              "description": "The source the evaluated trace counts under: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list.",
               "unit": null,
               "gates": [],
               "available": true
@@ -9595,7 +9611,7 @@
         },
         {
           "name": "analytics.custom_graphs",
-          "description": "Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable.",
+          "description": "Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable, and dashboard widgets are in dashboard_widgets.",
           "grain": "one row per CustomGraphId",
           "joinKeys": [
             "TenantId",
@@ -9652,7 +9668,7 @@
             {
               "name": "Kind",
               "type": "String",
-              "description": "Discriminator for the two chart shapes that share this table: - \"builder\" (default) - the chart builder's own `graph` payload - \"workbench_sql\" - a saved LangWatchQL workbench chart, whose `graph` holds the versioned definition Each reader filters by its own kind, so neither sees the other's rows and a builder chart can never be interpreted as a workbench definition.",
+              "description": "Discriminator for the chart shapes that share this table: - \"builder\" (default) - the chart builder's own `graph` payload - \"workbench_sql\" - a saved LangWatchQL workbench chart, whose `graph` holds the versioned definition - \"dashboard_srcdoc\" - frozen legacy copies of Dashboards v2 widgets, which now live in DashboardWidget; nothing new writes this kind Each reader filters by its own kind, so neither sees the other's rows and a builder chart can never be interpreted as a workbench definition.",
               "unit": null,
               "gates": [],
               "available": true
@@ -9810,8 +9826,113 @@
           "exampleSql": "SELECT OrganizationId, ScopeType, ScopeId\nFROM analytics.custom_llm_model_costs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
+          "name": "analytics.dashboard_widgets",
+          "description": "One row per widget in the Dashboards area: its React source and named LangWatchQL queries, and where it sits on its board. Widgets placed on a dashboard set to Only me are not queryable.",
+          "grain": "one row per DashboardWidgetId",
+          "joinKeys": [
+            "TenantId",
+            "DashboardWidgetId",
+            "DashboardId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the row belongs to. Join key to every other view.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DashboardWidgetId",
+              "type": "String",
+              "description": "Widget identifier.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DashboardId",
+              "type": "Nullable(String)",
+              "description": "The board the widget sits on. Matches `dashboards_v2.DashboardId`; null while unplaced.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Name",
+              "type": "String",
+              "description": "The widget's name.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Definition",
+              "type": "String",
+              "description": "The widget's definition: its React source, its named queries, description and prompt.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "GridColumn",
+              "type": "Int32",
+              "description": "The widget's left column on the board's grid.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "GridRow",
+              "type": "Int32",
+              "description": "The widget's top row on the board's grid.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ColSpan",
+              "type": "Int32",
+              "description": "How many grid columns the widget spans.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "RowSpan",
+              "type": "Int32",
+              "description": "How many grid rows the widget spans.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "CreatedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "UpdatedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT DashboardWidgetId, DashboardId, Name\nFROM analytics.dashboard_widgets\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
           "name": "analytics.dashboards",
-          "description": "Rows of the Dashboard table, one row per DashboardId. Dashboards set to Only me are not queryable.",
+          "description": "One row per Analytics Reports board. Dashboards set to Only me are not queryable, and a board only the Dashboards area holds is in dashboards_v2.",
           "grain": "one row per DashboardId",
           "joinKeys": [
             "TenantId",
@@ -9889,6 +10010,87 @@
             }
           ],
           "exampleSql": "SELECT DashboardId, Name, Order\nFROM analytics.dashboards\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.dashboards_v2",
+          "description": "One row per board in the Dashboards area. A board made before Dashboards and Analytics Reports split kept its id, so it can be in dashboards too. Dashboards set to Only me are not queryable.",
+          "grain": "one row per DashboardId",
+          "joinKeys": [
+            "TenantId",
+            "DashboardId",
+            "CreatedById"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the row belongs to. Join key to every other view.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DashboardId",
+              "type": "String",
+              "description": "Board identifier. Matches `dashboard_widgets.DashboardId`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Name",
+              "type": "String",
+              "description": "The board's name.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Description",
+              "type": "Nullable(String)",
+              "description": "Free text under the board's name; null until a member writes one.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "The member who made the board; null when no member is known.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Scope",
+              "type": "String",
+              "description": "Who sees the board: PROJECT, the project's members, or ORGANIZATION, every project of its organization.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "CreatedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "UpdatedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT DashboardId, Name, CreatedById\nFROM analytics.dashboards_v2\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
           "name": "analytics.data_privacy_policies",
@@ -14489,6 +14691,24 @@
               "description": "UpdatedAt",
               "unit": null,
               "gates": [],
+              "available": true
+            },
+            {
+              "name": "AutoPausedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "AutoPausedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AutoPausedReason",
+              "type": "Nullable(String)",
+              "description": "AutoPausedReason",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
               "available": true
             }
           ],

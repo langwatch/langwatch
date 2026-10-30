@@ -172,6 +172,9 @@ export class ModelRestrictedForFeatureError extends HandledError {
       `"${restrictedModel}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be the model for "${featureKey}".`,
       {
         httpStatus: 400,
+        // The project chose a model its licence keeps off this feature; the
+        // fix is a settings change, so it is never an incident of ours.
+        fault: "customer",
         meta: { featureKey, role, featureDisplayName, projectId, restrictedModels },
       },
     );
@@ -209,6 +212,9 @@ export class ModelRestrictedForExecutionError extends HandledError {
         : `"${input.model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
       {
         httpStatus: 400,
+        // Same licence rule as the selection-time refusal: a settings change
+        // on the customer's side, never an incident of ours.
+        fault: "customer",
         meta: {
           model: input.model,
           provider: input.provider,

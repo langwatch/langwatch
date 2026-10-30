@@ -4,6 +4,7 @@ import {
   isSaas,
   otelResourceAttributes,
   outboundProxy,
+  publicBaseUrl,
   serviceVersion,
 } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
@@ -49,7 +50,14 @@ export const licensingConfig = Config.define((c) => ({
       .optional()
       .transform((value) => value?.trim() || void 0),
   ),
-  connectDisabled: c.env("LANGWATCH_CONNECT_DISABLED", z.stringbool().optional()),
+  /** Blank reads as unset, as the previous release read it: Connect stays as the license says. */
+  connectDisabled: c.env(
+    "LANGWATCH_CONNECT_DISABLED",
+    z.preprocess(
+      (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+      z.stringbool().optional(),
+    ),
+  ),
   connectGatewayEndpoint: c.env(
     "LANGWATCH_CONNECT_GATEWAY_ENDPOINT",
     connectEndpoint("LANGWATCH_CONNECT_GATEWAY_ENDPOINT", CONNECT_DEFAULT_GATEWAY_ENDPOINT),
@@ -73,6 +81,8 @@ export const licensingConfig = Config.define((c) => ({
   otelResourceAttributes,
   /** The proxy spellings (the shared leaf); hosted calls follow them. */
   outboundProxy,
+  /** Cloud's own origin, for the Cloud admin link a diagnostics Slack message carries. */
+  publicBaseUrl,
 }));
 
 export type LicensingServerConfig = ConfigOf<typeof licensingConfig>;
@@ -86,4 +96,8 @@ export const licensingSecrets = {
   licensePrivateKey: Secret.load("LANGWATCH_LICENSE_PRIVATE_KEY", { optional: true }),
   /** The key this whole deployment is licensed by, where an operator set one. */
   instanceLicenseKey: Secret.load("LANGWATCH_LICENSE_KEY", { optional: true }),
+  /** Cloud only: LangWatch's own Slack channel each received upgrade diagnostics report goes to. */
+  upgradeDiagnosticsSlackWebhook: Secret.load("SLACK_CHANNEL_UPGRADE_DIAGNOSTICS", {
+    optional: true,
+  }),
 } as const;

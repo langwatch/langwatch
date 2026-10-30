@@ -5,7 +5,10 @@ import {
 } from "@langwatch/api/rest";
 import { isReadbackSafe, type ImageProxyRequest } from "@langwatch/stored-object-contract";
 
-import type { ExternalImageChannel } from "../channels/external-image.channel.ts";
+import {
+  type ExternalImageChannel,
+  ExternalImageTooLargeError,
+} from "../channels/external-image.channel.ts";
 
 /** Pictures are immutable at their address, so the browser may keep one for a year. */
 const IMAGE_CACHE_CONTROL = "public, max-age=31536000";
@@ -67,7 +70,9 @@ export class ImageProxyService {
         "Content-Disposition": `inline; filename="${proxiedFilename(url)}"`,
         "Cache-Control": IMAGE_CACHE_CONTROL,
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof ExternalImageTooLargeError) return refusal(413, "Image is too large");
+
       return refusal(500, "Failed to fetch image");
     }
   }

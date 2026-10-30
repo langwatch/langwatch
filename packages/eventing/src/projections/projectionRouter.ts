@@ -1,4 +1,4 @@
-import type { ExhaustedOutcome } from "@langwatch/group-queue";
+import { isQueueStagingClosed, type ExhaustedOutcome } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -32,13 +32,17 @@ import {
 } from "../runtime.types.ts";
 import { ConfigurationError, categorizeError, handleError } from "../services/errorHandling.ts";
 import type { FailedHandoff, HandoffLaneKind } from "../services/handoff/failedHandoff.ts";
-import type { QueueManager } from "../services/queues/queueManager.ts";
+import type { ProjectionSubscriberJob, QueueManager } from "../services/queues/queueManager.ts";
 import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
 import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
-import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import type {
+  CompactSubscriberJob,
+  SubscriberDispatchDefinition,
+} from "../subscribers/subscriber.types.ts";
 import { toError } from "../utils/errors.ts";
 import { EventUtils } from "../utils/event.utils.ts";
+import { appliedTokenOf } from "./appliedToken.ts";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition, FoldStateRead } from "./foldProjection.types.ts";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor.ts";
@@ -115,6 +119,14 @@ function laneNotRegistered({ kind, lane }: { kind: HandoffLaneKind; lane: string
   return new DispatchError({
     message: `No ${kind} lane "${lane}" is registered on this router; the hand-off retires dead`,
     retryable: false,
+  });
+}
+
+/** A registered fold whose queue this process has not opened yet: the hand-off waits for it. */
+function foldQueueNotReady(lane: string): DispatchError {
+  return new DispatchError({
+    message: `The fold lane "${lane}" has no queue in this process yet; the hand-off retries`,
+    retryable: true,
   });
 }
 
@@ -354,6 +366,14 @@ export class ProjectionRouter<
         { subscriberName: subscriber.name },
       );
     }
+    const coalesceMaxBatch = subscriber.options?.coalesceMaxBatch ?? 1;
+    if (!subscriber.handleBatch && coalesceMaxBatch > 1) {
+      throw new ConfigurationError(
+        "ProjectionRouter",
+        `Event subscriber "${subscriber.name}" coalesces up to ${coalesceMaxBatch} events but declares no handleBatch`,
+        { subscriberName: subscriber.name, coalesceMaxBatch },
+      );
+    }
     this.eventSubscribers.set(subscriber.name, subscriber);
   }
 
@@ -371,6 +391,7 @@ export class ProjectionRouter<
           delay?: number;
           deduplication?: DeduplicationStrategy<EventType>;
           groupKeyFn?: (event: EventType) => string;
+          coalesceMaxBatch?: number;
           spanAttributes: (event: EventType) => Record<string, string | number | boolean>;
         };
       }
@@ -387,6 +408,7 @@ export class ProjectionRouter<
           delay: subscriber.options?.delay,
           deduplication: subscriber.options?.deduplication,
           groupKeyFn: subscriber.options?.groupKeyFn,
+          coalesceMaxBatch: subscriber.options?.coalesceMaxBatch,
           spanAttributes: (event) => ({
             "subscriber.name": name,
             "event.type": event.type,
@@ -398,17 +420,37 @@ export class ProjectionRouter<
       };
     }
 
-    this.queueManager.initializeSubscriberQueues(subscriberDefs, async (subscriberName, event) => {
-      const subscriber = this.eventSubscribers.get(subscriberName);
-      if (!subscriber) {
-        throw new ConfigurationError(
-          "ProjectionRouter",
-          `Event subscriber "${subscriberName}" not found`,
-          { subscriberName },
-        );
-      }
-      await this.handleSubscriber(subscriber, event);
-    });
+    this.queueManager.initializeSubscriberQueues(
+      subscriberDefs,
+      async (subscriberName, event, context) => {
+        const subscriber = this.registeredEventSubscriber(subscriberName);
+        await this.handleSubscriber(subscriber, event, deliveryAttemptOf(context));
+      },
+      async (subscriberName, events, context) => {
+        const subscriber = this.registeredEventSubscriber(subscriberName);
+        const handleBatch = subscriber.handleBatch;
+        if (!handleBatch) {
+          throw new ConfigurationError(
+            "ProjectionRouter",
+            `Event subscriber "${subscriberName}" was handed a batch but declares no handleBatch`,
+            { subscriberName },
+          );
+        }
+        await this.handleSubscriberBatch({ subscriber, handleBatch, events, context });
+      },
+    );
+  }
+
+  private registeredEventSubscriber(subscriberName: string): EventSubscriberDefinition<EventType> {
+    const subscriber = this.eventSubscribers.get(subscriberName);
+    if (!subscriber) {
+      throw new ConfigurationError(
+        "ProjectionRouter",
+        `Event subscriber "${subscriberName}" not found`,
+        { subscriberName },
+      );
+    }
+    return subscriber;
   }
 
   private subscriberQueueDefinitions({
@@ -426,16 +468,9 @@ export class ProjectionRouter<
           name: subscriber.name,
           parentProjection,
           parentType,
-          handler: {
-            handle: async (payload: { event: EventType; foldState: unknown }) => {
-              await subscriber.handle(payload.event, {
-                tenantId: payload.event.tenantId,
-                aggregateId: String(payload.event.aggregateId),
-                foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
-              });
-            },
-          },
+          handler: { handle: this.subscriberJobHandler(subscriber) },
+          readsCompactJobs: subscriber.compactJob !== undefined,
+          ...this.compactJobStage(subscriber),
           groupKeyFn: subscriber.options?.groupKeyFn,
           options: {
             disabled: subscriber.options?.disabled,
@@ -455,6 +490,55 @@ export class ProjectionRouter<
     return definitions;
   }
 
+  /** Runs one queued subscriber job: a full body goes to `handle`, a compact one to its reader. */
+  private subscriberJobHandler(subscriber: SubscriberDispatchDefinition<EventType>) {
+    return async (payload: ProjectionSubscriberJob<EventType>) => {
+      const tenantId = payload.event.tenantId;
+      const aggregateId = String(payload.event.aggregateId);
+      if ("foldState" in payload) {
+        await subscriber.handle(payload.event, {
+          tenantId,
+          aggregateId,
+          foldState: payload.foldState,
+          isReplay: LIVE_DISPATCH_IS_REPLAY,
+        });
+        return;
+      }
+      // The lane's parse refuses a compact body for a subscriber that reads none,
+      // so reaching here without a reader fails the job rather than dropping it.
+      if (!subscriber.compactJob) {
+        throw new ConfigurationError(
+          "ProjectionRouter",
+          `Event subscriber "${subscriber.name}" received a compact job but reads none`,
+          { subscriberName: subscriber.name },
+        );
+      }
+      await subscriber.compactJob.handle(payload.job, { tenantId, aggregateId });
+    };
+  }
+
+  /** A subscriber queueing compact bodies stages each delivery into its identity and job body. */
+  private compactJobStage(subscriber: SubscriberDispatchDefinition<EventType>): {
+    stage?: (payload: { event: EventType; foldState: unknown }) => CompactSubscriberJob;
+  } {
+    const compactJob = subscriber.compactJob;
+    if (!compactJob?.stageOnSend) return {};
+    return {
+      stage: ({ event, foldState }) => ({
+        event: {
+          id: event.id,
+          aggregateId: event.aggregateId,
+          aggregateType: event.aggregateType,
+          tenantId: event.tenantId,
+          createdAt: event.createdAt,
+          occurredAt: event.occurredAt,
+          type: event.type,
+        },
+        job: compactJob.stage(event, this.buildSubscriberDispatchContext({ event, foldState })),
+      }),
+    };
+  }
+
   /**
    * Initialize queue processors for projection subscribers.
    * Each subscriber gets a SimpleQueue for async dispatch.
@@ -462,26 +546,9 @@ export class ProjectionRouter<
   initializeProjectionSubscriberQueues(): void {
     if (this.subscribersForFold.size === 0 && this.subscribersForMap.size === 0) return;
 
-    const subscriberDefs: Record<
-      string,
-      {
-        name: string;
-        parentProjection: string;
-        parentType: "fold" | "map";
-        handler: {
-          handle: (payload: { event: EventType; foldState: unknown }) => Promise<void>;
-        };
-        groupKeyFn?: (payload: { event: EventType; foldState: unknown }) => string;
-        options?: {
-          disabled?: boolean;
-          delay?: number;
-          deduplication?: DeduplicationStrategy<{
-            event: EventType;
-            foldState: unknown;
-          }>;
-        };
-      }
-    > = {};
+    const subscriberDefs: Parameters<
+      typeof this.queueManager.initializeProjectionSubscriberQueues
+    >[0] = {};
 
     for (const def of [
       ...this.subscriberQueueDefinitions({
@@ -861,7 +928,39 @@ export class ProjectionRouter<
   }): Promise<void> {
     if (kind === "map") return this.redeliverToMap({ lane, event });
     if (kind === "subscriber") return this.redeliverToSubscriber({ lane, event });
+    if (kind === "fold" && this.foldAcceptsResend(lane)) {
+      return this.redeliverToFold({ lane, event });
+    }
     return this.requestRebuild({ kind, lane, event });
+  }
+
+  /** A keyed fold that declared a repeated event harmless takes the single event again. */
+  private foldAcceptsResend(lane: string): boolean {
+    const fold = this.foldProjections.get(lane)?.definition;
+    return Boolean(fold?.key && fold.options?.resendOnRedelivery);
+  }
+
+  /** Re-sends one missed event onto a fold's live lane, the way a fresh dispatch stages it. */
+  private async redeliverToFold({
+    lane,
+    event,
+  }: {
+    lane: string;
+    event: EventType;
+  }): Promise<void> {
+    const entry = this.foldProjections.get(lane);
+    if (!entry) throw laneNotRegistered({ kind: "fold", lane });
+    if (entry.definition.options?.disabled) return;
+    if (this.queueManager.hasProjectionQueues()) {
+      const queue = this.queueManager.getProjectionQueue(lane);
+      if (!queue) throw foldQueueNotReady(lane);
+      await queue.sendBatch([event]);
+      return;
+    }
+    const context = { tenantId: event.tenantId };
+    await entry.open((fold) =>
+      this.processFoldProjectionEvent({ projectionName: lane, fold, event, context }),
+    );
   }
 
   /**
@@ -973,11 +1072,18 @@ export class ProjectionRouter<
       aggregateId: String(missed.aggregateId),
       occurredAtMs: missed.occurredAt,
     });
-    if (!history.some((event) => event.id === missed.id)) {
+    // A history read keeps the first row per idempotency key. A re-send under a held key is in
+    // the log, but the read returns an earlier copy until a merge in the same weekly partition
+    // keeps the newer row, and across partitions it never does. Waiting for the re-send's own id
+    // could then never end, so a held key counts as the log holding it, and the missed event is
+    // folded in at its own position: the rebuild writes what the live lane would have.
+    const held = history.some((event) => event.id === missed.id);
+    const missedToken = appliedTokenOf(missed);
+    if (!held && !history.some((event) => appliedTokenOf(event) === missedToken)) {
       throw new Error(`The log does not yet hold missed event ${missed.id}; retrying the rebuild`);
     }
     let latest: StoredProjection<State> | null = null;
-    for (const event of orderEvents(history)) {
+    for (const event of orderEvents(held ? history : [...history, missed])) {
       latest = applyStateEvent({ projection, latest, event });
     }
     if (!latest) return;
@@ -1047,14 +1153,14 @@ export class ProjectionRouter<
       try {
         await queueProcessor.sendBatch(filtered);
       } catch (error) {
-        this.logger.error(
-          {
+        this.logDispatchFailure({
+          error,
+          fields: {
             projectionName,
             eventCount: filtered.length,
-            error: error instanceof Error ? error.message : String(error),
           },
-          "Failed to dispatch batch of events to fold projection queue",
-        );
+          message: "Failed to dispatch batch of events to fold projection queue",
+        });
         failures.push({
           kind: "fold",
           lane: projectionName,
@@ -1153,14 +1259,14 @@ export class ProjectionRouter<
           this.sendToStateProjection({ name, projection: definition, matching, context, queued }),
         );
       } catch (error) {
-        this.logger.error(
-          {
+        this.logDispatchFailure({
+          error,
+          fields: {
             projectionName: name,
             eventCount: matching.length,
-            error: error instanceof Error ? error.message : String(error),
           },
-          "State projection dispatch failed",
-        );
+          message: "State projection dispatch failed",
+        });
         failures.push({ kind: "state", lane: name, events: matching, error: toError(error) });
       }
     }
@@ -1288,14 +1394,14 @@ export class ProjectionRouter<
       await queueProcessor.sendBatch(accepted);
       return [];
     } catch (error) {
-      this.logger.error(
-        {
+      this.logDispatchFailure({
+        error,
+        fields: {
           handlerName: name,
           eventCount: accepted.length,
-          error: error instanceof Error ? error.message : String(error),
         },
-        "Failed to dispatch batch of events to map projection queue",
-      );
+        message: "Failed to dispatch batch of events to map projection queue",
+      });
       return [{ kind: "map", lane: name, events: accepted, error: toError(error) }];
     }
   }
@@ -1464,6 +1570,34 @@ export class ProjectionRouter<
   }
 
   /**
+   * A drained queue's refusal is a shutdown whose consumer drain overran its budget; the caller
+   * keeps these events for re-drive, so it warns. Every other dispatch failure stays an error.
+   * Spec: specs/background/queue-drain-send-gate.feature
+   */
+  private logDispatchFailure({
+    error,
+    fields,
+    message,
+  }: {
+    error: unknown;
+    fields: Record<string, unknown>;
+    message: string;
+  }): void {
+    if (isQueueStagingClosed(error)) {
+      this.logger.warn(
+        {
+          ...fields,
+          error,
+          reason: "the queue's drain finished during shutdown; kept for re-drive",
+        },
+        message,
+      );
+      return;
+    }
+    this.logger.error({ ...fields, error }, message);
+  }
+
+  /**
    * Counts a failed staging. The caller records the hand-off for re-drive;
    * without this count a thrown filter/stage/send moved no series at all.
    */
@@ -1481,43 +1615,95 @@ export class ProjectionRouter<
       subscriberName: name,
       outcome: "failed",
     });
-    this.logger.error(
-      {
+    this.logDispatchFailure({
+      error,
+      fields: {
         subscriberName: name,
         eventId: event.id,
         eventType: event.type,
         aggregateId: String(event.aggregateId),
         tenantId: event.tenantId,
-        error: error instanceof Error ? error.message : String(error),
       },
-      "Event subscriber dispatch failed",
-    );
+      message: "Event subscriber dispatch failed",
+    });
   }
 
   private async handleSubscriber(
     subscriber: EventSubscriberDefinition<EventType>,
     event: EventType,
+    delivery: { deliveryAttempt?: number } = {},
   ): Promise<void> {
+    await this.runSubscriber({
+      subscriber,
+      spanName: "EventSubscriber.handle",
+      attributes: {
+        "event.id": event.id,
+        "event.type": event.type,
+        "event.aggregate_id": String(event.aggregateId),
+        "tenant.id": String(event.tenantId),
+      },
+      fn: () =>
+        subscriber.handle(event, {
+          tenantId: String(event.tenantId),
+          aggregateId: String(event.aggregateId),
+          ...delivery,
+        }),
+    });
+  }
+
+  /** A coalesced batch (ADR-066), one `handleBatch` call; each event keeps its own context. */
+  private async handleSubscriberBatch({
+    subscriber,
+    handleBatch,
+    events,
+    context,
+  }: {
+    subscriber: EventSubscriberDefinition<EventType>;
+    handleBatch: NonNullable<EventSubscriberDefinition<EventType>["handleBatch"]>;
+    events: EventType[];
+    context: { tenantId: string; deliveryAttempt?: number };
+  }): Promise<void> {
+    await this.runSubscriber({
+      subscriber,
+      spanName: "EventSubscriber.handleBatch",
+      attributes: { "batch.size": events.length, "tenant.id": String(context.tenantId) },
+      fn: () =>
+        handleBatch(
+          events,
+          events.map((event) => ({
+            tenantId: String(event.tenantId),
+            aggregateId: String(event.aggregateId),
+            ...deliveryAttemptOf(context),
+          })),
+        ),
+    });
+  }
+
+  /** Runs one subscriber call under its span, counting and timing it, warning when slow. */
+  private async runSubscriber({
+    subscriber,
+    spanName,
+    attributes,
+    fn,
+  }: {
+    subscriber: EventSubscriberDefinition<EventType>;
+    spanName: string;
+    attributes: Record<string, string | number>;
+    fn: () => Promise<void>;
+  }): Promise<void> {
     await this.tracer.withActiveSpan(
-      "EventSubscriber.handle",
+      spanName,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "subscriber.name": subscriber.name,
           "pipeline.name": this.pipelineName,
-          "event.id": event.id,
-          "event.type": event.type,
-          "event.aggregate_id": String(event.aggregateId),
-          "tenant.id": String(event.tenantId),
+          ...attributes,
         },
       },
       async () => {
         await withMetrics({
-          fn: () =>
-            subscriber.handle(event, {
-              tenantId: String(event.tenantId),
-              aggregateId: String(event.aggregateId),
-            }),
+          fn,
           onComplete: (ms) => {
             incrementEsSubscriberTotal({
               pipelineName: this.pipelineName,
@@ -2119,15 +2305,15 @@ export class ProjectionRouter<
         try {
           await queueProcessor.send({ event, foldState });
         } catch (error) {
-          this.logger.error(
-            {
+          this.logDispatchFailure({
+            error,
+            fields: {
               subscriberName: subscriber.name,
               projectionName,
               eventId: event.id,
-              error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to dispatch event to subscriber queue",
-          );
+            message: "Failed to dispatch event to subscriber queue",
+          });
           errors.push(toError(error));
         }
       } else {

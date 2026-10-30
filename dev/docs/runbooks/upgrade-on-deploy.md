@@ -191,6 +191,23 @@ rollback, so steps that need old writers gone wait again for the assertion or th
 next upgrade run, and reopens every done background step so it re-runs over the rollback's writes.
 It answers the ids it reopened; running it twice reopens nothing more.
 
+**LangWatchQL after a `helm rollback`.** A rollback to an image before the non-destructive
+converge (issue #8726) brings back its drop-first converge: it drops each `_pg` engine table before
+recreating it, so a converge that fails while ClickHouse is still re-mounting the named collection
+leaves no engine tables, and that image has no level-triggered check to repair them. After
+such a rollback, check that every `_pg` table exists in the LangWatchQL database once ClickHouse
+has finished rolling, and run the LangWatchQL provisioning again if one is missing. Rolling forward
+to an image with the check repairs them within 5 minutes.
+
+**What the LangWatchQL check repairs.** Every 5 minutes the worker's check creates the app-owned
+objects that are missing (engine tables, views, key map, app functions, approved PostgreSQL views)
+and grants the reader SELECT on an approved view that lacks it. It never compares columns, never
+revokes and never creates the reader role, so a changed column or a missing role converges only on
+a deploy: use Ops > Upgrades Retry. Alert on `level=error` with the message "lwql provisioning failed
+creating ClickHouse objects" or "lwql provisioning failed creating PostgreSQL objects". The check runs
+every 5 minutes and logs each failed statement at warn as "lwql reconvergence statement failed",
+which this alert filter does not match.
+
 ## One runner at a time
 
 Only one process runs the upgrade at once, because of the runner lease: a row lease in the
@@ -231,8 +248,9 @@ branded page while an upgrade blocks, so the operator signals below are the only
    `mutations_sync` is 0, because migration 00103 runs a `MATERIALIZE INDEX` mutation.
 6. On the OLD image's Deployment, for the window, set the old image's own skip switches
    (`SKIP_PRISMA_MIGRATE`, `SKIP_CLICKHOUSE_MIGRATE`, `SKIP_LWQL_PROVISION`) so restarting old
-   pods do not race the upgrade. These are switches of the old image only; the new image does
-   not read them.
+   pods do not race the upgrade. The new image ignores the first two, but its tasks job still
+   reads `SKIP_LWQL_PROVISION` and would skip LangWatchQL provisioning, so set the switches on
+   the old Deployment alone and keep them off the new image's job and worker.
 7. Confirm `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the old line, so jobs the old api
    enqueues are readable by new workers.
 8. Cut over at low traffic with no long transactions open. Keep

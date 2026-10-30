@@ -2,13 +2,18 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { registerRoutePolicy } from "@langwatch/api";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import { McpMethodNotAllowedError, McpRouteNotFoundError } from "@langwatch/hosted-mcp-contract";
 import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { classifyClient, createLogger, endpointClassOf } from "@langwatch/observability";
+import {
+  censusClientOf,
+  recordCredentialCensus,
+  type CensusCredentialType,
+} from "@langwatch/observability/credential-census";
 import { nowInstant } from "@langwatch/time";
 
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
 import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.repository.ts";
-import type { McpSessionRelayRepository } from "../repositories/mcp-session-relay.repository.ts";
 import type { McpSessionRepository } from "../repositories/mcp-session.repository.ts";
 import {
   AUTHORIZATION_SERVER_METADATA_PATH,
@@ -18,41 +23,44 @@ import {
   PROTECTED_RESOURCE_METADATA_PATH,
 } from "../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
-import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
 import { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
 import { McpHttpService } from "./mcp-http.service.ts";
 import { McpOAuthEndpointService } from "./mcp-oauth-endpoint.service.ts";
 import { type McpCliSessions, McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
 import { McpSessionService } from "./mcp-session.service.ts";
-import { McpSseTransportService } from "./mcp-sse-transport.service.ts";
 import { McpStreamableTransportService } from "./mcp-streamable-transport.service.ts";
 import type { ProjectMcpProjectLookupService } from "./project-mcp-project-lookup.service.ts";
+import type { ResolvedMcpClientAddressService } from "./resolved-mcp-client-address.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
 const REAPER_INTERVAL_MS = 60 * 1000;
 
+/** Under the shortest idle timeout a proxy in front of us is likely to use (ALB and nginx: 60s). */
+const KEEPALIVE_INTERVAL_MS = 20 * 1000;
+
 /** The long-lived MCP HTTP surface one process mounts on its raw Node listener. */
 export interface McpHandler {
   handleRequest: (req: IncomingMessage, res: ServerResponse) => void;
   isMcpRoute: (pathname: string) => boolean;
+  /** Whether this replica holds a live copy of the session (for testing). */
+  holdsSession: (sessionId: string) => boolean;
   /** Clear the in-memory OAuth token cache (for testing). */
   clearTokenCache: () => void;
   /** Clear the in-memory OAuth/auth-failure rate limiter state (for testing). */
   clearRateLimiters: () => void;
-  /** Close all active sessions and release their records (graceful shutdown). */
+  /** Close this replica's copies at shutdown; the records stay so another replica takes over. */
   closeAllSessions: () => Promise<void>;
 }
 
 type McpEndpointCollaborators = Readonly<{
   sessionRecords: McpSessionRepository;
-  relay: McpSessionRelayRepository;
   oauthTokenRecords: McpOAuthTokenRepository;
   oauthClients: McpOAuthClientRepository;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
   cliSessions: McpCliSessions;
-  address: Pick<HeaderMcpClientAddressService, "clientIp">;
+  address: Pick<ResolvedMcpClientAddressService, "clientIp">;
   sessionTools?: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
   /** The public origin the MCP client is told to come back to. */
   baseHost: string;
@@ -66,7 +74,7 @@ type RouteVerbs =
   | Readonly<{ byMethod: ReadonlyMap<string, RouteHandler> }>;
 
 /**
- * The hosted MCP endpoint: the Streamable HTTP and SSE transports, OAuth discovery, registration
+ * The hosted MCP endpoint: the Streamable HTTP transport, OAuth discovery, registration
  * and token exchange, CORS, the access log, and the reaper that bounds abandoned state.
  */
 export class McpEndpointService implements McpHandler {
@@ -77,6 +85,7 @@ export class McpEndpointService implements McpHandler {
   readonly #oauth: McpOAuthEndpointService;
   readonly #routes: ReadonlyMap<string, RouteVerbs>;
   readonly #reaper: ReturnType<typeof setInterval>;
+  readonly #keepalive: ReturnType<typeof setInterval>;
 
   private constructor(collaborators: McpEndpointCollaborators) {
     const http = McpHttpService.create({ baseHost: collaborators.baseHost });
@@ -92,7 +101,6 @@ export class McpEndpointService implements McpHandler {
     this.#auth = auth;
     this.#sessions = McpSessionService.create({
       records: collaborators.sessionRecords,
-      relay: collaborators.relay,
       sessionTools: collaborators.sessionTools,
     });
     this.#oauth = McpOAuthEndpointService.create({
@@ -101,13 +109,14 @@ export class McpEndpointService implements McpHandler {
       oauthTokens: this.#oauthTokens,
       clients: collaborators.oauthClients,
     });
-    this.#routes = this.#routeTable({
-      streamable: McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
-      sse: McpSseTransportService.create({ http, auth, sessions: this.#sessions }),
-    });
+    this.#routes = this.#routeTable(
+      McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
+    );
     this.#reaper = setInterval(() => this.#reap(), REAPER_INTERVAL_MS);
-    // The process may exit while the reaper is still scheduled.
+    this.#keepalive = setInterval(() => this.#sessions.pingOpenStreams(), KEEPALIVE_INTERVAL_MS);
+    // The process may exit while either timer is still scheduled.
     this.#reaper.unref();
+    this.#keepalive.unref();
   }
 
   /** Composed means mounted, and mounted means the route-policy audit should see it. */
@@ -142,11 +151,13 @@ export class McpEndpointService implements McpHandler {
       return;
     }
 
-    this.#dispatch({ req, res, pathname, method }).catch((err: unknown) => {
+    this.#dispatch({ req, res, pathname, method }).catch(async (err: unknown) => {
       logger.error({ error: err, url: req.url }, "MCP handler error");
-      if (!res.headersSent) this.#http.sendJson(res, 500, { error: "Internal server error" });
+      if (!res.headersSent) await this.#http.sendHandled(res, err);
     });
   };
+
+  holdsSession = (sessionId: string): boolean => this.#sessions.streamable.has(sessionId);
 
   clearTokenCache = (): void => {
     this.#auth.clearGrantChecks();
@@ -159,6 +170,7 @@ export class McpEndpointService implements McpHandler {
 
   closeAllSessions = async (): Promise<void> => {
     clearInterval(this.#reaper);
+    clearInterval(this.#keepalive);
     await this.#sessions.closeAll();
   };
 
@@ -170,31 +182,33 @@ export class McpEndpointService implements McpHandler {
   }): Promise<void> {
     const { req, res, pathname, method } = input;
     // RFC 9728 path-suffixed discovery, tried before the bare form by every current MCP client.
-    if (this.#serveMetadataSubtree({ res, pathname, method })) return;
+    if (await this.#serveMetadataSubtree({ res, pathname, method })) return;
 
     const verbs = this.#routes.get(pathname);
     if (!verbs) {
-      this.#http.sendJson(res, 404, { error: "Not found" });
+      await this.#http.sendHandled(res, new McpRouteNotFoundError());
       return;
     }
     const handle = "anyMethod" in verbs ? verbs.anyMethod : verbs.byMethod.get(method);
     if (!handle) {
-      this.#http.sendMethodNotAllowed(res);
+      await this.#http.sendHandled(res, new McpMethodNotAllowedError());
       return;
     }
     await handle(req, res);
   }
 
-  #routeTable(transports: {
-    streamable: McpStreamableTransportService;
-    sse: McpSseTransportService;
-  }): ReadonlyMap<string, RouteVerbs> {
+  #routeTable(streamable: McpStreamableTransportService): ReadonlyMap<string, RouteVerbs> {
     const oauth = this.#oauth;
-    const { streamable, sse } = transports;
     const only = (method: string, handler: RouteHandler): RouteVerbs => ({
       byMethod: new Map([[method, handler]]),
     });
-    const sseMessage = only("POST", (req, res) => sse.handleMessage(req, res));
+    const streamableVerbs: RouteVerbs = {
+      byMethod: new Map<string, RouteHandler>([
+        ["POST", (req, res) => streamable.handlePost(req, res)],
+        ["GET", (req, res) => streamable.handleGet(req, res)],
+        ["DELETE", (req, res) => streamable.handleDelete(req, res)],
+      ]),
+    };
     return new Map<string, RouteVerbs>([
       [
         "/mcp/health",
@@ -215,30 +229,25 @@ export class McpEndpointService implements McpHandler {
       ],
       ["/oauth/register", only("POST", (req, res) => oauth.handleRegister(req, res))],
       ["/oauth/token", only("POST", (req, res) => oauth.handleToken(req, res))],
-      [
-        "/mcp",
-        {
-          byMethod: new Map<string, RouteHandler>([
-            ["POST", (req, res) => streamable.handlePost(req, res)],
-            ["GET", (req, res) => streamable.handleGet(req, res)],
-            ["DELETE", (req, res) => streamable.handleDelete(req, res)],
-          ]),
-        },
-      ],
-      ["/sse", only("GET", (req, res) => sse.handleConnect(req, res))],
-      ["/messages", sseMessage],
-      ["/sse/messages", sseMessage],
+      ["/mcp", streamableVerbs],
+      // The SSE transport is retired; a client still configured with its URL is served the
+      // Streamable HTTP transport there.
+      ["/sse", streamableVerbs],
     ]);
   }
 
   /** Whether the request belonged to a path-suffixed discovery subtree and has been answered. */
-  #serveMetadataSubtree(input: { res: ServerResponse; pathname: string; method: string }): boolean {
+  async #serveMetadataSubtree(input: {
+    res: ServerResponse;
+    pathname: string;
+    method: string;
+  }): Promise<boolean> {
     const path = classifyMetadataSubtreePath(input.pathname);
     if (path.kind === "outside") return false;
     if (input.method !== "GET") {
-      this.#http.sendMethodNotAllowed(input.res);
+      await this.#http.sendHandled(input.res, new McpMethodNotAllowedError());
     } else if (path.kind === "unpublished") {
-      this.#oauth.handleUnpublishedMetadata(input.res);
+      await this.#oauth.handleUnpublishedMetadata(input.res);
     } else if (path.kind === "protected-resource") {
       this.#oauth.handleProtectedResourceMetadata(input.res, path.resourceSuffix);
     } else {
@@ -258,14 +267,18 @@ export class McpEndpointService implements McpHandler {
     try {
       const startedAt = nowInstant().epochMilliseconds;
       const userAgent = req.headers["user-agent"] ?? null;
+      const header = (name: string) => {
+        const value = req.headers[name];
+        return Array.isArray(value) ? value[0] : value;
+      };
       const attribution = {
         endpointClass: endpointClassOf(input.pathname),
-        ...classifyClient((name) => {
-          const value = req.headers[name];
-          return Array.isArray(value) ? value[0] : value;
-        }),
+        ...classifyClient(header),
       };
+      const bearer = this.#auth.extractBearer(req);
+      const credentialType = bearer ? this.#auth.credentialTypeOf(bearer) : undefined;
       res.once("close", () => {
+        this.#countCredential({ ...input, header, credentialType });
         try {
           logger.info(
             {
@@ -289,6 +302,32 @@ export class McpEndpointService implements McpHandler {
       }
     } catch {
       // Logging must not break request handling.
+    }
+  }
+
+  /** One authenticated MCP request into the credential census, as client hosted-mcp. */
+  #countCredential(input: {
+    res: ServerResponse;
+    pathname: string;
+    method: string;
+    header: (name: string) => string | undefined;
+    credentialType: CensusCredentialType | undefined;
+  }): void {
+    try {
+      const { projectId } = this.#http.logFieldsOf(input.res);
+      if (!input.credentialType || !projectId) return;
+      recordCredentialCensus({
+        ...censusClientOf(input.header),
+        client: "hosted-mcp",
+        credentialType: input.credentialType,
+        projectId,
+        method: input.method,
+        route: isMcpRoute(input.pathname) ? input.pathname : "<other>",
+        family: "hosted-mcp",
+        status: input.res.statusCode,
+      });
+    } catch {
+      // The census only observes.
     }
   }
 

@@ -174,60 +174,44 @@ $12,500.00",
 }
 `;
 
-exports[`given the Slack notice registry > when new-user / from a campaign is rendered > matches its stored rendering 1`] = `
+exports[`given the Slack notice registry > when new-organization / from a campaign is rendered > matches its stored rendering 1`] = `
 {
   "blocks": [
     {
-      "text": {
-        "emoji": true,
-        "text": "👋 New user registered",
-        "type": "plain_text",
-      },
-      "type": "header",
-    },
-    {
-      "fields": [
+      "actions": [
         {
-          "text": "*Name*
-Morgan Ellis",
-          "type": "mrkdwn",
-        },
-        {
-          "text": "*Email*
-morgan@acme.example",
-          "type": "mrkdwn",
-        },
-        {
-          "text": "*Organization*
-Acme Robotics",
-          "type": "mrkdwn",
-        },
-        {
-          "text": "*Phone*
-+31 20 555 0100",
-          "type": "mrkdwn",
-        },
-        {
-          "text": "*Campaign*
-launch-week",
-          "type": "mrkdwn",
-        },
-      ],
-      "type": "section",
-    },
-    {
-      "elements": [
-        {
-          "action_id": "new-user_0",
+          "action_id": "new-organization_0",
           "text": {
-            "text": "Open org in admin",
+            "text": "User in ops",
             "type": "plain_text",
           },
           "type": "button",
-          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+          "url": "https://app.langwatch.ai/ops/users?q=user_morgan",
+        },
+        {
+          "action_id": "new-organization_1",
+          "style": "primary",
+          "text": {
+            "text": "Organisation in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/organizations?q=organization_acme",
         },
       ],
-      "type": "actions",
+      "body": {
+        "text": "Campaign launch-week · +31 20 555 0100",
+        "type": "mrkdwn",
+      },
+      "subtitle": {
+        "text": "Morgan Ellis · morgan.ellis@acme.example",
+        "type": "mrkdwn",
+      },
+      "title": {
+        "text": "🏢 Acme Robotics · new organisation",
+        "type": "mrkdwn",
+      },
+      "type": "card",
     },
     {
       "elements": [
@@ -239,40 +223,44 @@ launch-week",
       "type": "context",
     },
   ],
-  "text": "👋 New user registered · Name: Morgan Ellis · Email: morgan@acme.example · Organization: Acme Robotics · Phone: +31 20 555 0100 · Campaign: launch-week",
+  "text": "🏢 Acme Robotics · new organisation · Morgan Ellis · morgan.ellis@acme.example · Campaign launch-week · +31 20 555 0100",
 }
 `;
 
-exports[`given the Slack notice registry > when new-user / with only an email is rendered > matches its stored rendering 1`] = `
+exports[`given the Slack notice registry > when new-organization / with only an email is rendered > matches its stored rendering 1`] = `
 {
   "blocks": [
     {
-      "text": {
-        "emoji": true,
-        "text": "👋 New user registered",
-        "type": "plain_text",
-      },
-      "type": "header",
-    },
-    {
-      "fields": [
+      "actions": [
         {
-          "text": "*Name*
-Unknown",
-          "type": "mrkdwn",
+          "action_id": "new-organization_0",
+          "text": {
+            "text": "User in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/users?q=user_morgan",
         },
         {
-          "text": "*Email*
-morgan@acme.example",
-          "type": "mrkdwn",
-        },
-        {
-          "text": "*Organization*
-Unknown",
-          "type": "mrkdwn",
+          "action_id": "new-organization_1",
+          "style": "primary",
+          "text": {
+            "text": "Organisation in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/organizations?q=organization_acme",
         },
       ],
-      "type": "section",
+      "subtitle": {
+        "text": "morgan.ellis@acme.example",
+        "type": "mrkdwn",
+      },
+      "title": {
+        "text": "🏢 An organisation · new organisation",
+        "type": "mrkdwn",
+      },
+      "type": "card",
     },
     {
       "elements": [
@@ -284,7 +272,154 @@ Unknown",
       "type": "context",
     },
   ],
-  "text": "👋 New user registered · Name: Unknown · Email: morgan@acme.example · Organization: Unknown",
+  "text": "🏢 An organisation · new organisation · morgan.ellis@acme.example",
+}
+`;
+
+exports[`given the Slack notice registry > when new-user / joined by invitation is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "actions": [
+        {
+          "action_id": "new-user_0",
+          "text": {
+            "text": "User in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/users?q=user_riley",
+        },
+        {
+          "action_id": "new-user_1",
+          "style": "primary",
+          "text": {
+            "text": "Organisation in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/organizations?q=organization_acme",
+        },
+      ],
+      "subtitle": {
+        "text": "riley.chen@acme.example · via invitation",
+        "type": "mrkdwn",
+      },
+      "title": {
+        "text": "👋 Riley Chen joined Acme Robotics",
+        "type": "mrkdwn",
+      },
+      "type": "card",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "👋 Riley Chen joined Acme Robotics · riley.chen@acme.example · via invitation",
+}
+`;
+
+exports[`given the Slack notice registry > when new-user / joined through SSO is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "actions": [
+        {
+          "action_id": "new-user_0",
+          "text": {
+            "text": "User in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/users?q=user_riley",
+        },
+        {
+          "action_id": "new-user_1",
+          "style": "primary",
+          "text": {
+            "text": "Organisation in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/organizations?q=organization_acme",
+        },
+      ],
+      "subtitle": {
+        "text": "riley.chen@acme.example · via SSO (Okta)",
+        "type": "mrkdwn",
+      },
+      "title": {
+        "text": "👋 Riley Chen joined Acme Robotics",
+        "type": "mrkdwn",
+      },
+      "type": "card",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "👋 Riley Chen joined Acme Robotics · riley.chen@acme.example · via SSO (Okta)",
+}
+`;
+
+exports[`given the Slack notice registry > when new-user / with only an id is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "actions": [
+        {
+          "action_id": "new-user_0",
+          "text": {
+            "text": "User in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/users?q=user_riley",
+        },
+        {
+          "action_id": "new-user_1",
+          "style": "primary",
+          "text": {
+            "text": "Organisation in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/organizations?q=organization_acme",
+        },
+      ],
+      "subtitle": {
+        "text": "via SCIM",
+        "type": "mrkdwn",
+      },
+      "title": {
+        "text": "👋 Somebody joined an organisation",
+        "type": "mrkdwn",
+      },
+      "type": "card",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "👋 Somebody joined an organisation · via SCIM",
 }
 `;
 
@@ -480,6 +615,90 @@ Free",
     },
   ],
   "text": "⚠️ Resource limit reached · Organization: Acme Robotics · Admin: morgan@acme.example · Plan: Free · members: 2/2",
+}
+`;
+
+exports[`given the Slack notice registry > when scim-sync-summary / a large sync is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "actions": [
+        {
+          "action_id": "scim-sync-summary_0",
+          "style": "primary",
+          "text": {
+            "text": "Organisation in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/organizations?q=organization_acme",
+        },
+      ],
+      "body": {
+        "text": "Added: Riley Chen, Morgan Ellis, Sam Okafor and 39 more",
+        "type": "mrkdwn",
+      },
+      "subtitle": {
+        "text": "42 added · 3 updated · 2 deactivated · 1 failed",
+        "type": "mrkdwn",
+      },
+      "title": {
+        "text": "📇 SCIM updated Acme Robotics",
+        "type": "mrkdwn",
+      },
+      "type": "card",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "📇 SCIM updated Acme Robotics · 42 added · 3 updated · 2 deactivated · 1 failed · Added: Riley Chen, Morgan Ellis, Sam Okafor and 39 more",
+}
+`;
+
+exports[`given the Slack notice registry > when scim-sync-summary / only deactivations is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "actions": [
+        {
+          "action_id": "scim-sync-summary_0",
+          "style": "primary",
+          "text": {
+            "text": "Organisation in ops",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/organizations?q=organization_acme",
+        },
+      ],
+      "subtitle": {
+        "text": "2 deactivated",
+        "type": "mrkdwn",
+      },
+      "title": {
+        "text": "📇 SCIM updated Acme Robotics",
+        "type": "mrkdwn",
+      },
+      "type": "card",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "📇 SCIM updated Acme Robotics · 2 deactivated",
 }
 `;
 
@@ -964,5 +1183,182 @@ Morgan Ellis",
     },
   ],
   "text": "🌱 Prospective subscription interest · Triggered by Morgan Ellis · Organization: Acme Robotics · Plan: GROWTH_SEAT_EVENT · Customer: Morgan Ellis",
+}
+`;
+
+exports[`given the Slack notice registry > when upgrade-diagnostics / an automatic repo… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Upgrade step trace:backfill-span-costs failed on 3.23.0",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "Fills the cost of every span stored before costs were recorded.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Company*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Release*
+3.23.0",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Step*
+\`trace:backfill-span-costs\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Attempt*
+2",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Sent*
+automatically",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*First report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Latest report*
+<!date^1792403600^{date_short_pretty} at {time}|2026-10-19T09:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Instance*
+\`instance_7c1f0e\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "upgrade-diagnostics_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/cloud/self-hosted-instances?instance=shi_1",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Upgrade step trace:backfill-span-costs failed on 3.23.0 · Fills the cost of every span stored before costs were recorded. · Company: Acme Robotics · Release: 3.23.0 · Step: trace:backfill-span-costs · Attempt: 2 · Sent: automatically · First report: 2026-10-19T08:53Z · Latest report: 2026-10-19T09:53Z · Instance: instance_7c1f0e",
+}
+`;
+
+exports[`given the Slack notice registry > when upgrade-diagnostics / an unlicensed nam… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Upgrade step licensing:copy-organization-licenses failed on an unknown release",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Company*
+Unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Release*
+unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Step*
+\`licensing:copy-organization-licenses\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Attempt*
+1",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Sent*
+by the operator",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*First report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Latest report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Instance*
+\`instance_7c1f0e\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "upgrade-diagnostics_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/cloud/self-hosted-instances",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Upgrade step licensing:copy-organization-licenses failed on an unknown release · Company: Unknown · Release: unknown · Step: licensing:copy-organization-licenses · Attempt: 1 · Sent: by the operator · First report: 2026-10-19T08:53Z · Latest report: 2026-10-19T08:53Z · Instance: instance_7c1f0e",
 }
 `;

@@ -96,7 +96,15 @@
             return;
           }
           write(null);
+          dropSplashNote();
           say("Could not load. Check your connection.", true);
+        }
+        // The loading screen's note (vite/boot-splash.ts) may say "Connected"; it must not
+        // stand under the failure. Before the body is parsed, wait for the note to exist.
+        function dropSplashNote() {
+          var splashNote = document.getElementById("lw-boot-note");
+          if (splashNote) return splashNote.remove();
+          document.addEventListener("DOMContentLoaded", dropSplashNote, { once: true });
         }
         // Only the tags the server sent count: the parser has inserted them all by
         // "interactive", and no script of ours has run yet.

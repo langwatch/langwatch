@@ -32,7 +32,3 @@ See `specs/README.md` for feature file binding.
 ## Test plan
 
 <!-- How did you verify this works? List the key test scenarios. For bug fixes: what regression test did you add, and does it fail without the fix? -->
-
-## Anything surprising?
-
-<!-- Optional. Call out: known limitations, follow-on work needed, things a reviewer should pay extra attention to, or edge cases you deliberately chose not to handle. Delete this section if there's nothing to flag. -->

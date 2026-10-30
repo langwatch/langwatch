@@ -4,6 +4,7 @@
  * @vitest-environment node
  * @see modules/instant-eval/specs/instant-eval-api.feature
  * @see modules/instant-eval/specs/instant-eval-shorthand.feature
+ * @see specs/model-providers/instant-evals-decision-model.feature
  */
 import type {
   AnalyticsApi,
@@ -26,8 +27,11 @@ import {
 import {
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_REQUEST_TYPE,
+  type InstantEvalClassification,
   type InstantEvalJudgeApi,
+  type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
+import type { DecisionModelResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -42,6 +46,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalProcessModule } from "../../instant-eval.module.ts";
+import type { InstantEvalModule } from "../instant-eval.app.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -135,7 +140,7 @@ function projectWithTeam(id: string): ProjectWithTeam {
 /** The peers a run resolves through, each answering the one question it asks. */
 function installation({
   isReleased = true,
-  isOptedIn = false,
+  isOptedIn = isReleased,
   isFreePlan = true,
   classifier = "jev",
   judgeKey = "test-judge-key",
@@ -148,9 +153,16 @@ function installation({
   planType,
   mayManageOrganization = true,
   recordOptIn = async () => undefined,
+  decisionModel = { kind: "langwatch" },
+  judgeClassify,
 }: {
+  /** What the release flag answers: on the hosted service it releases an enterprise plan only. */
   isReleased?: boolean;
-  /** Whether the organization switched Instant Evals on itself, as organization answers. */
+  /**
+   * Whether the organization switched Instant Evals on itself, as organization answers; it follows
+   * the flag unless stated, so a self-serve fixture is released the way the hosted service
+   * releases one.
+   */
   isOptedIn?: boolean;
   isFreePlan?: boolean;
   classifier?: "jev" | "null" | "memory" | undefined;
@@ -171,6 +183,10 @@ function installation({
   /** What authz answers for `organization:manage` on the project's organization. */
   mayManageOrganization?: boolean;
   recordOptIn?: OrganizationApi["recordInstantEvalsOptIn"];
+  /** What the project's Instant Evals column resolves to (ADR-182). */
+  decisionModel?: DecisionModelResolution;
+  /** The Instant Evals judge's classify, for a test that reads what it was asked. */
+  judgeClassify?: InstantEvalJudgeApi["classify"];
 } = {}) {
   return (
     createApp({ role: "api" })
@@ -233,9 +249,14 @@ function installation({
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
         }),
+        // A project runs on LangWatch Instant Preview unless a test names its own model (ADR-182).
+        "model-provider": createApiFixture<ModelProviderApi>({
+          resolveDecisionModel: async () => decisionModel,
+        }),
         // The key is the judge's: Instant Evals asks for it on its first call (ADR-174 d. 13).
         "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>({
           isClassifierConfigured: async () => judgeKey !== null,
+          ...(judgeClassify ? { classify: judgeClassify } : {}),
         }),
       })
   );
@@ -632,6 +653,89 @@ describe("given a hosted Connect call judged on LangWatch Cloud", () => {
   });
 });
 
+const OWN_DECISION_MODEL: DecisionModelResolution = {
+  kind: "own",
+  model: "inception/decisions:mercury-decide",
+  wire: "jev",
+  providerModel: "mercury-decide",
+  endpoint: "https://api.inceptionlabs.ai/v1/decisions",
+  apiKey: "customer-key",
+};
+
+type InstantEvalSearchBar = Pick<InstantEvalModule, "classifySearch">;
+
+function hasSearchBar(app: object): app is InstantEvalSearchBar {
+  // The Api is a proxy that answers `get`, not `in`.
+  return typeof Reflect.get(app, "classifySearch") === "function";
+}
+
+/** What the installation provides, which carries the search bar the Api does not publish. */
+async function withSearchBar<T>(
+  options: Parameters<typeof installation>[0],
+  read: (app: InstantEvalSearchBar) => Promise<T>,
+): Promise<T> {
+  const runtime = await installation(options).boot();
+
+  try {
+    const app = runtime.module(instantEvalProcessModule).provided;
+    if (!hasSearchBar(app)) throw new Error("Instant Evals installed no search bar.");
+    return await read(app);
+  } finally {
+    await runtime.stop();
+  }
+}
+
+/** The judge leaf's classify, keeping every request it was asked. */
+function judgeLeaf() {
+  const asked: InstantEvalClassification[] = [];
+  const classify = async (input: InstantEvalClassification): Promise<InstantEvalJudgement> => {
+    asked.push(input);
+    return { verdicts: [], inputTokens: 0, isTextTruncated: false };
+  };
+  return { asked, classify };
+}
+
+describe("given a project whose Instant Evals column names its own decision model", () => {
+  describe("when the search bar classifies a sentence", () => {
+    /** @scenario "The search bar stays on LangWatch's classifier with an own decision model" */
+    it("asks LangWatch's classifier and never the own model", async () => {
+      const leaf = judgeLeaf();
+
+      await withSearchBar(
+        { decisionModel: OWN_DECISION_MODEL, judgeClassify: leaf.classify },
+        (app) =>
+          app.classifySearch({
+            projectId: PROJECT,
+            text: "frustrated users",
+            timeRange: { from: 0, to: 24 * 3_600_000 },
+            actor: { type: "user", id: "user-1" },
+          }),
+      );
+
+      expect(leaf.asked).toHaveLength(1);
+      expect(leaf.asked[0]?.decisionModel).toBeUndefined();
+    });
+  });
+
+  describe("when a run's text is classified", () => {
+    it("asks the own model with the organization's key", async () => {
+      const leaf = judgeLeaf();
+
+      await withInstallation(
+        { decisionModel: OWN_DECISION_MODEL, judgeClassify: leaf.classify },
+        (api) =>
+          api.classify({
+            projectId: PROJECT,
+            text: "I am fed up",
+            questions: [{ id: "annoyed", kind: "boolean", instructions: "Annoyed?" }],
+          }),
+      );
+
+      expect(leaf.asked.map((request) => request.decisionModel?.apiKey)).toEqual(["customer-key"]);
+    });
+  });
+});
+
 describe("given an organization's own Instant Evals switch", () => {
   describe("when a member who may manage the organization reads the offer", () => {
     it("offers the switch on the hosted service", async () => {
@@ -669,6 +773,37 @@ describe("given an organization's own Instant Evals switch", () => {
 
       expect(access).toEqual({ released: true, offer: "enable", viaConnect: false });
       expect(recorded).toEqual([{ organizationId: ORGANIZATION, userId: "member-1" }]);
+    });
+  });
+
+  describe("when the release flag is on for a self-serve organization that never switched itself on", () => {
+    /** @scenario "The release flag does not release a self-serve organization that never switched itself on" */
+    it("is not released, and the popover still offers the switch", async () => {
+      const access = await withInstallation(
+        { isReleased: true, isOptedIn: false },
+        async (api) => ({
+          isEnabled: await api.isEnabled({ projectId: PROJECT }),
+          offer: await api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
+        }),
+      );
+
+      expect(access).toEqual({
+        isEnabled: false,
+        offer: { released: false, offer: "enable", viaConnect: false },
+      });
+    });
+  });
+
+  describe("when the release flag is on for an enterprise organization that never switched itself on", () => {
+    /** @scenario "The release flag releases an enterprise organization" */
+    it("is released from the flag", async () => {
+      await withInstallation(
+        { isReleased: true, isOptedIn: false, planType: "ENTERPRISE" },
+        async (api) => {
+          await expect(api.isReleased({ projectId: PROJECT })).resolves.toBe(true);
+          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
+        },
+      );
     });
   });
 

@@ -314,7 +314,7 @@ describe("given a member this connection's directory provisioned", () => {
       if (failure === "ambiguous-email") {
         store.users.set("user_twin", {
           id: "user_twin",
-          email: EMAIL.toUpperCase(),
+          email: EMAIL,
           emailVerified: false,
           createdAtMs: 0,
           userHashKey: null,
@@ -717,7 +717,7 @@ describe("given the callback linking rule (ADR-117 section 3)", () => {
       const { service, store, proposals, audits } = createWorld({ confirmed: true });
       store.users.set("user_twin", {
         id: "user_twin",
-        email: EMAIL.toUpperCase(),
+        email: EMAIL,
         emailVerified: true,
         createdAtMs: 0,
         userHashKey: null,

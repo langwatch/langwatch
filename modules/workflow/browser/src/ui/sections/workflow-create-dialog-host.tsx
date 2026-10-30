@@ -2,13 +2,13 @@
  * Creating a workflow, from a template or from an imported file.
  */
 
+import { EmojiPicker } from "@langwatch/design-system/emoji-picker";
 import {
   Button,
   Field,
   HStack,
   Input,
   Textarea,
-  useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
@@ -19,7 +19,6 @@ import { useForm } from "react-hook-form";
 import { workflowApi } from "../../behavior/workflow-api.ts";
 import { getRandomWorkflowIcon } from "../../model/random-workflow-icon.ts";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
-import { WorkflowEmojiPicker } from "../blocks/workflow-emoji-picker.tsx";
 import {
   WorkflowCreateDialog as WorkflowCreateDialogView,
   type WorkflowTemplateCardProps,
@@ -94,7 +93,6 @@ function NewWorkflowForm({
 }) {
   const host = useWorkflowHost();
   const { projectId, projectSlug } = host.scope();
-  const emojiPicker = useDisclosure();
   const [defaultIcon] = useState(
     template.icon && template.icon !== "🧩" ? template.icon : getRandomWorkflowIcon(),
   );
@@ -160,19 +158,9 @@ function NewWorkflowForm({
     <form id={formId} onSubmit={handleSubmit(onSubmit)}>
       <VStack gap={4} align="stretch">
         <Field.Root invalid={!!errors.name || !!errors.icon}>
-          <WorkflowEmojiPicker
-            open={emojiPicker.open}
-            onClose={emojiPicker.onClose}
-            onChange={(emoji) => {
-              setValue("icon", emoji);
-              emojiPicker.onClose();
-            }}
-          />
           <Field.Label>Name and icon</Field.Label>
           <HStack>
-            <Button variant="outline" onClick={emojiPicker.onOpen} textStyle="metric">
-              {icon}
-            </Button>
+            <EmojiPicker value={icon} onChange={(emoji) => setValue("icon", emoji)} />
             <Input
               {...register("name", { required: "Name is required" })}
               ref={nameRef}

@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/platform-api",
-  "version": "3.20.1",
+  "version": "3.21.0",
   "private": true,
   "description": "LangWatch interactive API process composition.",
   "files": [
@@ -33,6 +33,7 @@
     "@langwatch/analytics-process": "workspace:*",
     "@langwatch/annotation-process": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/api-key-process": "workspace:*",
     "@langwatch/audit-log-process": "workspace:*",
     "@langwatch/auth-process": "workspace:*",
@@ -122,6 +123,7 @@
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

@@ -382,7 +382,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .get("/api/trace/:id", "getLegacyTrace")
   .withParams(traceLegacyIdParamsSchema)
   .withQuery(traceFormatQuerySchema)
-  .withPermission("traces:view")
+  .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
   .withMiddlewareContext(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
@@ -405,6 +405,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   // Neither names a successor, so neither carries the deprecation headers the
   // read and the search do.
   .post("/api/trace/:id/share", "shareLegacyTrace")
+  .keepsRecords()
   .withAudit("share.createShare")
   .withParams(traceLegacyIdParamsSchema)
   .withPermission("traces:share")
@@ -426,6 +427,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
 
   .post("/api/trace/:id/unshare", "unshareLegacyTrace")
   .withAudit("share.revoke")
+  .withoutConfirmation("Langy keys cannot hold traces:share")
   .withParams(traceLegacyIdParamsSchema)
   .withPermission("traces:share")
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
@@ -448,10 +450,11 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   //
   // The framework reads the body; the family's own schema then parses it.
   .post("/api/trace/search", "searchLegacyTraces")
+  .keepsRecords()
   .withoutAudit("read sent as a POST")
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
-  .withPermission("traces:view")
+  .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
   .withMiddlewareContext(tracesRestCredential)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -477,7 +480,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   // ── the deprecated thread read ────────────────────────────────────────────
   .get("/api/thread/:threadId", "getLegacyThread")
   .withParams(traceLegacyThreadParamsSchema)
-  .withPermission("traces:view")
+  .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
   .withMiddlewareContext(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({ hide: true })

@@ -8,11 +8,11 @@ import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
 import { MemoryHostedMcpRepositories } from "../../repositories/memory/memory.hosted-mcp.repositories.ts";
 import { HOSTED_MCP_FAMILY, hostedMcpRoutePolicies } from "../../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
-import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 class NoProjects implements Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey"> {
@@ -33,7 +33,7 @@ function handler() {
     projects: new NoProjects(),
     grants: new NoGrants(),
     cliSessions: new FakeCliSessions(),
-    address: HeaderMcpClientAddressService.create(),
+    address: ResolvedMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   }).createHandler();
 }
@@ -43,8 +43,6 @@ const DISPATCHED_PATHS = [
   "/mcp",
   "/mcp/health",
   "/sse",
-  "/messages",
-  "/sse/messages",
   "/.well-known/oauth-protected-resource",
   "/.well-known/oauth-protected-resource/mcp",
   "/.well-known/oauth-protected-resource/sse",
@@ -86,6 +84,7 @@ describe("given the hosted MCP route policy declarations", () => {
       expect(byVerb.get("GET /mcp/health")?.policy.kind).toBe("public");
       expect(byVerb.get("OPTIONS /mcp")?.policy.kind).toBe("public");
       expect(byVerb.get("POST /mcp")?.family).toBe(HOSTED_MCP_FAMILY);
+      expect(byVerb.get("POST /sse")?.policy).toEqual(byVerb.get("POST /mcp")?.policy);
     });
   });
 

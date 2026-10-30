@@ -16,7 +16,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
 import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
+import { UpgradeDiagnosticsService } from "../../features/upgrades/services/upgrade-diagnostics.service.ts";
 import { MemoryCloudLatestReleaseRepository } from "../../repositories/memory/memory.cloud-latest-release.repository.ts";
+import { MemoryCloudNoticeRepository } from "../../repositories/memory/memory.cloud-notice.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
@@ -51,6 +53,22 @@ const INSTALL_WIDE_KEYS = [
 
 let world: UsageReportWorld;
 let switchWrites: { optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean }[];
+let optOutWrites: boolean[];
+
+/** The diagnostics service over a licensing stand-in that records each opt-out it is told. */
+function diagnosticsService(): UpgradeDiagnosticsService {
+  return UpgradeDiagnosticsService.create({
+    ledger: MemoryUpgradeLedgerRepository.create(),
+    licensing: createApiFixture<LicensingApi>({
+      findInstanceIdentity: async () => [],
+      setUpgradeDiagnosticsOptOut: async ({ optOut }) => {
+        optOutWrites.push(optOut);
+      },
+    }),
+    deployment: { imageRelease: "3.17.0", chartVersion: null, installMethod: "helm" },
+    automaticDisabled: false,
+  });
+}
 
 function checkupService(): OpsCheckupService {
   return OpsCheckupService.create({
@@ -66,6 +84,8 @@ function checkupService(): OpsCheckupService {
       clickhouseOpsUrl: undefined,
       usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
       collectClickHouseBackupMetrics: true,
+      noticesDisabled: false,
+      upgradeDiagnosticsAutoSendDisabled: false,
       productAnalytics: { key: undefined, host: undefined },
       grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },
       bugReportSlackChannel: undefined,
@@ -125,6 +145,7 @@ function checkupService(): OpsCheckupService {
       cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
         store: MemoryOpsStore.create(),
       }),
+      cloudNotices: MemoryCloudNoticeRepository.create({ store: MemoryOpsStore.create() }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),
@@ -159,6 +180,7 @@ function app({
 }: { managers?: readonly string[]; operators?: readonly string[] } = {}) {
   return createOpsTestApp({
     checkup: checkupService(),
+    upgradeDiagnostics: diagnosticsService(),
     projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org-1" }),
     authz: authzWith({ managers, operators }),
   }).app;
@@ -180,6 +202,7 @@ function expectVerdictsOnly(rows: CheckupResult["rows"]): void {
 
 beforeEach(() => {
   switchWrites = [];
+  optOutWrites = [];
   world = UsageReportWorld.create();
   world.projectsByOrganization.set("org-1", ["project-1"]);
   world.projectsByOrganization.set("org-2", ["project-2", "project-3"]);
@@ -239,6 +262,20 @@ describe("given the caller holds the platform-operator grant", () => {
       });
     });
   });
+
+  describe("when the automatic upgrade diagnostics switch is turned off", () => {
+    it("writes the opt-out apart from the report's switches", async () => {
+      const answer = await app().setUpgradeDiagnosticsAutoSend({
+        organizationId: "org-1",
+        operator: STAFF,
+        enabled: false,
+      });
+
+      expect(optOutWrites).toEqual([true]);
+      expect(switchWrites).toEqual([]);
+      expect(answer).toMatchObject({ deployment: "self-hosted" });
+    });
+  });
 });
 
 describe("given no platform operator exists and the caller manages the organization", () => {
@@ -271,15 +308,34 @@ describe("given no platform operator exists and the caller manages the organizat
   });
 
   describe("when the usage report switches are changed", () => {
-    /** @scenario "An organization manager changes what the install reports" */
-    it("writes the switches", async () => {
-      await managerApp().setUsageReportSwitches({
-        organizationId: "org-1",
-        operator: MANAGER,
-        hostnameOptOut: true,
-      });
+    /** @scenario "An organization manager cannot change what the install reports" */
+    it("refuses as operator-only and writes nothing", async () => {
+      await expect(
+        managerApp().setUsageReportSwitches({
+          organizationId: "org-1",
+          operator: MANAGER,
+          hostnameOptOut: true,
+        }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
 
-      expect(switchWrites).toEqual([{ hostnameOptOut: true }]);
+      expect(switchWrites).toEqual([]);
+    });
+  });
+
+  describe("when the automatic upgrade diagnostics switch is read or changed", () => {
+    it("refuses as operator-only and writes nothing", async () => {
+      await expect(
+        managerApp().getUpgradeDiagnosticsAutoSend({ organizationId: "org-1", operator: MANAGER }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
+      await expect(
+        managerApp().setUpgradeDiagnosticsAutoSend({
+          organizationId: "org-1",
+          operator: MANAGER,
+          enabled: false,
+        }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
+
+      expect(optOutWrites).toEqual([]);
     });
   });
 

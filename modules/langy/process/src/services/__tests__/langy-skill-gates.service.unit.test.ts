@@ -6,7 +6,6 @@ import { LangySkillGatesService } from "../langy-skill-gates.service.ts";
 
 const INPUT = { userId: "user-1", projectId: "project-1", organizationId: "org-1" };
 const DASHBOARDS_FLAG = "release_dashboards";
-const PLAYGROUND_FLAG = "release_custom_chart_playground";
 
 function makeFlags(isEnabled: FeatureFlagApi["isEnabled"]): FeatureFlagApi {
   return createApiFixture<FeatureFlagApi>({ isEnabled });
@@ -31,9 +30,9 @@ describe("LangySkillGatesService", () => {
     });
   });
 
-  describe("given Dashboards is on and the custom chart playground is off", () => {
+  describe("given Dashboards is on", () => {
     /** @scenario "Langy builds dashboard widgets when Dashboards is on" */
-    it("withholds lwql-charts and never asks the playground flag", async () => {
+    it("withholds lwql-charts", async () => {
       const isEnabled = vi.fn(async (flag: string) => flag === DASHBOARDS_FLAG);
 
       const disabled = await LangySkillGatesService.create(makeFlags(isEnabled)).resolveDisabled(
@@ -41,7 +40,6 @@ describe("LangySkillGatesService", () => {
       );
 
       expect(disabled).toEqual(["lwql-charts"]);
-      expect(isEnabled).not.toHaveBeenCalledWith(PLAYGROUND_FLAG, expect.anything());
     });
   });
 

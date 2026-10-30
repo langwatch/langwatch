@@ -78,13 +78,11 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   );
 
   // Zero enabled providers shows the empty state shared with the prompt playground and
-  // workflow pickers; a skeleton renders while the providers query is in flight.
-  // Instant Evals needs no provider, so a released project keeps the picker.
-  const { project, organization } = useOrganizationTeamProject();
-  const instantEvals = useInstantEvalJudgeModels({
-    projectId: project?.id,
-    organizationId: organization?.id,
-  });
+  // workflow pickers; a skeleton renders while either query is in flight. An unanswered
+  // decision model list is not an empty one: showing the model against it marks a judge
+  // saved on an own decision model as needing an update when nothing is wrong with it.
+  const { project } = useOrganizationTeamProject();
+  const instantEvals = useInstantEvalJudgeModels({ projectId: project?.id });
   const { builtInModels } = instantEvals;
   const { isEmpty, isLoading } = useModelSelection({
     options: allModelOptions,
@@ -92,7 +90,7 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     mode: "chat",
     builtInModels,
   });
-  if (isLoading || (isEmpty && instantEvals.isLoading)) {
+  if (isLoading || instantEvals.isLoading) {
     return <Skeleton width="full" height="40px" borderRadius="md" />;
   }
   if (isEmpty) {

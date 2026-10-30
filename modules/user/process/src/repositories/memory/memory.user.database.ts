@@ -30,6 +30,7 @@ export type MemoryUserRow = {
   joinOfferDismissedDomains: readonly string[];
   /** Topic to choice; a topic that is absent was never answered. */
   notificationPreferences: Readonly<Record<string, UserNotificationChoice>>;
+  passwordResetRequiredAt?: Instant | null;
 };
 
 type MemoryUserAccountRow = {
@@ -65,10 +66,9 @@ export class MemoryUserDatabase {
     return [...this.#users.values()];
   }
 
+  /** Exact, as Postgres compares the unique email: addresses are stored lower-cased. */
   usersWithEmail(email: string): MemoryUserRow[] {
-    const wanted = email.toLowerCase();
-
-    return [...this.#users.values()].filter((row) => row.email?.toLowerCase() === wanted);
+    return [...this.#users.values()].filter((row) => row.email === email);
   }
 
   usersById(ids: readonly string[]): MemoryUserRow[] {

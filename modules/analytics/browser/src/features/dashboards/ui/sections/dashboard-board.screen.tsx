@@ -24,13 +24,16 @@ import {
 import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
-import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
+import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
+  boardContextChip,
+  boardSetupDraft,
   boardSubject,
   widgetMissingDataDraft,
   widgetPromptDraft,
@@ -46,6 +49,8 @@ import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { BoardUnavailable } from "../blocks/board-unavailable.tsx";
+import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
+import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetEditor } from "./board-widget-editor.tsx";
@@ -72,6 +77,21 @@ function AddWidgetButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+/** The header's project chip, present only on a board shared across projects. */
+function sharedProjectChip(projects: ReturnType<typeof useBoardProjects>) {
+  if (!projects.isShared) return {};
+  return {
+    project: (
+      <BoardProjectChip
+        current={projects.current}
+        ownerProject={projects.ownerProject}
+        projects={projects.projects}
+        onPick={projects.openIn}
+      />
+    ),
+  };
+}
+
 function OpenBoard({ board }: { board: SavedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
@@ -88,14 +108,23 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     stored: board.description,
   });
-  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
+  const { range } = useBoardRange();
+  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
+  const { grain, period, setRange, setGrain } = useBoardPeriod({
+    refreshedAt: autoRefresh.refreshedAt,
+  });
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
   const { widgets } = boardWidgets;
   const subject = boardSubject({ board, widgets });
   const langy = useLangyAsk();
+  useBoardLangyChip(boardContextChip({ board: subject, range, period }));
   const editor = useBoardEditor({ board: subject, period, widgets });
-  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
+  const empty = useEmptyWidgets();
+  const emptyWidgetNames = empty.emptyNames({ widgets, keyOf: ({ id }) => id });
+  const askLangyToSetUp = langy.enabled
+    ? () => langy.ask(boardSetupDraft({ emptyWidgetNames, board: subject, period }))
+    : undefined;
 
   const openPicker = () => {
     if (!picker.isOpen) picker.open();
@@ -132,18 +161,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
             widgetCount: boardWidgets.status === "success" ? widgets.length : void 0,
           }}
           action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
-          {...(projects.isShared
-            ? {
-                project: (
-                  <BoardProjectChip
-                    current={projects.current}
-                    ownerProject={projects.ownerProject}
-                    projects={projects.projects}
-                    onPick={projects.openIn}
-                  />
-                ),
-              }
-            : {})}
+          {...sharedProjectChip(projects)}
           periodControl={
             <BoardPeriodControl
               range={range}
@@ -189,6 +207,10 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
           <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
             <VStack align="stretch" gap={4}>
+              <EmptyWidgetsBanner
+                emptyWidgetNames={emptyWidgetNames}
+                onAskLangy={askLangyToSetUp}
+              />
               <BoardWidgetsGrid
                 projectId={projectId}
                 projectSlug={saved.projectSlug}
@@ -197,6 +219,9 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 widgets={widgets}
                 period={period}
                 isWriting={boardWidgets.isWriting}
+                onEmptyChange={({ widget, empty: showsNoData }) =>
+                  empty.report({ key: widget.id, empty: showsNoData })
+                }
                 langyFor={
                   langy.enabled
                     ? (widget) => ({
@@ -271,7 +296,12 @@ function Board() {
   // A deleted board and one set to Only me read the same: the server tells neither apart.
   if (!board) return <BoardUnavailable />;
   // Keyed so a board's in-flight edits never leak into the next board.
-  return <OpenBoard key={board.id} board={board} />;
+  return (
+    <>
+      <OldAnalyticsBanner />
+      <OpenBoard key={board.id} board={board} />
+    </>
+  );
 }
 
 export default function DashboardBoardScreen() {

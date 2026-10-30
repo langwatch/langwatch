@@ -1,5 +1,6 @@
 import { ATTR_KEYS, CODEX_TURN_SPAN_NAME } from "../attributeKeys.ts";
 import { type ExtractorContext, takeAttribute } from "../canonicalAttributes.ts";
+import { restateInputAsFresh, setFreshInputTokens } from "../canonicalExtraction.ts";
 import {
   applyCanonicalLifts,
   asNumber,
@@ -43,6 +44,7 @@ export class CodexSpanCanonicaliserService {
 
     if (ctx.span.name !== CODEX_TURN_SPAN_NAME) {
       this.liftResponseSpan(ctx);
+      this.restateWholeInput(ctx);
       this.typeUsageSpanAsModelCall(ctx);
       if (scopeName !== this.scopes.execScope) {
         this.markRedundantUsageSpan(ctx);
@@ -63,10 +65,6 @@ export class CodexSpanCanonicaliserService {
       [ATTR_KEYS.GEN_AI_REQUEST_MODEL, model],
       [ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model],
       [
-        ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
-        computeNonCachedInput({ attrs, cacheRead, cacheCreation }),
-      ],
-      [
         ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
         asNumber(takeAttribute(attrs, "codex.turn.token_usage.output_tokens")),
       ],
@@ -83,8 +81,18 @@ export class CodexSpanCanonicaliserService {
       [ATTR_KEYS.GEN_AI_CONVERSATION_ID, extractConversationId(attrs)],
     ];
 
-    if (applyCanonicalLifts(ctx, lifts)) {
+    const nonCachedInput = computeNonCachedInput({ attrs, cacheRead, cacheCreation });
+    if (applyCanonicalLifts(ctx, lifts) || nonCachedInput !== null) {
       ctx.recordRule("codex/session_task.turn");
+    }
+    // Codex's own non-cached count wins over a whole input the GenAI pass read.
+    if (nonCachedInput !== null) {
+      setFreshInputTokens(ctx, {
+        freshInput: nonCachedInput,
+        ruleId: "codex/session_task.turn(fresh input)",
+      });
+    } else {
+      this.restateWholeInput(ctx);
     }
 
     if (scopeName === this.scopes.execScope && this.hasTokenUsage(ctx)) {
@@ -113,6 +121,14 @@ export class CodexSpanCanonicaliserService {
     if (applyCanonicalLifts(ctx, lifts)) {
       ctx.recordRule("codex/handle_responses");
     }
+  }
+
+  /**
+   * Codex sends `gen_ai.usage.input_tokens` as the whole input, cached tokens included, as the
+   * OpenAI usage does.
+   */
+  private restateWholeInput(ctx: ExtractorContext): void {
+    restateInputAsFresh(ctx, { cacheWrite: 0, ruleId: "codex/usage.input_tokens(fresh)" });
   }
 
   private typeUsageSpanAsModelCall(ctx: ExtractorContext): void {

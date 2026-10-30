@@ -11,16 +11,21 @@ it. On conflict between sections, the more specific wins.
 
 Four Node processes, one composite of two of them, and three Go services:
 
-| Process               | Package                   | What it is                                                     |
-| --------------------- | ------------------------- | -------------------------------------------------------------- |
-| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)                             |
-| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle                   |
-| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                   |
-| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills                              |
-| `apps/backend`        | `@langwatch/backend`      | api + worker in one process: what `npx @langwatch/server` runs |
-| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)                       |
-| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators                  |
-| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers)                |
+| Process               | Package                   | What it is                                                       |
+| --------------------- | ------------------------- | ---------------------------------------------------------------- |
+| `apps/docs`           | `@langwatch/docs-site`    | Static documentation UI; React prerenders HTML and agent exports |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)                               |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle                     |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                     |
+| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills                                |
+| `apps/backend`        | `@langwatch/backend`      | api + worker in one process: what `npx @langwatch/server` runs   |
+| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)                         |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators                    |
+| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers)                  |
+
+The docs UI is independently built under `apps/docs` from authored `docs/` content.
+Its deployment is static HTML, CSS, media and lazy browser islands; it needs no
+Node server, API or database in production.
 
 **Applications hold no product code.** The product lives in modules. An
 application is a `main.ts` and a `config.ts`; everything it used to carry —
@@ -181,8 +186,8 @@ or drops it. Each patch has one owning module and a test there that runs the pat
 
 **Build stamp** (Alex, 2026-10-09). `isReleaseBuild` in `packages/config/src/release-build.ts` is a
 committed `false`; the release image build sets it `true` in its builder stage (`infra/docker/Dockerfile`,
-build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/pack-npm.sh` sets it on the npx
-staged copy. Runtime env cannot change it, only a rebuild can. A release build verifies licences
+build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/build-app-archive.sh` sets it on
+the npx app archive's staged copy (ADR-180). Runtime env cannot change it, only a rebuild can. A release build verifies licences
 against the embedded LangWatch key only and logs once, by name, that the public-key override is ignored.
 
 ---
@@ -343,7 +348,8 @@ document, is the authority on filenames):
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
   The prefix is the owning subject's name without hyphens: `slackintegration` (Alex, 2026-09-30).
 - No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
-  `domain/`.
+  `domain/`, in a module or a framework package (Alex, 2026-10-19,
+  [ADR-181](adr/181-framework-packages-are-layered-like-a-process-half.md); §3.4).
 
 **A value is parsed once, where it enters untyped** (a transport, a channel's inbound message, a
 fold's stored payload) and travels as its `z.infer` type after that: a service does not re-parse what
@@ -493,7 +499,7 @@ A folder over 30 source files is grouped into features, not left flat; a process
 way, `process/src/features/<concern>/` holding that concern's services, rules and the rest
 (Alex, 2026-10-01).
 
-**Process and contract nest the same way** (Alex, 2026-10-01): a folder past 30 source files is grouped into concern features of small, single-responsibility classes, never a pile of loose root-level functions. `process/src/features/<concern>/` repeats `services/`, `rules/`, `repositories/` and `eventing/`; `contract/src/features/<concern>/` holds that concern's schemas, events and commands. What every concern shares stays at the top level; a concern's pieces move together. A lint budget on files per folder and lines per file keeps it from growing back. Nesting is one level: a module takes as many concerns as keep each folder at 30 or under, never `features/<a>/features/<b>/`. A framework package groups its files into plain folders behind unchanged `package.json` export subpaths.
+**Process and contract nest the same way** (Alex, 2026-10-01): a folder past 30 source files is grouped into concern features of small, single-responsibility classes, never a pile of loose root-level functions. `process/src/features/<concern>/` repeats `services/`, `rules/`, `repositories/` and `eventing/`; `contract/src/features/<concern>/` holds that concern's schemas, events and commands. What every concern shares stays at the top level; a concern's pieces move together. A lint budget on files per folder and lines per file keeps it from growing back. Nesting is one level: a module takes as many concerns as keep each folder at 30 or under, never `features/<a>/features/<b>/`. A framework package nests the same way (Alex, 2026-10-19; [ADR-181](adr/181-framework-packages-are-layered-like-a-process-half.md)): its `src/` holds `features/<concern>/` folders of `vocabulary/`, `services/`, `repositories/` and `channels/` (each with tier folders and memory twins, the Lua keyspace repositories excepted), `rules/` and `eventing/`; what every concern shares sits at the top in `vocabulary/`, `rules/`, `repositories/`, `channels/` and `telemetry/`; its public runtime classes are in `app/`, and its `package.json` entry files are `export … from` lines only. Export subpaths, public names and their signatures do not change. A package opts in with `"langwatch": { "layout": "features" }` in its own `package.json` when it moves; until then it keeps its plain folders.
 
 The fragment-file budget never reports a module contract's `<id>.config.ts` (§6) or a file its own `package.json` publishes through `exports`, a deliberate public entry point (ruling SF-2; Alex, 2026-10-08).
 
@@ -598,7 +604,9 @@ closed: a table is refused if any of its projects lacks it. Filtering per projec
 is a tracked gap (`@unimplemented` in `specs/lwql/catalogue-grants.feature`).
 
 **Authority fails closed, tooling fails open** (Alex, 2026-09-30). A failed authz check is a plain 500
-with no rows, never a partial answer. The LWQL editor still edits without a schema (grammar only), a
+with no rows, never a partial answer. The hosted MCP endpoint answers a grant or credential re-check
+that could not run as a 503 with `Retry-After` (`mcp_store_unavailable`), because MCP clients read a
+401 as "sign in again" and a 500 as fatal (Alex, 2026-10-14). The LWQL editor still edits without a schema (grammar only), a
 failed validation clears its markers, and Run always asks the server. Its markers come from the
 `analytics.lwql.validate` query (Alex, 2026-09-30), the server's own validator, which never executes;
 the browser never validates.
@@ -856,7 +864,7 @@ readings and publishes them to shared state; each process's gauge reads that sta
 never repeat the query and every gauge agrees (Alex, 2026-09-29).
 Traces and logs compose through the `langwatch` SDK's own observability
 setup where its API fits — the platform dogfoods its SDK.
-`hostedStores(stores)` from process-stores, `hostedRuntime({ name, runtime,
+`hostedStores({ source, drainTimeoutMs })` from process-stores, `hostedRuntime({ name, runtime,
 drain })` from the process package. A raw `{ name, start, stop }` object
 literal at a call site is banned — if a component has no spoken factory,
 write the factory. Transport/route discovery is likewise built in at the
@@ -1500,7 +1508,7 @@ step's per-tenant state lives in one framework-owned table beside the ledger,
 tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
 steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
 accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
-tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A step that reports `migrated` on every pass by design declares `migratedIsSteady`: its migrated tenants are kept in step, never held, and Ops lists only its parked ones as needing attention (Alex, 2026-10-12, SWB-F5). A finished upgrade run asks ops for one
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A step that reports `migrated` on every pass by design declares `migratedIsSteady`: its migrated tenants are kept in step, never held, and Ops lists only its parked ones as needing attention (Alex, 2026-10-12, SWB-F5). A single outcome takes the same form with `heldReason: "person"`, held until a person acts (the user proves the account, an operator lifts a pin): it never reads as failed, leaves its step settled, and Ops counts it apart from the tenants needing attention (2026-10-21). A finished upgrade run asks ops for one
 system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
 2026-10-09, UPG-008 D2); the request's queue jobs run ahead of any backlog (Alex, 2026-10-11). A step that must read every tenant reads through its owner's repository with
 raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1; the flag replaced the `-- @tenancy:` comment, Alex, 2026-10-10). Stored-object's ClickHouse import is a `project` tenant step with
@@ -1701,12 +1709,14 @@ read through a narrow single-event read seat beside the producer-only store, wit
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
 2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
 
-**A trace summary lookup is anchored on its event's time** (Alex, 2026-10-10): a summary is filed
-under its trace's start, which never moves, so a lookup reads windows widening back from the span's
-own occurredAt (3, 7, 21, 30 days, plus 1 day forward), stops at the first hit, and never scans every
-partition. Next: per-owner id index tables (unpartitioned, filled by a materialised view) for one
-exact read by id (`dev/docs/plans/id-index-2026-10-10.md`), replacing this ladder; parked: a
-default retention-period bound on every ClickHouse read.
+**A lookup by id reads through its table's id index** (Alex, 2026-10-11): each time-partitioned
+table looked up by id alone has an unpartitioned `<table>_id_index` (TenantId, id to its time range),
+owned by the table's owner and filled by a materialised view, with one background step per owner
+filling history. A read takes the caller's time when given, else the index's range, else (index not
+yet ready, or a miss) the old anchored or windowed read. Ready means the index holds its marker row
+on that ClickHouse target, written by the fill or, over an empty source, by the first check; never a
+feature flag (Alex, 2026-10-11). `dev/docs/plans/id-index-2026-10-10.md`.
+Parked: a default retention-period bound on every ClickHouse read.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
@@ -1789,6 +1799,9 @@ markPaidOutOfBand take `ops:manage`. A view-only operator reads and is refused o
 task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted install the first user to sign up is recorded as the seed's decision (`first-user`) from user's `lw.user.created` fact, whatever `ADMIN_EMAILS` says, while nobody holds the grant and they are the only user; the seed's one-key record and latch grant at most one (Alex, 2026-10-10).
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
+On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
+recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
+grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
 user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
 difference from main (Alex, 2026-10-01).
@@ -1903,7 +1916,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
-- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. Keys created on main keep main's access and new projects get no legacy key (Alex, 2026-10-09): a legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
+- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. New projects get no legacy key (Alex, 2026-10-09). A legacy key is ingestion-only (`traces:create`) plus the routes that name a scope flag listing its project (`withPermission(permission, { legacyKey })`, `LEGACY_PROJECT_KEY_SCOPE_FLAGS`); beyond that it is report-only by default, refused with 403 on a project in `legacy_project_key_scope_enforced`, and unrestricted on a project in `legacy_project_key_full_access` (spec: modules/auth/specs/legacy-project-key-scope.feature). A legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
   It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
   replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
   one, and a new project gets no customer-facing project key (Alex, 2026-09-30). No engine and no internal caller
@@ -2120,7 +2133,7 @@ each owner's events, which carry ids and the non-personal, point-in-time facts; 
 personal data: where a signal needs some it carries the id (and a revision), and nurturing reads the value from
 `UserApi` at delivery and never stores it. Only the email and name leave, to Customer.io, once at sign-up; each
 identify sends only the traits that signal changes, once per source event.
-With no owner-to-nurturing edges, its `nurturing -> user` read closes no construction or package-import cycle, and the ratchet baseline
+With no owner-to-nurturing edges, its `nurturing -> user` and `nurturing -> organization` reads close no construction or package-import cycle, and the ratchet baseline
 carries no exception for it (Alex, 2026-09-29).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
@@ -2162,6 +2175,7 @@ An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite c
 are gone; a fresh install plans upcast steps by their mode (Alex, 2026-10-06, rounds 15 and 16;
 no floor, Alex, 2026-10-11).
 A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data? }])` on its pipeline: jobs an older release queued under `from` run on that lane, its own or its peer lane; the alias is kept like every step (Alex, 2026-10-11). They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A lane with no successor is tombstoned (`{ from, tombstone }`), and an aliased job whose event type no successor takes is acknowledged with a log line; an alias whose lane is not installed still retries (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
+Beside an event subscriber's `enqueue.stage` (ADR-069), a fold projection subscriber may queue a compact job body parsed by its own schema instead of the event (`withProjectionSubscriber({ job })`); readers accept both bodies before any writer switches (Alex, 2026-10-20; `packages/eventing/specs/compact-subscriber-job.feature`).
 `defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over
 fold is refolded over the deploy overlap only; absent, the start of the log (round 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
@@ -2203,6 +2217,12 @@ A replay reads its projections off the pipelines the process registered: `replay
 unwraps a `RedisCachedFoldStore` to its durable tier, and a map projection's owner declares the
 `targetTable` a rebuild optimizes on its definition. No list outside the owning module names a
 store or a table (Alex, 2026-09-28).
+Ready groups of one handler and one tenant run as one batch, with one store write and one
+fold-state read; a failure retries per group, and a batch never waits past the settling window
+(Alex, 2026-10-16; `packages/group-queue/specs/cross-group-batch.feature`).
+Queue slots grow only while each step raises completed jobs per second, and shrink when job
+duration, failures, event-loop or heap pressure rise; never below the configured concurrency, at
+most 1000 (Alex, 2026-10-20; `packages/group-queue/specs/adaptive-slots.feature`).
 A pipeline whose projections write tenant rows declares each tenant's retention itself (Alex,
 2026-09-28): `.withRetention(resolver)`, built from its module's own `DataRetentionApi` dependency
 (`getResolvedForProject`, a tenant being a project), and registration prefers it to the runtime's.
@@ -2320,6 +2340,8 @@ its attempts. Only a single call that may run longer raises the limit (Alex, 202
 through the framework; no module scans queues or reads the `gq:parked-tenants` keys directly (Alex,
 2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
+Queue Lua scripts declare Redis 7 script flags: growth scripts are refused whole at the memory cap,
+scripts that free memory carry allow-oom; Redis 7 is the minimum (Alex, 2026-10-20).
 
 A dequeued event whose type no pipeline on that worker declares is handed back without using an
 attempt, not refused (Alex, 2026-10-08, round 24; 2026-10-12, G1-F1): mid rolling deploy an older
@@ -2465,7 +2487,7 @@ dialogs and cards are prop-driven shapes, not assembled parts (ADR-002 in
 
 **The session version is authz's, per user** (Alex, 2026-09-30): `AuthzApi.getSessionVersion({ userId })` backs `x-lw-session-version`, and a browser declaration states `.withApi(api, { contracts })`. A grant or role event bumps only the users it reaches (Alex, 2026-10-01): a role's holders come from its live grants, directly or through a group or team; a holder set that cannot be computed, or that passes 500 principals, bumps the whole organisation, and a failed lookup logs a warning; the tRPC host reads the version once per request (modules/authz/specs/session-version-holders.feature). ADR-170.
 
-**A query never returns a credential** (Alex, 2026-10-01): every tRPC query may be cached, in memory and on the browser's disk, so no query output carries a secret (S3 secret key, project API key, LangWatchQL key, tokens, passwords). A credential comes back only from a mutation, and a mutation is never cached. A form that writes a secret never reads it back: blank means unchanged. A blank secret where none is stored yet is refused. A legacy project key is never read or rotated: its one action, `project.revokeProjectApiKey`, ends it for good and shows no new key; personal access tokens replace it, the CLI included (Alex, 2026-10-01). Admins only (`project:manage`), offered by a deprecation banner with a two-step confirm; `project.getLegacyKeyStatus` answers `{ present }`, same permission. The revoke overwrites the column with `lw-revoked-<ksuid>`, a value that never authenticates, until the column is dropped at sunset; the api-key answer cache may still honour the old value for up to 5 s. Platform paths never hand the legacy key to an engine. A run that calls LangWatch gets a virtual key minted like Langy's, FOR the starting user: it acts as them and is bound to the project. Its permissions are what this run needs (derived from the graph or run kind at mint time) intersected with what the user holds, never an unused one, and it expires after 15 minutes. A user lacking a needed permission is refused before the run starts (Alex, 2026-10-01). A run started with an API key holds no more than that key either: the needed set must sit inside both the person's grants and the key's own, the narrower winning (coordinator, 2026-10-01); a person's access token (CLI, hosted MCP) has no key row, so the person alone bounds its run, and until a later change a run started by an ownerless service key is bounded by what the run needs, not by the key (coordinator, 2026-10-01). The key is reused per (user, project, permission set) while 5 minutes remain, so long runs re-mint and experiments don't mint per cell; expiry is the only end, with no revoke op. A holder with a longer bound asks for a key that outlives it: a Lambda dispatch its 900 s timeout plus a minute, a self-hosted engine's dispatch a full 15 minutes, a scenario child its 15-minute stop; a fresh key then lives that floor plus the 5-minute reuse window, and no holder may ask for more than an hour. `ApiKeyApi.mintRunKey` is the one mint, and a code agent's sandbox gets its own per-run key holding only `agentCache:manage`, since user code reads it (ruled 2026-10-01). A run nobody started (monitors, online evaluations) acts as the system actor, never as the monitor's creator (that would let a creator's grants leak into unattended runs): its key has no owner, is bound to its project and holds only what that run needs (Alex, 2026-10-01). A key LangWatch mints for itself is marked so on its row (`isSystemManaged`); hiding it, refusing a customer's edit or revoke, and the system actor read that mark, never the name, so a customer key already carrying a newly reserved name stays the customer's, and the name only refuses new keys (coordinator, 2026-10-01). A third party's token typed into an HTTP node becomes a project secret on save; the node keeps only the `{{ secrets.NAME }}` reference. A project secret is not bound to an origin: whoever may edit a node may send a referenced secret to the address the node names (Alex, 2026-10-01). A value made only of `{{ secrets.NAME }}` references, optionally after one scheme word, is kept as references, and an agent test call is sent only the secrets its saved config references (Alex, 2026-10-01). The token is never readable through any query and never enters any cache: the browser mirror, any server cache, or Redis and queue payloads (Alex, 2026-10-01). A header is a credential when it is `Authorization`, `X-Api-Key`, `Cookie` or `Proxy-Authorization`, or its name contains key, token, secret, auth or password, case-insensitive; one test decides it for save, read and trace (Alex, 2026-10-01). A copy into another project arrives with every HTTP credential blank for the user to re-enter, and an agent's secrets are named from its id, so names never collide (Alex, 2026-10-01). The CLI, Langy and the hosted MCP sign in with the CLI's existing OAuth device grant, extended with no new routes. The exchange answers access and refresh tokens and the project, never a key; `/refresh` takes an optional project to re-scope; the API door accepts those access tokens as the person, capped at that project. MCP connections re-authorise once (Alex, 2026-10-01). Hosted MCP mints and rotates these sessions only through `AuthApi.issueProjectCliSession` and `refreshCliSession`; the project-tier `POST /api/api-keys/ingestion` (`traces:create`) mints an app's ingestion key from the project-bound access token, never from a key, for one shape only (personal, the caller's own, one binding to that project, `INGESTION_PERMISSIONS`, named after the machine, may never expire); a project login's session is locked to its project; a `/refresh` naming another project forks a child session locked to it and leaves the parent valid, as an MCP connection's session is a child of the person's, and ending or revoking the parent ends its children; an open MCP session adopts a refreshed token only for the same person and project; and a person's MCP session is refused the organization's ingestion-template tools, OTTL rules included, while their own ingestion-key tools still answer (coordinator, 2026-10-01). `login --project` writes a personal API key into the app's `.env`: the person's own key, bound to that project, with the full project permissions, so prompts, datasets, evaluations and simulations work from it as they did on main. The legacy project key (`Project.apiKey`) is never minted or returned. The CLI mints the key with a child session locked to that project and logs the child out afterwards; the stored credential is the key, never that session's access token. The project-tier `POST /api/api-keys/full-access` (`project:manage`) mints it from the project-bound access token, never from a key, for one shape only (personal, the caller's own, one ADMIN binding to that project, `permissionMode` all, named after the machine, may never expire), so it reaches what the person reaches in that project and nothing else. A person without `project:manage` gets the ingestion key instead, and the CLI says that key only sends traces; an older server that answers the project pick with an `api_key` has that key written as it is (founder, 2026-10-02). There is no separate key kind, only the same personal access token with a project scope; it is revocable (Alex, 2026-10-01). A token minted from a setup snippet holds the least its screen needs: ingestion only (`traces:create`) for trace and OTLP snippets, the one permission a prompt, evaluator or workflow snippet calls, and project reads for a coding-agent or MCP setup; it never exceeds what the person holds, a mint beyond that is refused with a message, and the screen says what the token can do (Alex, 2026-10-01). A coding-agent setup mints two tokens: ingestion only for `.env`, project reads for the MCP config. A setup skill that creates something gets its own token holding exactly the create permission it calls. The `/authorize` page mints the device-flow default set, capped at what the person holds, never a full key (Alex, 2026-10-01). The deleted CLI project-key path answers 410 Gone with an upgrade hint for a few releases (Alex, 2026-10-01).
+**A query never returns a credential** (Alex, 2026-10-01): every tRPC query may be cached, in memory and on the browser's disk, so no query output carries a secret (S3 secret key, project API key, LangWatchQL key, tokens, passwords). A credential comes back only from a mutation, and a mutation is never cached. A form that writes a secret never reads it back: blank means unchanged. A blank secret where none is stored yet is refused. A legacy project key is never read or rotated: its one action, `project.revokeProjectApiKey`, ends it for good and shows no new key; personal access tokens replace it, the CLI included (Alex, 2026-10-01). Admins only (`project:manage`), offered as a "Legacy" row on the API keys page whose one action, Revoke, revokes the legacy key and then opens the create drawer filled with an API key with full access to that project and no expiry, shown once when created; the revoke is refused unless that key could send traces (Admin or Member role on the project), and a "Legacy project keys are going away" banner stays until the revoke; `project.getLegacyKeyStatus` answers `{ present, lastUsedAt }`, same permission, and never the key. The revoke overwrites the column with `lw-revoked-<ksuid>`, a value that never authenticates, until the column is dropped at sunset; the api-key answer cache may still honour the old value for up to 5 s. Platform paths never hand the legacy key to an engine. A run that calls LangWatch gets a virtual key minted like Langy's, FOR the starting user: it acts as them and is bound to the project. Its permissions are what this run needs (derived from the graph or run kind at mint time) intersected with what the user holds, never an unused one, and it expires after 15 minutes. A user lacking a needed permission is refused before the run starts (Alex, 2026-10-01). A run started with an API key holds no more than that key either: the needed set must sit inside both the person's grants and the key's own, the narrower winning (coordinator, 2026-10-01); a person's access token (CLI, hosted MCP) has no key row, so the person alone bounds its run, and until a later change a run started by an ownerless service key is bounded by what the run needs, not by the key (coordinator, 2026-10-01). The key is reused per (user, project, permission set) while 5 minutes remain, so long runs re-mint and experiments don't mint per cell; expiry is the only end, with no revoke op. A holder with a longer bound asks for a key that outlives it: a Lambda dispatch its 900 s timeout plus a minute, a self-hosted engine's dispatch a full 15 minutes, a scenario child its 15-minute stop; a fresh key then lives that floor plus the 5-minute reuse window, and no holder may ask for more than an hour. `ApiKeyApi.mintRunKey` is the one mint, and a code agent's sandbox gets its own per-run key holding only `agentCache:manage`, since user code reads it (ruled 2026-10-01). A run nobody started (monitors, online evaluations) acts as the system actor, never as the monitor's creator (that would let a creator's grants leak into unattended runs): its key has no owner, is bound to its project and holds only what that run needs (Alex, 2026-10-01). A key LangWatch mints for itself is marked so on its row (`isSystemManaged`); hiding it, refusing a customer's edit or revoke, and the system actor read that mark, never the name, so a customer key already carrying a newly reserved name stays the customer's, and the name only refuses new keys (coordinator, 2026-10-01). A third party's token typed into an HTTP node becomes a project secret on save; the node keeps only the `{{ secrets.NAME }}` reference. A project secret is not bound to an origin: whoever may edit a node may send a referenced secret to the address the node names (Alex, 2026-10-01). A value made only of `{{ secrets.NAME }}` references, optionally after one scheme word, is kept as references, and an agent test call is sent only the secrets its saved config references (Alex, 2026-10-01). The token is never readable through any query and never enters any cache: the browser mirror, any server cache, or Redis and queue payloads (Alex, 2026-10-01). A header is a credential when it is `Authorization`, `X-Api-Key`, `Cookie` or `Proxy-Authorization`, or its name contains key, token, secret, auth or password, case-insensitive; one test decides it for save, read and trace (Alex, 2026-10-01). A copy into another project arrives with every HTTP credential blank for the user to re-enter, and an agent's secrets are named from its id, so names never collide (Alex, 2026-10-01). The CLI, Langy and the hosted MCP sign in with the CLI's existing OAuth device grant, extended with no new routes. The exchange answers access and refresh tokens and the project, never a key; `/refresh` takes an optional project to re-scope; the API door accepts those access tokens as the person, capped at that project. MCP connections re-authorise once (Alex, 2026-10-01). Hosted MCP mints and rotates these sessions only through `AuthApi.issueProjectCliSession` and `refreshCliSession`; the project-tier `POST /api/api-keys/ingestion` (`traces:create`) mints an app's ingestion key from the project-bound access token, never from a key, for one shape only (personal, the caller's own, one binding to that project, `INGESTION_PERMISSIONS`, named after the machine, may never expire); a project login's session is locked to its project; a `/refresh` naming another project forks a child session locked to it and leaves the parent valid, as an MCP connection's session is a child of the person's, and ending or revoking the parent ends its children; an open MCP session adopts a refreshed token only for the same person and project; and a person's MCP session is refused the organization's ingestion-template tools, OTTL rules included, while their own ingestion-key tools still answer (coordinator, 2026-10-01). `login --project` writes a personal API key into the app's `.env`: the person's own key, bound to that project, with the full project permissions, so prompts, datasets, evaluations and simulations work from it as they did on main. The legacy project key (`Project.apiKey`) is never minted or returned. The CLI mints the key with a child session locked to that project and logs the child out afterwards; the stored credential is the key, never that session's access token. The project-tier `POST /api/api-keys/full-access` (`project:manage`) mints it from the project-bound access token, never from a key, for one shape only (personal, the caller's own, one ADMIN binding to that project, `permissionMode` all, named after the machine, may never expire), so it reaches what the person reaches in that project and nothing else. A person without `project:manage` gets the ingestion key instead, and the CLI says that key only sends traces; an older server that answers the project pick with an `api_key` has that key written as it is (founder, 2026-10-02). There is no separate key kind, only the same personal access token with a project scope; it is revocable (Alex, 2026-10-01). A token minted from a setup snippet holds the least its screen needs: ingestion only (`traces:create`) for trace and OTLP snippets, the one permission a prompt, evaluator or workflow snippet calls, and project reads for a coding-agent or MCP setup; it never exceeds what the person holds, a mint beyond that is refused with a message, and the screen says what the token can do (Alex, 2026-10-01). A coding-agent setup mints two tokens: ingestion only for `.env`, project reads for the MCP config. A setup skill that creates something gets its own token holding exactly the create permission it calls. The `/authorize` page mints the device-flow default set, capped at what the person holds, never a full key (Alex, 2026-10-01). The deleted CLI project-key path answers 410 Gone with an upgrade hint for a few releases (Alex, 2026-10-01).
 
 **Query outputs are checked for credentials** (Alex, 2026-10-01): no read is marked "never on disk"; a framework test fails any tRPC query output with a secret-looking field.
 
@@ -2904,25 +2926,25 @@ projectId, datasetId, page })`; evaluator `getById({ projectId, id })`; project:
 members `members({ organizationId })` for active members, with deactivated ones in a second key
 that needs `organization:manage`; user `user.me()`.
 
-**Reads are mirrored to disk by default** (Alex, 2026-09-30, amended 2026-10-01; supersedes opt-in
-persistence and the build-id discard). Each tab keeps its own React Query cache, and every declared
-query is mirrored, one sealed row per query keyed by user and query hash (sealing in §10; memory
-where IndexedDB is unavailable). A read stays in memory only when it is over the per-row cap or on
-the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED` in
-`@langwatch/browser-host/cache-tiers`); there is no opt-in. Each user's mirror is LRU-bounded
-(25 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out.
-A row carries its read's schema hash: a digest of the contract's input and output schemas and an
-optional `revision: n`, bumped when a read's meaning changes and its shape does not
-(`schemaHashOf`, `@langwatch/module`). The browser takes the hash from the contract it was
-built with and drops a row whose hash differs before painting it; the server's `x-lw-schema`
-header on every query answer is the backstop for a tab whose bundle is older. No build id or age
-decides it. A mirrored read is restored when first asked for, never all at start-up; the first
-page of a paged read is mirrored too, restored as stale and refetched at once. A tab shown again
-reads IndexedDB first, then refetches the stale reads it holds, so hints it missed while hidden
-are caught up (Alex, 2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash
-drops that row. ADR-170 (in part),
-specs/ui/browser-query-caching.feature.
-`CachedView` ships.
+**Reads are mirrored to disk by default** (Alex, 2026-09-30, amended 2026-10-01 and 2026-10-26;
+supersedes opt-in persistence and the build-id discard). Each tab keeps its own React Query cache,
+and every declared query is mirrored, one sealed row per query keyed by user and query hash (sealing
+in §10; memory where IndexedDB is unavailable). A read stays in memory only when it is over the
+per-row cap or on the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED`
+in `@langwatch/browser-host/cache-tiers`); there is no opt-in. Each user's mirror is LRU-bounded
+(100 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out,
+room made before a write. A write the browser refuses for space sheds the coldest half and retries
+once, then drops the row. An impersonated session wipes the mirror and writes nothing to it. A row
+carries its read's schema hash: a digest of the contract's input and output schemas and an optional
+`revision: n`, bumped when a read's meaning changes and its shape does not (`schemaHashOf`,
+`@langwatch/module`). The browser takes the hash from the contract it was built with and drops a row
+whose hash differs before painting it; the server's `x-lw-schema` header on every query answer is
+the backstop for a tab whose bundle is older. No build id or age decides it. A mirrored read is
+restored when first asked for, never all at start-up; the first page of a paged read is mirrored
+too, restored as stale and refetched at once. A tab shown again reads IndexedDB first, then
+refetches the stale reads it holds, so hints it missed while hidden are caught up (Alex,
+2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash drops that row. ADR-170
+(in part), specs/ui/browser-query-caching.feature. `CachedView` ships.
 
 **Browser telemetry** (Alex, 2026-10-01). RUM is on by default wherever a collector is configured.
 Console errors, uncaught errors and rejected promises go out as `browser.error` spans through our
@@ -2968,6 +2990,15 @@ The connect upstream reaches gateway as licensing's `connect_upstream_set` / `co
 naming only the organization; on set, gateway pulls `{ baseUrl, token, instanceId }` from
 `LicensingApi.findConnectUpstream` and seals the token itself; licensing alone derives the token, including the
 instance-wide `LANGWATCH_LICENSE_KEY` fallback (Alex, 2026-10-10, PC-G2-CONNECT-TOKEN; supersedes C3b D2).
+
+**Self-hosted notices ride the usage report reply** (Alex, 2026-10-21/22). Licensing owns the
+`SelfHostedNotice` table and its `*Api` operations; staff write, publish and withdraw them through
+enterprise-ops (`ops:view` reads, `ops:manage` writes, audited like the license registry); saas adds the
+published, unexpired notices to its usage report reply, only when there are some. The install's ops keeps
+them beside the latest release, hides one its running release fixes, and `DISABLE_LANGWATCH_NOTICES` opts
+out. Notices are public text: any install that reports receives them, so none is gated on a known
+instance. Specs: `enterprise/modules/licensing/specs/self-hosted-notices.feature`,
+`modules/ops/specs/self-hosted-notices.feature`.
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
@@ -3078,6 +3109,8 @@ with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-2
 A stand-in a test needs is a real fixture or builder, never a new contract type: types do not change
 for tests (Alex, 2026-09-29). A test never `vi.spyOn`s a real service; it drives memory twins and
 fixtures instead (Alex, 2026-09-29).
+group-queue's `processClaimedJob` characterization harness stays pinned until the processor
+carve-up ends (Alex, 2026-10-19; ADR-181).
 A module exports no `./testing` subpath: a fixture another module's tests need lives in that consumer
 (Alex, 2026-10-06, round 4, Q208; §3).
 A scenario bound from a package's tests counts toward feature parity like one bound from a module's
@@ -3095,6 +3128,8 @@ A product that disagrees with its scenario is a behaviour question for the coord
 bind and never a rewording. The `spec-binding-review` skill keeps the detail.
 Every repository has a real memory twin, gateway's included, and unit tests build over the memory
 registry; there is no refusing stand-in tier (coordinator, members wave, 2026-10-05).
+The Lua keyspace repositories of an opted-in framework package are the exception; the Redis
+integration suites are their proof (Alex, 2026-10-19; ADR-181).
 The "New Experiment" button stays solid primary; its e2e expectation is updated (Alex, 2026-10-05).
 
 The installation test boots the installed list over memory stores, with no server
@@ -3334,6 +3369,11 @@ multi-line why (Alex, 2026-10-05). The `feature-configuration` policy demands no
 `modules/<name>/client` and `enterprise/modules/<name>/client` have the `client` role in the enforcer
 (`manifests`, `application-boundaries`, `browser-node-leak`) and in `langwatch/package-boundaries`
 (`clientRuntime`, `clientConsumer`), not the portable library's (Alex, 2026-10-06, round 4, Q208).
+`packages/eventing` and `packages/group-queue` have the `framework` role. One that opts into the
+feature layout (§3.4) also has a strict source and a layer (`packages/oxlint-rules/src/classify.mjs`):
+the grammar's `FRAMEWORK_PATTERNS` and the entry files its `exports` names are its homes, the layer
+tables add `vocabulary` and `telemetry` rows, and `service-ceilings` measures its services. The
+`process`-gated rules take the role too (Alex, 2026-10-19; ADR-181).
 
 **House rules are strict; a disable is very rare** (Alex, 2026-10-05). Most `langwatch/*` rules must not be
 ignored: a disable directive naming one is itself an error (`langwatch/suppression-states-why`). Only a few

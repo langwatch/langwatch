@@ -201,8 +201,8 @@ export function brandFallbackPage({
   if (!html.includes(FALLBACK_MARKER)) return html;
   const body = `${BOOT_SPLASH_BODY}${BUILDING_NOTE}${ground ? groundTag(ground) : ""}`;
   return html
-    .replace(/<style>[\s\S]*?<\/style>/, `<meta charset="utf-8">${BOOT_SPLASH_HEAD}`)
-    .replace(/<body>[\s\S]*<\/body>/, `<body style="margin:0">${body}</body>`);
+    .replace(/<style>[\s\S]*?<\/style>/, () => `<meta charset="utf-8">${BOOT_SPLASH_HEAD}`)
+    .replace(/<body>[\s\S]*<\/body>/, () => `<body style="margin:0">${body}</body>`);
 }
 
 /** Holds back an HTML response's body so Vite's fallback page can be rewritten whole. */
@@ -243,13 +243,17 @@ export function bootSplash({
     },
     transformIndexHtml: {
       order: "pre",
-      handler: async (html) =>
-        html
-          .replace("</head>", `${BOOT_SPLASH_HEAD}\n  </head>`)
+      handler: async (html) => {
+        // A function replacement, so a `$` pattern in the bundled script stays literal text.
+        const ground = groundTag(await groundScript());
+        return html
+          .replace("</head>", () => `${BOOT_SPLASH_HEAD}\n  </head>`)
           .replace(
             '<div id="root"></div>',
-            `<div id="root"></div>\n    ${BOOT_SPLASH_BODY}\n    ${HAND_OFF_SCRIPT}\n    ${groundTag(await groundScript())}`,
-          ),
+            () =>
+              `<div id="root"></div>\n    ${BOOT_SPLASH_BODY}\n    ${HAND_OFF_SCRIPT}\n    ${ground}`,
+          );
+      },
     },
     // Registered before Vite's own middlewares, so it wraps the response they send.
     configureServer: (server) => {

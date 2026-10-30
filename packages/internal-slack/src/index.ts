@@ -7,6 +7,7 @@ export {
   moment,
   noticeOriginSchema,
   type Mrkdwn,
+  type CardLayout,
   type NoticeAction,
   type NoticeField,
   type NoticeFixture,
@@ -18,16 +19,23 @@ export {
   type SlackNotice,
   type SlackNoticeMessage,
 } from "./notice.ts";
-export type { NewUserNoticeProps } from "./templates/index.ts";
+export type {
+  NewOrganizationNoticeProps,
+  NewUserNoticeProps,
+  ScimSyncSummaryNoticeProps,
+} from "./templates/index.ts";
 export {
   billingThresholdFailureNotice,
   licensePurchaseNotice,
+  newOrganizationNotice,
   newUserNotice,
   planLimitReachedNotice,
   resourceLimitReachedNotice,
+  scimSyncSummaryNotice,
   selfHostedSignalNotice,
   slackNotices,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
   subscriptionProspectiveNotice,
+  upgradeDiagnosticsNotice,
 } from "./templates/index.ts";

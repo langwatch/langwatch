@@ -129,6 +129,7 @@ test_template_rendering() {
     "size-prod + ingress + clickhouse-replicated"
     "size-prod + ingress + postgres-external"
     "size-prod + ingress + redis-external"
+    "size-prod + ingress + redis-valkey"
     "size-prod + ingress + postgres-external + redis-external"
     "size-ha + ingress + clickhouse-replicated + cold-storage-s3"
     "size-ha + ingress + postgres-external + redis-external + cold-storage-s3"
@@ -145,6 +146,7 @@ test_template_rendering() {
     ["size-prod + ingress + clickhouse-replicated"]="-f ${OVERLAYS}/size-prod.yaml -f ${OVERLAYS}/access-ingress.yaml -f ${OVERLAYS}/clickhouse-replicated.yaml"
     ["size-prod + ingress + postgres-external"]="-f ${OVERLAYS}/size-prod.yaml -f ${OVERLAYS}/access-ingress.yaml -f ${OVERLAYS}/postgres-external.yaml"
     ["size-prod + ingress + redis-external"]="-f ${OVERLAYS}/size-prod.yaml -f ${OVERLAYS}/access-ingress.yaml -f ${OVERLAYS}/redis-external.yaml"
+    ["size-prod + ingress + redis-valkey"]="-f ${OVERLAYS}/size-prod.yaml -f ${OVERLAYS}/access-ingress.yaml -f ${OVERLAYS}/redis-valkey.yaml"
     ["size-prod + ingress + postgres-external + redis-external"]="-f ${OVERLAYS}/size-prod.yaml -f ${OVERLAYS}/access-ingress.yaml -f ${OVERLAYS}/postgres-external.yaml -f ${OVERLAYS}/redis-external.yaml"
     ["size-ha + ingress + clickhouse-replicated + cold-storage-s3"]="-f ${OVERLAYS}/size-ha.yaml -f ${OVERLAYS}/access-ingress.yaml -f ${OVERLAYS}/clickhouse-replicated.yaml -f ${OVERLAYS}/cold-storage-s3.yaml --set clickhouse.objectStorage.bucket=test --set clickhouse.objectStorage.region=us-east-1"
     ["size-ha + ingress + postgres-external + redis-external + cold-storage-s3"]="-f ${OVERLAYS}/size-ha.yaml -f ${OVERLAYS}/access-ingress.yaml -f ${OVERLAYS}/postgres-external.yaml -f ${OVERLAYS}/redis-external.yaml -f ${OVERLAYS}/cold-storage-s3.yaml --set clickhouse.objectStorage.bucket=test --set clickhouse.objectStorage.region=us-east-1"
@@ -1252,12 +1254,19 @@ test_install_minimal() {
     -f "${CHART_DIR}/tests/values-e2e.yaml"
   pass "helm install (minimal + nodeport)"
 
-  # The chart refuses workers.enabled=false (the workers run the upgrade), so
-  # values-e2e.yaml keeps the Deployment at replicaCount 0.
+  # values-e2e.yaml sets workers.enabled=false: the worker runs as a sidecar in
+  # each app pod (it runs the upgrade the app waits on), with no Deployment of its own.
   if kc get deployment "${RELEASE}-workers" &>/dev/null; then
-    pass "Workers Deployment present (replicaCount=0 via values-e2e)"
+    fail "a Workers Deployment exists although workers.enabled=false"
   else
-    fail "the Workers Deployment is missing"
+    pass "no Workers Deployment (workers.enabled=false)"
+  fi
+  local app_containers
+  app_containers=$(kc get deployment "${RELEASE}-app" -o jsonpath='{.spec.template.spec.containers[*].name}')
+  if [[ " ${app_containers} " == *" ${RELEASE}-workers "* ]]; then
+    pass "the app pod carries the worker sidecar"
+  else
+    fail "the app pod has no worker sidecar (containers: ${app_containers})"
   fi
 
   # ClickHouse should be a single pod
@@ -1400,6 +1409,43 @@ test_install_profile_local() {
   helm_uninstall
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: Install — redis-valkey overlay boots and answers with auth on
+# ─────────────────────────────────────────────────────────────────────────────
+# @scenario "The Valkey overlay boots and answers with auth on in a real cluster"
+test_install_redis_valkey() {
+  sep; info "Suite: install size-minimal + redis-valkey (auth on)"
+
+  # values-e2e.yaml turns Redis auth off; switch it back on so the chart's own
+  # probes (REDISCLI_AUTH) are what must pass for the pod to become Ready.
+  helm_install \
+    --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-minimal.yaml" \
+    -f "${OVERLAYS}/access-nodeport.yaml" \
+    -f "${CHART_DIR}/tests/values-e2e.yaml" \
+    -f "${OVERLAYS}/redis-valkey.yaml" \
+    --set redis.auth.enabled=true
+  pass "helm install (minimal + redis-valkey, auth on)"
+
+  wait_pod_ready "app.kubernetes.io/component=redis" 120
+  pass "Valkey pod ready (probes pass with auth on)"
+
+  local pod image
+  pod=$(kc get pod -l "app.kubernetes.io/component=redis" \
+    -o jsonpath='{.items[0].metadata.name}')
+  image=$(kc get pod "$pod" -o jsonpath='{.spec.containers[?(@.name=="redis")].image}')
+  assert_eq "Redis container runs the Valkey image" "$image" "valkey/valkey:9.1"
+
+  local pong val
+  pong=$(kc exec "$pod" -- sh -c 'REDISCLI_AUTH=$REDIS_PASSWORD redis-cli ping')
+  assert_eq "Valkey PING with auth -> PONG" "$pong" "PONG"
+  kc exec "$pod" -- sh -c 'REDISCLI_AUTH=$REDIS_PASSWORD redis-cli SET e2e:valkey hello' > /dev/null
+  val=$(kc exec "$pod" -- sh -c 'REDISCLI_AUTH=$REDIS_PASSWORD redis-cli GET e2e:valkey')
+  assert_eq "Valkey SET/GET with auth roundtrip" "$val" "hello"
+
+  helm_uninstall
+}
+
 # ─── Image loading ────────────────────────────────────────────────────────────
 load_images() {
   sep; info "Building and loading images for install tests"
@@ -1501,6 +1547,7 @@ main() {
   test_install_prod_ingress
   test_install_external_ch
   test_install_profile_local
+  test_install_redis_valkey
 
   sep
   pass "All overlay E2E tests passed"

@@ -9,6 +9,7 @@ import type {
   AnalyticsFilterValue,
   BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
+import { tenantScope } from "@langwatch/clickhouse-client";
 import { customMetadataKeyCondition } from "@langwatch/trace-contract";
 
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
@@ -21,7 +22,7 @@ import {
   type LatestVersionColumn,
   latestVersionSubquery,
 } from "./clickhouse.latest-version-dedup.mapper.ts";
-import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
+import { buildMetricAlias, memberScopedId } from "./clickhouse.metric-translator.mapper.ts";
 import {
   appendMetadataValueFilterClauses,
   collectStringValues,
@@ -58,10 +59,11 @@ function slimColumnFor(metric: SlimTraceMetricKey): string {
   switch (metric) {
     case "metadata.trace_id":
       return `${ta}.TraceId`;
+    // Keyed by member: two members of a group project can hold the same id.
     case "metadata.user_id":
-      return `${ta}.UserId`;
+      return memberScopedId({ tenantColumn: `${ta}.TenantId`, idColumn: `${ta}.UserId` });
     case "metadata.thread_id":
-      return `${ta}.ConversationId`;
+      return memberScopedId({ tenantColumn: `${ta}.TenantId`, idColumn: `${ta}.ConversationId` });
     case "performance.total_cost":
       return `${ta}.TotalCost`;
     case "performance.cost_non_billed":
@@ -83,7 +85,6 @@ function slimColumnFor(metric: SlimTraceMetricKey): string {
     case "performance.reasoning_tokens":
       return `${ta}.ReasoningTokens`;
     case "performance.total_tokens":
-      return `(coalesce(${ta}.PromptTokens, 0) + coalesce(${ta}.CompletionTokens, 0))`;
     case "performance.total_processed_tokens":
       // Mirrors the rollup's `total_processed_tokens` shape (rollup-timeseries-
       // query.ts:80) by summing the SAME four typed columns, not the Attributes-map
@@ -218,7 +219,7 @@ function dedupedSlim({
     sourceAlias: alias,
     keyColumns: ["TenantId", "TraceId"],
     columns: carried,
-    where: `TenantId = {tenantId:String} ${dateClause}`,
+    where: `${tenantScope("OccurredAt")} ${dateClause}`,
   });
 }
 
@@ -424,10 +425,8 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
   const havingClause =
     groupByColumn && !slimGroupByHandlesUnknown(input.groupBy) ? `HAVING group_key != ''` : "";
 
-  // Outer WHERE is wrapped in one enclosing paren: `dedupedSlim`'s own
-  // tenant predicate sits one bracket deep already, so this OR (and any
-  // filter clause) must nest deeper still to stay outside the tenant guard's
-  // reach — see the matching note on `baseWhere` in aggregation-builder.mapper.ts.
+  // The fence leads the outer WHERE as one bracket; every OR after it nests deeper, so the
+  // tenant guard never sees a disjunction beside the tenant set.
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
@@ -441,14 +440,14 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
       }),
       filterPredicates,
     })}
-    WHERE (${ta}.TenantId = {tenantId:String}
+    WHERE ${tenantScope("OccurredAt")}
       AND (
         (${ta}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.OccurredAt < {currentEnd:DateTime64(3)})
         OR
         (${ta}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.OccurredAt < {previousEnd:DateTime64(3)})
       )
       AND ${ta}.${SLIM_HAS_SIGNAL}
-      ${filterPredicates.length > 0 ? `AND ${ta}.${SLIM_MATCHES_FILTERS}` : ""})
+      ${filterPredicates.length > 0 ? `AND ${ta}.${SLIM_MATCHES_FILTERS}` : ""}
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
@@ -457,7 +456,6 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
   return {
     sql,
     params: {
-      tenantId: input.projectId,
       currentStart: input.startDate,
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,

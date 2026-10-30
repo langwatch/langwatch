@@ -4,9 +4,17 @@ import {
   renderJoinRequestReminderEmail,
 } from "../templates/join-request-emails.tsx";
 import {
+  type MonitorAutoPausedEmailProps,
+  renderMonitorAutoPausedEmail,
+} from "../templates/monitor-auto-paused-email.tsx";
+import {
   renderTriggerDigestEmail,
   type TriggerDigestMail,
 } from "../templates/trigger-digest-email.tsx";
+import {
+  renderUpgradeAlertEmail,
+  type UpgradeAlertEmailProps,
+} from "../templates/upgrade-alert-email.tsx";
 
 /**
  * The only place react-email is evaluated on backend; composition boundary
@@ -35,5 +43,15 @@ export class ReactEmailMailRenderer extends MailRender {
 
   renderJoinRequestExpiry(input: { organizationName: string }): Promise<string> {
     return renderJoinRequestExpiredEmail(input);
+  }
+
+  renderUpgradeAlert(input: UpgradeAlertEmailProps): Promise<{ subject: string; html: string }> {
+    return renderUpgradeAlertEmail(input);
+  }
+
+  renderMonitorAutoPaused(
+    input: MonitorAutoPausedEmailProps,
+  ): Promise<{ subject: string; html: string }> {
+    return renderMonitorAutoPausedEmail(input);
   }
 }

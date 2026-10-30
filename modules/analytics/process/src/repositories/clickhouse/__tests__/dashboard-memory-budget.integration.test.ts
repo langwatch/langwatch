@@ -22,6 +22,7 @@ import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.t
 import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
+import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = `acme-dashboard-memory-${nanoid(8)}`;
 const TRACE_COUNT = 1_000_000;
@@ -37,31 +38,37 @@ const SCALED_JOIN_BYTES = "30000000";
 
 /**
  * Model-grouped chart: its span-model join stacks three aggregations, and merging spilled parts
- * costs memory per part. At 100 MB spill (production: 500 MB) it peaks near 145 MiB on
- * ClickHouse 25.10 against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
+ * costs memory per part. At 100 MB spill (production: 500 MB) it peaks at 145-193 MiB across
+ * runs against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
  */
 const MODEL_GROUPED_SETTINGS = {
-  max_memory_usage: "200000000",
+  max_memory_usage: "250000000",
   max_bytes_before_external_group_by: "100000000",
 } as const;
 
+/** The spilling count panels peak near 146 MiB on CI; the cap leaves them about a quarter more. */
 const CAPPED_SETTINGS = {
   max_threads: 2,
-  max_memory_usage: "150000000",
+  max_memory_usage: "190000000",
   max_bytes_before_external_group_by: "30000000",
 } as const;
 
-/**
- * The seed writes in small blocks on one thread: a default INSERT ... SELECT of the million
- * traces holds over 1 GiB, more than the whole test server is given, while these hold under
- * 150 MiB each. Only the seed is shaped; the panels run as the service sends them.
- */
+/** The seed writes on one thread in 16k-row blocks: one default INSERT outgrows 1 GiB. */
 const SEED_SETTINGS = {
   max_threads: 1,
-  max_block_size: "4096",
-  min_insert_block_size_rows: "4096",
+  max_insert_threads: "1",
+  max_block_size: "16384",
+  min_insert_block_size_rows: "16384",
   min_insert_block_size_bytes: "0",
 } as const;
+
+const SEEDED_TABLES = ["trace_analytics", "trace_summaries", "stored_spans"] as const;
+
+/**
+ * Writing a wide part of these tables buffers up to 1 MiB per column stream, about 230 MiB a
+ * part, and the server merges four at once. 64 KiB buffers fit the test server's 1 GiB.
+ */
+const SEED_COMPRESS_BLOCK_BYTES = 65_536;
 
 const end = new Date(Math.floor(Date.now() / DAY_MS) * DAY_MS);
 const start = new Date(end.getTime() - RANGE_DAYS * DAY_MS);
@@ -112,27 +119,32 @@ function buildPanelQuery(input: AnalyticsTimeseriesInput) {
   resetParamCounter();
   switch (table) {
     case "trace_analytics":
-      return { table, ...buildSlimTimeseriesQuery(builderInput) };
+      return { table, fenced: true, ...buildSlimTimeseriesQuery(builderInput) };
     case "evaluation_analytics":
-      return { table, ...buildEvalSlimTimeseriesQuery(builderInput) };
+      return { table, fenced: true, ...buildEvalSlimTimeseriesQuery(builderInput) };
     case "trace_summaries":
     case "evaluation_runs":
-      return { table, ...buildTimeseriesQuery(builderInput) };
+      return { table, fenced: true, ...buildTimeseriesQuery(builderInput) };
     default:
       throw new Error(`panel routed to an unexpected table: ${table}`);
   }
 }
 
+/**
+ * Runs a panel's statement under the scaled-down cap. A series reads through the project's own
+ * proof, as the repository sends it; top documents still name the project by hand.
+ */
 async function runCapped<T>(
   ch: ClickHouseClient,
   query: {
     sql: string;
     params: Record<string, unknown>;
     settings?: Record<string, string | number>;
+    fenced?: boolean;
   },
   overrides: Record<string, string> = {},
 ): Promise<T[]> {
-  const result = await ch.query({
+  const statement = {
     query: query.sql,
     query_params: query.params,
     format: "JSONEachRow",
@@ -145,7 +157,12 @@ async function runCapped<T>(
       ...(query.settings?.max_bytes_in_join ? { max_bytes_in_join: SCALED_JOIN_BYTES } : {}),
       ...overrides,
     },
-  });
+  } as const;
+  if (query.fenced) {
+    const reader = ownProjectReaderOver({ client: ch, projectId: TENANT_ID });
+    return (await reader.query<T>(statement)).json();
+  }
+  const result = await ch.query(statement);
   return result.json<T>();
 }
 
@@ -173,6 +190,11 @@ describe("dashboard panels under a memory cap", () => {
 
   beforeAll(async () => {
     ch = (await startMigratedClickHouse()).client;
+    for (const table of SEEDED_TABLES) {
+      await ch.command({
+        query: `ALTER TABLE ${table} MODIFY SETTING max_compress_block_size = ${SEED_COMPRESS_BLOCK_BYTES}`,
+      });
+    }
 
     // Trace t occurs t * 60d / N before `end`, so the traces fill both
     // windows evenly. Even traces get a second, newer version.
@@ -242,32 +264,44 @@ describe("dashboard panels under a memory cap", () => {
     });
 
     // Ground truth straight from the seed, without any dedup machinery: the
-    // second version of a trace keeps its OccurredAt.
-    const [truth] = await (
-      await ch.query({
-        query: `
-          SELECT
-            uniqExactIf(TraceId, OccurredAt >= {start:DateTime64(3)}) AS currentTraces,
-            uniqExactIf(TraceId, OccurredAt < {start:DateTime64(3)}) AS previousTraces,
-            uniqExactIf(TraceId, OccurredAt >= {start:DateTime64(3)} AND HasError) AS currentErrorTraces,
-            uniqExactIf(UserId, OccurredAt >= {start:DateTime64(3)}) AS currentUsers
-          FROM trace_analytics
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {end:DateTime64(3)}
-        `,
-        query_params: {
-          tenantId: TENANT_ID,
-          start,
-          end,
-          previousStart: new Date(start.getTime() - RANGE_DAYS * DAY_MS),
-        },
-        format: "JSONEachRow",
-      })
-    ).json<Record<keyof typeof expected, string>>();
-    expected.currentTraces = Number(truth?.currentTraces);
-    expected.previousTraces = Number(truth?.previousTraces);
-    expected.currentErrorTraces = Number(truth?.currentErrorTraces);
-    expected.currentUsers = Number(truth?.currentUsers);
+    // second version of a trace keeps its OccurredAt. Each figure is a grouped
+    // count allowed to spill, so the truth stays exact without holding four
+    // million-key hash sets on the 1 GiB test server at once.
+    const window = {
+      current: "OccurredAt >= {start:DateTime64(3)} AND OccurredAt < {end:DateTime64(3)}",
+      previous:
+        "OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {start:DateTime64(3)}",
+    };
+    const distinctCount = async ({ column, where }: { column: string; where: string }) => {
+      const [row] = await (
+        await ch.query({
+          query: `
+            SELECT count() AS total FROM (
+              SELECT ${column} FROM trace_analytics
+              WHERE TenantId = {tenantId:String} AND ${where}
+              GROUP BY ${column}
+            )
+          `,
+          query_params: {
+            tenantId: TENANT_ID,
+            start,
+            end,
+            previousStart: new Date(start.getTime() - RANGE_DAYS * DAY_MS),
+          },
+          // One thread and a spilling group-by keep the million-key truth inside the 1 GiB server.
+          clickhouse_settings: { max_threads: 1, max_bytes_before_external_group_by: "50000000" },
+          format: "JSONEachRow",
+        })
+      ).json<{ total: string }>();
+      return Number(row?.total);
+    };
+    expected.currentTraces = await distinctCount({ column: "TraceId", where: window.current });
+    expected.previousTraces = await distinctCount({ column: "TraceId", where: window.previous });
+    expected.currentErrorTraces = await distinctCount({
+      column: "TraceId",
+      where: `${window.current} AND HasError`,
+    });
+    expected.currentUsers = await distinctCount({ column: "UserId", where: window.current });
     if (expected.currentTraces < 400_000) {
       throw new Error(`seed produced ${expected.currentTraces} traces in the current window`);
     }
@@ -275,11 +309,10 @@ describe("dashboard panels under a memory cap", () => {
 
   afterAll(async () => {
     if (!ch) return;
-    await deleteMigratedTenantRows({
-      client: ch,
-      tenantId: TENANT_ID,
-      tables: ["trace_analytics", "trace_summaries", "stored_spans"],
-    });
+    await deleteMigratedTenantRows({ client: ch, tenantId: TENANT_ID, tables: SEEDED_TABLES });
+    for (const table of SEEDED_TABLES) {
+      await ch.command({ query: `ALTER TABLE ${table} RESET SETTING max_compress_block_size` });
+    }
   }, 120_000);
 
   describe("when the trace count summary compares against the previous period", () => {
@@ -416,17 +449,12 @@ describe("dashboard panels under a memory cap", () => {
     /** @scenario The documents panel reads only the RAG contexts attribute */
     it("answers within the cap with the exact distinct document total", async () => {
       resetParamCounter();
-      const query = buildTopDocumentsQuery({
-        projectId: TENANT_ID,
-        startDate: start,
-        endDate: end,
-        filters: {},
-      });
+      const query = buildTopDocumentsQuery({ startDate: start, endDate: end, filters: {} });
       const rows = await runCapped<{
         documentId: string;
         count: string;
         total: string;
-      }>(ch, query);
+      }>(ch, { ...query, fenced: true });
       expect(rows).toHaveLength(10);
       expect(Number(rows[0]?.total)).toBe(RAG_DOCUMENT_COUNT);
       expect(Number(rows[0]?.count)).toBeGreaterThan(0);

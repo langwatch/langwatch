@@ -106,6 +106,8 @@ export function langyColumnState({
   restoringMessageCount,
   pendingPrompt,
   tourCard,
+  tourRunning,
+  onPutOffModelPrompt,
   empty,
 }: {
   showCardGallery: boolean;
@@ -118,25 +120,40 @@ export function langyColumnState({
   pendingPrompt: string | null;
   /** Set while a guided tour runs or its kickoff waits to send; only shown in an empty column. */
   tourCard: LangyColumnState["tourCard"];
+  tourRunning: boolean;
+  /** "Later" on the guided model prompt: drop the waiting kickoff and step aside. */
+  onPutOffModelPrompt: () => void;
   empty: NonNullable<LangyColumnState["empty"]>;
 }): LangyColumnState {
   const { reconnectCodex } = failure;
   const needsSetup = model.langyNeedsModel || reconnectCodex;
+  // A guided kickoff waiting on a model keeps the conversation: the tour plays, then Langy asks.
+  const guidedWaitsOnModel =
+    model.langyNeedsModel && !reconnectCodex && flags.isEmpty && tourCard !== null;
   return {
     showCardGallery,
-    modelSetup: needsSetup
-      ? {
-          reconnectCodex,
-          queuedPrompt: reconnectCodex ? null : pendingPrompt,
-          onComplete: () => {
-            void model.refetchResolvedDefault();
-            if (!reconnectCodex) return;
-            // Re-authenticated: back to the conversation, re-driving the failed turn.
-            failure.setReconnectCodex(false);
-            failure.retryTurn();
-          },
-        }
-      : null,
+    guidedModelPrompt:
+      guidedWaitsOnModel && !tourRunning && tourCard?.kickoff
+        ? {
+            organizationId: tourCard.organizationId,
+            onComplete: () => void model.refetchResolvedDefault(),
+            onLater: onPutOffModelPrompt,
+          }
+        : null,
+    modelSetup:
+      needsSetup && !guidedWaitsOnModel
+        ? {
+            reconnectCodex,
+            queuedPrompt: reconnectCodex ? null : pendingPrompt,
+            onComplete: () => {
+              void model.refetchResolvedDefault();
+              if (!reconnectCodex) return;
+              // Re-authenticated: back to the conversation, re-driving the failed turn.
+              failure.setReconnectCodex(false);
+              failure.retryTurn();
+            },
+          }
+        : null,
     blockingHistoryError: flags.blockingHistoryError,
     onHistoryErrorAction: (kind) => {
       if (kind === "retry") onHistoryErrorAction();

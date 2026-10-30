@@ -51,6 +51,13 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Then the run answers failed and the command exits 1
 
   @unit
+  Scenario: A run-once upgrade leaves the system-migrations pass request to the serving worker
+    Given a run-once upgrade, with no worker beside it to take queue jobs
+    When it reaches the reconcilers
+    Then it provisions LangWatchQL and sends no pass request, so it never waits on the queue
+    And a serving worker's run still sends the pass request
+
+  @unit
   Scenario: An image whose gate refuses runs nothing and refuses by name
     Given an api whose database role cannot create the upgrade ledger
     When its upgrade gate admits it

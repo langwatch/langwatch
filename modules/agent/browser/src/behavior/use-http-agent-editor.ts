@@ -108,6 +108,38 @@ function toConfig(draft: HttpAgentDraft): HttpAgentConfig {
   };
 }
 
+/** The keys the HTTP editor writes; every other stored key is the editor's to keep. */
+const HTTP_EDITOR_KEYS = [
+  "name",
+  "description",
+  "url",
+  "method",
+  "bodyTemplate",
+  "outputPath",
+  "sessionPath",
+  "headers",
+  "auth",
+  "scenarioMappings",
+] as const;
+
+/**
+ * An edited HTTP config over the stored one: what the editor wrote wins, and what it does not
+ * edit (a timeout, a dev tunnel, declared inputs) stays as stored.
+ */
+export function httpConfigKeepingStored({
+  stored,
+  edited,
+}: {
+  stored: HttpAgentConfig | undefined;
+  edited: HttpAgentConfig;
+}): HttpAgentConfig {
+  if (!stored) return edited;
+
+  const kept: Partial<HttpAgentConfig> = { ...stored };
+  for (const key of HTTP_EDITOR_KEYS) delete kept[key];
+  return { ...kept, ...edited };
+}
+
 function replaceMapping(
   mappings: Record<string, AgentInputBinding>,
   identifier: string,
@@ -129,7 +161,10 @@ async function saveHttpAgent(
   const input = {
     projectId: options.projectId,
     name: draft.name.trim(),
-    config: toConfig(draft),
+    config: httpConfigKeepingStored({
+      stored: readHttpConfig(options.agent),
+      edited: toConfig(draft),
+    }),
   };
   const result = options.agentId
     ? options.onUpdate({ ...input, id: options.agentId })

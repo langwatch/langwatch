@@ -9,6 +9,10 @@ import type {
   ReportEvaluationCommandData,
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
+import {
+  EVAL_INPUTS_HARD_CEILING_BYTES,
+  EVAL_INPUTS_INLINE_MAX_BYTES,
+} from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
@@ -275,7 +279,10 @@ export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {
   stagingTtlSeconds: 600,
   evaluationMaxPayloadBytes: 16_000_000,
   topicClusteringMaxPayloadBytes: 180_000_000,
+  inputsInlineMaxBytes: EVAL_INPUTS_INLINE_MAX_BYTES,
+  inputsHardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,
   azureContentSafetyEndpoint: undefined,
   enablePresidio: undefined,
   enableLingua: undefined,
+  evaluatorRetryWindowMinutes: 120,
 };

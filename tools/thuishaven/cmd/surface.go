@@ -163,8 +163,8 @@ var retired = map[string]retiredSpelling{
 
 func init() {
 	for _, sim := range simulators {
-		// githubsim never had a top-level command, so it has no old spelling.
-		if sim.name == "idp" || sim.name == "github" {
+		// githubsim and mcpsim never had a top-level command, so they have no old spelling.
+		if sim.name == "idp" || sim.name == "github" || sim.name == "mcp" {
 			continue
 		}
 		retired[sim.name] = func(rest []string) []string {
@@ -209,7 +209,7 @@ func needsTarget(name string) bool {
 		return false
 	}
 	switch name {
-	case "pr", "switch", "simulator", "static", "go-watch", "ui-watch", "keep", "daemon", "gate":
+	case "pr", "switch", "simulator", "static", "docs-mount", "go-watch", "ui-watch", "keep", "daemon", "gate":
 		return false
 	}
 	return true

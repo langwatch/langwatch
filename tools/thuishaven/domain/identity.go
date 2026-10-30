@@ -28,4 +28,8 @@ const (
 	DefaultOrganizationSlug = "local-dev-org"
 	DefaultTeamSlug         = "local-dev-team"
 	DefaultProjectSlug      = "local-dev-project"
+
+	// DefaultProjectID is the seeded project's id (PROJECT_ID in storage-seed.ts),
+	// the project an MCP OAuth approval grants.
+	DefaultProjectID = "local-dev-project"
 )

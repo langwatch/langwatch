@@ -10,9 +10,9 @@ Feature: Dashboard widgets placed on a dashboard
   widget in place from the card's menu.
 
   Dashboard widgets open with exactly two flags, everywhere: `release_dashboards`
-  and `release_lwql_workbench`. That covers boards, the REST/CLI surface and the
-  legacy Analytics reports page's widget drawer. The custom chart playground
-  flag (`release_custom_chart_playground`) opens none of them.
+  and `release_lwql_workbench`. That covers boards and the REST/CLI surface.
+  Since the boards split (owner, 2026-10-15) a widget lives on a Dashboards board
+  alone: the legacy Analytics reports page neither shows nor adds one.
 
   Placement is not mutually exclusive: a project can carry `workbench_sql`
   rows placed before widgets shipped and `dashboard_srcdoc` rows side by
@@ -30,34 +30,10 @@ Feature: Dashboard widgets placed on a dashboard
     And with the flag off the `kind` clause admits builder alone
 
   @integration
-  Scenario: A dashboard widget card draws the sandboxed widget, not the builder
-    Given a dashboard grid holding a dashboard widget
-    When the card is rendered
-    Then the sandboxed dashboard widget frame draws it, with the row's own code and queries, and the builder renderer is not mounted
-
-  @integration
-  Scenario: A dashboard widget card is not offered an alert it cannot evaluate
-    Given a dashboard grid holding a dashboard widget
-    When the card is rendered
-    Then no add-alert control is offered, because sandboxed author code has no series to threshold
-
-  @integration
-  Scenario: Edit opens the widget editor in place
-    Given a dashboard grid holding a dashboard widget
-    When the card's menu is opened and Edit is chosen
-    Then the item is labelled "Edit" and the widget's edit drawer opens over the grid, without navigating to the builder or any other page
-
-  @integration
   Scenario: A placed dashboard widget follows the dashboard's period control
     Given a dashboard grid holding a dashboard widget
     When the dashboard's period selector changes
     Then the widget's queries re-run against the new period, the same one control every other card on the grid reads
-
-  @integration
-  Scenario: A new widget previews against the dashboard's period
-    Given a dashboard whose period selector shows the last 30 days
-    When a member opens "Add chart" to draft a widget
-    Then the draft's preview is asked for that same period, not a fixed last 24 hours
 
   # Persistence invariants for the write path (dashboardWidget.service):
   # placement scoped to the target, dashboard ownership enforced, and partial
@@ -96,26 +72,18 @@ Feature: Dashboard widgets placed on a dashboard
   @unit
   Scenario: Dashboard widgets open with the Dashboards and LangWatchQL flags alone
     Given a project with `release_dashboards` and `release_lwql_workbench` on
-    And `release_custom_chart_playground` off
     When the widget surface asks whether the project may use it
     Then the project is admitted
 
   @unit
   Scenario: Dashboard widgets stay closed while the Dashboards or the LangWatchQL flag is off
-    Given a project with `release_custom_chart_playground` off
-    And `release_dashboards` or `release_lwql_workbench` off
-    When the widget surface asks whether the project may use it
-    Then it is refused with the widget surface's own error code
-
-  @unit
-  Scenario: The custom chart playground alone does not open dashboard widgets
-    Given a project with only `release_custom_chart_playground` on
+    Given a project with `release_dashboards` or `release_lwql_workbench` off
     When the widget surface asks whether the project may use it
     Then it is refused with the widget surface's own error code
 
   @integration
-  Scenario: The legacy reports page offers the widget drawer only with Dashboards and LangWatchQL on
-    Given the legacy Analytics reports page
-    When `release_dashboards` and `release_lwql_workbench` are both on
-    Then "Add chart" opens the widget drawer
-    And with either flag off, or with only `release_custom_chart_playground` on, "Add chart" links to the chart builder instead
+  Scenario: The legacy reports page neither shows nor adds dashboard widgets
+    Given the legacy Analytics reports page, with `release_dashboards` and `release_lwql_workbench` on
+    When a board is opened there
+    Then only the charts made in Reports are drawn on its grid
+    And "Add chart" links to the chart builder

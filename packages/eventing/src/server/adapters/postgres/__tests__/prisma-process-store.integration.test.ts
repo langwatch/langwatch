@@ -8,7 +8,7 @@ import {
   PrismaQueryGuard,
   skipTenantCheck,
 } from "@langwatch/prisma-client";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
@@ -22,7 +22,11 @@ import type {
   NewOutboxMessage,
   ProcessCommit,
 } from "../../../../process-manager/stores/processStore.types.ts";
-import { PrismaProcessStore } from "../prisma-process-store.ts";
+import {
+  consumedInboxSweepDelete,
+  dispatchedOutboxSweepDelete,
+  PrismaProcessStore,
+} from "../prisma-process-store.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -768,6 +772,163 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     expect(wakes).toEqual([{ ref: selected, revision: 1, wakeAt: 1_500 }]);
   });
 
+  describe("given due wakes for workers to claim", () => {
+    const claimedAt = 2_000;
+    const leaseMs = 60_000;
+
+    async function armWakes(keys: string[]): Promise<void> {
+      for (const [index, key] of keys.entries()) {
+        await store.commit(
+          commit({
+            target: ref(key),
+            sourceEventId: `event-${key}`,
+            nextWakeAt: 1_500 + index,
+            messages: [],
+          }),
+        );
+      }
+    }
+
+    function claim({
+      on = store,
+      now = claimedAt,
+      limit = 10,
+    }: { on?: PrismaProcessStore; now?: number; limit?: number } = {}) {
+      return on.leaseDueWakes({
+        now,
+        limit,
+        leaseDurationMs: leaseMs,
+        processNames: [processName],
+      });
+    }
+
+    function commitNextWake({ revision, nextWakeAt }: { revision: number; nextWakeAt: number }) {
+      return store.commit(
+        commit({
+          target: ref("sweep"),
+          sourceEventId: null,
+          expectedRevision: revision,
+          nextWakeAt,
+          messages: [],
+          now: claimedAt,
+        }),
+      );
+    }
+
+    function release() {
+      return store.releaseWakeClaim({
+        ref: ref("sweep"),
+        revision: 1,
+        wakeAt: 1_500,
+        claimedUntil: claimedAt + leaseMs,
+      });
+    }
+
+    describe("when a caller finds due wakes", () => {
+      /** @scenario "Finding due wakes claims nothing" */
+      it("lists the wake every time and leaves it for a claim", async () => {
+        await armWakes(["sweep"]);
+        const find = () =>
+          store.findDueWakes({ now: claimedAt, limit: 10, processNames: [processName] });
+
+        expect(await find()).toEqual([{ ref: ref("sweep"), revision: 1, wakeAt: 1_500 }]);
+        expect(await find()).toEqual([{ ref: ref("sweep"), revision: 1, wakeAt: 1_500 }]);
+        expect((await store.findByRef({ ref: ref("sweep") }))?.nextWakeAt).toBe(1_500);
+        expect(await claim()).toHaveLength(1);
+      });
+    });
+
+    describe("when a second worker claims while the first still holds its rows", () => {
+      /** @scenario "Concurrent claims take disjoint batches" */
+      it("skips the held rows without waiting and takes the rest", async () => {
+        const keys = ["sweep-0", "sweep-1", "sweep-2", "sweep-3"];
+        await armWakes(keys);
+
+        const { first, second } = await prisma.$transaction(async (tx) => {
+          const held = await claim({ on: storeOn(tx), limit: 2 });
+          return { first: held, second: await claim() };
+        });
+
+        const handed = [...first, ...second].map((wake) => wake.ref.processKey);
+        expect(first.map((wake) => wake.ref.processKey)).toEqual(["sweep-0", "sweep-1"]);
+        expect(second.map((wake) => wake.ref.processKey)).toEqual(["sweep-2", "sweep-3"]);
+        expect(handed.toSorted()).toEqual(keys);
+        expect(await claim()).toEqual([]);
+      });
+    });
+
+    describe("when a worker claims a wake due in the past", () => {
+      /** @scenario "A claimed wake carries the time it was due" */
+      it("reports the due instant and the scheduling revision, not the lease end", async () => {
+        await armWakes(["sweep"]);
+
+        expect(await claim()).toEqual([{ ref: ref("sweep"), revision: 1, wakeAt: 1_500 }]);
+        expect(await store.findByRef({ ref: ref("sweep") })).toMatchObject({
+          revision: 1,
+          nextWakeAt: claimedAt + leaseMs,
+          updatedAt: 1_000,
+        });
+      });
+    });
+
+    describe("when a claimed wake is never handled", () => {
+      /** @scenario "A claimed wake nobody commits or releases fires again after its lease" */
+      it("hands it out again at the same revision only once the lease has ended", async () => {
+        await armWakes(["sweep"]);
+        await claim();
+
+        expect(await claim({ now: claimedAt + leaseMs - 1 })).toEqual([]);
+        expect(await claim({ now: claimedAt + leaseMs })).toEqual([
+          { ref: ref("sweep"), revision: 1, wakeAt: claimedAt + leaseMs },
+        ]);
+      });
+    });
+
+    describe("when the claimed wake's handler commits a next wake time", () => {
+      /** @scenario "A handled wake is next due when its handler said" */
+      it("is next due at the handler's time, not at the end of the lease", async () => {
+        await armWakes(["sweep"]);
+        const [wake] = await claim();
+        const handlerNextWakeAt = claimedAt + 5_000;
+
+        await expect(
+          commitNextWake({ revision: wake?.revision ?? -1, nextWakeAt: handlerNextWakeAt }),
+        ).resolves.toMatchObject({ outcome: "committed", revision: 2 });
+
+        expect((await store.findByRef({ ref: ref("sweep") }))?.nextWakeAt).toBe(handlerNextWakeAt);
+        expect(await claim({ now: handlerNextWakeAt })).toEqual([
+          { ref: ref("sweep"), revision: 2, wakeAt: handlerNextWakeAt },
+        ]);
+      });
+    });
+
+    describe("when the worker releases the claim unhandled", () => {
+      /** @scenario "A released claim is due again at the time it was first due" */
+      it("restores the due instant, so the next claim takes it with that instant", async () => {
+        await armWakes(["sweep"]);
+        await claim();
+
+        expect(await release()).toEqual({ applied: true });
+        expect((await store.findByRef({ ref: ref("sweep") }))?.nextWakeAt).toBe(1_500);
+        expect(await claim({ now: claimedAt + 1 })).toEqual([
+          { ref: ref("sweep"), revision: 1, wakeAt: 1_500 },
+        ]);
+      });
+    });
+
+    describe("when the claim is released after a commit re-armed the wake", () => {
+      /** @scenario "Releasing a claim after a commit re-armed the wake changes nothing" */
+      it("reports the release as not applied and keeps the commit's wake", async () => {
+        await armWakes(["sweep"]);
+        await claim();
+        await commitNextWake({ revision: 1, nextWakeAt: claimedAt + 5_000 });
+
+        expect(await release()).toEqual({ applied: false });
+        expect((await store.findByRef({ ref: ref("sweep") }))?.nextWakeAt).toBe(claimedAt + 5_000);
+      });
+    });
+  });
+
   it("lists one process's instance keys across the named projects only", async () => {
     await store.commit(commit({ target: ref("in-one", "project-1"), messages: [] }));
     await store.commit(commit({ target: ref("in-two", "project-2"), messages: [] }));
@@ -1446,6 +1607,77 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
         expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(2);
         expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(1);
         expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(0);
+      });
+    });
+
+    // The production shape: the table holds thousands of rows still inside the retention window
+    // and the sweep's cutoff matches none of them. On an empty table the planner's costs tie and
+    // its pick says nothing, so each plan is taken over such rows, with fresh statistics, inside a
+    // transaction that rolls back.
+    describe("when the planner plans each sweep delete", () => {
+      const liveRows = 5_000;
+      const before = Date.UTC(2000, 0, 1);
+
+      async function planOf({
+        seed,
+        table,
+        statement,
+      }: {
+        seed: string;
+        table: string;
+        statement: Prisma.Sql;
+      }): Promise<string> {
+        let plan = "";
+        const rollback = new Error("roll back the planner fixture");
+        await database()
+          .$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(seed);
+            await tx.$executeRawUnsafe(`ANALYZE "${table}"`);
+            const rows = await tx.$queryRaw<{ "QUERY PLAN": string }[]>(
+              Prisma.sql`EXPLAIN ${statement}`,
+            );
+            plan = rows.map((row) => row["QUERY PLAN"]).join("\n");
+            throw rollback;
+          })
+          .catch((error: unknown) => {
+            if (error !== rollback) throw error;
+          });
+        return plan;
+      }
+
+      /** @scenario "Each sweep delete finds its expired rows through an index" */
+      it("reads the dispatched outbox through its age index", async () => {
+        const plan = await planOf({
+          table: "ProcessManagerOutbox",
+          seed: `
+            INSERT INTO "ProcessManagerOutbox" ("id", "processName", "projectId", "processKey",
+              "tenantId", "messageKey", "intentType", "payload", "traceCarrier", "status",
+              "nextAttemptAt", "dispatchedAt", "createdAt", "updatedAt")
+            SELECT 'planner-' || n, '${processName}', 'project-1', 'key-' || n, 'tenant-1',
+              'message-' || n, 'intent', '{}', '{}', 'dispatched', now(), now(), now(), now()
+            FROM generate_series(1, ${liveRows}) AS n`,
+          statement: dispatchedOutboxSweepDelete({ before, limit: 5_000 }),
+        });
+
+        expect(plan).toContain("ProcessManagerOutbox_dispatchedAt_idx");
+        expect(plan).not.toContain('Seq Scan on "ProcessManagerOutbox"');
+      });
+
+      /** @scenario "Each sweep delete finds its expired rows through an index" */
+      it("reads the consumed inbox through its age index", async () => {
+        const plan = await planOf({
+          table: "ProcessManagerInbox",
+          seed: `
+            INSERT INTO "ProcessManagerInbox" ("id", "processName", "projectId", "processKey",
+              "tenantId", "sourceEventId", "consumedAt")
+            SELECT 'planner-' || n, '${processName}', 'project-1', 'key-' || n, 'tenant-1',
+              'event-' || n, now()
+            FROM generate_series(1, ${liveRows}) AS n`,
+          statement: consumedInboxSweepDelete({ before, limit: 5_000 }),
+        });
+
+        expect(plan).toContain("ProcessManagerInbox_consumedAt_idx");
+        expect(plan).not.toContain('Seq Scan on "ProcessManagerInbox"');
       });
     });
   });

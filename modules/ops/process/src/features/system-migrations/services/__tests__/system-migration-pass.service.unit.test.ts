@@ -96,7 +96,8 @@ function stubDatabase({
   const findMany = vi.fn().mockResolvedValue([]);
   const projectFindMany = vi.fn().mockResolvedValue([]);
   const organizationFindMany = vi.fn().mockResolvedValue([]);
-  const projectOrganization = vi.fn().mockResolvedValue({ team: { organizationId: "org_acme" } });
+  const projectOrganization = vi.fn().mockResolvedValue({ teamId: "team_acme" });
+  const team = { id: "team_acme", organizationId: "org_acme" };
   return {
     findUnique,
     findMany,
@@ -110,6 +111,10 @@ function stubDatabase({
       $queryRawUnsafe: vi.fn().mockResolvedValue([]),
       organization: { findMany: organizationFindMany },
       project: { findMany: projectFindMany, findUniqueOrThrow: projectOrganization },
+      team: {
+        findUnique: vi.fn().mockResolvedValue(team),
+        findMany: vi.fn().mockResolvedValue([team]),
+      },
       user: { findMany: vi.fn().mockResolvedValue([]), findUnique },
       organizationUser: { findMany },
     }),
@@ -365,7 +370,7 @@ describe("project-rooted step composition", () => {
     ).resolves.toMatchObject({ status: "finalized" });
     expect(projectOrganization).toHaveBeenCalledWith({
       where: { id: "project_1" },
-      select: { team: { select: { organizationId: true } } },
+      select: { teamId: true },
     });
   });
 
@@ -379,9 +384,7 @@ describe("project-rooted step composition", () => {
     const projectIds = ["project_1", "project_2", "project_3"];
     projectFindMany
       .mockResolvedValueOnce(projectIds.map((id) => ({ id })))
-      .mockResolvedValueOnce(
-        projectIds.map((id) => ({ id, team: { organizationId: "org_acme" } })),
-      );
+      .mockResolvedValueOnce(projectIds.map((id) => ({ id, teamId: "team_acme" })));
     vi.spyOn(RedisMigrationLeaseRepository.prototype, "acquire").mockResolvedValue(true);
     vi.spyOn(RedisMigrationLeaseRepository.prototype, "release").mockResolvedValue();
     const adapter = SystemMigrationPassService.create({
@@ -396,7 +399,7 @@ describe("project-rooted step composition", () => {
     expect(projectOrganization).not.toHaveBeenCalled();
     expect(projectFindMany).toHaveBeenCalledWith({
       where: { id: { in: projectIds } },
-      select: { id: true, team: { select: { organizationId: true } } },
+      select: { id: true, teamId: true },
     });
   });
 });

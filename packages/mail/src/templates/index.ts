@@ -18,6 +18,7 @@ import {
   joinRequestReminderTemplate,
 } from "./join-request-emails.tsx";
 import { licenseEmailTemplate } from "./license-email.tsx";
+import { monitorAutoPausedEmailTemplate } from "./monitor-auto-paused-email.tsx";
 import { organizationMfaRequirementEmailTemplate } from "./organization-mfa-requirement-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
@@ -27,6 +28,7 @@ import {
   ssoDomainProofWaveringTemplate,
 } from "./sso-domain-proof-emails.tsx";
 import { triggerDigestEmailTemplate } from "./trigger-digest-email.tsx";
+import { upgradeAlertEmailTemplate } from "./upgrade-alert-email.tsx";
 import { usageLimitEmailTemplate } from "./usage-limit-email.tsx";
 
 /**
@@ -49,10 +51,12 @@ export const mailTemplates: readonly MailTemplate[] = [
   ssoDomainProofLapsedTemplate,
   organizationMfaRequirementEmailTemplate,
   licenseEmailTemplate,
+  upgradeAlertEmailTemplate,
   connectedStatementEmailTemplate,
   budgetIncreaseRequestEmailTemplate,
   usageLimitEmailTemplate,
   automationLimitEmailTemplate,
+  monitorAutoPausedEmailTemplate,
   triggerDigestEmailTemplate,
   digestPlanPressureTemplate,
   digestScenariosTrendTemplate,

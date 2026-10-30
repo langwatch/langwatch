@@ -4,6 +4,7 @@ import {
   type ScenarioExecutionService,
   type ScenarioExecutionPrefetchResult,
 } from "@langwatch/scenario-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -147,7 +148,7 @@ describe("ScenarioProcessorService", () => {
     it("finishes with the complete run and target context", async () => {
       const fixture = processorFixture();
 
-      await fixture.processor.handleFailed(job("run-1"), "Prefetch failed");
+      await fixture.processor.handleFailed({ jobData: job("run-1"), error: "Prefetch failed" });
 
       expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledWith({
         projectId: "project-1",
@@ -164,9 +165,29 @@ describe("ScenarioProcessorService", () => {
       const fixture = processorFixture();
       fixture.finishUnsuccessfulRun.mockRejectedValue(new Error("write failed"));
 
-      await expect(fixture.processor.handleFailed(job("run-1"), "failed")).rejects.toThrow(
-        "write failed",
-      );
+      await expect(
+        fixture.processor.handleFailed({ jobData: job("run-1"), error: "failed" }),
+      ).rejects.toThrow("write failed");
+    });
+  });
+
+  describe("when the hook record of a run whose setup failed cannot be written", () => {
+    /** @scenario "A failed setup whose record cannot be written is logged as an error" */
+    it("logs an error, not a warning, and never fails the job", async () => {
+      const fixture = processorFixture();
+      fixture.execution.recordHooks = () => Promise.reject(new Error("store down"));
+      const { logger, lines } = createTestLogger();
+
+      await fixture.processor.recordHooks({
+        jobData: job("run-1"),
+        result: { success: false, hooks: { setup: { status: "failed", durationMs: 5 } } },
+        jobLogger: logger,
+      });
+
+      expect(lines.findLine("error", "Could not record a failed setup")).toMatchObject({
+        scenarioRunId: "run-1",
+      });
+      expect(lines.findLine("warn", "Could not record")).toBeUndefined();
     });
 
     /** @scenario "A child startup failure is stored on the run" */

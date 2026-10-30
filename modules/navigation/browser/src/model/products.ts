@@ -3,6 +3,7 @@ import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import {
   Boxes,
   Building2,
+  Crown,
   LayoutDashboard,
   type LucideIcon,
   UserRound,
@@ -48,7 +49,7 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     icon: LayoutDashboard,
     scopeKind: "project",
     homeHref: ({ projectSlug }) => (projectSlug ? `/${projectSlug}/dashboards` : null),
-    gates: [{ flag: "release_dashboards" }, { permission: "analytics:view" }],
+    gates: [{ flag: "release_dashboards", closesPages: true }, { permission: "analytics:view" }],
   },
   {
     id: "me",
@@ -169,6 +170,14 @@ export function productFromPathname(pathname: string): ProductId | null {
   return area === "dashboards" ? "dashboards" : "llm-ops";
 }
 
+/** The operator console: not a product, so it sits apart in the switcher and its own sidebar. */
+export const OPERATIONS_CONSOLE = {
+  label: "Operations",
+  pitch: "With LangWatch's great features, come great responsibility",
+  icon: Crown,
+  href: "/ops",
+} as const;
+
 /** The operator console (/ops): inside the settings detour, but with its own Admin sidebar. */
 export function isAdminShellRoute(pathname: string): boolean {
   return isPathUnder({ pathname, base: "/ops" });
@@ -177,4 +186,24 @@ export function isAdminShellRoute(pathname: string): boolean {
 /** Settings detour: settings and ops pages; both org-scoped, render the detour's sidebar */
 export function isSettingsShellRoute(pathname: string): boolean {
   return isPathUnder({ pathname, base: "/settings" }) || isPathUnder({ pathname, base: "/ops" });
+}
+
+/**
+ * Detour pages addressed by one organization's entity. Instance pages under
+ * `/ops` are not among them: a replay run or an operator belongs to the
+ * instance, so its address means the same thing in every organization.
+ */
+const ENTITY_ADDRESSED_DETOUR_BASES = ["/settings/teams"];
+
+/**
+ * Whether a detour address names an entity of the current organization, such
+ * as `/settings/teams/:team`. Carrying one into another organization asks it
+ * for something it does not have, so a switch cannot keep the reader there.
+ */
+export function isEntityAddressedDetourRoute(pathname: string): boolean {
+  return ENTITY_ADDRESSED_DETOUR_BASES.some((base) => {
+    if (!pathname.startsWith(`${base}/`)) return false;
+    const [entity] = pathname.slice(base.length + 1).split("/");
+    return Boolean(entity);
+  });
 }

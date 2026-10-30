@@ -39,8 +39,6 @@ export const FRONTEND_FEATURE_FLAGS = [
   // purely additive: the current Simulations pages and menu group are
   // untouched while it is off, and the backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
-  // Gates nothing now; kept until the flag is removed.
-  "release_custom_chart_playground",
   // The Dashboards area, its sidebar entry and its saved-dashboards list.
   "release_dashboards",
   // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
@@ -51,6 +49,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // bar says Instant Evals are not enabled instead of starting a run
   // (specs/traces-v2/instant-eval-search.feature).
   "release_instant_evals",
+  // The own decision models in the Instant Evals column of Default models (ADR-182).
+  "release_instant_evals_own_decision_model",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",

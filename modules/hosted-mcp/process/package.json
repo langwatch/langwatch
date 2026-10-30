@@ -2,7 +2,7 @@
   "name": "@langwatch/hosted-mcp-process",
   "version": "0.1.0",
   "private": true,
-  "description": "The Model Context Protocol endpoint LangWatch hosts: Streamable HTTP and SSE transports, OAuth token issue and exchange, and session recovery.",
+  "description": "The Model Context Protocol endpoint LangWatch hosts: the Streamable HTTP transport, OAuth token issue and exchange, and session recovery.",
   "files": [
     "src"
   ],
@@ -26,6 +26,7 @@
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/hosted-mcp-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
@@ -37,6 +38,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@opentelemetry/api": "catalog:",
     "hono": "catalog:",
     "ioredis": "catalog:",
     "zod": "catalog:"

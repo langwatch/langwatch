@@ -1,8 +1,9 @@
-import { ClickHouseColumns } from "@langwatch/clickhouse-client";
+import { ClickHouseColumns, queryWindowed } from "@langwatch/clickhouse-client";
 import type {
   Projection,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
+  ReadTimeWindow,
 } from "@langwatch/eventing";
 import {
   classifyClickHouseError,
@@ -26,7 +27,7 @@ import {
   evaluationsToColumns,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
-import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
+import { type SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 import {
   type ClickHouseCriteriaColumns,
   columnsToCriteria,
@@ -35,6 +36,22 @@ import {
 } from "./simulation-criteria.mapper.ts";
 
 const TABLE_NAME = "simulation_runs" as const;
+
+/**
+ * How far the latest-version lookup reaches past the row window. StartedAt moves
+ * (hours, until the run starts), so a latest version just outside the row window
+ * still wins the lookup and the read answers empty, never an older version.
+ */
+export const LATEST_VERSION_LOOKUP_MARGIN_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** The StartedAt predicates of a run-state read, and their params. */
+interface StartedAtBounds {
+  /** For the row read (alias `t`). */
+  row: string;
+  /** For the latest-version lookup (alias `s`). */
+  latestVersion: string;
+  params: Record<string, number>;
+}
 
 const logger = createLogger("langwatch:simulation-processing:run-state-repository");
 
@@ -231,6 +248,35 @@ export class ClickHouseSimulationRunStateRepository<
     };
   }
 
+  /**
+   * The StartedAt bounds for a read within `window`: the row read to the window,
+   * the latest-version lookup to the window widened by
+   * {@link LATEST_VERSION_LOOKUP_MARGIN_MS}. No window, no bounds.
+   */
+  static startedAtBounds({ window }: { window: ReadTimeWindow | undefined }): StartedAtBounds {
+    if (!window) return { row: "", latestVersion: "", params: {} };
+
+    return {
+      row:
+        "AND t.StartedAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+        "AND t.StartedAt <= fromUnixTimestamp64Milli({toMs:Int64})",
+      latestVersion:
+        "AND s.StartedAt >= fromUnixTimestamp64Milli({lookupFromMs:Int64}) " +
+        "AND s.StartedAt <= fromUnixTimestamp64Milli({lookupToMs:Int64})",
+      params: {
+        fromMs: Math.floor(window.fromMs),
+        toMs: Math.ceil(window.toMs),
+        lookupFromMs: Math.floor(window.fromMs - LATEST_VERSION_LOOKUP_MARGIN_MS),
+        lookupToMs: Math.ceil(window.toMs + LATEST_VERSION_LOOKUP_MARGIN_MS),
+      },
+    };
+  }
+
+  /**
+   * A fold read-back carries the fold's read window (ADR-066), applied verbatim
+   * with no fallback here: the fold executor retries a miss without the window.
+   * Any other read takes the run's id index range once the index is ready, else every partition.
+   */
   async findProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
@@ -238,16 +284,131 @@ export class ClickHouseSimulationRunStateRepository<
     EventUtils.validateTenantId(context, "SimulationRunStateRepositoryClickHouse.findProjection");
 
     const scenarioRunId = String(aggregateId);
+    const window = context.readWindow;
 
     try {
-      const client = await this.options.resolveClient(context.tenantId);
-      const input = { table: TABLE_NAME, alias: "t", columns: CRITERIA_COLUMNS };
-      const criteria = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
-      // Latest-version read via scalar equality on UpdatedAt (PREWHERE-able for heavy columns).
-      // IN-tuple form causes OOM on runs with many snapshots; scalar is better for single-row gets.
-      const result = await client.query({
-        query: `
-          SELECT
+      const row = window
+        ? await queryWindowed<ClickHouseSimulationRunRecord | null>({
+            table: TABLE_NAME,
+            hintMs: (window.fromMs + window.toMs) / 2,
+            windowMs: (window.toMs - window.fromMs) / 2,
+            fallback: "none",
+            isEmpty: (result) => result === null,
+            run: (fragment) =>
+              this.#findLatestRow({
+                tenantId: context.tenantId,
+                scenarioRunId,
+                window: fragment ? window : undefined,
+              }),
+          })
+        : await this.#findLatestRowById({ tenantId: context.tenantId, scenarioRunId });
+      if (!row) return null;
+
+      const projection: SimulationRunState = {
+        id: row.ProjectionId,
+        aggregateId: scenarioRunId,
+        tenantId: createTenantId(context.tenantId),
+        version: row.Version,
+        data: this.mapClickHouseRecordToProjectionData(row),
+      };
+
+      return projection as ProjectionType;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.warn(
+        { scenarioRunId, tenantId: context.tenantId, readWindow: window, error },
+        "Failed to get projection from ClickHouse",
+      );
+      throw new StoreError({
+        operation: "findProjection",
+        store: "SimulationRunStateRepositoryClickHouse",
+        message: `Failed to get projection for scenario run ${scenarioRunId}: ${errorMessage}`,
+        category: classifyClickHouseError(error),
+        context: { scenarioRunId },
+        cause: error,
+      });
+    }
+  }
+
+  async #findLatestRow({
+    tenantId,
+    scenarioRunId,
+    window,
+  }: {
+    tenantId: string;
+    scenarioRunId: string;
+    window: ReadTimeWindow | undefined;
+  }): Promise<ClickHouseSimulationRunRecord | null> {
+    const bounds = ClickHouseSimulationRunStateRepository.startedAtBounds({ window });
+    const client = await this.options.resolveClient(tenantId);
+    const columns = await this.#latestRowColumns(client);
+    // Latest-version read via scalar equality on UpdatedAt (PREWHERE-able for heavy columns).
+    // IN-tuple form causes OOM on runs with many snapshots; scalar is better for single-row gets.
+    const result = await client.query({
+      // ID_BOUND_SKIP: a fold read-back's own window, applied verbatim (ADR-066).
+      query: `
+          SELECT ${columns}
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ScenarioRunId = {scenarioRunId:String}
+            ${bounds.row}
+            AND t.UpdatedAt = (
+              SELECT max(s.UpdatedAt)
+              FROM ${TABLE_NAME} AS s
+              WHERE s.TenantId = {tenantId:String}
+                AND s.ScenarioRunId = {scenarioRunId:String}
+                ${bounds.latestVersion}
+            )
+          LIMIT 1
+        `,
+      query_params: { tenantId, scenarioRunId, ...bounds.params },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<ClickHouseSimulationRunRecord>();
+    return rows[0] ?? null;
+  }
+
+  /** The run's latest row by id, bounded by the run id index once ready, else every partition. */
+  async #findLatestRowById({
+    tenantId,
+    scenarioRunId,
+  }: {
+    tenantId: string;
+    scenarioRunId: string;
+  }): Promise<ClickHouseSimulationRunRecord | null> {
+    const client = await this.options.resolveClient(tenantId);
+    const columns = await this.#latestRowColumns(client);
+    const result = await client.query({
+      query: `
+          SELECT ${columns}
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ScenarioRunId = {scenarioRunId:String}
+            {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:t}}
+            AND t.UpdatedAt = (
+              SELECT max(s.UpdatedAt)
+              FROM ${TABLE_NAME} AS s
+              WHERE s.TenantId = {tenantId:String}
+                AND s.ScenarioRunId = {scenarioRunId:String}
+                {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:s}}
+            )
+          LIMIT 1
+        `,
+      query_params: { tenantId, scenarioRunId },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    const rows = await result.json<ClickHouseSimulationRunRecord>();
+    return rows[0] ?? null;
+  }
+
+  /** The latest-row select list, criteria columns named as this tenant's target holds them. */
+  async #latestRowColumns(
+    client: Awaited<ReturnType<SimulationClickHouseClientResolver>>,
+  ): Promise<string> {
+    const input = { table: TABLE_NAME, alias: "t", columns: CRITERIA_COLUMNS };
+    const criteria = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
+    return `
             t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
             t.ScenarioRunId AS ScenarioRunId, t.ScenarioId AS ScenarioId,
             t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
@@ -277,50 +438,7 @@ export class ClickHouseSimulationRunStateRepository<
             toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
             if(t.CancellationRequestedAt IS NOT NULL, toUnixTimestamp64Milli(t.CancellationRequestedAt), NULL) AS CancellationRequestedAt,
             toUnixTimestamp64Milli(t.LastSnapshotOccurredAt) AS LastSnapshotOccurredAt,
-            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.ScenarioRunId = {scenarioRunId:String}
-            AND t.UpdatedAt = (
-              SELECT max(s.UpdatedAt)
-              FROM ${TABLE_NAME} AS s
-              WHERE s.TenantId = {tenantId:String}
-                AND s.ScenarioRunId = {scenarioRunId:String}
-            )
-          LIMIT 1
-        `,
-        query_params: { tenantId: context.tenantId, scenarioRunId },
-        format: "JSONEachRow",
-      });
-
-      const rows = await result.json<ClickHouseSimulationRunRecord>();
-      const row = rows[0];
-      if (!row) return null;
-
-      const projection: SimulationRunState = {
-        id: row.ProjectionId,
-        aggregateId: scenarioRunId,
-        tenantId: createTenantId(context.tenantId),
-        version: row.Version,
-        data: this.mapClickHouseRecordToProjectionData(row),
-      };
-
-      return projection as ProjectionType;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warn(
-        { scenarioRunId, tenantId: context.tenantId, error },
-        "Failed to get projection from ClickHouse",
-      );
-      throw new StoreError({
-        operation: "findProjection",
-        store: "SimulationRunStateRepositoryClickHouse",
-        message: `Failed to get projection for scenario run ${scenarioRunId}: ${errorMessage}`,
-        category: classifyClickHouseError(error),
-        context: { scenarioRunId },
-        cause: error,
-      });
-    }
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt`;
   }
 
   async storeProjection(

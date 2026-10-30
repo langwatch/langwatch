@@ -29,6 +29,8 @@ haven service off mail             # switch one service in place, keeping the mo
 haven up +langevals               # evaluators (monitors, evaluations)
 haven up +llm                     # zero-cost model answers (llmsim)
 haven up +design-system +mail-room  # the Storybook and the mail studio
+haven up +docs                    # the docs site (apps/docs) on Vite, hot reloading, at docs.<slug>
+haven up --only docs --agent -d   # the docs site ALONE: no app, databases or sims; haven down stops it
 haven up --force                  # restart even when the stack already matches
 haven up --no-seed                # skip the auto-seed of an empty stack (haven-seed)
 haven up --mode <mode>            # a deployment mode from dev/tests/modes; sticky, `none` clears
@@ -50,7 +52,7 @@ worker are one process: see `dev-runtime`. The `go` lane also hosts the simulato
 deprecated alias). The Go lane rebuilds and swaps its child on a Go change
 only under `--watch` or `--hmr`, and `LANGWATCH_GO_WATCH=0` keeps it off; `haven logs <sim>` still reads
 each one. Langy stays its own lane. On the host tier its `langwatch`/`lw` run this checkout's built CLI
-(`sdks/typescript/dist/cli`, shims in `.bin/langwatch-cli`), built on `haven up` when missing.
+(the SDK's built CLI, shims in `.bin/langwatch-cli`), built on `haven up` when missing.
 
 ```bash
 haven restart api                 # restart the whole lane

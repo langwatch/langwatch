@@ -161,45 +161,22 @@ describe("ScenarioChildSpawn.resolve", () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
       });
 
-      /** @scenario "Processor falls back to tsx with loud logging when bundle is missing in production" */
-      it("falls back to tsx instead of crashing", () => {
-        const result = ScenarioChildSpawn.create().resolve(spawnOptions("production"));
-
-        expect(result).toEqual({ command: "pnpm", args: ["exec", "tsx", SOURCE_PATH] });
-        expect(createRequire).toHaveBeenCalledWith(path.join(PACKAGE_ROOT, "package.json"));
+      /** @scenario "Processor fails loudly when the bundle is missing in production" */
+      it("throws instead of falling back to pnpm exec tsx", () => {
+        expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("production"))).toThrow(
+          /NOT FOUND/,
+        );
+        expect(createRequire).not.toHaveBeenCalled();
       });
 
       it("logs an error with the missing bundle path", () => {
-        ScenarioChildSpawn.create().resolve(spawnOptions("production"));
+        expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("production"))).toThrow(
+          /NOT FOUND/,
+        );
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({ bundlePath: BUNDLE }),
-          expect.stringContaining("NOT FOUND"),
-        );
-      });
-
-      it("logs a remediation hint in the error message", () => {
-        ScenarioChildSpawn.create().resolve(spawnOptions("production"));
-
-        expect(mockLogger.error).toHaveBeenCalledWith(
-          expect.any(Object),
           expect.stringContaining("build:server"),
-        );
-      });
-
-      /** @scenario "Missing tsx fails before spawn when the bundle is missing" */
-      it("fails before spawning pnpm when tsx does not resolve", () => {
-        const cause = tsxDoesNotResolve();
-
-        expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("production"))).toThrow(
-          MISSING_TSX,
-        );
-
-        const logged = mockLogger.error.mock.calls.map((call) => String(call[1])).join("\n");
-        expect(logged).not.toContain(SECRET);
-        expect(mockLogger.error).toHaveBeenCalledWith(
-          expect.objectContaining({ bundleState: "missing", err: cause }),
-          MISSING_TSX,
         );
       });
     });
@@ -275,12 +252,16 @@ describe("ScenarioChildSpawn.resolve", () => {
     /** @scenario "Missing tsx fails before spawn when the bundle is missing" */
     it("names a missing bundle when tsx does not resolve", () => {
       givenMtimes({ sourceMtimeMs: 1000 });
-      tsxDoesNotResolve();
+      const cause = tsxDoesNotResolve();
 
       expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("development"))).toThrow(
         MISSING_TSX,
       );
       expect(JSON.stringify(mockLogger.error.mock.calls)).not.toContain(SECRET);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ bundleState: "missing", err: cause }),
+        MISSING_TSX,
+      );
     });
 
     /** @scenario "Missing tsx fails before spawn when the bundle is stale" */

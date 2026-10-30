@@ -10,6 +10,7 @@ import { cliRefreshTokenKey } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -136,6 +137,7 @@ function refreshWorld() {
   const sessions = CliDeviceSessionService.create({
     store,
     settlements: MemoryCliDeviceSettlementChannel.create(),
+    rotations: MemorySharedCredentialStore.create(),
   });
   const state = {
     activeMembership: true,

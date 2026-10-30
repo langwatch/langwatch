@@ -87,3 +87,37 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
       And style-src includes https://cdn.langwatch.ai
       And font-src includes https://cdn.langwatch.ai
       And connect-src includes https://cdn.langwatch.ai
+
+  Rule: The ECR publish workflow uploads each image's assets to the CDN bucket
+
+    # Workflow YAML has no test harness; first verified on the merge to main.
+    @unimplemented
+    Scenario: A published langwatch-app image has its assets on the CDN before consumers pin it
+      Given FRONTEND_ASSETS_BUCKET names the CDN bucket
+      When publish-docker-ecr builds langwatch-app for the tag "git-abc123"
+      Then dist/client/assets is synced to s3://<bucket>/git-abc123/assets/ with an immutable Cache-Control
+      And sourcemaps are not uploaded
+      And the zero-byte object git-abc123/.complete is written only after the sync finished
+
+    @unimplemented
+    Scenario: A tag whose .complete marker exists is not uploaded again
+      Given s3://<bucket>/git-abc123/.complete exists
+      When publish-docker-ecr runs again for the tag "git-abc123"
+      Then no assets are exported or uploaded
+
+    @unimplemented
+    Scenario: A re-tagged langwatch-app image gets its assets with the types and cache of a build
+      Given the langwatch-app image for "git-abc123" is re-tagged from "git-old456"
+      And s3://<bucket>/git-old456/.complete exists
+      When publish-docker-ecr publishes the tag "git-abc123"
+      Then the assets of git-old456 are uploaded under s3://<bucket>/git-abc123/assets/ from the runner's disk
+      And each asset's Content-Type follows its file extension, so JavaScript is served as text/javascript
+      And each asset has the immutable Cache-Control of a build
+      And a wrong Content-Type stored under git-old456 is not carried over
+      And the zero-byte object git-abc123/.complete is written only after the upload finished
+
+    @unimplemented
+    Scenario: Without a bucket variable the upload is skipped with a notice
+      Given FRONTEND_ASSETS_BUCKET is empty
+      When publish-docker-ecr builds langwatch-app
+      Then the run reports a notice and the image is still published

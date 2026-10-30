@@ -115,9 +115,9 @@ function inMemoryServer({
     state.calls.push(call);
     const input = (call.input ?? {}) as Input;
     switch (call.path) {
-      case "dashboards.getAll":
+      case "boards.getAll":
         return Promise.resolve(state.boards.map((each) => ({ ...each })));
-      case "dashboards.create": {
+      case "boards.create": {
         const created: Board = {
           ...HOME_BOARD,
           id: `board-new-${state.boards.length + 1}`,
@@ -130,17 +130,13 @@ function inMemoryServer({
         state.boards.push(created);
         return Promise.resolve({ ...created });
       }
-      case "dashboards.rename": {
-        const renamed = board(input.dashboardId);
-        renamed.name = String(input.name);
-        return Promise.resolve({ ...renamed });
+      case "boards.update": {
+        const updated = board(input.dashboardId);
+        if (input.name !== void 0) updated.name = input.name as string;
+        if (input.description !== void 0) updated.description = input.description as string | null;
+        return Promise.resolve({ ...updated });
       }
-      case "dashboards.updateDetails": {
-        const described = board(input.dashboardId);
-        described.description = input.description as string | null;
-        return Promise.resolve({ ...described });
-      }
-      case "dashboards.listStarred":
+      case "boards.listStarred":
         return Promise.resolve(
           state.boards
             .filter((each) => each.isStarred)
@@ -540,7 +536,7 @@ describe("a member's board", () => {
         expect(pickerSearch()).toHaveValue("");
         const all = chip({ row: "Categories", name: "All" });
         expect(all).toHaveAttribute("aria-pressed", "true");
-        expect(all).toHaveTextContent(chipText({ name: "All", count: TOTAL }));
+        expect(all.textContent).toMatch(chipText({ name: "All", count: TOTAL }));
         expect(chip({ row: "Categories", name: "Grow" })).toBeInTheDocument();
         const types = within(screen.getByRole("group", { name: "Agent types" }));
         expect(types.getByRole("button", { name: /^Voice agent\s*\d+$/ })).toBeInTheDocument();
@@ -572,7 +568,7 @@ describe("a member's board", () => {
         const protect = PICKER_QUESTIONS.filter(({ trunk }) => trunk === "Protect");
 
         await screen.findByRole("dialog");
-        expect(chip({ row: "Categories", name: "Protect" })).toHaveTextContent(
+        expect(chip({ row: "Categories", name: "Protect" }).textContent).toMatch(
           chipText({ name: "Protect", count: protect.length }),
         );
         await user.click(chip({ row: "Categories", name: "Protect" }));
@@ -586,7 +582,7 @@ describe("a member's board", () => {
         expect(regions.every((region) => region.getAttribute("data-trunk") === "Protect")).toBe(
           true,
         );
-        expect(chip({ row: "Categories", name: "All" })).toHaveTextContent(
+        expect(chip({ row: "Categories", name: "All" }).textContent).toMatch(
           chipText({ name: "All", count: TOTAL }),
         );
 
@@ -826,6 +822,43 @@ describe("a member's board", () => {
       });
     });
 
+    describe("when a fixed range is refreshed", () => {
+      afterEach(() => vi.useRealTimers());
+
+      /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+      it("moves every widget's window end to the refresh, keeping its length", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(Date.UTC(2026, 8, 28, 12, 0, 30));
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const frames = recordWidgetFrames();
+        try {
+          openBoard({ server: boardWithTwoWidgets(), query: { range: "24h" } });
+          frames.loadAll(await screen.findAllByTitle("Custom chart"));
+          const before = frames.latestContexts().map(({ timeWindow }) => timeWindow);
+          expect(before.map(({ end }) => end)).toEqual([
+            Date.UTC(2026, 8, 28, 12, 1),
+            Date.UTC(2026, 8, 28, 12, 1),
+          ]);
+
+          vi.setSystemTime(Date.UTC(2026, 8, 28, 12, 10, 5));
+          await user.click(screen.getByRole("button", { name: "Period" }));
+          await user.click(await screen.findByRole("menuitem", { name: "Refresh now" }));
+
+          await waitFor(() => {
+            frames.loadAll(screen.getAllByTitle("Custom chart"));
+            expect(frames.latestContexts().map(({ timeWindow }) => timeWindow.end)).toEqual([
+              Date.UTC(2026, 8, 28, 12, 11),
+              Date.UTC(2026, 8, 28, 12, 11),
+            ]);
+          });
+          const after = frames.latestContexts().map(({ timeWindow }) => timeWindow);
+          expect(after.map(({ start, end }) => end - start)).toEqual([86_400_000, 86_400_000]);
+        } finally {
+          frames.restore();
+        }
+      });
+    });
+
     describe("when the member changes the grain", () => {
       /** @scenario "AC13 Grain choices update every block" */
       it.each([
@@ -874,7 +907,7 @@ describe("a member's board", () => {
         await user.clear(field);
         await user.type(field, "Launch week{Enter}");
 
-        expect(callsTo(server, "dashboards.rename")[0]?.input).toEqual({
+        expect(callsTo(server, "boards.update")[0]?.input).toEqual({
           projectId: "proj-1",
           dashboardId: "board-1",
           name: "Launch week",
@@ -904,7 +937,7 @@ describe("a member's board", () => {
         expect(screen.getByText("What we check every Monday")).toBeInTheDocument();
         expect(screen.queryByText("Add a description")).toBeNull();
         await waitFor(() =>
-          expect(callsTo(server, "dashboards.updateDetails")[0]?.input).toEqual({
+          expect(callsTo(server, "boards.update")[0]?.input).toEqual({
             projectId: "proj-1",
             dashboardId: "board-1",
             description: "What we check every Monday",

@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
+  CreateSelfHostedNoticeInput,
+  SelfHostedNoticeView,
+  UpdateSelfHostedNoticeInput,
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
+  IssuedLicenseFilters,
   IssuedLicensePage,
   IssuedLicenseView,
   LicenseCustomer,
   LicenseTermsInput,
   SeatChangeResult,
   SelfHostedInstanceDetail,
+  SelfHostedInstanceFilters,
   SelfHostedInstancePage,
+  SelfHostedInstanceSummary,
+  UpgradeDiagnosticsDownload,
+  UpgradeDiagnosticsReport,
   SignedIssuedLicense,
 } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
@@ -22,12 +30,14 @@ import type { OpsOperator } from "@langwatch/ops-contract";
 export interface EnterpriseOpsApi {
   // -- the license registry (ADR-156) ------------------------------------------
 
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicensePage>;
+  listIssuedLicenses(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+      operator: OpsOperator | null;
+    } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage>;
   getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;
   issueLicense(input: {
     customer: LicenseCustomer;
@@ -107,16 +117,49 @@ export interface EnterpriseOpsApi {
 
   // -- the registry of self-hosted installs (ADR-156, section 10); read only --
 
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<SelfHostedInstancePage>;
+  listSelfHostedInstances(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+      operator: OpsOperator | null;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage>;
   getSelfHostedInstance(input: {
     id: string;
     operator: OpsOperator | null;
   }): Promise<SelfHostedInstanceDetail>;
+  summarizeSelfHostedInstances(input: {
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedInstanceSummary>;
+  /** The upgrade diagnostics one install sent, newest first. */
+  findUpgradeDiagnostics(input: {
+    instanceRowId: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsReport[]>;
+  /** A five-minute link to one bundle: the sensitive read, so it asks `ops:manage`. */
+  getUpgradeDiagnosticsDownload(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsDownload>;
+
+  // -- notices to self-hosted installs (self-hosted-notices.feature); writes ask ops:manage --
+
+  findSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
+  createSelfHostedNotice(
+    input: CreateSelfHostedNoticeInput & { operator: OpsOperator | null },
+  ): Promise<SelfHostedNoticeView>;
+  updateSelfHostedNotice(
+    input: UpdateSelfHostedNoticeInput & { operator: OpsOperator | null },
+  ): Promise<SelfHostedNoticeView>;
+  publishSelfHostedNotice(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedNoticeView>;
+  withdrawSelfHostedNotice(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedNoticeView>;
 }
 
 export const EnterpriseOpsApi = moduleApi<EnterpriseOpsApi>()("enterprise-ops");

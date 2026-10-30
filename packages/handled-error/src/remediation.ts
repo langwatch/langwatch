@@ -27,6 +27,17 @@ const registry = {
       "Fix those fields and send the request again; retrying it unchanged will fail identically",
     ],
   },
+  projects_required: {
+    tips: [
+      'Send `projects`, a list of the project ids to read, or the string "all" for every project the key can read; the answer\'s `params.dashboard_context_projects` lists what was read',
+      "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
+    ],
+  },
+  projects_unreadable: {
+    tips: [
+      "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",
+    ],
+  },
   malformed_request: {
     tips: [
       "The body could not be parsed at all; check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
@@ -35,6 +46,19 @@ const registry = {
   unsupported_media_type: {
     tips: [
       "Send the body with the Content-Type in meta.expected; meta.received names the one that was sent",
+    ],
+  },
+  request_body_unreadable: {
+    tips: [
+      "This usually means the connection closed before the body finished uploading. Send the request again.",
+    ],
+  },
+
+  // ---- identity ----
+  identity_password_reset_required: {
+    tips: [
+      "This password may no longer be used; request a reset link from the forgot-password screen and choose a new password",
+      "Signing in through single sign-on, a social provider or a passkey is not affected",
     ],
   },
 
@@ -51,6 +75,21 @@ const registry = {
       "Set S3_BUCKET_NAME (with its credentials) so datasets are stored in object storage",
       "Or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory and restart the service",
       "The server log line next to this failure names the directory that was refused",
+    ],
+  },
+
+  dataset_invalid_column: {
+    tips: [
+      "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
+      "The message names the dataset's valid columns",
+    ],
+  },
+
+  // ---- automations ----
+  automation_dataset_unavailable: {
+    tips: [
+      "Open the automation and pick a dataset that exists, or restore the archived one",
+      "Check the column mapping still names columns the dataset has; retrying unchanged will fail identically",
     ],
   },
 
@@ -134,12 +173,14 @@ const registry = {
       "Read `meta.parameters`; it lists the reserved names the request set for itself",
       "`dashboard_context_period_start` and `dashboard_context_period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
       "`dashboard_context_granularity_seconds` is likewise supplied by the surface; drop it from `parameters` and send it as the request's own `granularitySeconds` field instead",
+      "`dashboard_context_sources` and `dashboard_context_projects` are likewise supplied; drop them from `parameters` and send the request's own `sources` and `projects` fields instead",
     ],
   },
   lwql_reserved_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names declared with the wrong type",
-      "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
+      "Declare each time-window name as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
+      "Declare `dashboard_context_sources` and `dashboard_context_projects` as `Array(String)`, for example `{dashboard_context_sources:Array(String)}`",
     ],
   },
   lwql_result_too_large: {
@@ -179,12 +220,6 @@ const registry = {
       "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
     ],
   },
-  custom_graph_writes_disabled_for_playground: {
-    tips: [
-      "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
-      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
-    ],
-  },
   saved_workbench_chart_already_exists: {
     tips: [
       "A saved chart with this id already exists in this project",
@@ -219,7 +254,7 @@ const registry = {
   saved_workbench_charts_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
-      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {
@@ -291,6 +326,12 @@ const registry = {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  legacy_project_key_ingestion_only: {
+    tips: [
+      "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_permission_not_delegable: {
     tips: [
       "A wider key or a higher role does not change this; make the change in LangWatch instead",
@@ -306,6 +347,12 @@ const registry = {
   project_visibility_too_wide: {
     tips: ["Bind the key to the teams or projects it works with instead of the whole organization"],
     docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  docs_origin_not_registered: {
+    tips: [
+      "Open the playground from a documentation site this installation registers, or paste an API key instead",
+      "A self-hosted installation registers more documentation sites in its configuration",
+    ],
   },
   api_key_reserved_name: {
     tips: [
@@ -532,6 +579,11 @@ const registry = {
     tips: [
       "Add the model to the provider's allowed models list in the model provider settings",
       "Answer each permission card instead; the folder boundary and the privilege rule hold either way",
+    ],
+  },
+  langy_confirmation_required: {
+    tips: [
+      "Wait for the person to choose Yes on the confirmation card in the Langy conversation, then run the same command again",
     ],
   },
   langy_wait_expired: {
@@ -1018,6 +1070,25 @@ const registry = {
     tips: [
       "The app functions are not provisioned on this deployment, so retrying the same query will not help",
       "They are created at deploy time; a redeploy converges them, and the query works unchanged afterwards",
+    ],
+  },
+  upgrade_diagnostics_license_required: {
+    tips: [
+      "Paste or activate a LangWatch licence in Settings, then send the diagnostics again",
+      "Without a licence, download the diagnostics from the step page and email them to support@langwatch.ai",
+    ],
+    docsPath: "/self-hosting/data-and-telemetry",
+  },
+  upgrade_diagnostics_rate_limited: {
+    tips: [
+      "The allowance resets within a day; the step's diagnostics stay on the step page meanwhile",
+      "Download the diagnostics from the step page and email them to support@langwatch.ai if it cannot wait",
+    ],
+    docsPath: "/self-hosting/data-and-telemetry",
+  },
+  upgrade_diagnostics_not_found: {
+    tips: [
+      "The report expired or was never stored; ask the install to send the step's diagnostics again",
     ],
   },
 } as const satisfies Record<string, RemediationEntry>;

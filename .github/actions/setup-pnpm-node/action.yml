@@ -15,6 +15,10 @@
 #       # optional: npm registry for a publish job. Writes the .npmrc that
 #       # `pnpm publish` authenticates through. Omit everywhere else.
 #       registry-url: "https://registry.npmjs.org"
+#       # optional: save the pnpm store at the end of the install. Set it on ONE
+#       # job per workflow that installs every project (`install: all`); see the
+#       # store steps below.
+#       save-store: "true"
 name: setup-pnpm-node
 description: Set up pnpm + Node 24 with pnpm-store caching.
 inputs:
@@ -40,6 +44,14 @@ inputs:
       or `@langwatch/platform-api... @langwatch/langyworker...` for two roots).
     required: false
     default: ""
+  save-store:
+    description: >
+      Save the pnpm store after the install, on a push to main, when no store
+      was restored for this lockfile. Only a job that installs every project
+      may set it: the key is shared, the first save wins, and a store saved
+      from a filtered install is partial for every full install that reuses it.
+    required: false
+    default: "false"
   registry-url:
     description: >
       npm registry to authenticate against, for publish jobs only. Passed
@@ -67,10 +79,25 @@ runs:
     - name: Setup Node
       uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
       with:
-        node-version: 24
-        cache: "pnpm"
-        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+        node-version: "24.22.1"
+        package-manager-cache: false
         registry-url: ${{ inputs.registry-url }}
+
+    # setup-node's own `cache: pnpm` keyed the store on the lockfile alone and
+    # saved it from whichever job finished first, filtered installs included, so
+    # a 915-package store from a small job was reused by every 2143-package
+    # install. Here only a full install saves, under a key of its own.
+    - name: Find the pnpm store
+      id: store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the pnpm store
+      id: restore-store
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.cache-dependency-path) }}
 
     # The dev scripts (generate:modules, ensure:built, and the
     # apps' predev/pretest hooks) are Go: dev/scripts/devscripts.sh runs them.
@@ -135,3 +162,13 @@ runs:
           done
           CI=true pnpm install --frozen-lockfile "${filters[@]}"
         fi
+
+    - name: Save the pnpm store
+      if: >-
+        inputs.install == 'all' && inputs.save-store == 'true'
+        && github.ref == 'refs/heads/main'
+        && steps.restore-store.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.cache-dependency-path) }}

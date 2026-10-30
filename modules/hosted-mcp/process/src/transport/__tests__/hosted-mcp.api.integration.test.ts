@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join, resolve } from "node:path";
 
+import { ClientAddress } from "@langwatch/api/policy";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import {
   afterAll,
@@ -23,12 +24,12 @@ import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
 import { LiveHostedMcpRepositories } from "../../repositories/live/live.hosted-mcp.repositories.ts";
 import type { McpSessionCipher } from "../../repositories/mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
-import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 function stringField(body: unknown, key: string): string {
@@ -54,6 +55,7 @@ const mockRedis = {
   set: vi.fn(),
   del: vi.fn(),
   expire: vi.fn(),
+  ttl: vi.fn(),
   sadd: vi.fn(),
   srem: vi.fn(),
   smembers: vi.fn(),
@@ -301,8 +303,9 @@ async function sendRequest({
   if (body && !fetchHeaders["content-type"]) {
     fetchHeaders["content-type"] = "application/json";
   }
-  // MCP Streamable HTTP requires Accept header for POST/GET on /mcp
-  if (path === "/mcp" && (method === "POST" || method === "GET") && !fetchHeaders.accept) {
+  // MCP Streamable HTTP requires Accept header for POST/GET on /mcp (and its /sse alias)
+  const streamablePath = path === "/mcp" || path === "/sse";
+  if (streamablePath && (method === "POST" || method === "GET") && !fetchHeaders.accept) {
     fetchHeaders.accept = "text/event-stream, application/json";
   }
 
@@ -351,11 +354,17 @@ beforeAll(async () => {
     projects: new FakeProjectLookup(),
     grants: sessionGrant,
     cliSessions,
-    address: HeaderMcpClientAddressService.create(),
+    address: ResolvedMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   }).createHandler();
 
+  // Stands in for the process's own stamp, behind a trusted local edge that names each caller.
+  const edge = ClientAddress.fromTrustedProxies({
+    addresses: ["127.0.0.1"],
+    trustCloudflare: true,
+  });
   server = createServer((req, res) => {
+    edge.handleIncoming(req);
     handler.handleRequest(req, res);
   });
 
@@ -429,6 +438,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // is not matched as an MCP route. In production, start.ts checks
       // isMcpRoute() first and falls through to Next.js.
       expect(res.status).toBe(404);
+      expect(res.json().error).toBe("Not found");
     });
   });
 
@@ -877,6 +887,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
         expect(res.status).toBe(404);
         expect(res.contentType).toContain("application/json");
+        expect(res.body.error).toBe("not_found");
       });
     });
 
@@ -887,6 +898,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
         expect(res.status).toBe(404);
         expect(res.contentType).toContain("application/json");
+        expect(res.body.error).toBe("not_found");
       });
     });
   });
@@ -993,6 +1005,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
+      expect(res.json().error).toBe("Invalid API key");
     });
   });
 
@@ -1198,12 +1211,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(401);
       expect(res.headers["www-authenticate"]).toContain("resource_metadata");
+      expect(res.json().error).toBe("Invalid or expired token");
     });
   });
 
   describe("when a client refreshes while its MCP session is open", () => {
     /** @scenario "An open MCP session adopts the refreshed token of the same person and project" */
-    it("serves the session under the refreshed token and refuses another person's", async () => {
+    it("serves the session under the refreshed token and hides it from another person", async () => {
       const first = await exchangeCode();
       const opened = await sendRequest({
         server,
@@ -1239,7 +1253,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(adopted.status).toBe(200);
-      expect(refused.status).toBe(401);
+      // A valid token for someone else learns nothing and is not sent to sign in again.
+      expect(refused.status).toBe(404);
+      expect(refused.json().error).toBe("Session not found");
     });
   });
 
@@ -1262,6 +1278,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(401);
       expect(res.headers["www-authenticate"]).toContain("resource_metadata");
+      expect(res.json().error).toBe("Invalid API key");
     });
   });
 
@@ -1385,6 +1402,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
+      expect(res.json().error).toBe("Authorization required");
     });
 
     it("returns 401 on GET", async () => {
@@ -1433,6 +1451,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
+      expect(res.json().error).toBe("Invalid or expired token");
     });
   });
 
@@ -1848,99 +1867,83 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
-  // --- SSE Transport Tool Execution ---
+  // --- /sse, the retired SSE transport's URL ---
 
-  describe("when a tool is called via the SSE transport", () => {
-    it("propagates the API key to search_traces", async () => {
+  describe("when a client still configured with /sse connects", () => {
+    /** @scenario "A client configured with the retired /sse URL is served Streamable HTTP" */
+    it("opens a Streamable HTTP session there and calls a tool on it", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
+      const authorization = `Bearer ${VALID_API_KEY}`;
 
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const baseUrl = `http://127.0.0.1:${port}`;
+      const initRes = await sendRequest({
+        server,
+        path: "/sse",
+        body: mcpInitializeBody(),
+        headers: { authorization },
+      });
+      expect(initRes.status).toBe(200);
+      const sessionId = initRes.headers["mcp-session-id"]!;
+      expect(sessionId).toBeTruthy();
 
-      // 1. Connect via SSE — GET /sse with Bearer token
-      // Use AbortController since SSE is a long-lived stream
-      const abortController = new AbortController();
-      const sseChunks: string[] = [];
+      await sendRequest({
+        server,
+        path: "/sse",
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+        headers: { authorization, "mcp-session-id": sessionId },
+      });
 
-      const ssePromise = fetch(`${baseUrl}/sse`, {
-        method: "GET",
+      const listRes = await sendRequest({
+        server,
+        path: "/sse",
+        body: { jsonrpc: "2.0", id: 7, method: "tools/list" },
+        headers: { authorization, "mcp-session-id": sessionId },
+      });
+      expect(listRes.status).toBe(200);
+      const result = listRes.json().result as { tools: unknown[] };
+      expect(result.tools.length).toBeGreaterThan(0);
+
+      const closeRes = await sendRequest({
+        server,
+        method: "DELETE",
+        path: "/sse",
+        headers: { authorization, "mcp-session-id": sessionId },
+      });
+      expect(closeRes.status).toBe(200);
+    });
+  });
+
+  describe("when a client posts to the retired SSE message endpoint", () => {
+    /** @scenario "The retired SSE message endpoint is no longer served" */
+    it("answers 404, as for any path the endpoint does not serve", async () => {
+      const res = await sendRequest({
+        server,
+        path: "/messages?sessionId=anything",
+        body: mcpInitializeBody(),
         headers: { authorization: `Bearer ${VALID_API_KEY}` },
-        signal: abortController.signal,
-      }).then(async (res) => {
-        expect(res.status).toBe(200);
-        const reader = res.body!.getReader();
-        const decoder = new TextDecoder();
-        // Read chunks until we have the endpoint event
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          sseChunks.push(decoder.decode(value, { stream: true }));
-          const joined = sseChunks.join("");
-          if (joined.includes("event: endpoint")) break;
-        }
       });
 
-      // Wait for the endpoint event
-      await ssePromise;
+      expect(res.status).toBe(404);
+      expect(res.json().error).toBe("Not found");
+    });
+  });
 
-      // Parse SSE stream to get the endpoint event with session URL
-      const sseBody = sseChunks.join("");
-      const endpointMatch = sseBody.match(/event:\s*endpoint\ndata:\s*(.+)/);
-      expect(endpointMatch).toBeTruthy();
-
-      const messagesPath = endpointMatch![1]!.trim();
-      expect(messagesPath).toContain("sessionId=");
-
-      // 2. Send initialize request via POST /messages
-      const initRes = await fetch(`${baseUrl}${messagesPath}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${VALID_API_KEY}`,
-        },
-        body: JSON.stringify(mcpInitializeBody()),
-      });
-      expect(initRes.status).toBe(202);
-
-      // 3. Send initialized notification
-      await fetch(`${baseUrl}${messagesPath}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${VALID_API_KEY}`,
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "notifications/initialized",
-        }),
+  describe("when a request is malformed for the endpoint", () => {
+    it("answers a non-initialize request with no session id as 400 mcp_session_id_required", async () => {
+      const res = await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
       });
 
-      // 4. Call search_traces via SSE transport
-      const toolRes = await fetch(`${baseUrl}${messagesPath}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${VALID_API_KEY}`,
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 7,
-          method: "tools/call",
-          params: { name: "search_traces", arguments: {} },
-        }),
-      });
-      expect(toolRes.status).toBe(202);
+      expect(res.status).toBe(400);
+      expect(res.json().error).toBe("Invalid request — no session ID or not an initialize request");
+    });
 
-      // Wait for the tool to execute (response goes through SSE stream)
-      await new Promise((done) => setTimeout(done, 2000));
+    it("answers a method the route does not serve as 405 mcp_method_not_allowed", async () => {
+      const res = await sendRequest({ server, method: "PUT", path: "/mcp" });
 
-      // Verify the server is still healthy (tool didn't crash it)
-      const healthRes = await fetch(`${baseUrl}/mcp/health`);
-      expect(healthRes.status).toBe(200);
-
-      // Clean up the SSE connection
-      abortController.abort();
+      expect(res.status).toBe(405);
+      expect(res.json().error).toBe("Method not allowed");
     });
   });
 });

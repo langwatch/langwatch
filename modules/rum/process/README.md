@@ -6,7 +6,7 @@ The server half of [rum](../README.md). The platform's own browser telemetry, pr
 
 ## Installation
 
-`defineProcessModule("rum").withRepositories(rumRepositories).withChannels(rumChannels).withApi(RumModule).withTransports(rumRest)`, `src/rum.module.ts:10`.
+`defineProcessModule("rum").withRepositories(rumRepositories).withChannels(rumChannels).withApi(RumModule).withTransports(rumRest).provideMiddlewareContext(…)`, `src/rum.module.ts:11`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The platform's own browser telemetry, proxied to its collector (ADR-058).
 
-Peers call these through the token, declared at `../contract/src/rum.api.ts:24`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/rum.api.ts:23`; nothing else in this package is public.
 
 #### `ingestBrowserTraces`
 
@@ -30,7 +30,7 @@ ingestBrowserTraces(report: BrowserTraceReport): Promise<void>;
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/rum.rest.ts:19`         |
+| Declared at | `src/transport/rum.rest.ts:23`         |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
@@ -39,14 +39,14 @@ ingestBrowserTraces(report: BrowserTraceReport): Promise<void>;
 
 Report the platform's own browser traces
 
-Public: browser telemetry ingest; the browser has no credential to present and the payload is treated as untrusted. Declared at `src/transport/rum.rest.ts:24`.
+Public: browser telemetry ingest; the browser has no credential to present and the payload is treated as untrusted. Declared at `src/transport/rum.rest.ts:28`.
 
 Answers at `/api/rum/v1/traces`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/rum.rest.ts:26)
-type Headers = z.infer<typeof rumReportHeadersSchema>; // ../contract/src/rum.api.ts:11
-// Response: inline, src/transport/rum.rest.ts:39
+// Rawbody: "text" (inline, src/transport/rum.rest.ts:31)
+type Headers = z.infer<typeof rumReportHeadersSchema>; // ../contract/src/rum.api.ts:10
+// Response: inline, src/transport/rum.rest.ts:45
 type Response = unknown;
 ```
 
@@ -67,9 +67,9 @@ None: rum declares no pipeline, process manager, subscriber or task.
 | Kind   | Leaf                | Environment variable          | Declared at                        |
 | ------ | ------------------- | ----------------------------- | ---------------------------------- |
 | secret | `–`                 | `RUM_COLLECTOR_HEADERS`       | `src/app/rum.app.ts:29`            |
-| config | `enabled`           | `RUM_ENABLED`                 | `../contract/src/rum.config.ts:15` |
-| config | `sampleRatio`       | `RUM_SAMPLE_RATIO`            | `../contract/src/rum.config.ts:22` |
-| config | `collectorEndpoint` | `RUM_COLLECTOR_ENDPOINT`      | `../contract/src/rum.config.ts:26` |
-| config | `telemetryEndpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `../contract/src/rum.config.ts:30` |
+| config | `enabled`           | `RUM_ENABLED`                 | `../contract/src/rum.config.ts:19` |
+| config | `sampleRatio`       | `RUM_SAMPLE_RATIO`            | `../contract/src/rum.config.ts:26` |
+| config | `collectorEndpoint` | `RUM_COLLECTOR_ENDPOINT`      | `../contract/src/rum.config.ts:30` |
+| config | `telemetryEndpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `../contract/src/rum.config.ts:34` |
 
 <!-- readme:generated:end -->

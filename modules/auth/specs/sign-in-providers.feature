@@ -8,6 +8,11 @@ Feature: The deployment's sign-in providers mount on Better Auth
   beside it (main's D09), and federation is offered only where a signed
   license permits platform single sign-on (ADR-027).
 
+  Mounting is not offering. On cloud, Auth0 stays mounted so organizations
+  still on legacy Auth0 SSO reach it by domain routing, but the sign-in screen
+  and the Connect buttons never offer it (specs/identity/signin-router.feature,
+  "Cloud never offers the Auth0 broker on the sign-in screen").
+
   @unit
   Scenario: A deployment that names no provider mounts none
     Given no sign-in provider is named
@@ -105,3 +110,9 @@ Feature: The deployment's sign-in providers mount on Better Auth
     When the sign-in screen renders in development
     Then google is offered
     And no other social provider is offered
+
+  @regression @integration
+  Scenario: Every provider mark on a sign-in button declares its own size
+    Given the sign-in screen offers google, github and microsoft
+    When their buttons render
+    Then each provider mark is an svg with a width and height equal to its box

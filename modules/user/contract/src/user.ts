@@ -74,7 +74,8 @@ export interface UserProfilesInputSchema extends Named<typeof userProfilesInputS
 export const userProfilesInputSchema: UserProfilesInputSchema = userProfilesInputSchemaDefinition;
 export type UserProfilesInput = z.infer<typeof userProfilesInputSchema>;
 
-export const userEmailSchema = z.string().trim().pipe(z.email());
+/** Stored and looked up lower-cased, so a plain match on the unique index finds the account. */
+export const userEmailSchema = z.string().trim().toLowerCase().pipe(z.email());
 const userEmailInputSchemaDefinition = z.object({ email: userEmailSchema }).strict();
 export interface UserEmailInputSchema extends Named<typeof userEmailInputSchemaDefinition> {}
 export const userEmailInputSchema: UserEmailInputSchema = userEmailInputSchemaDefinition;
@@ -113,6 +114,14 @@ const createdUserSchemaDefinition = z.object({ id: z.string().min(1) }).strict()
 export interface CreatedUserSchema extends Named<typeof createdUserSchemaDefinition> {}
 export const createdUserSchema: CreatedUserSchema = createdUserSchemaDefinition;
 export type CreatedUser = z.infer<typeof createdUserSchema>;
+
+/** A user holding a credential password, and whether it is already marked for a reset. */
+const passwordHolderSchemaDefinition = z
+  .object({ id: z.string().min(1), email: z.string().nullable(), markedForReset: z.boolean() })
+  .strict();
+export interface PasswordHolderSchema extends Named<typeof passwordHolderSchemaDefinition> {}
+export const passwordHolderSchema: PasswordHolderSchema = passwordHolderSchemaDefinition;
+export type PasswordHolder = z.infer<typeof passwordHolderSchema>;
 
 const setFirstUserPasswordInputSchemaDefinition = z
   .object({ id: z.string().min(1), passwordHash: z.string().min(1) })

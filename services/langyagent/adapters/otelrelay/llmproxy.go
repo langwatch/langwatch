@@ -21,6 +21,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/pkg/providererr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
@@ -214,8 +215,11 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 // complexity. See the ModifyResponse call site for what it is responsible
 // for.
 func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error {
+	if resp.StatusCode < 400 && isEventStream(resp) {
+		promoteBareJSONStreamError(resp)
+	}
 	if resp.StatusCode < 400 {
-		if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+		if isEventStream(resp) {
 			// A 200 stream can still fail: providers signal hard limits
 			// (OpenAI's insufficient_quota) as an in-stream error event
 			// after the stream opens. Watch the frames as they pass through
@@ -411,6 +415,7 @@ var hardLimitReasonCodes = map[herr.Code]bool{
 	"codex_plan_limit":           true,
 	"insufficient_quota":         true,
 	"billing_hard_limit_reached": true,
+	ErrProviderOutOfCredit:       true,
 }
 
 // hasHardLimitReason walks a captured LLM error's code and reason chain for a
@@ -561,7 +566,32 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 	if refusal, ok := credentialRefusalReason(status); ok && refusal != code {
 		e.Reasons = append(e.Reasons, herr.E{Code: refusal})
 	}
+	if cause, ok := accountCauseReason(status, peeked); ok {
+		e.Reasons = append(e.Reasons, herr.E{Code: cause})
+	}
 	return e
+}
+
+// The account-level causes a provider body names in prose only (Anthropic's
+// spent balance is a 400 invalid_request_error), classified here so the panel
+// can say which one it was while the sentence itself stays behind.
+const (
+	// ErrProviderOutOfCredit marks a provider account with no credit or quota left.
+	ErrProviderOutOfCredit = herr.Code("llm_provider_out_of_credit")
+	// ErrProviderKeyRejected marks a key the provider refused on a status other than 401 or 403.
+	ErrProviderKeyRejected = herr.Code("llm_provider_key_rejected")
+)
+
+func accountCauseReason(status int, body []byte) (herr.Code, bool) {
+	switch {
+	case providererr.AccountExhausted(status, body):
+		return ErrProviderOutOfCredit, true
+	case providererr.KeyRejected(status, body):
+		// A 401 or 403 already carries its status reason (credentialRefusalReason).
+		_, statusSaysSo := credentialRefusalReason(status)
+		return ErrProviderKeyRejected, !statusSaysSo
+	}
+	return "", false
 }
 
 // credentialRefusalReason names a 401 or 403 next to the provider's own

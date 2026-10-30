@@ -110,9 +110,12 @@ export function getVersionValidator(schemaVersion: SchemaVersion): typeof config
  * @throws Error if the schema llmConfigVersion is unknown
  * @throws ZodError if the config data is invalid
  */
-export function parseLlmConfigVersion(llmConfigVersion: {
-  schemaVersion: SchemaVersion | string;
-}): LatestConfigVersionSchema {
+export function parseLlmConfigVersion(
+  llmConfigVersion: {
+    schemaVersion: SchemaVersion | string;
+  },
+  options?: { onLegacyPromptingTechnique?: (change: LegacyPromptingTechniqueChange) => void },
+): LatestConfigVersionSchema {
   const { schemaVersion } = llmConfigVersion;
 
   const validator = getVersionValidator(schemaVersion as SchemaVersion);
@@ -121,7 +124,91 @@ export function parseLlmConfigVersion(llmConfigVersion: {
     throw new Error(`Unknown schema llmConfigVersion: ${schemaVersion}`);
   }
 
+  // Read path only: stored data may predate the strict enum. Writes validate
+  // with the strict validator directly and never go through this function.
+  const configData = (llmConfigVersion as { configData?: unknown }).configData;
+  if (configData && typeof configData === "object" && !Array.isArray(configData)) {
+    const { configData: normalized, change } = normalizeLegacyPromptingTechnique(
+      configData as Record<string, unknown>,
+    );
+    if (change) {
+      options?.onLegacyPromptingTechnique?.(change);
+      return validator.parse({ ...llmConfigVersion, configData: normalized });
+    }
+  }
+
   return validator.parse(llmConfigVersion);
+}
+
+type PromptingTechniqueType = "few_shot" | "in_context" | "chain_of_thought";
+
+export interface LegacyPromptingTechniqueChange {
+  /** Shape of the stored value, never its content (e.g. "string", "null", "object"). */
+  storedShape: string;
+  action: "mapped" | "dropped";
+  mappedTo?: PromptingTechniqueType;
+}
+
+const TECHNIQUE_ALIASES: Record<string, PromptingTechniqueType> = {
+  fewshot: "few_shot",
+  incontext: "in_context",
+  incontextlearning: "in_context",
+  chainofthought: "chain_of_thought",
+  cot: "chain_of_thought",
+};
+
+function mapLegacyTechniqueType(raw: unknown): PromptingTechniqueType | undefined {
+  if (typeof raw !== "string") return undefined;
+  const key = raw.toLowerCase().replace(/[^a-z]/g, "");
+  return TECHNIQUE_ALIASES[key];
+}
+
+/**
+ * Normalises legacy stored `prompting_technique` values (other spellings, a bare
+ * string, null, unknown types) to the strict shape. No equivalent: dropped.
+ */
+export function normalizeLegacyPromptingTechnique(configData: Record<string, unknown>): {
+  configData: Record<string, unknown>;
+  change?: LegacyPromptingTechniqueChange;
+} {
+  if (!("prompting_technique" in configData)) return { configData };
+  const stored = configData.prompting_technique;
+  if (stored === undefined) return { configData };
+
+  const { prompting_technique: _omit, ...rest } = configData;
+  const drop = (storedShape: string) => ({
+    configData: rest,
+    change: { storedShape, action: "dropped" as const },
+  });
+
+  if (stored === null) return drop("null");
+
+  if (typeof stored === "string") {
+    const mapped = mapLegacyTechniqueType(stored);
+    return mapped
+      ? {
+          configData: { ...rest, prompting_technique: { type: mapped } },
+          change: { storedShape: "string", action: "mapped", mappedTo: mapped },
+        }
+      : drop("string");
+  }
+
+  if (typeof stored !== "object" || Array.isArray(stored)) {
+    return drop(Array.isArray(stored) ? "array" : typeof stored);
+  }
+
+  const technique = stored as Record<string, unknown>;
+  if (promptingTechniqueSchema.validate(technique)) return { configData };
+
+  const mapped = mapLegacyTechniqueType(technique.type);
+  if (!mapped) return drop("object");
+  const candidate = { ...technique, type: mapped };
+  // If the demonstrations are malformed too, keep the technique and drop them.
+  const value = promptingTechniqueSchema.validate(candidate) ? candidate : { type: mapped };
+  return {
+    configData: { ...rest, prompting_technique: value },
+    change: { storedShape: "object", action: "mapped", mappedTo: mapped },
+  };
 }
 
 export type RuntimeParameters = Record<string, unknown>;

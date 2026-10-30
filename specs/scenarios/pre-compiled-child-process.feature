@@ -158,17 +158,17 @@ Feature: Pre-compiled Scenario Child Process
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Processor falls back to tsx with loud logging when bundle is missing in production
+  Scenario: Processor fails loudly when the bundle is missing in production
     Given the pre-compiled bundle file does not exist at the expected path
     And NODE_ENV is "production"
-    And tsx resolves from the scenario child package
     When the scenario processor resolves the child process spawn
-    Then it returns the tsx command rather than throwing
+    Then resolution fails rather than returning a tsx command
     And it logs an error with the missing bundle path and remediation steps
 
   @unit @regression
   Scenario: Missing tsx fails before spawn when the bundle is missing
     Given the pre-compiled bundle file does not exist at the expected path
+    And NODE_ENV is not production
     And tsx does not resolve from the scenario child package
     When the scenario processor resolves the child process spawn
     Then resolution fails before returning a pnpm command
@@ -192,10 +192,10 @@ Feature: Pre-compiled Scenario Child Process
     And the failure metric is recorded
     And the execution pool is released
 
-  # The fallback returns a tsx command only when tsx resolves from the scenario
-  # child package. tsx is a devDependency of @langwatch/scenario-child, so a
-  # source checkout that installed dev dependencies can run it, including with
-  # NODE_ENV=production. The Docker image and the published npx tree prune
-  # tsx; there the resolver fails with the install or build remedy instead of
-  # handing pnpm a command it cannot run. The bundle is the only supported
+  # Outside production, the fallback returns a tsx command only when tsx
+  # resolves from the scenario child package. tsx is a devDependency of
+  # @langwatch/scenario-child, so a source checkout that installed dev
+  # dependencies can run it. Where it does not resolve, the resolver fails with
+  # the install or build remedy instead of handing pnpm a command it cannot
+  # run. Production never falls back: the bundle is the only supported
   # packaged-deployment path.

@@ -25,6 +25,7 @@
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
+    "test:repo": "vitest run --config vitest.repo.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
@@ -48,7 +49,6 @@
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
-    "prom-client": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -41,13 +41,13 @@ function boardsServer(boards: ReturnType<typeof listed>[]) {
   const state = { boards: [...boards], calls: [] as UiProcedureCall[] };
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     state.calls.push(call);
-    if (call.path === "dashboards.getAll") return Promise.resolve([...state.boards]);
-    if (call.path === "dashboards.create") {
+    if (call.path === "boards.getAll") return Promise.resolve([...state.boards]);
+    if (call.path === "boards.create") {
       const created = listed({ id: "board-new", name: (call.input as { name: string }).name });
       state.boards.push(created);
       return Promise.resolve(created);
     }
-    if (call.path === "dashboards.star" || call.path === "dashboards.unstar") {
+    if (call.path === "boards.star" || call.path === "boards.unstar") {
       return Promise.resolve({ success: true });
     }
     return NO_PROCEDURES(call);
@@ -116,12 +116,13 @@ describe("the Dashboards screens", () => {
           element: <DashboardBoardScreen />,
           host: hostOpening({ dashboardId: "board-1", flags: FLAG_ON }),
           answer: (call) =>
-            call.path === "dashboards.getAll"
+            call.path === "boards.getAll"
               ? Promise.reject(new UiProcedureRefusal("FORBIDDEN", 403))
               : NO_PROCEDURES(call),
         });
 
         expect(await screen.findByRole("heading", NOT_FOUND)).toBeInTheDocument();
+        expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
         expect(refused.container.innerHTML).toBe(flagOffPage);
       });
     });
@@ -138,7 +139,7 @@ describe("the Dashboards screens", () => {
         renderDashboards({ element: <DashboardsIndexScreen />, host, answer: server.answer });
 
         await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/mine"]));
-        expect(server.state.calls.map(({ path }) => path)).not.toContain("dashboards.create");
+        expect(server.state.calls.map(({ path }) => path)).not.toContain("boards.create");
       });
     });
 
@@ -162,9 +163,9 @@ describe("the Dashboards screens", () => {
           expect(host.navigations).toEqual(["/test-project/dashboards/board-new"]),
         );
         const paths = server.state.calls.map(({ path }) => path);
-        expect(paths.filter((path) => path === "dashboards.create")).toHaveLength(1);
-        expect(paths).not.toContain("dashboards.star");
-        expect(server.state.calls.find(({ path }) => path === "dashboards.create")?.input).toEqual({
+        expect(paths.filter((path) => path === "boards.create")).toHaveLength(1);
+        expect(paths).not.toContain("boards.star");
+        expect(server.state.calls.find(({ path }) => path === "boards.create")?.input).toEqual({
           projectId: "proj-1",
           name: "My dashboard",
         });
@@ -177,10 +178,10 @@ describe("the Dashboards screens", () => {
           element: <DashboardBoardScreen />,
           host: hostOpening({ dashboardId: "board-1", flags: FLAG_ON }),
           answer: (call) => {
-            if (call.path === "dashboards.getAll") {
+            if (call.path === "boards.getAll") {
               return Promise.resolve([listed({ id: "board-1", name: "Weekly review" })]);
             }
-            if (call.path === "dashboards.listStarred") return Promise.resolve([]);
+            if (call.path === "boards.listStarred") return Promise.resolve([]);
             if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
             return NO_PROCEDURES(call);
           },
@@ -189,6 +190,42 @@ describe("the Dashboards screens", () => {
         expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
         expect(screen.queryByText("Default")).toBeNull();
       });
+    });
+
+    describe("when the member opens a board", () => {
+      /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
+      it("asks if they look for the old Analytics and links to it", async () => {
+        renderDashboards({
+          element: <DashboardBoardScreen />,
+          host: hostOpening({ dashboardId: "board-1", flags: FLAG_ON }),
+          answer: (call) => {
+            if (call.path === "boards.getAll") return Promise.resolve([listed({ id: "board-1" })]);
+            if (call.path === "boards.listStarred") return Promise.resolve([]);
+            if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
+            return NO_PROCEDURES(call);
+          },
+        });
+
+        expect(await screen.findByTestId("old-analytics-banner")).toHaveTextContent(
+          "Looking for the old Analytics? It is still here.",
+        );
+        expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
+          "href",
+          "/test-project/analytics",
+        );
+      });
+    });
+  });
+
+  describe("given the flag is off", () => {
+    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
+    it("shows no old-Analytics banner", () => {
+      renderDashboards({
+        element: <DashboardBoardScreen />,
+        host: hostOpening({ dashboardId: "board-1", flags: FLAG_OFF }),
+      });
+
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 });

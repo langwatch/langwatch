@@ -92,10 +92,12 @@ export function useUiScopeReading({
   // it is the URL naming the deployment's demo, not a project of the caller's.
   const isDemo = Boolean(demoProjectSlug && route.projectParam === demoProjectSlug);
 
+  // Only for a signed-in reader: the session read sends anyone else to sign in, and the
+  // graph would only answer 401 (modules/organization/specs/scope-graph.feature).
   const organizations = useUiOrganizations({
     transport,
     isDemo,
-    enabled: !!session.user || !route.isPublicRoute,
+    enabled: !!session.user,
     userId,
   });
   const sharedTrace = useUiSharedProject({

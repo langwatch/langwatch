@@ -330,17 +330,3 @@ export class UserLastPlatformOperatorError extends HandledError {
     this.name = "UserLastPlatformOperatorError";
   }
 }
-
-/** More than one account holds this address in different case, and none holds it exactly. */
-export class UserEmailAmbiguousError extends HandledError {
-  declare readonly code: "user_email_ambiguous";
-
-  constructor() {
-    super(
-      "user_email_ambiguous",
-      "More than one account holds this address in different case; change one of their addresses first",
-      { httpStatus: 409, fault: "customer" },
-    );
-    this.name = "UserEmailAmbiguousError";
-  }
-}

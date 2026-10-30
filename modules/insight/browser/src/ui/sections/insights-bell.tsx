@@ -25,6 +25,8 @@ export function InsightsBell(_props: InsightsBellProps) {
   if (!reading.available || !reading.project) return null;
   const inboxHref = `/${reading.project.slug}/insights`;
   const unseen = reading.inbox?.unseen ?? [];
+  // The bell counts only unseen insights; seen ones still wait in the inbox.
+  const waiting = reading.inbox?.inbox.length ?? 0;
   const go = (to: string) => {
     setOpen(false);
     host.navigate(to);
@@ -100,15 +102,10 @@ export function InsightsBell(_props: InsightsBellProps) {
               ))}
             </VStack>
           ) : (
-            <Text
-              paddingX={4}
-              paddingY={8}
-              textAlign="center"
-              textStyle="caption"
-              color="fg.subtle"
-            >
-              All caught up.
-            </Text>
+            <VStack gap={1} paddingX={4} paddingY={8} textStyle="caption" color="fg.subtle">
+              <Text>No new insights</Text>
+              {waiting > 0 && <Text>{inboxCountLabel(waiting)}</Text>}
+            </VStack>
           )}
         </Box>
         <HStack borderTopWidth="1px" borderColor="border">
@@ -131,4 +128,8 @@ export function InsightsBell(_props: InsightsBellProps) {
       </Popover.Content>
     </Popover.Root>
   );
+}
+
+function inboxCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "insight" : "insights"} in your inbox`;
 }

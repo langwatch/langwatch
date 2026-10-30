@@ -239,6 +239,10 @@ model User {
   /// answered. The browser's own permission is not stored here.
   /// Spec: specs/langy/langy-notifications.feature
   notificationPreferences       Json                     @default("{}")
+  /// When an operator marked this person's password as no longer trusted. A
+  /// password sign-in opens no session while it is set; any write of a new
+  /// password hash clears it. Spec: modules/auth/specs/forced-password-reset.feature
+  passwordResetRequiredAt       DateTime?
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]
@@ -1839,6 +1843,9 @@ model Project {
   name                String
   slug                String                    @unique
   apiKey              String                    @unique
+  /// When the legacy apiKey last authenticated a request, written at most once a
+  /// minute per project and process. Spec: modules/api-key/specs/request-credential-type.feature
+  legacyApiKeyLastUsedAt DateTime?
   /// Random per-project secret whose SHA-256 digest is this project's LangWatchQL
   /// SQL tenant capability in ClickHouse. Deliberately NOT the API key: the
   /// credential a caller authenticates with and the capability the database
@@ -2105,6 +2112,8 @@ model Monitor {
   threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @default(now()) @updatedAt
+  autoPausedAt      DateTime? // Set when the monitor paused itself because its evaluations mostly errored
+  autoPausedReason  String? // Why it paused itself; cleared with autoPausedAt when enabled again
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -2257,13 +2266,17 @@ model Dashboard {
   /// and a rolling deploy's older image still reads it.
   order     Int           @default(0)
   /// Free text under the board's name; null until a member writes one.
+  /// Retiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it.
   description String?
   /// The member who created it; null for boards that predate the column.
+  /// Retiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it.
   createdById String?
   /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
+  /// Retiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it.
   scope          DashboardScope @default(PROJECT)
   /// The owning project's organization, stamped when the board is first set to
   /// ORGANIZATION; null before. No relation, per the database rule.
+  /// Retiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it.
   organizationId String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @default(now()) @updatedAt
@@ -2284,7 +2297,8 @@ model Dashboard {
 model DashboardFavourite {
   id          String   @id @default(nanoid())
   userId      String
-  /// Null when the star is a template.
+  /// A DashboardsV2 board's id (copied boards kept their Dashboard id); null when
+  /// the star is a template.
   dashboardId String?
   /// The starred From LangWatch template id; null when the star is a board.
   templateId  String?
@@ -2298,6 +2312,54 @@ model DashboardFavourite {
   @@index([userId, projectId, position])
   @@index([dashboardId])
   @@map("DashboardFavourite")
+}
+
+/// A Dashboards v2 board, apart from the Analytics Reports boards in Dashboard. Boards
+/// made before the split were copied here with their ids, so stars and insight
+/// pointers still name them. No relation, per the database rule.
+model DashboardsV2 {
+  id              String         @id @default(nanoid())
+  /// The project that owns the board; only there can it be edited.
+  projectId       String
+  name            String
+  /// Free text under the board's name; null until a member writes one.
+  description     String?
+  /// The member who created it; null for boards that predate authorship.
+  createdById     String?
+  /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
+  scope           DashboardScope @default(PROJECT)
+  /// The owning project's organization, stamped when the board is first set to
+  /// ORGANIZATION; null before.
+  organizationId  String?
+  /// Deprecated: unused since each widget query names its own sources (dashboards-v2 AC200,
+  /// 2026-10-28); dropped in a later migration, once no serving release reads it.
+  excludedOrigins Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
+
+  @@index([projectId])
+  @@index([organizationId, scope])
+}
+
+/// A Dashboards v2 widget: a srcdoc definition placed on a DashboardsV2 board, or
+/// unplaced. Widgets made before the split were copied from CustomGraph with their
+/// ids. No relation, per the database rule.
+model DashboardWidget {
+  id          String   @id @default(nanoid())
+  projectId   String
+  /// The DashboardsV2 board it sits on; null while unplaced.
+  dashboardId String?
+  name        String
+  /// The widget's srcdoc definition.
+  definition  Json
+  gridColumn  Int      @default(0)
+  gridRow     Int      @default(0)
+  colSpan     Int      @default(1)
+  rowSpan     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([projectId, dashboardId])
 }
 
 /// One insight in its owner's inbox in a project, folded from its `insight` aggregate
@@ -2450,11 +2512,13 @@ model CustomGraph {
   /// The chart's definition, in the shape its `kind` names.
   graph     Json
   filters   Json?
-  /// Discriminator for the two chart shapes that share this table:
+  /// Discriminator for the chart shapes that share this table:
   ///   - "builder" (default) - the chart builder's own `graph` payload
   ///   - "workbench_sql"     - a saved LangWatchQL workbench chart, whose
   ///     `graph` holds the versioned { sql, parameters, vegaLiteSpec }
   ///     definition (see server/analytics/saved-workbench-charts)
+  ///   - "dashboard_srcdoc"  - frozen legacy copies of Dashboards v2 widgets, which
+  ///     now live in DashboardWidget; nothing new writes this kind
   /// Each reader filters by its own kind, so neither sees the other's rows and
   /// a builder chart can never be interpreted as a workbench definition.
   kind      String   @default("builder")
@@ -4711,6 +4775,11 @@ model ApiKey {
   /// by a customer create; rows before the column stay false.
   isSystemManaged Boolean @default(false)
 
+  /// The browser session that minted a docs session key (ADR-185), so signing
+  /// out of that session revokes it. NULL for every other key. Unindexed:
+  /// sign-out filters by the indexed `userId` first.
+  createdByBrowserSessionId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   // DELIBERATELY UNINDEXED: the Langy session-key reaper sweeps on
@@ -4766,12 +4835,17 @@ model NurturingProject {
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {
-  organizationId     String   @id
-  adminUserId        String?
-  seeded             Boolean  @default(false)
-  evaluationCount    Int      @default(0)
-  simulationRunCount Int      @default(0)
-  updatedAt          DateTime @updatedAt
+  organizationId       String    @id
+  adminUserId          String?
+  seeded               Boolean   @default(false)
+  evaluationCount      Int       @default(0)
+  simulationRunCount   Int       @default(0)
+  // Each coding signal is written by one conditional update (null-only, not-has, lt-day).
+  codingFirstSessionAt DateTime?
+  codingAgentTypes     String[]  @default([])
+  codingActiveDays     Int       @default(0)
+  codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  updatedAt            DateTime  @updatedAt
 }
 
 model BillingMeterCheckpoint {
@@ -6099,15 +6173,13 @@ model ProcessManagerInbox {
   /// adds NOT NULL once the fleet has cycled and closes it.
   sourceEventKey String?
   consumedAt     DateTime @db.Timestamptz(3)
-  // Do not add an index on `consumedAt` here. The retention sweep can use one,
-  // but a deploy-time CREATE INDEX holds a SHARE lock that blocks INSERT on
-  // this table, the highest-volume write path in the system. The index is
-  // ops-managed instead: built with CREATE INDEX CONCURRENTLY, see
-  // dev/docs/runbooks/process-manager-table-purge.md. The sweep works without
-  // it on the bounded table it maintains.
 
   @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
+  // The retention sweep reaps by age across every process name. Migration
+  // 20261014150000_process_manager_sweep_age_indexes builds it; that file
+  // carries the ops pre-build note for installs with real traffic.
+  @@index([consumedAt])
 }
 
 enum ProcessManagerOutboxStatus {
@@ -6146,13 +6218,11 @@ model ProcessManagerOutbox {
   dispatchedAt  DateTime?                  @db.Timestamptz(3)
   createdAt     DateTime                   @db.Timestamptz(3)
   updatedAt     DateTime                   @db.Timestamptz(3)
-  // Do not add an index on `dispatchedAt` here. The retention sweep can use a
-  // partial one (WHERE status = 'dispatched'), but Prisma cannot express a
-  // partial index and a deploy-time CREATE INDEX holds a SHARE lock that
-  // blocks INSERT on this table, the highest-volume write path in the system.
-  // The index is ops-managed instead: built with CREATE INDEX CONCURRENTLY,
-  // see dev/docs/runbooks/process-manager-table-purge.md. The sweep works
-  // without it on the bounded table it maintains.
+  // A PARTIAL INDEX on (dispatchedAt) WHERE status = 'dispatched', for the
+  // retention sweep, is added by migration
+  // 20261014150000_process_manager_sweep_age_indexes - Prisma cannot express a
+  // partial index, so it is raw SQL there and this comment is its home in the
+  // model.
 
   attemptLog ProcessManagerOutboxAttempt[]
 
@@ -7062,6 +7132,9 @@ model InstanceIdentity {
   /// Hostname, which names the customer's own network and so has a switch of
   /// its own rather than travelling with its category.
   hostnameOptOut                         Boolean   @default(false)
+  /// Sending a failed upgrade step's diagnostics to LangWatch on its own,
+  /// switched off by the operator (upgrade-diagnostics-via-connect, decision 4).
+  upgradeDiagnosticsOptOut               Boolean   @default(false)
 }
 
 /// One self-hosted install, as its daily usage report describes it (ADR-139,
@@ -7135,6 +7208,55 @@ model SelfHostedInstance {
   @@index([lastSeenAt])
   @@index([organizationId])
   @@index([issuedLicenseId])
+}
+
+/// One upgrade diagnostics bundle a self-hosted install sent over Connect, on
+/// LangWatch Cloud. The bytes live in object storage under
+/// `upgrade-diagnostics/` and expire at 30 days by a lifecycle rule; this row
+/// points at them and feeds Cloud admin and the Slack signal. Plain column
+/// refs, no relation, as the usage report rows.
+model SelfHostedInstanceDiagnostic {
+  id               String    @id
+  /// The `SelfHostedInstance.instanceId` the licence caller presented.
+  instanceId       String
+  stepId           String
+  stepDescription  String?
+  release          String?
+  attempt          Int
+  /// `operator` or `automatic`.
+  trigger          String
+  byteLength       Int
+  objectKey        String
+  receivedAt       DateTime  @default(now())
+  /// When the lifecycle rule removes the bundle; the row is listed until then.
+  expiresAt        DateTime
+  /// Set on the report that posted this step and release's one Slack message.
+  slackAnnouncedAt DateTime?
+
+  @@index([instanceId, receivedAt])
+}
+
+/// A notice LangWatch staff send every self-hosted install in Cloud's reply to its daily usage
+/// report (enterprise/modules/licensing/specs/self-hosted-notices.feature). Cloud only, and no
+/// tenant: every install receives every published notice that has not expired.
+model SelfHostedNotice {
+  id          String    @id
+  /// `info`, `warning` or `security`.
+  severity    String
+  title       String
+  body        String
+  /// An https link to read more; null where the notice names none.
+  url         String?
+  /// The release that fixes what the notice is about; an install on it or newer hides it.
+  fixedIn     String?
+  /// `draft`, `published` or `withdrawn`. Only a published notice that has not expired is sent.
+  status      String
+  expiresAt   DateTime?
+  publishedAt DateTime?
+  /// The staff member who published it, by user id.
+  publishedBy String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 /// One usage report, exactly as it arrived. Kept so a number on an install's

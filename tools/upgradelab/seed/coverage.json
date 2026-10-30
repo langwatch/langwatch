@@ -43,6 +43,11 @@
       "cells": ["C1", "C3"],
       "note": "one webhook connection per organization; paused triggers not yet written"
     },
+    "automation:unwrap-trigger-json-text": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs Trigger rows whose filters or actionParams hold JSON text, as the previous release saved them; no seed writes one yet"
+    },
     "billing:fill-seat-change-organizations": {
       "status": "seeded",
       "seed": "tenancy-sql:subscription",
@@ -226,6 +231,12 @@
     "upcast:entitlement:lw.usage.month_counted": {
       "status": "unheld",
       "note": "branch-era event type, never written by a release; the upcast-events overlay (L5) injects it"
+    },
+    "user:lower-case-stored-addresses": {
+      "status": "pending",
+      "seed": "tenancy-sql:users",
+      "cells": ["C1", "C2"],
+      "note": "needs mixed-case addresses and one case-only twin; judge every other address lower-cased and the twin listed in the step report, not renamed"
     },
     "user:record-created-facts": {
       "status": "seeded",

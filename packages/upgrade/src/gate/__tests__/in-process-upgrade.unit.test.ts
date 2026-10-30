@@ -157,4 +157,30 @@ describe("inProcessUpgrade()", () => {
 
     expect(await upgrade()).toEqual({ code: "failed", logTail: ["reconciler langwatchql failed"] });
   });
+
+  /** @scenario "A run-once upgrade leaves the system-migrations pass request to the serving worker" */
+  it("hands the pass request only to a serving worker's run", async () => {
+    const reconcilerNames = async ({ admitAtBlockingDone }: { admitAtBlockingDone: boolean }) => {
+      let names: string[] = [];
+      await inProcessUpgrade({
+        boot: (use) => use(modules),
+        databaseUrl: "postgresql://localhost:1/never",
+        environment: {},
+        development: false,
+        admitAtBlockingDone,
+        run: async ({ inputs }) => {
+          names = (inputs.reconcilers ?? []).map((reconciler) => reconciler.name);
+          return upgradeOutcome({ code: "done", message: "upgraded" });
+        },
+      })();
+      return names;
+    };
+
+    expect(await reconcilerNames({ admitAtBlockingDone: false })).not.toContain(
+      "system-migrations-pass-request",
+    );
+    expect(await reconcilerNames({ admitAtBlockingDone: true })).toContain(
+      "system-migrations-pass-request",
+    );
+  });
 });

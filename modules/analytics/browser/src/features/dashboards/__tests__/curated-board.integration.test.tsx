@@ -31,7 +31,7 @@ function readOnlyServer() {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
-    if (call.path === "dashboards.getAll" || call.path === "dashboards.listStarred") {
+    if (call.path === "boards.getAll" || call.path === "boards.listStarred") {
       return Promise.resolve([]);
     }
     return NO_PROCEDURES(call);
@@ -67,6 +67,13 @@ describe("given a member opens a From LangWatch board", () => {
     const items = await screen.findAllByRole("menuitem");
     expect(items.map((item) => item.textContent?.trim())).toEqual(["Export CSV Still loading"]);
     expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
+  });
+
+  /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
+  it("points back to the old Analytics", async () => {
+    openCurated("release");
+
+    expect(await screen.findByTestId("old-analytics-banner")).toBeInTheDocument();
   });
 
   describe("when the board is Can I trust my numbers?", () => {

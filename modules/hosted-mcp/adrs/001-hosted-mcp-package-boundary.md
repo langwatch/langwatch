@@ -34,8 +34,9 @@ requires nothing.
 ## Persistence
 
 OAuth clients, authorization codes and sessions in Redis, with memory twins.
-The session relay is Redis pub/sub, built in the live repositories bundle
-beside them, with a memory twin (presence's broadcast repository precedent).
+The session relay (Redis pub/sub that carried messages to the replica holding
+an SSE stream) was removed with the SSE transport; `/sse` now answers the
+Streamable HTTP transport, which needs no relay.
 
 ## Runtime and registration
 

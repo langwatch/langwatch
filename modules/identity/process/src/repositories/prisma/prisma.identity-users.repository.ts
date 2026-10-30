@@ -79,13 +79,13 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
   }
 
   /**
-   * The legacy half of the cross-population collision guard (ADR-116 §6):
-   * case-insensitive match on what `User.email @unique` defends. Deactivated
+   * The legacy half of the cross-population collision guard (ADR-116 §6): a plain match on
+   * what `User.email @unique` defends, addresses being stored lower-cased. Deactivated
    * users still count as holders, since the unique index still enforces it.
    */
   async findUserIdsByEmail({ normalizedValue }: { normalizedValue: string }): Promise<string[]> {
     const users = await this.database.user.findMany({
-      where: { email: { equals: normalizedValue, mode: "insensitive" } },
+      where: { email: normalizedValue },
       select: { id: true },
     });
     return users.map((user) => user.id);

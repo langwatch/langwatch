@@ -1,7 +1,13 @@
 import { PRODUCT_NAMES } from "@langwatch/design-system/product-colours";
 import { describe, expect, it } from "vitest";
 
-import { PRODUCTS, productById, productFromPathname, seatReachesProduct } from "../products.ts";
+import {
+  isEntityAddressedDetourRoute,
+  PRODUCTS,
+  productById,
+  productFromPathname,
+  seatReachesProduct,
+} from "../products.ts";
 
 describe("product registry", () => {
   describe("given the five products the registry declares", () => {
@@ -39,9 +45,9 @@ describe("product registry", () => {
     });
 
     /** @scenario "AC1 Flag off hides the area" */
-    it("gates Dashboards on its release flag and analytics:view", () => {
+    it("gates Dashboards on its release flag, which closes its pages, and analytics:view", () => {
       expect(productById("dashboards").gates).toEqual([
-        { flag: "release_dashboards" },
+        { flag: "release_dashboards", closesPages: true },
         { permission: "analytics:view" },
       ]);
     });
@@ -133,6 +139,28 @@ describe("productFromPathname", () => {
           }
         }
       });
+    });
+  });
+});
+
+describe("detour addresses that name an entity", () => {
+  describe("given an address that names one organization's team", () => {
+    it("reports it as entity-addressed, since the next organization has no such team", () => {
+      expect(isEntityAddressedDetourRoute("/settings/teams/acme-core")).toBe(true);
+    });
+  });
+
+  describe("given a detour address that names no organization entity", () => {
+    it("reports it as portable, including the team list and the instance pages", () => {
+      for (const pathname of [
+        "/settings",
+        "/settings/members",
+        "/settings/teams",
+        "/ops",
+        "/ops/projections/run_17",
+      ]) {
+        expect(isEntityAddressedDetourRoute(pathname)).toBe(false);
+      }
     });
   });
 });

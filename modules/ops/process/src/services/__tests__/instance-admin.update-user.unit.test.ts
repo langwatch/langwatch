@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { InstanceAdminRepository } from "../../repositories/instance-admin.repository.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
 import { InstanceAdminService } from "../instance-admin.service.ts";
-import { adminOperator } from "./support/admin-doubles.ts";
+import { adminOperator, noOperators } from "./support/admin-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 class RecordingRepository extends InstanceAdminRepository {
@@ -36,6 +36,7 @@ class RecordingAudit extends AdminAuditSink {
 async function updateUser(data: Record<string, unknown>) {
   const log: unknown[] = [];
   const service = InstanceAdminService.create({
+    operators: noOperators,
     repository: new RecordingRepository(log),
     users: new TestUserApi({
       reactivate: async ({ id, actor }) => {
@@ -88,6 +89,7 @@ describe("InstanceAdminService user update", () => {
   it("refuses an unrecognised deactivation value with validation_error and writes nothing", async () => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      operators: noOperators,
       accounts: {
         deactivateUser: () => Promise.reject(new Error("unreached")),
         changeUserEmail: () => Promise.reject(new Error("unreached")),
@@ -120,6 +122,7 @@ describe("InstanceAdminService user writes past the user module", () => {
   ])("refuses %s with validation_error and writes nothing", async (method, params) => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      operators: noOperators,
       accounts: {
         deactivateUser: () => Promise.reject(new Error("unreached")),
         changeUserEmail: () => Promise.reject(new Error("unreached")),
@@ -136,6 +139,110 @@ describe("InstanceAdminService user writes past the user module", () => {
   });
 });
 
+describe("InstanceAdminService writes on an operator's account", () => {
+  function serviceOverOperator(log: unknown[]) {
+    return InstanceAdminService.create({
+      operators: {
+        isAdmin: async ({ id }) => {
+          log.push(["operators.isAdmin", id]);
+          return id === "operator-1";
+        },
+      },
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({ reactivate: () => Promise.reject(new Error("unreached")) }),
+      audit: new RecordingAudit(log),
+    });
+  }
+
+  it.each<[string, Record<string, unknown>]>([
+    ["an edit", { name: "Renamed" }],
+    ["an email change", { email: "elsewhere@example.com" }],
+    ["a deactivation", { deactivatedAt: "2026-01-02T03:04:05.000Z" }],
+    ["a reactivation", { deactivatedAt: null }],
+  ])("refuses %s with validation_error and writes nothing", async (_label, data) => {
+    const log: unknown[] = [];
+
+    await expect(
+      serviceOverOperator(log).execute({
+        resource: "user",
+        method: "update",
+        params: { id: "operator-1", data },
+        actorId: "olive",
+        req: { headers: {} },
+      }),
+    ).rejects.toMatchObject({ code: "validation_error" });
+    expect(log).toEqual([["operators.isAdmin", "operator-1"]]);
+  });
+
+  /** @scenario "The Back office does not edit an operator's account" */
+  it("refuses deleting an operator's account and writes nothing", async () => {
+    const log: unknown[] = [];
+
+    await expect(
+      serviceOverOperator(log).execute({
+        resource: "user",
+        method: "delete",
+        params: { id: "operator-1" },
+        actorId: "olive",
+        req: { headers: {} },
+      }),
+    ).rejects.toMatchObject({ code: "validation_error" });
+    expect(log).toEqual([]);
+  });
+
+  /** @scenario "The Back office does not edit an operator's account" */
+  it("still edits an account that holds no operator grant", async () => {
+    const log: unknown[] = [];
+
+    await serviceOverOperator(log).execute({
+      resource: "user",
+      method: "update",
+      params: { id: "user-1", data: { name: "Renamed" } },
+      actorId: "olive",
+      req: { headers: {} },
+    });
+
+    expect(log).toEqual([
+      ["operators.isAdmin", "user-1"],
+      ["audit.record", "admin/update/user", { id: "user-1", data: { name: "Renamed" } }],
+      ["repository.execute", { id: "user-1", data: { name: "Renamed" } }],
+    ]);
+  });
+});
+
+describe("InstanceAdminService email verification", () => {
+  /** @scenario "The Back office does not set an address's verification" */
+  it.each<[AdminOperationInput["method"], AdminOperationInput["params"]]>([
+    ["create", { data: { email: "new@example.com", emailVerified: true } }],
+    ["update", { id: "user-1", data: { emailVerified: true } }],
+    ["update", { id: "user-1", data: { name: "N", emailVerified: false } }],
+  ])("refuses a %s carrying emailVerified with validation_error", async (method, params) => {
+    const log: unknown[] = [];
+    const service = InstanceAdminService.create({
+      operators: noOperators,
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({}),
+      audit: new RecordingAudit(log),
+    });
+
+    await expect(
+      service.execute({ resource: "user", method, params, actorId: "olive", req: { headers: {} } }),
+    ).rejects.toMatchObject({
+      code: "validation_error",
+      meta: { fieldErrors: { emailVerified: [expect.any(String)] } },
+    });
+    expect(log).toEqual([]);
+  });
+});
+
 describe("InstanceAdminService user create", () => {
   /** @scenario "The Back office creates an account only as active" */
   it.each([null, "2026-01-02T03:04:05.000Z", 5])(
@@ -143,6 +250,7 @@ describe("InstanceAdminService user create", () => {
     async (deactivatedAt) => {
       const log: unknown[] = [];
       const service = InstanceAdminService.create({
+        operators: noOperators,
         accounts: {
           deactivateUser: () => Promise.reject(new Error("unreached")),
           changeUserEmail: () => Promise.reject(new Error("unreached")),
@@ -202,6 +310,7 @@ describe("InstanceAdminService audit before write", () => {
         return { ...adminOperator, id: "user-1" };
       };
       const service = InstanceAdminService.create({
+        operators: noOperators,
         repository: new RecordingRepository(log),
         users: new TestUserApi({
           reactivate: record("users.reactivate"),
@@ -223,6 +332,7 @@ describe("InstanceAdminService audit before write", () => {
   it("records every row of a bulk write before writing any of them", async () => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      operators: noOperators,
       accounts: {
         deactivateUser: () => Promise.reject(new Error("unreached")),
         changeUserEmail: () => Promise.reject(new Error("unreached")),
@@ -254,6 +364,7 @@ describe("InstanceAdminService audit before write", () => {
   ])("records only the changed fields' prior values for %s", async (_label, resource) => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      operators: noOperators,
       accounts: {
         deactivateUser: () => Promise.reject(new Error("unreached")),
         changeUserEmail: () => Promise.reject(new Error("unreached")),
@@ -285,6 +396,7 @@ describe("InstanceAdminService audit before write", () => {
   it("records a create's intended data before the row exists", async () => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      operators: noOperators,
       accounts: {
         deactivateUser: () => Promise.reject(new Error("unreached")),
         changeUserEmail: () => Promise.reject(new Error("unreached")),

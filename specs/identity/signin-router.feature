@@ -216,9 +216,9 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the budget is spent against the address the caller connected from
 
   @unit
-  Scenario: An in-cluster ingress does not collapse every visitor into one bucket
-    Given no trusted proxy is configured
-    And the app is reached through an ingress on a private address
+  Scenario: An in-cluster ingress declared as a trusted proxy does not collapse every visitor into one bucket
+    Given the ingress's private range is configured as a trusted proxy
+    And the app is reached through that ingress
     When two visitors ask the sign-in router where an address should go
     Then the ingress is read as the deployment's own hop
     And each visitor spends a separate per-client budget
@@ -305,47 +305,34 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And a deployment that chose email mode mounts and offers no social provider, whatever credentials linger
     And a provider env naming something unmountable still lands in email mode with the password offered
 
-  # ── The Auth0 connection bridge (deliberately short-term, D09) ─────────
-  #
-  # SaaS's social sign-ins still broker through Auth0. Until they are native,
-  # the door shows each brokered connection as its own branded button, and
-  # clicking one dials Auth0 pre-scoped to that connection — the person picks
-  # their provider exactly once, on our screen, and Auth0's own picker never
-  # appears. Self-hosted Auth0 deployments are untouched: their tenant's
-  # connections have names no hardcoded bridge may guess, so they keep the
-  # generic hand-off to Auth0's own screen.
+  # ── Auth0 serves only legacy SSO organizations on cloud ────────────────
+  # On cloud the rail never draws the Auth0 broker or its social buttons; legacy
+  # SSO organizations reach it by typing their address. Self-hosted keeps it.
 
   @unit
-  Scenario: SaaS shows the broker's social connections as their own buttons
+  Scenario: Cloud never offers the Auth0 broker on the sign-in screen
     Given a SaaS deployment whose provider is the Auth0 broker
+    And credentials are present for the native Google and GitHub providers
     When the sign-in page is requested
-    Then Google, GitHub and Microsoft are offered as branded methods ahead of the generic one
-    And dialing a branded method names the connection Auth0's own screen offered
-    And a self-hosted Auth0 deployment is offered only the generic method
+    Then the native Google and GitHub methods and the password are offered
+    And neither the broker nor a branded button for one of its connections is offered
+    And with no native social provider set up only the password is offered
 
-  # Alex 2026-10-06: never built. The rail offers the branded bridge methods, but the router's
-  # account ranking holds no brokered-connection to branded-method mapping (not on main either).
-  @unit @unimplemented
-  Scenario: An account brokered through a social connection routes to its own button
-    Given the account for "sam@home.net" signed in through the broker's Google connection
-    When "sam@home.net" is submitted to the router on SaaS
-    Then the decision redirects to the branded Google method
-    And an account the broker holds as a database user keeps the generic method
-
-  # How the bridge ends: one provider at a time, on its credentials. Mounting
-  # a native client for a bridged provider IS that provider's cutover — the
-  # rail can never draw two buttons that both say "Continue with Google", and
-  # the accounts already brokered through that connection must follow the
-  # button the rail actually draws, or ranking drops them onto the generic
-  # picker the bridge exists to avoid.
   @unit
-  Scenario: A natively mounted provider takes over its own bridge button
-    Given a SaaS deployment whose provider is the Auth0 broker
-    And credentials are present for the native Google provider
-    When the sign-in page is requested
-    Then the native Google method stands in the bridge's Google slot
-    And the providers with no native credentials keep their branded bridge methods
-    And an account brokered through the Google connection routes to the native method
+  Scenario: An organization still on legacy Auth0 SSO is routed to the broker by its domain
+    Given a SaaS deployment whose provider is the Auth0 broker and that issues its own passwords
+    And "acme.com" belongs to an organization still on legacy Auth0 SSO
+    When "sam@acme.com" is submitted to the router
+    Then the decision redirects to the broker for that organization's connection
+
+  @unit
+  Scenario: A deployment whose door is its named provider keeps offering it
+    Given a deployment whose provider is the Auth0 broker
+    When the sign-in page is requested on a self-hosted install
+    Then the broker is offered ahead of the native social methods
+    And a SaaS deployment never offers the broker, whatever its password setting
+    And a SaaS deployment that issues no passwords of its own and has no native social provider offers no password
+    And no branded button for one of the broker's connections is offered anywhere
 
   # What of the ask survives on every deployment: the address was already
   # typed once, on our screen, and typing it again on the provider's is the

@@ -1,5 +1,7 @@
 import { sealAuthorization } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ModelProviderServerConfig } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
@@ -74,6 +76,7 @@ function createFullModelProviderTestProjects(): ProjectApi {
   return createApiFixture<ProjectApi>({
     getWithTeam: async (id: string) => testProject(id),
     findWithTeam: async (id: string) => testProject(id),
+    findOrganizationId: async () => "organization-1",
     listIdsByOrganization: async () => [],
     findLiveNonGovernanceIdsByOrganization: async () => [],
     listNamesByIds: async () => [],
@@ -99,9 +102,23 @@ function createFullModelProviderTestOrganizations(): OrganizationApi {
  * Builds the app exactly the way boot does: through `create`, not test-only
  * `createForTesting`.
  */
+const NO_PROVIDER_FALLBACKS: ModelProviderServerConfig["providerFallbacks"] = {
+  OPENAI_BASE_URL: undefined,
+  ANTHROPIC_BASE_URL: undefined,
+  AZURE_OPENAI_ENDPOINT: undefined,
+  CUSTOM_BASE_URL: undefined,
+  VERTEXAI_PROJECT: undefined,
+  VERTEXAI_LOCATION: undefined,
+  AWS_REGION_NAME: undefined,
+};
+
 function createRealModelProviderApp(
   repositories: ModelProviderRepositories = MemoryModelProviderRepositories.create(),
   traces: TraceApi = createModelProviderTestTraces(),
+  deployment: {
+    providerFallbacks?: Partial<ModelProviderServerConfig["providerFallbacks"]>;
+    environment?: Record<string, string>;
+  } = {},
 ): Promise<ModelProviderModule> {
   return ModelProviderModule.create({
     repositories,
@@ -113,6 +130,7 @@ function createRealModelProviderApp(
       dataPrivacy: createModelProviderTestDataPrivacy(),
       managed: createModelProviderTestManagedProviders(),
       secrets: createModelProviderTestSecrets(),
+      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     },
     config: {
       blockLocalHttpCalls: true,
@@ -130,13 +148,13 @@ function createRealModelProviderApp(
         groq: undefined,
         elevenlabs: undefined,
       },
+      providerFallbacks: { ...NO_PROVIDER_FALLBACKS, ...deployment.providerFallbacks },
       codexOAuthIssuer: undefined,
     },
     resources: new ResourceScope(),
-    secrets: SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(
-      "model-provider",
-      Object.values(ModelProviderModule.secrets),
-    ),
+    secrets: SecretsResolver.over(
+      SecretsChain.start({ environment: deployment.environment ?? {} }).withEnv(),
+    ).scopeTo("model-provider", Object.values(ModelProviderModule.secrets)),
   });
 }
 
@@ -167,6 +185,47 @@ describe("ModelProviderModule.create", () => {
           customKeys: { OPENAI_API_KEY: "sk-test" },
         }),
       ).resolves.toBeDefined();
+    });
+  });
+
+  describe("given install-wide provider settings and a row that leaves them empty", () => {
+    /** @scenario "A provider row falls back to the install-wide provider settings" */
+    it("executes OpenAI against the deployment's base URL", async () => {
+      const app = await createRealModelProviderApp(undefined, undefined, {
+        providerFallbacks: { OPENAI_BASE_URL: "https://proxy.example.com/v1" },
+      });
+      await app.upsertUnattributed({
+        projectId: "project-1",
+        provider: "openai",
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: "sk-test" },
+      });
+
+      await expect(
+        app.prepareExecution({ model: "openai/gpt-5", projectId: "project-1" }),
+      ).resolves.toMatchObject({ api_base: "https://proxy.example.com/v1" });
+    });
+
+    /** @scenario "A provider row falls back to the install-wide provider settings" */
+    it("executes Bedrock with the deployment's region and never an environment secret", async () => {
+      const app = await createRealModelProviderApp(undefined, undefined, {
+        providerFallbacks: { AWS_REGION_NAME: "eu-west-1" },
+        environment: { AWS_SECRET_ACCESS_KEY: "deployment-secret" },
+      });
+      await app.upsertUnattributed({
+        projectId: "project-1",
+        provider: "bedrock",
+        enabled: true,
+        customKeys: { AWS_ACCESS_KEY_ID: "AKIATEST" },
+      });
+
+      await expect(
+        app.prepareExecution({ model: "bedrock/anthropic.claude-v2", projectId: "project-1" }),
+      ).resolves.toMatchObject({
+        aws_access_key_id: "AKIATEST",
+        aws_secret_access_key: "invalid",
+        aws_region_name: "eu-west-1",
+      });
     });
   });
 

@@ -19,12 +19,142 @@ Feature: Dashboards v1
     And the product switcher does not offer Dashboards
 
   @integration
+  Scenario: AC1b A Dashboards address with the flag off is a 404 with no Dashboards sidebar
+    Given the release_dashboards flag is off for the project
+    When a member opens /[project]/dashboards or one of its boards
+    Then they get the not-found page with no product sidebar around it
+    And a project page still draws in its own chrome
+
+  @integration
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
     When the member looks at the Dashboards product sidebar
     Then they see "Your dashboards" with My dashboard first, then Starred when they have stars,
       then From LangWatch, each board with a menu
     And the sidebar shows nothing else besides Quick Search
+
+  # Switch-over: where Dashboards opens, the Analytics entry leads to Dashboards and the
+  # legacy pages stay at /[project]/analytics, with a banner pointing to Dashboards (AC20).
+  @integration
+  Scenario: AC3b The Analytics entry opens Dashboards when the project can reach them
+    Given the member holds analytics:view
+    And the release_dashboards flag is on for the project
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry opens /[project]/dashboards
+    And it carries no Legacy pill
+
+  @integration
+  Scenario: AC3h The Analytics entry opens analytics when Dashboards is out of reach
+    Given the release_dashboards flag is off for the project
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry opens /[project]/analytics
+    And it carries no Legacy pill
+
+  @integration
+  Scenario: AC3i The Dashboards pages point back to the old Analytics
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens a Dashboards page
+    Then an info banner asks "Looking for the old Analytics? It is still here."
+    And the banner links to /[project]/analytics
+
+  @integration
+  Scenario: AC3j The Dashboards pages show no old-Analytics banner when they do not open
+    Given the release_dashboards flag is off for the project
+    When the member opens a Dashboards page
+    Then no old-Analytics banner shows
+
+  @integration
+  Scenario: AC3c The legacy Analytics page offers Dashboards when the flag is on
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens a legacy analytics page
+    Then a warning banner at the top says it is the legacy view
+    And the banner links to /[project]/dashboards
+
+  @integration
+  Scenario: AC3d The legacy Analytics page shows no banner when the flag is off
+    Given the release_dashboards flag is off for the project
+    When the member opens a legacy analytics page
+    Then no legacy banner shows
+
+  @integration
+  Scenario: AC3e The legacy Analytics page shows no banner to a member without analytics:view
+    Given the release_dashboards flag is on for the project
+    And the member lacks analytics:view
+    When the member opens a legacy analytics page
+    Then no legacy banner shows
+
+  @integration
+  Scenario: AC3f The custom graph pages carry the legacy banner too
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens /[project]/analytics/custom
+    Then a warning banner at the top says it is the legacy view
+
+  @integration
+  Scenario: AC3k The Analytics entry waits for the Dashboards answer
+    Given the release_dashboards flag is still loading
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry is not shown yet
+
+  @integration
+  Scenario: AC3l Opening Dashboards from the Analytics entry makes Dashboards the remembered product
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens /[project]/dashboards from the Analytics entry
+    And later opens the root address
+    Then they land on /[project]/dashboards
+
+  @integration
+  Scenario: AC3m The Analytics entry is not marked active on a legacy analytics page when it leads to Dashboards
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens a legacy analytics page
+    Then the Analytics entry is not marked active
+
+  @integration
+  Scenario: AC3n The Analytics entry is marked active on a legacy analytics page when it leads to analytics
+    Given the release_dashboards flag is off for the project
+    When the member opens a legacy analytics page
+    Then the Analytics entry is marked active
+
+  @integration
+  Scenario: AC3o A custom graph that cannot be opened still carries the legacy banner
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    And a custom graph was saved in a shape the chart builder cannot open
+    When the member opens that graph
+    Then a warning banner at the top says it is the legacy view
+
+  @integration
+  Scenario: AC3p The Analytics entry waits for the permission read as well
+    Given the release_dashboards flag is on for the project
+    And the member's permissions are still being read
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry is not shown yet
+    And once they are read the entry opens /[project]/dashboards
+
+  @integration
+  Scenario: AC3q An aggregate project keeps the Analytics entry on analytics
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    And the project is an aggregate project
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry opens /[project]/analytics
+    And a legacy analytics page shows no legacy banner
+
+  @integration
+  Scenario: AC3r Quick Search opens the same Analytics destination as the sidebar
+    Given the member searches for "analytics" in Quick Search
+    Then the Analytics page opens where the sidebar Analytics entry would
+
+  @integration
+  Scenario: AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view
+    Given the release_dashboards flag is on for the project
+    And the member lacks analytics:view
+    When the member opens a Dashboards page
+    Then no old-Analytics banner shows
 
   # ---------------------------------------------------------------------------
   # Agent Flight Deck
@@ -168,24 +298,20 @@ Feature: Dashboards v1
   # Guard rails
   # ---------------------------------------------------------------------------
 
-  @e2e @unimplemented
+  @integration
   Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
     Given any dashboard page is open
     When its data loads
     Then every data request goes to the LWQL endpoint
     And no request goes to a legacy analytics endpoint
 
-  @unit @unimplemented
-  Scenario: AC20 Legacy analytics files are untouched
-    Given the change is merged
-    When the diff is limited to the legacy analytics paths
-    Then it is empty
-
-  @integration @unimplemented
+  # AC20 "legacy analytics files are untouched" is a merge-time diff check, not a test.
+  # The one change allowed is the legacy banner on those pages (AC3c to AC3f).
+  @integration
   Scenario: AC20 Legacy analytics pages behave exactly as before
     Given the change is merged
     When a member opens the legacy analytics pages
-    Then they behave exactly as they did before the change
+    Then they behave exactly as they did before the change, apart from the legacy banner (AC3c to AC3f)
 
   @integration
   Scenario: AC21 A member without analytics:view is refused
@@ -215,7 +341,7 @@ Feature: Dashboards v1
     When the member views the widget
     Then it follows the connected, unconnected and empty-period rules like any other widget
 
-  @integration @unimplemented
+  @integration
   Scenario: AC23 A failing query does not take the board down
     Given one widget on a board whose LWQL query fails
     When the member views the board
@@ -295,6 +421,9 @@ Feature: Dashboards v1
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing" (changed again by langwatch/tasks#911: /dashboards lands on My dashboard) -> dashboards-v2.feature Scenario: AC160 The dashboards area lands on My dashboard
   # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Starred, From LangWatch; no Browse templates item) -> Scenario: AC3 Sidebar matches the reference
+  # AC 3b: "The Analytics entry leads to Dashboards" -> Scenario: AC3b The Analytics entry opens Dashboards when the project can reach them
+  # AC 3c: "Legacy analytics offers Dashboards" -> Scenario: AC3c The legacy Analytics page offers Dashboards when the flag is on
+  # AC 3d: "Flag off shows no banner" -> Scenario: AC3d The legacy Analytics page shows no banner when the flag is off
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period
   # AC 6: "Unconnected source shows a call to action" → Scenario: AC6 Unconnected source shows a call to action
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data
@@ -310,7 +439,7 @@ Feature: Dashboards v1
   # AC 17: "Langy insights on a block" (withdrawn: a widget's result lives in its sandboxed frame; no scenario until it can be read)
   # AC 18: "Every Project board is visible to every project member" (changed by langwatch/tasks#911; scope added on 2026-10-09, dashboards-v2.feature AC170-186) -> Scenario: AC18 Every Project board is visible to every member of the project; Scenario: AC18 Blocks on a Project board are reachable to every member; Scenario: AC18 Saved charts on a Project board are reachable to every member
   # AC 19: "LWQL only" → Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
-  # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics files are untouched; Scenario: AC20 Legacy analytics pages behave exactly as before
+  # AC 20: "Legacy analytics untouched except for the legacy banner" → Scenario: AC20 Legacy analytics pages behave exactly as before (the "files are untouched" half is a merge-time diff check, see the note above the scenario)
   # AC 21: "Permissions" (sharpened) → Scenario: AC21 A member without analytics:view is refused; Scenario: AC21 A refused member sees the same not-found page
   # AC 22: "Gateway routing and coding agents ship in the state their data supports" → Scenario: AC22 An unqueryable source ships as a call to action; Scenario: AC22 A queryable source follows the normal widget rules
   # AC 23: "A failing query does not take the board down" → Scenario: AC23 A failing query does not take the board down

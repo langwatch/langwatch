@@ -51,6 +51,10 @@ type Selection struct {
 	// a tool for the person writing an email template, not a service the
 	// application talks to, so nothing else in the stack degrades without it.
 	MailRoom bool `json:"mail-room"`
+	// Docs is the public docs site, built and mounted at app.<slug>/docs; off by
+	// default for the same reason as DesignSystem: a tool for whoever is
+	// writing the docs. `haven up +docs` once.
+	Docs bool `json:"docs"`
 	// Langevals is the evaluator service monitors and evaluations call. Off by
 	// default like Langy: it is a Python process whose imports alone hold a
 	// few GiB, and most worktrees never run an evaluator. `haven up
@@ -92,6 +96,10 @@ type Selection struct {
 	// GitHub App and points the github module's API and install page at the
 	// sim. `haven up +github` once.
 	Github bool `json:"github"`
+	// Mcp is the MCP client stand-in (mcpsim). Off by default: it signs in as
+	// the seeded admin to approve its own OAuth connects, which nobody should
+	// get by surprise. `haven up +mcp` once.
+	Mcp bool `json:"mcp"`
 }
 
 // RefreshMode is the one stack mode switch: still (the zero value, `haven up`),
@@ -128,7 +136,7 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{AppSelection, "gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "github", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{AppSelection, "gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "github", "mcp", "design-system", "mail-room", "docs", "langevals"}
 
 // AppSelection is the ±name of the LangWatch app: ui, api and worker as one.
 const AppSelection = "app"
@@ -238,6 +246,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.DesignSystem = on
 	case "mail-room":
 		sel.MailRoom = on
+	case DocsService:
+		sel.Docs = on
 	case LangevalsService:
 		sel.Langevals = on
 	case StorageService:
@@ -258,6 +268,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.Lambda = on
 	case GithubService:
 		sel.Github = on
+	case McpService:
+		sel.Mcp = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -285,6 +297,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.DesignSystem = local
 		case MailRoomService:
 			sel.MailRoom = local
+		case DocsService:
+			sel.Docs = local
 		case LangevalsService:
 			sel.Langevals = local
 		case StorageService:
@@ -305,6 +319,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Lambda = local
 		case GithubService:
 			sel.Github = local
+		case McpService:
+			sel.Mcp = local
 		}
 	}
 	return sel
@@ -377,8 +393,10 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.Telemetry, TelemetryService)
 	add(s.Lambda, LambdaService)
 	add(s.Github, GithubService)
+	add(s.Mcp, McpService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
+	add(s.Docs, DocsService)
 	add(s.Langevals, LangevalsService)
 	out := "services: " + strings.Join(on, " · ")
 	if len(off) > 0 {

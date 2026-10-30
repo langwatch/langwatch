@@ -4,7 +4,6 @@ import type { HostedMcpRepositories } from "../hosted-mcp.repositories.ts";
 import type { McpSessionCipher } from "../mcp-session.repository.ts";
 import { RedisMcpOAuthClientRepository } from "../redis/redis.mcp-oauth-client.repository.ts";
 import { RedisMcpOAuthTokenRepository } from "../redis/redis.mcp-oauth-token.repository.ts";
-import { RedisMcpSessionRelayRepository } from "../redis/redis.mcp-session-relay.repository.ts";
 import { RedisMcpSessionRepository } from "../redis/redis.mcp-session.repository.ts";
 
 /**
@@ -21,7 +20,6 @@ export class LiveHostedMcpRepositories {
   }: Readonly<{ encryption: McpSessionCipher; redis: Redis | Cluster }>): HostedMcpRepositories {
     return {
       sessions: RedisMcpSessionRepository.create({ redis, cipher: encryption }),
-      relay: RedisMcpSessionRelayRepository.create({ redis }),
       oauthTokens: RedisMcpOAuthTokenRepository.create({ redis }),
       oauthClients: RedisMcpOAuthClientRepository.create({ redis }),
     };

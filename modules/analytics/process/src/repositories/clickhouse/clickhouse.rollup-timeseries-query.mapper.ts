@@ -5,6 +5,7 @@
  */
 
 import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
+import { tenantScope } from "@langwatch/clickhouse-client";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
@@ -51,8 +52,8 @@ function rollupColumnFor(metric: TraceRollupMetricKey): string {
       return `${ra}.CacheWriteTokensSum`;
     case "performance.reasoning_tokens":
       return `${ra}.ReasoningTokensSum`;
+    // Total tokens count the cache reads and writes: input is the fresh remainder.
     case "performance.total_tokens":
-      return `(${ra}.PromptTokensSum + ${ra}.CompletionTokensSum)`;
     case "performance.total_processed_tokens":
       return `(${ra}.PromptTokensSum + ${ra}.CompletionTokensSum + ${ra}.CacheReadTokensSum + ${ra}.CacheWriteTokensSum)`;
     default: {
@@ -175,7 +176,7 @@ export function buildRollupTimeseriesQuery(input: TimeseriesQueryInput): BuiltAn
     SELECT
       ${selectExprs.join(",\n      ")}
     FROM ${ROLLUP_TABLE} ${ra}
-    WHERE ${ra}.TenantId = {tenantId:String}
+    WHERE ${tenantScope("BucketStart")}
       AND (
         (${ra}.BucketStart >= {currentStart:DateTime64(3)} AND ${ra}.BucketStart < {currentEnd:DateTime64(3)})
         OR
@@ -188,7 +189,6 @@ export function buildRollupTimeseriesQuery(input: TimeseriesQueryInput): BuiltAn
   return {
     sql,
     params: {
-      tenantId: input.projectId,
       currentStart: input.startDate,
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,

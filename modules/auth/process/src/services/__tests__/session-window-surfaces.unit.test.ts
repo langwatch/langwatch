@@ -4,6 +4,7 @@
  * @see specs/identity/org-session-lifetime.feature
  */
 import { NO_LOCKOUT, type VerifiedBrowserSession } from "@langwatch/auth-contract";
+import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -49,6 +50,7 @@ async function worldWithAnIdleSessionPastItsWindow({
     }),
   });
   const service = BrowserSessionService.create({
+    docsKeys: { revokeDocsSessionKeys: async () => ({ revoked: true as const }) },
     sessions: MemoryAuthSessionRepository.create({ memory }),
     cache: null,
     identityEmails: void 0,
@@ -140,6 +142,7 @@ describe("an organization that ends browser sessions after an hour", () => {
       const cli = CliDeviceSessionService.create({
         store: MemoryCliDeviceSessionRepository.create({ now: () => cliClock }),
         settlements: MemoryCliDeviceSettlementChannel.create(),
+        rotations: MemorySharedCredentialStore.create(),
       });
       const minted = await cli.mintSession({
         userId: "sam",

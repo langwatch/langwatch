@@ -2079,6 +2079,7 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 	// Every error response is logged with fault attribution before it is
 	// written, so failures are visible in CloudWatch even when the response
 	// correctly forwards the provider's error to the client.
+	err = abandonedOnClientCancel(ctx, err)
 	logWriteError(logger, ctx, err)
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) {
@@ -2091,6 +2092,26 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 		return
 	}
 	herr.WriteHTTP(w, domain.Remediate(withFault(herr.New(ctx, domain.ErrInternal, nil))))
+}
+
+// abandonedOnClientCancel names a raw context.Canceled for what it is: the
+// caller went away. Unnamed, it would be written and logged as an unhandled
+// internal error, a platform fault on the line operators page on. A handled
+// error or a forwarded provider answer already says what happened and is
+// left alone. Both cancels must hold: a handler can raise a Canceled of its
+// own while the request is still live, and that one is ours.
+func abandonedOnClientCancel(ctx context.Context, err error) error {
+	if !errors.Is(err, context.Canceled) || !errors.Is(ctx.Err(), context.Canceled) {
+		return err
+	}
+	var e herr.E
+	var ue *domain.UpstreamError
+	if errors.As(err, &e) || errors.As(err, &ue) {
+		return err
+	}
+	return herr.New(ctx, domain.ErrRequestAbandoned, herr.M{
+		"message": "the caller went away before the request finished",
+	}, err)
 }
 
 // withFault stamps the error's fault attribution onto the envelope, from the
@@ -2121,10 +2142,12 @@ func withFault(e herr.E) herr.E {
 }
 
 // writeUpstreamError forwards a provider's terminal response to the client.
-// The provider's native error body is written byte-for-byte when present, so
-// the client sees the exact upstream envelope under the upstream's real
-// status code (not a masked 502) and can tell terminal from retryable. When
-// the native body is unavailable, the minimal envelope still preserves the
+// The provider's native error body is written byte-for-byte when it is JSON
+// or came with its own Content-Type, so the client sees the exact upstream
+// envelope under the upstream's real status code (not a masked 502) and can
+// tell terminal from retryable. A body that is neither moves into the
+// minimal envelope's message, since it would otherwise be served as broken
+// JSON. When the native body is unavailable, the minimal envelope still preserves the
 // error's identity: the provider's own error type/code (insufficient_quota,
 // overloaded_error, ...) when the adapter parsed them, and a generic
 // provider_error only when nothing better is known. The originating provider
@@ -2150,12 +2173,26 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	if ue.Provider != "" {
 		w.Header().Set("X-LangWatch-Provider", ue.Provider)
 	}
-	if w.Header().Get("Content-Type") == "" {
+	upstreamContentType := w.Header().Get("Content-Type") != ""
+	if !upstreamContentType {
 		w.Header().Set("Content-Type", "application/json")
 	}
+	body, message := ue.Body, ue.Message
+	// A body without a Content-Type of its own is served as JSON, so a
+	// plain-text body (e.g. "Account balance too low.") goes inside the
+	// envelope instead of reaching the client as broken JSON. A message
+	// already set on the error wins over the body text: the governance
+	// re-message for account exhaustion is set there, and the provider's
+	// billing text must not replace it.
+	if len(body) > 0 && !upstreamContentType && !gjson.ValidBytes(body) {
+		if message == "" {
+			message = strings.TrimSpace(string(body))
+		}
+		body = nil
+	}
 	w.WriteHeader(status)
-	if len(ue.Body) > 0 {
-		_, _ = w.Write(ue.Body)
+	if len(body) > 0 {
+		_, _ = w.Write(body)
 		return
 	}
 	errType := ue.ErrorType
@@ -2173,15 +2210,15 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	if ue.Provider != "" {
 		meta["provider"] = ue.Provider
 	}
-	body, _ := sonic.Marshal(map[string]any{
+	envelope, _ := sonic.Marshal(map[string]any{
 		"error": map[string]any{
 			"type":    errType,
 			"code":    errCode,
-			"message": ue.Message,
+			"message": message,
 			"meta":    meta,
 		},
 	})
-	_, _ = w.Write(body)
+	_, _ = w.Write(envelope)
 }
 
 // errorsRegisteredOnce guards a write into herr's package-level status map.

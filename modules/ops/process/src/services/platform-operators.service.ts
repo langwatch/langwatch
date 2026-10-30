@@ -9,7 +9,9 @@ import {
   type OpsPlatformOperator,
 } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { type UserApi, UserEmailAmbiguousError, type UserProfile } from "@langwatch/user-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
+
+import { grantsAreStaffOnly, isStaffAccount } from "../rules/platform-operator-staff.rules.ts";
 
 const logger = createLogger("langwatch:ops:platform-operators");
 
@@ -56,6 +58,8 @@ type PlatformOperatorsServiceOptions = Readonly<{
   >;
   users: Pick<UserApi, "findByEmail" | "findById" | "countUsage">;
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "findAdministrators">;
+  /** `cloud` is the seed's own: a deployment LangWatch runs. */
+  deployment: Readonly<{ cloud: boolean; isLocalDevelopment: boolean }>;
 }>;
 
 /**
@@ -97,9 +101,7 @@ export class PlatformOperatorsService {
     operator: OpsOperator | null;
   }): Promise<OpsPlatformOperator> {
     const granter = signedInOperator(operator);
-    const user = await this.#activeUserOf(email);
-    // The page never grants an unclaimed address: whoever registered it first would operate.
-    if (!user.emailVerified) throw new PlatformOperatorUserNotFoundError({ userId: user.id });
+    const user = await this.#eligibleUserOf(email);
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "user", id: granter.id },
@@ -126,7 +128,7 @@ export class PlatformOperatorsService {
 
   /** The recovery task: lockout on self-hosted, staff at the cloud cutover. */
   async grantAsSystem({ email }: { email: string }): Promise<OpsPlatformOperator> {
-    const user = await this.#activeUserOf(email);
+    const user = await this.#eligibleUserOf(email);
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "system" },
@@ -277,21 +279,10 @@ export class PlatformOperatorsService {
   async #verifiedUsersNamed(adminEmails: readonly string[]): Promise<string[]> {
     const ids = new Set<string>();
     for (const email of adminEmails) {
-      const user = await this.#namedUser(email);
+      const user = await this.options.users.findByEmail({ email });
       if (user && user.emailVerified && user.deactivatedAt === null) ids.add(user.id);
     }
     return [...ids];
-  }
-
-  /** An address several case-variant accounts share names nobody: the seed never guesses. */
-  async #namedUser(email: string): Promise<UserProfile | null> {
-    try {
-      return await this.options.users.findByEmail({ email });
-    } catch (error) {
-      if (!(error instanceof UserEmailAmbiguousError)) throw error;
-      logger.warn("ADMIN_EMAILS names an address several accounts share; skipped");
-      return null;
-    }
   }
 
   async #oldestActiveAdministrator({
@@ -308,11 +299,19 @@ export class PlatformOperatorsService {
       .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id;
   }
 
-  async #activeUserOf(email: string): Promise<UserProfile> {
+  /**
+   * Who the page and the task may grant: an active account with a verified address, since
+   * whoever registered an unclaimed one first would operate; where grants are staff-only, staff.
+   */
+  async #eligibleUserOf(email: string): Promise<UserProfile> {
     const user = await this.options.users.findByEmail({ email });
     if (!user) throw new PlatformOperatorUserNotFoundError();
-    if (user.deactivatedAt !== null)
+    if (user.deactivatedAt !== null || !user.emailVerified) {
       throw new PlatformOperatorUserNotFoundError({ userId: user.id });
+    }
+    if (grantsAreStaffOnly(this.options.deployment) && !isStaffAccount(user)) {
+      throw new PlatformOperatorUserNotFoundError({ userId: user.id });
+    }
     return user;
   }
 }

@@ -168,6 +168,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 	if opts.Selection.MailRoom && !st.Layout.IsMonolith() && p.port(domain.MailRoomService) != 0 {
 		out = append(out, p.mailRoomChild())
 	}
+	if opts.Selection.Docs && !st.Layout.IsMonolith() && p.port(domain.DocsService) != 0 {
+		out = append(out, p.docsChild())
+	}
 	if opts.Selection.Langy {
 		langy := o.langyChild(st, opts, p.base, p.port("langyagent"), opts.langyDockerHost)
 		langy.LogPath = p.logPath("langyagent")
@@ -441,7 +444,7 @@ func (p *childPlan) planSimulators() simulatorPlan {
 	return sp
 }
 
-// hostBundledSimulators places storage, voice, LLM, analytics, outbound, payment, telemetry, lambda and github, in that order.
+// hostBundledSimulators places storage, voice, LLM, analytics, outbound, payment, telemetry, lambda, github and mcp, in that order.
 func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	for _, sim := range []struct {
@@ -459,6 +462,7 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 		{sel.Telemetry, "telemetrysim", func() []string { return telemetryEnv(st) }, func() Child { return o.telemetryChild(st, repoRoot, base) }},
 		{sel.Lambda, "lambdasim", func() []string { return lambdaEnv(st) }, func() Child { return o.lambdaChild(st, repoRoot, base) }},
 		{sel.Github, "githubsim", func() []string { return githubEnv(st) }, func() Child { return o.githubChild(st, repoRoot, base) }},
+		{sel.Mcp, "mcpsim", func() []string { return mcpEnv(st) }, func() Child { return o.mcpChild(st, repoRoot, base) }},
 	} {
 		if sim.isSelected {
 			sp.host(sim.binary, sim.env, sim.child)

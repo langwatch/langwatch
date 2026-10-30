@@ -10,6 +10,7 @@ import {
   SESSION_REDACTION_SUMMARY,
 } from "../internal/generated/redaction/sessionReport";
 import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
+import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
@@ -72,6 +73,13 @@ const NOTE_FLAG_HELP =
 /** Help for the `--test-suite` flag on the scenario write commands. */
 const TEST_SUITE_FLAG_HELP = "The test suite to file this scenario in, named by ID or by name.";
 
+/** How a caller of `scenario create` picks the suite; Langy reads `--help`, not only the skill. */
+const SCENARIO_CREATE_SUITE_PICK =
+  "Run `langwatch test-suite list` first and file the scenario in the suite that fits; if none fits, ask the user which suite (or whether to make a new one).";
+
+/** Help for `--test-suite` on `scenario create`: steers the pick before the write. */
+const SCENARIO_CREATE_TEST_SUITE_FLAG_HELP = `The test suite to file this scenario in, by ID or name. ${SCENARIO_CREATE_SUITE_PICK}`;
+
 /**
  * Help for the four scope flags of `run-plan run`. They answer one question,
  * so exactly one of them must be given.
@@ -94,7 +102,7 @@ const SCOPE_SCENARIO_FLAG_HELP =
  * eating argv until the next flag.
  */
 const TARGET_FLAG_HELP =
-  "What to run against, written <type>:<referenceId>, for example connected:support-agent. The types are connected, http, code, prompt and workflow. connected:<name> runs the agent in development, or in the one other environment it is online in; connected:<name>@<environment> names the environment, for example connected:support-agent@production, and connected:<id> names the agent by id. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example connected:support-agent?model=gpt-5, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
+  "What to run against, written <type>:<referenceId>, for example connected:support-agent. The types are connected, http, code, prompt and workflow. connected:<name> runs the agent in development, or in the one other environment it is online in; connected:<name>@<environment> names the environment, for example connected:support-agent@production, and connected:<id> names the agent by id. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example connected:support-agent?model=gpt-6-sol, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
 
 const RUN_NAME_FLAG_HELP =
   "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
@@ -362,6 +370,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerWorkflowCommands(program);
   registerLangyCommands(program);
   registerAgentCommands(program);
+  registerAnalyticsReportCommands(program);
   registerDashboardCommands(program);
   registerModelProviderCommands(program);
   registerModelDefaultCommands(program);
@@ -380,7 +389,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerTestSuiteCommands(program);
   registerGraphCommands(program);
   registerChartCommands(program);
-  registerDashboardWidgetCommands(program);
   registerTriggerCommands(program);
   registerSlackConnectionCommands(program);
   registerSecretCommands(program);
@@ -1494,13 +1502,13 @@ function registerEvaluatorCommands(program: Command): void {
 
   emitsResult(
     evaluatorCmd
-      .command("get <idOrSlug>")
-      .description("Get evaluator details by ID or slug")
+      .command("get <idSlugOrName>")
+      .description("Get evaluator details by ID, slug or display name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idOrSlug: string) => {
+    async (idSlugOrName: string) => {
       try {
         const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
-        return await impl(idOrSlug);
+        return await impl(idSlugOrName);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -1550,7 +1558,7 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("update <idOrSlug>")
-      .description("Update an evaluator name or settings")
+      .description("Update an evaluator by id or slug (find the id with `evaluator get <name>`)")
       .option("--name <name>", "New evaluator name")
       .option("--settings <json>", "Evaluator config settings as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -1569,7 +1577,9 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("delete <idOrSlug>")
-      .description("Archive (soft-delete) an evaluator")
+      .description(
+        "Archive (soft-delete) an evaluator by id or slug (find the id with `evaluator get <name>`)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (idOrSlug: string) => {
       try {
@@ -1608,8 +1618,12 @@ function registerExperimentCommands(program: Command): void {
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option(
+        "--concurrency <n>",
+        "Cells (one row against one target) to run at once for this run only, 1 to 24 (default: the server's setting; 1 runs them in order)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean; param?: string[] }) => {
+    async (slug: string, options: { wait?: boolean; param?: string[]; concurrency?: string }) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },
@@ -2028,63 +2042,238 @@ function registerAgentCommands(program: Command): void {
   );
 }
 
-function registerDashboardCommands(program: Command): void {
-  // Add dashboard command group
-  const dashboardCmd = program.command("dashboard").description("Manage analytics dashboards");
+/** `langwatch analytics-report`: the Analytics Reports, over /api/v1/analytics/reports. */
+function registerAnalyticsReportCommands(program: Command): void {
+  const reportsCmd = program
+    .command("analytics-report")
+    .description("Manage Analytics Reports (the older analytics dashboards)");
 
   emitsResult(
-    dashboardCmd
+    reportsCmd
       .command("list")
-      .description("List all dashboards in the project")
+      .description("List all Analytics Reports in the project")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async () => {
-      const { listDashboardsCommand: impl } = await import("./commands/dashboards/list.js");
+      const { listAnalyticsReportsCommand: impl } =
+        await import("./commands/analytics-reports/list.js");
       return impl();
     },
   );
 
   emitsResult(
-    dashboardCmd
+    reportsCmd
       .command("get <id>")
-      .description("Get dashboard details by ID")
+      .description("Get an Analytics Report by ID")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
-      const { getDashboardCommand: impl } = await import("./commands/dashboards/get.js");
+      const { getAnalyticsReportCommand: impl } =
+        await import("./commands/analytics-reports/get.js");
       return impl(id);
     },
   );
 
   emitsResult(
-    dashboardCmd
+    reportsCmd
       .command("update <id>")
-      .description("Rename a dashboard")
-      .requiredOption("--name <name>", "New dashboard name")
+      .description("Rename an Analytics Report")
+      .requiredOption("--name <name>", "New report name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, options: { name?: string }) => {
-      const { updateDashboardCommand: impl } = await import("./commands/dashboards/update.js");
+      const { updateAnalyticsReportCommand: impl } =
+        await import("./commands/analytics-reports/update.js");
       return impl(id, options);
     },
   );
 
   emitsResult(
-    dashboardCmd
+    reportsCmd
       .command("create <name>")
-      .description("Create a new dashboard")
+      .description("Create a new Analytics Report")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (name: string) => {
-      const { createDashboardCommand: impl } = await import("./commands/dashboards/create.js");
+      const { createAnalyticsReportCommand: impl } =
+        await import("./commands/analytics-reports/create.js");
       return impl(name);
     },
   );
 
   emitsResult(
-    dashboardCmd
+    reportsCmd
       .command("delete <id>")
-      .description("Delete a dashboard and its graphs")
+      .description("Delete an Analytics Report and its graphs")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
-      const { deleteDashboardCommand: impl } = await import("./commands/dashboards/delete.js");
+      const { deleteAnalyticsReportCommand: impl } =
+        await import("./commands/analytics-reports/delete.js");
       return impl(id);
+    },
+  );
+}
+
+function registerDashboardCommands(program: Command): void {
+  // The project comes from the API key, over /api/v1/dashboards.
+  const dashboardsCmd = program
+    .command("dashboard")
+    .description("Manage dashboards and the widgets on them");
+  const format = (command: Command) =>
+    command.option("-f, --format <format>", "Output format: table (default) or json", "table");
+
+  emitsResult(
+    format(dashboardsCmd.command("list").description("List the project's dashboards")),
+    async () => {
+      const { listDashboardsCommand: impl } = await import("./commands/dashboards/dashboards.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    format(dashboardsCmd.command("get <dashboardId>").description("Get a dashboard by ID")),
+    async (dashboardId: string) => {
+      const { getDashboardCommand: impl } = await import("./commands/dashboards/dashboards.js");
+      return impl(dashboardId);
+    },
+  );
+
+  emitsResult(
+    format(dashboardsCmd.command("create <name>").description("Create an empty dashboard")),
+    async (name: string) => {
+      const { createDashboardCommand: impl } = await import("./commands/dashboards/dashboards.js");
+      return impl(name);
+    },
+  );
+
+  emitsResult(
+    format(
+      dashboardsCmd
+        .command("update <dashboardId>")
+        .description("Rename a dashboard or change its description")
+        .option("--name <name>", "New dashboard name")
+        .option("--description <description>", "New dashboard description")
+        .addOption(
+          new Option("--clear-description", "Remove the dashboard's description").conflicts(
+            "description",
+          ),
+        ),
+    ),
+    async (
+      dashboardId: string,
+      options: { name?: string; description?: string; clearDescription?: boolean },
+    ) => {
+      const { updateDashboardCommand: impl } = await import("./commands/dashboards/dashboards.js");
+      return impl(dashboardId, options);
+    },
+  );
+
+  emitsResult(
+    format(
+      dashboardsCmd
+        .command("delete <dashboardId>")
+        .description("Delete a dashboard and its widgets"),
+    ),
+    async (dashboardId: string) => {
+      const { deleteDashboardCommand: impl } = await import("./commands/dashboards/dashboards.js");
+      return impl(dashboardId);
+    },
+  );
+
+  const widgetCmd = dashboardsCmd
+    .command("widget")
+    .description("Manage the widgets on a dashboard");
+
+  emitsResult(
+    format(
+      widgetCmd
+        .command("schema")
+        .description(
+          "Discover the LangWatchQL analytics datasets and columns to write a widget's queries against",
+        )
+        .option("--project <slug-or-id>", "Project to run against"),
+    ),
+    async (options: { project?: string }) => {
+      const { dashboardWidgetSchemaCommand: impl } =
+        await import("./commands/dashboards/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    format(widgetCmd.command("list <dashboardId>").description("List the widgets on a dashboard")),
+    async (dashboardId: string) => {
+      const { listWidgetsOnDashboardCommand: impl } =
+        await import("./commands/dashboards/widgets.js");
+      return impl(dashboardId);
+    },
+  );
+
+  emitsResult(
+    format(
+      widgetCmd
+        .command("get <dashboardId> <widgetId>")
+        .description("Get a widget on a dashboard — its React source and named queries"),
+    ),
+    async (dashboardId: string, widgetId: string) => {
+      const { getWidgetOnDashboardCommand: impl } =
+        await import("./commands/dashboards/widgets.js");
+      return impl(dashboardId, widgetId);
+    },
+  );
+
+  const definitionOptions = (command: Command) =>
+    command
+      .option("--description <description>", "What the widget shows")
+      .option("--code <code>", "The widget's React source")
+      .option("--code-file <path>", "Read the widget's React source from a file")
+      .option(
+        "--queries-file <path>",
+        "JSON file: an array of { name, sql, parameters?, sources? }",
+      )
+      .option(
+        "--sources <list>",
+        `Comma list of the trace origins every query counts: ${TRACE_SOURCES.join(", ")}`,
+      )
+      .option(
+        "--projects <ids>",
+        "Comma list of the project ids every query reads (default: the board's project)",
+      );
+
+  emitsResult(
+    format(
+      definitionOptions(
+        widgetCmd
+          .command("add <dashboardId>")
+          .description("Add a widget to a dashboard from a React source file and its queries")
+          .requiredOption("--name <name>", "Widget name"),
+      ),
+    ),
+    async (dashboardId: string, options: Record<string, string | undefined>) => {
+      const { addWidgetToDashboardCommand: impl } =
+        await import("./commands/dashboards/widgets.js");
+      return impl(dashboardId, options);
+    },
+  );
+
+  emitsResult(
+    format(
+      definitionOptions(
+        widgetCmd
+          .command("update <dashboardId> <widgetId>")
+          .description("Update a widget on a dashboard")
+          .option("--name <name>", "New widget name"),
+      ),
+    ),
+    async (dashboardId: string, widgetId: string, options: Record<string, string | undefined>) => {
+      const { updateWidgetOnDashboardCommand: impl } =
+        await import("./commands/dashboards/widgets.js");
+      return impl(dashboardId, widgetId, options);
+    },
+  );
+
+  emitsResult(
+    format(widgetCmd.command("delete <dashboardId> <widgetId>").description("Delete a widget")),
+    async (dashboardId: string, widgetId: string) => {
+      const { deleteWidgetOnDashboardCommand: impl } =
+        await import("./commands/dashboards/widgets.js");
+      return impl(dashboardId, widgetId);
     },
   );
 }
@@ -2113,7 +2302,7 @@ function registerModelProviderCommands(program: Command): void {
       .description("Configure a model provider (e.g. openai, anthropic)")
       .option("--enabled <boolean>", "Enable or disable the provider", (v) => v === "true")
       .option("--api-key <key>", "API key for the provider")
-      .option("--default-model <model>", "Default model to use (e.g. gpt-5-mini)")
+      .option("--default-model <model>", "Default model to use (e.g. gpt-6-luna)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       provider: string,
@@ -2966,7 +3155,15 @@ function registerQueryCommands(program: Command): void {
         "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
       )
       .option("--out <file>", "Write the result to a file instead of stdout")
-      .option("--project <idOrSlug>", QUERY_PROJECT_FLAG_HELP),
+      .option("--project <idOrSlug>", QUERY_PROJECT_FLAG_HELP)
+      .option(
+        "--projects <ids>",
+        'Project ids to read, comma separated, or "all" for every project the key can read. A login that reaches several projects must name them or pass all; one that reads a single project defaults to it',
+      )
+      .option(
+        "--sources <list>",
+        "Trace sources {dashboard_context_sources:Array(String)} is bound to, comma separated (default: application)",
+      ),
     async (sql: string | undefined, options: Record<string, string>) => {
       const { runQueryCommand: impl } = await import("./commands/query/run.js");
       return impl(sql, options);
@@ -3468,11 +3665,11 @@ function registerScenarioCommands(program: Command): void {
   emitsResult(
     scenarioCmd
       .command("create <name>")
-      .description("Create a new scenario")
+      .description(`Create a new scenario. ${SCENARIO_CREATE_SUITE_PICK}`)
       .requiredOption("--situation <situation>", "The situation/context for the scenario")
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
-      .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
+      .option("--test-suite <test-suite>", SCENARIO_CREATE_TEST_SUITE_FLAG_HELP)
       .option("--field <pair>", SCENARIO_FIELD_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
@@ -4077,132 +4274,6 @@ function registerChartCommands(program: Command): void {
   );
 }
 
-function registerDashboardWidgetCommands(program: Command): void {
-  // Add dashboard-widget command group — custom-chart-playground widgets
-  const dashboardWidgetCmd = program
-    .command("dashboard-widget")
-    .description("Manage dashboard widgets");
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("schema")
-      .description(
-        "Discover the LangWatchQL analytics datasets and columns to write a widget's queries against",
-      )
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { project?: string }) => {
-      const { dashboardWidgetSchemaCommand: impl } =
-        await import("./commands/dashboard-widgets/schema.js");
-      return impl(options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("list")
-      .description("List the project's dashboard widgets")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { project?: string }) => {
-      const { listDashboardWidgetsCommand: impl } =
-        await import("./commands/dashboard-widgets/list.js");
-      return impl(options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("get <id>")
-      .description("Get a dashboard widget by ID — its React source and named queries")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
-      const { getDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/get.js");
-      return impl(id, options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("create")
-      .description(
-        "Save a dashboard widget from a React source file and its named LangWatchQL queries",
-      )
-      .requiredOption("--name <name>", "Widget name")
-      .option("--code <code>", "The widget's React source")
-      .option("--code-file <path>", "Read the widget's React source from a file")
-      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: {
-      name?: string;
-      code?: string;
-      codeFile?: string;
-      queriesFile?: string;
-      project?: string;
-    }) => {
-      const { createDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/create.js");
-      return impl(options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("update <id>")
-      .description("Update a dashboard widget's name or definition")
-      .option("--name <name>", "New widget name")
-      .option("--code <code>", "New React source")
-      .option("--code-file <path>", "Read the new React source from a file")
-      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (
-      id: string,
-      options: {
-        name?: string;
-        code?: string;
-        codeFile?: string;
-        queriesFile?: string;
-        project?: string;
-      },
-    ) => {
-      const { updateDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/update.js");
-      return impl(id, options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("delete <id>")
-      .description("Delete a dashboard widget")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
-      const { deleteDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/delete.js");
-      return impl(id, options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("pin <widget>")
-      .description("Add a dashboard widget to a dashboard (widget and dashboard by id or name)")
-      .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (widget: string, options: { dashboard?: string; project?: string }) => {
-      const { pinDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/pin.js");
-      return impl(widget, options);
-    },
-  );
-}
-
 function registerTriggerCommands(program: Command): void {
   // Add trigger (automation) command group
   const triggerCmd = program
@@ -4507,12 +4578,12 @@ function registerMonitorCommands(program: Command): void {
 
   emitsResult(
     monitorCmd
-      .command("get <id>")
-      .description("Get monitor details by ID")
+      .command("get <idOrSlugOrName>")
+      .description("Get monitor details by id, slug or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
+    async (idOrSlugOrName: string) => {
       const { getMonitorCommand: impl } = await import("./commands/monitors/get.js");
-      return impl(id);
+      return impl(idOrSlugOrName);
     },
   );
 
@@ -4556,7 +4627,7 @@ function registerMonitorCommands(program: Command): void {
   emitsResult(
     monitorCmd
       .command("update <id>")
-      .description("Update a monitor")
+      .description("Update a monitor by id (find the id with `monitor get <name>`)")
       .option("--name <name>", "New monitor name")
       .option("--enabled <boolean>", "Enable or disable the monitor (true/false)")
       .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE, AS_GUARDRAIL, MANUALLY")
@@ -4581,7 +4652,7 @@ function registerMonitorCommands(program: Command): void {
   emitsResult(
     monitorCmd
       .command("delete <id>")
-      .description("Delete a monitor")
+      .description("Delete a monitor by id (find the id with `monitor get <name>`)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteMonitorCommand: impl } = await import("./commands/monitors/delete.js");
@@ -6183,8 +6254,8 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
       .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
-      const { hookCommand } = await import("./commands/ingestion/hook.js");
-      await hookCommand({ tool });
+      const { runHookProcess } = await import("./commands/ingestion/hook.js");
+      await runHookProcess({ tool });
     } catch {
       // Same contract as the command itself: never break the session.
       void 0;
@@ -6202,11 +6273,14 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
         "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
       )
       .option("--session-id <id>", "declare for this session instead of resolving the live one")
-      .option("--agent <tool>", "the agent the session belongs to: claude-code, codex or opencode"),
+      .option(
+        "--agent <tool>",
+        "the agent the session belongs to: claude-code, codex, opencode or copilot",
+      ),
   ).action(async (options: { sessionId?: string; agent?: string }) => {
     try {
-      const { contextCommand } = await import("./commands/ingestion/context.js");
-      await contextCommand(options);
+      const { runContextProcess } = await import("./commands/ingestion/context.js");
+      await runContextProcess(options);
     } catch {
       // Never break the session the agent runs this from.
       void 0;

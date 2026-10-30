@@ -37,7 +37,9 @@ import {
   type ContractTerms,
   type IncomingUsageReport,
   type SelfHostedInstanceDetail,
+  type SelfHostedInstanceFilters,
   type SelfHostedInstancePage,
+  type SelfHostedInstanceSummary,
   type SelfHostedSignal,
   type IssueLicenseInput,
   type IssuedLicenseView,
@@ -50,6 +52,7 @@ import {
   licensingSecrets,
   type PlatformLicenseAccess,
   type RemoveLicenseResult,
+  type IssuedLicenseFilters,
   type IssuedLicensePage,
   type LicenseStatus,
   type PlanInfo,
@@ -57,6 +60,14 @@ import {
   type SeatChangeResult,
   type SignedIssuedLicense,
   type StoreLicenseResult,
+  type UpgradeDiagnosticsAvailability,
+  type UpgradeDiagnosticsDownload,
+  type UpgradeDiagnosticsReceipt,
+  type UpgradeDiagnosticsReport,
+  type UpgradeDiagnosticsSubmission,
+  type CreateSelfHostedNoticeInput,
+  type SelfHostedNoticeView,
+  type UpdateSelfHostedNoticeInput,
   type GenerateLicenseKeyInput,
   LicenseSigningNotConfiguredError,
   type GenerateLicenseOutput,
@@ -65,8 +76,9 @@ import {
 import type { SsoSignInProviderRecordedEventData } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { optionalUsageReportKeys } from "@langwatch/ops-contract";
+import { optionalUsageReportKeys, type SelfHostedNotice } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant, Temporal } from "@langwatch/time";
 
@@ -75,6 +87,8 @@ import type { ConnectLicenseChannel } from "../channels/connect-license.channel.
 import { HttpConnectGatewayChannel } from "../channels/http/http.connect-gateway.channel.ts";
 import { connectTransportFor, dispatcherOf } from "../channels/http/http.connect-host.channel.ts";
 import { HttpConnectLicenseChannel } from "../channels/http/http.connect-license.channel.ts";
+import { SlackUpgradeDiagnosticsAnnouncementChannel } from "../channels/slack/slack.upgrade-diagnostics-announcement.channel.ts";
+import type { UpgradeDiagnosticsAnnouncementChannel } from "../channels/upgrade-diagnostics-announcement.channel.ts";
 import {
   buildLicensingCustomerPipeline,
   type LicensingCustomerPipeline,
@@ -90,6 +104,10 @@ import type { SignInProviderMountRepository } from "../repositories/sign-in-prov
 import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
 import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
 import { licenseVerifyingKeyOf } from "../rules/license-verifying-key.rules.ts";
+import {
+  UPGRADE_DIAGNOSTICS_LIMIT,
+  upgradeDiagnosticsRateLimitKey,
+} from "../rules/upgrade-diagnostics.rules.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
 import type { ActivationRateLimit } from "../services/activation-code.service.ts";
 import {
@@ -116,7 +134,10 @@ import { LicensingInfrastructureService } from "../services/licensing-infrastruc
 import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
+import { SelfHostedNoticeService } from "../services/self-hosted-notice.service.ts";
 import { SsoGateStatusService } from "../services/sso-gate-status.service.ts";
+import { UpgradeDiagnosticsSenderService } from "../services/upgrade-diagnostics-sender.service.ts";
+import { UpgradeDiagnosticsService } from "../services/upgrade-diagnostics.service.ts";
 
 /** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
@@ -156,6 +177,7 @@ export class LicensingModule implements LicensingApiContract {
   static readonly secrets = {
     instanceLicenseKey: licensingSecrets.instanceLicenseKey,
     licensePrivateKey: licensingSecrets.licensePrivateKey,
+    upgradeDiagnosticsSlackWebhook: licensingSecrets.upgradeDiagnosticsSlackWebhook,
   } as const;
 
   readonly #service: LicenseService;
@@ -176,6 +198,9 @@ export class LicensingModule implements LicensingApiContract {
   readonly #signingKey: string | undefined;
   readonly #domainClaims: DomainClaimAuthorityService;
   readonly #ssoGate: SsoGateStatusService;
+  readonly #diagnostics: UpgradeDiagnosticsService;
+  readonly #diagnosticsSender: UpgradeDiagnosticsSenderService;
+  readonly #notices: SelfHostedNoticeService;
   #configuredActivation: ConfiguredActivationService | undefined;
 
   /** The licensing_customer pipeline, whose facts organization applies (R42). */
@@ -206,7 +231,11 @@ export class LicensingModule implements LicensingApiContract {
     domainClaims,
     customerFacts,
     signInProviderMounts,
+    diagnostics,
+    notices,
   }: {
+    diagnostics: UpgradeDiagnosticsService;
+    notices: SelfHostedNoticeService;
     signInProviderMounts: SignInProviderMountRepository;
     customerFacts: LicensingCustomerFactsService;
     generation: LicenseGenerationService;
@@ -235,6 +264,9 @@ export class LicensingModule implements LicensingApiContract {
     this.#identity = install.identity;
     this.#customerFacts = customerFacts;
     this.#refresh = install.refresh;
+    this.#diagnosticsSender = install.diagnosticsSender;
+    this.#diagnostics = diagnostics;
+    this.#notices = notices;
     this.#ssoGate = SsoGateStatusService.create({
       mounts: signInProviderMounts,
       isPlatformSsoLicensed: () => this.isPlatformSsoLicensed(),
@@ -250,7 +282,16 @@ export class LicensingModule implements LicensingApiContract {
       LicensingModule.secrets.licensePrivateKey,
       (value) => value,
     );
-    return LicensingModule.#assemble(setup, { instanceLicenseKey, licensePrivateKey });
+    const announcements = await setup.secrets.into(
+      LicensingModule.secrets.upgradeDiagnosticsSlackWebhook,
+      (webhookUrl) =>
+        webhookUrl ? SlackUpgradeDiagnosticsAnnouncementChannel.create({ webhookUrl }) : undefined,
+    );
+    return LicensingModule.#assemble(setup, {
+      instanceLicenseKey,
+      licensePrivateKey,
+      announcements,
+    });
   }
 
   static #assemble(
@@ -258,7 +299,12 @@ export class LicensingModule implements LicensingApiContract {
     {
       instanceLicenseKey,
       licensePrivateKey,
-    }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
+      announcements,
+    }: {
+      instanceLicenseKey: string | undefined;
+      licensePrivateKey: string | undefined;
+      announcements?: UpgradeDiagnosticsAnnouncementChannel | undefined;
+    },
   ): LicensingModule {
     const { publicKey, ignoredVariable, refuseDevStack } = licenseVerifyingKeyOf({
       override: config.publicKey,
@@ -334,6 +380,15 @@ export class LicensingModule implements LicensingApiContract {
         organizations: repositories.connectOrganizations,
       }),
       signInProviderMounts: repositories.signInProviderMounts,
+      diagnostics: upgradeDiagnosticsOver({
+        repositories,
+        baseUrl: config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+        ...(announcements ? { announcements } : {}),
+      }),
+      notices: SelfHostedNoticeService.create({
+        repository: repositories.selfHostedNotices,
+        now: nowInstant,
+      }),
     });
     if (!config.isSaas && configured.form === "activation_code") {
       app.#configuredActivation = ConfiguredActivationService.create({
@@ -546,11 +601,13 @@ export class LicensingModule implements LicensingApiContract {
     return this.#registry.getById(input);
   }
 
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<IssuedLicensePage> {
+  listIssuedLicenses(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage> {
     return this.#registry.list(input);
   }
 
@@ -652,6 +709,10 @@ export class LicensingModule implements LicensingApiContract {
     return this.#identity.setReportSwitches(input);
   }
 
+  setUpgradeDiagnosticsOptOut({ optOut }: { optOut: boolean }): Promise<void> {
+    return this.#identity.setReportSwitches({ upgradeDiagnosticsOptOut: optOut });
+  }
+
   isConnectServiceEnabled(input: {
     organizationId: string;
     service: ConnectService;
@@ -737,17 +798,122 @@ export class LicensingModule implements LicensingApiContract {
     return this.#instances.recordReport(input);
   }
 
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<SelfHostedInstancePage> {
+  listSelfHostedInstances(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage> {
     return this.#instances.list(input);
   }
 
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail> {
     return this.#instances.getById(input);
   }
+
+  summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary> {
+    return this.#instances.summarize();
+  }
+
+  sendUpgradeDiagnostics(
+    submission: UpgradeDiagnosticsSubmission,
+  ): Promise<UpgradeDiagnosticsReceipt> {
+    return this.#diagnosticsSender.send(submission);
+  }
+
+  getUpgradeDiagnosticsAvailability(): Promise<UpgradeDiagnosticsAvailability> {
+    return this.#diagnosticsSender.availability();
+  }
+
+  recordUpgradeDiagnostics(input: {
+    caller: ConnectLicenceCaller;
+    submission: UpgradeDiagnosticsSubmission;
+  }): Promise<UpgradeDiagnosticsReceipt> {
+    return this.#diagnostics.record(input);
+  }
+
+  findUpgradeDiagnostics(input: { instanceRowId: string }): Promise<UpgradeDiagnosticsReport[]> {
+    return this.#diagnostics.findForInstance(input);
+  }
+
+  getUpgradeDiagnosticsDownload(input: { id: string }): Promise<UpgradeDiagnosticsDownload> {
+    return this.#diagnostics.getDownload(input);
+  }
+
+  findSelfHostedNotices(): Promise<SelfHostedNoticeView[]> {
+    return this.#notices.findAll();
+  }
+
+  createSelfHostedNotice(input: CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView> {
+    return this.#notices.create(input);
+  }
+
+  updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput): Promise<SelfHostedNoticeView> {
+    return this.#notices.update(input);
+  }
+
+  publishSelfHostedNotice(input: {
+    id: string;
+    operatorId: string;
+  }): Promise<SelfHostedNoticeView> {
+    return this.#notices.publish(input);
+  }
+
+  withdrawSelfHostedNotice(input: { id: string }): Promise<SelfHostedNoticeView> {
+    return this.#notices.withdraw(input);
+  }
+
+  findPublishedSelfHostedNotices(): Promise<SelfHostedNotice[]> {
+    return this.#notices.findSent();
+  }
+}
+
+/** Cloud's origin where BASE_HOST names none, as billing's Slack links read it. */
+const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
+
+const UPGRADE_DIAGNOSTIC_RESOURCE = "upgradediagnostic";
+
+/**
+ * The hosted intake over this module's own stores. Every deployment composes it, as the
+ * instance registry; only Cloud's door verifies a licence caller, so only Cloud receives one.
+ */
+function upgradeDiagnosticsOver({
+  repositories,
+  baseUrl,
+  announcements,
+}: {
+  repositories: Pick<
+    LicensingRepositories,
+    | "upgradeDiagnostics"
+    | "upgradeDiagnosticBundles"
+    | "selfHostedInstances"
+    | "connectOrganizations"
+    | "rateLimits"
+  >;
+  baseUrl: string;
+  announcements?: UpgradeDiagnosticsAnnouncementChannel;
+}): UpgradeDiagnosticsService {
+  return UpgradeDiagnosticsService.create({
+    repository: repositories.upgradeDiagnostics,
+    bundles: repositories.upgradeDiagnosticBundles,
+    instances: repositories.selfHostedInstances,
+    organizations: { findById: customerLookup(repositories.connectOrganizations) },
+    rateLimit: {
+      allow: async ({ instanceId }) =>
+        (
+          await repositories.rateLimits.check(
+            upgradeDiagnosticsRateLimitKey(instanceId),
+            UPGRADE_DIAGNOSTICS_LIMIT,
+          )
+        ).allowed,
+    },
+    ...(announcements ? { announcements } : {}),
+    baseUrl,
+    newReportId: () => generate(UPGRADE_DIAGNOSTIC_RESOURCE).toString(),
+    now: () => nowInstant(),
+    logger,
+  });
 }
 
 /** A redemption at start gives up well before the transport's own timeout. */
@@ -933,6 +1099,7 @@ type ConnectInstallParts = Readonly<{
   install: ConnectInstallService;
   identity: InstanceIdentityService;
   refresh: LicenseRefreshService;
+  diagnosticsSender: UpgradeDiagnosticsSenderService;
 }>;
 
 /**
@@ -1024,6 +1191,10 @@ function connectInstallParts({
   return {
     identity,
     install,
+    diagnosticsSender: UpgradeDiagnosticsSenderService.create({
+      install,
+      ...(infrastructure.licenseHost ? { host: infrastructure.licenseHost } : {}),
+    }),
     refresh: LicenseRefreshService.create({
       instanceId: () => identity.getInstanceId(),
       install,

@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -35,10 +35,11 @@ const mocks = vi.hoisted(() => ({
     updatedAt: new Date("2026-01-02"),
   },
   create: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
+  star: { mutateAsync: vi.fn(), isPending: false },
   rename: { mutate: vi.fn(), isPending: false },
   remove: { mutate: vi.fn(), isPending: false },
   utils: {
-    dashboards: {
+    boards: {
       getAll: { invalidate: vi.fn() },
       listStarred: { invalidate: vi.fn() },
     },
@@ -54,7 +55,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     useUtils: () => mocks.utils,
-    dashboards: {
+    boards: {
       getAll: {
         useQuery: (input: unknown) => {
           mocks.listInputs.push(input);
@@ -67,7 +68,8 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
         },
       },
       create: { useMutation: () => mocks.create },
-      rename: { useMutation: () => mocks.rename },
+      star: { useMutation: () => mocks.star },
+      update: { useMutation: () => mocks.rename },
       delete: { useMutation: () => mocks.remove },
     },
   },
@@ -97,6 +99,26 @@ describe("given a member creates a board", () => {
   });
 });
 
+describe("given the pin fails after the board is made", () => {
+  /** @scenario "A failed pin leaves exactly one dashboard" */
+  it("tells the member, and the created board still opens with Add a widget", async () => {
+    const error = new Error("pin down");
+    mocks.create.mutate.mockImplementationOnce(
+      (_input: unknown, options: { onSuccess: (board: { id: string }) => Promise<void> }) =>
+        void options.onSuccess({ id: "board-new" }),
+    );
+    mocks.star.mutateAsync.mockRejectedValueOnce(error);
+    const { result } = renderHook(() => useSavedDashboards());
+
+    act(() => result.current.createBoard({ pin: true, addWidget: true }));
+
+    await waitFor(() =>
+      expect(mocks.host.navigate).toHaveBeenCalledWith("/acme/dashboards/board-new?addBlock=open"),
+    );
+    expect(mocks.host.failed).toHaveBeenCalledWith(expect.objectContaining({ error }));
+  });
+});
+
 describe("given the project has boards", () => {
   /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
   it("lists each with its star, scope and last change", () => {
@@ -116,5 +138,27 @@ describe("given the project has boards", () => {
       asked: { projectId: "project-1", includeOrganization: true },
       organizationBoards: [mocks.shared],
     });
+  });
+
+  /** @scenario "AC199 Split: Dashboards and Analytics Reports each list and open only their own boards" */
+  it("asks the Dashboards area's own list, never the Analytics Reports one", () => {
+    renderHook(() => useSavedDashboards());
+
+    // The mock answers `boards.getAll` alone; a `dashboards.*` read would throw.
+    expect(mocks.listInputs).not.toHaveLength(0);
+  });
+});
+
+describe("given a member deletes a board", () => {
+  /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
+  it("deletes through the Dashboards area's own procedure, which keeps a Reports board", () => {
+    const { result } = renderHook(() => useSavedDashboards());
+
+    act(() => result.current.deleteBoard({ dashboardId: "board-1", onDeleted: vi.fn() }));
+
+    expect(mocks.remove.mutate).toHaveBeenCalledWith(
+      { projectId: "project-1", dashboardId: "board-1" },
+      expect.anything(),
+    );
   });
 });

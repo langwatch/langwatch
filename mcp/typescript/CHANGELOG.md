@@ -1,5 +1,59 @@
 # Changelog
 
+## [3.0.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.2.0...mcp-server@v3.0.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk:** client.dashboards and langwatch.dashboards now address the new Dashboards API, not the old Reports; use client.analyticsReports / langwatch.analytics_reports for those. MCP Reports tools are renamed platform_*_analytics_report(s).
+
+### Features
+
+* **auth:** log which credential and client each API request used ([#9003](https://github.com/langwatch/langwatch/issues/9003)) ([c55dc6e](https://github.com/langwatch/langwatch/commit/c55dc6e6e22aa2a6563b4be7d3e93d7f40c7f23b))
+* **dashboard:** add REST create and delete for Dashboards boards ([#8896](https://github.com/langwatch/langwatch/issues/8896)) ([fbc1469](https://github.com/langwatch/langwatch/commit/fbc1469027d6ef59c920243f63e2ebaf2264bcf8))
+* **dashboards:** per-widget "Langy traces" setting in the query editor ([#9137](https://github.com/langwatch/langwatch/issues/9137)) ([5e82c1e](https://github.com/langwatch/langwatch/commit/5e82c1ebc1d2dbfda817cf175f3aba62e485a0d8))
+* **experiment:** accept a per-run concurrency on the experiment run API ([#9023](https://github.com/langwatch/langwatch/issues/9023)) ([640d0f6](https://github.com/langwatch/langwatch/commit/640d0f6e21afd19e46eaed9312d4c04c121b9a4b))
+* **monitor:** pause a monitor whose evaluations mostly fail ([#9040](https://github.com/langwatch/langwatch/issues/9040)) ([fcbd9ed](https://github.com/langwatch/langwatch/commit/fcbd9edabbfa2fd9b3a4c142c678298a846e184d))
+* **sdk:** one product per dashboards path; dashboards means the new product everywhere ([#9089](https://github.com/langwatch/langwatch/issues/9089)) ([552534d](https://github.com/langwatch/langwatch/commit/552534d24487441ac5395d91c1af69ed072a0c00))
+
+
+### Bug Fixes
+
+* **dashboards:** refresh moves fixed ranges, hidden stars keep their place, agents read boards by id ([#9048](https://github.com/langwatch/langwatch/issues/9048)) ([a5ea0ed](https://github.com/langwatch/langwatch/commit/a5ea0eda1d886635096da02bb76b2b99f9bed6f6))
+* **deps:** raise authlib, litellm and dnspython for today's advisories ([#9120](https://github.com/langwatch/langwatch/issues/9120)) ([828259f](https://github.com/langwatch/langwatch/commit/828259f92eafec9a0d4e1c5ffecab87e4abd2257))
+* **langevals:** judges reach a verdict on gpt-6 reasoning models ([#9102](https://github.com/langwatch/langwatch/issues/9102)) ([d7b6238](https://github.com/langwatch/langwatch/commit/d7b623874e55e0b6af4d81ce9671114d54dfb2cc))
+* **mcp:** repair main after the board-reading merge ([#9087](https://github.com/langwatch/langwatch/issues/9087)) ([96a4bf6](https://github.com/langwatch/langwatch/commit/96a4bf61c903ffb0f75b64e93cef7fd43d0897cd))
+* **security:** close 148 of 150 alerts across the python locks ([#7634](https://github.com/langwatch/langwatch/issues/7634)) ([c0837d1](https://github.com/langwatch/langwatch/commit/c0837d164d28f15ba179fc6f1c1f0516be32cfa3))
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+
+## [2.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.1.0...mcp-server@v2.2.0) (2026-10-21)
+
+
+### Features
+
+* **automations:** one automation flow: wizard composer, Slack connections, always-on webhooks and API parity ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
+* **dashboard:** move dashboards v2 onto its own tables ([#8707](https://github.com/langwatch/langwatch/issues/8707)) ([7f1f527](https://github.com/langwatch/langwatch/commit/7f1f527f85363fe97cdc93d300b7c469de4463eb))
+* **dashboards,insight:** dashboards and insights v1 ([#8545](https://github.com/langwatch/langwatch/issues/8545)) ([7b5e13d](https://github.com/langwatch/langwatch/commit/7b5e13dd84492d526f1442e3360005ff1ed08613))
+* **datasets:** upload images and files into cells and deliver them to prompts and agents ([#7964](https://github.com/langwatch/langwatch/issues/7964)) ([78e8b62](https://github.com/langwatch/langwatch/commit/78e8b624bfe59801bb76a278435dafa7f435e8b5))
+* **governance:** an aggregate project reads its member projects through shared grants ([#8487](https://github.com/langwatch/langwatch/issues/8487)) ([e683dd9](https://github.com/langwatch/langwatch/commit/e683dd9ea52c148e7678b1c22202dbfea9f1eb9f))
+* **instant-evals:** the Instant Eval run, a judgment job over an LWQL statement with progress and persisted judgments ([#8208](https://github.com/langwatch/langwatch/issues/8208)) ([e337419](https://github.com/langwatch/langwatch/commit/e33741926479c94f6d0b6d2b80d76e886dc1e109))
+* **lwql:** app-side extraction functions as identity UDFs with a hydration stage ([#8196](https://github.com/langwatch/langwatch/issues/8196)) ([ad1bc9e](https://github.com/langwatch/langwatch/commit/ad1bc9eddf8f1c30e79b213cbd7fdbcb4563f990))
+* **lwql:** derive every tenant-scoped Postgres model into the catalog by default ([#8209](https://github.com/langwatch/langwatch/issues/8209)) ([ea93080](https://github.com/langwatch/langwatch/commit/ea93080f4db38c70406b7737344b7132f3b931e9))
+* **lwql:** eval functions judged by the classifier interface (Instant Evals) ([#8201](https://github.com/langwatch/langwatch/issues/8201)) ([1eb6dfe](https://github.com/langwatch/langwatch/commit/1eb6dfe76206df168df94c443319760dc4bc4591))
+* **query:** one reference door for LWQL and trace filters, filter and facets on the traces API, langwatch query CLI, MCP run_query ([#8198](https://github.com/langwatch/langwatch/issues/8198)) ([0b5f4d0](https://github.com/langwatch/langwatch/commit/0b5f4d0add6cdc6c6483264f1ff4847f44410eb5))
+* **sdk:** list the Slack connections a project can use, through GET /api/slack-connections, langwatch slack-connection list, Python list_slack_connections and Go SlackConnections ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
+* **traces-v2:** enter to search, a routed search bar, instant evals in the filter bar, Langy in sync with the explorer ([#8234](https://github.com/langwatch/langwatch/issues/8234)) ([a4db9f8](https://github.com/langwatch/langwatch/commit/a4db9f83d4483804a113640cda81072d0fbc11e1))
+* webinar learnings, connected agent scope, scenario names, search hints, deep links, judge and Langy fixes ([#8236](https://github.com/langwatch/langwatch/issues/8236)) ([2054720](https://github.com/langwatch/langwatch/commit/2054720f391a2fcec60b86870a98d87345ccf6ee))
+
+
+### Bug Fixes
+
+* follow-ups that missed the [#7536](https://github.com/langwatch/langwatch/issues/7536) merge (eventing leases, group-queue dead workers, upgrade pacing, upgradelab) ([#8580](https://github.com/langwatch/langwatch/issues/8580)) ([7aca052](https://github.com/langwatch/langwatch/commit/7aca0524747e37193b219add62a00b45b1e55ae7))
+* main's CI back to green, with the last strict-layout follow-ups ([#8598](https://github.com/langwatch/langwatch/issues/8598)) ([6791316](https://github.com/langwatch/langwatch/commit/6791316ad775a628d620d6315422b73ebeb4e15b))
+* **security:** pin Node to 24.22.1 for the October 2026 security releases ([#8933](https://github.com/langwatch/langwatch/issues/8933)) ([84b8925](https://github.com/langwatch/langwatch/commit/84b892544207ee63f7ed04e890820fb08f04a6d8))
+* **selfhost:** issues found on a fresh 3.18.0 Helm install on EKS ([#8326](https://github.com/langwatch/langwatch/issues/8326)) ([e494045](https://github.com/langwatch/langwatch/commit/e494045ab02a63459a49592a203314b0f7736cee))
+* **triggers:** refuse a different customGraphId on PATCH instead of ignoring it ([#8433](https://github.com/langwatch/langwatch/issues/8433)) ([0ad8ad2](https://github.com/langwatch/langwatch/commit/0ad8ad2e1ae6981c130c4c2877bbd5e2722e8dd6))
+
 ## [2.1.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.0.0...mcp-server@v2.1.0) (2026-09-12)
 
 

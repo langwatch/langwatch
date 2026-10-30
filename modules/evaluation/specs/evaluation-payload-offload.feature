@@ -28,7 +28,8 @@ Feature: Evaluation payload offload
   #   - Offload decision + marker shaping + resolve fail-safe:
   #     modules/evaluation/process/src/services/evaluation-inputs-offload.service.ts
   #     with the key grammar in rules/evaluation-input-object.rules.ts.
-  #     (EVAL_INPUTS_INLINE_MAX_BYTES = 1 MiB, HARD_CEILING = 50 MiB, preview 16 KiB).
+  #     (inline 1 MiB and ceiling 50 MiB by default, from LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES
+  #     and LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES; preview 16 KiB).
   #   - Write-time wiring (event carries the marker): the offload runs inside
   #     emitReported in evaluation-execution-intent.service.ts BEFORE EventUtils.createEvent,
   #     flag-gated + fail-open at the composition root (pipelineRegistry.ts) on
@@ -51,6 +52,14 @@ Feature: Evaluation payload offload
 
   Background:
     Given the evaluations pipeline persists evaluator inputs with each run
+
+  @unit
+  Scenario: The inline threshold and the hard ceiling are deployment settings
+    Given LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES and LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES
+    When either is unset, blank or not a positive number
+    Then the inline threshold is 1 MiB and the hard ceiling is 50 MiB
+    When either is a positive number
+    Then that number of bytes is used, rounded down
 
   @unit
   Scenario: an oversized evaluation input is offloaded, not truncated

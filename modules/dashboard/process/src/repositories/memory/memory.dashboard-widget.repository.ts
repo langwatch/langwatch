@@ -11,6 +11,7 @@ import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type {
@@ -22,15 +23,31 @@ import type {
   DashboardWidgetScope,
   UpdateDashboardWidgetInput,
 } from "../dashboard-widget.repository.ts";
+import { MemoryDashboardDatabase } from "./memory.dashboard.database.ts";
 
-/** In-memory parity for widget CRUD; dashboard ownership is enforced by the live transaction. */
+/** In-memory parity for widget CRUD; create and assign refuse a board this project does not own. */
 export class MemoryDashboardWidgetRepository implements DashboardWidgetRepository {
-  #rows: DashboardWidgetRow[] = [];
+  #database: MemoryDashboardDatabase;
 
-  private constructor() {}
+  private constructor(database: MemoryDashboardDatabase) {
+    this.#database = database;
+  }
 
-  static create(): MemoryDashboardWidgetRepository {
-    return new MemoryDashboardWidgetRepository();
+  /** `database` is shared with the module's other memory repositories; a fresh one otherwise. */
+  static create(
+    options: { database?: MemoryDashboardDatabase } = {},
+  ): MemoryDashboardWidgetRepository {
+    return new MemoryDashboardWidgetRepository(
+      options.database ?? MemoryDashboardDatabase.create(),
+    );
+  }
+
+  get #rows(): DashboardWidgetRow[] {
+    return this.#database.widgets;
+  }
+
+  set #rows(rows: DashboardWidgetRow[]) {
+    this.#database.widgets = rows;
   }
 
   async findAll(input: { projectId: string }): Promise<DashboardWidgetRow[]> {
@@ -45,6 +62,10 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
   }
 
   async createWidget(input: CreateDashboardWidgetInput): Promise<DashboardWidgetRow> {
+    const { projectId, dashboardId } = input;
+    if (dashboardId !== undefined && !this.#ownsBoard({ projectId, dashboardId })) {
+      throw new DashboardNotFoundError(projectId);
+    }
     const rows = this.#rows.filter(
       (row) =>
         row.projectId === input.projectId &&
@@ -104,10 +125,19 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
 
   async deleteWidget(input: DashboardWidgetScope): Promise<void> {
     const row = this.#require(input);
-    this.#rows = this.#rows.filter((candidate) => candidate.id !== row.id);
+    this.#rows = this.#rows.filter((candidate) => candidate !== row);
+    this.#database.charts = this.#database.charts.filter(
+      (chart) =>
+        !(
+          chart.id === row.id &&
+          chart.projectId === row.projectId &&
+          chart.kind === "dashboard_srcdoc"
+        ),
+    );
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput): Promise<DashboardWidgetRow> {
+    if (!this.#ownsBoard(input)) throw new DashboardNotFoundError(input.projectId);
     const current = this.#require(input);
     const onDashboard = this.#rows.filter(
       (row) => row.projectId === input.projectId && row.dashboardId === input.dashboardId,
@@ -137,6 +167,12 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
         updatedAt: nowInstant(),
       });
     }
+  }
+
+  #ownsBoard(input: { projectId: string; dashboardId: string }): boolean {
+    return this.#database.boards.some(
+      (board) => board.id === input.dashboardId && board.projectId === input.projectId,
+    );
   }
 
   #require(input: DashboardWidgetScope): DashboardWidgetRow {

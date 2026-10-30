@@ -27,6 +27,12 @@ Feature: The image proxy shows a picture from an outside address
     Then it answers 404 with the body {"error":"Failed to fetch image: Not Found"}
 
   @integration
+  Scenario: the image proxy refuses a picture over the size limit
+    Given an outside address that answers with a picture larger than the proxy relays
+    When the browser asks the image proxy for that address
+    Then it answers 413 with the body {"error":"Image is too large"}
+
+  @integration
   Scenario: the image proxy answers 500 when the address cannot be reached
     Given an outside address the egress fence refuses
     When the browser asks the image proxy for that address

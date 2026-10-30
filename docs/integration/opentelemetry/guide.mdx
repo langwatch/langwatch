@@ -26,11 +26,11 @@ import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 
 LangWatch provides a standard OpenTelemetry Protocol (OTLP) endpoint for receiving traces:
 
-```
+```text
 https://app.langwatch.ai/api/otel/v1/traces
 ```
 
-This endpoint accepts OTLP over HTTP and gRPC protocols, making it compatible with all OpenTelemetry SDKs.
+This endpoint accepts OTLP over HTTP, with protobuf or JSON bodies. OTLP over gRPC is not supported: set your exporter to `http/protobuf` or `http/json` (for example `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`), since some SDKs default to gRPC.
 
 ## General Setup Pattern
 
@@ -141,9 +141,13 @@ The setup follows this general pattern across all languages:
                 var builder = Sdk.CreateTracerProviderBuilder()
                     .SetResourceBuilder(ResourceBuilder.CreateDefault()
                         .AddService(serviceName: "my-service"))
-                    .AddOtlpExporter(opts => opts
-                        .Endpoint = new Uri("https://app.langwatch.ai/api/otel/v1/traces")
-                        .Headers = "Authorization=Bearer " + Environment.GetEnvironmentVariable("LANGWATCH_API_KEY"))
+                    .AddOtlpExporter(opts =>
+                    {
+                        // Most .NET targets default to gRPC, which LangWatch does not accept.
+                        opts.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                        opts.Endpoint = new Uri("https://app.langwatch.ai/api/otel/v1/traces");
+                        opts.Headers = "Authorization=Bearer " + Environment.GetEnvironmentVariable("LANGWATCH_API_KEY");
+                    })
                     .Build();
             }
         }
@@ -204,7 +208,7 @@ public class LLMService {
         try (var scope = span.makeCurrent()) {
             // Add relevant attributes
             span.setAttribute("llm.provider", "custom-provider");
-            span.setAttribute("llm.model", "gpt-5-mini");
+            span.setAttribute("llm.model", "gpt-6-luna");
             span.setAttribute("llm.prompt", prompt);
 
             // Your LLM call here

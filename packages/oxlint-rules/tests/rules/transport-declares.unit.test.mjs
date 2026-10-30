@@ -364,6 +364,21 @@ describe("given a key door route that declares it reads the key", () => {
   });
 });
 
+describe("given a public route whose handler resolves its own key", () => {
+  it("accepts recordKey from withAccess(publicRoute(...)) and reports it otherwise", () => {
+    expect(
+      located(
+        '  .post("/widgets/collect", "collectWidget")',
+        '  .withAccess(publicRoute({ reason: "key resolved in the handler" }))',
+        "  .handle(async ({ app, recordKey }) => app.collectWidget(recordKey))",
+        '  .post("/widgets/own", "ownWidget")',
+        '  .withPermission("widget:view")',
+        "  .handle(async ({ app, recordKey }) => app.ownWidget(recordKey))",
+      ),
+    ).toEqual([["rawContextField", "recordKey", 8, 24]]);
+  });
+});
+
 describe("given a handler taking a producer its route did not declare", () => {
   /** @scenario "A handler taking a producer its own route did not declare is reported at the field" */
   it("reports raw without withRawBody, request on a bytes route and files without withMultipart", () => {

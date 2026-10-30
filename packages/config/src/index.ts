@@ -63,7 +63,9 @@ export { isReleaseBuild } from "./release-build.ts";
 export {
   environmentBooleanSchema,
   environmentExactOneSchema,
+  environmentExactOnSchema,
   environmentLegacyTruthySchema,
+  environmentNotExactOffSchema,
   environmentNotExactOneSchema,
   environmentOneOrTrueSchema,
   environmentPresenceSchema,
@@ -71,5 +73,13 @@ export {
   nonNegativeSafeIntegerOrUndefined,
   positiveSafeIntegerOrUndefined,
 } from "./env-schemas.ts";
+export {
+  canonicalOriginOf,
+  docsOrigins,
+  isExactOrigin,
+  isRegisteredDocsOrigin,
+  registeredDocsOrigins,
+  SAAS_DOCS_ORIGIN,
+} from "./docs-origins.ts";
 export { zodErrorMessage } from "./zod-error-message.ts";
 export { mapZodIssuesToLogContext } from "./zod-issues.ts";

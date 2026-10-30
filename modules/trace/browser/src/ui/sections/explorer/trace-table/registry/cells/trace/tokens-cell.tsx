@@ -8,14 +8,8 @@ import { TokenBreakdownTooltipContent } from "../../../../../../blocks/explorer/
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import type { CellDef } from "../../types.ts";
 
-// The cell shows the input+output "delta"; the hover surfaces the full
-// breakdown so a cached turn's true processed-token count (input + output +
-// cache read + cache write) is one hover away — Anthropic reports input as the
-// NON-cached portion, so the cache counts are additive, not a subset.
-function totalWithCacheOf(row: TraceListItem): number {
-  return row.totalTokens + (row.cacheReadTokens ?? 0) + (row.cacheCreationTokens ?? 0);
-}
-
+// `totalTokens` counts every token processed (input, output, cache read and cache write);
+// the hover breaks it down.
 // Suppress the "estimated" caveat when we have concrete input AND output
 // numbers — historical summaries can carry a stale tokensEstimated flag.
 function isEstimated(row: TraceListItem): boolean {
@@ -36,7 +30,7 @@ function TokenBreakdownTooltip({ row, children }: { row: TraceListItem; children
           cacheReadTokens={row.cacheReadTokens ?? null}
           cacheCreationTokens={row.cacheCreationTokens ?? null}
           reasoningTokens={row.reasoningTokens ?? null}
-          totalWithCache={totalWithCacheOf(row)}
+          totalWithCache={row.totalTokens}
           estimated={isEstimated(row)}
         />
       }

@@ -16,7 +16,7 @@ import { Task } from "@langwatch/task";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import * as runner from "../index.ts";
 import { seedActionSchema, seedReplySchema, type SeedReply } from "../protocol.ts";
@@ -381,8 +381,11 @@ describe("seed:apply", () => {
 
   /** @scenario "A trace chunk older than 31 days asks the trace owner's backfill reach" */
   it("asks the trace owner's backfill reach for a chunk older than 31 days, and only then", async () => {
+    const now = Date.parse("2026-10-13T12:00:00.000Z");
+    vi.useFakeTimers({ now, toFake: ["Date"] });
+    onTestFinished(() => void vi.useRealTimers());
     const apis = seedApis();
-    const at = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+    const at = (daysAgo: number) => new Date(now - daysAgo * 86_400_000).toISOString();
     const chunk = (id: string, daysAgo: number) => ({
       id,
       kind: "trace.otlp",

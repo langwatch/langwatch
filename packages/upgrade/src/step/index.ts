@@ -28,3 +28,12 @@ export {
   type LaneReplayer,
   defineProjectionReplayStep,
 } from "./projection-replay-step.ts";
+export {
+  LEDGER_TEXT_MAX_CHARS,
+  type LedgerTextRedactor,
+  type MigrationStepLog,
+  STEP_LOG_TAIL_LINES,
+  StepLogTail,
+  ledgerRedactor,
+  ledgerText,
+} from "./step-log.ts";

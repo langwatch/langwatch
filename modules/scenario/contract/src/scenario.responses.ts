@@ -4,6 +4,7 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
+import { SCENARIO_EVALUATION_STATUSES } from "./scenario-evaluation-result.ts";
 import { runParameterValuesSchema } from "./scenario.parameters.ts";
 import { scenarioVersionSummarySchema, scenarioVersionDetailSchema } from "./scenario.version.ts";
 
@@ -91,6 +92,19 @@ export type ScenarioBatchArchiveResult = z.infer<typeof scenarioBatchArchiveResu
 
 // -- the Results tab --------------------------------------------------------
 
+/** One evaluator result on an atom: what ran, whether it counted, and what it said. */
+const atomEvaluationSchema = z
+  .object({
+    evaluatorId: z.string(),
+    name: z.string(),
+    status: z.enum(SCENARIO_EVALUATION_STATUSES),
+    required: z.boolean(),
+    passed: z.boolean().nullable(),
+    score: z.number().nullable(),
+    label: z.string().nullable(),
+  })
+  .strict();
+
 /** One scenario, run once against one target, inside one run — the Results tab's grain. */
 const resultAtomSchemaDefinition = z
   .object({
@@ -108,7 +122,8 @@ const resultAtomSchemaDefinition = z
     targetParameters: runParameterValuesSchema.nullable(),
     targetName: z.string().nullable(),
     status: z.string(),
-    outcome: z.enum(["passed", "failed", "pending"]),
+    outcome: z.enum(["passed", "failed", "not_scored", "pending"]),
+    evaluations: z.array(atomEvaluationSchema),
     durationMs: z.number().nullable(),
     costUsd: z.number().nullable(),
     costSource: z.enum(["run", "traces", "none", "unknown"]),

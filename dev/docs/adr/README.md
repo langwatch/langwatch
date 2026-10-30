@@ -97,6 +97,13 @@ Reusable framework decisions live with their packages:
 | [172](./172-oversized-payloads-live-under-expirable-prefixes.md)       | Oversized payloads live under expirable prefixes, never in a stored object                                                 | Accepted                  |
 | [174](./174-instant-evals-judge-call-is-metered.md)                    | An LLM judge on Instant Evals is one metered, budget-checked call answered by a leaf module                                | Accepted                  |
 | [177](./177-aggregate-project-reads-member-projects-through-grants.md) | An aggregate project reads its member projects through shared grants                                                       | Accepted                  |
+| [180](./180-scenario-run-hooks.md)                                     | Scenario run hooks: setup and teardown on connected agents                                                                 | Proposed                  |
+| [181](./181-tsrs-runs-behind-tsc.md)                                   | tsrs runs behind `tsc`                                                                                                     | Proposed                  |
+| [183](./183-vitest-workers-cache-module-loading.md)                    | Vitest workers cache how they load installed packages                                                                      | Proposed                  |
+| [184](./184-isolated-jsdom-files-share-a-worker.md)                    | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
+| [185](./185-docs-session-credentials.md)                               | Short-lived credentials for the documentation playground                                                                   | Accepted                  |
+| [186](./186-test-changed-runs-the-tests-an-edit-reaches.md)            | `test:changed` runs the tests an edit reaches, from a kept import graph                                                    | Proposed                  |
+| [187](./187-async-inserts-waiting-for-a-slot-share-a-statement.md)     | Async inserts waiting for a statement slot share one statement                                                             | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

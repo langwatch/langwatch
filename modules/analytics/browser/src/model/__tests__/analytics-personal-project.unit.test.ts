@@ -17,12 +17,12 @@ const GRAPH: AnalyticsScopeGraph = [
 ];
 
 describe("isPersonalProject", () => {
-  /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
+  /** @scenario "A personal project's Analytics reads keep Langy's turns" */
   it("is true for the project of a personal workspace", () => {
     expect(isPersonalProject({ graph: GRAPH, projectId: "project-mine" })).toBe(true);
   });
 
-  /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
+  /** @scenario "A personal project's Analytics reads keep Langy's turns" */
   it.each([
     { given: "a team's project", graph: GRAPH, projectId: "project-team" },
     { given: "a project the graph does not name", graph: GRAPH, projectId: "project-other" },

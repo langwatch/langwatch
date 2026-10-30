@@ -668,7 +668,8 @@ describe("the personal Pull Requests table", () => {
     });
 
     /** @scenario "A branch row reports the models its sessions ran" */
-    it("names the models its sessions ran", () => {
+    /** @scenario "The detail marks a model whose figures are not known" */
+    it("names the models its sessions ran, each marked not known on hover", async () => {
       pinUsage({
         rows: [],
         unlinked: [
@@ -686,7 +687,10 @@ describe("the personal Pull Requests table", () => {
 
       // The leading model, and the count of the rest, exactly as a mapped row
       // reads: a branch has no per-call totals, not no models.
-      expect(screen.getByText("claude-opus-5 +1")).toBeInTheDocument();
+      const cell = screen.getByText("claude-opus-5 +1");
+      expect(cell).toBeInTheDocument();
+      await userEvent.setup().hover(cell);
+      expect(await screen.findByText("claude-opus-5: not known")).toBeInTheDocument();
     });
   });
 
@@ -881,6 +885,7 @@ describe("the personal Pull Requests table", () => {
 
       await user.click(screen.getByRole("button", { name: /all time/i }));
       await user.click(await screen.findByText("Last 7 days"));
+      await periodPopoverClosed();
       expect(screen.queryByText("Untouched for a month")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /last 7 days/i }));

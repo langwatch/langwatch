@@ -3,7 +3,6 @@
  * the settings AmbientGround renders at rest. The boot splash mounts it before the app loads,
  * so the loading screen looks the same from first paint to the app.
  */
-import { nowInstant } from "@langwatch/time";
 import {
   defaultObjectSizing,
   defaultPatternSizing,
@@ -64,10 +63,11 @@ function sizing(base: typeof defaultObjectSizing, rest: typeof MESH_AT_REST | ty
 
 /**
  * The shader's clock for this moment, from the wall clock rather than page load: a page that
- * reloads (Vite's bundling page into the app) picks the animation up where it was.
+ * reloads (Vite's bundling page into the app) picks the animation up where it was. A plain
+ * clock, not @langwatch/time: the boot splash inlines this, and Temporal would add ~100 KB.
  */
 export function wallClockFrame({ speed }: { speed: number }): number {
-  return (nowInstant().epochMilliseconds % 3_600_000) * speed;
+  return ((performance.timeOrigin + performance.now()) % 3_600_000) * speed;
 }
 
 /**
@@ -93,13 +93,48 @@ async function loadedNoiseTexture(): Promise<HTMLImageElement | undefined> {
   return image;
 }
 
+/**
+ * Software WebGL draws each frame on the page's thread and stalls the app's start by close to a
+ * minute; with this the context is refused, mounting rejects, and the still ground stays.
+ */
+const LIVE_ONLY_ON_A_GPU: WebGLContextAttributes = { failIfMajorPerformanceCaveat: true };
+
+/** A frame slower than this is under ten a second: the drawing holds up the page's thread. */
+const SLOW_FRAME_MS = 100;
+
+/**
+ * Watches the first frames and calls `stop` after three slow ones in a row, which is what
+ * software WebGL gives. One slow frame is a busy load; sixty fast ones end the watch.
+ */
+export function stopWhenFramesAreSlow({
+  stop,
+  requestFrame = requestAnimationFrame,
+}: {
+  stop: () => void;
+  requestFrame?: (tick: FrameRequestCallback) => unknown;
+}): void {
+  let last: number | undefined;
+  let slowInARow = 0;
+  let frames = 0;
+  const tick = (now: number) => {
+    if (last !== undefined) slowInARow = now - last > SLOW_FRAME_MS ? slowInARow + 1 : 0;
+    last = now;
+    if (slowInARow >= 3) return stop();
+    if (++frames <= 60) requestFrame(tick);
+  };
+  requestFrame(tick);
+}
+
 /** Starts the mesh or the warp in `element` and resolves to the stop; rejects without WebGL. */
 export async function mountAmbientShader({
   element,
   mode,
+  onSlow,
 }: {
   element: HTMLElement;
   mode: "light" | "dark";
+  /** Called once the shader has stopped itself because its frames were too slow. */
+  onSlow?: () => void;
 }): Promise<() => void> {
   const noiseTexture = mode === "dark" ? await loadedNoiseTexture() : undefined;
   const mount =
@@ -120,7 +155,7 @@ export async function mountAmbientShader({
             u_noiseTexture: noiseTexture,
             ...sizing(defaultPatternSizing, WARP_AT_REST),
           },
-          undefined,
+          LIVE_ONLY_ON_A_GPU,
           WARP_AT_REST.speed,
           wallClockFrame({ speed: WARP_AT_REST.speed }),
         )
@@ -136,9 +171,22 @@ export async function mountAmbientShader({
             u_grainOverlay: 0,
             ...sizing(defaultObjectSizing, MESH_AT_REST),
           },
-          undefined,
+          LIVE_ONLY_ON_A_GPU,
           MESH_AT_REST.speed,
           wallClockFrame({ speed: MESH_AT_REST.speed }),
         );
-  return () => mount.dispose();
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    mount.dispose();
+  };
+  stopWhenFramesAreSlow({
+    stop: () => {
+      if (stopped) return;
+      stop();
+      onSlow?.();
+    },
+  });
+  return stop;
 }

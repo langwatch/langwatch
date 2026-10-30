@@ -133,6 +133,7 @@ import { WorkflowSignalsService } from "../services/workflow-signals.service.ts"
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
 import { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
+import { WorkflowStudioSyncService } from "../services/workflow-studio-sync.service.ts";
 import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
 import { WorkflowService } from "../services/workflow.service.ts";
 import type { WorkflowBrowserApi } from "../transport/workflow.trpc.ts";
@@ -286,6 +287,8 @@ interface WorkflowInfrastructure {
   studioDispatch?: WorkflowStudioDispatchService;
   /** Relays a scenario child's turn to its project's own engine. */
   executeSyncRelay: WorkflowExecuteSyncRelayService;
+  /** Runs a peer's prepared event synchronously on the project's engine. */
+  studioSync: WorkflowStudioSyncService;
   /** The ONE workflow graph service on this process. */
   workflows: WorkflowService;
   /** The dataset copies a Studio graph carries with it into another project. */
@@ -347,6 +350,7 @@ function composeEngine(setup: WorkflowSetup): WorkflowEngine {
     cache: setup.repositories.nlpLambdaArns,
     resolver: engine.resolver,
     imageUri: engine.imageUri,
+    imageOrder: engine.imageOrder,
     configFingerprint: engine.configFingerprint,
     logger,
   });
@@ -569,6 +573,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       }),
       publications: publicationsOf(setup.repositories.lineage),
       signals: WorkflowSignalsService.create(),
+      studioSync: WorkflowStudioSyncService.create({ runtime: nlpRuntime }),
       executeSyncRelay: WorkflowExecuteSyncRelayService.create({
         runtime: nlpRuntime,
         turnCeilingMs: relayTurnCeilingMs({ configured: setup.config.relayTurnCeilingMs }),
@@ -693,6 +698,17 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent> {
     return this.#infrastructure.workflows.enrichStudioEvent(input);
+  }
+
+  /** One prepared Studio event run to completion on the project's engine. */
+  executeStudioEventSync(input: {
+    projectId: string;
+    event: StudioClientEvent;
+    origin: WorkflowRunOrigin;
+    causalityDepth?: number;
+    parentTrace?: { traceId: string; parentSpanId: string };
+  }): Promise<WorkflowRunAnswer> {
+    return this.#infrastructure.studioSync.execute(input);
   }
 
   /** The evaluator-fields shape a peer's guard and run read off this workflow. */

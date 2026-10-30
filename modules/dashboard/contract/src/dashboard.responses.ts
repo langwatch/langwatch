@@ -1,6 +1,6 @@
 import type { Named } from "@langwatch/module";
 /**
- * What `/api/dashboards` and `/api/graphs` answer with: no `projectId` (the
+ * What `/api/v1/analytics/reports` and `/api/graphs` answer with: no `projectId` (the
  * credential names the project) and a `platformUrl` the reader opens.
  */
 import { z } from "zod";
@@ -19,14 +19,11 @@ import { graphSchema } from "./graph.ts";
  * no `platformUrl`) — the tRPC client reads the same shape the service holds.
  */
 
-/** `getAll`: each dashboard, with the card count the grid renders and the reader's star. */
+/** `dashboards.getAll`: each Reports board, with the card count the grid renders. */
 const dashboardTrpcSummarySchemaDefinition = z
   .object({
     ...dashboardSchema.shape,
     _count: z.object({ graphs: z.number().int().nonnegative() }).strict(),
-    isStarred: z.boolean(),
-    /** The project that owns an Organization board listed in another project; null at home. */
-    ownerProject: dashboardProjectSchema.nullable(),
   })
   .strict();
 export interface DashboardTrpcSummarySchema extends Named<
@@ -34,6 +31,18 @@ export interface DashboardTrpcSummarySchema extends Named<
 > {}
 export const dashboardTrpcSummarySchema: DashboardTrpcSummarySchema =
   dashboardTrpcSummarySchemaDefinition;
+
+/** `boards.getAll`: each Dashboards board, its widget count and the reader's star. */
+const boardTrpcSummarySchemaDefinition = z
+  .object({
+    ...dashboardTrpcSummarySchema.shape,
+    isStarred: z.boolean(),
+    /** The project that owns an Organization board listed in another project; null at home. */
+    ownerProject: dashboardProjectSchema.nullable(),
+  })
+  .strict();
+export interface BoardTrpcSummarySchema extends Named<typeof boardTrpcSummarySchemaDefinition> {}
+export const boardTrpcSummarySchema: BoardTrpcSummarySchema = boardTrpcSummarySchemaDefinition;
 
 /** `getById`: one dashboard with its graphs, in grid order. */
 const dashboardTrpcDetailSchemaDefinition = z

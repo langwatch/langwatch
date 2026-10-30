@@ -264,7 +264,7 @@ platformUrl(input: { projectSlug: string; agentId: string; agentType: string }):
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/agent-connect.rest.ts:106` |
+| Declared at | `src/transport/agent-connect.rest.ts:110` |
 | Base URL    | `/api/v1/agents`                          |
 | Addressing  | v1-only                                   |
 | Credential  | project                                   |
@@ -273,13 +273,13 @@ platformUrl(input: { projectSlug: string; agentId: string; agentType: string }):
 
 Register this process's agents
 
-Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:113`.
+Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:117`.
 
 Answers at `/api/v1/agents/connect/register`.
 
 ```typescript
 type Body = z.infer<typeof agentConnectRegisterInputSchema>; // ../contract/src/connected-agent.connection.ts:72
-// Response: inline, src/transport/agent-connect.rest.ts:118
+// Response: inline, src/transport/agent-connect.rest.ts:123
 type Response = unknown;
 ```
 
@@ -287,7 +287,7 @@ type Response = unknown;
 
 Wait for call and cancel frames while refreshing this instance's presence
 
-Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:144`.
+Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:149`.
 
 Answers at `/api/v1/agents/connect/poll`.
 
@@ -296,7 +296,7 @@ Answers at `/api/v1/agents/connect/poll`.
 interface Query {
   inFlight?: string;
 }
-// Response: inline, src/transport/agent-connect.rest.ts:148
+// Response: inline, src/transport/agent-connect.rest.ts:153
 type Response = unknown;
 ```
 
@@ -304,13 +304,13 @@ type Response = unknown;
 
 Accept this instance's acknowledgements, results and deregistration
 
-Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:170`.
+Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:175`.
 
 Answers at `/api/v1/agents/connect/frames`.
 
 ```typescript
 type Body = z.infer<typeof agentConnectFramesInputSchema>; // ../contract/src/connected-agent.connection.ts:112
-// Response: inline, src/transport/agent-connect.rest.ts:175
+// Response: inline, src/transport/agent-connect.rest.ts:181
 type Response = unknown;
 ```
 
@@ -368,7 +368,7 @@ interface Response {
 
 Get an agent; superseded by /api/v1/agents
 
-Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/transport/agent-legacy.rest.ts:99`.
+Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/transport/agent-legacy.rest.ts:100`.
 
 Answers at `/api/agents/:id`; also, undocumented, `/api/agents/2026-08-07/:id`, `/api/agents/latest/:id`.
 
@@ -384,7 +384,7 @@ type Response = z.infer<typeof legacyResponse>; // src/transport/agent-legacy.re
 
 Update an agent; superseded by /api/v1/agents
 
-Permission `project:update`. Hidden from the OpenAPI document. Declared at `src/transport/agent-legacy.rest.ts:109`.
+Permission `project:update`. Hidden from the OpenAPI document. Declared at `src/transport/agent-legacy.rest.ts:110`.
 
 Answers at `/api/agents/:id`; also, undocumented, `/api/agents/2026-08-07/:id`, `/api/agents/latest/:id`.
 
@@ -404,7 +404,7 @@ type Response = z.infer<typeof legacyResponse>; // src/transport/agent-legacy.re
 
 Update an agent (PUT keeps partial semantics); superseded by /api/v1/agents
 
-Permission `project:update`. Hidden from the OpenAPI document. Declared at `src/transport/agent-legacy.rest.ts:121`.
+Permission `project:update`. Hidden from the OpenAPI document. Declared at `src/transport/agent-legacy.rest.ts:123`.
 
 Answers at `/api/agents/:id`; also, undocumented, `/api/agents/2026-08-07/:id`, `/api/agents/latest/:id`.
 
@@ -418,7 +418,7 @@ type Response = z.infer<typeof legacyResponse>; // src/transport/agent-legacy.re
 
 Archive an agent; superseded by /api/v1/agents
 
-Permission `project:delete`. Hidden from the OpenAPI document. Declared at `src/transport/agent-legacy.rest.ts:136`.
+Permission `project:delete`. Hidden from the OpenAPI document. Declared at `src/transport/agent-legacy.rest.ts:139`.
 
 Answers at `/api/agents/:id`; also, undocumented, `/api/agents/2026-08-07/:id`, `/api/agents/latest/:id`.
 
@@ -481,7 +481,7 @@ interface Response {
 
 Get an agent in the caller's project
 
-Permission `project:view`. Declared at `src/transport/agent.rest.ts:143`.
+Permission `project:view`. Declared at `src/transport/agent.rest.ts:144`.
 
 Answers at `/api/v1/agents/:id`.
 
@@ -494,7 +494,7 @@ type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-re
 
 Update an authored agent
 
-Permission `project:update`. Declared at `src/transport/agent.rest.ts:159`.
+Permission `project:update`. Declared at `src/transport/agent.rest.ts:160`.
 
 Answers at `/api/v1/agents/:id`.
 
@@ -508,7 +508,7 @@ type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-re
 
 Update an authored agent; PUT retains partial update semantics
 
-Permission `project:update`. Declared at `src/transport/agent.rest.ts:178`.
+Permission `project:update`. Declared at `src/transport/agent.rest.ts:180`.
 
 Answers at `/api/v1/agents/:id`.
 
@@ -522,7 +522,7 @@ type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-re
 
 Archive an agent while keeping its runs
 
-Permission `project:delete`. Declared at `src/transport/agent.rest.ts:197`.
+Permission `project:delete`. Declared at `src/transport/agent.rest.ts:200`.
 
 Answers at `/api/v1/agents/:id`.
 
@@ -535,14 +535,14 @@ type Response = z.infer<typeof archiveResultSchema>; // ../contract/src/agent-re
 
 Send one conversation turn to an online connected agent
 
-Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:209`.
+Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:213`.
 
 Answers at `/api/v1/agents/:id/call`.
 
 ```typescript
 type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-rest.schemas.ts:13
-type Body = z.infer<typeof relayCallBodySchema>; // ../contract/src/connected-agent.call.ts:40
-type Response = z.infer<typeof relayCallResponseSchema>; // ../contract/src/connected-agent.call.ts:57
+type Body = z.infer<typeof relayCallBodySchema>; // ../contract/src/connected-agent.call.ts:59
+type Response = z.infer<typeof relayCallResponseSchema>; // ../contract/src/connected-agent.call.ts:79
 ```
 
 ## tRPC transport
@@ -658,7 +658,7 @@ type Output = {
 
 | Protocol  | Paths                    | Prefixes | Declared at                            |
 | --------- | ------------------------ | -------- | -------------------------------------- |
-| websocket | `/api/v1/agents/connect` | –        | `src/transport/agent-connect.ws.ts:23` |
+| websocket | `/api/v1/agents/connect` | –        | `src/transport/agent-connect.ws.ts:24` |
 
 ## Workers
 
@@ -683,8 +683,8 @@ Declared at `src/eventing/agent-workflow-fields.pipeline.ts:43`.
 
 | Kind   | Leaf                | Environment variable                   | Declared at                          |
 | ------ | ------------------- | -------------------------------------- | ------------------------------------ |
-| config | `replicaCount`      | `LANGWATCH_APP_REPLICAS`               | `../contract/src/agent.config.ts:6`  |
-| config | `relayMaxPayloadMb` | `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` | `../contract/src/agent.config.ts:7`  |
-| config | `publicBaseUrl`     | `BASE_HOST`                            | `../contract/src/agent.config.ts:11` |
+| config | `replicaCount`      | `LANGWATCH_APP_REPLICAS`               | `../contract/src/agent.config.ts:10` |
+| config | `relayMaxPayloadMb` | `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` | `../contract/src/agent.config.ts:14` |
+| config | `publicBaseUrl`     | `BASE_HOST`                            | `../contract/src/agent.config.ts:18` |
 
 <!-- readme:generated:end -->
