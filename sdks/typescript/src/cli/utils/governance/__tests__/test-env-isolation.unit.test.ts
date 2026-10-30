@@ -49,7 +49,7 @@ describe("test run environment isolation", () => {
       process.env.CODEX_HOME = "/sentinel/codex";
       process.env.LANGWATCH_CLI_CONFIG = "/sentinel/cli/config.json";
       vi.resetModules();
-      await import("../../../../../test-setup");
+      await import("../../../../../test-setup.js");
       expect({
         claude: process.env.CLAUDE_CONFIG_DIR,
         codex: process.env.CODEX_HOME,
