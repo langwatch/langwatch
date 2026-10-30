@@ -1534,11 +1534,11 @@ cronjobs:
   # See: https://kubespec.dev/batch/v1/CronJob#spec.jobTemplate.spec.template.spec.containers.image
   ## @extra cronjobs.image Cron job image.
   ## @param cronjobs.image.repository [string, default: curlimages/curl] Image repository.
-  ## @param cronjobs.image.tag [string, default: 8.12.1] Image tag.
+  ## @param cronjobs.image.tag [string, default: 8.23.0] Image tag.
   ## @param cronjobs.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
   image:
     repository: curlimages/curl
-    tag: "8.12.1"
+    tag: "8.23.0"
     pullPolicy: IfNotPresent
 
   # Resource requirements for cron job pods
@@ -1827,10 +1827,10 @@ prometheus:
     # Image configuration (prometheus-community default: prom/prometheus)
     ## @extra prometheus.server.image Image configuration.
     ## @param prometheus.server.image.repository [string, default: quay.io/prometheus/prometheus] Image repository.
-    ## @param prometheus.server.image.tag [string, default: v3.2.1] Image tag.
+    ## @param prometheus.server.image.tag [string, default: v3.5.5] Image tag.
     image:
       repository: quay.io/prometheus/prometheus
-      tag: v3.2.1
+      tag: v3.5.5
 
     # Number of Prometheus replicas
     # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
@@ -1957,8 +1957,8 @@ postgresql:
   image:
     ## @param postgresql.image.repository [string, default: postgres] Image repository.
     repository: postgres
-    ## @param postgresql.image.tag [string, default: "17.5"] Image tag.
-    tag: "17.5"
+    ## @param postgresql.image.tag [string, default: "17.11"] Image tag.
+    tag: "17.11"
     ## @param postgresql.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
     pullPolicy: IfNotPresent
 
@@ -2256,8 +2256,8 @@ redis:
   image:
     ## @param redis.image.repository [string, default: redis] Image repository (valkey/valkey for Valkey).
     repository: redis
-    ## @param redis.image.tag [string, default: "8.0"] Image tag ("9.1" with valkey/valkey).
-    tag: "8.0"
+    ## @param redis.image.tag [string, default: "8.10.3"] Image tag ("9.1" with valkey/valkey).
+    tag: "8.10.3"
     ## @param redis.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
     pullPolicy: IfNotPresent
 

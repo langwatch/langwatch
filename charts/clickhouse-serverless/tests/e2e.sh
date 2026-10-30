@@ -412,7 +412,7 @@ build_and_load_image() {
   # slower connections. On EKS / managed clusters the image is typically
   # cached at the node group, so the chart default of 60s is fine in prod.
   local preflight_image
-  preflight_image="${PREFLIGHT_IMAGE:-alpine/k8s:1.30.0}"
+  preflight_image="${PREFLIGHT_IMAGE:-alpine/k8s:1.34.9}"
   info "Pre-pulling preflight image: $preflight_image"
   docker pull "$preflight_image" >/dev/null
   kind load docker-image "$preflight_image" --name "$CLUSTER_NAME"
