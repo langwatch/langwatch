@@ -172,7 +172,7 @@ export interface ShardLoad {
   alone: number;
   /** Every light suite, which shares the shard's concurrency slots. */
   shared: number;
-  /** Light integration and browser suites, each lane one suite at a time. */
+  /** Light integration and browser suites, one suite of either at a time. */
   integration: number;
   browser: number;
 }
@@ -180,12 +180,12 @@ export interface ShardLoad {
 const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, integration: 0, browser: 0 };
 
 /**
- * A shard's wall time, which the split balances: heavy packages run alone and add
- * all their weight; light suites share `concurrency` slots, but the integration and
- * browser lanes run one suite at a time, so the light part takes the longest of them.
+ * A shard's wall time, which the split balances. Heavy packages run alone.
+ * Light suites share the slots; integration and browser suites run back to back.
+ * The light part takes the longer of the two.
  */
 export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency: number }) =>
-  load.alone + Math.max(load.shared / concurrency, load.integration, load.browser);
+  load.alone + Math.max(load.shared / concurrency, load.integration + load.browser);
 
 /**
  * `load` with one package added. The weights file records a package, not its
@@ -320,9 +320,9 @@ export interface SuiteJob {
 }
 
 /**
- * The lanes that may not overlap across packages. Integration files run
- * serially against one shared datastore; a browser lane installs Chromium
- * through apt, which holds a machine-wide lock. Everything else is `shared`.
+ * Lanes that may not overlap across packages. Integration files share one datastore;
+ * browser suites install Chromium under a machine-wide apt lock. Everything else is `shared`.
+ * The two lanes may not overlap each other either: see keysOf.
  */
 const LANES: Record<string, "integration" | "browser"> = {
   "test:integration": "integration",
@@ -420,7 +420,7 @@ const startReady = ({
 
 /**
  * Runs every job, at most `concurrency` at once, in order where it can. A package
- * runs one script at a time, `integration` and `browser` hold one slot each, and a
+ * runs one script at a time, `integration` and `browser` share one slot, and a
  * heavy job runs alone. Every job runs even after one fails.
  */
 export const runJobs = async ({
@@ -459,15 +459,19 @@ export const runJobs = async ({
   return statuses;
 };
 
+/**
+ * Integration suites start containers in CI, and each adds a network interface.
+ * Chromium aborts in-flight requests with ERR_NETWORK_CHANGED and has no switch
+ * to ignore it, so browser suites fail while loading modules.
+ */
+const SERIAL_LANES_KEY = "integration-or-browser";
+
 /** The shard-wide keys a job holds while it runs: its package, its lane, and heavy. */
-const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => {
-  const lane = laneOf(job.script);
-  return [
-    `package:${job.pkg.name}`,
-    ...(lane === "shared" ? [] : [lane]),
-    ...(isHeavy(job.pkg) ? ["heavy"] : []),
-  ];
-};
+const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => [
+  `package:${job.pkg.name}`,
+  ...(laneOf(job.script) === "shared" ? [] : [SERIAL_LANES_KEY]),
+  ...(isHeavy(job.pkg) ? ["heavy"] : []),
+];
 
 /** Only a package's earliest queued script may start, so its lanes keep their order. */
 const isEarliest = (job: SuiteJob, queue: readonly SuiteJob[]) =>
