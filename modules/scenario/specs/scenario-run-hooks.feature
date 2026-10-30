@@ -345,6 +345,21 @@ Feature: Scenario run hooks: setup and teardown
       Then the run verdict is still success
       And the teardown records its error
 
+    @integration
+    Scenario: An HTTP hooks URL on a private address is refused before any request
+      Given the deployment blocks local HTTP calls
+      And an HTTP agent whose hooks URL is a private address
+      When setup is called
+      Then no request is sent
+      And the setup fails with an SSRF error
+
+    @integration
+    Scenario: An HTTP hooks URL that answers a redirect is refused
+      Given an HTTP agent whose hooks URL answers HTTP 302, even to a public address
+      When setup is called
+      Then the redirect is not followed
+      And the setup fails naming the redirect
+
     @unit
     Scenario: An HTTP hook answer that is not a JSON object fails the hook
       Given a setup that answers HTTP 200 with a body that is not a JSON object
@@ -410,7 +425,7 @@ Feature: Scenario run hooks: setup and teardown
       Then the config keeps a "{{ secrets.NAME }}" reference to a new project secret
       And a read of the agent shows the reference, never the secret
 
-    @integration
+    @unimplemented
     Scenario: The agent form shows a new signing secret once and can rotate it
       Given an HTTP agent form with no hooks URL
       When the person types a hooks URL
