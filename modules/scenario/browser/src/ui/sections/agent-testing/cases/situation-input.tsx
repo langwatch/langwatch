@@ -111,7 +111,9 @@ export function SituationInput({
         color="transparent"
         caretColor="var(--chakra-colors-fg)"
         position="relative"
-        css={{ scrollbarGutter: "stable" }}
+        // Inline-block leaves a baseline gap below the field, so the wrapper
+        // (and the mirror's inset: 0) ends up taller and scrolls 5px short.
+        css={{ display: "block", scrollbarGutter: "stable" }}
         autoresize
         resize="none"
         rows={2}
