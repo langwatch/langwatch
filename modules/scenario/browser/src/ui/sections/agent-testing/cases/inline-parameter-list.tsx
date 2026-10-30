@@ -20,21 +20,27 @@ function listedDeclarations(declarations: readonly InlineDeclaration[]): InlineD
   });
 }
 
+const CONFLICT_BADGE = {
+  duplicate: { label: "declared twice", colorPalette: "orange" },
+  stored: { label: "stored wins", colorPalette: "orange" },
+  secret: { label: "secret", colorPalette: "red" },
+} as const;
+
 /** What the row says next to the name. A secret's value is never shown. */
 function InlineParameterDetail({ declaration }: { declaration: InlineDeclaration }) {
   const { name, status, defaultValue } = declaration;
   switch (status.kind) {
     case "secret":
-      return <Text color="red.fg">{SECRET_IN_SITUATION_MESSAGE}</Text>;
+      return <Text color="fg.muted">{SECRET_IN_SITUATION_MESSAGE}</Text>;
     case "duplicate":
       return (
-        <Text color="orange.fg">
+        <Text color="fg.muted">
           {name} is declared twice; the first default, {status.usedDefault}, is used
         </Text>
       );
     case "stored":
       return (
-        <Text color="orange.fg">
+        <Text color="fg.muted">
           Stored parameter wins
           {status.storedDefault === undefined ? "" : `, default ${String(status.storedDefault)}`}
         </Text>
@@ -68,9 +74,20 @@ export function InlineParameterList({
             {declaration.name}
           </Text>
           <InlineParameterDetail declaration={declaration} />
-          <Badge size="xs" variant="subtle" flexShrink={0} marginLeft="auto">
-            from situation
-          </Badge>
+          <HStack gap={1} flexShrink={0} marginLeft="auto">
+            {declaration.status.kind !== "declared" && (
+              <Badge
+                size="xs"
+                variant="subtle"
+                colorPalette={CONFLICT_BADGE[declaration.status.kind].colorPalette}
+              >
+                {CONFLICT_BADGE[declaration.status.kind].label}
+              </Badge>
+            )}
+            <Badge size="xs" variant="subtle" colorPalette="gray">
+              from situation
+            </Badge>
+          </HStack>
         </HStack>
       ))}
     </VStack>
