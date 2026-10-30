@@ -1,7 +1,10 @@
 import {
   fillsStoredSecrets,
+  HOOKS_SIGNING_SECRET_FIELD,
   httpSecretsKeepingStored,
   isCredentialHeader,
+  isStoredSecretNameFor,
+  readSecretReference,
   withoutLiteralCredential,
   type Agent,
   type AgentOverview,
@@ -82,7 +85,36 @@ function fillsStoredSigningSecret(input: {
   return stored.hooksSigningSecret !== undefined && !incoming.hooksSigningSecret;
 }
 
-/** Hook calls go where credentials were trusted: the stored hooks URL, else the turn URL. */
+/** Every credential value a config holds: credential headers, auth secret, signing secret. */
+function credentialValues(config: HttpDestination): string[] {
+  const values: string[] = [];
+  httpConfigBlanking(config as HttpAgentConfig, (value) => {
+    values.push(value);
+    return value;
+  });
+  return values;
+}
+
+/**
+ * Whether the write sends back a `{{ secrets.NAME }}` reference the stored config holds. A read
+ * of the agent keeps references, so the form saves them back unchanged: that is a stored secret
+ * carried along just as a blank one is.
+ */
+function carriesStoredReference(input: {
+  stored: HttpDestination;
+  incoming: HttpDestination;
+}): boolean {
+  const stored = new Set(
+    credentialValues(input.stored).filter((value) => readSecretReference(value).isReference),
+  );
+  return credentialValues(input.incoming).some((value) => stored.has(value));
+}
+
+/**
+ * Hook calls go where credentials were trusted: the stored hooks URL, else the turn URL. A hooks
+ * URL on another origin takes no stored credential, blank or as its reference: the person types
+ * the headers and auth again and rotates the signing secret.
+ */
 function movesStoredSecretsToHooksUrl(input: {
   stored: HttpDestination;
   incoming: HttpDestination;
@@ -92,7 +124,9 @@ function movesStoredSecretsToHooksUrl(input: {
   const trusted = stored.hooksUrl || stored.url;
   if (isSameOrigin({ requested: incoming.hooksUrl, saved: trusted })) return false;
 
-  return fillsStoredSecrets(input) || fillsStoredSigningSecret(input);
+  return (
+    fillsStoredSecrets(input) || fillsStoredSigningSecret(input) || carriesStoredReference(input)
+  );
 }
 
 /**
@@ -131,4 +165,31 @@ export function configForCopy(input: {
   }
 
   return httpSecretsKeepingStored({ stored: current.config, incoming: blank });
+}
+
+/**
+ * The signing secrets a save left unused (none or one): the one named before, when the saved
+ * config names another or none. Only a name the save made for this agent, never one the person
+ * picked or another agent still names (a copy in the same project keeps the reference).
+ */
+export function replacedSigningSecretNames(input: {
+  agentId: string;
+  before: Agent;
+  after: Agent;
+  projectAgents: readonly Agent[];
+}): string[] {
+  const { agentId, before, after } = input;
+  if (before.type !== "http") return [];
+  const previous = readSecretReference(before.config.hooksSigningSecret ?? "");
+  if (!previous.isReference) return [];
+  const { name } = previous;
+  if (!isStoredSecretNameFor({ name, owner: agentId, field: HOOKS_SIGNING_SECRET_FIELD })) {
+    return [];
+  }
+  const reference = new RegExp(`secrets\\.${name}(?![A-Z0-9_])`);
+  const named = (agent: Agent) => reference.test(JSON.stringify(agent.config));
+  if (named(after)) return [];
+  const stillNamed = input.projectAgents.some((agent) => agent.id !== agentId && named(agent));
+
+  return stillNamed ? [] : [name];
 }

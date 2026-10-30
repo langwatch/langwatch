@@ -53,6 +53,9 @@ export function secretStoreFixture(initial: Record<string, string> = {}) {
 
       return rowOf(input);
     },
+    delete: async ({ id }) => {
+      Reflect.deleteProperty(values, id);
+    },
   });
 
   return { secrets, values };
