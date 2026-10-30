@@ -44,7 +44,9 @@ We will add an optional **hooks URL** to the HTTP agent. The platform calls it a
 
 A fixed 60 s timeout per hook (no per-scenario override yet), the 64 KiB cap on state and on teardown's returned object, the 1,000-character error cut, "Not scored" when setup fails, teardown attempted in a `finally`, the Setup and Teardown bands on the run, and the hook event and record. Retries: none in v1, as in ADR-180.
 
-### Langy in prod
+### Langy in prod (future work)
+
+This part is not built by the first PRs (see Future work under Consequences).
 
 - Prod Langy runs as an HTTP agent. Its turns call Langy's public REST API (`POST /api/langy/conversations/:id/messages`), as the connector does today.
 - The setup and teardown code in `dev/dogfood/langy` moves behind one hooks URL in a small stateless service. It only calls the LangWatch public API, so it needs no database of its own.
