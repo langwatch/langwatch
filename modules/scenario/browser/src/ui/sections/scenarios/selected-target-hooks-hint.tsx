@@ -1,4 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Box } from "@langwatch/design-system/primitives";
 
 import { useAgents } from "../../../behavior/agents/use-agents.ts";
 import type { TargetValue } from "../../../model/scenario-target.ts";
@@ -16,5 +17,9 @@ export function SelectedTargetHooksHint({ target }: { target: TargetValue }) {
   const agent = agents?.find((candidate) => candidate.id === target.id);
   if (!agent) return null;
 
-  return <ConnectedAgentHooksHint status={agent.status} config={agent.config} />;
+  return (
+    <Box marginBottom={4}>
+      <ConnectedAgentHooksHint status={agent.status} config={agent.config} />
+    </Box>
+  );
 }
