@@ -355,9 +355,9 @@ export const workerEnvFor = ({
     : {};
 
 /**
- * What a job adds to its environment. Ryuk is off: it removes a suite's leftover
- * containers, and itself, about ten seconds after the suite exits, when a browser
- * suite may have started and Chromium aborts its loads. Suites stop or reuse their own.
+ * What a job adds to its environment. Ryuk is off: reused ClickHouse containers get no
+ * Ryuk label and are never reaped, Redis and Postgres stop in afterAll, and the shared
+ * Ryuk container, removed about 10 s after its last client left, aborted Chromium's loads.
  */
 export const suiteEnvFor = (options: {
   job: SuiteJob;
@@ -451,7 +451,7 @@ export const runJobs = async ({
   const busy = new Set<string>();
   const running = new Set<Promise<void>>();
   const start = (job: SuiteJob) => {
-    const keys = keysOf(job, isHeavy);
+    const keys = keysOf({ job, isHeavy });
     for (const key of keys) busy.add(key);
     const settled: Promise<void> = run(job)
       .catch(() => 1)
@@ -472,14 +472,20 @@ export const runJobs = async ({
 };
 
 /**
- * Integration suites start containers in CI, and each adds a network interface.
- * Chromium aborts in-flight requests with ERR_NETWORK_CHANGED and has no switch
- * to ignore it, so browser suites fail while loading modules.
+ * Integration suites may create or remove containers (Redis and Postgres per suite,
+ * ClickHouse reused). Each change adds or drops a network interface, and Chromium
+ * aborts in-flight requests with ERR_NETWORK_CHANGED and has no switch to ignore it.
  */
 const SERIAL_LANES_KEY = "integration-or-browser";
 
 /** The shard-wide keys a job holds: its package, SERIAL_LANES_KEY if not shared, and heavy. */
-const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => [
+const keysOf = ({
+  job,
+  isHeavy,
+}: {
+  job: SuiteJob;
+  isHeavy: (pkg: DiscoveredPackage) => boolean;
+}): string[] => [
   `package:${job.pkg.name}`,
   ...(laneOf(job.script) === "shared" ? [] : [SERIAL_LANES_KEY]),
   ...(isHeavy(job.pkg) ? ["heavy"] : []),
@@ -509,7 +515,9 @@ const canStart = ({
   if (!isEarliest(job, queue)) return false;
   if (isHeavy(job.pkg)) return running === 0;
   const heavyWaiting = queue.some((queued) => isHeavy(queued.pkg) && isEarliest(queued, queue));
-  return !heavyWaiting && keysOf(job, isHeavy).every((key) => !busy.has(key)) && !busy.has("heavy");
+  return (
+    !heavyWaiting && keysOf({ job, isHeavy }).every((key) => !busy.has(key)) && !busy.has("heavy")
+  );
 };
 
 /** A package's single verdict from its scripts' exit codes. */
