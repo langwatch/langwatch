@@ -7,6 +7,7 @@ import type { ArchitectureViolation } from "../../types.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import { readWorkspaceMembers } from "../../workspace/workspace-members.ts";
+import { startsContainers } from "./container-starters.ts";
 
 const POLICY = "default-test-lane";
 const TIMEOUT_CEILING_MS = 120_000;
@@ -19,7 +20,10 @@ const DEFAULT_CONFIGS = [
 const VITEST_DEFAULT_INCLUDE = ["**/*.{test,spec}.?(c|m)[jt]s?(x)"];
 const ALWAYS_EXCLUDED = ["**/node_modules/**", "**/dist/**"];
 const SCENARIO_FILE = /\.scenario\.test\.[cm]?[jt]sx?$/;
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", ".git", ".claude"]);
+/** Packages the package-suites job does not run, one `<name>  # reason` per line. */
+const SUITES_JOB_EXCLUDED = ".github/package-suites.excluded";
 
 type Lane = {
   config: string | undefined;
@@ -86,14 +90,14 @@ function laneOf(directory: string, script: string): Lane {
   };
 }
 
-function scenarioFiles(directory: string, base = directory): string[] {
+function testFiles(directory: string, base = directory): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (entry.isDirectory()) {
       return SKIPPED_DIRECTORIES.has(entry.name)
         ? []
-        : scenarioFiles(join(directory, entry.name), base);
+        : testFiles(join(directory, entry.name), base);
     }
-    return SCENARIO_FILE.test(entry.name) ? [relative(base, join(directory, entry.name))] : [];
+    return TEST_FILE.test(entry.name) ? [relative(base, join(directory, entry.name))] : [];
   });
 }
 
@@ -110,7 +114,28 @@ function testScriptOf(directory: string): string | undefined {
   return script?.includes("vitest") ? script : undefined;
 }
 
-function violationsFor(directory: string, script: string): ArchitectureViolation[] {
+/**
+ * The packages the package-suites job leaves to their own jobs. Only that job runs
+ * suites beside browser suites, so only its packages' lanes must not start containers.
+ */
+function excludedFromSuitesJob(root: string): Set<string> {
+  const register = join(root, SUITES_JOB_EXCLUDED);
+  if (!existsSync(register)) return new Set();
+  const names = readFileSync(register, "utf8")
+    .split("\n")
+    .map((line) => line.split("#")[0]?.trim() ?? "");
+  return new Set(names.filter((name) => name !== ""));
+}
+
+function violationsFor({
+  directory,
+  script,
+  sharesShardWithBrowsers,
+}: {
+  directory: string;
+  script: string;
+  sharesShardWithBrowsers: boolean;
+}): ArchitectureViolation[] {
   const lane = laneOf(directory, script);
   const file = lane.config ?? join(directory, "package.json");
   const slow =
@@ -125,8 +150,9 @@ function violationsFor(directory: string, script: string): ArchitectureViolation
           },
         ]
       : [];
-  const live = scenarioFiles(directory)
-    .filter((scenario) => collects(lane, scenario))
+  const collected = testFiles(directory).filter((test) => collects(lane, test));
+  const live = collected
+    .filter((test) => SCENARIO_FILE.test(test))
     .map((scenario) => ({
       policy: POLICY,
       file: join(directory, scenario),
@@ -134,17 +160,31 @@ function violationsFor(directory: string, script: string): ArchitectureViolation
       allowed:
         "Exclude `**/*.scenario.test.*` from the default lane and run scenarios through their own script and config.",
     }));
-  return [...slow, ...live];
+  const containers = collected
+    .filter((test) => sharesShardWithBrowsers && !SCENARIO_FILE.test(test))
+    .filter((test) => startsContainers(join(directory, test)))
+    .map((test) => ({
+      policy: POLICY,
+      file: join(directory, test),
+      message: `The default test lane collects ${test}, which starts a container. In CI that lane runs beside browser suites, and a container's network change aborts Chromium's loads.`,
+      allowed:
+        "Exclude `**/*.integration.test.ts` from the default lane and run them through a `test:integration` script and vitest.integration.config.ts, as modules/suite/process does.",
+    }));
+  return [...slow, ...live, ...containers];
 }
 
 /**
- * `pnpm test` and `nx run-many -t test` must finish without live services, so
- * the lane a package's `test` script runs never collects a scenario suite and
- * never waits more than two minutes for one test.
+ * `pnpm test` and `nx run-many -t test` must finish without live services: a `test` lane
+ * collects no scenario suite, waits at most two minutes per test, and, where the
+ * package-suites job runs it, collects no suite that starts a container.
  */
 export function lintDefaultTestLanes(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const excluded = excludedFromSuitesJob(snapshot.root);
   return readWorkspaceMembers(snapshot.root).flatMap((member) => {
     const script = testScriptOf(member.directory);
-    return script ? violationsFor(member.directory, script) : [];
+    const sharesShardWithBrowsers = !excluded.has(member.name);
+    return script
+      ? violationsFor({ directory: member.directory, script, sharesShardWithBrowsers })
+      : [];
   });
 }

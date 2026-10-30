@@ -82,6 +82,78 @@ describe("default test lanes", () => {
     });
   });
 
+  describe("when the default lane collects a file that starts a container", () => {
+    /** @scenario "A shared test lane that starts a container is reported" */
+    it.each([
+      [
+        "a testcontainers class",
+        'import { RedisContainer } from "@testcontainers/redis";\nawait new RedisContainer("redis").start();',
+      ],
+      [
+        "the ClickHouse endpoint starter",
+        'import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";\nawait startTestClickHouseEndpoints({ suite: "s", names: ["a"], environment: {} });',
+      ],
+      [
+        "a helper module that calls the starter",
+        'import { startStore } from "./support/store.harness.ts";\nawait startStore();',
+      ],
+    ])("reports the file when it starts one through %s", (_name, test) => {
+      workspace({
+        "tools/probe/package.json": manifest("vitest run"),
+        "tools/probe/src/support/store.harness.ts": [
+          'import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";',
+          "export const startStore = () => startTestClickHouseEndpoints({ suite: 's', names: [], environment: {} });",
+        ].join("\n"),
+        "tools/probe/src/store.integration.test.ts": test,
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("src/store.integration.test.ts"),
+      ]);
+    });
+  });
+
+  describe("when no file in the default lane starts a container", () => {
+    /** @scenario "A shared test lane that leaves its container suites to test:integration passes" */
+    it.each([
+      [
+        "the starters live only in files the lane excludes",
+        'vitest run --exclude "**/*.integration.test.ts"',
+        'import { startStore } from "./support/store.harness.ts";\nawait startStore();',
+      ],
+      [
+        "a file imports a constant from a module that also starts containers",
+        "vitest run",
+        'import { STORE_IMAGE } from "./support/store.harness.ts";\nexport const image = STORE_IMAGE;',
+      ],
+    ])("passes when %s", (_name, test, source) => {
+      workspace({
+        "tools/probe/package.json": manifest(test),
+        "tools/probe/src/support/store.harness.ts": [
+          'import { RedisContainer } from "@testcontainers/redis";',
+          'export const STORE_IMAGE = "redis:alpine";',
+          "export async function startStore() {",
+          "  return new RedisContainer(STORE_IMAGE).start();",
+          "}",
+        ].join("\n"),
+        "tools/probe/src/store.integration.test.ts": source,
+      });
+
+      expect(lint()).toEqual([]);
+    });
+
+    it("passes when the package-suites job leaves the package to a job of its own", () => {
+      workspace({
+        ".github/package-suites.excluded": "# header\n@langwatch/probe  # runs in its own job\n",
+        "tools/probe/package.json": manifest("vitest run"),
+        "tools/probe/src/store.integration.test.ts":
+          'import { RedisContainer } from "@testcontainers/redis";\nawait new RedisContainer("redis").start();',
+      });
+
+      expect(lint()).toEqual([]);
+    });
+  });
+
   describe("when the default lane waits longer than two minutes per test", () => {
     /** @scenario "A default test lane with a timeout above two minutes is reported" */
     it("reports the evaluated timeout", () => {
