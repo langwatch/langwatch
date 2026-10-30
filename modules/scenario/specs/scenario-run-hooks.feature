@@ -369,6 +369,7 @@ Feature: Scenario run hooks: setup and teardown
     Scenario: An HTTP hook that does not answer in time times out
       Given a setup that does not answer within its timeout
       Then the hook records the status timed_out
+      And over the worker's real egress the request is aborted at the hook timeout
 
     @unit
     Scenario: An HTTP hook call is signed so the receiver can verify it
@@ -409,8 +410,58 @@ Feature: Scenario run hooks: setup and teardown
 
     @unit
     Scenario: An HTTP hook call carries the run's idempotency key
-      When the setup hook of the run "run_1" is called
-      Then it carries "Idempotency-Key: run_1:setup"
+      When the setup hook of the run "run_1" is called in its attempt "attempt_1"
+      Then it carries "Idempotency-Key: run_1:attempt_1:setup"
+      And its signed body carries "idempotencyKey": "run_1:attempt_1:setup"
+      And the teardown of that attempt carries "run_1:attempt_1:teardown"
+
+    @integration
+    Scenario: A run executed again gets a new idempotency key
+      Given the job queue delivers a run's execution a second time under the same run id
+      When its setup is called again
+      Then the key names a new attempt, so a receiver makes the data again
+
+    @unit
+    Scenario: An HTTP hook call outside a scenario run still carries a key
+      Given a hook call with no scenario run id
+      Then it carries "Idempotency-Key: <attempt>:<kind>"
+
+    @unit
+    Scenario: An HTTP hooks URL must use https
+      Given an HTTP agent whose hooks URL is "http://shop.example.com/hooks"
+      When a hook is called
+      Then no request is sent and the hook fails naming https
+      But a hooks URL on localhost may use plain http
+
+    @integration
+    Scenario: A customer header cannot stand in for the LangWatch signature
+      Given an HTTP agent with headers "x-langwatch-signature" and "idempotency-key" of its own
+      When a hook is called
+      Then the call carries only the signature and the key LangWatch set
+
+    @unit
+    Scenario: An HTTP hook answer over the state cap is cut off while it is read
+      Given a setup that streams an answer longer than 64 KiB
+      Then no more than 64 KiB is read
+      And the hook fails naming the cap
+
+    @integration
+    Scenario: An HTTP hook answer is measured and parsed before secrets are scrubbed
+      Given a setup that answers an object holding a secret value of the agent
+      Then the state it records holds the placeholder in place of the value
+
+    @unit
+    Scenario: A new hooks URL on another origin is refused when the form sends the stored references back
+      Given a saved HTTP agent whose authentication and signing secret are "{{ secrets.NAME }}" references
+      When an update moves the hooks URL to another origin and sends one of those references back
+      Then the update is refused for sending stored credentials to another origin
+
+    @unit
+    Scenario: Rotating the hooks signing secret deletes the old one
+      Given a saved HTTP agent whose signing secret is the project secret the save made for it
+      When the signing secret is rotated and the agent is saved
+      Then the old project secret is deleted
+      But a secret the person picked, or one another agent still names, is kept
 
     @unit
     Scenario: An HTTP hook call sends the agent's headers, auth and run parameters
