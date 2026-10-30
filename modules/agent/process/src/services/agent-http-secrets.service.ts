@@ -5,6 +5,7 @@ import {
   httpAgentConfigSchema,
   AgentHooksUrlTemplatedOriginError,
   AgentStoredCredentialsDestinationError,
+  templatesHooksOrigin,
   type CreateAgentCommand,
   type UpdateAgentCommand,
 } from "@langwatch/agent-contract";
@@ -15,7 +16,6 @@ import { nextAgentId } from "../rules/agent-id.rules.ts";
 import {
   movesStoredSecrets,
   replacedSigningSecretNames,
-  templatesHooksOrigin,
   withoutHooklessSigningSecret,
 } from "../rules/agent-secrets.rules.ts";
 import type { AgentService } from "./agent.service.ts";

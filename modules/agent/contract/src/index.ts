@@ -6,6 +6,7 @@ export * from "./agent.schemas.ts";
 export * from "./agent-rest.schemas.ts";
 export * from "./config/index.ts";
 export * from "./fields.ts";
+export * from "./hooks-url.ts";
 export * from "./http-node.ts";
 export * from "./agent.trpc.ts";
 export * from "./connected-agent.constants.ts";

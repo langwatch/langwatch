@@ -28,6 +28,8 @@ export type HttpHooksConfigSectionProps = {
   moveNotice: HooksMoveNotice | null;
   /** When the previous signing secret of a rotation stops working, while it still works. */
   previousSigningSecretValidUntil: string | null;
+  /** A hooks URL template the form refuses, shown at the field until the URL changes. */
+  hooksUrlError: string | null;
 };
 
 /** The hooks URL a scenario run calls before and after its turns (ADR-188). */
@@ -41,6 +43,7 @@ export function HooksConfigSection({
   onRotateSigningSecret,
   moveNotice,
   previousSigningSecretValidUntil,
+  hooksUrlError,
 }: HttpHooksConfigSectionProps) {
   const hasUrl = hooksUrl.trim() !== "";
 
@@ -60,8 +63,14 @@ export function HooksConfigSection({
         />
         <Text fontSize="sm" color="fg.muted" data-testid="hooks-url-https-rule">
           Use https. Plain http reaches only a local address, and only on deployments that allow
-          local addresses. This is checked when the hook runs.
+          local addresses. This is checked when the hook runs. Templates are allowed only in the
+          path or the query, not in the scheme or host.
         </Text>
+        {hooksUrlError ? (
+          <Text fontSize="sm" color="fg.error" data-testid="hooks-url-error">
+            {hooksUrlError}
+          </Text>
+        ) : null}
       </Field.Root>
       {moveNotice ? (
         <MoveNotice notice={moveNotice} previousValidUntil={previousSigningSecretValidUntil} />
