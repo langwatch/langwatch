@@ -106,13 +106,29 @@ function collects(lane: Lane, file: string): boolean {
   return included && !lane.exclude.some((pattern) => matchesGlob(file, pattern));
 }
 
-/** The script CI runs as the unit lane: `test:unit` wins over `test`, as in run-package-suites. */
-function testScriptOf(directory: string): string | undefined {
+type NamedScript = { name: "test" | "test:unit"; script: string };
+
+/** The `test` script when it runs vitest: what `pnpm test` and `nx run-many -t test` run. */
+function testScriptOf(scripts: Record<string, string>): NamedScript | undefined {
+  const script = scripts.test;
+  return script?.includes("vitest") ? { name: "test", script } : undefined;
+}
+
+/**
+ * The lane the package-suites job runs: `test:unit` when declared (truthy), else `test`,
+ * as `scriptsFor` picks. Without vitest there, a vitest `test` stands in.
+ */
+function suitesLaneOf(scripts: Record<string, string>): NamedScript | undefined {
+  const name = scripts["test:unit"] ? "test:unit" : "test";
+  const script = scripts[name];
+  return script?.includes("vitest") ? { name, script } : testScriptOf(scripts);
+}
+
+function scriptsOf(directory: string): Record<string, string> {
   const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
   };
-  const script = manifest.scripts?.["test:unit"] ?? manifest.scripts?.test;
-  return script?.includes("vitest") ? script : undefined;
+  return manifest.scripts ?? {};
 }
 
 /**
@@ -128,14 +144,12 @@ function excludedFromSuitesJob(root: string): Set<string> {
   return new Set(names.filter((name) => name !== ""));
 }
 
-function violationsFor({
+function defaultLaneViolations({
   directory,
-  script,
-  sharesShardWithBrowsers,
+  lane: { script },
 }: {
   directory: string;
-  script: string;
-  sharesShardWithBrowsers: boolean;
+  lane: NamedScript;
 }): ArchitectureViolation[] {
   const lane = laneOf(directory, script);
   const file = lane.config ?? join(directory, "package.json");
@@ -145,47 +159,56 @@ function violationsFor({
           {
             policy: POLICY,
             file,
-            message: `The default test lane waits ${lane.timeoutMs} ms per test; a suite that needs longer than ${TIMEOUT_CEILING_MS} ms belongs in its own lane.`,
+            message: `The \`test\` lane waits ${lane.timeoutMs} ms per test; a suite that needs longer than ${TIMEOUT_CEILING_MS} ms belongs in its own lane.`,
             allowed:
               "Move the slow suite to a vitest.<lane>.config file run by its own script, and keep `test` under two minutes per test.",
           },
         ]
       : [];
-  const collected = testFiles(directory).filter((test) => collects(lane, test));
-  const live = collected
-    .filter((test) => SCENARIO_FILE.test(test))
+  const live = testFiles(directory)
+    .filter((test) => collects(lane, test) && SCENARIO_FILE.test(test))
     .map((scenario) => ({
       policy: POLICY,
       file: join(directory, scenario),
-      message: `The default test lane collects ${scenario}, a scenario suite that drives live services.`,
+      message: `The \`test\` lane collects ${scenario}, a scenario suite that drives live services.`,
       allowed:
-        "Exclude `**/*.scenario.test.*` from the default lane and run scenarios through their own script and config.",
+        "Exclude `**/*.scenario.test.*` from the `test` lane and run scenarios through their own script and config.",
     }));
-  const containers = collected
-    .filter((test) => sharesShardWithBrowsers && !SCENARIO_FILE.test(test))
+  return [...slow, ...live];
+}
+
+function containerViolations({
+  directory,
+  lane: { name, script },
+}: {
+  directory: string;
+  lane: NamedScript;
+}): ArchitectureViolation[] {
+  const lane = laneOf(directory, script);
+  return testFiles(directory)
+    .filter((test) => collects(lane, test) && !SCENARIO_FILE.test(test))
     .filter((test) => startsContainers(join(directory, test)))
     .map((test) => ({
       policy: POLICY,
       file: join(directory, test),
-      message: `The default test lane collects ${test}, which starts a container. In CI that lane runs beside browser suites, and a container's network change aborts Chromium's loads.`,
-      allowed:
-        "Exclude `**/*.integration.test.ts` from the default lane and run them through a `test:integration` script and vitest.integration.config.ts, as modules/suite/process does.",
+      message: `The \`${name}\` lane collects ${test}, which starts a container. In CI that lane runs beside browser suites, and a container's network change aborts Chromium's loads.`,
+      allowed: `Exclude \`**/*.integration.test.ts\` from the \`${name}\` lane and run them through a \`test:integration\` script and vitest.integration.config.ts, as modules/suite/process does.`,
     }));
-  return [...slow, ...live, ...containers];
 }
 
 /**
- * `pnpm test` and `nx run-many -t test` must finish without live services: a `test` lane
- * collects no scenario suite, waits at most two minutes per test, and, where the
- * package-suites job runs it, collects no suite that starts a container.
+ * The `test` lane collects no scenario suite and waits at most two minutes per test. The
+ * lane the package-suites job runs (`test:unit` if declared, else `test`) starts no container.
  */
 export function lintDefaultTestLanes(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const excluded = excludedFromSuitesJob(snapshot.root);
   return readWorkspaceMembers(snapshot.root).flatMap((member) => {
-    const script = testScriptOf(member.directory);
-    const sharesShardWithBrowsers = !excluded.has(member.name);
-    return script
-      ? violationsFor({ directory: member.directory, script, sharesShardWithBrowsers })
-      : [];
+    const scripts = scriptsOf(member.directory);
+    const test = testScriptOf(scripts);
+    const suites = excluded.has(member.name) ? undefined : suitesLaneOf(scripts);
+    return [
+      ...(test ? defaultLaneViolations({ directory: member.directory, lane: test }) : []),
+      ...(suites ? containerViolations({ directory: member.directory, lane: suites }) : []),
+    ];
   });
 }
