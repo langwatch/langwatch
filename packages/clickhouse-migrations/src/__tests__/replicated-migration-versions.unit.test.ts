@@ -62,13 +62,14 @@ describe("a database holding tables with no version history", () => {
     const refusal = unversionedTablesRefusal({ database: "langwatch", versions: 0, tables });
 
     expect(refusal).toContain("goose_db_version records no migration");
-    expect(refusal).toContain("Nothing was changed");
+    expect(refusal).toContain("No table was read or written, and no migration ran");
     expect(refusal).toContain("restore langwatch.goose_db_version");
     expect(refusal).not.toMatch(/drop database/i);
   });
 
   /** @scenario "A database with a version history or no tables bootstraps as usual" */
   it("lets a recorded history or an empty database through", () => {
+    // One row is enough, goose's own version 0 included: a crashed run resumes, it is not refused.
     expect(unversionedTablesRefusal({ database: "langwatch", versions: 1, tables })).toBeNull();
     expect(unversionedTablesRefusal({ database: "langwatch", versions: 0, tables: [] })).toBeNull();
   });
