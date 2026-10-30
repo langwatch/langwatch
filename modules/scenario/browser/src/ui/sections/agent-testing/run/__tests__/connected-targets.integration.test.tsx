@@ -110,6 +110,7 @@ describe("connected agents in the run dialog", () => {
       );
     });
 
+    /** @scenario "An online agent that declares no hooks says none are declared" */
     it("says none are declared for an online agent without hooks", () => {
       renderSection(agentsFor([connectedRow({ id: "agent_n" })]), {
         type: "connected",
@@ -122,13 +123,16 @@ describe("connected agents in the run dialog", () => {
     });
 
     /** @scenario "No hooks line shows for an HTTP agent, a prompt or no target" */
-    it("is absent when nothing is selected or the selected agent is not connected", () => {
-      renderSection(agentsFor([connectedRow({ id: "agent_n" })]));
-      expect(screen.queryByTestId("connected-agent-hooks-hint")).not.toBeInTheDocument();
-      cleanup();
+    it.each([
+      ["nothing is selected", connectedRow({ id: "agent_n" }), null],
+      [
+        "the selected agent is not connected",
+        { ...connectedRow({ id: "agent_http" }), type: "http" },
+        { type: "http", id: "agent_http" } as const,
+      ],
+    ])("is absent when %s", (_name, row, target) => {
+      renderSection(agentsFor([row]), target);
 
-      const http = { ...connectedRow({ id: "agent_http" }), type: "http" };
-      renderSection(agentsFor([http]), { type: "http", id: "agent_http" });
       expect(screen.queryByTestId("connected-agent-hooks-hint")).not.toBeInTheDocument();
     });
   });

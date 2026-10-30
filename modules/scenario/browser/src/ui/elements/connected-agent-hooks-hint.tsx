@@ -3,14 +3,20 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
+import {
+  agentHooksSchema,
+  connectedAgentHooksCopy,
+  HOOKS_DOCS_URL,
+} from "@langwatch/agent-contract";
 import { Link } from "@langwatch/browser-host/link";
 import { Text } from "@langwatch/design-system/primitives";
 
-import {
-  connectedAgentHooksCopy,
-  declaredHooksOf,
-  HOOKS_DOCS_URL,
-} from "../../model/connected-agent-hooks-copy.ts";
+/** An old or empty config declares none. */
+function declaredHooksOf(config: unknown) {
+  const hooks =
+    typeof config === "object" && config !== null && "hooks" in config ? config.hooks : undefined;
+  return agentHooksSchema.safeParse(hooks).data;
+}
 
 export function ConnectedAgentHooksHint({
   status,

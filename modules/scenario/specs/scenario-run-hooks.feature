@@ -363,5 +363,5 @@ Feature: Scenario run hooks: setup and teardown
 
     @integration
     Scenario: No hooks line shows for an HTTP agent, a prompt or no target
-      When the selected target is an HTTP agent, a prompt or nothing
+      When the selected target is an HTTP agent, a prompt, nothing, or a connected agent not in this project
       Then no hooks line shows

@@ -61,6 +61,8 @@ function AgentBody({
   return (
     <VStack align="stretch" gap={6} paddingBottom={6}>
       {inputs}
+      {/* Shows the hooks from the last registration; during a rolling deploy,
+          running copies may differ. */}
       <ConnectedAgentHooksHint status={agent.status} hooks={agent.config.hooks} />
       <ParametersTable agent={agent} />
       <InstancesTable agent={agent} />

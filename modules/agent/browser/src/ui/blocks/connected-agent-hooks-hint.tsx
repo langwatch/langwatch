@@ -3,10 +3,9 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
+import { connectedAgentHooksCopy, HOOKS_DOCS_URL } from "@langwatch/agent-contract";
 import { Link } from "@langwatch/browser-host/link";
 import { Text } from "@langwatch/design-system/primitives";
-
-import { connectedAgentHooksCopy, HOOKS_DOCS_URL } from "../../model/connected-agent-hooks-copy.ts";
 
 export function ConnectedAgentHooksHint({
   status,

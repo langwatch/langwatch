@@ -1,3 +1,8 @@
+/**
+ * The hooks line of the scenario editor (ADR-180).
+ * @see modules/scenario/specs/scenario-run-hooks.feature
+ */
+
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Box } from "@langwatch/design-system/primitives";
 
