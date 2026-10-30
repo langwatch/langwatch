@@ -450,7 +450,7 @@ Feature: Scenario run hooks: setup and teardown
       Given a setup that answers an object holding a secret value of the agent
       Then the state it records holds the placeholder in place of the value
 
-    @unit
+    @integration
     Scenario: A new hooks URL on another origin is refused when the form sends the stored references back
       Given a saved HTTP agent whose authentication and signing secret are "{{ secrets.NAME }}" references
       When an update moves the hooks URL to another origin and sends one of those references back
@@ -462,6 +462,13 @@ Feature: Scenario run hooks: setup and teardown
       When the signing secret is rotated and the agent is saved
       Then the old project secret is deleted
       But a secret the person picked, or one another agent still names, is kept
+
+    @unit
+    Scenario: Removing the hooks URL deletes the hooks signing secret
+      Given a saved HTTP agent whose signing secret is the project secret the save made for it
+      When the hooks URL is cleared and the agent is saved, with or without the secret's reference
+      Then the config holds no signing secret
+      And the project secret is deleted
 
     @unit
     Scenario: An HTTP hook call sends the agent's headers, auth and run parameters
@@ -513,3 +520,23 @@ Feature: Scenario run hooks: setup and teardown
       When the person types a hooks URL
       Then the form shows a new signing secret to copy before saving
       And after the agent is saved, the form shows only that a secret is set, with a Rotate button
+      And Rotate saves a new secret in place of the stored reference
+      And clearing the hooks URL again drops the unsaved secret
+      And Rotate is disabled while the hooks URL is empty
+      And once the drawer is closed and opened again, the secret is hidden
+
+    @integration
+    Scenario: The agent form explains a hooks URL on another origin than the stored credentials
+      Given a saved HTTP agent with a stored auth token and signing secret
+      When the person changes the hooks URL to another origin
+      Then the Hooks tab says to type the auth token again on the Auth tab
+      And the form makes a new signing secret by itself
+      And back on the saved origin, the stored signing secret stands again
+      And a refused save names the Auth tab
+
+    @integration
+    Scenario: Clearing the hooks URL in the agent form removes the signing secret
+      Given a saved HTTP agent with a hooks URL and a stored signing secret
+      When the person clears the hooks URL
+      Then the Hooks tab says saving deletes the signing secret
+      And the save sends no signing secret

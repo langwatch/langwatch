@@ -7,6 +7,7 @@ import {
   httpNodeParametersStoringSecrets,
   httpNodeParametersWithoutCredentials,
   httpNodeParametersWithoutSecrets,
+  httpSecretBaseName,
   isCredentialHeader,
   readSecretReference,
   withoutLiteralCredential,
@@ -307,5 +308,25 @@ describe("a credential typed into an HTTP node", () => {
       });
       expect(Object.values(values)).toEqual(["tok_live_123", "key_456"]);
     });
+  });
+});
+
+describe("httpSecretBaseName", () => {
+  it("trims leading and trailing underscores from each part", () => {
+    expect(httpSecretBaseName({ owner: "__agent-1__", field: "-auth token-" })).toBe(
+      "HTTP_AGENT_1_AUTH_TOKEN",
+    );
+  });
+
+  it("drops a part that is only underscores", () => {
+    expect(httpSecretBaseName({ owner: "agent_1", field: "___" })).toBe("HTTP_AGENT_1");
+  });
+
+  it("names a long run of underscores in linear time", () => {
+    const run = "_".repeat(100_000);
+
+    expect(httpSecretBaseName({ owner: `${run}agent${run}`, field: `${run}!${run}` })).toBe(
+      "HTTP_AGENT",
+    );
   });
 });

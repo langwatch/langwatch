@@ -869,6 +869,12 @@ const presentations = {
         : "Check the agent's configuration and test it again.";
     },
   },
+  // An HTTP agent's save, test or run that would send stored credentials to another origin.
+  agent_stored_credentials_destination_mismatch: {
+    title: "Stored credentials stay with the saved address",
+    describe: () =>
+      "This URL is on another host, so the stored credentials are not sent to it. Type the auth token again on the Auth tab, and any credential headers on the Headers tab, then save.",
+  },
   agent_environment_unresolved: {
     title: "Name the environment of this agent",
     describe: (error) => {

@@ -127,6 +127,34 @@ describe("a hooks signing secret typed into an HTTP agent", () => {
     });
   });
 
+  /** @scenario Removing the hooks URL deletes the hooks signing secret */
+  it("deletes the stored secret when the hooks URL is cleared, even if its reference is sent back", async () => {
+    const { secrets, values } = secretStoreFixture({ HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN });
+    const { app } = createAgentAppFixture({ secrets });
+    await app.create(withHooks(SIGNING_SECRET));
+    const {
+      hooksUrl: _cleared,
+      hooks: _hooks,
+      ...config
+    } = withHooks("{{ secrets.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET }}").config;
+
+    const updated = await app.update({ ...withHooks(""), config });
+
+    expect(updated.config).not.toHaveProperty("hooksSigningSecret");
+    expect(values).toEqual({ HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN });
+  });
+
+  it("makes no project secret for a signing secret saved with no hooks URL", async () => {
+    const { secrets, values } = secretStoreFixture();
+    const { app } = createAgentAppFixture({ secrets });
+    const { hooksUrl: _none, ...config } = withHooks(SIGNING_SECRET).config;
+
+    const created = await app.create({ ...withHooks(SIGNING_SECRET), config });
+
+    expect(created.config).not.toHaveProperty("hooksSigningSecret");
+    expect(values).toEqual({});
+  });
+
   /** @scenario An update that omits the hooks signing secret keeps the stored reference */
   it("keeps its reference when an update omits the secret altogether", async () => {
     const { secrets, values } = secretStoreFixture();

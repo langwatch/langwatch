@@ -11,7 +11,11 @@ import { createLogger } from "@langwatch/observability";
 import type { SecretApi } from "@langwatch/secret-contract";
 
 import { nextAgentId } from "../rules/agent-id.rules.ts";
-import { movesStoredSecrets, replacedSigningSecretNames } from "../rules/agent-secrets.rules.ts";
+import {
+  movesStoredSecrets,
+  replacedSigningSecretNames,
+  withoutHooklessSigningSecret,
+} from "../rules/agent-secrets.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 
 const logger = createLogger("langwatch:agents:http-secrets");
@@ -95,8 +99,10 @@ export class AgentHttpSecretsService {
     if (!parsed.success) return command;
 
     const { projectId } = command;
+    // No project secret is made for a signing secret an agent without hooks would never use.
+    const config = withoutHooklessSigningSecret(parsed.data);
     const { headers, auth, hooksSigningSecret } = await httpAgentConfigStoringSecrets({
-      config: parsed.data,
+      config,
       owner,
       reference: createSecretReferencer({
         values: async () => {
@@ -113,7 +119,7 @@ export class AgentHttpSecretsService {
     return {
       ...command,
       config: {
-        ...parsed.data,
+        ...config,
         ...(headers ? { headers } : {}),
         ...(auth ? { auth } : {}),
         ...(hooksSigningSecret ? { hooksSigningSecret } : {}),

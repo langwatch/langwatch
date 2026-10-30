@@ -1,5 +1,6 @@
 import {
   httpAgentConfigSchema,
+  isCredentialHeader,
   type AgentInputBinding,
   type Field,
   type HttpAgentConfig,
@@ -9,6 +10,7 @@ import {
 } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import { computeBestMatchMappings, hasScenarioInputMapping } from "@langwatch/scenario-contract";
+import { isSameOrigin } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
@@ -109,7 +111,8 @@ function toConfig(draft: HttpAgentDraft): HttpAgentConfig {
     ...draft,
     hooksUrl: hooksUrl || void 0,
     hooks: hooksUrl ? draft.hooks : void 0,
-    hooksSigningSecret: draft.hooksSigningSecret || void 0,
+    // No hooks URL, no signing secret: the save then deletes the stored one.
+    hooksSigningSecret: (hooksUrl && draft.hooksSigningSecret) || void 0,
     name: "HTTP",
     description: "HTTP API endpoint",
     sessionPath: draft.sessionPath.trim() || void 0,
@@ -209,50 +212,86 @@ function unmappedVariableIds(input: {
     : new Set<string>();
 }
 
+/** The stored credentials a hooks URL on another origin does not take, to be typed again. */
+export interface HooksMoveNotice {
+  retypeAuth: boolean;
+  retypeHeaders: boolean;
+}
+
+/**
+ * The notice for a hooks URL on another origin than the one the stored credentials were saved
+ * for (the saved hooks URL, else the turn URL), or null. The server refuses to send them there,
+ * so the form says which ones to type again (agent-secrets.rules.ts, movesStoredSecrets).
+ */
+function hooksMoveNotice(input: {
+  hooksUrl: string;
+  saved: HttpAgentConfig | undefined;
+}): HooksMoveNotice | null {
+  const { hooksUrl, saved } = input;
+  if (!saved || hooksUrl.trim() === "") return null;
+  const retypeAuth = Boolean(saved.auth && saved.auth.type !== "none");
+  const retypeHeaders = (saved.headers ?? []).some(({ key }) => isCredentialHeader(key));
+  if (!retypeAuth && !retypeHeaders && !saved.hooksSigningSecret) return null;
+  if (isSameOrigin({ requested: hooksUrl.trim(), saved: saved.hooksUrl || saved.url })) {
+    return null;
+  }
+
+  return { retypeAuth, retypeHeaders };
+}
+
 /**
  * The hooks signing secret the form shows: one made in this session is shown until the drawer
- * closes, then never again. Clearing the hooks URL drops an unsaved one, so no project secret is
- * made for an agent without hooks.
+ * closes. Clearing the hooks URL drops an unsaved one. A hooks URL on another origin gets a new
+ * one by itself, as the stored one stays with the saved address, which takes it back again.
  */
 function useHooksSigningSecret({
   draftSecret,
-  savedSecret,
+  saved,
   change,
 }: {
   draftSecret: string;
-  savedSecret: string | undefined;
+  saved: HttpAgentConfig | undefined;
   change: (values: Partial<HttpAgentDraft>) => void;
 }) {
+  const savedSecret = saved?.hooksSigningSecret;
   const [newSigningSecret, setNewSigningSecret] = useState<string | null>(null);
-  const forget = useCallback(() => setNewSigningSecret(null), []);
+  const [madeForMove, setMadeForMove] = useState(false);
+  const forget = useCallback(() => {
+    setNewSigningSecret(null);
+    setMadeForMove(false);
+  }, []);
 
-  function rotateSigningSecret() {
+  function makeSigningSecret(input: { hooksUrl?: string; forMove: boolean }) {
     const secret = newHooksSigningSecret();
     setNewSigningSecret(secret);
-    change({ hooksSigningSecret: secret });
+    setMadeForMove(input.forMove);
+    const { hooksUrl } = input;
+    change({ ...(hooksUrl === undefined ? {} : { hooksUrl }), hooksSigningSecret: secret });
+  }
+
+  function keepStoredSigningSecret(hooksUrl: string) {
+    forget();
+    change({ hooksUrl, hooksSigningSecret: savedSecret ?? "" });
   }
 
   function changeHooksUrl(hooksUrl: string) {
     const isCleared = hooksUrl.trim() === "";
-    if (isCleared && newSigningSecret !== null) {
-      setNewSigningSecret(null);
-      change({ hooksUrl, hooksSigningSecret: savedSecret ?? "" });
-      return;
+    const moves = Boolean(savedSecret) && hooksMoveNotice({ hooksUrl, saved }) !== null;
+    const dropsNewSecret = isCleared ? newSigningSecret !== null : !moves && madeForMove;
+    if (dropsNewSecret) {
+      keepStoredSigningSecret(hooksUrl);
+    } else if (!isCleared && (draftSecret === "" || (moves && draftSecret === savedSecret))) {
+      makeSigningSecret({ hooksUrl, forMove: moves });
+    } else {
+      change({ hooksUrl });
     }
-    if (!isCleared && draftSecret === "") {
-      const secret = newHooksSigningSecret();
-      setNewSigningSecret(secret);
-      change({ hooksUrl, hooksSigningSecret: secret });
-      return;
-    }
-    change({ hooksUrl });
   }
 
   return {
     newSigningSecret,
     hasStoredSigningSecret: Boolean(savedSecret),
     changeHooksUrl,
-    rotateSigningSecret,
+    rotateSigningSecret: () => makeSigningSecret({ forMove: false }),
     forget,
   };
 }
@@ -269,12 +308,11 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const [activeTab, setActiveTab] = useState(options.showVariables ? "variables" : "body");
   const initialized = useRef<string | undefined>(void 0);
   const identity = options.agentId ?? "new";
-  const hooks = useHooksSigningSecret({
+  const { forget: forgetSigningSecret, ...signingSecret } = useHooksSigningSecret({
     draftSecret: draft.hooksSigningSecret,
-    savedSecret: savedConfig?.hooksSigningSecret,
+    saved: savedConfig,
     change,
   });
-  const { forget: forgetSigningSecret } = hooks;
 
   const [mappingsFrom, setMappingsFrom] = useState(inputMappings);
   if (mappingsFrom !== inputMappings) {
@@ -356,7 +394,10 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
       }));
       setDirty(true);
     },
-    hooks,
+    hooks: {
+      ...signingSecret,
+      moveNotice: hooksMoveNotice({ hooksUrl: draft.hooksUrl, saved: savedConfig }),
+    },
     stored: {
       authType: savedConfig?.auth?.type,
       headerKeys: savedConfig?.headers?.map(({ key }) => key) ?? [],

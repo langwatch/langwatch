@@ -168,6 +168,19 @@ export function configForCopy(input: {
 }
 
 /**
+ * A config with no hooks URL holds no signing secret: removing the hooks removes the secret, so
+ * the "blank keeps the stored one" rule cannot put it back and the save deletes it (ADR-188).
+ */
+export function withoutHooklessSigningSecret<
+  Config extends Pick<HttpAgentConfig, "hooksUrl" | "hooksSigningSecret">,
+>(config: Config): Config {
+  if (config.hooksUrl?.trim() || config.hooksSigningSecret === undefined) return config;
+  const { hooksSigningSecret: _removed, ...rest } = config;
+
+  return rest as Config;
+}
+
+/**
  * The signing secrets a save left unused (none or one): the one named before, when the saved
  * config names another or none. Only a name the save made for this agent, never one the person
  * picked or another agent still names (a copy in the same project keeps the reference).

@@ -202,6 +202,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
             newSigningSecret: form.hooks.newSigningSecret,
             hasStoredSigningSecret: form.hooks.hasStoredSigningSecret,
             onRotateSigningSecret: form.hooks.rotateSigningSecret,
+            moveNotice: form.hooks.moveNotice,
           }}
         />
         {props.agentId && props.projectId ? (
