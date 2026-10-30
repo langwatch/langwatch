@@ -287,7 +287,7 @@ async def scenario_hooks(request: Request):
 
 ### Make test data once
 
-LangWatch can send the same hook more than once, and the `Idempotency-Key` is the same each time. Store the key with the data setup made. When a call arrives with a key you have seen, return the stored state and make nothing new. In teardown, delete what is there and treat "already gone" as success.
+LangWatch can send the same hook more than once, and the `Idempotency-Key` is the same each time. Store the key with the data setup made. When a call arrives with a key you have seen, return the stored state and do not create the test data again. In teardown, delete what is there and treat "already gone" as success.
 
 ## What do the simulated user and the judge see
 
