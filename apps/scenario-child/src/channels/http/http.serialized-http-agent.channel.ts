@@ -4,6 +4,8 @@
  * threads.
  */
 
+import { STATE_MAX_BYTES } from "@langwatch/agent-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
@@ -25,10 +27,15 @@ import {
   hookIdempotencyKey,
   hookRequestBody,
   hookSignature,
+  hooksUrlRefusal,
   hookTimeoutMessage,
   HttpHookError,
   IDEMPOTENCY_HEADER,
+  readCappedBody,
+  scrubbedObject,
   SIGNATURE_HEADER,
+  withoutReservedHookHeaders,
+  type HookBodyStream,
   type HttpHookKind,
   type HttpHookObject,
   type HttpHookRun,
@@ -44,6 +51,8 @@ export interface ScenarioHttpResponse {
   headers: Pick<Headers, "get">;
   json(): Promise<unknown>;
   text(): Promise<string>;
+  /** The body as a stream, read with a size cap where the cap matters (a hook's answer). */
+  body?: HookBodyStream | null;
 }
 
 /**
@@ -179,6 +188,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     parameters?: RunParameterValues;
     httpPort?: ScenarioHttp;
     run?: HttpHookRun;
+    attemptId?: string;
   }): HttpSerializedHttpAgentChannel {
     return new HttpSerializedHttpAgentChannel(options);
   }
@@ -190,6 +200,8 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
   private readonly parameters: RunParameterValues;
   private readonly httpPort: ScenarioHttp | undefined;
   private readonly run: HttpHookRun;
+  /** This execution of the run; a re-executed run gets a new one, and so a new idempotency key. */
+  private readonly attemptId: string;
   /** What setup returned; an HTTP turn never changes it (ADR-188). */
   private state: HttpHookObject | null = null;
 
@@ -199,6 +211,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     parameters,
     httpPort,
     run,
+    attemptId,
   }: {
     config: HttpAgentData;
     logger?: Logger;
@@ -207,6 +220,8 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     httpPort?: ScenarioHttp;
     /** The scenario run the hook calls name; absent outside a scenario run. */
     run?: HttpHookRun;
+    /** Fixed in a test; a fresh id per channel otherwise. */
+    attemptId?: string;
   }) {
     super();
     this.name = "SerializedHttpAgentAdapter";
@@ -214,6 +229,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     this.parameters = parameters ?? {};
     this.httpPort = httpPort;
     this.run = run ?? {};
+    this.attemptId = attemptId ?? generate("hookattempt").toString();
     this.logger = logger ?? createLogger("langwatch:scenarios:http-adapter");
   }
 
@@ -292,6 +308,8 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
   }): Promise<HttpHookObject | undefined> {
     const { hooksUrl } = this.config;
     if (!hooksUrl) throw new HttpHookError({ message: "The agent has no hooks URL." });
+    const refusal = hooksUrlRefusal(hooksUrl);
+    if (refusal) throw new HttpHookError({ message: refusal });
     const secret = this.signingSecret();
     const { headers: propagationHeaders, traceId } = injectTraceContextHeaders({ headers: {} });
     const context = buildTemplateContext({
@@ -301,28 +319,36 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
       state: this.state,
     });
     const url = this.buildUrl(context, hooksUrl);
+    const idempotencyKey = hookIdempotencyKey({
+      run: this.run,
+      attemptId: this.attemptId,
+      kind,
+    });
     const body = hookRequestBody({
       kind,
       run: this.run,
+      idempotencyKey,
       params: this.parameters,
       state: this.state,
     });
-    const idempotencyKey = hookIdempotencyKey({ run: this.run, kind });
     const headers = {
-      ...this.buildRequestHeaders(context, propagationHeaders),
+      ...withoutReservedHookHeaders(this.buildRequestHeaders(context, propagationHeaders)),
       [SIGNATURE_HEADER]: hookSignature({
         secret,
         body,
         timestampSeconds: Math.floor(nowInstant().epochMilliseconds / 1000),
       }),
-      ...(idempotencyKey ? { [IDEMPOTENCY_HEADER]: idempotencyKey } : {}),
+      [IDEMPOTENCY_HEADER]: idempotencyKey,
     };
-    const { status, text } = await this.postHook({ url, headers, body, timeoutMs });
+    const { status, text, overCap } = await this.postHook({ url, headers, body, timeoutMs });
     this.logger.info(
       { kind, url: this.scrub(redactUrlForLogs(url)), status },
       "http hook answered",
     );
-    return hookAnswer({ kind, status, body: this.scrub(text) });
+    // Measured and parsed as it came: scrubbing first changes its size and can break its JSON.
+    // Error messages are scrubbed on the way out (callHook); the state is scrubbed here.
+    const answer = hookAnswer({ kind, status, body: text, overCap });
+    return answer && scrubbedObject(answer, (value) => this.scrub(value));
   }
 
   /** The resolved signing secret; a hook is never sent unsigned. */
@@ -350,7 +376,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     headers: Record<string, string>;
     body: string;
     timeoutMs: number;
-  }): Promise<{ status: number; text: string }> {
+  }): Promise<{ status: number; text: string; overCap: boolean }> {
     if (!this.httpPort)
       throw new Error("Serialized HTTP scenario adapter requires a ScenarioHttpPort");
     const signal = AbortSignal.timeout(timeoutMs);
@@ -359,7 +385,13 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
         url,
         init: { method: "POST", headers, body, signal },
       });
-      return { status: response.status, text: await response.text() };
+      if (!response.body)
+        return { status: response.status, text: await response.text(), overCap: false };
+      const { text, overCap } = await readCappedBody({
+        stream: response.body,
+        maxBytes: STATE_MAX_BYTES,
+      });
+      return { status: response.status, text, overCap };
     } catch (error) {
       if (signal.aborted) {
         throw new HttpHookError({

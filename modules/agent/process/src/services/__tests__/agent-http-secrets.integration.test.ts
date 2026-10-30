@@ -112,6 +112,21 @@ describe("a hooks signing secret typed into an HTTP agent", () => {
     expect(values.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET_2).toBe("whsec_rotated");
   });
 
+  /** @scenario Rotating the hooks signing secret deletes the old one */
+  it("deletes the replaced secret on each rotation, so only the current one is left", async () => {
+    const { secrets, values } = secretStoreFixture({ HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN });
+    const { app } = createAgentAppFixture({ secrets });
+    await app.create(withHooks(SIGNING_SECRET));
+
+    await app.update(withHooks("whsec_rotated_once"));
+    await app.update(withHooks("whsec_rotated_twice"));
+
+    expect(values).toEqual({
+      HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN,
+      HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET: "whsec_rotated_twice",
+    });
+  });
+
   /** @scenario An update that omits the hooks signing secret keeps the stored reference */
   it("keeps its reference when an update omits the secret altogether", async () => {
     const { secrets, values } = secretStoreFixture();

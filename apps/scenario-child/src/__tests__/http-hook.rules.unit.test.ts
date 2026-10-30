@@ -12,12 +12,38 @@ import {
   hookAnswer,
   hookIdempotencyKey,
   hookRequestBody,
+  hooksUrlRefusal,
   hookSignature,
   hookTimeoutMessage,
   HttpHookError,
+  readCappedBody,
+  scrubbedObject,
+  withoutReservedHookHeaders,
+  type HookBodyStream,
 } from "../rules/http-hook.rules.ts";
 
 const run = { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" };
+const idempotencyKey = "run_1:attempt_1:setup";
+
+/** A body stream that hands out the given chunks and records whether it was cancelled. */
+function streamOf(chunks: string[]): HookBodyStream & { cancelled: boolean; pulled: number } {
+  const queue = chunks.map((chunk) => Buffer.from(chunk, "utf8"));
+  const stream = {
+    cancelled: false,
+    pulled: 0,
+    getReader: () => ({
+      read: async () => {
+        const value = queue.shift();
+        if (value) stream.pulled += 1;
+        return value ? { done: false, value } : { done: true };
+      },
+      cancel: async () => {
+        stream.cancelled = true;
+      },
+    }),
+  };
+  return stream;
+}
 
 /** What a receiver does: recompute over the raw bytes, compare in constant time. */
 function receiverAccepts({
@@ -41,7 +67,13 @@ function receiverAccepts({
 describe("hookSignature()", () => {
   /** @scenario "An HTTP hook call is signed so the receiver can verify it" */
   it("lets a receiver recompute it over the raw bytes with the secret", () => {
-    const body = hookRequestBody({ kind: "setup", run, params: { name: "Zoë" }, state: null });
+    const body = hookRequestBody({
+      kind: "setup",
+      run,
+      idempotencyKey,
+      params: { name: "Zoë" },
+      state: null,
+    });
 
     const header = hookSignature({ secret: "whsec_test", body, timestampSeconds: 1_761_800_000 });
 
@@ -52,7 +84,7 @@ describe("hookSignature()", () => {
   });
 
   it("does not verify with another secret or a changed body", () => {
-    const body = hookRequestBody({ kind: "setup", run, params: {}, state: null });
+    const body = hookRequestBody({ kind: "setup", run, idempotencyKey, params: {}, state: null });
     const header = hookSignature({ secret: "whsec_test", body, timestampSeconds: 1 });
 
     expect(receiverAccepts({ header, rawBody: Buffer.from(body), secret: "whsec_other" })).toBe(
@@ -72,27 +104,117 @@ describe("hookTimeoutMessage()", () => {
 
 describe("hookIdempotencyKey()", () => {
   /** @scenario "An HTTP hook call carries the run's idempotency key" */
-  it("is the run id and the hook kind", () => {
-    expect(hookIdempotencyKey({ run, kind: "setup" })).toBe("run_1:setup");
-    expect(hookIdempotencyKey({ run, kind: "teardown" })).toBe("run_1:teardown");
+  it("is the run id, the attempt and the hook kind", () => {
+    expect(hookIdempotencyKey({ run, attemptId: "attempt_1", kind: "setup" })).toBe(
+      "run_1:attempt_1:setup",
+    );
+    expect(hookIdempotencyKey({ run, attemptId: "attempt_1", kind: "teardown" })).toBe(
+      "run_1:attempt_1:teardown",
+    );
+  });
+
+  describe("when the run is executed again under the same run id", () => {
+    it("is a new key, so a receiver makes the data again", () => {
+      expect(hookIdempotencyKey({ run, attemptId: "attempt_2", kind: "setup" })).not.toBe(
+        hookIdempotencyKey({ run, attemptId: "attempt_1", kind: "setup" }),
+      );
+    });
+  });
+
+  describe("when there is no scenario run id", () => {
+    /** @scenario "An HTTP hook call outside a scenario run still carries a key" */
+    it("is still sent, as the attempt and the kind", () => {
+      expect(hookIdempotencyKey({ run: {}, attemptId: "attempt_1", kind: "setup" })).toBe(
+        "attempt_1:setup",
+      );
+    });
+  });
+});
+
+/** @scenario "An HTTP hooks URL must use https" */
+describe("hooksUrlRefusal()", () => {
+  it("accepts https", () => {
+    expect(hooksUrlRefusal("https://shop.example.com/hooks")).toBeNull();
+  });
+
+  it.each(["http://localhost:3000/hooks", "http://127.0.0.1/hooks", "http://[::1]/hooks"])(
+    "keeps plain http for the loopback host %s",
+    (url) => {
+      expect(hooksUrlRefusal(url)).toBeNull();
+    },
+  );
+
+  it.each(["http://shop.example.com/hooks", "http://10.0.0.5/hooks", "ftp://shop.example.com"])(
+    "refuses %s",
+    (url) => {
+      expect(hooksUrlRefusal(url)).toMatch(/https/);
+    },
+  );
+
+  it("refuses a value that is not a URL", () => {
+    expect(hooksUrlRefusal("not a url")).toMatch(/not a valid URL/);
+  });
+});
+
+describe("withoutReservedHookHeaders()", () => {
+  it("drops any spelling of the signature and key headers, and keeps the rest", () => {
+    expect(
+      withoutReservedHookHeaders({
+        "x-langwatch-signature": "t=1,v1=forged",
+        "X-LANGWATCH-SIGNATURE": "t=2,v1=forged",
+        "idempotency-key": "mine",
+        Authorization: "Bearer tok",
+      }),
+    ).toEqual({ Authorization: "Bearer tok" });
+  });
+});
+
+describe("readCappedBody()", () => {
+  it("reads a body under the cap whole", async () => {
+    expect(await readCappedBody({ stream: streamOf(['{"a":', "1}"]), maxBytes: 100 })).toEqual({
+      text: '{"a":1}',
+      overCap: false,
+    });
+  });
+
+  describe("when the body streams past the cap", () => {
+    /** @scenario "An HTTP hook answer over the state cap is cut off while it is read" */
+    it("stops reading at the cap and cancels the rest", async () => {
+      const stream = streamOf(["12345", "67890", "never read"]);
+
+      const read = await readCappedBody({ stream, maxBytes: 8 });
+
+      expect(read).toEqual({ text: "12345678", overCap: true });
+      expect(stream.cancelled).toBe(true);
+      expect(stream.pulled).toBe(2);
+    });
+  });
+});
+
+describe("scrubbedObject()", () => {
+  it("scrubs every string, nested ones and keys included, and keeps other values", () => {
+    const scrub = (text: string) => text.split("tok_live").join("[REDACTED]");
+
+    expect(
+      scrubbedObject(
+        { token: "tok_live", nested: { list: ["a tok_live b", 3] }, tok_live: true },
+        scrub,
+      ),
+    ).toEqual({ token: "[REDACTED]", nested: { list: ["a [REDACTED] b", 3] }, "[REDACTED]": true });
   });
 });
 
 describe("hookRequestBody()", () => {
-  it("gives setup no state and teardown the state", () => {
+  /** @scenario "An HTTP hook call carries the run's idempotency key" */
+  it("gives setup no state and teardown the state, and carries the key under the signature", () => {
     const state = { customerId: "c_1" };
 
-    expect(JSON.parse(hookRequestBody({ kind: "setup", run, params: {}, state }))).toEqual({
-      kind: "setup",
-      run,
-      params: {},
-    });
-    expect(JSON.parse(hookRequestBody({ kind: "teardown", run, params: {}, state }))).toEqual({
-      kind: "teardown",
-      run,
-      params: {},
-      state,
-    });
+    expect(
+      JSON.parse(hookRequestBody({ kind: "setup", run, idempotencyKey, params: {}, state })),
+    ).toEqual({ kind: "setup", run, idempotencyKey, params: {} });
+    expect(
+      JSON.parse(hookRequestBody({ kind: "teardown", run, idempotencyKey, params: {}, state })),
+    ).toEqual({ kind: "teardown", run, idempotencyKey, params: {}, state });
   });
 });
 
@@ -143,6 +265,18 @@ describe("hookAnswer()", () => {
   describe("when the object is over the state cap", () => {
     it("fails the hook", () => {
       const body = JSON.stringify({ blob: "y".repeat(70 * 1024) });
+
+      expect(() => hookAnswer({ kind: "setup", status: 200, body })).toThrow(/cap/);
+    });
+
+    it("fails a body that was cut at the cap while it was read", () => {
+      expect(() =>
+        hookAnswer({ kind: "setup", status: 200, body: '{"a":1}', overCap: true }),
+      ).toThrow("The setup hook answered more than 7 bytes, over the 65536-byte cap.");
+    });
+
+    it("fails a non-JSON body over the cap on the size, before it is parsed", () => {
+      const body = "z".repeat(70 * 1024);
 
       expect(() => hookAnswer({ kind: "setup", status: 200, body })).toThrow(/cap/);
     });
