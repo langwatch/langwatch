@@ -425,7 +425,7 @@ Feature: Scenario run hooks: setup and teardown
       Then the config keeps a "{{ secrets.NAME }}" reference to a new project secret
       And a read of the agent shows the reference, never the secret
 
-    @unimplemented
+    @integration
     Scenario: The agent form shows a new signing secret once and can rotate it
       Given an HTTP agent form with no hooks URL
       When the person types a hooks URL
