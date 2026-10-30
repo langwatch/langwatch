@@ -145,4 +145,29 @@ describe("AgentModule HTTP agent credentials", () => {
       });
     });
   });
+
+  it("leaves no new project secret behind when a rotation moves the hooks host and is refused", async () => {
+    const { app, agent, values } = await savedHttpAgent();
+    const before = { ...values };
+
+    await expect(
+      app.update({
+        id: agent.id,
+        projectId,
+        config: {
+          ...config,
+          hooksUrl: "https://elsewhere.test/hooks",
+          hooks: { setup: true, teardown: true },
+          headers: [
+            { key: "X-Tenant-Key", value: "" },
+            { key: "Accept", value: "application/json" },
+          ],
+          auth: { type: "bearer", token: "" },
+          hooksSigningSecret: "whsec_brand_new_0123456789",
+        },
+      }),
+    ).rejects.toThrow();
+
+    expect(values).toEqual(before);
+  });
 });

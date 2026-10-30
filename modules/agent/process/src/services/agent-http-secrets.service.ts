@@ -3,6 +3,7 @@ import {
   createSecretReferencer,
   httpAgentConfigStoringSecrets,
   httpAgentConfigSchema,
+  AgentStoredCredentialsDestinationError,
   type CreateAgentCommand,
   type UpdateAgentCommand,
 } from "@langwatch/agent-contract";
@@ -10,7 +11,7 @@ import { createLogger } from "@langwatch/observability";
 import type { SecretApi } from "@langwatch/secret-contract";
 
 import { nextAgentId } from "../rules/agent-id.rules.ts";
-import { replacedSigningSecretNames } from "../rules/agent-secrets.rules.ts";
+import { movesStoredSecrets, replacedSigningSecretNames } from "../rules/agent-secrets.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 
 const logger = createLogger("langwatch:agents:http-secrets");
@@ -43,9 +44,18 @@ export class AgentHttpSecretsService {
       projectId: command.projectId,
     });
 
-    return (command.type ?? existing.type) === "http"
-      ? this.stored({ command, owner: command.id })
-      : command;
+    if ((command.type ?? existing.type) !== "http") return command;
+    // Refuse before any secret is created, so a refused save leaves nothing behind.
+    const incoming = httpAgentConfigSchema.safeParse(command.config);
+    if (
+      incoming.success &&
+      existing.type === "http" &&
+      movesStoredSecrets({ stored: existing.config, incoming: incoming.data })
+    ) {
+      throw new AgentStoredCredentialsDestinationError();
+    }
+
+    return this.stored({ command, owner: command.id });
   }
 
   /**

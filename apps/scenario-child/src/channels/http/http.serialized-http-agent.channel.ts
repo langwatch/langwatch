@@ -319,6 +319,9 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
       state: this.state,
     });
     const url = this.buildUrl(context, hooksUrl);
+    // A template can render to a host the raw value did not show.
+    const renderedRefusal = hooksUrlRefusal(url);
+    if (renderedRefusal) throw new HttpHookError({ message: renderedRefusal });
     const idempotencyKey = hookIdempotencyKey({
       run: this.run,
       attemptId: this.attemptId,

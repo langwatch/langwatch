@@ -103,10 +103,12 @@ export function hookIdempotencyKey({
 }
 
 const LOOPBACK_HOSTS = new Set(["localhost", "[::1]"]);
+// A real IPv4 loopback only: a bare "127." prefix would also match 127.evil.com.
+const IPV4_LOOPBACK = /^127(\.\d{1,3}){3}$/;
 
 function isLoopbackHost(hostname: string): boolean {
   return (
-    LOOPBACK_HOSTS.has(hostname) || hostname.endsWith(".localhost") || hostname.startsWith("127.")
+    LOOPBACK_HOSTS.has(hostname) || hostname.endsWith(".localhost") || IPV4_LOOPBACK.test(hostname)
   );
 }
 

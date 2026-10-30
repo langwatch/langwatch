@@ -280,6 +280,23 @@ describe("ScenarioRunHooksService over the HTTP channel", () => {
     });
   });
 
+  describe("when the hooks URL template names a plain http host from a parameter", () => {
+    it("sends nothing and fails naming https", async () => {
+      const egress = fakeEgress();
+      const channel = channelOver(egress, {
+        ...baseConfig,
+        hooksUrl: "http://{{params.loyalty_tier}}.example.com/hooks",
+      });
+
+      const error = (await hooksFor(channel, { setup: true, teardown: false })
+        .around(oneTurn(channel))
+        .catch((caught: unknown) => caught)) as ScenarioRunHooksError;
+
+      expect(egress.sent).toEqual([]);
+      expect(error.hooks.setup?.error).toMatch(/https|not a valid URL/);
+    });
+  });
+
   describe("when setup answers an object holding a secret value", () => {
     /** @scenario "An HTTP hook answer is measured and parsed before secrets are scrubbed" */
     it("parses the answer as it came, then scrubs the secret from the state", async () => {
