@@ -304,6 +304,39 @@ export class UpgradeLedgerRepository {
     return rows.map((row) => upgradeTargetSchema.parse(row));
   }
 
+  /**
+   * Records every shipped ClickHouse step of a target that has no ledger rows yet, as pending, in
+   * one statement: either all its rows land or none, so an interrupted run never leaves a target
+   * recorded for part of the schema. A row already present keeps its status.
+   */
+  async seedTargetSteps({
+    target,
+    steps,
+  }: {
+    target: string;
+    steps: readonly { stepId: string; version: string }[];
+  }): Promise<UpgradeTarget[]> {
+    if (steps.length === 0) return [];
+    const { rows } = await this.query<object>(
+      (t) => `INSERT INTO ${t.target}
+              ("step_id", "target", "status", "version", "last_error", "updated_at")
+       SELECT source.step_id, $2, 'pending', source.version, NULL, ${NOW_UTC}
+         FROM unnest($1::text[], $3::text[]) AS source(step_id, version)
+       ON CONFLICT ("step_id", "target") DO NOTHING
+       RETURNING ${TARGET_COLUMNS}`,
+      [steps.map((step) => step.stepId), target, steps.map((step) => step.version)],
+    );
+    return rows.map((row) => upgradeTargetSchema.parse(row));
+  }
+
+  /** Every target with at least one row, whatever its status. */
+  async findRecordedTargets(): Promise<string[]> {
+    const { rows } = await this.query<{ target: string }>(
+      (t) => `SELECT DISTINCT "target" FROM ${t.target} ORDER BY "target"`,
+    );
+    return rows.map((row) => row.target);
+  }
+
   /** Every ClickHouse step a target has not applied yet: a held private target's backlog. */
   async findTargetsBehind(): Promise<UpgradeTarget[]> {
     const { rows } = await this.query<object>(

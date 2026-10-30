@@ -1199,6 +1199,69 @@ describe.skipIf(!DB_URL)("the upgrade runner over a private ClickHouse target", 
     });
   });
 
+  describe("when a private ClickHouse target is configured after the last schema release", () => {
+    const rowsOf = async (stepId: string) =>
+      (await ledger().findTargets({ stepId })).map(({ target, status, lastError }) => ({
+        target,
+        status,
+        lastError,
+      }));
+    const targets = ["shared", "private:org_1"];
+
+    /** @scenario "A configured private ClickHouse target with no ledger rows is seeded as behind and catches up" */
+    it("seeds it pending on every shipped ClickHouse step, catches it up, and seeds nothing twice", async () => {
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
+      expect(await ledger().findRecordedTargets()).toEqual(["shared"]);
+      const seeded: string[] = [];
+      const applier = fakeApplier({
+        release: "3.21.0",
+        targets,
+        during: async () => {
+          seeded.push(...(await ledger().findTargetsBehind()).map(({ target }) => target));
+        },
+      });
+      const runner = runnerFor({ release: "3.21.0", applier, clickhouseTargets: targets });
+      const outcome = await run(runner);
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      expect(seeded).toEqual(["private:org_1", "private:org_1"]);
+      expect(applier.calls).toEqual([null]);
+      for (const id of ["clickhouse:00001", "clickhouse:00002"]) {
+        expect(await rowsOf(id)).toEqual([
+          { target: "private:org_1", status: "done", lastError: null },
+          { target: "shared", status: "done", lastError: null },
+        ]);
+      }
+      expect(await ledger().findTargetsBehind()).toEqual([]);
+      expect((await runner.status()).failedTargets).toBe(0);
+      const again = fakeApplier({ release: "3.21.0", targets });
+      await run(runnerFor({ release: "3.21.0", applier: again, clickhouseTargets: targets }));
+      expect(again.calls).toEqual([]);
+      expect(await ledger().findTargetsBehind()).toEqual([]);
+    });
+
+    /** @scenario "A configured private ClickHouse target with no ledger rows that is down is held, not hidden" */
+    it("holds it with its rows failed and pending, so the installation needs attention", async () => {
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
+      const applier = fakeApplier({ release: "3.21.0", targets, failOn: ["private:org_1"] });
+      const runner = runnerFor({ release: "3.21.0", applier, clickhouseTargets: targets });
+      const outcome = await run(runner);
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      expect(await rowsOf("clickhouse:00001")).toEqual([
+        { target: "private:org_1", status: "failed", lastError: "Code: 210. Connection refused" },
+        { target: "shared", status: "done", lastError: null },
+      ]);
+      expect(await rowsOf("clickhouse:00002")).toEqual([
+        { target: "private:org_1", status: "pending", lastError: null },
+        { target: "shared", status: "done", lastError: null },
+      ]);
+      expect(await runner.status()).toMatchObject({
+        state: "needs-attention",
+        reason: "failed-target",
+        failedTargets: 1,
+      });
+    });
+  });
+
   describe("when the shared ClickHouse target fails beside a private one", () => {
     /** @scenario "A failing shared ClickHouse target fails the run" */
     it("fails the step and the run, holding nothing", async () => {

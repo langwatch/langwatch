@@ -4,7 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { startTargetCatchUp } from "../target-catch-up.ts";
+import { privateTargetsBehind, startTargetCatchUp } from "../target-catch-up.ts";
 
 const EVERY_MS = 1_000;
 
@@ -87,6 +87,30 @@ describe("startTargetCatchUp", () => {
       await running.stop();
       await vi.advanceTimersByTimeAsync(5 * EVERY_MS);
       expect(runs).toEqual([]);
+    });
+  });
+});
+
+describe("privateTargetsBehind", () => {
+  describe("when a configured private target has no ledger rows", () => {
+    /** @scenario "An admitted worker counts a configured private target with no ledger rows as behind" */
+    it("names it beside the recorded one, once each, never the shared target", () => {
+      const targets = privateTargetsBehind({
+        behind: ["private:org_1", "private:org_1"],
+        recorded: ["shared", "private:org_1"],
+        configured: ["shared", "private:org_1", "private:org_2"],
+      });
+      expect(targets).toEqual(["private:org_1", "private:org_2"]);
+    });
+
+    it("names nothing when every configured target is recorded and current", () => {
+      expect(
+        privateTargetsBehind({
+          behind: [],
+          recorded: ["shared", "private:org_1"],
+          configured: ["shared", "private:org_1"],
+        }),
+      ).toEqual([]);
     });
   });
 });

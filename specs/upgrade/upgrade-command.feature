@@ -112,6 +112,27 @@ Feature: The upgrade command
     And every step reads done on both targets and no target is behind
     And the installation no longer counts a failed target
 
+  # A private target configured after the last schema release has no ledger rows, so nothing reads
+  # it behind: its first run seeds it pending on every shipped ClickHouse step, then catches it up.
+  @integration
+  Scenario: A configured private ClickHouse target with no ledger rows is seeded as behind and catches up
+    Given an upgrade that ran with "shared" as its only ClickHouse target
+    And the environment now also configures "private:org_1", which has no target rows
+    When the upgrade runs again with nothing else to apply
+    Then its preflight records "private:org_1" pending on every shipped ClickHouse step
+    And it applies the image's ClickHouse steps on "private:org_1" in the same run
+    And every step reads done on both targets and no target is behind
+    And a third run records nothing new and asks the applier for nothing
+
+  @integration
+  Scenario: A configured private ClickHouse target with no ledger rows that is down is held, not hidden
+    Given an upgrade that ran with "shared" as its only ClickHouse target
+    And the environment now also configures "private:org_1", which has no target rows and is down
+    When the upgrade runs again with nothing else to apply
+    Then it exits with code 0
+    And on "private:org_1" the first step failed with the error and the rest pending
+    And the installation reads "needs attention" with one failed target
+
   @integration
   Scenario: A held private ClickHouse target still down stays held and the pass succeeds
     Given an upgrade that held "private:org_1", still down

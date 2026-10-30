@@ -110,6 +110,19 @@ export class MigrationError extends Error {
   }
 }
 
+/** The code the unversioned-tables refusal carries, so a caller matches it without its prose. */
+export const UNVERSIONED_TABLES_CODE = "clickhouse_migrations.unversioned_tables";
+
+/** The bootstrap refusal a database restored without its version history earns, by that code. */
+export class UnversionedTablesError extends MigrationError {
+  readonly code = UNVERSIONED_TABLES_CODE;
+
+  constructor(message: string) {
+    super(message, "bootstrap");
+    this.name = "UnversionedTablesError";
+  }
+}
+
 async function withClient<T>(
   url: string,
   fn: (client: ClickHouseClient) => Promise<T>,
@@ -630,6 +643,51 @@ async function syncClusterVersionTable({
   await client.command({ query: sync, clickhouse_settings: { wait_end_of_query: 1 } });
 }
 
+/** goose's own table, created by the bootstrap, so never evidence that migrations ran. */
+const GOOSE_VERSION_TABLE = "goose_db_version";
+
+/**
+ * A database holding tables with no version history at all: adopting it at version 0 replays every
+ * migration over them, and a migration that swaps a table in (00065) then discards its contents.
+ * Restoring the history is the operator's call. Any table but goose's own counts, ours or not.
+ */
+export function unversionedTablesRefusal({
+  database,
+  versions,
+  tables,
+}: {
+  database: string;
+  versions: number;
+  tables: readonly string[];
+}): string | null {
+  if (versions > 0 || tables.length === 0) return null;
+  return `Database "${database}" holds ${tables.length} table(s) (${tables.slice(0, 5).join(", ")}) but ${GOOSE_VERSION_TABLE} records no migration, so a run would replay every migration over them and the table swaps among them would discard what they hold. No table was read or written, and no migration ran; only ${GOOSE_VERSION_TABLE} itself may have been created, empty. This is a database whose migration history was not restored with its data: restore ${database}.${GOOSE_VERSION_TABLE} from the same copy, or insert the version rows the data was written at, then run again.`;
+}
+
+/** Reads the counts the refusal decides on; on a cluster, after every replica has caught up. */
+async function refuseUnversionedTables({
+  client,
+  config,
+}: {
+  client: ClickHouseClient;
+  config: ClickHouseConfig;
+}): Promise<void> {
+  const result = await client.query({
+    query: `SELECT name FROM system.tables WHERE database = {database:String} AND name != {goose:String} ORDER BY name`,
+    query_params: { database: config.database, goose: GOOSE_VERSION_TABLE },
+    format: "JSONEachRow",
+  });
+  const tables = (await result.json<{ name: string }>()).map(({ name }) => name);
+  if (tables.length === 0) return;
+  const counted = await client.query({
+    query: `SELECT count() AS versions FROM ${config.database}.${GOOSE_VERSION_TABLE}`,
+    format: "JSONEachRow",
+  });
+  const versions = Number((await counted.json<{ versions: number | string }>())[0]?.versions ?? 0);
+  const refusal = unversionedTablesRefusal({ database: config.database, versions, tables });
+  if (refusal) throw new UnversionedTablesError(refusal);
+}
+
 /**
  * Inserts the version 0 row when the table is empty (atomic, no TOCTOU race): goose needs one row
  * to find its starting version, else it reports "no next version found".
@@ -710,6 +768,7 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
     );
 
     await syncClusterVersionTable({ client, config, verbose });
+    await refuseUnversionedTables({ client, config });
     await insertInitialVersion({ client, config, verbose });
   });
 
