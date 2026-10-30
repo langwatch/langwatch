@@ -11,6 +11,7 @@ export const codingAgentSchema = z.enum([
   "codex",
   "gemini_cli",
   "copilot",
+  "pi",
   "unknown",
 ]);
 

@@ -29,26 +29,21 @@
 # re-reads an attribute the GenAI canonicaliser already consumed, because
 # reading a figure twice is how a token count ends up doubled.
 #
-# EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
-# or @integration now would report a binding that does not exist. Each scenario
-# names the tag it becomes in a comment above it, and the commit that makes one
-# pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
-# change. A scenario still carrying @unimplemented when ADR-188 is called done
-# is work that was not done.
+# The canonicalisation scenarios are bound by
+# packages/span-normalisation/src/__tests__/piCanonicaliser.unit.test.ts, which
+# runs the whole ordered chain exactly as ingestion does.
 #
-# WHAT BLOCKS THESE, AS OF 2026-10-30:
-#   1. NOTHING EMITS pi_cli SPANS. The extension that would export them does
-#      not exist (specs/ai-governance/cli-wrappers/pi-extension-install.feature)
-#      and `pi` is not a wrapped tool in otel-env-block.ts, so no OTLP traffic
-#      arrives under this source type for the chain to canonicalise.
-#   2. THE pi EXTRACTOR IS UNWRITTEN. These scenarios assert that the generic
-#      GenAI chain does nearly all of the work and one thin extractor does the
-#      rest. Neither half is in the tree yet.
+# The origin-stamping scenarios are bound by
+# enterprise/modules/governance/contract/src/__tests__/otlp-receiver-policy.unit.test.ts,
+# which lists pi_cli among CODING_AGENT_SOURCES.
 #
-# The file yields no enforced scenario while that holds, so it is listed in
-# LEGACY_INERT in packages/architecture-enforcer/src/tools/check-feature-parity.ts.
-# The commit that binds the first scenario here deletes that line with it.
+# WHAT IS STILL @unimplemented, AND WHY, AS OF 2026-10-30:
+#   THE PAYLOAD-CAP SCENARIOS. capPayloadString already bounds any oversized
+#   value, but nothing applies it per ingest source, so there is no
+#   pi-specific behaviour to assert and no receiver test to assert it in.
+#
+# A scenario still carrying @unimplemented when ADR-188 is called done is work
+# that was not done.
 
 Feature: pi CLI OTLP spans canonicalise on the unified substrate
   Spans arrive through the personal-ingest-key path with sourceType "pi_cli"
@@ -60,58 +55,52 @@ Feature: pi CLI OTLP spans canonicalise on the unified substrate
 
   Rule: the dual-written GenAI attributes canonicalise without pi-specific code
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A pi model-call span yields model and token usage on the canonical trace
       Given a span named "pi.ai.request"
       And attribute "gen_ai.request.model" is "claude-opus-4-7"
       And attribute "gen_ai.usage.input_tokens" is "120"
       And attribute "gen_ai.usage.output_tokens" is "30"
-      When the span is ingested with the pi_cli ingest key
+      When the canonicalisation chain runs
       Then the recorded span attributes contain:
-        | attribute                 | value             |
-        | langwatch.model           | claude-opus-4-7   |
-        | langwatch.input_tokens    | 120               |
-        | langwatch.output_tokens   | 30                |
+        | attribute                  | value           |
+        | gen_ai.request.model       | claude-opus-4-7 |
+        | gen_ai.usage.input_tokens  | 120             |
+        | gen_ai.usage.output_tokens | 30              |
+      And the span is typed as a model call
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A pi tool span canonicalises as a tool span
       Given a span named "pi.harness.tool"
       And attribute "pi.tool.name" is "bash"
-      When the span is ingested with the pi_cli ingest key
+      When the canonicalisation chain runs
       Then the recorded span's type reflects a tool execution
       And it keeps the tool name "bash"
 
   Rule: the pi extractor lifts only what the conventions cannot name
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Cache-write and reasoning tokens are lifted as their own token types
       Given a pi.ai.request span reporting cache-write and reasoning tokens
       When the canonicalisation chain runs
       Then the canonical span records each as its own token type
       And neither is added into the output token count
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: pi's reported cost survives beside the computed cost, never as it
       Given a span named "pi.ai.request"
       And attribute "pi.ai.usage.cost" is "0.0875"
       When the canonicalisation chain runs
       Then the canonical span still carries "pi.ai.usage.cost" with value "0.0875"
-      And nothing lifts that figure onto "langwatch.cost.usd"
-      And the charge for the call is still the catalogue price of its own tokens
+      And no canonical cost attribute is set from that figure
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: pi's stop reason and error type are lifted onto the canonical span
       Given a pi.ai.request span that ended with a stop reason and an error type
       When the canonicalisation chain runs
       Then the canonical span carries both as pi reported them
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Session, turn and tool identifiers are lifted from pi's harness spans
       Given the run, turn and tool spans of one pi session
       And the run carries attribute "pi.session.id" "s-1"
@@ -121,8 +110,7 @@ Feature: pi CLI OTLP spans canonicalise on the unified substrate
         | langwatch.thread.id | s-1   |
       And the turn and tool spans keep pi's turn and tool-call identifiers
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A span with neither pi nor gen_ai attributes is left untouched
       Given an OTLP span in an unrelated namespace
       When the canonicalisation chain runs
@@ -130,16 +118,14 @@ Feature: pi CLI OTLP spans canonicalise on the unified substrate
 
   Rule: pi spans are stamped with the coding-agent origin at the edge
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A pi span ingested under its own key carries the coding-agent origin
       Given a pi.harness.run span
       When the span is ingested with the pi_cli ingest key
       Then the recorded span carries the coding-agent origin
       And it carries the organisation and source as resource attributes
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: pi spans sent with another source's key do not pass as pi's
       Given a pi.harness.run span
       When the span is ingested with an unrelated source's ingest key

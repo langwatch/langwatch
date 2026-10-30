@@ -3,6 +3,7 @@ import { claudeCodeAgent, claudeCoworkAgent, copilotAgent } from "./coding-agent
 import type { CodingAgentDefinition } from "./coding-agent-definition.ts";
 import { geminiCliAgent } from "./gemini-cli.ts";
 import { opencodeAgent } from "./opencode.ts";
+import { piAgent } from "./pi.ts";
 
 export type {
   CodingAgent,
@@ -25,6 +26,7 @@ export const CODING_AGENT_REGISTRY = [
   codexAgent,
   geminiCliAgent,
   copilotAgent,
+  piAgent,
 ] as const satisfies readonly CodingAgentDefinition[];
 
 // Module-load failure on a duplicate id: `satisfies` checks each entry's

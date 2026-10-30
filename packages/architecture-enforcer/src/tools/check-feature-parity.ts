@@ -684,7 +684,6 @@ const LEGACY_INERT: string[] = [
   // still here when ADR-188 is called done means ADR-188 is not done.
   "specs/ai-governance/cli-wrappers/pi-env-injection.feature",
   "specs/ai-governance/cli-wrappers/pi-extension-install.feature",
-  "specs/ai-governance/ingestion-sources/pi-cli-otlp.feature",
   "specs/coding-agent/pi-model-calls.feature",
   "specs/coding-agent/pi-sessions.feature",
 ];
