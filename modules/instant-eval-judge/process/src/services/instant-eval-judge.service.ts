@@ -141,7 +141,8 @@ export class InstantEvalJudgeService {
     const spend = { organizationId, projectId, requestKey };
     const judgement = await this.classifyRecordingStop({ spend, call });
     // A skip billed nothing, so it records nothing; a routed cost with no input tokens still bills.
-    if (!isInstantEvalSpendBillable(judgement)) return { outcome: "judged", judgement, priceUsd: 0 };
+    if (!isInstantEvalSpendBillable(judgement))
+      return { outcome: "judged", judgement, priceUsd: 0 };
 
     const { inputTokens, costNanoUsd } = judgement;
     const priceUsd = await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
@@ -149,10 +150,9 @@ export class InstantEvalJudgeService {
   }
 
   /**
-   * One classify; a routed stop after paid legs records what they spent, then is rethrown. The
-   * stop takes a freshly minted request id, never the retry key: the redelivery that completes
-   * keeps the key's row, since a spend row per request id is never rewritten. A spend that cannot
-   * be written is logged with what it spent, and the stop is still what the caller gets.
+   * One classify; a routed stop after paid legs records what they spent under a freshly minted
+   * request id, never the retry key, so the redelivery keeps the key's row. A spend that cannot be
+   * written is logged with what it spent, and the stop is still what the caller gets.
    */
   private async classifyRecordingStop({
     spend,

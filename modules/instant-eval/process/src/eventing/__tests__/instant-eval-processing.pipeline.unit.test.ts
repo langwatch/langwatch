@@ -271,7 +271,7 @@ describe("given two runs of one project judging at the same time", () => {
         }),
       );
 
-      expect(groupKeys).toEqual(new Array(6).fill(PROJECT_ID));
+      expect(groupKeys).toEqual(Array.from({ length: 6 }, () => PROJECT_ID));
     });
   });
 });

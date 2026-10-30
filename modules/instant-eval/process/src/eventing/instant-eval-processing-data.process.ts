@@ -83,7 +83,8 @@ const instantEvalLatePageSchema = z.object({
  * Bills a routed page the finish did not count: its own spend row, then its cost and price on the
  * finished run's row. Emitted only once the run's finish is recorded, so the row adds it last.
  */
-export const instantEvalBillLatePageIntentSchema = instantEvalLatePageSchema.extend({
+export const instantEvalBillLatePageIntentSchema = z.object({
+  ...instantEvalLatePageSchema.shape,
   runId: z.string(),
   projectId: z.string(),
 });

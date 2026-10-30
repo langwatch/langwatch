@@ -57,10 +57,9 @@ export interface InstantEvalSpendAttribution {
 }
 
 /**
- * A run's id is derived from the run, so a finish delivered twice appends the
- * same request and the spine's own idempotency key drops the second. A query
- * mints a fresh one, so a retry is a second query, which is what it is. A
- * routed page billed after its run finished has its own id beside the run's.
+ * A run's id is derived from the run, so a finish delivered twice is one request. A query mints a
+ * fresh one, so a retry is a second query. A routed page billed after its run finished has its
+ * own id beside the run's (ADR-190 decision 3).
  */
 export function instantEvalSpendRequestId({
   runId,

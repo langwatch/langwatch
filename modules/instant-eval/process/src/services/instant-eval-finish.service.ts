@@ -148,7 +148,12 @@ export class InstantEvalFinishService {
     routedInputTokens: number;
   }): InstantEvalSpend {
     const { pricing } = this;
-    const costUsd = instantEvalSpentCostUsd({ inputTokens, costNanoUsd, routedInputTokens, pricing });
+    const costUsd = instantEvalSpentCostUsd({
+      inputTokens,
+      costNanoUsd,
+      routedInputTokens,
+      pricing,
+    });
 
     return { costUsd, priceUsd: instantEvalPriceUsd({ costUsd, pricing }) };
   }

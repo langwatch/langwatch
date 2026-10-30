@@ -55,7 +55,7 @@ export function instantEvalJudgeClassifierCostOf({
   table: InstantEvalJudgeRouteTable;
   pricing: InstantEvalJudgeRoutePricing;
   inputTokens: number;
-  /** Priced at the routed output rate; the published rate has none, as the classifier bills none. */
+  /** Priced at the routed output rate; the published rate prices input alone. */
   outputTokens?: number;
 }): number {
   for (const [backend, config] of Object.entries(table.backends)) {
