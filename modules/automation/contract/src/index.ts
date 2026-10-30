@@ -4,7 +4,6 @@ export * from "./automation-rest.schemas.ts";
 export * from "./automation.trpc.ts";
 export * from "./automation.trpc-schemas.ts";
 export * from "./email-suppression.trpc.ts";
-export * from "./alert-link.ts";
 export * from "./automation.events.ts";
 export * from "./report-schedule.events.ts";
 export * from "./automation.commands.ts";

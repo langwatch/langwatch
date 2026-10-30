@@ -26,9 +26,7 @@ describe("buildTemplateContext", () => {
         matches: [{ traceId: "trace_1", input: "in", output: "out" }],
       });
       expect(ctx.project.url).toBe("https://app.langwatch.ai/acme");
-      expect(ctx.matches[0]?.trace.url).toBe(
-        "https://app.langwatch.ai/acme/traces/trace_1?lw_from=alert",
-      );
+      expect(ctx.matches[0]?.trace.url).toBe("https://app.langwatch.ai/acme/traces/trace_1");
       expect(ctx.matches[0]?.trace.id).toBe("trace_1");
     });
   });
@@ -40,7 +38,7 @@ describe("buildTemplateContext", () => {
         matches: [{ graphId: "graph_1" }],
       });
       expect(ctx.matches[0]?.trace.url).toBe(
-        "https://app.langwatch.ai/acme/analytics/custom/graph_1?lw_from=alert",
+        "https://app.langwatch.ai/acme/analytics/custom/graph_1",
       );
     });
   });

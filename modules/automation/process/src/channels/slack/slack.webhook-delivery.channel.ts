@@ -2,8 +2,8 @@ import {
   isSlackWebhookUrl,
   type AlertType,
   type SlackPayload,
-  withAlertLinkMarker,
 } from "@langwatch/automation-contract";
+import { withAlertLinkMarker } from "@langwatch/automation-contract/alert-link";
 import { DispatchError, toDispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import { z } from "zod";

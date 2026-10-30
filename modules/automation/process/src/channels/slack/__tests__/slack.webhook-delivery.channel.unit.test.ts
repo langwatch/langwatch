@@ -36,7 +36,7 @@ function capturingAdapter() {
 describe("SlackWebhookDeliveryChannel.deliver", () => {
   describe("when the trigger matches a trace with a known start time", () => {
     /** @scenario "Notification links carry the timestamp" */
-    /** @scenario "Slack and template links to a trace or a chart carry the marker" */
+    /** @scenario "Slack's default message links to a trace carry the marker" */
     it("links the trace with its start time, so the drawer opens in one pruned read", async () => {
       const { adapter, sent } = capturingAdapter();
 

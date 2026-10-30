@@ -97,7 +97,7 @@ person who acted: `filed` (on the owner), `seen`, `archived` and `kept`. No
 title, body, query, board name or insight id is sent. `renewed` is not sent: a
 renewal names no person, so there is nobody to count it on.
 
-An alert's links to a trace or a chart (templates, Slack, digest emails) carry
+An alert's links to a trace or a chart in Slack's default message and in digest emails carry
 `lw_from=alert`. A signed-in member who opens one sends one
 `automations.opened.alert_link`, and the marker is then dropped from the
 address, so a reload is not counted again. Report links are not marked.

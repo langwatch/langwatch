@@ -16,9 +16,9 @@ Feature: A member landing from an alert's link is counted
     And a dead "#" link stays "#"
 
   @unit
-  Scenario: Slack and template links to a trace or a chart carry the marker
-    When a Slack alert or a notification template links a trace and a chart
-    Then both links carry "lw_from=alert"
+  Scenario: Slack's default message links to a trace carry the marker
+    When the default Slack alert links a trace
+    Then the link carries "lw_from=alert"
 
   @unit
   Scenario: Digest email links carry the marker

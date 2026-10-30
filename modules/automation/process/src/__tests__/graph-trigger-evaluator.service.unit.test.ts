@@ -533,8 +533,7 @@ describe("evaluateGraphTrigger", () => {
       expect(arg.context.graph.url).toBe(
         "https://app.langwatch.test/demo/analytics/custom/graph-1" +
           `?startDate=${encodeURIComponent(toDate(NOW.subtract({ milliseconds: 60 * 60 * 1000 })).toISOString())}` +
-          `&endDate=${encodeURIComponent(toDate(NOW).toISOString())}` +
-          "&lw_from=alert",
+          `&endDate=${encodeURIComponent(toDate(NOW).toISOString())}`,
       );
       expect(arg.context.metric.label).toBe("Trace count");
       expect(arg.context.metric.seriesName).toBe("0/metadata.trace_id/cardinality");

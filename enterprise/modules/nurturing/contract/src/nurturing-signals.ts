@@ -4,7 +4,6 @@
  * holds, one member per kind main sent. Nurturing fetches nothing.
  * @see enterprise/modules/nurturing/specs/nurturing.feature
  */
-import { insightFiledViaSchema, insightToneSchema } from "@langwatch/insight-contract";
 import type { Named } from "@langwatch/module";
 import {
   guidedOnboardingStateSchema,
@@ -62,6 +61,9 @@ export const selfHostedOrgTraitsSchema: SelfHostedOrgTraitsSchema =
 
 /** The insight acts nurturing tells PostHog of: renewed names no person, so it is left out. */
 export const INSIGHT_ACTS = ["filed", "seen", "archived", "kept"] as const;
+/** How an insight was filed and its tone: insight's own values, held here so no insight code loads. */
+export const INSIGHT_SIGNAL_FILED_VIA = ["chat", "run"] as const;
+export const INSIGHT_SIGNAL_TONES = ["bad", "watch", "good"] as const;
 
 /** An organization-wide count taken by the owner when it recorded, this one included. */
 const countIncludingThis = z.number().int().positive();
@@ -343,8 +345,8 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     projectId: id,
     act: z.enum(INSIGHT_ACTS),
-    filedVia: insightFiledViaSchema.nullish(),
-    tone: insightToneSchema.nullish(),
+    filedVia: z.enum(INSIGHT_SIGNAL_FILED_VIA).nullish(),
+    tone: z.enum(INSIGHT_SIGNAL_TONES).nullish(),
     fromBoard: z.boolean().nullish(),
   }),
   z.object({

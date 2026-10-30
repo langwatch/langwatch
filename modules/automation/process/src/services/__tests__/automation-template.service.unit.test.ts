@@ -425,7 +425,7 @@ describe("testFireTrigger", () => {
       const payload = JSON.stringify(sentSlack[0]?.payload);
       // A populated dashboard link — the empty `<|Open dashboard>` symptom
       // is precisely a missing graph.url from a trace context.
-      expect(payload).toContain("/acme/analytics/custom/example-graph?lw_from=alert|");
+      expect(payload).toContain("/acme/analytics/custom/example-graph|");
       expect(payload).toContain("Traces count");
       expect(payload).toContain("is greater than");
       // The value line carries the example currentValue, not a blank.

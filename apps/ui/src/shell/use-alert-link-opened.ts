@@ -9,7 +9,7 @@ import {
   alertLinkOpened,
   isAlertLinkSearch,
   searchWithoutAlertMarker,
-} from "@langwatch/automation-contract";
+} from "@langwatch/automation-contract/alert-link";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useSession } from "@langwatch/browser-host/session";
 import { useEffect } from "react";

@@ -3903,9 +3903,6 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
-      '@langwatch/insight-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/insight/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
