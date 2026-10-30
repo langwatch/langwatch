@@ -552,9 +552,10 @@ Feature: Scenario run hooks: setup and teardown
       Given a saved HTTP agent with a stored auth token and signing secret
       When the person changes the hooks URL to another origin
       Then the Hooks tab says to type the auth token again on the Auth tab
+      And it says the stored signing secret stops working when the agent is saved, as a move keeps no old secret
       And the form makes a new signing secret by itself
       And back on the saved origin, the stored signing secret stands again
-      And a refused save names the Auth tab
+      And a refused save names the Auth tab and says to type the stored value again
 
     @integration
     Scenario: Clearing the hooks URL in the agent form removes the signing secret
@@ -562,3 +563,17 @@ Feature: Scenario run hooks: setup and teardown
       When the person clears the hooks URL
       Then the Hooks tab says saving deletes the signing secret
       And the save sends no signing secret
+
+    @integration
+    Scenario: The agent form says the old signing secret stays valid for 24 hours after a rotation
+      Given a saved HTTP agent with a hooks URL and a stored signing secret
+      When the person rotates the signing secret
+      Then the Hooks tab says the old secret stays valid for 24 hours after saving, so the receiver can switch
+      And once saved, the Hooks tab says until when the previous secret stays valid
+      And the save never sends the previous signing secret back
+
+    @integration
+    Scenario: The agent form states the hooks URL https rule
+      Given an HTTP agent form on the Hooks tab
+      Then it says the hooks URL needs https
+      And that plain http reaches only a local address, on deployments that allow local addresses, checked when the hook runs

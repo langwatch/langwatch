@@ -53,6 +53,7 @@ function Harness({ showVariablesTab = false }: { showVariablesTab?: boolean }) {
         hasStoredSigningSecret: false,
         onRotateSigningSecret: () => void 0,
         moveNotice: null,
+        previousSigningSecretValidUntil: null,
       }}
     />
   );

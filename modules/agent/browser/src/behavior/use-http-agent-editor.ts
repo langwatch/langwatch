@@ -10,6 +10,7 @@ import {
 } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import { computeBestMatchMappings, hasScenarioInputMapping } from "@langwatch/scenario-contract";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { isSameOrigin } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -140,9 +141,12 @@ const HTTP_EDITOR_KEYS = [
   "hooksSigningSecret",
 ] as const;
 
+/** Keys only the server writes: a value a save sends is ignored, so the editor never sends one. */
+const HTTP_SERVER_KEYS = ["hooksPreviousSigningSecret"] as const;
+
 /**
  * An edited HTTP config over the stored one: what the editor wrote wins, and what it does not
- * edit (a timeout, a dev tunnel, declared inputs) stays as stored.
+ * edit (a timeout, a dev tunnel, declared inputs) stays as stored. Server-only keys are dropped.
  */
 export function httpConfigKeepingStored({
   stored,
@@ -154,7 +158,7 @@ export function httpConfigKeepingStored({
   if (!stored) return edited;
 
   const kept: Partial<HttpAgentConfig> = { ...stored };
-  for (const key of HTTP_EDITOR_KEYS) delete kept[key];
+  for (const key of [...HTTP_EDITOR_KEYS, ...HTTP_SERVER_KEYS]) delete kept[key];
   return { ...kept, ...edited };
 }
 
@@ -216,6 +220,8 @@ function unmappedVariableIds(input: {
 export interface HooksMoveNotice {
   retypeAuth: boolean;
   retypeHeaders: boolean;
+  /** A move keeps no previous signing secret: the stored one stops working on save. */
+  replacesSigningSecret: boolean;
 }
 
 /**
@@ -236,7 +242,19 @@ function hooksMoveNotice(input: {
     return null;
   }
 
-  return { retypeAuth, retypeHeaders };
+  return { retypeAuth, retypeHeaders, replacesSigningSecret: Boolean(saved.hooksSigningSecret) };
+}
+
+/**
+ * When the previous signing secret a same-origin rotation left stops working, while it still
+ * works; else null. The server keeps it 24 hours (agent-secrets.rules.ts,
+ * withPreviousSigningSecret).
+ */
+function previousSigningSecretValidUntil(saved: HttpAgentConfig | undefined): string | null {
+  const expiresAt = saved?.hooksPreviousSigningSecret?.expiresAt;
+  if (!expiresAt) return null;
+
+  return toEpochMs(expiresAt) > nowInstant().epochMilliseconds ? expiresAt : null;
 }
 
 /**
@@ -397,6 +415,7 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
     hooks: {
       ...signingSecret,
       moveNotice: hooksMoveNotice({ hooksUrl: draft.hooksUrl, saved: savedConfig }),
+      previousSigningSecretValidUntil: previousSigningSecretValidUntil(savedConfig),
     },
     stored: {
       authType: savedConfig?.auth?.type,
