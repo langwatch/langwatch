@@ -246,6 +246,30 @@ describe("given a page of judged rows", () => {
       expect(counters).toMatchObject({ failed: 1, skipped: 0 });
     });
 
+    /** @scenario "A run whose own decision model cannot answer skips its rows by reason" */
+    it.each([
+      "classifier_key_invalid",
+      "classifier_rate_limited",
+      "classifier_provider_unavailable",
+    ])(
+      "records a skip named by its reason where an own decision model could not answer (%s)",
+      (skipReason) => {
+        const { records, counters } = mapInstantEvalPage({
+          tenantId: "project-1",
+          runId: "run-1",
+          questions: booleanOnly,
+          rows: [{ TraceId: "t1", annoyed: null }],
+          keys: keys("t1"),
+          skipReason,
+          now: NOW,
+        });
+
+        expect(records[0]).toMatchObject({ Status: "skipped", Error: skipReason });
+        expect(counters).toMatchObject({ skipped: 1, failed: 0 });
+        expect(instantEvalPageFailureRate({ counters, questions: 1 })).toBe(0);
+      },
+    );
+
     /** @scenario "A page stopped part way keeps the judgements it made" */
     it("names the stop on the rows it reached, not the page's own skip", () => {
       const { records } = mapInstantEvalPage({

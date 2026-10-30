@@ -27,6 +27,17 @@ const registry = {
       "Fix those fields and send the request again; retrying it unchanged will fail identically",
     ],
   },
+  projects_required: {
+    tips: [
+      'Send `projects`, a list of the project ids to read, or the string "all" for every project the key can read; the answer\'s `params.dashboard_context_projects` lists what was read',
+      "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
+    ],
+  },
+  projects_unreadable: {
+    tips: [
+      "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",
+    ],
+  },
   malformed_request: {
     tips: [
       "The body could not be parsed at all; check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
@@ -40,6 +51,14 @@ const registry = {
   request_body_unreadable: {
     tips: [
       "This usually means the connection closed before the body finished uploading. Send the request again.",
+    ],
+  },
+
+  // ---- identity ----
+  identity_password_reset_required: {
+    tips: [
+      "This password may no longer be used; request a reset link from the forgot-password screen and choose a new password",
+      "Signing in through single sign-on, a social provider or a passkey is not affected",
     ],
   },
 
@@ -154,12 +173,14 @@ const registry = {
       "Read `meta.parameters`; it lists the reserved names the request set for itself",
       "`dashboard_context_period_start` and `dashboard_context_period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
       "`dashboard_context_granularity_seconds` is likewise supplied by the surface; drop it from `parameters` and send it as the request's own `granularitySeconds` field instead",
+      "`dashboard_context_sources` and `dashboard_context_projects` are likewise supplied; drop them from `parameters` and send the request's own `sources` and `projects` fields instead",
     ],
   },
   lwql_reserved_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names declared with the wrong type",
-      "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
+      "Declare each time-window name as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
+      "Declare `dashboard_context_sources` and `dashboard_context_projects` as `Array(String)`, for example `{dashboard_context_sources:Array(String)}`",
     ],
   },
   lwql_result_too_large: {
@@ -233,7 +254,7 @@ const registry = {
   saved_workbench_charts_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
-      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {
@@ -305,6 +326,12 @@ const registry = {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  legacy_project_key_ingestion_only: {
+    tips: [
+      "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_permission_not_delegable: {
     tips: [
       "A wider key or a higher role does not change this; make the change in LangWatch instead",
@@ -320,6 +347,12 @@ const registry = {
   project_visibility_too_wide: {
     tips: ["Bind the key to the teams or projects it works with instead of the whole organization"],
     docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  docs_origin_not_registered: {
+    tips: [
+      "Open the playground from a documentation site this installation registers, or paste an API key instead",
+      "A self-hosted installation registers more documentation sites in its configuration",
+    ],
   },
   api_key_reserved_name: {
     tips: [

@@ -421,3 +421,72 @@ describe("given postgresApprovedViewStatement", () => {
     });
   });
 });
+
+describe("given the named collection's values an engine table is built on", () => {
+  const CONNECTION = {
+    host: "postgres.internal",
+    port: 5432,
+    database: "langwatch",
+    user: "lwql_ro",
+    password: "reader-password-DO-NOT-LOG",
+  };
+  const fingerprintOf = (overrides: Partial<typeof CONNECTION> = {}) =>
+    postgresMapping.credentialFingerprint({ connection: { ...CONNECTION, ...overrides } });
+  const engineTable = (credentialFingerprint?: string) =>
+    postgresMapping.engineTableStatement({
+      names: {
+        database: "langwatch",
+        restrictedUser: "langwatch_lwql",
+        settingsProfile: "lwql_restricted",
+        keyMapTable: "api_key_tenants",
+        tenantSetting: "custom_api_key_hash",
+      },
+      table: "annotations_pg",
+      columns: [{ name: "TenantId", type: "String" }],
+      collection: "lwql_postgres_langwatch",
+      postgresRelation: "lwql_annotations",
+      ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
+    });
+
+  describe("when the fingerprint is taken twice from the same values", () => {
+    /** @scenario "An engine table carries a fingerprint of the named collection's values, never the password" */
+    it("is the same short digest both times", () => {
+      expect(fingerprintOf()).toBe(fingerprintOf());
+      expect(fingerprintOf()).toMatch(/^[0-9a-f]{16}$/);
+    });
+  });
+
+  describe("when the password, or any other value, changes", () => {
+    /** @scenario "An engine table carries a fingerprint of the named collection's values, never the password" */
+    it.each([
+      { password: "rotated-reader-password" },
+      { host: "postgres.other" },
+      { port: 5433 },
+      { database: "other" },
+      { user: "other_reader" },
+    ])("gives a different fingerprint for %o", (change) => {
+      expect(fingerprintOf(change)).not.toBe(fingerprintOf());
+    });
+  });
+
+  describe("when an engine table is stamped with it", () => {
+    /** @scenario "An engine table carries a fingerprint of the named collection's values, never the password" */
+    it("carries the fingerprint in its comment and never the password", () => {
+      const fingerprint = fingerprintOf();
+      const statement = engineTable(fingerprint);
+
+      expect(statement).toMatch(
+        new RegExp(
+          `SETTINGS postgresql_connection_pool_size = \\d+ COMMENT '[^']*${fingerprint}'$`,
+        ),
+      );
+      expect(statement).toContain(postgresMapping.credentialComment({ fingerprint }));
+      expect(statement).not.toContain(CONNECTION.password);
+    });
+
+    /** @scenario "No engine table is rebuilt until ClickHouse holds the app's collection values" */
+    it("carries no comment while it is unstamped", () => {
+      expect(engineTable()).not.toContain("COMMENT");
+    });
+  });
+});

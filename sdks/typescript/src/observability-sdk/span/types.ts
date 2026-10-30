@@ -138,7 +138,7 @@ export interface LangWatchSpan extends Span {
   setType(type: SpanType): this;
 
   /**
-   * The model sent in the API request (e.g. 'gpt-4'), as opposed to the response model.
+   * The model sent in the API request (e.g. 'gpt-6-luna'), as opposed to the response model.
    * @param model - The request model name
    * @returns this
    */

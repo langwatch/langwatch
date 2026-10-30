@@ -9,6 +9,11 @@ import {
   type ChartQueryError,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 
+import { PROJECT_GATE } from "./widget-access.ts";
+
+/** The code of the one answer a missing, foreign or unreadable project gets. */
+const PROJECT_NOT_FOUND_CODE = "project_not_found";
+
 /** What one query has answered since the frame (re)started. */
 export interface WidgetQueryRecord {
   /** The latest result's report; null when that result carried none. */
@@ -49,6 +54,11 @@ export function recordQueryFailure({
   const record = records[queryName] ?? UNANSWERED;
   const attempts = (record.failure?.attempts ?? 0) + 1;
   return { ...records, [queryName]: { ...record, failure: { error, attempts } } };
+}
+
+/** No query has answered since the frame (re)started, so the card has nothing to draw yet. */
+export function awaitsFirstAnswer(records: WidgetQueryRecords): boolean {
+  return !Object.values(records).some((record) => record.hasResult);
 }
 
 /** What all of a widget's queries together say about their data. */
@@ -101,7 +111,10 @@ function isFinal(failure: NonNullable<WidgetQueryRecord["failure"]>): boolean {
 
 /** Every gate the queries were last refused for, sorted; empty when none was refused for access. */
 function gatesRefused(records: readonly WidgetQueryRecord[]): readonly string[] {
-  const gates = records.flatMap((record) => record.failure?.error.missingGates ?? []);
+  const gates = records.flatMap((record) => [
+    ...(record.failure?.error.missingGates ?? []),
+    ...(record.failure?.error.code === PROJECT_NOT_FOUND_CODE ? [PROJECT_GATE] : []),
+  ]);
   return [...new Set(gates)].toSorted();
 }
 

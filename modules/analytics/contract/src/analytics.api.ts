@@ -1,4 +1,4 @@
-import type { RestCredentialPrincipal } from "@langwatch/authorization";
+import type { Authorization, RestCredentialPrincipal } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
@@ -26,6 +26,7 @@ import type {
   DashboardWidgetQuery,
   DashboardWidgetSource,
 } from "./features/dashboard-widget/dashboard-widget-definition.ts";
+import type { LangWatchQLKeyReach } from "./features/lwql/analytics-lwql.schemas.ts";
 import type {
   LangWatchQLCaller,
   LangWatchQLExecuteInput,
@@ -71,31 +72,45 @@ export interface DashboardWidgetDefinitionInput {
   readonly source?: DashboardWidgetSource;
 }
 
+/** The proof a cost-gated read runs under (ADR-177 v4.15). */
+export type CostReadOptions = { readonly authorization: Authorization };
+
 /** The callable analytics capability shared by process peers. */
 export interface AnalyticsApi {
   getTimeseries(
     input: AnalyticsTimeseriesInput,
     options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult>;
-  getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult>;
+  /** The cost-gated reads below take the route's `cost:view` proof, as a series takes its own. */
+  getFeedbacks(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsFeedbacksResult>;
   /**
    * The same feedbacks as {@link getFeedbacks}, newest first, one bounded page at a time.
    * Refuses a cursor from another project or filter set with `validation_error`.
    */
   getFeedbacksPage(
     input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
+    options: CostReadOptions,
   ): Promise<AnalyticsFeedbacksPageResult>;
-  getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult>;
-  filterOptions(input: {
-    readonly projectId: string;
-    readonly field: string;
-    readonly startDate: number;
-    readonly endDate: number;
-    readonly query?: string;
-    readonly key?: string;
-    readonly subkey?: string;
-    readonly filters?: Record<string, unknown>;
-  }): Promise<AnalyticsFilterOption[]>;
+  getTopUsedDocuments(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsTopDocumentsResult>;
+  filterOptions(
+    input: {
+      readonly projectId: string;
+      readonly field: string;
+      readonly startDate: number;
+      readonly endDate: number;
+      readonly query?: string;
+      readonly key?: string;
+      readonly subkey?: string;
+      readonly filters?: Record<string, unknown>;
+    },
+    options: { readonly authorization: Authorization },
+  ): Promise<AnalyticsFilterOption[]>;
   /** Refuses the dashboard-widget surface unless Dashboards and LangWatchQL are both on. */
   assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void>;
@@ -168,6 +183,19 @@ export interface AnalyticsApi {
    */
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  /**
+   * Proves each project exists and holds `analytics:view` for the member, so a widget never
+   * stores a project its writer could not read.
+   * @throws LangWatchQLProjectNotFoundError with no id, for any that does not.
+   */
+  assertProjectsReadable(input: {
+    userId?: string;
+    /** The API key writing, whose reach a run would apply. It decides over `userId`. */
+    reach?: LangWatchQLKeyReach;
+    projectIds: readonly string[];
+    /** The board's or run's project: a member's projects must lie in its organization. */
+    anchorProjectId: string;
+  }): Promise<void>;
   /**
    * Re-validates the statement with the full policy, eval gate taken from the caller's
    * answer, then runs it inside the fixed wrapper its pass names: an instant-eval read.

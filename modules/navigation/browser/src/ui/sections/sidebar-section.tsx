@@ -1,8 +1,10 @@
-import { SidebarSection as SidebarSectionView } from "@langwatch/design-system/app-shell";
+import {
+  SidebarSectionLabel,
+  SidebarSection as SidebarSectionView,
+} from "@langwatch/design-system/app-shell";
 import type React from "react";
 
 import { useSidebarSectionState } from "../../behavior/use-sidebar-section-state.ts";
-import { SideMenuSectionLabel } from "../elements/side-menu-section-label.tsx";
 
 type SidebarSectionProps = {
   id: string;
@@ -28,7 +30,7 @@ export const SidebarSection = ({
   return (
     <SidebarSectionView
       label={label}
-      heading={<SideMenuSectionLabel label={label} />}
+      heading={<SidebarSectionLabel label={label} />}
       isExpanded={isExpanded}
       onToggle={toggleSection}
       showExpanded={showExpanded}

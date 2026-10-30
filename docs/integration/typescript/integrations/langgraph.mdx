@@ -55,7 +55,7 @@ const GraphState = z.object({
 type GraphStateType = z.infer<typeof GraphState>;
 
 async function main(message: string): Promise<string> {
-  const llm = new ChatOpenAI({ model: "gpt-5" });
+  const llm = new ChatOpenAI({ model: "gpt-6-luna" });
 
   const generate = async (state: GraphStateType) => {
     const result = await llm.invoke([
@@ -83,6 +83,12 @@ console.log(await main("Hey, tell me a joke"));
 ```
 
 The `LangWatchCallbackHandler` captures LangGraph node executions and workflow patterns. Pass the callback handler to your compiled graph via `withConfig()`.
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the graph's nodes and LLM calls.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 

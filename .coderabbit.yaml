@@ -10,7 +10,7 @@
 #  (2) AC3 deterministic rules move to the langwatch oxlint plugin (and two
 #      semgrep rules); path_instructions keeps only judgment rules.
 #  (3) AC5 leaves CodeRabbit entirely (path_instructions cannot see PR
-#      descriptions). It now lives in .github/workflows/deployment-impact-check.yml.
+#      descriptions). It is now computed from the diff by cmd/deployimpact.
 #  (4) Pre-merge checks are off: workflows gate the PR title and description,
 #      and the docstring rule lives in path_instructions below.
 #

@@ -157,9 +157,19 @@ const ACCESS_DENIAL_CODES = new Set([
   "api_key_permission_denied",
   "api_key_not_owned",
   "api_key_scope_violation",
-  // The CLI's own status-derived codes, for a 401/403 that carried no body.
-  "unauthorized",
+  // The CLI's own status-derived code, for a 403 that carried no body.
   "forbidden",
+]);
+
+/**
+ * The codes that mean Langy's own sandbox key was missing or refused: an
+ * internal failure, never the reader's access and never theirs to sign in to.
+ */
+const SANDBOX_CREDENTIAL_CODES = new Set([
+  "missing_api_key",
+  "unauthorized",
+  // The CLI's local "Not logged in" check, which never reaches the server.
+  "not_authenticated",
 ]);
 
 /**
@@ -172,6 +182,9 @@ const normalizedCode = (domain: LangWatchHandledErrorShape): string =>
 
 const isAccessDenial = (domain: LangWatchHandledErrorShape): boolean =>
   ACCESS_DENIAL_CODES.has(normalizedCode(domain));
+
+const isSandboxCredentialFailure = (domain: LangWatchHandledErrorShape): boolean =>
+  SANDBOX_CREDENTIAL_CODES.has(normalizedCode(domain));
 
 const asCount = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
@@ -214,7 +227,13 @@ function limitSentence(limit: LangyToolFailureLimit): string {
 /**
  * What to SAY about a failure.
  */
-function describeFailure(domain: LangWatchHandledErrorShape): {
+function describeFailure({
+  domain,
+  toolName,
+}: {
+  domain: LangWatchHandledErrorShape;
+  toolName: string | undefined;
+}): {
   message: string;
   detail?: string;
   limit?: LangyToolFailureLimit;
@@ -227,6 +246,16 @@ function describeFailure(domain: LangWatchHandledErrorShape): {
   const limit = readPlanLimit(domain);
   if (limit) {
     return { message: limitSentence(limit), limit, remediationApplies: false };
+  }
+
+  // The CLI's own text and tips say "run langwatch login": true on a laptop
+  // (a local tool), a dead end in a sandbox the reader cannot open.
+  if (isSandboxCredentialFailure(domain) && !toolName?.startsWith(LOCAL_TOOL_PREFIX)) {
+    return {
+      message: "Langy hit an internal error and couldn't complete this step.",
+      detail: "This is on our side, not your access. There is nothing for you to set up.",
+      remediationApplies: false,
+    };
   }
 
   if (isAccessDenial(domain)) {
@@ -316,11 +345,17 @@ function buildNoDomainPresentation(
 }
 
 /** Levels 1 and 2: a domain error document, structured into card copy. */
-function buildDomainPresentation(
-  title: string,
-  domain: LangWatchHandledErrorShape,
-  raw: string | undefined,
-): LangyToolErrorPresentation {
+function buildDomainPresentation({
+  title,
+  domain,
+  raw,
+  toolName,
+}: {
+  title: string;
+  domain: LangWatchHandledErrorShape;
+  raw: string | undefined;
+  toolName: string | undefined;
+}): LangyToolErrorPresentation {
   // New-CLI documents carry the trace links top-level on the error; documents
   // written by an older CLI keep them nested under `meta.trace` (the shared
   // REST handler's wire shape). Prefer the top-level fields, fall back to the
@@ -331,7 +366,7 @@ function buildDomainPresentation(
   const traceUrl = safeHttpUrl(domain.traceUrl) ?? safeHttpUrl(trace?.traceUrl);
   const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
   const docsUrl = safeHttpUrl(domain.docUrl);
-  const { message, detail, limit, remediationApplies } = describeFailure(domain);
+  const { message, detail, limit, remediationApplies } = describeFailure({ domain, toolName });
 
   return {
     title: `${title} failed`,
@@ -367,8 +402,9 @@ export function presentLangyToolError({
   title: string;
   errorText: unknown;
   /**
-   * The tool that failed. Only used to tell the sandbox's `gh` apart from the
-   * developer's own — see {@link githubAppNotInstalled}.
+   * The tool that failed. Tells the sandbox's `gh` apart from the developer's
+   * own (see {@link githubAppNotInstalled}), and a `local_*` tool keeps the
+   * CLI's own credential words instead of the sandbox copy.
    */
   toolName?: string;
 }): LangyToolErrorPresentation {
@@ -380,7 +416,7 @@ export function presentLangyToolError({
   if (notInstalled) return notInstalled;
 
   return domain
-    ? buildDomainPresentation(title, domain, raw)
+    ? buildDomainPresentation({ title, domain, raw, toolName })
     : buildNoDomainPresentation(title, raw);
 }
 

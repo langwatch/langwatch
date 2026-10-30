@@ -18,6 +18,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Context } from "hono";
 
 import { ProjectInvalidCredentialsError } from "../errors.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { EndpointVariables, ServiceContext } from "./response.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,6 +82,25 @@ export function credentialPrincipalOfToken(
     ...(resolved.isLangySessionKey === undefined
       ? {}
       : { isLangySessionKey: resolved.isLangySessionKey }),
+  };
+}
+
+/**
+ * The key-door principal of an API key a project door resolved: the one mapping, so a run at the
+ * key door and a write at a project door judge the same key the same way. None for other kinds.
+ */
+export function keyPrincipalOfApiKey(
+  resolved: RestResolvedProjectCredential,
+): Extract<RestKeyCredentialPrincipal, { kind: "apiKey" }> | undefined {
+  if (resolved.type !== "apiKey") return undefined;
+
+  return {
+    kind: "apiKey",
+    apiKeyId: resolved.apiKeyId,
+    userId: resolved.userId,
+    organizationId: resolved.organizationId,
+    resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
+    ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
   };
 }
 
@@ -169,6 +189,7 @@ const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCre
 const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
 const keyCredentials = new WeakMap<Request, RestKeyDoorPrincipal>();
 const browserCallers = new WeakMap<Request, RestBrowserCaller>();
+const routeTemplates = new WeakMap<Request, string>();
 
 /** The project door states what it resolved, once per request. */
 export function recordProjectCredential(
@@ -202,6 +223,16 @@ export function recordKeyCredential(request: Request, credential: RestKeyDoorPri
 /** The byte door states who it verified, once per request. */
 export function recordBrowserCaller(request: Request, caller: RestBrowserCaller): void {
   browserCallers.set(request, caller);
+}
+
+/** The runtime states the route a request matched, as `METHOD /path/:template`, before its door. */
+export function recordRouteTemplate(request: Request, template: string): void {
+  routeTemplates.set(request, template);
+}
+
+/** The route template the runtime recorded, never the concrete URL; outside a route, says so. */
+export function routeTemplateOf(request: Request): string {
+  return routeTemplates.get(request) ?? `${request.method} (no route template)`;
 }
 
 /**
@@ -240,6 +271,11 @@ export function browserSessionOfRequest(request: Request): { id: string } | null
   const sessionId = browserCallers.get(request)?.sessionId;
 
   return sessionId ? { id: sessionId } : null;
+}
+
+/** The value of `callerAddressContext`: the address the door resolved once for this request. */
+export function callerAddressOfRequest(request: Request): string | null {
+  return ClientAddress.resolvedFor(request) ?? null;
 }
 
 function actorIdOf(credential: RestResolvedProjectCredential): string {

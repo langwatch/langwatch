@@ -15,14 +15,13 @@ import { ArrowUpRight, Plus } from "lucide-react";
 import { BarChart2 } from "react-feather";
 
 import { useDashboards } from "../../../behavior/use-dashboards.ts";
-import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import { projectAwaitsFirstTrace, useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { DocumentsMetrics } from "../../../ui/sections/documents-metrics.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { LLMMetrics } from "../../../ui/sections/llm-metrics.tsx";
 import { UserMetrics } from "../../../ui/sections/user-metrics.tsx";
-import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 function AnalyticsContent() {
   const host = useAnalyticsHost();
@@ -30,7 +29,8 @@ function AnalyticsContent() {
 
   return (
     <AnalyticsLayout tab="overview">
-      {project && !project.hasFirstMessage && (
+      {/* An aggregate receives no traces of its own (ADR-177), so it is not asked to send any. */}
+      {project && projectAwaitsFirstTrace(project) && (
         <Box marginBottom={6}>
           <Banner
             status="warning"
@@ -138,4 +138,4 @@ export function CustomReportsSection({ slug }: { slug: string }) {
  * `analytics:view` permission and layout chrome are stated once in
  * `analytics-routes.tsx`, in front of the same loader registry.
  */
-export default withAggregateAnalyticsGate("Analytics", AnalyticsContent);
+export default AnalyticsContent;

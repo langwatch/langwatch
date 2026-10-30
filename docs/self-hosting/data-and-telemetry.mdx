@@ -1,5 +1,5 @@
 ---
-title: "Data and telemetry: every outbound connection of a self-hosted install"
+title: "Data and telemetry: every outbound connection"
 description: "Every connection a self-hosted install can open to LangWatch and to third parties, what each one carries, and the switch that stops it"
 sidebarTitle: Data and telemetry
 keywords: telemetry, usage report, upgrade diagnostics, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup, egress, outbound connections, firewall, managed models, instant evals, air-gapped, LANGWATCH_CONNECT_DISABLED
@@ -25,17 +25,87 @@ The chart ships a NetworkPolicy for the Langy agent only, and the AI Gateway's N
 
 ### To LangWatch
 
-| Host and path | Component | When | What it carries | How to stop it |
-|---|---|---|---|---|
-| `app.langwatch.ai/api/track_usage` | Workers | Daily at 12:00 UTC, when no license on the install names a hosted service | The usage report: counts, timestamps, the release, optional email domains and hostname. No content | `DISABLE_USAGE_STATS=true` |
-| `connect.langwatch.ai/v1/stats` | Workers | The same report, sent here instead once a license names a hosted service | The same report | `DISABLE_USAGE_STATS=true` |
-| `connect.langwatch.ai/v1/license/sync` | Workers daily; App on demand from the License page | For organizations whose license names a hosted service | The license token, the instance id, the release, and the member and lite member counts | `LANGWATCH_CONNECT_DISABLED=true` |
-| `connect.langwatch.ai/v1/upgrade-diagnostics` | Workers, on the hourly upgrade check after a step fails; App when an admin presses **Send to LangWatch** | The install has a license and an upgrade step failed. The hourly check sends when the [upgrade diagnostics](#upgrade-diagnostics) switch is on; an admin can send from the step either way | One failed step's [diagnostics](#upgrade-diagnostics), with secrets masked. Its error, report and log lines are what the step wrote, and can quote what it was processing | Automatic sends only: switch **Upgrade diagnostics** off on **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`. Both automatic and admin sends: `LANGWATCH_CONNECT_DISABLED=true` |
-| `connect.langwatch.ai/v1/license/activate` | App | An admin redeems an activation code on the License page | The activation code and the instance id | Paste a license instead, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1/instant-evals/classify` | App, Workers | The license names [Instant Evals](#instant-evals), no admin switched it off, and Instant Evals run or a sentence typed in trace search is routed | Content: the text being judged and the questions | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1` | AI Gateway | The license names [managed models](#managed-models), no admin switched it off, and a virtual-key request names a `langwatch/` model | Content: the full model request and response | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1/usage`, `/v1/budget` | App | Someone opens **Settings, Connect** or **Settings, Checkup** in an organization whose license names a hosted service, an admin switches a service on or off, or an admin sets a spending cap | The license token and the instance id; the cap | `LANGWATCH_CONNECT_DISABLED=true`. A blocked or failed read shows usage as unavailable on the page |
-| `connect.langwatch.ai`, `gateway.langwatch.ai` | App | Someone runs the reach checks on **Settings, Checkup** | A `HEAD` request with no body, to test the firewall | `LANGWATCH_CONNECT_DISABLED=true`, or do not run them |
+#### `app.langwatch.ai/api/track_usage`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers |
+| When | Daily at 12:00 UTC, when no license on the install names a hosted service |
+| What it carries | The usage report: counts, timestamps, the release, optional email domains and hostname. No content |
+| How to stop it | `DISABLE_USAGE_STATS=true` |
+
+#### `connect.langwatch.ai/v1/stats`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers |
+| When | The same report, sent here instead once a license names a hosted service |
+| What it carries | The same report |
+| How to stop it | `DISABLE_USAGE_STATS=true` |
+
+#### `connect.langwatch.ai/v1/license/sync`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers daily; App on demand from the License page |
+| When | For organizations whose license names a hosted service |
+| What it carries | The license token, the instance id, the release, and the member and lite member counts |
+| How to stop it | `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `connect.langwatch.ai/v1/upgrade-diagnostics`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers, on the hourly upgrade check after a step fails; App when an admin presses **Send to LangWatch** |
+| When | The install has a license and an upgrade step failed. The hourly check sends when the [upgrade diagnostics](#upgrade-diagnostics) switch is on; an admin can send from the step either way |
+| What it carries | One failed step's [diagnostics](#upgrade-diagnostics), with secrets masked. Its error, report and log lines are what the step wrote, and can quote what it was processing |
+| How to stop it | Automatic sends only: switch **Upgrade diagnostics** off on **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`. Both automatic and admin sends: `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `connect.langwatch.ai/v1/license/activate`
+
+| Property | Details |
+| --- | --- |
+| Component | App |
+| When | An admin redeems an activation code on the License page |
+| What it carries | The activation code and the instance id |
+| How to stop it | Paste a license instead, or `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `gateway.langwatch.ai/v1/instant-evals/classify`
+
+| Property | Details |
+| --- | --- |
+| Component | App, Workers |
+| When | The license names [Instant Evals](#instant-evals), no admin switched it off, and Instant Evals run or a sentence typed in trace search is routed |
+| What it carries | Content: the text being judged and the questions |
+| How to stop it | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `gateway.langwatch.ai/v1`
+
+| Property | Details |
+| --- | --- |
+| Component | AI Gateway |
+| When | The license names [managed models](#managed-models), no admin switched it off, and a virtual-key request names a `langwatch/` model |
+| What it carries | Content: the full model request and response |
+| How to stop it | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `gateway.langwatch.ai/v1/usage`, `/v1/budget`
+
+| Property | Details |
+| --- | --- |
+| Component | App |
+| When | Someone opens **Settings, Connect** or **Settings, Checkup** in an organization whose license names a hosted service, an admin switches a service on or off, or an admin sets a spending cap |
+| What it carries | The license token and the instance id; the cap |
+| How to stop it | `LANGWATCH_CONNECT_DISABLED=true`. A blocked or failed read shows usage as unavailable on the page |
+
+#### `connect.langwatch.ai`, `gateway.langwatch.ai`
+
+| Property | Details |
+| --- | --- |
+| Component | App |
+| When | Someone runs the reach checks on **Settings, Checkup** |
+| What it carries | A `HEAD` request with no body, to test the firewall |
+| How to stop it | `LANGWATCH_CONNECT_DISABLED=true`, or do not run them |
+
 
 The license token is a hash of the license key, not the key itself. The instance id is minted once into the install's own database.
 
@@ -53,14 +123,60 @@ With a license that names hosted services, the install also runs the daily licen
 
 ### To services you configure
 
-| Host | Component | When | What it carries | How to stop it |
-|---|---|---|---|---|
-| Model providers you add (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex AI, Gemini, custom endpoints and others) | AI Gateway, NLP, LangEvals; App when it validates a key | A feature uses a provider you configured | Content: prompts and completions | Remove the provider |
-| `dlp.googleapis.com` | App, Workers | Strict PII redaction, only when the in-cluster Presidio call fails and Google credentials are set (`app.evaluators.google.enabled`) | Content: span text to redact | `LANGWATCH_DISABLE_GOOGLE_DLP=true` |
-| `api.github.com`, or `GITHUB_LANGY_HOST` | App | The Langy GitHub App is configured | Repository and installation metadata, token requests | Leave the GitHub App unset |
-| `github.com`, `api.github.com`, `codeload.github.com`, the npm registry, and hosts on a project's allow-list | Langy agent | `networkPolicy.allowExternalHttps: true` on the Langy agent. The NetworkPolicy then allows `:443` to any public address. The agent's L7 egress adapter checks proxied traffic against the allow-list, which is cooperative by default | git clone and push, `gh`, `npm` | Off by default, see [Langy networking](/self-hosting/langy/networking-and-egress) |
-| Twilio, ElevenLabs | Workers, AI Gateway | Voice scenarios with your credentials | Audio | Do not configure them |
-| Webhooks, Slack, email (SMTP, SES, SendGrid, Resend), SSO identity providers, S3 or Azure Blob storage, OTLP export | App, Workers; NLP for workflow HTTP blocks | You configure them | What you configure them to send | Do not configure them |
+#### Model providers you add (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex AI, Gemini, custom endpoints and others)
+
+| Property | Details |
+| --- | --- |
+| Component | AI Gateway, NLP, LangEvals; App when it validates a key |
+| When | A feature uses a provider you configured |
+| What it carries | Content: prompts and completions |
+| How to stop it | Remove the provider |
+
+#### `dlp.googleapis.com`
+
+| Property | Details |
+| --- | --- |
+| Component | App, Workers |
+| When | Strict PII redaction, only when the in-cluster Presidio call fails and Google credentials are set (`app.evaluators.google.enabled`) |
+| What it carries | Content: span text to redact |
+| How to stop it | `LANGWATCH_DISABLE_GOOGLE_DLP=true` |
+
+#### `api.github.com`, or `GITHUB_LANGY_HOST`
+
+| Property | Details |
+| --- | --- |
+| Component | App |
+| When | The Langy GitHub App is configured |
+| What it carries | Repository and installation metadata, token requests |
+| How to stop it | Leave the GitHub App unset |
+
+#### `github.com`, `api.github.com`, `codeload.github.com`, the npm registry, and hosts on a project's allow-list
+
+| Property | Details |
+| --- | --- |
+| Component | Langy agent |
+| When | `networkPolicy.allowExternalHttps: true` on the Langy agent. The NetworkPolicy then allows `:443` to any public address. The agent's L7 egress adapter checks proxied traffic against the allow-list, which is cooperative by default |
+| What it carries | git clone and push, `gh`, `npm` |
+| How to stop it | Off by default, see [Langy networking](/self-hosting/langy/networking-and-egress) |
+
+#### Twilio, ElevenLabs
+
+| Property | Details |
+| --- | --- |
+| Component | Workers, AI Gateway |
+| When | Voice scenarios with your credentials |
+| What it carries | Audio |
+| How to stop it | Do not configure them |
+
+#### Webhooks, Slack, email (SMTP, SES, SendGrid, Resend), SSO identity providers, S3 or Azure Blob storage, OTLP export
+
+| Property | Details |
+| --- | --- |
+| Component | App, Workers; NLP for workflow HTTP blocks |
+| When | You configure them |
+| What it carries | What you configure them to send |
+| How to stop it | Do not configure them |
+
 
 Presidio runs inside LangEvals, in the cluster. Strict PII redaction stays in the cluster unless the Google DLP fallback above is set up.
 
@@ -68,13 +184,51 @@ Presidio runs inside LangEvals, in the cluster. Strict PII redaction stays in th
 
 Libraries inside the images can call third parties on their own. A self-hosted install switches each of these off by default: the code, the images and the `npx @langwatch/server` launcher set the defaults below, and the Helm chart sets them again in a ConfigMap. The images carry the tokenizer files and the model prices they need.
 
-| Host | Component | What it would do | Default | How to turn it on |
-|---|---|---|---|---|
-| `api.trycloudflare.com` and the Cloudflare tunnel edge; `cloudflare-dns.com`, `dns.google` | Workers | Open a public `*.trycloudflare.com` hostname to the worker's voice media listener, so phone calls can reach it | Off: the app leaves the tunnel off on a self-hosted production install, and the chart sets `VOICE_TUNNEL=false` | `VOICE_TUNNEL=true` on the Workers. Or set `VOICE_PUBLIC_BASE_URL` to your own hostname, which needs no tunnel |
-| `checkpoint.prisma.io` | App (the upgrade Job, or the app's first boot) | Prisma's version check while `pnpm task upgrade` applies migrations: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
-| `openaipublic.blob.core.windows.net` | App, Workers, LangEvals | Download a tokenizer file for token counting | Never: the app image ships every file and sets `TIKTOKENS_PATH`, and the LangEvals image ships them in its tiktoken cache | No switch |
-| `raw.githubusercontent.com` | LangEvals | Download the LiteLLM model price list at startup | Never: LangEvals prices model calls from LangWatch's own model catalog, shipped in the image, on top of the list bundled with the pinned LiteLLM | No switch |
-| `t.explodinggradients.com` | LangEvals | RAGAS usage analytics: a random id, the RAGAS version, provider and model names, request counts | Off: LangEvals, its image and the chart set `RAGAS_DO_NOT_TRACK=true` | `RAGAS_DO_NOT_TRACK=false` |
+#### `api.trycloudflare.com` and the Cloudflare tunnel edge; `cloudflare-dns.com`, `dns.google`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers |
+| What it would do | Open a public `*.trycloudflare.com` hostname to the worker's voice media listener, so phone calls can reach it |
+| Default | Off: the app leaves the tunnel off on a self-hosted production install, and the chart sets `VOICE_TUNNEL=false` |
+| How to turn it on | `VOICE_TUNNEL=true` on the Workers. Or set `VOICE_PUBLIC_BASE_URL` to your own hostname, which needs no tunnel |
+
+#### `checkpoint.prisma.io`
+
+| Property | Details |
+| --- | --- |
+| Component | App (the upgrade Job, or the app's first boot) |
+| What it would do | Prisma's version check while `pnpm task upgrade` applies migrations: CLI version, hashed project path, database type, command name |
+| Default | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher |
+| How to turn it on | No switch |
+
+#### `openaipublic.blob.core.windows.net`
+
+| Property | Details |
+| --- | --- |
+| Component | App, Workers, LangEvals |
+| What it would do | Download a tokenizer file for token counting |
+| Default | Never: the app image ships every file and sets `TIKTOKENS_PATH`, and the LangEvals image ships them in its tiktoken cache |
+| How to turn it on | No switch |
+
+#### `raw.githubusercontent.com`
+
+| Property | Details |
+| --- | --- |
+| Component | LangEvals |
+| What it would do | Download the LiteLLM model price list at startup |
+| Default | Never: LangEvals prices model calls from LangWatch's own model catalog, shipped in the image, on top of the list bundled with the pinned LiteLLM |
+| How to turn it on | No switch |
+
+#### `t.explodinggradients.com`
+
+| Property | Details |
+| --- | --- |
+| Component | LangEvals |
+| What it would do | RAGAS usage analytics: a random id, the RAGAS version, provider and model names, request counts |
+| Default | Off: LangEvals, its image and the chart set `RAGAS_DO_NOT_TRACK=true` |
+| How to turn it on | `RAGAS_DO_NOT_TRACK=false` |
+
 
 Emails the install sends embed the LangWatch logo from `app.langwatch.ai`, so the recipient's mail client loads it when it shows images.
 
@@ -108,18 +262,32 @@ When the license names `managed_models` and no administrator switched it off, th
 
 The gateway sends the whole request (messages, tools, attachments) to that slot, and the response comes back through it. LangWatch serves it with model providers it holds keys for and meters it against the organization's budget.
 
-A request reaches the slot only when the caller names a `langwatch/<model>` model, for example `langwatch/gpt-5-mini`.
+A request reaches the slot only when the caller names a `langwatch/<model>` model, for example `langwatch/gpt-6-luna`.
 
-A bare model name, with no provider prefix, never reaches the slot. It is served by the organization's own providers, or refused with `model_not_recognized` when the slot is the only provider. A model with another provider prefix, for example `openai/gpt-5-mini`, stays with that provider, and its retries never fall back to the slot.
+A bare model name, with no provider prefix, never reaches the slot. It is served by the organization's own providers, or refused with `model_not_recognized` when the slot is the only provider. A model with another provider prefix, for example `openai/gpt-6-luna`, stays with that provider, and its retries never fall back to the slot.
 
 To remove the slot, switch managed models off on **Settings, Connect**, or set `LANGWATCH_CONNECT_DISABLED=true` for the whole install.
 
 ## The usage report and the license sync
 
-| Channel | Who sends it | Where it goes | What it carries | How to stop it |
-|---|---|---|---|---|
-| Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
-| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | A license token derived from the signed license key (a hash, not the key), the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch of its own. `LANGWATCH_CONNECT_DISABLED=true` stops it with everything else. An offline license never sends it |
+### Usage report
+
+| Property | Details |
+| --- | --- |
+| Who sends it | Every install: open source, offline license, or connected |
+| Where it goes | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service |
+| What it carries | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains |
+| How to stop it | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
+
+### License sync
+
+| Property | Details |
+| --- | --- |
+| Who sends it | Installs whose license names a hosted service |
+| Where it goes | `connect.langwatch.ai/v1/license/sync` |
+| What it carries | A license token derived from the signed license key (a hash, not the key), the instance id, the release, and the member and lite member counts |
+| How to stop it | It is a term of a license with hosted services and has no switch of its own. `LANGWATCH_CONNECT_DISABLED=true` stops it with everything else. An offline license never sends it |
+
 
 The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that.
 
@@ -163,6 +331,7 @@ LangWatch keeps a received bundle for 30 days, in the EU (Frankfurt), and then d
 | `DISABLE_USAGE_STATS=true` | Environment, or `app.telemetry.usage.enabled: false` in the chart | The usage report as a whole. No report leaves the install |
 | Usage counts and onboarding dates | **Settings, Checkup** | The optional category: usage counts, onboarding dates, email domains, model provider names. The report keeps the release, the counts of organizations and projects, and the sign-in method |
 | Hostname | **Settings, Checkup** | The `hostname` field alone. It names your own network, so it has a switch of its own |
+| `DISABLE_LANGWATCH_NOTICES=true` | Environment | The notices LangWatch sends back with the usage report reply, such as a new release or a security fix, shown on **Ops, Upgrades**. The report itself is still sent |
 | Upgrade diagnostics | **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true` | The automatic sending of a failed upgrade step's [diagnostics](#upgrade-diagnostics). It is not part of the usage report, and an admin can still send them from the step |
 
 `LANGWATCH_CONNECT_DISABLED=true` is one more switch, for an audit that has to prove absence rather than derive it from the license. With it set the install opens no connection to LangWatch for any reason, see [To LangWatch](#to-langwatch).

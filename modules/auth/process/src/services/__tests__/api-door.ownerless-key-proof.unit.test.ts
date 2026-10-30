@@ -15,11 +15,16 @@ import {
 } from "@langwatch/api/rest";
 import { internalActor, sealAuthorization } from "@langwatch/authorization";
 import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { moduleApi } from "@langwatch/module";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { ApiDoorService, type ApiDoorPeers } from "../api-door.service.ts";
+
+/** Every legacy key in this suite keeps full access; the default is legacy-project-key-scope's. */
+const KEEPS_FULL_ACCESS = createApiFixture<FeatureFlagApi>({ isEnabled: async () => true });
 
 const PROJECT = {
   id: "project-1",
@@ -78,6 +83,7 @@ function world() {
         Promise.resolve({ ok: false, reason: "unusable_credential" } as const),
       markUsed: () => {},
     },
+    featureFlags: KEEPS_FULL_ACCESS,
     cliProjects: { getCliAccessProject: refuseEverything },
     authz: {
       hasApiKeyPermission: async () => true,
@@ -165,7 +171,7 @@ const OWN_READ = {
 
 describe("a trace search with a key created on main", () => {
   describe("given a legacy project key", () => {
-    /** @scenario "A legacy project key reads its own project's traces" */
+    /** @scenario "A legacy project key on the full-access allowlist reads its own project's traces" */
     it("reads its own project's traces on an own-only proof", async () => {
       const { response, internal, ran } = await search({ "x-auth-token": "sk-lw-legacy" });
 
@@ -174,7 +180,7 @@ describe("a trace search with a key created on main", () => {
       expect(ran).toEqual(["search"]);
     });
 
-    /** @scenario "A legacy project key reads its own project's traces" */
+    /** @scenario "A legacy project key on the full-access allowlist reads its own project's traces" */
     it("still reads only its own project when it names another", async () => {
       const { internal } = await search({
         "x-auth-token": "sk-lw-legacy",

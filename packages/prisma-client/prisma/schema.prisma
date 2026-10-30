@@ -239,6 +239,10 @@ model User {
   /// answered. The browser's own permission is not stored here.
   /// Spec: specs/langy/langy-notifications.feature
   notificationPreferences       Json                     @default("{}")
+  /// When an operator marked this person's password as no longer trusted. A
+  /// password sign-in opens no session while it is set; any write of a new
+  /// password hash clears it. Spec: modules/auth/specs/forced-password-reset.feature
+  passwordResetRequiredAt       DateTime?
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]
@@ -1839,6 +1843,9 @@ model Project {
   name                String
   slug                String                    @unique
   apiKey              String                    @unique
+  /// When the legacy apiKey last authenticated a request, written at most once a
+  /// minute per project and process. Spec: modules/api-key/specs/request-credential-type.feature
+  legacyApiKeyLastUsedAt DateTime?
   /// Random per-project secret whose SHA-256 digest is this project's LangWatchQL
   /// SQL tenant capability in ClickHouse. Deliberately NOT the API key: the
   /// credential a caller authenticates with and the capability the database
@@ -2105,6 +2112,8 @@ model Monitor {
   threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @default(now()) @updatedAt
+  autoPausedAt      DateTime? // Set when the monitor paused itself because its evaluations mostly errored
+  autoPausedReason  String? // Why it paused itself; cleared with autoPausedAt when enabled again
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -2309,21 +2318,24 @@ model DashboardFavourite {
 /// made before the split were copied here with their ids, so stars and insight
 /// pointers still name them. No relation, per the database rule.
 model DashboardsV2 {
-  id             String         @id @default(nanoid())
+  id              String         @id @default(nanoid())
   /// The project that owns the board; only there can it be edited.
-  projectId      String
-  name           String
+  projectId       String
+  name            String
   /// Free text under the board's name; null until a member writes one.
-  description    String?
+  description     String?
   /// The member who created it; null for boards that predate authorship.
-  createdById    String?
+  createdById     String?
   /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
-  scope          DashboardScope @default(PROJECT)
+  scope           DashboardScope @default(PROJECT)
   /// The owning project's organization, stamped when the board is first set to
   /// ORGANIZATION; null before.
-  organizationId String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @default(now()) @updatedAt
+  organizationId  String?
+  /// Deprecated: unused since each widget query names its own sources (dashboards-v2 AC200,
+  /// 2026-10-28); dropped in a later migration, once no serving release reads it.
+  excludedOrigins Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
 
   @@index([projectId])
   @@index([organizationId, scope])
@@ -4763,6 +4775,11 @@ model ApiKey {
   /// by a customer create; rows before the column stay false.
   isSystemManaged Boolean @default(false)
 
+  /// The browser session that minted a docs session key (ADR-185), so signing
+  /// out of that session revokes it. NULL for every other key. Unindexed:
+  /// sign-out filters by the indexed `userId` first.
+  createdByBrowserSessionId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   // DELIBERATELY UNINDEXED: the Langy session-key reaper sweeps on
@@ -4818,12 +4835,17 @@ model NurturingProject {
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {
-  organizationId     String   @id
-  adminUserId        String?
-  seeded             Boolean  @default(false)
-  evaluationCount    Int      @default(0)
-  simulationRunCount Int      @default(0)
-  updatedAt          DateTime @updatedAt
+  organizationId       String    @id
+  adminUserId          String?
+  seeded               Boolean   @default(false)
+  evaluationCount      Int       @default(0)
+  simulationRunCount   Int       @default(0)
+  // Each coding signal is written by one conditional update (null-only, not-has, lt-day).
+  codingFirstSessionAt DateTime?
+  codingAgentTypes     String[]  @default([])
+  codingActiveDays     Int       @default(0)
+  codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  updatedAt            DateTime  @updatedAt
 }
 
 model BillingMeterCheckpoint {
@@ -7212,6 +7234,29 @@ model SelfHostedInstanceDiagnostic {
   slackAnnouncedAt DateTime?
 
   @@index([instanceId, receivedAt])
+}
+
+/// A notice LangWatch staff send every self-hosted install in Cloud's reply to its daily usage
+/// report (enterprise/modules/licensing/specs/self-hosted-notices.feature). Cloud only, and no
+/// tenant: every install receives every published notice that has not expired.
+model SelfHostedNotice {
+  id          String    @id
+  /// `info`, `warning` or `security`.
+  severity    String
+  title       String
+  body        String
+  /// An https link to read more; null where the notice names none.
+  url         String?
+  /// The release that fixes what the notice is about; an install on it or newer hides it.
+  fixedIn     String?
+  /// `draft`, `published` or `withdrawn`. Only a published notice that has not expired is sent.
+  status      String
+  expiresAt   DateTime?
+  publishedAt DateTime?
+  /// The staff member who published it, by user id.
+  publishedBy String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 /// One usage report, exactly as it arrived. Kept so a number on an install's

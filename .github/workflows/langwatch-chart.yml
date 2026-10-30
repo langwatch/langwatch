@@ -14,6 +14,8 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      - "tools/chartheap/**"
+      - "cmd/chartheap/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -50,6 +52,8 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      - "tools/chartheap/**"
+      - "cmd/chartheap/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -226,6 +230,13 @@ jobs:
         if: "!cancelled()"
         run: ./tests/redis-valkey.sh
 
+      # An install taking existing agent objects over in place needs the
+      # chart to render their selector, which can never change on a live
+      # Deployment. The default presets never set these values.
+      - name: "assert the langyagent takeover values render"
+        if: "!cancelled()"
+        run: ./tests/langyagent-takeover.sh
+
       # Static on purpose, and helm being installed here changes nothing.
       # Every `lookup` in the render step runs against no cluster and so
       # returns empty, which is exactly what a lookup the installer is
@@ -274,6 +285,18 @@ jobs:
       - name: "assert Redis memory ceiling is half the limit"
         if: "!cancelled()"
         run: ./tests/redis-maxmemory.sh
+
+      # The app's and the worker's heap ceiling follows the memory limit, so a heavy
+      # request or job does not exhaust a half-size heap with the container half empty.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: "!cancelled()"
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      - name: "assert app and worker heap ceiling follows the memory limit"
+        if: "!cancelled()"
+        working-directory: .
+        run: go run ./cmd/chartheap -prove-node infra/docker/Dockerfile
 
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade

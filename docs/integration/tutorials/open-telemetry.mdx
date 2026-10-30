@@ -551,12 +551,11 @@ def handle_request(user_query: str):
 
     try:
         completion = client.chat.completions.create(
-            model="gpt-5-mini",
+            model="gpt-6-luna",
             messages=[
                 {"role": "system", "content": f"Use this context: {context_docs}"},
                 {"role": "user", "content": user_query}
             ],
-            temperature=0.5,
         )
         llm_result = completion.choices[0].message.content
     except Exception as e:
@@ -685,12 +684,11 @@ async function handleRequest(userQuery: string): Promise<string> {
 
       // Call OpenAI
       const completion = await client.chat.completions.create({
-        model: "gpt-5-mini",
+        model: "gpt-6-luna",
         messages: [
           { role: "system", content: `Use this context: ${contextDocs.join(" ")}` },
           { role: "user", content: userQuery },
         ],
-        temperature: 0.5,
       });
 
       const llmResult = completion.choices[0].message.content || "No response";
@@ -845,6 +843,8 @@ span.end();
 <CodeGroup>
 
 ```python Python Best Practices
+import langwatch
+
 # Use context managers for automatic span management
 with langwatch.span(name="operation") as span:
     # Your code here
@@ -948,6 +948,8 @@ provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
 ```
 
 ```typescript TypeScript Debugging Migration
+import { setupObservability } from "langwatch/observability/node";
+
 // Enable detailed logging during migration
 const handle = setupObservability({
   langwatch: {

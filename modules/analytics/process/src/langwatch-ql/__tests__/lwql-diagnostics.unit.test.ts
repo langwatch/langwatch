@@ -283,9 +283,15 @@ describe("given a LangWatchQL query that ran", () => {
 
       expect(codesOf(diagnostics)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(find(diagnostics, "UNBOUNDED_TIME_RANGE")!.meta).toEqual({
-        view: "analytics.traces",
+        view: "traces",
         timeColumn: "OccurredAt",
       });
+    });
+
+    it("names the dataset as a statement does, without the database that holds it", () => {
+      const diagnostics = diagnose({ sql: "SELECT count() AS n FROM analytics.traces" });
+
+      expect(find(diagnostics, "UNBOUNDED_TIME_RANGE")!.message).toMatch(/^traces was read/);
     });
 
     it("reports each unbounded dataset once, and not the bounded one beside it", () => {
@@ -301,7 +307,7 @@ describe("given a LangWatchQL query that ran", () => {
         diagnostics
           .filter((diagnostic) => diagnostic.code === "UNBOUNDED_TIME_RANGE")
           .map((diagnostic) => diagnostic.meta?.view),
-      ).toEqual(["analytics.spans"]);
+      ).toEqual(["spans"]);
     });
 
     it("counts a condition written inside a common table expression as bounding it", () => {

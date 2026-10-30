@@ -87,6 +87,12 @@ export type {
   ClickHouseVendorClient,
   ClickHouseVendorClientOptions,
 } from "./managed-client.ts";
+export {
+  coalesceKeyOf,
+  DEFAULT_INSERT_COALESCE_MAX_ROWS,
+  InsertCoalescer,
+} from "./insert-coalescing.ts";
+export type { CoalescedInsertRunner } from "./insert-coalescing.ts";
 export type { RoutableStatementClient } from "./routingDriver.ts";
 export { PrivateTargetSchemaError, routingDriver } from "./routingDriver.ts";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool.ts";
@@ -298,7 +304,6 @@ export {
   fenceFor,
   HAND_WRITTEN_TENANT_PREDICATE,
   ownProjectIdOf,
-  PROOF_BEARING_PERMISSIONS,
   singleTenantOf,
   TenantReaderClientUnavailableError,
   TenantScopedReader,

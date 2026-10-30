@@ -132,6 +132,24 @@ describe("explainHandledError", () => {
       expect(description).toContain("Remove them");
     });
 
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("points a supplied sources or projects name at the request field", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["dashboard_context_sources", "dashboard_context_projects"] },
+        }),
+      );
+
+      expect(description).toContain("`sources` and `projects` fields");
+    });
+
+    it("does not promise that a reload brings a missing project back", () => {
+      const { description } = explainHandledError(shape({ code: "project_not_found" }));
+
+      expect(description).not.toContain("Reload");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("still says something useful when the supplied names are absent", () => {
       const { title, description } = explainHandledError(
@@ -786,6 +804,7 @@ describe("explainHandledError", () => {
     it.each([
       ["llm_error", 401, /API key/i],
       ["llm_error", 429, /rate limiting/i],
+      ["llm_error", 402, /no credit or budget left.*gateway budget/i],
       ["llm_error", 503, /trouble/i],
       ["evaluator_error", 403, /API key/i],
       ["agent_workflow_error", 429, /rate limiting/i],

@@ -31,7 +31,7 @@ An endpoint belongs to your **organization** and carries:
 
 Manage endpoints under **AI Gateway > Webhooks** (`/gateway/webhooks`) or over REST with an organization API key:
 
-```
+```text
 POST   /api/webhooks/v1/endpoints                    webhookEndpoints:manage
 GET    /api/webhooks/v1/endpoints                    webhookEndpoints:view
 GET    /api/webhooks/v1/endpoints/:id                webhookEndpoints:view
@@ -199,7 +199,7 @@ The envelope id embeds the budget, the bucket, the kind, and the period start, w
 
 Every delivery carries:
 
-```
+```http
 Content-Type: application/json
 X-LangWatch-Delivery-Id: <delivery id, stable across retries of this batch>
 X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256(secret, "<t>.<raw body>")>

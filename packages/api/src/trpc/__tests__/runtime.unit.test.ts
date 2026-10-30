@@ -39,10 +39,6 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
       logged.push({ fields, message });
     },
   }),
-  validationMeta: (error: { issues: { path: PropertyKey[]; code: string }[] }) => ({
-    issueCount: error.issues.length,
-    issues: error.issues.map((issue) => ({ path: "<redacted>", code: issue.code })),
-  }),
 }));
 
 interface ReviewApi {
@@ -292,35 +288,90 @@ describe("a mounted contract procedure", () => {
   });
 
   describe("given the handler answers a shape its declaration refuses", () => {
-    /** @scenario "A procedure whose answer breaks its output schema refuses rather than answering" */
-    it("logs the procedure and the issue path, never the body, and refuses the caller", async () => {
+    /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
+    it("logs the procedure and the issue path, never the body, and answers only what the schema allows", async () => {
       const { runtime } = harness();
       const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
 
       const declaration = reviewRouter({
-        getById: (async () => ({ id: "annotation-1", comment: 7 })) as never,
+        getById: (async () => ({
+          id: "annotation-1",
+          comment: 7,
+          secret: "stored-value",
+        })) as never,
       });
 
       const caller = runtime
         .mount(declaration, () => app)
         .createCaller({ actor: { id: "reviewer-1" } });
 
-      const refusal = await onTheWire(
-        caller.getById({ projectId: "project-1", id: "annotation-1" }),
-      );
+      const answer = await caller.getById({ projectId: "project-1", id: "annotation-1" });
 
-      expect(refusal.data.error).toBeNull();
-      expect(JSON.stringify(refusal)).not.toContain("annotation-1");
+      expect(answer).toEqual({ id: "annotation-1" });
       const record = logged[0] as { fields: Record<string, unknown>; message: string };
       expect(record.fields.endpoint).toBe("review.getById");
       expect(record.fields.protocol).toBe("trpc");
 
       expect(record.fields.validation).toEqual({
         issueCount: 1,
-        issues: [{ path: "<redacted>", code: "invalid_type" }],
+        issues: [{ path: "comment", code: "invalid_type", expected: "string" }],
       });
 
       expect(JSON.stringify(record)).not.toContain("annotation-1");
+      expect(JSON.stringify(record)).not.toContain("stored-value");
+    });
+
+    /** @scenario "A procedure that declares no output and answers a value is logged and answers nothing" */
+    it("logs a value from a procedure that declares no output, and answers nothing", async () => {
+      const { runtime } = harness();
+      const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
+
+      const declaration = reviewRouter({
+        getById: (async () => ({ id: "annotation-1", comment: "read" })) as never,
+        archive: (async () => ({ secret: "stored-value" })) as never,
+      });
+
+      const caller = runtime
+        .mount(declaration, () => app)
+        .createCaller({ actor: { id: "reviewer-1" } });
+
+      const answer = await caller.archive({ projectId: "project-1", id: "annotation-1" });
+
+      expect(answer).toBeUndefined();
+      const record = logged[0] as { fields: Record<string, unknown>; message: string };
+      expect(record.fields.endpoint).toBe("review.archive");
+      expect(record.fields.validation).toEqual({ expected: "void", received: "object" });
+      expect(JSON.stringify(record)).not.toContain("stored-value");
+    });
+
+    /** @scenario "A subscription that declares no output is refused" */
+    it("still refuses a subscription that declares no output, and logs it", async () => {
+      const { runtime } = harness();
+      const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
+
+      const streams = defineTrpcContract("feed")
+        .subscription("watch")
+        .withInput(z.object({ projectId: z.string() }))
+        .build();
+
+      const declaration = defineTrpcRouter(ReviewApi, streams)
+        .procedure("watch")
+        .withPermission("annotations:view")
+        .handle(async function* () {
+          yield { secret: "stored-value" };
+        } as never)
+        .build();
+
+      const caller = runtime
+        .mount(declaration, () => app)
+        .createCaller({ actor: { id: "reviewer-1" } });
+
+      await expect(caller.watch({ projectId: "project-1" })).rejects.toThrow(
+        /declares no output schema/,
+      );
+      const record = logged[0] as { fields: Record<string, unknown>; message: string };
+      expect(record.fields.endpoint).toBe("feed.watch");
+      expect(JSON.stringify(record)).not.toContain("stored-value");
     });
   });
 

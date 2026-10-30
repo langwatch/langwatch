@@ -3,6 +3,7 @@ import {
   type AnalyticsFilterValue as FilterParam,
   type FilterField,
 } from "@langwatch/analytics-contract";
+import { tenantSet } from "@langwatch/clickhouse-markers";
 import {
   customMetadataKeyCondition,
   customMetadataValueCondition,
@@ -19,7 +20,20 @@ type FilterConditionResult = {
 type FilterConditionOptions = {
   /** Bounds `sp.StartTime` to the window in `stored_spans` EXISTS subqueries; empty without one. */
   spanTimeBound?: string;
+  /** Whether the statement reads through a proof's fence instead of naming its own tenant. */
+  fenced?: boolean;
 };
+
+/**
+ * How an EXISTS subquery over a side table names its tenant. Fenced (ADR-177), it takes the
+ * proof's tenant set and the outer trace's own tenant, so a trace id two members share never
+ * matches the other member's row; otherwise the one project the statement binds.
+ */
+function sideTenantPredicate(alias: string, options?: FilterConditionOptions): string {
+  return options?.fenced
+    ? `${tenantSet()} AND ${alias}.TenantId = ts.TenantId`
+    : `${alias}.TenantId = {tenantId:String}`;
+}
 
 /** Builds one field's parameterized condition; `paramId` keeps combined filters' names apart. */
 type FilterConditionBuilder = (input: {
@@ -46,10 +60,10 @@ const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
  * evaluation_runs.TraceId is Nullable(String) while trace_summaries.TraceId is String.
  */
 function buildEvaluatorExistsCondition(additionalWhere: string): FilterConditionBuilder {
-  return ({ values, paramId }) => ({
+  return ({ values, paramId, options }) => ({
     sql: `EXISTS (
       SELECT 1 FROM evaluation_runs es
-      WHERE es.TenantId = {tenantId:String}
+      WHERE ${sideTenantPredicate("es", options)}
         AND es.TraceId IS NOT NULL
         AND assumeNotNull(es.TraceId) = ts.TraceId
         AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
@@ -141,7 +155,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
   "spans.type": ({ values, paramId, options }) => ({
     sql: `EXISTS (
       SELECT 1 FROM stored_spans sp
-      WHERE sp.TenantId = {tenantId:String}
+      WHERE ${sideTenantPredicate("sp", options)}
         AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
         AND sp.SpanAttributes['langwatch.span.type'] IN ({${paramId}_values:Array(String)})
     )`,
@@ -180,13 +194,13 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     `AND es.Label IS NOT NULL AND es.Label != '' AND es.Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')`,
   ),
 
-  "evaluations.passed": ({ values, paramId, key }) => {
+  "evaluations.passed": ({ values, paramId, key, options }) => {
     if (!key) return { sql: "1=0", params: {} };
     const passedValues = values.map((v) => (v === "true" || v === "1" ? 1 : 0));
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
-        WHERE es.TenantId = {tenantId:String}
+        WHERE ${sideTenantPredicate("es", options)}
           AND es.TraceId IS NOT NULL
           AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -199,7 +213,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     };
   },
 
-  "evaluations.score": ({ values, paramId, key }) => {
+  "evaluations.score": ({ values, paramId, key, options }) => {
     if (!key || values.length < 2) return { sql: "1=0", params: {} };
     const minScore = parseFloat(values[0] ?? "");
     const maxScore = parseFloat(values[1] ?? "");
@@ -214,7 +228,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
-        WHERE es.TenantId = {tenantId:String}
+        WHERE ${sideTenantPredicate("es", options)}
           AND es.TraceId IS NOT NULL
           AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -229,12 +243,12 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     };
   },
 
-  "evaluations.state": ({ values, paramId, key }) => {
+  "evaluations.state": ({ values, paramId, key, options }) => {
     if (!key) return { sql: "1=0", params: {} };
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
-        WHERE es.TenantId = {tenantId:String}
+        WHERE ${sideTenantPredicate("es", options)}
           AND es.TraceId IS NOT NULL
           AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -247,12 +261,12 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     };
   },
 
-  "evaluations.label": ({ values, paramId, key }) => {
+  "evaluations.label": ({ values, paramId, key, options }) => {
     if (!key) return { sql: "1=0", params: {} };
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
-        WHERE es.TenantId = {tenantId:String}
+        WHERE ${sideTenantPredicate("es", options)}
           AND es.TraceId IS NOT NULL
           AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -269,7 +283,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
   "events.event_type": ({ values, paramId, options }) => ({
     sql: `EXISTS (
       SELECT 1 FROM stored_spans sp
-      WHERE sp.TenantId = {tenantId:String}
+      WHERE ${sideTenantPredicate("sp", options)}
         AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
         AND sp.SpanAttributes['event.type'] IN ({${paramId}_values:Array(String)})
     )`,
@@ -292,7 +306,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
-        WHERE sp.TenantId = {tenantId:String}
+        WHERE ${sideTenantPredicate("sp", options)}
           AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND (${metricConditions.join(" OR ")})
@@ -316,7 +330,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
-        WHERE sp.TenantId = {tenantId:String}
+        WHERE ${sideTenantPredicate("sp", options)}
           AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND toFloat64OrNull(sp.SpanAttributes[{${paramId}_attrkey:String}]) >= {${paramId}_min:Float64}
@@ -346,7 +360,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
-        WHERE sp.TenantId = {tenantId:String}
+        WHERE ${sideTenantPredicate("sp", options)}
           AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND (${detailConditions.join(" OR ")})
@@ -473,6 +487,7 @@ function buildSpanTimeBound(timeWindow?: { startDate?: number; endDate?: number 
 export function generateClickHouseFilterConditions(
   filters: Partial<Record<FilterField, FilterParam>>,
   timeWindow?: { startDate?: number; endDate?: number },
+  { fenced = false }: { fenced?: boolean } = {},
 ): GenerateFilterConditionsResult {
   const conditions: string[] = [];
   const allParams: Record<string, unknown> = {};
@@ -480,7 +495,7 @@ export function generateClickHouseFilterConditions(
   let hasUnsupportedFilters = false;
 
   const spanBound = buildSpanTimeBound(timeWindow);
-  const options: FilterConditionOptions = { spanTimeBound: spanBound.sql };
+  const options: FilterConditionOptions = { spanTimeBound: spanBound.sql, fenced };
   Object.assign(allParams, spanBound.params);
 
   for (const [field, filterParams] of Object.entries(filters)) {
@@ -521,9 +536,13 @@ const legacyFiltersSchema = z.record(z.string(), analyticsFilterValueSchema);
 export function translateLegacyFilters({
   filters,
   window,
+  fenced,
 }: {
   filters: Readonly<Record<string, unknown>>;
   window?: { startDate?: number; endDate?: number };
+  fenced?: boolean;
 }): GenerateFilterConditionsResult {
-  return generateClickHouseFilterConditions(legacyFiltersSchema.parse(filters), window);
+  return generateClickHouseFilterConditions(legacyFiltersSchema.parse(filters), window, {
+    fenced,
+  });
 }

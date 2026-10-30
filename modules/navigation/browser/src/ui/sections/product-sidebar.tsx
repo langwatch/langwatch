@@ -322,8 +322,8 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 /**
- * The member's starred dashboards in every other product's sidebar, for a member who can reach
- * Dashboards; Dashboards lists its stars itself, and Settings is no product.
+ * The Dashboards section analytics lends, in the LLM Ops sidebar only and for a member who can
+ * reach Dashboards: the owner wants it in the project's sidebar, not everywhere.
  */
 function StarredDashboardsGroup({
   surface,
@@ -333,7 +333,7 @@ function StarredDashboardsGroup({
   showExpanded: boolean;
 }) {
   const { reachableProducts } = useReachableProducts();
-  if (!showExpanded || surface === "dashboards" || surface === "settings") return null;
+  if (!showExpanded || surface !== "llm-ops") return null;
   if (!reachableProducts.includes("dashboards")) return null;
   return <StarredDashboards />;
 }

@@ -64,6 +64,7 @@ import {
   createBeforeUserCreateHook,
   type BetterAuthHookCollaborators,
   type FindGoverningConnections,
+  PASSWORD_RESET_REQUIRED_CODE,
   type SessionMintClaims,
   type SignUpPolicy,
   toConcretePath,
@@ -284,7 +285,10 @@ async function countSignInAttempt({
   const [identifier] = findSubmittedAddresses(ctx.body);
   if (identifier === undefined) return;
 
-  const refused = ctx.context?.returned instanceof APIError;
+  const returned = ctx.context?.returned;
+  // A correct password refused only because it must be replaced is not a failed guess.
+  if (returned instanceof APIError && returned.body?.code === PASSWORD_RESET_REQUIRED_CODE) return;
+  const refused = returned instanceof APIError;
   try {
     await (refused
       ? signInLockout.recordFailure({ identifier })
@@ -522,9 +526,9 @@ export const createAuthOptions = ({
   database: storage,
 
   /**
-   * The only header BetterAuth's rate limiter (and session IP tracking) reads, with no
-   * trusted proxies so it takes the value as stated: the auth route restates the
-   * platform's resolved caller there (transport/auth.rest.ts).
+   * Read as stated, so safe only because every request reaching `handler` is restamped with
+   * the resolved caller first (requestStatingCaller, services/auth-door.service.ts).
+   * Server-side `api.*` calls skip BetterAuth's rate limiter.
    */
   advanced: {
     ipAddress: {
@@ -1179,6 +1183,7 @@ const transportOptions = ({
         await sendResetPassword({ email: user.email, token });
       },
       onPasswordReset: async ({ user }, request) => {
+        await database.clearPasswordResetRequirement({ userId: user.id });
         await auth.revokeAllBrowserSessions({ userId: user.id });
         passwordResetSession.recordPasswordReset({ userId: user.id, request });
       },
