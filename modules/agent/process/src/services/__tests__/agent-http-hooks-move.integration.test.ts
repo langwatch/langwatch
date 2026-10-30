@@ -30,7 +30,7 @@ async function savedWithHooks() {
     agent({
       auth: { type: "bearer", token: "tok_live_support" },
       hooksUrl: "https://support.example/hooks",
-      hooksSigningSecret: "whsec_0123456789abcdef",
+      hooksSigningSecret: "whsec_test_fixture_secret",
     }),
   );
   const read = agentWithoutSecrets(await app.getById({ id: "agent_1", projectId: "project_1" }));
