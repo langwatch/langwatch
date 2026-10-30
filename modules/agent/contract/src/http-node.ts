@@ -301,11 +301,17 @@ export type SecretReferencer = (input: {
   value: string;
 }) => Promise<string>;
 
+/** The text without leading and trailing `_`, in one linear scan (an anchored regex backtracks). */
+function trimUnderscores(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "_") start += 1;
+  while (end > start && text[end - 1] === "_") end -= 1;
+  return text.slice(start, end);
+}
+
 function upperSnake(text: string): string {
-  return text
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  return trimUnderscores(text.toUpperCase().replace(/[^A-Z0-9]+/g, "_"));
 }
 
 const MAX_NAME_ATTEMPTS = 3;

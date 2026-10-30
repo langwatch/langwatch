@@ -166,7 +166,7 @@ describe("AgentModule HTTP agent credentials", () => {
           hooksSigningSecret: "whsec_brand_new_0123456789",
         },
       }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "agent_stored_credentials_destination_mismatch" });
 
     expect(values).toEqual(before);
   });
