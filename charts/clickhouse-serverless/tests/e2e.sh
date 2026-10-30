@@ -414,17 +414,7 @@ build_and_load_image() {
   local preflight_image
   preflight_image="${PREFLIGHT_IMAGE:-alpine/k8s:1.34.9}"
   info "Pre-pulling preflight image: $preflight_image"
-  # alpine/k8s is a multi-platform list. `kind load docker-image` imports with
-  # --all-platforms and dies when the docker containerd store holds only the
-  # native child, so save the one platform and load the archive instead (the
-  # same path as ac11d-transition-guard.sh and upgrade-access.sh).
-  local platform archive
-  platform="linux/$(docker version --format '{{.Server.Arch}}' 2>/dev/null || echo amd64)"
-  archive="$(mktemp -d)/preflight-image.tar"
-  docker pull --platform "$platform" "$preflight_image" >/dev/null
-  docker save --platform "$platform" -o "$archive" "$preflight_image"
-  kind load image-archive "$archive" --name "$CLUSTER_NAME"
-  rm -f "$archive"
+  kind_side_load "$preflight_image"
 }
 
 main() {
