@@ -19,6 +19,7 @@ import {
 } from "@langwatch/scenario-contract";
 import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
+import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "@langwatch/webhook-signing";
 import { JSONPath } from "jsonpath-plus";
 
 import { applyAuthentication } from "../../rules/http-auth.rules.ts";
@@ -26,20 +27,19 @@ import {
   hookAnswer,
   hookIdempotencyKey,
   hookRequestBody,
-  hookSignature,
+  hookSigningSecretReferences,
   hooksUrlRefusal,
   hookTimeoutMessage,
   HttpHookError,
   IDEMPOTENCY_HEADER,
   readCappedBody,
   scrubbedObject,
-  SIGNATURE_HEADER,
   withoutReservedHookHeaders,
   type HookBodyStream,
   type HttpHookKind,
   type HttpHookObject,
-  type HttpHookRun,
 } from "../../rules/http-hook.rules.ts";
+import type { ScenarioCallRun } from "../../rules/scenario-call-run.rules.ts";
 import * as ScenarioSecretReferenceAdapter from "../../rules/scenario-secret-reference.rules.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
@@ -60,6 +60,8 @@ export interface ScenarioHttpResponse {
  * SSRF-safe implementation; no adapter reaches for native fetch.
  */
 export interface ScenarioHttp {
+  /** Whether the deployment's egress policy allows local addresses; absent means it does not. */
+  readonly localAddressesAllowed?: boolean;
   fetch(input: {
     url: string;
     init: {
@@ -69,6 +71,11 @@ export interface ScenarioHttp {
       /** Ends the request, redirects included, when a hook's budget runs out. */
       signal?: AbortSignal;
     };
+    /**
+     * Holds plain `http://` to a local address, judged at the address the fence admitted (a
+     * hook call); refused with an `HttpHookError` before any byte is sent.
+     */
+    plainHttpOnlyToLocal?: boolean;
   }): Promise<ScenarioHttpResponse>;
 }
 
@@ -187,7 +194,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     logger?: Logger;
     parameters?: RunParameterValues;
     httpPort?: ScenarioHttp;
-    run?: HttpHookRun;
+    run?: ScenarioCallRun;
     attemptId?: string;
   }): HttpSerializedHttpAgentChannel {
     return new HttpSerializedHttpAgentChannel(options);
@@ -199,7 +206,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
   private readonly logger: Logger;
   private readonly parameters: RunParameterValues;
   private readonly httpPort: ScenarioHttp | undefined;
-  private readonly run: HttpHookRun;
+  private readonly run: ScenarioCallRun;
   /** This execution of the run; a re-executed run gets a new one, and so a new idempotency key. */
   private readonly attemptId: string;
   /** What setup returned; an HTTP turn never changes it (ADR-188). */
@@ -219,7 +226,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     parameters?: RunParameterValues;
     httpPort?: ScenarioHttp;
     /** The scenario run the hook calls name; absent outside a scenario run. */
-    run?: HttpHookRun;
+    run?: ScenarioCallRun;
     /** Fixed in a test; a fresh id per channel otherwise. */
     attemptId?: string;
   }) {
@@ -308,9 +315,10 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
   }): Promise<HttpHookObject | undefined> {
     const { hooksUrl } = this.config;
     if (!hooksUrl) throw new HttpHookError({ message: "The agent has no hooks URL." });
-    const refusal = hooksUrlRefusal(hooksUrl);
+    const urlPolicy = { localAddressesAllowed: this.httpPort?.localAddressesAllowed ?? false };
+    const refusal = hooksUrlRefusal(hooksUrl, urlPolicy);
     if (refusal) throw new HttpHookError({ message: refusal });
-    const secret = this.signingSecret();
+    const secrets = this.signingSecrets();
     const { headers: propagationHeaders, traceId } = injectTraceContextHeaders({ headers: {} });
     const context = buildTemplateContext({
       input: { messages: [] },
@@ -320,7 +328,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     });
     const url = this.buildUrl(context, hooksUrl);
     // A template can render to a host the raw value did not show.
-    const renderedRefusal = hooksUrlRefusal(url);
+    const renderedRefusal = hooksUrlRefusal(url, urlPolicy);
     if (renderedRefusal) throw new HttpHookError({ message: renderedRefusal });
     const idempotencyKey = hookIdempotencyKey({
       run: this.run,
@@ -336,8 +344,8 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     });
     const headers = {
       ...withoutReservedHookHeaders(this.buildRequestHeaders(context, propagationHeaders)),
-      [SIGNATURE_HEADER]: hookSignature({
-        secret,
+      [WEBHOOK_SIGNATURE_HEADER]: signWebhookPayload({
+        secrets,
         body,
         timestampSeconds: Math.floor(nowInstant().epochMilliseconds / 1000),
       }),
@@ -354,19 +362,24 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     return answer && scrubbedObject(answer, (value) => this.scrub(value));
   }
 
-  /** The resolved signing secret; a hook is never sent unsigned. */
-  private signingSecret(): string {
-    const reference = this.config.hooksSigningSecret ?? "";
-    const secret = ScenarioSecretReferenceAdapter.resolve({
-      value: reference,
-      secrets: this.secrets,
-    });
-    if (secret === "" || secret.includes("{{")) {
+  /**
+   * The resolved signing secrets, newest first: the current one, which a hook is never sent
+   * without, then the one a rotation replaced while its window is open. A previous secret that
+   * no longer resolves is left out rather than failing the call.
+   */
+  private signingSecrets(): string[] {
+    const [current = "", ...previous] = hookSigningSecretReferences({
+      current: this.config.hooksSigningSecret ?? "",
+      previous: this.config.hooksPreviousSigningSecret,
+      now: nowInstant(),
+    }).map((value) => ScenarioSecretReferenceAdapter.resolve({ value, secrets: this.secrets }));
+    const isResolved = (secret: string) => secret !== "" && !secret.includes("{{");
+    if (!isResolved(current)) {
       throw new HttpHookError({
         message: "The hooks signing secret is missing. Rotate it in the agent's Hooks tab.",
       });
     }
-    return secret;
+    return [current, ...previous.filter(isResolved)];
   }
 
   private async postHook({
@@ -387,6 +400,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
       const response = await this.httpPort.fetch({
         url,
         init: { method: "POST", headers, body, signal },
+        plainHttpOnlyToLocal: true,
       });
       if (!response.body)
         return { status: response.status, text: await response.text(), overCap: false };
@@ -396,6 +410,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
       });
       return { status: response.status, text, overCap };
     } catch (error) {
+      if (error instanceof HttpHookError) throw error;
       if (signal.aborted) {
         throw new HttpHookError({
           message: hookTimeoutMessage(timeoutMs),

@@ -9,6 +9,7 @@ import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
 import { decodeScenarioEgressPolicy } from "@langwatch/scenario-contract";
 
 import type { ScenarioChildEnvironment } from "../../config.ts";
+import { HttpHookError, plainHttpHookRefusal } from "../../rules/http-hook.rules.ts";
 import type { ScenarioHttp, ScenarioHttpResponse } from "./http.serialized-http-agent.channel.ts";
 
 /**
@@ -17,20 +18,26 @@ import type { ScenarioHttp, ScenarioHttpResponse } from "./http.serialized-http-
  * other outbound request in the product does rather than through native `fetch`.
  */
 export class WorkerScenarioChildHttp implements ScenarioHttp {
+  readonly localAddressesAllowed: boolean;
   private readonly validate: ReturnType<typeof createSsrfUrlValidator>;
   private readonly rejectUnauthorized: boolean;
 
   constructor(environment: Pick<ScenarioChildEnvironment, "egressPolicy" | "rejectUnauthorized">) {
-    this.validate = createSsrfUrlValidator(decodeScenarioEgressPolicy(environment.egressPolicy));
+    const policy = decodeScenarioEgressPolicy(environment.egressPolicy);
+    this.localAddressesAllowed = !policy.blockLocal;
+    this.validate = createSsrfUrlValidator(policy);
     this.rejectUnauthorized = environment.rejectUnauthorized;
   }
 
   /**
-   * `init.signal` is passed through to every hop: a hook's budget ends the request, so a hook that
-   * never answers stops at its timeout and not at undici's 300 s default.
+   * A hook's plain `http://` is judged at the address the fence resolved, the one dialled (no
+   * redirect is followed). `init.signal` reaches every hop, so a hook that never answers stops at
+   * its budget and not at undici's 300 s default.
    */
   async fetch(input: Parameters<ScenarioHttp["fetch"]>[0]): Promise<ScenarioHttpResponse> {
     const validated = await this.validate(input.url);
+    const refusal = input.plainHttpOnlyToLocal ? plainHttpHookRefusal(validated) : null;
+    if (refusal) throw new HttpHookError({ message: refusal });
     return fetchValidatedDestination(validated, input.init, {
       rejectUnauthorized: this.rejectUnauthorized,
     });

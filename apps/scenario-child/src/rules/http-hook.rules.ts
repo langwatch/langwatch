@@ -5,24 +5,22 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
-import { createHmac } from "node:crypto";
+import { STATE_MAX_BYTES, type PreviousSigningSecret } from "@langwatch/agent-contract";
+import {
+  isPrivateOrLocalhostIP,
+  type SsrfValidationResult,
+} from "@langwatch/egress/ssrf/url-validator";
+import { Temporal, type Instant } from "@langwatch/time";
+import { WEBHOOK_SIGNATURE_HEADER } from "@langwatch/webhook-signing";
 
-import { STATE_MAX_BYTES } from "@langwatch/agent-contract";
+import type { ScenarioCallRun } from "./scenario-call-run.rules.ts";
 
 export type HttpHookKind = "setup" | "teardown";
 export type HttpHookObject = Record<string, unknown>;
 
-/** The scenario run a hook call names. */
-export interface HttpHookRun {
-  scenarioRunId?: string;
-  scenarioName?: string;
-  batchRunId?: string;
-}
-
 /** The longest piece of a failed hook's answer its error keeps, as the run record does. */
 export const HOOK_ERROR_BODY_CHARS = 1000;
 
-export const SIGNATURE_HEADER = "X-LangWatch-Signature";
 export const IDEMPOTENCY_HEADER = "Idempotency-Key";
 
 /**
@@ -57,7 +55,7 @@ export function hookRequestBody({
   state,
 }: {
   kind: HttpHookKind;
-  run: HttpHookRun;
+  run: ScenarioCallRun;
   idempotencyKey: string;
   params: Record<string, unknown>;
   state: HttpHookObject | null;
@@ -71,18 +69,28 @@ export function hookRequestBody({
   });
 }
 
-/** `t=<unix seconds>,v1=<hex HMAC-SHA256 of "t.body">`, the value a receiver checks. */
-export function hookSignature({
-  secret,
-  body,
-  timestampSeconds,
+/**
+ * The `{{ secrets.NAME }}` references a hook call is signed with, newest first: the current
+ * secret, then the one a rotation replaced while its window is open, as webhook deliveries sign
+ * through a rotation. An expiry that cannot be read counts as closed.
+ */
+export function hookSigningSecretReferences({
+  current,
+  previous,
+  now,
 }: {
-  secret: string;
-  body: string;
-  timestampSeconds: number;
-}): string {
-  const v1 = createHmac("sha256", secret).update(`${timestampSeconds}.${body}`).digest("hex");
-  return `t=${timestampSeconds},v1=${v1}`;
+  current: string;
+  previous?: PreviousSigningSecret;
+  now: Instant;
+}): string[] {
+  if (!previous) return [current];
+  let isOpen: boolean;
+  try {
+    isOpen = Temporal.Instant.compare(Temporal.Instant.from(previous.expiresAt), now) > 0;
+  } catch {
+    isOpen = false;
+  }
+  return isOpen ? [current, previous.secret] : [current];
 }
 
 /**
@@ -95,29 +103,25 @@ export function hookIdempotencyKey({
   attemptId,
   kind,
 }: {
-  run: HttpHookRun;
+  run: ScenarioCallRun;
   attemptId: string;
   kind: HttpHookKind;
 }): string {
   return [run.scenarioRunId, attemptId, kind].filter(Boolean).join(":");
 }
 
-const LOOPBACK_HOSTS = new Set(["localhost", "[::1]"]);
-// A real IPv4 loopback only: a bare "127." prefix would also match 127.evil.com.
-const IPV4_LOOPBACK = /^127(\.\d{1,3}){3}$/;
-
-function isLoopbackHost(hostname: string): boolean {
-  return (
-    LOOPBACK_HOSTS.has(hostname) || hostname.endsWith(".localhost") || IPV4_LOOPBACK.test(hostname)
-  );
-}
+const PLAIN_HTTP_REFUSAL =
+  "The hooks URL must use https://. Plain http:// is allowed only to a local address, where the deployment allows local addresses.";
 
 /**
- * Why a hooks URL is refused, or null. A hook call carries run data and an unsigned key header,
- * so it must be `https://`; plain `http://` is kept for loopback only, a receiver on the
- * developer's machine (the egress fence refuses loopback where local addresses are blocked).
+ * Why a hooks URL is refused before it is dialled, or null. A hook call carries run data and an
+ * unsigned key header, so it must be `https://`; plain `http://` passes only where the egress
+ * policy allows local addresses, and {@link plainHttpHookRefusal} holds it to one after resolving.
  */
-export function hooksUrlRefusal(hooksUrl: string): string | null {
+export function hooksUrlRefusal(
+  hooksUrl: string,
+  { localAddressesAllowed = false }: { localAddressesAllowed?: boolean } = {},
+): string | null {
   let parsed: URL;
   try {
     parsed = new URL(hooksUrl);
@@ -125,12 +129,27 @@ export function hooksUrlRefusal(hooksUrl: string): string | null {
     return "The hooks URL is not a valid URL.";
   }
   if (parsed.protocol === "https:") return null;
-  if (parsed.protocol === "http:" && isLoopbackHost(parsed.hostname)) return null;
-  return "The hooks URL must use https://. Plain http:// is allowed only for localhost.";
+  if (parsed.protocol === "http:" && localAddressesAllowed) return null;
+  return PLAIN_HTTP_REFUSAL;
+}
+
+/**
+ * Why a plain-http hook call is refused at the address the egress fence admitted, or null: only a
+ * private or loopback address (the egress classifier's "local") may take one, or an allowlisted
+ * host pinned without a lookup. A name that did not resolve is not shown to be local.
+ */
+export function plainHttpHookRefusal(destination: SsrfValidationResult): string | null {
+  if (destination.protocol !== "http:") return null;
+  if (destination.type === "unresolved") return PLAIN_HTTP_REFUSAL;
+  const { resolvedIp } = destination;
+  // An allowlisted host may be pinned without a lookup; the operator named it as internal.
+  if (resolvedIp === undefined)
+    return destination.type === "allowlisted" ? null : PLAIN_HTTP_REFUSAL;
+  return isPrivateOrLocalhostIP(resolvedIp) ? null : PLAIN_HTTP_REFUSAL;
 }
 
 const RESERVED_HOOK_HEADERS = new Set([
-  SIGNATURE_HEADER.toLowerCase(),
+  WEBHOOK_SIGNATURE_HEADER.toLowerCase(),
   IDEMPOTENCY_HEADER.toLowerCase(),
 ]);
 

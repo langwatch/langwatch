@@ -806,6 +806,9 @@
     },
     {
       "path": "./modules/insight/process"
+    },
+    {
+      "path": "./packages/webhook-signing"
     }
   ]
 }

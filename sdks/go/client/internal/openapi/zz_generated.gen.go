@@ -41668,6 +41668,10 @@ type CreateAgentJSONBody3 struct {
 			Setup    bool `json:"setup"`
 			Teardown bool `json:"teardown"`
 		} `json:"hooks,omitempty"`
+		HooksPreviousSigningSecret *struct {
+			ExpiresAt string `json:"expiresAt"`
+			Secret    string `json:"secret"`
+		} `json:"hooksPreviousSigningSecret,omitempty"`
 		HooksSigningSecret *string `json:"hooksSigningSecret,omitempty"`
 		HooksUrl           *string `json:"hooksUrl,omitempty"`
 		Inputs             *[]struct {

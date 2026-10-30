@@ -7520,6 +7520,21 @@
                           "hooksSigningSecret": {
                             "type": "string"
                           },
+                          "hooksPreviousSigningSecret": {
+                            "type": "object",
+                            "properties": {
+                              "secret": {
+                                "type": "string"
+                              },
+                              "expiresAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "secret",
+                              "expiresAt"
+                            ]
+                          },
                           "devTunnel": {
                             "type": "object",
                             "properties": {

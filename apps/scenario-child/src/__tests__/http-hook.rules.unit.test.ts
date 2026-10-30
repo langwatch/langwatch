@@ -3,8 +3,8 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-
+import type { SsrfValidationResult } from "@langwatch/egress/ssrf/url-validator";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,8 +12,9 @@ import {
   hookAnswer,
   hookIdempotencyKey,
   hookRequestBody,
+  hookSigningSecretReferences,
   hooksUrlRefusal,
-  hookSignature,
+  plainHttpHookRefusal,
   hookTimeoutMessage,
   HttpHookError,
   readCappedBody,
@@ -45,54 +46,46 @@ function streamOf(chunks: string[]): HookBodyStream & { cancelled: boolean; pull
   return stream;
 }
 
-/** What a receiver does: recompute over the raw bytes, compare in constant time. */
-function receiverAccepts({
-  header,
-  rawBody,
-  secret,
-}: {
-  header: string;
-  rawBody: Buffer;
-  secret: string;
-}) {
-  const [tPart, v1Part] = header.split(",");
-  const t = tPart?.replace(/^t=/, "") ?? "";
-  const v1 = v1Part?.replace(/^v1=/, "") ?? "";
-  const expected = createHmac("sha256", secret)
-    .update(Buffer.concat([Buffer.from(`${t}.`, "utf8"), rawBody]))
-    .digest("hex");
-  return v1.length === expected.length && timingSafeEqual(Buffer.from(v1), Buffer.from(expected));
-}
+const NOW = Temporal.Instant.from("2026-10-30T12:00:00Z");
 
-describe("hookSignature()", () => {
-  /** @scenario "An HTTP hook call is signed so the receiver can verify it" */
-  it("lets a receiver recompute it over the raw bytes with the secret", () => {
-    const body = hookRequestBody({
-      kind: "setup",
-      run,
-      idempotencyKey,
-      params: { name: "Zoë" },
-      state: null,
-    });
+describe("hookSigningSecretReferences()", () => {
+  const current = "{{ secrets.HTTP_SHOP_HOOKS_SIGNING_SECRET_2 }}";
+  const previousReference = "{{ secrets.HTTP_SHOP_HOOKS_SIGNING_SECRET }}";
 
-    const header = hookSignature({ secret: "whsec_test", body, timestampSeconds: 1_761_800_000 });
-
-    expect(header).toMatch(/^t=1761800000,v1=[0-9a-f]{64}$/);
+  /** @scenario "Rotating the hooks signing secret keeps the old one valid for 24 hours" */
+  it("is the current secret, then the previous one while it has not expired", () => {
     expect(
-      receiverAccepts({ header, rawBody: Buffer.from(body, "utf8"), secret: "whsec_test" }),
-    ).toBe(true);
+      hookSigningSecretReferences({
+        current,
+        previous: { secret: previousReference, expiresAt: "2026-10-31T11:59:59Z" },
+        now: NOW,
+      }),
+    ).toEqual([current, previousReference]);
   });
 
-  it("does not verify with another secret or a changed body", () => {
-    const body = hookRequestBody({ kind: "setup", run, idempotencyKey, params: {}, state: null });
-    const header = hookSignature({ secret: "whsec_test", body, timestampSeconds: 1 });
-
-    expect(receiverAccepts({ header, rawBody: Buffer.from(body), secret: "whsec_other" })).toBe(
-      false,
-    );
+  /** @scenario "The replaced hooks signing secret stops signing and is deleted once it expires" */
+  it("drops the previous secret once it has expired", () => {
     expect(
-      receiverAccepts({ header, rawBody: Buffer.from(`${body} `), secret: "whsec_test" }),
-    ).toBe(false);
+      hookSigningSecretReferences({
+        current,
+        previous: { secret: previousReference, expiresAt: "2026-10-30T12:00:00Z" },
+        now: NOW,
+      }),
+    ).toEqual([current]);
+  });
+
+  it("drops a previous secret whose expiry cannot be read", () => {
+    expect(
+      hookSigningSecretReferences({
+        current,
+        previous: { secret: previousReference, expiresAt: "tomorrow" },
+        now: NOW,
+      }),
+    ).toEqual([current]);
+  });
+
+  it("is the current secret alone when no rotation is open", () => {
+    expect(hookSigningSecretReferences({ current, now: NOW })).toEqual([current]);
   });
 });
 
@@ -136,26 +129,69 @@ describe("hooksUrlRefusal()", () => {
     expect(hooksUrlRefusal("https://shop.example.com/hooks")).toBeNull();
   });
 
-  it.each(["http://localhost:3000/hooks", "http://127.0.0.1/hooks", "http://[::1]/hooks"])(
-    "keeps plain http for the loopback host %s",
-    (url) => {
-      expect(hooksUrlRefusal(url)).toBeNull();
-    },
-  );
-
   /** @scenario "An HTTP hooks URL must use https" */
   it.each([
     "http://shop.example.com/hooks",
     "http://10.0.0.5/hooks",
+    "http://localhost:3000/hooks",
+    "http://127.0.0.1/hooks",
+    "http://[::1]/hooks",
     "ftp://shop.example.com",
     "http://127.evil.com/hooks",
     "http://127.0.0.1.nip.io/h",
-  ])("refuses %s", (url) => {
+  ])("refuses %s where local addresses are blocked", (url) => {
     expect(hooksUrlRefusal(url)).toMatch(/https/);
+  });
+
+  /** @scenario "Plain http reaches a hooks URL only at a local address where local addresses are allowed" */
+  it.each(["http://localhost:3000/hooks", "http://127.0.0.1/hooks", "http://[::1]/hooks"])(
+    "leaves plain http %s to the address check where local addresses are allowed",
+    (url) => {
+      expect(hooksUrlRefusal(url, { localAddressesAllowed: true })).toBeNull();
+    },
+  );
+
+  it("still refuses a scheme that is neither https nor http", () => {
+    expect(hooksUrlRefusal("ftp://localhost/h", { localAddressesAllowed: true })).toMatch(/https/);
   });
 
   it("refuses a value that is not a URL", () => {
     expect(hooksUrlRefusal("not a url")).toMatch(/not a valid URL/);
+  });
+});
+
+describe("plainHttpHookRefusal()", () => {
+  const destination = (protocol: string, address: Partial<SsrfValidationResult>) =>
+    ({
+      originalUrl: `${protocol}//receiver/hooks`,
+      hostname: "receiver",
+      port: protocol === "https:" ? 443 : 80,
+      protocol,
+      path: "/hooks",
+      type: "resolved",
+      resolvedIp: "93.184.216.34",
+      ...address,
+    }) as SsrfValidationResult;
+
+  /** @scenario "Plain http reaches a hooks URL only at a local address where local addresses are allowed" */
+  it.each([
+    ["a loopback address", { resolvedIp: "127.0.0.1" }],
+    ["a private address", { resolvedIp: "10.0.0.5" }],
+    ["an IPv6 loopback", { resolvedIp: "::1" }],
+    ["a host the operator allowlisted", { type: "allowlisted", resolvedIp: undefined }],
+  ] as const)("admits plain http to %s", (_name, address) => {
+    expect(plainHttpHookRefusal(destination("http:", address))).toBeNull();
+  });
+
+  it.each([
+    ["a public address", { resolvedIp: "93.184.216.34" }],
+    ["a name that did not resolve", { type: "unresolved", reason: "dns-failed" }],
+  ] as const)("refuses plain http to %s, naming https", (_name, address) => {
+    expect(plainHttpHookRefusal(destination("http:", address))).toMatch(/https/);
+  });
+
+  it("leaves https alone", () => {
+    expect(plainHttpHookRefusal(destination("https:", {}))).toBeNull();
   });
 });
 
