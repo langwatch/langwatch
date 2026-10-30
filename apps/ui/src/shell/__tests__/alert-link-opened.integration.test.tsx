@@ -18,8 +18,8 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
-import { cleanup, render } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { act, cleanup, render } from "@testing-library/react";
+import { MemoryRouter, useLocation, useSearchParams } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { useAlertLinkOpened } from "../use-alert-link-opened";
@@ -111,50 +111,76 @@ function hostServices(user: UiActor | null, analytics: UiAnalytics): UiHostServi
   };
 }
 
-/** Mounts the hook at an address the browser and the router both hold. */
+/** A router entry for an address, its pathname, query and hash apart. */
+function entryOf(at: string) {
+  const { pathname, search, hash } = new URL(at, "https://app.test");
+  return { pathname, search, hash };
+}
+
+/** Mounts the hook at an address, with a probe on the router's location and search setter. */
 function open({ user, at }: { user: UiActor | null; at: string }) {
-  window.history.replaceState({ idx: 0 }, "", at);
   const analytics = new RecordingAnalytics();
-  const entriesBefore = window.history.length;
+  const router: { address: string; state: unknown; setSearch?: (query: string) => void } = {
+    address: "",
+    state: undefined,
+  };
   function Probe() {
     useAlertLinkOpened();
+    const location = useLocation();
+    const [, setSearchParams] = useSearchParams();
+    router.address = `${location.pathname}${location.search}${location.hash}`;
+    router.state = location.state;
+    router.setSearch = (query) =>
+      setSearchParams((params) => {
+        params.set("q", query);
+        return params;
+      });
     return null;
   }
   render(
     <UiHostServicesContextProvider value={hostServices(user, analytics)}>
-      <MemoryRouter initialEntries={[at]}>
+      <MemoryRouter initialEntries={[{ ...entryOf(at), state: { from: "mail" } }]}>
         <Probe />
       </MemoryRouter>
     </UiHostServicesContextProvider>,
   );
-  const address = () =>
-    `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  return { analytics, address, entriesBefore };
+  return { analytics, router };
 }
 
 afterEach(cleanup);
 
+const OPENED = {
+  boundary: "automations",
+  action: "opened",
+  name: "alert_link",
+  attributes: { landedOn: "trace" },
+};
+
 describe("useAlertLinkOpened", () => {
   describe("when a signed-in member opens an alert's trace link", () => {
     /** @scenario "Opening an alert link sends one event and replaces the marker out of history" */
-    it("sends one automations.opened.alert_link and replaces the marker in place", () => {
-      const { analytics, address, entriesBefore } = open({
+    it("sends one automations.opened.alert_link and the router drops the marker", () => {
+      const { analytics, router } = open({
         user: ADA,
         at: "/demo/traces/trace-1?t=1&lw_from=alert#spans",
       });
 
-      expect(analytics.tracked).toEqual([
-        {
-          boundary: "automations",
-          action: "opened",
-          name: "alert_link",
-          attributes: { landedOn: "trace" },
-        },
-      ]);
-      expect(address()).toBe("/demo/traces/trace-1?t=1#spans");
-      expect(window.history.length).toBe(entriesBefore);
-      expect(window.history.state).toEqual({ idx: 0 });
+      expect(analytics.tracked).toEqual([OPENED]);
+      expect(router.address).toBe("/demo/traces/trace-1?t=1#spans");
+      expect(router.state).toEqual({ from: "mail" });
       expect(JSON.stringify(analytics.tracked)).not.toContain("trace-1");
+    });
+  });
+
+  describe("when the page later updates its search", () => {
+    /** @scenario "A later search update keeps the marker gone and sends nothing more" */
+    it("keeps the marker gone and the event sent once", () => {
+      const { analytics, router } = open({ user: ADA, at: "/demo/traces/trace-1?lw_from=alert" });
+
+      act(() => router.setSearch?.("errors"));
+
+      expect(router.address).toBe("/demo/traces/trace-1?q=errors");
+      expect(analytics.tracked).toEqual([OPENED]);
     });
   });
 
@@ -167,7 +193,7 @@ describe("useAlertLinkOpened", () => {
 
       const signedOut = open({ user: null, at: "/demo/traces/trace-1?lw_from=alert" });
       expect(signedOut.analytics.tracked).toEqual([]);
-      expect(signedOut.address()).toBe("/demo/traces/trace-1?lw_from=alert");
+      expect(signedOut.router.address).toBe("/demo/traces/trace-1?lw_from=alert");
     });
   });
 });

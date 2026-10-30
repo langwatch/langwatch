@@ -120,6 +120,20 @@ describe("nurturing's insight peer subscribers", () => {
     });
   });
 
+  describe("when insight records a filing with no owner", () => {
+    /** @scenario "A filing with no owner is tracked on its filer" */
+    it("tracks insights.filed.insight on the filer", async () => {
+      const { posthog, handle } = nurturing();
+
+      await handle(filing({ ownerUserId: null, filedByUserId: "user-2" }));
+      await settle();
+
+      expect(posthog.tracked.map(({ userId, event }) => [userId, event])).toEqual([
+        ["user-2", "insights.filed.insight"],
+      ]);
+    });
+  });
+
   describe("when insight records a filing with no owner and no filer", () => {
     /** @scenario "A filing with no owner and no filer sends nothing" */
     it("delivers no signal", async () => {
@@ -155,6 +169,25 @@ describe("nurturing's insight peer subscribers", () => {
           properties: { projectId: "project-1" },
         },
       ]);
+    });
+  });
+
+  describe("when the same insight fact is delivered twice", () => {
+    /** @scenario "The same insight fact delivered twice is tracked once" */
+    it("tracks it once", async () => {
+      const { posthog, handle } = nurturing();
+      const seen = insightFact({
+        type: INSIGHT_EVENT_TYPES.SEEN,
+        id: "evt-seen",
+        data: { insightId: "insight-1", userId: "user-1" },
+      });
+
+      await handle(seen);
+      await settle();
+      await handle(seen);
+      await settle();
+
+      expect(posthog.tracked.map(({ event }) => event)).toEqual(["insights.seen.insight"]);
     });
   });
 

@@ -4,8 +4,25 @@
  * facts. No title, body, query or insight id travels on. Pure.
  * @see enterprise/modules/nurturing/specs/insight-lifecycle.feature
  */
-import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
-import type { InsightFiledEventData, InsightReaderEventData } from "@langwatch/insight-contract";
+import type {
+  INSIGHT_SIGNAL_FILED_VIA,
+  INSIGHT_SIGNAL_TONES,
+  NurturingSignal,
+  NurturingSignalOf,
+} from "@langwatch/enterprise-nurturing-contract";
+import type {
+  InsightFiledEventData,
+  InsightFiledVia,
+  InsightReaderEventData,
+  InsightTone,
+} from "@langwatch/insight-contract";
+
+/** True only when both sets hold the same values: a value added to either side fails the build. */
+type SameValues<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const sameToneValues: SameValues<InsightTone, (typeof INSIGHT_SIGNAL_TONES)[number]> = true;
+const sameFiledViaValues: SameValues<InsightFiledVia, (typeof INSIGHT_SIGNAL_FILED_VIA)[number]> =
+  true;
+void [sameToneValues, sameFiledViaValues];
 
 /** The insight event a signal is raised from: one signal per event, keyed by its id. */
 type InsightEventContext = Readonly<{ eventId: string; tenantId: string; occurredAt: number }>;
@@ -17,7 +34,7 @@ const sourceOf = ({ eventId, tenantId, occurredAt }: InsightEventContext) => ({
   projectId: tenantId,
 });
 
-/** An insight filed, on its owner; none for one stored before owners with no filer either. */
+/** An insight filed, on its owner, else its filer; none when it names neither. */
 export function insightFiledSignal({
   data,
   context,

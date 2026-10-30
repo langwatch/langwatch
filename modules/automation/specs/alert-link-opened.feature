@@ -4,8 +4,8 @@ Feature: A member landing from an alert's link is counted
   chart in our own app) carry the marker `lw_from=alert`. Webhook bodies and
   custom templates are sent byte for byte as before, without it. When a
   signed-in member opens a marked link, the app sends one
-  `automations.opened.alert_link` event with the page it opened, then replaces
-  the marker out of the current history entry. The event carries no trace,
+  `automations.opened.alert_link` event with the page it opened, then the router
+  replaces the current history entry without the marker. The event carries no trace,
   chart or automation id and no URL.
 
   @unit
@@ -39,8 +39,15 @@ Feature: A member landing from an alert's link is counted
     Given a signed-in member
     When they open "/demo/traces/trace-1?t=1&lw_from=alert#spans"
     Then one automations.opened.alert_link is sent with landedOn "trace"
-    And the address becomes "/demo/traces/trace-1?t=1#spans" in the same history entry
+    And the address becomes "/demo/traces/trace-1?t=1#spans" in the same history entry, keeping its state
     And no trace id or URL is in the event
+
+  @integration
+  Scenario: A later search update keeps the marker gone and sends nothing more
+    Given a signed-in member opened "/demo/traces/trace-1?lw_from=alert"
+    When the page sets its search to "q=errors"
+    Then the address is "/demo/traces/trace-1?q=errors"
+    And automations.opened.alert_link was sent once
 
   @integration
   Scenario: A page without the marker, or a signed-out reader, sends nothing

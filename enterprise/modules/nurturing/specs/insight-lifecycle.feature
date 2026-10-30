@@ -2,7 +2,7 @@ Feature: Insight acts reach PostHog through nurturing
 
   Insight records each insight's filing and its owner's acts on its own pipeline.
   Nurturing subscribes to those facts and tells PostHog once per fact, on the
-  person who acted, as `insights.<act>.insight`. No title, body, query or insight
+  person who acted (a filing on its owner, else its filer), as `insights.<act>.insight`. No title, body, query or insight
   id is sent; a filing carries only how it was filed, its tone and whether it
   came from a board.
 
@@ -12,6 +12,11 @@ Feature: Insight acts reach PostHog through nurturing
     Then nurturing delivers one insight_acted signal for user-1 with act "filed"
     And PostHog tracks insights.filed.insight with filedVia "run", tone "bad" and fromBoard true
     And no title, body, query or insight id is in the properties
+
+  @unit
+  Scenario: A filing with no owner is tracked on its filer
+    When insight records a filing with no owner, filed by user-2
+    Then nurturing delivers one insight_acted signal for user-2 with act "filed"
 
   @unit
   Scenario: A filing with no owner and no filer sends nothing
@@ -29,6 +34,11 @@ Feature: Insight acts reach PostHog through nurturing
       | seen     |
       | archived |
       | kept     |
+
+  @unit
+  Scenario: The same insight fact delivered twice is tracked once
+    When insight's seen fact for user-1 is delivered twice
+    Then PostHog tracks insights.seen.insight once
 
   @unit
   Scenario: A renewed insight is not tracked

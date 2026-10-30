@@ -93,7 +93,7 @@ only in the log line, which Prometheus never reads.
 ## Insights and alerts
 
 Insight's own events reach PostHog through nurturing, once per event, on the
-person who acted: `filed` (on the owner), `seen`, `archived` and `kept`. No
+person who acted: `filed` (on the owner, else the filer), `seen`, `archived` and `kept`. No
 title, body, query, board name or insight id is sent. `renewed` is not sent: a
 renewal names no person, so there is nobody to count it on.
 
@@ -101,8 +101,9 @@ An alert's default email (the digest mail) and its default Slack message
 mark their links to our own app's traces and charts with
 `lw_from=alert`. Webhook bodies, custom templates and links to other sites are
 sent unchanged. A signed-in member who opens a marked link sends one
-`automations.opened.alert_link`, and the marker is then replaced out of the
-current history entry, so Back, a reload or a copied link does not carry it.
+`automations.opened.alert_link`, and the app's router then replaces the
+current history entry without the marker, so Back, a reload, a copied link or
+a later search update does not carry it or send the event again.
 
 Not counted yet:
 
