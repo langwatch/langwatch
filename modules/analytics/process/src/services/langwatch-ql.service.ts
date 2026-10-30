@@ -49,6 +49,7 @@ import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import { LangWatchQLTimeWindowService } from "./langwatch-ql-time-window.service.ts";
 import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service.ts";
@@ -61,6 +62,7 @@ const timeWindows = LangWatchQLTimeWindowService.create();
 const lwqlSchema = LangWatchQLSchemaService.create();
 const lwqlCompleteness = LangWatchQLCompletenessService.create();
 const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
+const lwqlRunTelemetry = LangWatchQLRunTelemetryService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -117,6 +119,7 @@ export class LangWatchQLService {
         hydration: deps.hydration,
         judging: deps.judging,
       }),
+      runTelemetry: lwqlRunTelemetry,
     });
   }
 
@@ -380,7 +383,20 @@ export class LangWatchQLService {
   }
 
   /** The same, over every project in the set — an API key's readable projects. */
-  async executeForProjects({
+  async executeForProjects(
+    input: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate & LangWatchQLMemberScope,
+  ): Promise<LangWatchQLQueryResult> {
+    try {
+      return await this.#executeForProjects(input);
+    } catch (error) {
+      // Every refusal on the way counts, not only the database's: a gate that turns most widget
+      // runs away is the failure worth an alert.
+      lwqlRunTelemetry.recordFailed({ telemetry: input.telemetry, sql: input.sql, error });
+      throw error;
+    }
+  }
+
+  async #executeForProjects({
     projects,
     protections,
     sql,
@@ -392,6 +408,7 @@ export class LangWatchQLService {
     memberWindows,
     isInstantEvalsEnabled,
     signal,
+    telemetry,
   }: LangWatchQLProjectSetExecuteInput &
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
@@ -446,6 +463,7 @@ export class LangWatchQLService {
       ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
+      telemetry,
     });
     // After the main query, never beside it: a refused or failed query costs no second read.
     const completeness = await lwqlCompleteness.assess({

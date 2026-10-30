@@ -193,6 +193,7 @@ function boardServer({ widgets = [WIDGET] }: { widgets?: readonly (typeof WIDGET
               sources?: unknown;
               projects?: unknown;
               excludeOrigins?: unknown;
+              telemetry?: unknown;
               granularitySeconds?: number;
               timeWindow?: { start: string; end: string };
             },
@@ -351,6 +352,16 @@ function openBoard({
 
 const sourcesOf = (runs: ReturnType<ReturnType<typeof boardServer>["runs"]>) =>
   runs.map((run) => run.sources);
+
+describe("given a widget placed on a board", () => {
+  /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+  it("sends the board and the widget with the card's run, for its log line", async () => {
+    const server = openBoard();
+    await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+    expect(server.runs()[0]?.telemetry).toEqual({ dashboardId: BOARD.id, widgetId: WIDGET.id });
+  });
+});
 
 describe("given a stored widget whose query stores no sources", () => {
   /** @scenario "AC200f Sources: a query that stores none counts application traces" */

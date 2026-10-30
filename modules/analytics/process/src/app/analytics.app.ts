@@ -771,6 +771,7 @@ export class AnalyticsModule
       ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
       ...(sources ? { sources } : {}),
       ...(signal ? { signal } : {}),
+      telemetry: { caller: "rest_api" },
       isInstantEvalsEnabled:
         statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
     });

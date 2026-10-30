@@ -32,6 +32,24 @@ const lwqlRunRequestSchemaDefinition = z.object({
 export interface LwqlRunRequestSchema extends Named<typeof lwqlRunRequestSchemaDefinition> {}
 export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDefinition;
 
+/** An id a log line records: bounded, so a run cannot write an arbitrary string into the logs. */
+const telemetryIdSchema = z.string().min(1).max(200);
+
+/** What the browser says of the widget a run is for. */
+const lwqlRunTelemetryRequestSchemaDefinition = z
+  .object({
+    dashboardId: telemetryIdSchema.optional(),
+    widgetId: telemetryIdSchema,
+    templateId: telemetryIdSchema.optional(),
+  })
+  .strict();
+export interface LwqlRunTelemetryRequestSchema extends Named<
+  typeof lwqlRunTelemetryRequestSchemaDefinition
+> {}
+export const lwqlRunTelemetryRequestSchema: LwqlRunTelemetryRequestSchema =
+  lwqlRunTelemetryRequestSchemaDefinition;
+export type LangWatchQLRunTelemetryRequest = z.infer<typeof lwqlRunTelemetryRequestSchema>;
+
 /**
  * One statement run, kept to the trace origins a dashboard query counts (dashboards-v2 AC200):
  * its stored list, or `null` when it stores none, which the server reads as the default. Absent,
@@ -42,6 +60,11 @@ const lwqlQueryRequestSchemaDefinition = z.object({
   sources: traceSourcesSchema.nullable().optional(),
   /** The projects the card reads; absent, the board's project (AC206). */
   projects: lwqlMemberProjectsRequestSchema.optional(),
+  /**
+   * The widget a run is for, recorded on its log line only. Present, the server names the
+   * caller `dashboard_widget`; absent, `workbench`. The browser never names the caller.
+   */
+  telemetry: lwqlRunTelemetryRequestSchema.optional(),
 });
 export interface LwqlQueryRequestSchema extends Named<typeof lwqlQueryRequestSchemaDefinition> {}
 export const lwqlQueryRequestSchema: LwqlQueryRequestSchema = lwqlQueryRequestSchemaDefinition;

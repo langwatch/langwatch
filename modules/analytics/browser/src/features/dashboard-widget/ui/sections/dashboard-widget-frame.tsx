@@ -141,6 +141,16 @@ function WidgetFrameOverWindow({
   // crashing the grid.
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
+  const source = parsed.success ? parsed.data.source : void 0;
+  const templateId = source?.kind === "catalogue" ? source.catalogueId : void 0;
+  // Kept by value, so a re-render with the same ids does not start the queries over.
+  const telemetry = useMemo(
+    () =>
+      dashboardId === void 0
+        ? void 0
+        : { dashboardId, widgetId: id, ...(templateId === void 0 ? {} : { templateId }) },
+    [dashboardId, id, templateId],
+  );
   const {
     executeQuery: runQuery,
     params: hostParams,
@@ -148,6 +158,7 @@ function WidgetFrameOverWindow({
   } = useDashboardWidgetExecutor(projectId, definition.queries, {
     timeWindow,
     ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
+    ...(telemetry ? { telemetry } : {}),
   });
   const { executeQuery, records, results, reset } = useWidgetQueryRecords({
     executeQuery: runQuery,

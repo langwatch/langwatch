@@ -9,6 +9,7 @@ import {
   type LangWatchQLAcceptedGranularityStep,
   type LangWatchQLGranularityStep,
   type LangWatchQLQueryResult,
+  type LangWatchQLRunTelemetryRequest,
 } from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
@@ -70,6 +71,8 @@ export interface DashboardWidgetExecutorOverrides {
   readonly timeWindow?: { start: number; end: number };
   /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** The placed widget its runs are for, for their log line; absent in the editor's preview. */
+  readonly telemetry?: LangWatchQLRunTelemetryRequest;
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splits would scatter closured state.
@@ -89,6 +92,7 @@ export function useDashboardWidgetExecutor(
   const pageWindow = overrides?.timeWindow ?? mountWindow;
   const granularitySeconds: LangWatchQLAcceptedGranularityStep =
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  const telemetry = overrides?.telemetry;
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({
@@ -135,6 +139,7 @@ export function useDashboardWidgetExecutor(
           // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
           sources: query.sources ?? null,
           ...(query.projects ? { projects: query.projects } : {}),
+          ...(telemetry ? { telemetry } : {}),
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.
@@ -143,7 +148,7 @@ export function useDashboardWidgetExecutor(
       noteLimits({ query: query.sql, result });
       return toChartQueryResult(result);
     },
-    [execute, pageWindow, granularitySeconds, noteLimits],
+    [execute, pageWindow, granularitySeconds, noteLimits, telemetry],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(
