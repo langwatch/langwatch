@@ -45,6 +45,15 @@ describe("given a ClickHouse database restored without its goose version history
       query: `CREATE TABLE ${database}.${RESTORED_TABLE} (id String, at DateTime)
               ENGINE = MergeTree() ORDER BY id`,
     });
+    // Goose's own table, empty: what a restore of the data without its history leaves behind.
+    await client.command({
+      query: `CREATE TABLE ${database}.goose_db_version (
+                version_id Int64,
+                is_applied UInt8,
+                date Date DEFAULT now(),
+                tstamp DateTime DEFAULT now()
+              ) ENGINE = MergeTree() ORDER BY date`,
+    });
   }, 180_000);
 
   afterAll(async () => {
