@@ -118,10 +118,14 @@ function SigningSecret({
         marginTop={2}
         alignSelf="flex-start"
         onClick={onRotate}
+        disabled={!hasUrl}
         data-testid="rotate-signing-secret-button"
       >
         Rotate
       </Button>
+      <Text fontSize="sm" color="fg.muted" marginTop={1}>
+        The old secret stops working when you save. Update your receiver at the same time.
+      </Text>
     </Field.Root>
   );
 }

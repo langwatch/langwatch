@@ -425,6 +425,13 @@ Feature: Scenario run hooks: setup and teardown
       Then the config keeps a "{{ secrets.NAME }}" reference to a new project secret
       And a read of the agent shows the reference, never the secret
 
+    @unit
+    Scenario: An update that omits the hooks signing secret keeps the stored reference
+      Given a saved HTTP agent whose hooks signing secret is a "{{ secrets.NAME }}" reference
+      When the agent is updated with a config that leaves the signing secret out
+      Then the config still holds the same reference
+      And no new project secret is created
+
     @integration
     Scenario: The agent form shows a new signing secret once and can rotate it
       Given an HTTP agent form with no hooks URL
