@@ -187,6 +187,22 @@ does **not** give away.
    the day a pi IDE extension ships, and widening a source-type slug after keys are minted against it
    means rewriting provenance on rows already stored.
 
+   Four names therefore coexist, each belonging to a different reader, and two earlier passes of this
+   record conflated them. The **wrapper command** is `langwatch pi`. The **ingestion slug** is `pi_cli`,
+   and that is also the argument `langwatch ingest install` takes: `SUPPORTED_TOOLS`
+   (`sdks/typescript/src/cli/commands/ingestion/install.ts:30`) is a list of source types, not of
+   commands, which is why it reads `claude_code` and `copilot_cli` rather than `claude` and `copilot`, and
+   `normaliseTool` (`:120`) only lowercases and maps `-` to `_` before demanding exact membership, so
+   `langwatch ingest install pi` exits with "Unknown tool 'pi'". The **session-context hook argument** is
+   plain `pi`, that field being the human-facing spelling (`session-context-agents.ts:33`, `claude-code`
+   and `copilot` in the rows at `:81` and `:125`), so `langwatch ingest hook pi` is right. The **AI-tool
+   catalogue slug** is plain `pi` as well, and that is what `ingestSourceType` returns in spite of its
+   name (`coding-agent-pull-request-usage.service.ts:74`): its fallthrough passes the agent id straight
+   through, and the value feeds the lookup `billing.isSourceNonBillable` is keyed on. The two plain-`pi`
+   readers and the one `pi_cli` reader are not interchangeable: writing `pi_cli` into the billing lookup
+   breaks it, and writing `pi` into `SUPPORTED_TOOLS` installs the seam under a source type no key is
+   minted for.
+
 3. **`matches()` tests pi's own record namespace and nothing else.** pi's definition is
    `matches: (signal) => signal.name.startsWith("pi.")`. The shared `signalSays` helper
    (`contract/src/telemetry/coding-agent-definition.ts:94-100`) is deliberately **not** used, and the
@@ -221,7 +237,7 @@ does **not** give away.
    resolves the row by key source type (`:225`) and then branches on a hard-coded id, `opencode` taking
    the plugin path and everything else the hook-entries path (`:227-230`). pi therefore needs `pi_cli` in
    `SUPPORTED_TOOLS` (`:30`, today `codex`, `claude_code`, `gemini`, `opencode`, `copilot_cli`) and an arm
-   in that branch, or `langwatch ingest install pi` installs no extension and silently writes hook entries
+   in that branch, or `langwatch ingest install pi_cli` installs no extension and silently writes hook entries
    into a file pi never reads. The wrapper path (`governance/wrapper.ts`) installs no session-context seam
    at all: it reports and offers a shell rc edit (`reportIngestionSetup` at `:541-576`) and refreshes only
    the Claude Code plugin (`reportPluginUpdate` at `:616-640`).
@@ -570,7 +586,10 @@ does **not** give away.
       the guard has to bite at the gate rather than at attribution, the marker must be the scope name.
 
     What settles it: the commit that gives that worker an OTel exporter also decides the marker, and this
-    record should be revisited then rather than guessing the spelling now.
+    record should be revisited then rather than guessing the spelling now. `specs/coding-agent/pi-sessions.feature`
+    therefore carries no scenario for this guard and says so in its header: a scenario naming a marker
+    nobody has chosen could not be written, let alone bound. This paragraph is where the hazard lives
+    until then.
 
     Rejects making pi's own predicate stricter (name namespace **and** a recognised scope): it would be the
     only two-part condition in the registry, it would test a scope string that does not exist yet, and it
@@ -599,7 +618,7 @@ does **not** give away.
 | Session key attribute                         | `pi.session.id`                                                                              | `deriveSessionKeyFromSpan`, and the `session.id` the context record must repeat (Decision 10). Written on every span the shim emits, including the two pi does not declare it on, which is the schema's single documented exception (Decision 8)                                                                                                                                                                                                                                                                                                                   |
 | Model call span                               | `pi.ai.request`                                                                              | span-fed model calls, dual-written to `gen_ai.*`; also added to `MODEL_CALL_SPAN_NAMES` by hand (Decision 7)                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Reported cost attribute                       | `pi.ai.usage.cost`                                                                           | folded into `agentReportedCostUsd` as a drift signal, never as the session's cost (Decision 7)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Extension file                                | `pi-plugin.ts` in pi's extension directory                                                   | first-party shim, written by `langwatch ingest install pi` and not by `langwatch pi` (Decision 4); registered in `telemetry-targets.ts`                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Extension file                                | `pi-plugin.ts` in pi's extension directory                                                   | first-party shim, written by `langwatch ingest install pi_cli` and not by `langwatch pi` (Decision 4); registered in `telemetry-targets.ts`                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Session context seam                          | a row in `SESSION_CONTEXT_AGENTS` with `hookTarget: { kind: "plugin" }`                      | the extension shells out to `langwatch ingest hook pi`, the opencode shape; `hookTarget` is a required field, so there is no row without one (Decision 10)                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Platform policy defaults                      | `allowVk: false, allowOtelDirect: true`                                                      | ingestion only (Decision 1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Declared but not emitted                      | `pi.harness.navigation`, `pi.harness.step`, `pi.harness.checkpoint`, `pi.harness.compaction` | all four are declared (`dist/harness/telemetry.js:209`, `:283`, `:231`, `:187`) and pi 0.84.2's extension API fires no event for any of them. Not a parentage problem: `pi.harness.step` names `pi.harness.turn` first among its four legal parents (`:285-288`) (Decision 5)                                                                                                                                                                                                                                                                                      |
@@ -638,6 +657,31 @@ does **not** give away.
   to speak today.
 - **Instrument through `pi-agent-core` in-process**, as Langy's harness could: works for our worker, and
   is irrelevant to a customer running the CLI on their own machine.
+
+## Consequences
+
+**Positive.** pi becomes the first agent tracked without us authoring a single fact about it: the span
+tree, the attribute keys and the cost figure are all pi's own, so an upstream rename fails a conformance
+test rather than degrading data quietly. The dual write means the generic GenAI canonicaliser and the
+generic fold carry pi with no pi-shaped branch in either, and the day pi wires its own `TelemetryContext`
+the shim is deleted and nothing server-side changes. pi is also the first agent to exercise the
+span-fed-and-self-reporting combination, which makes the cost drift signal real on the span lane for every
+agent that follows.
+
+**Negative.** We take on seven invented attribute values (Decision 5) because pi marks keys required that
+its extension API gives no source for, so the conformance test can prove the required set is present and
+cannot prove it is true. Four spans pi declares are given up, compaction among them, so a canonical event
+we fold for other agents is missing for pi until pi fires the event. Three hand-maintained lists grow
+(`SUPPORTED_TOOLS`, `CODING_AGENT_CONTRIBUTION_KEYS`, `MODEL_CALL_SPAN_NAMES`) and each one fails silently
+when it is missed: the span is stored and the session simply learns nothing from it. Two edits are needed
+before the reported cost figure is anything but zero, and either one alone leaves no error behind.
+
+**Obligations this creates.** Whoever gives our in-house worker an OTel exporter also chooses its
+telemetry marker and writes the registry-order guard; until then our own `pi.*` spans would fold as
+customer sessions if that worker ever exported anything, which no code prevents today. Whoever takes this
+record out of Proposed first settles the minimum pi version against the npm registry and the worker marker
+above, both marked UNVERIFIED here. And whoever deletes the shim owns the death-date check: the extension
+exists only while pi's CLI has no exporter, and nothing expires it on its own.
 
 ## References
 

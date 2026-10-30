@@ -18,7 +18,7 @@ Rule: Every agent that can emit the event joins on the same terms
     When the session fold runs
     Then the session carries the repository, branch and worktree from the event
 
-  # Parked 2026-10-30: ADR-188 is accepted and pi has no row in
+  # Parked 2026-10-30: ADR-188 is proposed and pi has no row in
   # SESSION_CONTEXT_AGENTS, so no context event ever declares the pi agent. It
   # binds with that row. The rest of this file stays enforced.
   # becomes @unit

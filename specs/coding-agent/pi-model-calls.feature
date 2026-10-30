@@ -35,7 +35,7 @@
 # product they did not buy.
 #
 # EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is accepted; none of what it describes is built. Tagging these @unit
+# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
 # or @integration now would report a binding that does not exist. Each scenario
 # names the tag it becomes in a comment above it, and the commit that makes one
 # pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
