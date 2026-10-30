@@ -7,9 +7,9 @@ description: Create the test data a scenario needs before its first turn and rem
 
 ## What are setup and teardown hooks
 
-Setup and teardown hooks are two optional functions you declare on a connected agent, which LangWatch calls around each scenario run. **Setup** runs before the first turn and returns the state the run starts with, such as the id of a test customer with a loyalty tier. **Teardown** runs after the last turn and gets that state, so it can delete what setup made.
+Setup and teardown hooks are two optional steps that LangWatch runs around each scenario run. You declare them as functions on a connected agent, or give an HTTP agent a hooks URL. **Setup** runs before the first turn and returns the state the run starts with, such as the id of a test customer with a loyalty tier. **Teardown** runs after the last turn and gets that state, so it can delete what setup made.
 
-Both hooks run in your own process, the one that already answers the agent's turns, so they can use your database, your secrets and your internal APIs the same way the agent does. LangWatch calls them over the connection the SDK already holds open.
+Both hooks run in your own code, the code that already answers the agent's turns, so they can use your database, your secrets and your internal APIs the same way the agent does. For a connected agent, LangWatch calls the functions over the connection the SDK already holds open. For an HTTP agent, it POSTs to your hooks URL.
 
 A run goes in this order: setup, then the turns, then teardown.
 
@@ -154,7 +154,7 @@ LangWatch sends these headers:
 |---|---|
 | The agent's own headers and auth | The same ones the agent sends on a turn, such as a bearer token. |
 | `X-LangWatch-Signature` | `t=<unix seconds>,v1=<signature>`. The signature is the lower-case hex HMAC-SHA256 of `<t>.<raw request body>`, made with the signing secret. |
-| `Idempotency-Key` | `<scenarioRunId>:<kind>`, for example `scenariorun_abc:setup`. It is the same on every try of one hook of one run. |
+| `Idempotency-Key` | `<scenarioRunId>:<kind>`, for example `scenariorun_abc:setup`. It is the same for every call of one hook of one run, so a repeated call carries the same key. |
 
 ### The answer
 
@@ -287,7 +287,7 @@ async def scenario_hooks(request: Request):
 
 ### Make test data once
 
-LangWatch can send the same hook more than once, and the `Idempotency-Key` is the same each time. Store the key with the data setup made. When a call arrives with a key you have seen, return the stored state and do not create the test data again. In teardown, delete what is there and treat "already gone" as success.
+LangWatch does not retry a hook, but a call can still arrive more than once, for example when a proxy or the network retries it. The `Idempotency-Key` is the same each time. Store the key with the data setup made. When a call arrives with a key you have seen, return the stored state and do not create the test data again. In teardown, delete what is there and treat "already gone" as success.
 
 ## What do the simulated user and the judge see
 
