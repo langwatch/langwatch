@@ -1398,6 +1398,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../packages/time
+      '@langwatch/webhook-signing':
+        specifier: workspace:*
+        version: link:../../packages/webhook-signing
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../modules/workflow/contract
@@ -1471,6 +1474,9 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config
+      '@langwatch/webhook-verify':
+        specifier: workspace:*
+        version: link:../../packages/webhook-verify
       esbuild:
         specifier: 'catalog:'
         version: 0.28.2
@@ -4889,6 +4895,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
+      '@langwatch/webhook-contract':
+        specifier: workspace:*
+        version: link:../../webhook/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -16335,6 +16344,9 @@ importers:
       '@langwatch/webhook-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/webhook-signing':
+        specifier: workspace:*
+        version: link:../../../packages/webhook-signing
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
@@ -18487,6 +18499,21 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/webhook-signing:
+    devDependencies:
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/webhook-verify:
     devDependencies:

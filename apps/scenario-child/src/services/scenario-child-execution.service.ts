@@ -15,10 +15,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
-import {
-  type ConnectedCallRun,
-  HttpSerializedConnectedAgentChannel,
-} from "../channels/http/http.serialized-connected-agent.channel.ts";
+import { HttpSerializedConnectedAgentChannel } from "../channels/http/http.serialized-connected-agent.channel.ts";
 import {
   HttpSerializedHttpAgentChannel,
   type ScenarioHttp,
@@ -37,6 +34,7 @@ import {
 } from "../rules/agent-first-script.rules.ts";
 import { buildCallerVoiceSimulatorConfig } from "../rules/caller-voice-simulator.rules.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
+import { callRunOf } from "../rules/scenario-call-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptService } from "./agent-test-script.service.ts";
 import { RunStateRolesService } from "./run-state-roles.service.ts";
@@ -230,15 +228,6 @@ function hookTargetOf({
     adapter instanceof HttpSerializedConnectedAgentChannel ||
     adapter instanceof HttpSerializedHttpAgentChannel;
   return isHookCaller ? { caller: adapter, declared } : null;
-}
-
-/** The scenario run every connected agent call names (ADR-180). */
-function callRunOf(jobData: ChildProcessJobData): ConnectedCallRun {
-  return {
-    ...(jobData.scenarioRunId ? { scenarioRunId: jobData.scenarioRunId } : {}),
-    scenarioName: jobData.scenario.name,
-    batchRunId: jobData.context.batchRunId,
-  };
 }
 
 /** The run's turns through the scenario library, up to its verdict. */

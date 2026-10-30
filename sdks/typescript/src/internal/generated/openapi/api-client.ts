@@ -2022,6 +2022,10 @@ export interface operations {
                             teardown: boolean;
                         };
                         hooksSigningSecret?: string;
+                        hooksPreviousSigningSecret?: {
+                            secret: string;
+                            expiresAt: string;
+                        };
                         devTunnel?: {
                             previousUrl?: string;
                             connectedAt?: string;

@@ -1,6 +1,7 @@
 import {
   AgentNotFoundError,
   agentHooksSchema,
+  previousSigningSecretSchema,
   DEFAULT_CALL_TIMEOUT_MS,
   MAX_CALL_TIMEOUT_MS,
   type Agent,
@@ -406,15 +407,22 @@ const HttpAgentConfigSchema = z.object({
   hooksUrl: z.string().optional(),
   hooks: agentHooksSchema.optional(),
   hooksSigningSecret: z.string().optional(),
+  hooksPreviousSigningSecret: previousSigningSecretSchema.optional(),
 });
 
 /** An HTTP agent's hook fields for the job: only with a hooks URL and a checked hook (ADR-188). */
 function httpHookFields(
   config: z.infer<typeof HttpAgentConfigSchema>,
-): Pick<HttpAgentData, "hooksUrl" | "hooks" | "hooksSigningSecret"> {
-  const { hooksUrl, hooks, hooksSigningSecret } = config;
+): Pick<HttpAgentData, "hooksUrl" | "hooks" | "hooksSigningSecret" | "hooksPreviousSigningSecret"> {
+  const { hooksUrl, hooks, hooksSigningSecret, hooksPreviousSigningSecret } = config;
   if (!hooksUrl?.trim() || !(hooks?.setup || hooks?.teardown)) return {};
-  return { hooksUrl, hooks, ...(hooksSigningSecret ? { hooksSigningSecret } : {}) };
+  return {
+    hooksUrl,
+    hooks,
+    ...(hooksSigningSecret ? { hooksSigningSecret } : {}),
+    // The child checks the expiry when it signs: a run can start after the window closed.
+    ...(hooksPreviousSigningSecret ? { hooksPreviousSigningSecret } : {}),
+  };
 }
 
 /**

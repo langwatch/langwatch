@@ -7,6 +7,11 @@ import {
   type WebhookMethod,
   type WebhookSignatureScheme,
 } from "@langwatch/webhook-contract";
+import {
+  signLegacyWebhookPayload,
+  signWebhookPayload,
+  WEBHOOK_SIGNATURE_HEADER,
+} from "@langwatch/webhook-signing";
 
 import type { HttpWebhookSender } from "../channels/webhook-destination.channel.ts";
 import {
@@ -15,11 +20,6 @@ import {
   WEBHOOK_TEST_FIRE_HEADER,
   type WebhookSendResult,
 } from "../rules/webhook-delivery-classification.rules.ts";
-import {
-  signLegacyWebhookPayload,
-  signWebhookPayload,
-  WEBHOOK_SIGNATURE_HEADER,
-} from "../rules/webhook-signature.rules.ts";
 import { describeTransportFailure } from "../rules/webhook-transport-failure.rules.ts";
 import { judgeWebhookUrl, webhookUrlValidator } from "../rules/webhook-url-policy.rules.ts";
 import type { WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";

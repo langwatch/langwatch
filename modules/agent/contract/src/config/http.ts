@@ -29,6 +29,20 @@ const httpAuthSchemaDefinition = z.discriminatedUnion("type", [
 export interface HttpAuthSchema extends Named<typeof httpAuthSchemaDefinition> {}
 export const httpAuthSchema: HttpAuthSchema = httpAuthSchemaDefinition;
 
+const previousSigningSecretSchemaDefinition = z.object({
+  /** The `{{ secrets.NAME }}` reference of the secret a rotation replaced. */
+  secret: z.string(),
+  /** ISO instant the old secret stops signing: `WEBHOOK_PREVIOUS_SECRET_TTL_MS` after rotation. */
+  expiresAt: z.string(),
+});
+export interface PreviousSigningSecretSchema extends Named<
+  typeof previousSigningSecretSchemaDefinition
+> {}
+/** A hooks signing secret a rotation replaced, still signed with until it expires (ADR-188). */
+export const previousSigningSecretSchema: PreviousSigningSecretSchema =
+  previousSigningSecretSchemaDefinition;
+export type PreviousSigningSecret = z.infer<typeof previousSigningSecretSchema>;
+
 export const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
 
 const httpAgentConfigSchemaDefinition = z.object({
@@ -53,6 +67,11 @@ const httpAgentConfigSchemaDefinition = z.object({
     .string()
     .refine((value) => value === "" || value.length >= 16, "must be at least 16 characters")
     .optional(),
+  /**
+   * Set by the server when a save rotates the signing secret on the same hooks origin, so a
+   * receiver can swap secrets on its own schedule; a value a write sends is ignored.
+   */
+  hooksPreviousSigningSecret: previousSigningSecretSchema.optional(),
   devTunnel: z
     .object({
       previousUrl: z.string().optional(),

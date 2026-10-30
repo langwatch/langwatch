@@ -373,10 +373,10 @@ Feature: Scenario run hooks: setup and teardown
 
     @unit
     Scenario: An HTTP hook call is signed so the receiver can verify it
-      Given an HTTP agent whose signing secret is "whsec_test"
+      Given an HTTP agent with a hooks signing secret
       When a hook is called
-      Then it carries "X-LangWatch-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of t.body>"
-      And the receiver recomputes the same signature with "whsec_test"
+      Then it carries "X-LangWatch-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of t.body>", signed as webhook deliveries are
+      And "@langwatch/webhook-verify" accepts it with that secret
 
     @unit
     Scenario: An HTTP hook is never sent unsigned
@@ -428,10 +428,17 @@ Feature: Scenario run hooks: setup and teardown
 
     @unit
     Scenario: An HTTP hooks URL must use https
-      Given an HTTP agent whose hooks URL is "http://shop.example.com/hooks"
+      Given the deployment blocks local HTTP calls
+      And an HTTP agent whose hooks URL is "http://shop.example.com/hooks" or "http://127.0.0.1/hooks"
       When a hook is called
       Then no request is sent and the hook fails naming https
-      But a hooks URL on localhost may use plain http
+
+    @integration
+    Scenario: Plain http reaches a hooks URL only at a local address where local addresses are allowed
+      Given the deployment allows local HTTP calls
+      When a hook is called on "http://127.0.0.1:8123/hooks"
+      Then the call is sent
+      But a hook on plain http to a public address is refused naming https, and nothing is sent
 
     @integration
     Scenario: A customer header cannot stand in for the LangWatch signature
@@ -457,18 +464,33 @@ Feature: Scenario run hooks: setup and teardown
       Then the update is refused for sending stored credentials to another origin
 
     @unit
-    Scenario: Rotating the hooks signing secret deletes the old one
+    Scenario: Rotating the hooks signing secret keeps the old one valid for 24 hours
       Given a saved HTTP agent whose signing secret is the project secret the save made for it
       When the signing secret is rotated and the agent is saved
-      Then the old project secret is deleted
+      Then the old project secret is kept as the previous signing secret until 24 hours later
+      And every hook call in that window carries one v1 signature per secret, the new one first
+      And a receiver holding either secret verifies the call
+
+    @unit
+    Scenario: A second rotation inside the window drops the oldest secret at once
+      Given an HTTP agent whose signing secret was rotated less than 24 hours ago
+      When the signing secret is rotated again
+      Then the secret it replaced is the previous one, for 24 hours
+      And the oldest project secret is deleted at once
+
+    @unit
+    Scenario: The replaced hooks signing secret stops signing and is deleted once it expires
+      Given an HTTP agent whose signing secret was rotated more than 24 hours ago
+      Then a hook call carries only the new secret's signature
+      And the first save after the window closed deletes the old project secret
       But a secret the person picked, or one another agent still names, is kept
 
     @unit
     Scenario: Removing the hooks URL deletes the hooks signing secret
       Given a saved HTTP agent whose signing secret is the project secret the save made for it
       When the hooks URL is cleared and the agent is saved, with or without the secret's reference
-      Then the config holds no signing secret
-      And the project secret is deleted
+      Then the config holds no signing secret and no previous one
+      And the project secret is deleted, the previous one too, inside a rotation window
 
     @unit
     Scenario: An HTTP hook call sends the agent's headers, auth and run parameters

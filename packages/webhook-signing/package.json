@@ -1,0 +1,31 @@
+{
+  "name": "@langwatch/webhook-signing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The one LangWatch outbound request signature, X-LangWatch-Signature: t=<unix s>,v1=<hex hmac-sha256>, for every sender that signs and the reference verifier.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "libraries"
+  }
+}

@@ -17,6 +17,9 @@ if TYPE_CHECKING:
     from ..models.create_agent_body_type_3_config_dev_tunnel import CreateAgentBodyType3ConfigDevTunnel
     from ..models.create_agent_body_type_3_config_headers_item import CreateAgentBodyType3ConfigHeadersItem
     from ..models.create_agent_body_type_3_config_hooks import CreateAgentBodyType3ConfigHooks
+    from ..models.create_agent_body_type_3_config_hooks_previous_signing_secret import (
+        CreateAgentBodyType3ConfigHooksPreviousSigningSecret,
+    )
     from ..models.create_agent_body_type_3_config_inputs_item import CreateAgentBodyType3ConfigInputsItem
     from ..models.create_agent_body_type_3_config_outputs_item import CreateAgentBodyType3ConfigOutputsItem
     from ..models.create_agent_body_type_3_config_parameters_item import CreateAgentBodyType3ConfigParametersItem
@@ -52,6 +55,7 @@ class CreateAgentBodyType3Config:
         hooks_url (str | Unset):
         hooks (CreateAgentBodyType3ConfigHooks | Unset):
         hooks_signing_secret (str | Unset):
+        hooks_previous_signing_secret (CreateAgentBodyType3ConfigHooksPreviousSigningSecret | Unset):
         dev_tunnel (CreateAgentBodyType3ConfigDevTunnel | Unset):
     """
 
@@ -82,6 +86,7 @@ class CreateAgentBodyType3Config:
     hooks_url: str | Unset = UNSET
     hooks: CreateAgentBodyType3ConfigHooks | Unset = UNSET
     hooks_signing_secret: str | Unset = UNSET
+    hooks_previous_signing_secret: CreateAgentBodyType3ConfigHooksPreviousSigningSecret | Unset = UNSET
     dev_tunnel: CreateAgentBodyType3ConfigDevTunnel | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -168,6 +173,10 @@ class CreateAgentBodyType3Config:
 
         hooks_signing_secret = self.hooks_signing_secret
 
+        hooks_previous_signing_secret: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.hooks_previous_signing_secret, Unset):
+            hooks_previous_signing_secret = self.hooks_previous_signing_secret.to_dict()
+
         dev_tunnel: dict[str, Any] | Unset = UNSET
         if not isinstance(self.dev_tunnel, Unset):
             dev_tunnel = self.dev_tunnel.to_dict()
@@ -219,6 +228,8 @@ class CreateAgentBodyType3Config:
             field_dict["hooks"] = hooks
         if hooks_signing_secret is not UNSET:
             field_dict["hooksSigningSecret"] = hooks_signing_secret
+        if hooks_previous_signing_secret is not UNSET:
+            field_dict["hooksPreviousSigningSecret"] = hooks_previous_signing_secret
         if dev_tunnel is not UNSET:
             field_dict["devTunnel"] = dev_tunnel
 
@@ -233,6 +244,9 @@ class CreateAgentBodyType3Config:
         from ..models.create_agent_body_type_3_config_dev_tunnel import CreateAgentBodyType3ConfigDevTunnel
         from ..models.create_agent_body_type_3_config_headers_item import CreateAgentBodyType3ConfigHeadersItem
         from ..models.create_agent_body_type_3_config_hooks import CreateAgentBodyType3ConfigHooks
+        from ..models.create_agent_body_type_3_config_hooks_previous_signing_secret import (
+            CreateAgentBodyType3ConfigHooksPreviousSigningSecret,
+        )
         from ..models.create_agent_body_type_3_config_inputs_item import CreateAgentBodyType3ConfigInputsItem
         from ..models.create_agent_body_type_3_config_outputs_item import CreateAgentBodyType3ConfigOutputsItem
         from ..models.create_agent_body_type_3_config_parameters_item import CreateAgentBodyType3ConfigParametersItem
@@ -369,6 +383,15 @@ class CreateAgentBodyType3Config:
 
         hooks_signing_secret = d.pop("hooksSigningSecret", UNSET)
 
+        _hooks_previous_signing_secret = d.pop("hooksPreviousSigningSecret", UNSET)
+        hooks_previous_signing_secret: CreateAgentBodyType3ConfigHooksPreviousSigningSecret | Unset
+        if isinstance(_hooks_previous_signing_secret, Unset):
+            hooks_previous_signing_secret = UNSET
+        else:
+            hooks_previous_signing_secret = CreateAgentBodyType3ConfigHooksPreviousSigningSecret.from_dict(
+                _hooks_previous_signing_secret
+            )
+
         _dev_tunnel = d.pop("devTunnel", UNSET)
         dev_tunnel: CreateAgentBodyType3ConfigDevTunnel | Unset
         if isinstance(_dev_tunnel, Unset):
@@ -398,6 +421,7 @@ class CreateAgentBodyType3Config:
             hooks_url=hooks_url,
             hooks=hooks,
             hooks_signing_secret=hooks_signing_secret,
+            hooks_previous_signing_secret=hooks_previous_signing_secret,
             dev_tunnel=dev_tunnel,
         )
 

@@ -1,5 +1,6 @@
 import type { MessageAttributeValue } from "@aws-sdk/client-sqs";
 import { nowInstant } from "@langwatch/time";
+import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "@langwatch/webhook-signing";
 
 import {
   type WebhookDestination,
@@ -11,7 +12,6 @@ import {
   type SqsWebhookSender,
 } from "../channels/webhook-destination.channel.ts";
 import { WEBHOOK_DELIVERY_ID_HEADER } from "../rules/webhook-delivery-classification.rules.ts";
-import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../rules/webhook-signature.rules.ts";
 import { type WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
 
 /**
