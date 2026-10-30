@@ -50,14 +50,17 @@ export function instantEvalJudgeClassifierCostOf({
   table,
   pricing,
   inputTokens,
+  outputTokens = 0,
 }: {
   table: InstantEvalJudgeRouteTable;
   pricing: InstantEvalJudgeRoutePricing;
   inputTokens: number;
+  /** Priced at the routed output rate; the published rate has none, as the classifier bills none. */
+  outputTokens?: number;
 }): number {
   for (const [backend, config] of Object.entries(table.backends)) {
     if (config.kind !== "jev") continue;
-    const cost = instantEvalJudgeCallCostOf({ backend, inputTokens, outputTokens: 0, pricing });
+    const cost = instantEvalJudgeCallCostOf({ backend, inputTokens, outputTokens, pricing });
     if (cost.outcome === "priced") return cost.costNanoUsd;
   }
   return Math.round(instantEvalCostUsd({ inputTokens }) * NANO_USD_PER_USD);

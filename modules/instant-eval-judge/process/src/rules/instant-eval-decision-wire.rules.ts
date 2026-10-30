@@ -81,7 +81,9 @@ const openAiDecisionResponseSchema = z.object({
       probabilities: z.array(openAiProbabilitySchema).optional(),
     }),
   ),
-  usage: z.object({ input_tokens: z.number().optional() }).optional(),
+  usage: z
+    .object({ input_tokens: z.number().optional(), output_tokens: z.number().optional() })
+    .optional(),
 });
 
 /** The answer as the Jev reader takes it, or undefined when it is not the provider's shape. */
@@ -104,11 +106,12 @@ function parseOpenAiDecision(body: unknown): ClassifierResponse | undefined {
   if (!parsed.success) return undefined;
 
   const answers = parseOpenAiAnswers(parsed.data.answers);
-  const inputTokens = parsed.data.usage?.input_tokens;
+  const { usage } = parsed.data;
   return {
     ...(parsed.data.model ? { model: parsed.data.model } : {}),
     answers,
-    ...(inputTokens === undefined ? {} : { usage: { input_tokens: inputTokens } }),
+    // Both counts carry through, so a hosted leg is billed for every token OpenAI reports.
+    ...(usage === undefined ? {} : { usage }),
   };
 }
 

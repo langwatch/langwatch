@@ -11,7 +11,7 @@ import { HttpInstantEvalDecisionModelChannel } from "./http.instant-eval-decisio
 const DECISIONS_ENDPOINT = "https://api.openai.com/v1/decisions";
 
 /**
- * The own decision model channel, held with LangWatch's key and the input tokens kept. One send
+ * The own decision model channel, held with LangWatch's key and its billed tokens kept. One send
  * per call, never a retry: the router takes one limiter permit per call, so a retry here would
  * send past its pacing on the shared key exactly while the provider is overloaded.
  */

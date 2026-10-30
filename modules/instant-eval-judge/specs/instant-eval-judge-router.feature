@@ -234,6 +234,15 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then the priced fact carries that cost times the markup, under the router's model and rate
 
   @unit
+  Scenario: A decision-model leg is billed for its output tokens too
+    Given a Decisions or Jev backend priced with an output rate
+    When its leg answers and its provider reports input and output tokens
+    Then the leg costs its input tokens at the input rate plus its output tokens at the output rate
+    And a leg that reported output tokens alone is billed for them
+    And an own decision model still bills nothing to LangWatch
+    And a call with no route is still priced from its input tokens alone, as before
+
+  @unit
   Scenario: Every judgement a routed call returns carries its cost
     Given a call that carries a route but asks a question the router does not route
     When the hosted classifier answers it

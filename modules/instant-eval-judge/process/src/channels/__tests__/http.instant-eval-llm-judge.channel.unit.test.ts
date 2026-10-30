@@ -312,6 +312,29 @@ describe("HttpInstantEvalHostedDecisionsChannel", () => {
     expect(body).toMatchObject({ model: "decision-model-a" });
   });
 
+  /** @scenario "A decision-model leg is billed for its output tokens too" */
+  it("keeps the billed output tokens too, so the leg is priced for them", async () => {
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/decisions", method: "POST" })
+      .reply(200, {
+        answers: [{ type: "predicate", name: "upset", probability: 0.81 }],
+        usage: { input_tokens: 1000, output_tokens: 12 },
+      });
+    const channel = HttpInstantEvalHostedDecisionsChannel.create({
+      apiKey: "lw-decisions",
+      dispatcher: agent,
+    });
+
+    const judgement = await channel.classify({
+      text: "user: late",
+      questions: [QUESTION],
+      model: "decision-model-a",
+    });
+
+    expect(judgement).toMatchObject({ inputTokens: 1000, outputTokens: 12 });
+  });
+
   /** @scenario "Decisions and LLM legs draw on the rate limiter too" */
   it("sends once per call through a 429 and a 503, so each send is one the router paced", async () => {
     let sends = 0;

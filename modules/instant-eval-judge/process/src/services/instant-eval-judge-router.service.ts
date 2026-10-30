@@ -170,10 +170,10 @@ export class InstantEvalJudgeRouterService {
       ...(signal ? [signal] : []),
     );
     const { table, pricing } = this.deps;
-    const { inputTokens } = judgement;
+    const { inputTokens, outputTokens = 0 } = judgement;
     return {
       ...judgement,
-      costNanoUsd: instantEvalJudgeClassifierCostOf({ table, pricing, inputTokens }),
+      costNanoUsd: instantEvalJudgeClassifierCostOf({ table, pricing, inputTokens, outputTokens }),
     };
   }
 }

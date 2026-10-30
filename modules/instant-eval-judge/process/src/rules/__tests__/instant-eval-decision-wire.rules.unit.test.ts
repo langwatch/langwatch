@@ -129,6 +129,19 @@ describe("parseDecisionResponse", () => {
     ]);
   });
 
+  /** @scenario "A decision-model leg is billed for its output tokens too" */
+  it("keeps the output tokens OpenAI reports beside the input tokens", () => {
+    const response = parseDecisionResponse({
+      wire: "openai_decisions",
+      body: {
+        answers: [{ type: "predicate", name: "polite", probability: 0.9 }],
+        usage: { input_tokens: 42, output_tokens: 7 },
+      },
+    });
+
+    expect(response?.usage).toEqual({ input_tokens: 42, output_tokens: 7 });
+  });
+
   it("drops a refused question and keeps the rest", () => {
     const response = parseDecisionResponse({
       wire: "openai_decisions",

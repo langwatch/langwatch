@@ -313,7 +313,8 @@ export class InstantEvalJudgeRouteRunService {
       this.flags.push(`${backend}_unavailable`);
       return { outcome: "failed", reason: "classifier_provider_unavailable" };
     }
-    this.paid({ backend, inputTokens: judgement.inputTokens, outputTokens: 0 });
+    const { inputTokens, outputTokens = 0 } = judgement;
+    this.paid({ backend, inputTokens, outputTokens });
     if (judgement.skippedReason) return { outcome: "failed", reason: judgement.skippedReason };
     const answers = instantEvalDecisionAnswersOf({ questions, judgement, table: this.deps.table });
     if (answers.size === 0) return { outcome: "failed", reason: "classifier_provider_unavailable" };

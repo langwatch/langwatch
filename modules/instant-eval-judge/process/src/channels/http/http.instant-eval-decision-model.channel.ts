@@ -91,7 +91,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
           });
         return {
           verdicts: readClassifierVerdicts({ questions, response }),
-          inputTokens: billedInputTokensOf({ isBilledToLangWatch, response }),
+          ...billedTokensOf({ isBilledToLangWatch, response }),
           isTextTruncated: prepared.isTruncated,
         };
       }
@@ -168,15 +168,23 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   }
 }
 
-/** An own model bills the organization, so LangWatch bills nothing for it (ADR-182). */
-function billedInputTokensOf({
+/**
+ * An own model bills the organization, so LangWatch bills nothing for it (ADR-182). A send billed
+ * to LangWatch carries every token the provider reports, input and output alike.
+ */
+function billedTokensOf({
   isBilledToLangWatch,
   response,
 }: {
   isBilledToLangWatch: boolean | undefined;
-  response: { usage?: { input_tokens?: number } | undefined };
-}): number {
-  return isBilledToLangWatch ? (response.usage?.input_tokens ?? 0) : 0;
+  response: { usage?: { input_tokens?: number; output_tokens?: number } | undefined };
+}): { inputTokens: number; outputTokens?: number } {
+  if (!isBilledToLangWatch) return { inputTokens: 0 };
+  const outputTokens = response.usage?.output_tokens;
+  return {
+    inputTokens: response.usage?.input_tokens ?? 0,
+    ...(outputTokens === undefined ? {} : { outputTokens }),
+  };
 }
 
 function waitMs({ attempt, retryAfter }: { attempt: number; retryAfter: string | null }): number {

@@ -593,6 +593,33 @@ describe("given a judge call that carries a route", () => {
     expect(recorded[0]).toMatchObject({ model: "jev", inputTokens: 500 });
   });
 
+  /** @scenario "A call with no route keeps today's single classifier call" */
+  it("prices a call with no route from its input tokens alone, as main does, when the classifier reports output", async () => {
+    const { service, recorded, seed } = harness({
+      classify: async () => ({ ...answered(500), outputTokens: 200 }),
+    });
+    await seed();
+
+    const answer = await service.judge(call);
+
+    // 500 tokens at the published $0.042 per million, at the 1.3 markup; output is never priced.
+    expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0.0000273 });
+    expect(recorded).toEqual([
+      {
+        tenantId: ORGANIZATION_ID,
+        occurredAt: NOW,
+        organizationId: ORGANIZATION_ID,
+        projectId: PROJECT_ID,
+        requestId: "minted-1",
+        model: "jev",
+        rateVersion: "instant_eval@0.042x1.3",
+        inputTokens: 500,
+        priceNanoUsd: 27_300,
+        costNanoUsd: 21_000,
+      },
+    ]);
+  });
+
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
   it("records a run's routed spend from its summed cost", async () => {
     const { service, recorded } = harness();

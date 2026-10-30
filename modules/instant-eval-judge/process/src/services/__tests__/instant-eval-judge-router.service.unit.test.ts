@@ -78,6 +78,7 @@ function harness({
   hasDecisions = true,
   table = syntheticRouteTable(),
   limiter = MemoryInstantEvalRateLimiter.create(),
+  pricing = PRICING,
 }: {
   decisions?: Script;
   jev?: Script;
@@ -88,6 +89,7 @@ function harness({
   hasDecisions?: boolean;
   table?: InstantEvalJudgeRouteTable;
   limiter?: MemoryInstantEvalRateLimiter;
+  pricing?: InstantEvalJudgeRoutePricing;
 } = {}) {
   const hostedDecisions = ScriptedInstantEvalHostedDecisionsChannel.create({
     answer: (_request, signal) => decisions(signal),
@@ -108,7 +110,7 @@ function harness({
   });
   const router = InstantEvalJudgeRouterService.create({
     table,
-    pricing: PRICING,
+    pricing,
     classifier,
     hostedDecisions: hasDecisions ? hostedDecisions : undefined,
     llmJudge,
@@ -589,6 +591,62 @@ describe("InstantEvalJudgeRouterService", () => {
     expect(jevCalls()).toBe(1);
     expect(hostedDecisions.requests).toHaveLength(0);
     expect(judgement.routing).toBeUndefined();
+  });
+
+  describe("given decision-model backends priced with an output rate", () => {
+    const OUTPUT_PRICED: InstantEvalJudgeRoutePricing = {
+      version: "test-output",
+      backends: {
+        ...PRICING.backends,
+        "decision-a": { usdPerMillionInputTokens: 0.1, usdPerMillionOutputTokens: 3 },
+        "decision-b": { usdPerMillionInputTokens: 0.05, usdPerMillionOutputTokens: 2 },
+      },
+    };
+    const reporting = (probability: number, outputTokens: number): InstantEvalJudgement => ({
+      ...judged(probability),
+      outputTokens,
+    });
+
+    /** @scenario "A decision-model leg is billed for its output tokens too" */
+    it("bills a Decisions leg's output tokens at its output rate", async () => {
+      const { classify } = harness({
+        pricing: OUTPUT_PRICED,
+        decisions: () => reporting(0.05, 300),
+      });
+      const judgement = await classify(SHORT);
+      // 1000 input x 0.1 + 300 output x 3, in nano-USD per thousand tokens
+      expect(judgement.costNanoUsd).toBe(100_000 + 900_000);
+    });
+
+    /** @scenario "A decision-model leg is billed for its output tokens too" */
+    it("bills both legs' output tokens on a pair, the Jev leg at its own output rate", async () => {
+      const { classify } = harness({
+        pricing: OUTPUT_PRICED,
+        decisions: () => reporting(0.05, 300),
+        jev: () => reporting(0.9, 50),
+      });
+      const judgement = await classify(PAIRED);
+      // decision-a 1000 x 0.1 + 300 x 3, decision-b 1000 x 0.05 + 50 x 2
+      expect(judgement.costNanoUsd).toBe(100_000 + 900_000 + 50_000 + 100_000);
+    });
+
+    /** @scenario "A decision-model leg is billed for its output tokens too" */
+    it("bills the hosted classifier's output tokens on a kind the table does not route", async () => {
+      const { classify } = harness({ pricing: OUTPUT_PRICED, jev: () => reporting(0.5, 40) });
+      const judgement = await classify(SHORT, [rating("s", "how polite")]);
+      // decision-b is the hosted classifier: 1000 x 0.05 + 40 x 2
+      expect(judgement.costNanoUsd).toBe(50_000 + 80_000);
+    });
+
+    /** @scenario "A decision-model leg is billed for its output tokens too" */
+    it("bills a leg whose provider reported output tokens alone", async () => {
+      const { classify } = harness({
+        pricing: OUTPUT_PRICED,
+        decisions: () => ({ ...judged(0.05, 0), outputTokens: 300 }),
+      });
+      const judgement = await classify(SHORT);
+      expect(judgement.costNanoUsd).toBe(900_000);
+    });
   });
 
   /** @scenario "Every judgement a routed call returns carries its cost" */

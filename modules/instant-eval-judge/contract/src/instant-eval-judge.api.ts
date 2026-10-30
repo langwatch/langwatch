@@ -266,6 +266,11 @@ export interface InstantEvalJudgement {
   readonly skippedReason?: InstantEvalSkipReason;
   /** Input tokens the classifier billed for. Zero for a skip. */
   readonly inputTokens: number;
+  /**
+   * Output tokens the backend reported, when it reports them. A routed leg prices them at its
+   * backend's output rate; an unrouted judgement is priced from input alone (ADR-174).
+   */
+  readonly outputTokens?: number;
   readonly isTextTruncated: boolean;
   /**
    * Time this classification waited for rate-limit capacity. A run whose wall
