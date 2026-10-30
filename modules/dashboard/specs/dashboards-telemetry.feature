@@ -45,15 +45,24 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then "dashboards.deleted.dashboard" is sent
 
   @unit
-  Scenario: Telemetry: asking Langy from a board sends dashboards.asked.langy
+  Scenario: Telemetry: asking Langy from a board sends langy.asked.question with where it was asked
     When a member puts a question to Langy from a board: a suggested question under the ask bar, or the question typed in "Add a widget"
-    Then "dashboards.asked.langy" is sent once
+    Then "langy.asked.question" is sent once
+    And its surface is "ask_bar" or "add_widget"
+    And it carries no question text
+    And an empty ask from "Add a widget" counts, because the member pressed ask
+
+  @integration
+  Scenario: Telemetry: a question typed in Langy's composer sends langy.asked.question
+    When a member sends a question they typed in Langy's composer
+    Then "langy.asked.question" is sent once with surface "composer"
+    And a question handed over from a board and sent for the member sends no second one
 
   @unit
   Scenario: Telemetry: a draft the app seeds in Langy sends no ask
     Given the app seeds a Langy draft by itself
     When a widget is added from the catalogue, "Edit code" opens, "Duplicate to edit" makes a copy, or a template board is made
-    Then no "dashboards.asked.langy" is sent
+    Then no "langy.asked.question" is sent
 
   @unit
   Scenario: Telemetry: changing whether a widget counts Langy traces sends dashboards.toggled.langy_traces
@@ -123,3 +132,16 @@ Feature: Dashboards telemetry: product events and query telemetry
     Given a query from a dashboard widget, the workbench, the REST API or a saved chart
     Then its caller is "dashboard_widget", "workbench", "rest_api" or "saved_chart"
     And the browser never names the caller itself
+
+  @integration
+  Scenario: Telemetry: a key's query is counted by the client that sent it
+    Given an API key runs a LangWatchQL query
+    When the request names the LangWatch CLI, a local or hosted MCP server, or any other client
+    Then its caller is "cli", "mcp" or "rest_api"
+    And an unknown client is counted as "rest_api", so the label keeps a fixed set of values
+
+  @unit
+  Scenario: Telemetry: a query Langy runs with its session key counts as langy
+    Given Langy runs a LangWatchQL query with the session key it was given for a chat
+    When the request comes from the CLI, an MCP server or any other client
+    Then its caller is "langy"

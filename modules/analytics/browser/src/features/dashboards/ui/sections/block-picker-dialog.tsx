@@ -7,6 +7,7 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { langyQuestionAsked } from "@langwatch/langy-contract";
 import {
   Activity,
   AlertTriangle,
@@ -44,7 +45,6 @@ import {
   NO_CATALOGUE_FILTERS,
   trunkCounts,
 } from "../../model/catalogue-filter.ts";
-import { langyAsked } from "../../model/dashboard-usage-events.ts";
 import type { WidgetQuestion, WidgetQuestionIcon } from "../../model/widget-questions.ts";
 import {
   AgentKindChips,
@@ -116,7 +116,7 @@ export function BlockPickerDialog({
     const question = text.trim() === "" ? "Help me build a dashboard" : text;
     langy.ask(boardQuestion({ question, board, period }));
     // A question the member put to Langy; the drafts seeded after an add send nothing.
-    analytics.track(langyAsked());
+    analytics.track(langyQuestionAsked({ surface: "add_widget" }));
     onClose();
   };
 

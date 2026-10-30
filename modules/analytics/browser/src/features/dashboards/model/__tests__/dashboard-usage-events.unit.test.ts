@@ -4,6 +4,7 @@
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
+import { langyQuestionAsked } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -11,7 +12,6 @@ import {
   dashboardDeleted,
   dashboardFavourited,
   dashboardViewed,
-  langyAsked,
   langyTracesToggled,
   widgetAdded,
   widgetDeleted,
@@ -68,9 +68,11 @@ describe("the Dashboards product events", () => {
     expect(composed(dashboardDeleted())).toBe("dashboards.deleted.dashboard");
   });
 
-  /** @scenario "Telemetry: asking Langy from a board sends dashboards.asked.langy" */
-  it("names a Langy ask", () => {
-    expect(composed(langyAsked())).toBe("dashboards.asked.langy");
+  /** @scenario "Telemetry: asking Langy from a board sends langy.asked.question with where it was asked" */
+  it("names a Langy ask by where it was asked, never by its text", () => {
+    const event = langyQuestionAsked({ surface: "add_widget" });
+    expect(composed(event)).toBe("langy.asked.question");
+    expect(event.attributes).toEqual({ surface: "add_widget" });
   });
 
   /** @scenario "Telemetry: starring a board sends dashboards.favourited.dashboard" */
