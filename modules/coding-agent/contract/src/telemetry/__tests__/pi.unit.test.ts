@@ -107,11 +107,18 @@ describe("the pi coding-agent definition", () => {
   });
 
   /**
-   * pi 0.84.2 fires `session_before_compact` and `session_compact`, so the
-   * compaction span arrives. `sessionSpanNames` is also the admission list.
+   * pi 0.84.2 fires `session_compact` and `session_tree`, so compaction, its
+   * reason-carrying step and navigation arrive. `sessionSpanNames` is also the
+   * admission list.
    */
-  it("declares the compaction span, which pi does emit", () => {
-    expect(piAgent.sessionSpanNames).toContain("pi.harness.compaction");
+  it("admits the harness spans the extension emits", () => {
+    expect(piAgent.sessionSpanNames).toEqual(
+      expect.arrayContaining(["pi.harness.compaction", "pi.harness.step", "pi.harness.navigation"]),
+    );
+  });
+
+  it("does not admit the checkpoint span, which no pi event drives", () => {
+    expect(piAgent.sessionSpanNames).not.toContain("pi.harness.checkpoint");
   });
 
   describe("given the canonicalisation allowlist", () => {
