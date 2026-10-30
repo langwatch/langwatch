@@ -14,9 +14,16 @@ export const piAgent: CodingAgentDefinition = {
   namePrefixes: ["pi."],
 
   // Also the admission list: a harness span neither listed here nor holding a
-  // declared GenAI role is dropped at the pipeline filter. `pi.harness.compaction`
-  // is listed because pi 0.84.2 fires `session_before_compact`/`session_compact`.
-  sessionSpanNames: ["pi.harness.run", "pi.harness.turn", "pi.harness.compaction"],
+  // declared GenAI role is dropped at the pipeline filter. pi 0.84.2 fires
+  // `session_compact` and `session_tree`; the compaction reason rides a
+  // `pi.harness.step`. `pi.harness.checkpoint` has no event, so it never arrives.
+  sessionSpanNames: [
+    "pi.harness.run",
+    "pi.harness.turn",
+    "pi.harness.compaction",
+    "pi.harness.step",
+    "pi.harness.navigation",
+  ],
 
   // pi's own span names, verbatim: `genAiOperationRoleOf` compares the first
   // space-delimited word of the span name, and pi's names carry no space.
