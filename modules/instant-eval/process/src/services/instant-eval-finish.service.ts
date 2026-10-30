@@ -8,6 +8,7 @@ import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
 import {
   instantEvalPriceUsd,
+  isInstantEvalSpendBillable,
   pickInstantEvalRoutedSpend,
   instantEvalSpentCostUsd,
 } from "@langwatch/instant-eval-judge-contract";
@@ -81,8 +82,8 @@ export class InstantEvalFinishService {
     const priceUsd = instantEvalPriceUsd({ costUsd, pricing });
 
     // A run that judged no row records no spend: a record of zero is one a
-    // customer has to read and dismiss.
-    if (inputTokens > 0) {
+    // customer has to read and dismiss. A routed cost with no input tokens is billed.
+    if (isInstantEvalSpendBillable({ inputTokens, costNanoUsd })) {
       await this.spend.recordSpend({
         projectId,
         runId,

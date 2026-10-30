@@ -210,6 +210,25 @@ describe("given a routed run", () => {
     expect(recorded[0]).toMatchObject({ costNanoUsd: 5_000_000, routedInputTokens: 0 });
   });
 
+  /** @scenario "A routed cost with no input tokens is still billed" */
+  it("records a routed run's cost that came with no input tokens", async () => {
+    const { service, recorded } = finishing();
+
+    const spend = await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 0,
+      requests: 1,
+      costNanoUsd: 5000,
+      routedInputTokens: 0,
+    });
+
+    expect(spend).toEqual({ costUsd: 0.000005, priceUsd: 0.0000065 });
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({ inputTokens: 0, costNanoUsd: 5000 });
+  });
+
   /** @scenario "A page event without a routed cost still reads and prices from tokens" */
   it("prices the tokens as before when the run carries no routed cost", async () => {
     const { service, recorded } = finishing();

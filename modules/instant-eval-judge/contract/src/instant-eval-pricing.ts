@@ -137,6 +137,21 @@ export function pickInstantEvalRoutedSpend({
 }
 
 /**
+ * Whether a judgement's, page's, run's or query's spend has anything to bill: input tokens, or a
+ * routed cost above zero, which a leg billed for output alone carries with no input tokens. The
+ * one gate every judge call, run and query records its spend behind; unrouted, it is tokens > 0.
+ */
+export function isInstantEvalSpendBillable({
+  inputTokens,
+  costNanoUsd = 0,
+}: {
+  inputTokens: number;
+  costNanoUsd?: number | undefined;
+}): boolean {
+  return inputTokens > 0 || costNanoUsd > 0;
+}
+
+/**
  * One judgement's routed part. The router prices every judgement it returns, so a cost, zero
  * included, routes all of its input tokens; no cost is an unrouted judgement.
  */

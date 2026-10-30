@@ -52,6 +52,13 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
     And it is a best-effort hold, not a hard cap on what a routed query can spend
 
   @unit
+  Scenario: A routed cost with no input tokens is still billed
+    Given a routed judge call, run, page or judged query whose cost is above zero and whose input tokens are zero
+    When its spend is recorded or checked against the budget
+    Then it is billed at that cost times the markup, under the router's model and rate
+    And a spend with neither input tokens nor a cost still records nothing
+
+  @unit
   Scenario: Routed and unrouted tokens are billed separately
     Given a run whose judgements carry a routed cost for some of its input tokens
     When the run is priced

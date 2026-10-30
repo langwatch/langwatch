@@ -13,6 +13,7 @@ import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract"
 import {
   instantEvalCostUsd,
   instantEvalPriceUsd,
+  isInstantEvalSpendBillable,
   pickInstantEvalRoutedSpend,
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
@@ -125,7 +126,7 @@ export class InstantEvalQueryJudgingService {
     projectId: string;
     usage: InstantEvalJudgeUsage;
   }): Promise<boolean> {
-    if (usage.inputTokens <= 0) return true;
+    if (!isInstantEvalSpendBillable(usage)) return true;
     try {
       await this.options.spend.recordSpend({
         projectId,

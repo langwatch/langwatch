@@ -709,6 +709,66 @@ describe("given a judge call that carries a route", () => {
     });
   });
 
+  /** @scenario "A routed cost with no input tokens is still billed" */
+  it("records a routed judge call whose legs billed output alone, with no input tokens", async () => {
+    const { service, router, recorded, seed } = harness();
+    await seed();
+    vi.spyOn(router, "classify").mockResolvedValue({
+      verdicts: [{ questionId: QUESTION.id, probability: 0.9 }],
+      inputTokens: 0,
+      costNanoUsd: 5000,
+      isTextTruncated: false,
+    });
+
+    const answer = await service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
+
+    expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0.0000065 });
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({
+      model: "langwatch-judge",
+      inputTokens: 0,
+      costNanoUsd: 5000,
+      priceNanoUsd: 6500,
+    });
+  });
+
+  /** @scenario "A routed cost with no input tokens is still billed" */
+  it("records a run's routed cost that came with no input tokens", async () => {
+    const { service, recorded } = harness();
+
+    await service.recordSpend({
+      organizationId: ORGANIZATION_ID,
+      projectId: PROJECT_ID,
+      requestId: "run-1",
+      inputTokens: 0,
+      costNanoUsd: 5000,
+      routedInputTokens: 0,
+      requests: 1,
+      occurredAt: NOW,
+    });
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({ model: "langwatch-judge", costNanoUsd: 5000 });
+  });
+
+  /** @scenario "A routed cost with no input tokens is still billed" */
+  it("still records nothing for a run with neither input tokens nor a cost", async () => {
+    const { service, recorded } = harness();
+
+    await service.recordSpend({
+      organizationId: ORGANIZATION_ID,
+      projectId: PROJECT_ID,
+      requestId: "run-1",
+      inputTokens: 0,
+      costNanoUsd: 0,
+      routedInputTokens: 0,
+      requests: 1,
+      occurredAt: NOW,
+    });
+
+    expect(recorded).toEqual([]);
+  });
+
   /** @scenario "Routed and unrouted tokens are billed separately" */
   it("bills a mixed run's unrouted tokens at the published rate on top of its routed cost", async () => {
     const { service, recorded } = harness();

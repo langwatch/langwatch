@@ -8,6 +8,7 @@ import {
   INSTANT_EVAL_FREE_BUDGET_USD,
   InstantEvalFreeBudgetExhaustedError,
   InstantEvalJudgeStoppedError,
+  isInstantEvalSpendBillable,
   pickInstantEvalJudgementRoutedSpend,
   pickInstantEvalRoutedSpend,
   instantEvalSkipped,
@@ -139,8 +140,8 @@ export class InstantEvalJudgeService {
 
     const spend = { organizationId, projectId, requestKey };
     const judgement = await this.classifyRecordingStop({ spend, call });
-    // A skip billed nothing, so it records nothing.
-    if (judgement.inputTokens <= 0) return { outcome: "judged", judgement, priceUsd: 0 };
+    // A skip billed nothing, so it records nothing; a routed cost with no input tokens still bills.
+    if (!isInstantEvalSpendBillable(judgement)) return { outcome: "judged", judgement, priceUsd: 0 };
 
     const { inputTokens, costNanoUsd } = judgement;
     const priceUsd = await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
@@ -217,7 +218,7 @@ export class InstantEvalJudgeService {
     runId,
     occurredAt,
   }: InstantEvalJudgeSpendRecord): Promise<void> {
-    if (inputTokens <= 0) return;
+    if (!isInstantEvalSpendBillable({ inputTokens, costNanoUsd })) return;
     const { fact } = instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,

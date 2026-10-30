@@ -461,6 +461,24 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
       });
     });
 
+    /** @scenario "A routed cost with no input tokens is still billed" */
+    it("records a query whose routed judgements cost something but carried no input tokens", async () => {
+      const judge = new ScriptedJudge(async ({ request, index }) => {
+        const judgement = await answerEvery({ probability: 0.7 })({ request, index });
+        return { ...judgement, inputTokens: 0, costNanoUsd: 5000 };
+      });
+      const { service, records } = harness({ judge, concurrency: 1 });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }, { annoyed: "two" }],
+      });
+
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({ inputTokens: 0, costNanoUsd: 10_000 });
+    });
+
     /** @scenario "A routed judgement is priced from the summed cost of every call" */
     it("counts a routed judgement that cost nothing as routed tokens, apart from the unrouted ones", async () => {
       const judge = new ScriptedJudge(async ({ request, index }) => {

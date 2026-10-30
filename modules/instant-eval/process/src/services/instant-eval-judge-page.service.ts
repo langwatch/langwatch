@@ -5,7 +5,11 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import { instantEvalSpentPriceUsd, NANO_USD_PER_USD } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalSpentPriceUsd,
+  isInstantEvalSpendBillable,
+  NANO_USD_PER_USD,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -309,13 +313,10 @@ export class InstantEvalJudgePageService {
    * routed token count, so every token is also priced at the published rate: never below the bill.
    */
   #spentSoFarUsd({ tokens, costUsd }: { tokens: number; costUsd: number }): number {
-    if (tokens <= 0) return 0;
+    const costNanoUsd = Math.round(costUsd * NANO_USD_PER_USD);
+    if (!isInstantEvalSpendBillable({ inputTokens: tokens, costNanoUsd })) return 0;
     const { pricing } = this.judge;
-    return instantEvalSpentPriceUsd({
-      inputTokens: tokens,
-      costNanoUsd: Math.round(costUsd * NANO_USD_PER_USD),
-      pricing,
-    });
+    return instantEvalSpentPriceUsd({ inputTokens: tokens, costNanoUsd, pricing });
   }
 
   /** The page's texts, judged, with a cancel or the lease able to stop it. */

@@ -638,6 +638,22 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.costNanoUsd).toBe(50_000 + 80_000);
     });
 
+    /** @scenario "A routed cost with no input tokens is still billed" */
+    it("carries an output-only leg's cost on a caller's stop during the escalation", async () => {
+      const stop = new AbortController();
+      const { classify } = harness({
+        pricing: OUTPUT_PRICED,
+        decisions: () => {
+          setTimeout(() => stop.abort(new DOMException("stopped", "AbortError")), 5);
+          return { ...judged(0.4, 0), outputTokens: 300 };
+        },
+        llm: (signal) => hangUntilAborted(signal),
+      });
+      const error = await classify(SHORT, [Q], stop.signal).catch((thrown: unknown) => thrown);
+      expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
+      expect(error).toMatchObject({ inputTokens: 0, costNanoUsd: 900_000 });
+    });
+
     /** @scenario "A decision-model leg is billed for its output tokens too" */
     it("bills a leg whose provider reported output tokens alone", async () => {
       const { classify } = harness({

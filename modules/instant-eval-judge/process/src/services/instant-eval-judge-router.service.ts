@@ -9,6 +9,7 @@ import {
   INSTANT_EVAL_QUESTION_KINDS,
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
+  isInstantEvalSpendBillable,
   type InstantEvalClassification,
   type InstantEvalJudgeRouteRequest,
   type InstantEvalJudgement,
@@ -122,7 +123,7 @@ export class InstantEvalJudgeRouterService {
     const failure = settled.find((part) => part.status === "rejected");
     if (!failure) return instantEvalMergedJudgementOf({ questions, parts: done });
     if (signal?.aborted) throw this.stopped({ settled, done, cause: failure.reason });
-    const isPaid = done.some((part) => part.judgement.inputTokens > 0);
+    const isPaid = done.some((part) => isInstantEvalSpendBillable(part.judgement));
     if (!isPaid && !done.some((part) => part.judgement.verdicts.length > 0)) throw failure.reason;
     const failed = groupsThatThrew({ settled, kinds: kindsOf(questions) });
     const skips = failed.map((kind) => ({
@@ -153,7 +154,7 @@ export class InstantEvalJudgeRouterService {
       inputTokens += paid.inputTokens;
       costNanoUsd += paid.costNanoUsd ?? 0;
     }
-    if (inputTokens <= 0) return cause;
+    if (!isInstantEvalSpendBillable({ inputTokens, costNanoUsd })) return cause;
     return new InstantEvalJudgeStoppedError({ inputTokens, costNanoUsd, cause });
   }
 

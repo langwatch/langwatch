@@ -8,6 +8,7 @@
 import {
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
+  isInstantEvalSpendBillable,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
   type InstantEvalJudgement,
@@ -101,7 +102,7 @@ export class InstantEvalJudgeRouteRunService {
     try {
       return await this.judgeLegs({ questions, firstSend: await first });
     } catch (error) {
-      if (this.inputTokens <= 0) throw error;
+      if (!this.isPaid()) throw error;
       if (this.signal?.aborted) {
         throw new InstantEvalJudgeStoppedError({ ...this.spent(), cause: error });
       }
@@ -439,7 +440,7 @@ export class InstantEvalJudgeRouteRunService {
    * is rethrown, as an unrouted call does, only when nothing was paid.
    */
   private nothingAnswered(leg: Extract<Leg, { outcome: "failed" }>): InstantEvalJudgement {
-    if (leg.error !== undefined && this.inputTokens <= 0) throw leg.error;
+    if (leg.error !== undefined && !this.isPaid()) throw leg.error;
     return { ...instantEvalSkipped(leg.reason), ...this.spent(), routing: this.routing({}) };
   }
 
@@ -468,6 +469,11 @@ export class InstantEvalJudgeRouteRunService {
 
   private spent() {
     return { inputTokens: this.inputTokens, costNanoUsd: this.costNanoUsd };
+  }
+
+  /** Whether a leg billed anything, input tokens or a cost for output alone. */
+  private isPaid(): boolean {
+    return isInstantEvalSpendBillable(this.spent());
   }
 
   private routing({
