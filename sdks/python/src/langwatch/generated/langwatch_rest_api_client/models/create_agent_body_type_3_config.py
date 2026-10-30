@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ..models.create_agent_body_type_3_config_auth_type_3 import CreateAgentBodyType3ConfigAuthType3
     from ..models.create_agent_body_type_3_config_dev_tunnel import CreateAgentBodyType3ConfigDevTunnel
     from ..models.create_agent_body_type_3_config_headers_item import CreateAgentBodyType3ConfigHeadersItem
+    from ..models.create_agent_body_type_3_config_hooks import CreateAgentBodyType3ConfigHooks
     from ..models.create_agent_body_type_3_config_inputs_item import CreateAgentBodyType3ConfigInputsItem
     from ..models.create_agent_body_type_3_config_outputs_item import CreateAgentBodyType3ConfigOutputsItem
     from ..models.create_agent_body_type_3_config_parameters_item import CreateAgentBodyType3ConfigParametersItem
@@ -48,6 +49,9 @@ class CreateAgentBodyType3Config:
         session_path (str | Unset):
         timeout_ms (float | Unset):
         scenario_mappings (CreateAgentBodyType3ConfigScenarioMappings | Unset):
+        hooks_url (str | Unset):
+        hooks (CreateAgentBodyType3ConfigHooks | Unset):
+        hooks_signing_secret (str | Unset):
         dev_tunnel (CreateAgentBodyType3ConfigDevTunnel | Unset):
     """
 
@@ -75,6 +79,9 @@ class CreateAgentBodyType3Config:
     session_path: str | Unset = UNSET
     timeout_ms: float | Unset = UNSET
     scenario_mappings: CreateAgentBodyType3ConfigScenarioMappings | Unset = UNSET
+    hooks_url: str | Unset = UNSET
+    hooks: CreateAgentBodyType3ConfigHooks | Unset = UNSET
+    hooks_signing_secret: str | Unset = UNSET
     dev_tunnel: CreateAgentBodyType3ConfigDevTunnel | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -153,6 +160,14 @@ class CreateAgentBodyType3Config:
         if not isinstance(self.scenario_mappings, Unset):
             scenario_mappings = self.scenario_mappings.to_dict()
 
+        hooks_url = self.hooks_url
+
+        hooks: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.hooks, Unset):
+            hooks = self.hooks.to_dict()
+
+        hooks_signing_secret = self.hooks_signing_secret
+
         dev_tunnel: dict[str, Any] | Unset = UNSET
         if not isinstance(self.dev_tunnel, Unset):
             dev_tunnel = self.dev_tunnel.to_dict()
@@ -198,6 +213,12 @@ class CreateAgentBodyType3Config:
             field_dict["timeoutMs"] = timeout_ms
         if scenario_mappings is not UNSET:
             field_dict["scenarioMappings"] = scenario_mappings
+        if hooks_url is not UNSET:
+            field_dict["hooksUrl"] = hooks_url
+        if hooks is not UNSET:
+            field_dict["hooks"] = hooks
+        if hooks_signing_secret is not UNSET:
+            field_dict["hooksSigningSecret"] = hooks_signing_secret
         if dev_tunnel is not UNSET:
             field_dict["devTunnel"] = dev_tunnel
 
@@ -211,6 +232,7 @@ class CreateAgentBodyType3Config:
         from ..models.create_agent_body_type_3_config_auth_type_3 import CreateAgentBodyType3ConfigAuthType3
         from ..models.create_agent_body_type_3_config_dev_tunnel import CreateAgentBodyType3ConfigDevTunnel
         from ..models.create_agent_body_type_3_config_headers_item import CreateAgentBodyType3ConfigHeadersItem
+        from ..models.create_agent_body_type_3_config_hooks import CreateAgentBodyType3ConfigHooks
         from ..models.create_agent_body_type_3_config_inputs_item import CreateAgentBodyType3ConfigInputsItem
         from ..models.create_agent_body_type_3_config_outputs_item import CreateAgentBodyType3ConfigOutputsItem
         from ..models.create_agent_body_type_3_config_parameters_item import CreateAgentBodyType3ConfigParametersItem
@@ -336,6 +358,17 @@ class CreateAgentBodyType3Config:
         else:
             scenario_mappings = CreateAgentBodyType3ConfigScenarioMappings.from_dict(_scenario_mappings)
 
+        hooks_url = d.pop("hooksUrl", UNSET)
+
+        _hooks = d.pop("hooks", UNSET)
+        hooks: CreateAgentBodyType3ConfigHooks | Unset
+        if isinstance(_hooks, Unset):
+            hooks = UNSET
+        else:
+            hooks = CreateAgentBodyType3ConfigHooks.from_dict(_hooks)
+
+        hooks_signing_secret = d.pop("hooksSigningSecret", UNSET)
+
         _dev_tunnel = d.pop("devTunnel", UNSET)
         dev_tunnel: CreateAgentBodyType3ConfigDevTunnel | Unset
         if isinstance(_dev_tunnel, Unset):
@@ -362,6 +395,9 @@ class CreateAgentBodyType3Config:
             session_path=session_path,
             timeout_ms=timeout_ms,
             scenario_mappings=scenario_mappings,
+            hooks_url=hooks_url,
+            hooks=hooks,
+            hooks_signing_secret=hooks_signing_secret,
             dev_tunnel=dev_tunnel,
         )
 
