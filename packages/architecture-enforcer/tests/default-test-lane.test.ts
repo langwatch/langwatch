@@ -97,6 +97,18 @@ describe("default test lanes", () => {
         "a helper module that calls the starter",
         'import { startStore } from "./support/store.harness.ts";\nawait startStore();',
       ],
+      [
+        "a namespace import of the helper module",
+        'import * as store from "./support/store.harness.ts";\nawait store.startStore();',
+      ],
+      [
+        "a renamed `export { x } from` re-export",
+        'import { boot } from "./support/named-barrel.ts";\nawait boot();',
+      ],
+      [
+        "an `export * from` re-export",
+        'import { startStore } from "./support/star-barrel.ts";\nawait startStore();',
+      ],
     ])("reports the file when it starts one through %s", (_name, test) => {
       workspace({
         "tools/probe/package.json": manifest("vitest run"),
@@ -104,6 +116,9 @@ describe("default test lanes", () => {
           'import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";',
           "export const startStore = () => startTestClickHouseEndpoints({ suite: 's', names: [], environment: {} });",
         ].join("\n"),
+        "tools/probe/src/support/named-barrel.ts":
+          'export { startStore as boot } from "./store.harness.ts";',
+        "tools/probe/src/support/star-barrel.ts": 'export * from "./store.harness.ts";',
         "tools/probe/src/store.integration.test.ts": test,
       });
 

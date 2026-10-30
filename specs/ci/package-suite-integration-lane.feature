@@ -168,24 +168,8 @@ Feature: A package's integration suite runs in CI when it declares one
       Then the browser suite and the integration suite never overlap
       And the unit suites still run alongside either of them
 
-    # Lanes are keyed on the script name, so a suite that starts containers from `test`
-    # still lands beside a browser suite, as @langwatch/log-process's private-dataplane suite
-    # did. The default-test-lane policy follows the calls of each file `test` collects to a
-    # testcontainers class or startTestClickHouseEndpoints, through local helpers, for every
-    # package the job runs (not those in .github/package-suites.excluded).
-    @unit @regression
-    Scenario: A shared test lane that starts a container is reported
-      Given a package the package suites job runs, whose `test` lane collects a file
-      And that file starts a container directly or through a helper module
-      When the architecture lint runs
-      Then it reports that file and points it to a `test:integration` lane
-
-    @unit
-    Scenario: A shared test lane that leaves its container suites to test:integration passes
-      Given a package whose `test` lane excludes its container suites, or only imports a value from a module that starts containers
-      And a package that starts containers from `test` but that the package suites job leaves to a job of its own
-      When the architecture lint runs
-      Then it reports nothing
+    # The default-test-lane policy scenarios for container-starting files in a shared lane live in
+    # specs/tooling/default-test-lane.feature.
 
     # Ryuk's own container, and any it reaps, was removed about ten seconds after the
     # last client disconnected, aborting browser loads. With Ryuk off, reused ClickHouse
