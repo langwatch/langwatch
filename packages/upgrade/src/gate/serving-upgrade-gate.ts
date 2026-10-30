@@ -746,7 +746,7 @@ export async function servingUpgradeGate({
             processId: `${hostname()}:${process.pid}:${role}`,
             firstInstall: upgrade,
             credentialKeys,
-            clickhouseTargets: gateClickHouseTargets({ environment, databaseUrl, clickhouse }),
+            clickhouseTargets: configuredClickHouseTargets({ environment: upgradeEnvironment }),
             targetsCatchingUp: redisTargetsCatchingUp({
               url: redis?.trim() || undefined,
               environment,
@@ -759,24 +759,6 @@ export async function servingUpgradeGate({
       ),
     ),
   );
-}
-
-/**
- * The ClickHouse targets the gate counts behind: read from the environment the upgrade runs
- * under, never the process's own, so a route at the shared URL folds into "shared" for both.
- */
-export function gateClickHouseTargets({
-  environment,
-  databaseUrl,
-  clickhouse,
-}: {
-  environment: Readonly<Record<string, string | undefined>>;
-  databaseUrl: string;
-  clickhouse: string | undefined;
-}): readonly string[] {
-  return configuredClickHouseTargets({
-    environment: upgradeEnvironmentOver({ environment, databaseUrl, clickhouse }),
-  });
 }
 
 /**

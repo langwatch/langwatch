@@ -311,12 +311,12 @@ export class UpgradeLedgerRepository {
    */
   async seedTargetSteps({
     target,
-    stepIds,
+    steps,
   }: {
     target: string;
-    stepIds: readonly string[];
+    steps: readonly { stepId: string; version: string }[];
   }): Promise<UpgradeTarget[]> {
-    if (stepIds.length === 0) return [];
+    if (steps.length === 0) return [];
     const { rows } = await this.query<object>(
       (t) => `INSERT INTO ${t.target}
               ("step_id", "target", "status", "version", "last_error", "updated_at")
@@ -324,7 +324,7 @@ export class UpgradeLedgerRepository {
          FROM unnest($1::text[], $3::text[]) AS source(step_id, version)
        ON CONFLICT ("step_id", "target") DO NOTHING
        RETURNING ${TARGET_COLUMNS}`,
-      [stepIds, target, stepIds.map((id) => id.slice("clickhouse:".length))],
+      [steps.map((step) => step.stepId), target, steps.map((step) => step.version)],
     );
     return rows.map((row) => upgradeTargetSchema.parse(row));
   }
