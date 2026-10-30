@@ -854,6 +854,13 @@ const presentations = {
       "This agent points at a local development tunnel that seems to have ended. Run `langwatch agent dev` again on the machine that started it, or restore the agent's URL in its settings.",
   },
 
+  // ---- HTTP agent hooks ----
+  agent_hooks_url_templated_origin: {
+    title: "The hooks URL needs a fixed host",
+    describe: () =>
+      "A template in the scheme or host of the hooks URL could send the agent's credentials and signed hook calls to another host on each run. Type the scheme and host in full; templates are fine in the path and the query.",
+  },
+
   // ---- connected agents ----
   agent_register_only: {
     title: "This agent is registered from code",

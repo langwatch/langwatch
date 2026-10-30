@@ -96,6 +96,36 @@ describe("movesStoredSecrets for a hooks URL", () => {
     ).toBe(true);
   });
 
+  /**
+   * @scenario A new hooks URL on another origin is refused when the form sends the stored references back
+   * The save stores a loosely typed reference in the canonical spelling, so every spelling counts.
+   */
+  it("refuses a stored reference sent back in a spelling the save rewrites", () => {
+    const withHeader = {
+      ...stored,
+      headers: [{ key: "Authorization", value: "Bearer {{ secrets.HEADER }}" }],
+    } as HttpAgentConfig;
+    const toNewOrigin = {
+      hooksUrl: "https://evil.example.net/hooks",
+      headers: [],
+      auth: { type: "bearer", token: "tok_new" },
+      hooksSigningSecret: "whsec_new_0123456789",
+    } as Partial<HttpAgentConfig>;
+
+    for (const token of ["{{secrets.TOKEN}}", "  {{ secrets.TOKEN }}  ", "{{  secrets.TOKEN\t}}"]) {
+      expect(moves({ ...toNewOrigin, auth: { type: "bearer", token } }, withHeader)).toBe(true);
+    }
+    for (const value of ["bearer {{secrets.HEADER}}", "BEARER  {{ secrets.HEADER }} "]) {
+      expect(
+        moves({ ...toNewOrigin, headers: [{ key: "Authorization", value }] }, withHeader),
+      ).toBe(true);
+    }
+    expect(moves(toNewOrigin, withHeader)).toBe(false);
+    expect(
+      moves({ ...toNewOrigin, auth: { type: "bearer", token: "{{secrets.OTHER}}" } }, withHeader),
+    ).toBe(false);
+  });
+
   it("allows the stored references back on the stored hooks URL's origin", () => {
     const withHooks = { ...stored, hooksUrl: "https://hooks.example.com/a" };
 
@@ -374,6 +404,7 @@ describe("configForCopy with a rotation window", () => {
     const ownWindow = { secret: "{{ secrets.COPY_S0 }}", expiresAt: "2026-10-31T13:00:00Z" };
     const current = {
       ...httpAgent("agent_copy", {
+        hooksUrl: "https://hooks.example.com/old",
         hooksSigningSecret: "{{ secrets.COPY_S1 }}",
         hooksPreviousSigningSecret: ownWindow,
       }),
@@ -383,6 +414,76 @@ describe("configForCopy with a rotation window", () => {
     expect(configForCopy({ source, targetProjectId: "project_2", current })).toMatchObject({
       hooksSigningSecret: "{{ secrets.COPY_S1 }}",
       hooksPreviousSigningSecret: ownWindow,
+    });
+  });
+});
+
+describe("configForCopy with a hooks URL", () => {
+  const copyWindow = { secret: "{{ secrets.COPY_S0 }}", expiresAt: "2026-10-31T13:00:00Z" };
+  const current = {
+    ...httpAgent("agent_copy", {
+      headers: [{ key: "Authorization", value: "Bearer {{ secrets.COPY_HEADER }}" }],
+      auth: { type: "bearer", token: "{{ secrets.COPY_TOKEN }}" },
+      hooksUrl: "https://hooks.example.com/old",
+      hooksSigningSecret: "{{ secrets.COPY_S1 }}",
+      hooksPreviousSigningSecret: copyWindow,
+    }),
+    projectId: "project_2",
+  } as Agent;
+  const sourceWithHooksAt = (hooksUrl: string) =>
+    httpAgent("agent_1", {
+      headers: [{ key: "Authorization", value: "Bearer {{ secrets.SOURCE_HEADER }}" }],
+      auth: { type: "bearer", token: "{{ secrets.SOURCE_TOKEN }}" },
+      hooksUrl,
+      hooksSigningSecret: "{{ secrets.SOURCE_S1 }}",
+    });
+
+  /** @scenario A copy updated from its source takes no stored credential to a hooks URL on another origin */
+  it("carries none of the copy's stored credentials to a hooks URL on another origin", () => {
+    const config = configForCopy({
+      source: sourceWithHooksAt("https://evil.example.net/hooks"),
+      targetProjectId: "project_2",
+      current,
+    });
+
+    expect(config).toMatchObject({
+      hooksUrl: "https://evil.example.net/hooks",
+      headers: [{ key: "Authorization", value: "" }],
+      auth: { type: "bearer", token: "" },
+      hooksSigningSecret: "",
+    });
+    expect(config).not.toHaveProperty("hooksPreviousSigningSecret");
+    expect(JSON.stringify(config)).not.toContain("secrets.");
+  });
+
+  it("carries none of them to a first hooks URL off the copy's turn URL origin", () => {
+    const {
+      hooksUrl: _none,
+      hooksSigningSecret: _secret,
+      ...withoutHooks
+    } = (current as Extract<Agent, { type: "http" }>).config;
+    const config = configForCopy({
+      source: sourceWithHooksAt("https://evil.example.net/hooks"),
+      targetProjectId: "project_2",
+      current: { ...current, config: withoutHooks } as Agent,
+    });
+
+    expect(JSON.stringify(config)).not.toContain("secrets.");
+  });
+
+  it("keeps the copy's credentials and window on the copy's hooks origin", () => {
+    expect(
+      configForCopy({
+        source: sourceWithHooksAt("https://hooks.example.com/new"),
+        targetProjectId: "project_2",
+        current,
+      }),
+    ).toMatchObject({
+      hooksUrl: "https://hooks.example.com/new",
+      headers: [{ key: "Authorization", value: "Bearer {{ secrets.COPY_HEADER }}" }],
+      auth: { type: "bearer", token: "{{ secrets.COPY_TOKEN }}" },
+      hooksSigningSecret: "{{ secrets.COPY_S1 }}",
+      hooksPreviousSigningSecret: copyWindow,
     });
   });
 });

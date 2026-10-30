@@ -274,6 +274,66 @@ describe("a hooks signing secret typed into an HTTP agent", () => {
       ).rejects.toMatchObject({ code: "agent_stored_credentials_destination_mismatch" });
       expect(values).toEqual(before);
     });
+
+    /** @scenario A new hooks URL on another origin is refused when the form sends the stored references back */
+    it.each([
+      ["with no spaces", "{{secrets.HTTP_AGENT_HTTP_AUTH_TOKEN}}"],
+      ["padded", "  {{  secrets.HTTP_AGENT_HTTP_AUTH_TOKEN }} "],
+      ["behind a scheme in another case", "BEARER {{ secrets.HTTP_AGENT_HTTP_AUTH_TOKEN }}"],
+    ])("refuses a stored reference sent back %s", async (_spelling, token) => {
+      const sentBack = moved(token, "whsec_typed_for_the_new_host");
+
+      await expect(
+        app.update({
+          ...sentBack,
+          config: { ...sentBack.config, hooksUrl: "https://new.example.net/h" },
+        }),
+      ).rejects.toMatchObject({ code: "agent_stored_credentials_destination_mismatch" });
+      expect(values).toEqual(before);
+    });
+  });
+
+  describe("when the hooks URL has a template in its scheme or host", () => {
+    /** @scenario A hooks URL with a template in its scheme or host is refused on save */
+    it.each([
+      "https://{{ params.host }}/hooks",
+      "https://hooks.{{ params.domain }}/hooks",
+      "{{ params.scheme }}://support.example/hooks",
+      "{{ params.base }}/hooks",
+      "https://user:{{ params.password }}@support.example/hooks",
+    ])("refuses %s, on create and on update, before any secret is made", async (hooksUrl) => {
+      const { secrets, values } = secretStoreFixture({ HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN });
+      const { app } = createAgentAppFixture({ secrets });
+      const templated = { ...withHooks(SIGNING_SECRET).config, hooksUrl };
+
+      await expect(
+        app.create({ ...withHooks(SIGNING_SECRET), config: templated }),
+      ).rejects.toMatchObject({ code: "agent_hooks_url_templated_origin" });
+      expect(values).toEqual({ HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN });
+
+      await app.create(withHooks(SIGNING_SECRET));
+      const saved = { ...values };
+      await expect(
+        app.update({
+          ...withHooks(""),
+          config: { ...templated, hooksSigningSecret: "whsec_rotated_0123456789" },
+        }),
+      ).rejects.toMatchObject({ code: "agent_hooks_url_templated_origin" });
+      expect(values).toEqual(saved);
+    });
+
+    it("accepts a template in the path or the query", async () => {
+      const { secrets } = secretStoreFixture({ HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN });
+      const { app } = createAgentAppFixture({ secrets });
+      const hooksUrl = "https://support.example/{{ params.tenant }}/hooks?run={{ params.run }}";
+
+      const created = await app.create({
+        ...withHooks(SIGNING_SECRET),
+        config: { ...withHooks(SIGNING_SECRET).config, hooksUrl },
+      });
+
+      expect(created.config).toMatchObject({ hooksUrl });
+    });
   });
 
   /** @scenario Removing the hooks URL deletes the hooks signing secret */
