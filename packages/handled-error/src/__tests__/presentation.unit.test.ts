@@ -1251,3 +1251,37 @@ describe("provider_usage_limit_reached", () => {
     expect(description).not.toContain("copied the whole key");
   });
 });
+
+describe("budget_exceeded", () => {
+  const budget = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "budget_exceeded", httpStatus: 402, meta }));
+
+  describe("when the gateway names the scope and the window", () => {
+    it("names whose limit ran out and when it resets", () => {
+      const copy = budget({ budget_scope: "team", budget_window: "month" });
+
+      expect(copy.title).toBe("Your team's monthly AI spending limit is reached");
+      expect(copy.description).toBe(
+        "Requests are blocked until the month resets on the 1st at midnight UTC. An admin can raise it in AI Gateway budgets.",
+      );
+    });
+
+    it("drops the period word for a limit that never resets", () => {
+      const copy = budget({ budget_scope: "virtual_key", budget_window: "total" });
+
+      expect(copy.title).toBe("This key's AI spending limit is reached");
+      expect(copy.description).toContain("never resets");
+    });
+  });
+
+  describe("when the meta names nothing the registry knows", () => {
+    it("keeps the plain headline and never echoes the value", () => {
+      const copy = budget({ budget_scope: "toString", budget_window: "<b>" });
+
+      expect(copy.title).toBe("Your AI spending limit is reached");
+      expect(copy.description).toBe(
+        "Requests are blocked until the limit is raised. An admin can raise it in AI Gateway budgets.",
+      );
+    });
+  });
+});
