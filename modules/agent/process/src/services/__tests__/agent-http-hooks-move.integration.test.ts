@@ -47,6 +47,7 @@ describe("a save from the form that moves the hooks URL to another origin", () =
     await expect(save).rejects.toBeInstanceOf(AgentStoredCredentialsDestinationError);
   });
 
+  /** @scenario "A hooks URL on another origin is allowed when every credential is typed again" */
   it("is allowed once the token is typed again and the secret rotated", async () => {
     const { app, read } = await savedWithHooks();
 
