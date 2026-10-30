@@ -180,6 +180,76 @@ Feature: Scenario run parameters
     Then "tone" is listed as declared by the scenario with the default "frustrated"
     And a value typed for "tone" is not flagged as undeclared
 
+  # --- Inline declarations in the scenario editor ---
+  #
+  # The editor reads the situation with the same reader the run uses, so what
+  # it marks and lists is what a run declares. A conflict is shown, never
+  # resolved silently, and a secret's value is never shown.
+
+  @unit
+  Scenario: The editor marks exactly what a run declares
+    Given a situation reading 'A { plan: free } user, {{ tone: calm }}, {"id": 1}, {} in { region: eu-central }'
+    When it is read for inline declarations
+    Then "{ plan: free }" and "{ region: eu-central }" are placed in the text
+    And nothing else is
+
+  @unit
+  Scenario: A name declared inline twice with another default is flagged
+    Given a situation reading "{ plan: free } now, { plan: pro } later, { plan: free } again"
+    When it is read for inline declarations
+    Then the second declaration is flagged as a duplicate whose first default "free" is used
+    And the third, repeating the first default, is not flagged
+
+  @unit
+  Scenario: An inline name a stored parameter has is flagged as overridden
+    Given a scenario declaring "plan" with the default "pro"
+    And its situation reads "A { plan: free } customer"
+    When it is read for inline declarations
+    Then the declaration is flagged as overridden by the stored default "pro"
+
+  @unit
+  Scenario: An inline name a stored secret has is flagged as refused
+    Given a scenario declaring the secret parameter "api_token"
+    And its situation reads "Use { api_token: abc } or { api_token: def }"
+    When it is read for inline declarations
+    Then both declarations are flagged as a secret
+
+  @integration
+  Scenario: The editor highlights the inline declarations in the situation
+    Given the scenario editor is open
+    When the situation reads 'A { plan: free } customer in { region: eu-central } says {{ tone: calm }} and {"id": 1}'
+    Then "{ plan: free }" and "{ region: eu-central }" are highlighted
+    And "{{ tone: calm }}" and the JSON are not
+
+  @integration
+  Scenario: The editor lists the inline parameters live with their defaults
+    Given the scenario editor is open on a scenario that declares no parameters
+    When the situation reads "A { plan: free } customer in { region: eu-central }"
+    Then the parameters section is open without being asked for
+    And it lists "plan" with "free" and "region" with "eu-central", each marked as from the situation
+    And neither can be edited there
+
+  @integration
+  Scenario: The editor shows a stored parameter winning over an inline one
+    Given the scenario editor is open on a scenario declaring "plan" with the default "pro"
+    When the situation reads "A { plan: free } customer"
+    Then the parameters line still reads "plan=pro"
+    And "plan" from the situation is listed as overridden by the stored parameter with "pro"
+
+  @integration
+  Scenario: The editor warns when a name is declared twice inline with another default
+    Given the scenario editor is open
+    When the situation reads "{ plan: free } now, { plan: pro } later"
+    Then the editor warns "plan is declared twice; the first default, free, is used"
+
+  @integration
+  Scenario: The editor refuses an inline declaration naming a stored secret
+    Given the scenario editor is open on a scenario declaring the secret parameter "api_token"
+    When the situation reads "Use { api_token: abc123 } to sign in"
+    Then "api_token" is listed as refused: a secret cannot be declared in the situation
+    And the listed parameters show no value for it
+    And saving is refused with that message and nothing is sent
+
   # --- Reaching the target under test ---
 
   @unit

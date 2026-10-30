@@ -27,6 +27,7 @@ import {
   CALLER_VOICE_EFFECTS,
   DEFAULT_CALLER_VOICE,
   type CallerVoiceConfig,
+  type InlineDeclaration,
   type ScenarioFieldValue,
   type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
@@ -50,8 +51,11 @@ import { parameterPlaceholder } from "../run-parameters/parameter-suggestions.ts
 import { useAgentDeclaredParameters } from "../run-parameters/use-agent-declared-parameters.ts";
 import { CaseRecentRunsButton } from "./case-recent-runs-button.tsx";
 import { CaseVersionHistoryPopover } from "./case-version-history-popover.tsx";
+import { InlineParameterList } from "./inline-parameter-list.tsx";
+import { SituationInput } from "./situation-input.tsx";
 import {
   criteriaOf,
+  secretInSituationProblem,
   strayFieldValues,
   type CaseDraft,
   type CaseEditorState,
@@ -162,28 +166,29 @@ function TitleAndSuiteRow({
 function SituationAndCriteria({
   draft,
   setDraft,
+  inlineDeclarations,
+  situationError,
   criteriaError,
 }: {
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
+  inlineDeclarations: InlineDeclaration[];
+  situationError: string | undefined;
   criteriaError: string | undefined;
 }) {
   return (
     <>
       <Box>
         <FieldLabel>Situation · what is the user trying to do?</FieldLabel>
-        <Textarea
-          {...DIALOG_FIELD_STYLE}
-          {...GROWING_FIELD}
-          rows={2}
+        <SituationInput
+          value={draft.situation}
+          onChange={(situation) => setDraft({ situation })}
+          declarations={inlineDeclarations}
+          invalid={situationError !== undefined}
           minHeight={SITUATION_HEIGHT.min}
           maxHeight={SITUATION_HEIGHT.max}
-          aria-label="Situation"
-          data-testid="case-modal-situation-input"
-          placeholder="The customer is on day three of waiting for a refund and threatens to charge back."
-          value={draft.situation}
-          onChange={(event) => setDraft({ situation: event.target.value })}
         />
+        <FieldError message={situationError} />
       </Box>
 
       <Box>
@@ -386,10 +391,13 @@ function SuiteFieldsBlock({ editor }: { editor: CaseEditorState }) {
 function ParametersBlock({
   draft,
   setDraft,
+  inlineDeclarations,
   onRemove,
 }: {
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
+  /** Listed under the line; while there are any, the block stays open. */
+  inlineDeclarations: InlineDeclaration[];
   onRemove: () => void;
 }) {
   const definitions = useAgentDeclaredParameters();
@@ -405,7 +413,9 @@ function ParametersBlock({
           trigger="hover"
           testId="case-parameters-info"
         />
-        <RemoveBlockButton label="Remove the parameters" onClick={onRemove} />
+        {inlineDeclarations.length === 0 && (
+          <RemoveBlockButton label="Remove the parameters" onClick={onRemove} />
+        )}
       </FieldLabel>
       <ParameterLineField
         ariaLabel="Parameters"
@@ -415,6 +425,7 @@ function ParametersBlock({
         definitions={definitions}
         testId="case-parameters-line"
       />
+      <InlineParameterList declarations={inlineDeclarations} />
     </Box>
   );
 }
@@ -431,7 +442,11 @@ export function CaseModalFields({
   attempted: boolean;
 }) {
   const { draft, setDraft } = editor;
-  const problems = caseDraftProblems({ draft, attempted });
+  const problems = caseDraftProblems({
+    draft,
+    inlineDeclarations: editor.inlineDeclarations,
+    attempted,
+  });
 
   if (editor.isLoading) return <CaseModalSkeleton />;
 
@@ -446,7 +461,13 @@ export function CaseModalFields({
         suites={suites}
         titleError={problems.title}
       />
-      <SituationAndCriteria draft={draft} setDraft={setDraft} criteriaError={problems.criteria} />
+      <SituationAndCriteria
+        draft={draft}
+        setDraft={setDraft}
+        inlineDeclarations={editor.inlineDeclarations}
+        situationError={problems.situation}
+        criteriaError={problems.criteria}
+      />
       <SuiteFieldsBlock editor={editor} />
       {/* A block a chip opened reads where the reader was looking when they
           opened it: straight under the criteria, in the order the chips sit
@@ -469,13 +490,23 @@ export function CaseModalFields({
 }
 
 /** What a save would refuse, by field: nothing until a save was tried. */
-export function caseDraftProblems({ draft, attempted }: { draft: CaseDraft; attempted: boolean }): {
+export function caseDraftProblems({
+  draft,
+  inlineDeclarations,
+  attempted,
+}: {
+  draft: CaseDraft;
+  inlineDeclarations: readonly InlineDeclaration[];
+  attempted: boolean;
+}): {
   title: string | undefined;
+  situation: string | undefined;
   criteria: string | undefined;
 } {
-  if (!attempted) return { title: void 0, criteria: void 0 };
+  if (!attempted) return { title: void 0, situation: void 0, criteria: void 0 };
   return {
     title: draft.title.trim() ? void 0 : "A scenario needs a title.",
+    situation: secretInSituationProblem(inlineDeclarations),
     criteria: criteriaOf(draft).length === 0 ? "A scenario needs at least one criterion." : void 0,
   };
 }
@@ -699,7 +730,12 @@ function CustomizeBlocks({ editor }: { editor: CaseEditorState }) {
   return (
     <VStack align="stretch" gap={4} data-testid="case-customize-blocks">
       {customize.showParameters && (
-        <ParametersBlock draft={draft} setDraft={setDraft} onRemove={customize.removeParameters} />
+        <ParametersBlock
+          draft={draft}
+          setDraft={setDraft}
+          inlineDeclarations={editor.inlineDeclarations}
+          onRemove={customize.removeParameters}
+        />
       )}
       {customize.showTurns && (
         <TurnsBlock draft={draft} setDraft={setDraft} onRemove={customize.removeTurns} />

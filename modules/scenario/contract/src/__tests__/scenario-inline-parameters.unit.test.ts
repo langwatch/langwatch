@@ -9,7 +9,11 @@ import { describe, expect, it } from "vitest";
 
 import { resolveRunParameters } from "../features/run/run-parameters.ts";
 import { renderScenarioContent } from "../scenario-content-template.ts";
-import { declaredScenarioParameters, extractInlineRunParameters } from "../scenario.parameters.ts";
+import {
+  declaredScenarioParameters,
+  extractInlineRunParameters,
+  inlineDeclarationsOf,
+} from "../scenario.parameters.ts";
 import type { ScenarioRunConfig } from "../scenario.ts";
 
 function scenario(overrides: Partial<ScenarioRunConfig> = {}): ScenarioRunConfig {
@@ -245,6 +249,67 @@ describe("a run of a scenario with inline declarations", () => {
           values: { api_token: "tok-live-xyz" },
         }),
       ).rejects.toMatchObject({ code: "scenario_secret_parameter_in_text" });
+    });
+  });
+});
+
+describe("inlineDeclarationsOf", () => {
+  describe("given declarations among braces that are not declarations", () => {
+    /** @scenario "The editor marks exactly what a run declares" */
+    it("places each declaration the run reads, and nothing else", () => {
+      const text =
+        'A { plan: free } user, {{ tone: calm }}, {"id": 1}, {} in { region: eu-central }';
+
+      const declarations = inlineDeclarationsOf({ text, parameters: [] });
+
+      expect(declarations.map(({ start, end }) => text.slice(start, end))).toEqual([
+        "{ plan: free }",
+        "{ region: eu-central }",
+      ]);
+      expect(declarations.map(({ name }) => name)).toEqual(
+        extractInlineRunParameters({ text }).definitions.map(({ name }) => name),
+      );
+      expect(declarations.every(({ status }) => status.kind === "declared")).toBe(true);
+    });
+  });
+
+  describe("given the same name twice with another default", () => {
+    /** @scenario "A name declared inline twice with another default is flagged" */
+    it("flags the second as a duplicate naming the first default", () => {
+      const declarations = inlineDeclarationsOf({
+        text: "{ plan: free } now, { plan: pro } later, { plan: free } again",
+        parameters: [],
+      });
+
+      expect(declarations.map(({ status }) => status)).toEqual([
+        { kind: "declared" },
+        { kind: "duplicate", usedDefault: "free" },
+        { kind: "declared" },
+      ]);
+    });
+  });
+
+  describe("given a stored parameter with the inline name", () => {
+    /** @scenario "An inline name a stored parameter has is flagged as overridden" */
+    it("flags it with the stored default, which wins", () => {
+      const [declaration] = inlineDeclarationsOf({
+        text: "A { plan: free } customer",
+        parameters: [{ name: "plan", defaultValue: "pro" }],
+      });
+
+      expect(declaration?.status).toEqual({ kind: "stored", storedDefault: "pro" });
+    });
+  });
+
+  describe("given a stored secret with the inline name", () => {
+    /** @scenario "An inline name a stored secret has is flagged as refused" */
+    it("flags it as a secret, ahead of any other conflict", () => {
+      const declarations = inlineDeclarationsOf({
+        text: "Use { api_token: abc } or { api_token: def }",
+        parameters: [{ name: "api_token", secret: true }],
+      });
+
+      expect(declarations.map(({ status }) => status.kind)).toEqual(["secret", "secret"]);
     });
   });
 });

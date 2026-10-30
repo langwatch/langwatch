@@ -53,11 +53,14 @@ export function useCaseCustomizeBlocks({
   seedCount,
   draft,
   setDraft,
+  hasInlineParameters,
 }: {
   /** Rises every time the draft is seeded, which is when the blocks follow it. */
   seedCount: number;
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
+  /** True while the situation declares a parameter inline, which keeps the parameters open. */
+  hasInlineParameters: boolean;
 }): CaseCustomizeBlocks {
   const [open, setOpen] = useState<OpenBlocks>(NONE_OPEN);
   const voiceAgentsEnabled = useVoiceAgentsEnabled();
@@ -89,8 +92,9 @@ export function useCaseCustomizeBlocks({
     setDraft({ callerVoice: null });
   }, [setDraft]);
 
+  const showParameters = open.parameters || hasInlineParameters;
   const chips: CustomizeChip[] = [];
-  if (!open.parameters) {
+  if (!showParameters) {
     chips.push({
       key: "case-parameters",
       label: "Add parameters",
@@ -120,7 +124,7 @@ export function useCaseCustomizeBlocks({
   }
 
   return {
-    showParameters: open.parameters,
+    showParameters,
     showTurns: open.turns,
     showModels: open.models,
     showCallerVoice: open.callerVoice && voiceAgentsEnabled,
