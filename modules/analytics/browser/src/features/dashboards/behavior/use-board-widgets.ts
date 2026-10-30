@@ -5,6 +5,7 @@
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
+import { pickerWidgets, type WidgetQuestion } from "@langwatch/analytics-catalogue";
 import type {
   DashboardWidgetDefinition,
   DashboardWidgetSource,
@@ -15,7 +16,6 @@ import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import type { DashboardWidgetDraft } from "../../../model/dashboard-widget-draft.ts";
-import { pickerWidgets } from "../catalogue/index.ts";
 import { blankWidgetSlot } from "../model/blank-widget.ts";
 import { atLeastBoardMinRows } from "../model/board-grid.ts";
 import { boardRestorePlan } from "../model/board-restore.ts";
@@ -25,7 +25,6 @@ import {
   boardWidgetsOf,
   duplicateSlot,
 } from "../model/board-widgets.ts";
-import type { WidgetQuestion } from "../model/widget-questions.ts";
 import { CODE_SOURCE, catalogueSource } from "../model/widget-source.ts";
 import { withStoredSources } from "../model/widget-sources.ts";
 import { offerUndo, withdrawUndo } from "./widget-undo.ts";

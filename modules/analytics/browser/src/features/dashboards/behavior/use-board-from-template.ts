@@ -4,6 +4,7 @@
  * the half-made one.
  */
 
+import type { BoardTemplate, BoardTemplateWidget } from "@langwatch/analytics-catalogue";
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useState } from "react";
 
@@ -18,7 +19,6 @@ import {
 } from "../model/boards.ts";
 import type { CuratedBoard } from "../model/curated-boards.ts";
 import { catalogueSource } from "../model/widget-source.ts";
-import type { BoardTemplate, BoardTemplateWidget } from "../templates/index.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
 /** What a new board is made of; `widgets` is read only once the board is about to be made. */

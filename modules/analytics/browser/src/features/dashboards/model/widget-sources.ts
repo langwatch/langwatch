@@ -3,10 +3,13 @@
  * counts nothing at all (dashboards-v2 AC200, AC200m).
  */
 
+import {
+  canFollowSources,
+  PRESENCE_QUERY,
+  readsSourcesParameter,
+} from "@langwatch/analytics-catalogue";
 import { effectiveSources } from "@langwatch/analytics-contract";
 import { type DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
-
-import { canFollowSources, PRESENCE_QUERY, readsSourcesParameter } from "./sources-parameter.ts";
 
 type Sourced = Pick<DashboardWidgetQuery, "name" | "sources" | "sql">;
 

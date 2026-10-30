@@ -6,6 +6,7 @@
  * @see specs/analytics/dashboard-rest-api.feature
  * @vitest-environment node
  */
+import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
 import {
   bindMiddlewareContext,
   canonicalErrorResponse,
@@ -480,6 +481,22 @@ describe("given two Dashboards boards, one holding a widget", () => {
       status: 200,
       name: "Traces",
     });
+  });
+
+  /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */
+  it("answers a From LangWatch widget reached through a board's path as not found", async () => {
+    const { board, send } = await twoBoards();
+    const [curated] = CURATED_BOARD_DEFINITIONS;
+    const [widget] = curated?.widgets ?? [];
+    if (!curated || !widget) throw new Error("No From LangWatch board ships a widget");
+    const id = templateWidgetId({ templateId: curated.templateId, key: widget.key });
+
+    const read = await send(
+      "dashboards",
+      `${BOARDS}/${board.id}/widgets/${encodeURIComponent(id)}`,
+    );
+
+    expect(refusal(read)).toEqual({ status: 404, code: "dashboard_widget_not_found" });
   });
 
   /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */

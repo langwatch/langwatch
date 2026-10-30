@@ -5,25 +5,23 @@
  * @see modules/dashboard/specs/dashboards-widget-quality.feature
  */
 
-import { describe, expect, it } from "vitest";
-
-import { isLowerBound, mergeBuckets } from "../../../../model/dashboard-widget/chartsLib/index.ts";
 import {
+  BOARD_TEMPLATES,
+  BUCKETS,
   CATALOGUE_WIDGET_BUILDS,
   CATALOGUE_WIDGETS,
-  DATA_REQUIREMENTS,
-  IMPLEMENTED_WIDGET_IDS,
-  implementedWidget,
-} from "../../catalogue/index.ts";
-import { BOARD_TEMPLATES } from "../index.ts";
-import {
-  BUCKETS,
   COMPLETENESS,
+  DATA_REQUIREMENTS,
   DATES,
   GAP_BRIDGE,
+  IMPLEMENTED_WIDGET_IDS,
+  implementedWidget,
   NUMBERS,
   SERIES_CHART,
-} from "../model/widget-code-parts.ts";
+} from "@langwatch/analytics-catalogue";
+import { describe, expect, it } from "vitest";
+
+import { isLowerBound, mergeBuckets } from "../../../model/dashboard-widget/chartsLib/index.ts";
 
 type Row = Record<string, unknown>;
 interface Query {

@@ -1,3 +1,4 @@
+import { type CuratedBoardWidget, curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
 import {
   DashboardWidgetDefinitionInvalidError,
   DashboardWidgetNotFoundError,
@@ -19,6 +20,7 @@ import {
   type DashboardViewer,
 } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
+import { Temporal } from "@langwatch/time";
 
 import type {
   DashboardWidgetRow,
@@ -40,6 +42,9 @@ type Keyed = Readonly<{ keyReach?: LangWatchQLKeyReach | undefined }>;
 
 /** A widget addressed under one board's path: on any other board, or none, it is not found. */
 type OnBoard = Readonly<{ onDashboardId?: string }>;
+
+/** A From LangWatch widget was never stored, so it carries no time of its own. */
+const NEVER_STORED = Temporal.Instant.fromEpochMilliseconds(0);
 
 /** An update's code and queries, each optional; the repository merges them into the stored half. */
 const definitionUpdateSchema = dashboardWidgetDefinitionSchema.partial();
@@ -84,8 +89,17 @@ export class DashboardWidgetService {
     return rows.map((row) => this.#present(row));
   }
 
+  /**
+   * A `template:` id reads a From LangWatch widget from the catalogue: every member sees it.
+   * It sits on no stored board, so under a board's path it is not found.
+   */
   async getById(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
+    const curated = curatedBoardWidgetById(input.id);
+    if (curated) {
+      if (input.onDashboardId !== undefined) throw new DashboardWidgetNotFoundError();
+      return this.#presentCurated({ projectId: input.projectId, curated });
+    }
     return this.#present(await this.#visibleRow(input));
   }
 
@@ -285,6 +299,26 @@ export class DashboardWidgetService {
     if (!parsed.success) {
       throw new DashboardWidgetDefinitionRefusedError(widgetId, { reasons: [parsed.error] });
     }
+  }
+
+  #presentCurated({
+    projectId,
+    curated,
+  }: {
+    projectId: string;
+    curated: CuratedBoardWidget;
+  }): DashboardWidget {
+    const { name, definition, layout } = curated.widget;
+    return {
+      id: curated.id,
+      projectId,
+      name,
+      definition,
+      createdAt: NEVER_STORED,
+      updatedAt: NEVER_STORED,
+      dashboardId: null,
+      ...layout,
+    };
   }
 
   #present(row: DashboardWidgetRow): DashboardWidget {

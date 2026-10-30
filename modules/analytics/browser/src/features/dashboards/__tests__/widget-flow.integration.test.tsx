@@ -6,6 +6,7 @@
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
+import { PICKER_QUESTIONS, pickerWidgets } from "@langwatch/analytics-catalogue";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
@@ -23,7 +24,6 @@ import {
   StubAnalyticsHost,
   type StubAnalyticsHostOptions,
 } from "../../../testing.tsx";
-import { PICKER_QUESTIONS, pickerWidgets } from "../catalogue/index.ts";
 import { WIDGET_AGENT_DOCS_URL, widgetCreatePrompt } from "../model/widget-api.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";

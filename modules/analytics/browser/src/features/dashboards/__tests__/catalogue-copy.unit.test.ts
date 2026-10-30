@@ -4,9 +4,6 @@
  * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
-import { describe, expect, it } from "vitest";
-
-import { SUGGESTED_QUESTIONS } from "../../langy/model/board-langy.ts";
 import {
   CATALOGUE_TEMPLATES,
   CATALOGUE_WIDGETS,
@@ -14,7 +11,10 @@ import {
   QUESTION_TREE,
   QUESTION_TYPE_LABELS,
   TRUNK_QUESTIONS,
-} from "../index.ts";
+} from "@langwatch/analytics-catalogue";
+import { describe, expect, it } from "vitest";
+
+import { SUGGESTED_QUESTIONS } from "../langy/model/board-langy.ts";
 
 const BARE_IT = /\bit\b/i;
 

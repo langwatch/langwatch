@@ -34,7 +34,7 @@ const SCOPE = { projectId: PROJECT, board: { kind: BOARD.kind, id: BOARD.id } };
 const ON = { projectId: PROJECT, board: BOARD, hour: 9, timezone: "Europe/Amsterdam" };
 const OFF = { projectId: PROJECT, board: BOARD };
 const UNDECIDED = { state: "undecided", settings: null, lastRun: null, offReason: null };
-const TEMPLATE: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
+const TEMPLATE: InsightRunBoard = { kind: "template", id: "release", name: "Release check" };
 const PRIVATE_BOARD: InsightRunBoard = { kind: "dashboard", id: "dashboard-private", name: "Mine" };
 
 /** An organisation admin on an aggregate: the admin gate admits, so the write guard decides. */
@@ -188,6 +188,25 @@ describe("given a member with analytics:view and a board they can open", () => {
         await member.getBoardDailyRun({ ...scope, board: { kind: "dashboard", id: TEMPLATE.id } }),
       ).toEqual(UNDECIDED);
       expect(daily.boardReads).toEqual([]);
+    });
+
+    /** @scenario "A From LangWatch board is named by the catalogue, and one not offered is refused" */
+    it("keeps the catalogue's name, and refuses a template id the catalogue does not offer", async () => {
+      const { as, daily } = await project();
+      const member = as({ userId: MEMBER });
+      const renamed = { ...TEMPLATE, name: "Anything" };
+      const unknown = { ...TEMPLATE, id: "nope" };
+
+      await member.configureBoardDailyRun({ ...ON, board: renamed, maxInsights: 1 });
+      const refused = await refusalOf(
+        member.configureBoardDailyRun({ ...ON, board: unknown, maxInsights: 1 }),
+      );
+
+      expect(await daily.configuredBoardsOf({ userId: MEMBER, board: TEMPLATE })).toEqual([
+        TEMPLATE,
+      ]);
+      expect(refused).toMatchObject({ code: "NOT_FOUND", cause: { code: "dashboard_not_found" } });
+      expect(await daily.runEventsOf({ userId: MEMBER, board: unknown })).toEqual([]);
     });
   });
 
