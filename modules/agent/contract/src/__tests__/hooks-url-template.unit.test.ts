@@ -71,9 +71,17 @@ describe("readHooksOrigin", () => {
     "https:///{{ h }}/hook",
     "https:/\\{{p.h}}",
     "https://{{ params.user }}@support.example/hooks",
+    "https://user:{{ params.password }}@support.example/hooks",
     "{{ params.base }}/hooks",
     "not a url",
   ])("is not fixed for %j, whose origin a template chooses or which does not parse", (hooksUrl) => {
     expect(readHooksOrigin(hooksUrl)).toEqual({ isFixed: false });
+  });
+
+  it("is fixed for a static password, which no template can change", () => {
+    expect(readHooksOrigin("https://user:pw@support.example/hooks")).toEqual({
+      isFixed: true,
+      origin: "https://support.example",
+    });
   });
 });

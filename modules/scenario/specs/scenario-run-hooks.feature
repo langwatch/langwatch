@@ -483,7 +483,7 @@ Feature: Scenario run hooks: setup and teardown
     @integration
     Scenario: A hook whose rendered URL leaves the saved hooks origin is refused before any request
       Given an HTTP agent saved with a hooks URL whose host a template chooses, such as "https:///{{ params.host }}/hooks"
-      When a hook is called
+      When setup or teardown is called
       Then no request is sent and the hook fails naming the hooks URL's host
       And a rendered hooks URL on another origin than the saved one is refused the same way
 
