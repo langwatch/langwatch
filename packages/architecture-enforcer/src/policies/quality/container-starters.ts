@@ -17,6 +17,28 @@ type Binding = {
 const startingNames = new Map<string, ReadonlySet<string>>();
 const reading = new Set<string>();
 
+/** The bindings one import clause introduces, by local name. */
+function clauseBindings({
+  clause,
+  target,
+}: {
+  clause: ts.ImportClause;
+  target: Pick<Binding, "file" | "testcontainers">;
+}) {
+  const bindings = new Map<string, Binding>();
+  if (clause.name) bindings.set(clause.name.text, { name: "default", ...target });
+  const named = clause.namedBindings;
+  if (named && ts.isNamespaceImport(named)) bindings.set(named.name.text, { name: "*", ...target });
+  if (named && ts.isNamedImports(named)) {
+    for (const element of named.elements) {
+      if (element.isTypeOnly) continue;
+      const name = (element.propertyName ?? element.name).text;
+      bindings.set(element.name.text, { name, ...target });
+    }
+  }
+  return bindings;
+}
+
 function bindingsOf({ source, file }: { source: ts.SourceFile; file: string }) {
   const bindings = new Map<string, Binding>();
   for (const statement of source.statements) {
@@ -29,17 +51,7 @@ function bindingsOf({ source, file }: { source: ts.SourceFile; file: string }) {
       file: resolveRelativeModule({ file, specifier }),
       testcontainers: TESTCONTAINERS.test(specifier),
     };
-    if (clause.name) bindings.set(clause.name.text, { name: "default", ...target });
-    const named = clause.namedBindings;
-    if (named && ts.isNamespaceImport(named))
-      bindings.set(named.name.text, { name: "*", ...target });
-    if (named && ts.isNamedImports(named)) {
-      for (const element of named.elements) {
-        if (element.isTypeOnly) continue;
-        const name = (element.propertyName ?? element.name).text;
-        bindings.set(element.name.text, { name, ...target });
-      }
-    }
+    for (const [name, binding] of clauseBindings({ clause, target })) bindings.set(name, binding);
   }
   return bindings;
 }
@@ -82,6 +94,28 @@ function callsStarter({
   return visit(node);
 }
 
+/** Whether `namespace.name(...)` calls a starter of the module the namespace import names. */
+function namespaceCallStarts({
+  callee,
+  bindings,
+}: {
+  callee: ts.PropertyAccessExpression;
+  bindings: ReadonlyMap<string, Binding>;
+}) {
+  if (!ts.isIdentifier(callee.expression)) return false;
+  const namespace = bindings.get(callee.expression.text);
+  return namespace?.name === "*" && namespace.file !== undefined
+    ? containerStartingNames(namespace.file).has(callee.name.text)
+    : false;
+}
+
+/** Whether calling an imported name starts a container. */
+function importedCallStarts({ binding, constructs }: { binding: Binding; constructs: boolean }) {
+  if (binding.testcontainers) return constructs;
+  if (NAMED_STARTERS.has(binding.name)) return true;
+  return binding.file !== undefined && containerStartingNames(binding.file).has(binding.name);
+}
+
 /** A callee judge for one file: its own starting names, plus what its imports bring in. */
 function starterJudge({
   bindings,
@@ -91,36 +125,24 @@ function starterJudge({
   local: ReadonlySet<string>;
 }) {
   return ({ callee, constructs }: { callee: ts.Expression; constructs: boolean }): boolean => {
-    if (ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression)) {
-      const namespace = bindings.get(callee.expression.text);
-      return namespace?.name === "*" && namespace.file !== undefined
-        ? containerStartingNames(namespace.file).has(callee.name.text)
-        : false;
-    }
+    if (ts.isPropertyAccessExpression(callee)) return namespaceCallStarts({ callee, bindings });
     if (!ts.isIdentifier(callee)) return false;
     if (local.has(callee.text)) return true;
     const binding = bindings.get(callee.text);
-    if (!binding) return false;
-    if (binding.testcontainers) return constructs;
-    if (NAMED_STARTERS.has(binding.name)) return true;
-    return binding.file !== undefined && containerStartingNames(binding.file).has(binding.name);
+    return binding !== undefined && importedCallStarts({ binding, constructs });
   };
 }
 
-/**
- * The names a module declares or re-exports whose call starts a container. Read by
- * call, not by import: a file that takes only a constant from a harness starts nothing.
- */
-export function containerStartingNames(file: string): ReadonlySet<string> {
-  const cached = startingNames.get(file);
-  if (cached) return cached;
-  if (reading.has(file)) return new Set();
-  reading.add(file);
-  const source = sourceFile({ file, parents: false });
-  const bindings = bindingsOf({ source, file });
-  const starting = new Set<string>();
-  const isStarter = starterJudge({ bindings, local: starting });
-  const declarations = declarationsOf(source);
+/** Grows `starting` with every declaration whose body calls a starter, until nothing changes. */
+function growStarting({
+  declarations,
+  starting,
+  isStarter,
+}: {
+  declarations: ReadonlyMap<string, ts.Node>;
+  starting: Set<string>;
+  isStarter: Parameters<typeof callsStarter>[0]["isStarter"];
+}) {
   for (let grew = true; grew;) {
     grew = false;
     for (const [name, node] of declarations) {
@@ -129,21 +151,49 @@ export function containerStartingNames(file: string): ReadonlySet<string> {
       grew = true;
     }
   }
+}
+
+/** Adds the starters one `export ... from` statement passes on. */
+function addReexported({
+  statement,
+  file,
+  starting,
+}: {
+  statement: ts.ExportDeclaration;
+  file: string;
+  starting: Set<string>;
+}) {
+  const specifier = statement.moduleSpecifier;
+  if (!specifier || !ts.isStringLiteral(specifier)) return;
+  const target = resolveRelativeModule({ file, specifier: specifier.text });
+  if (!target) return;
+  const reexported = containerStartingNames(target);
+  const clause = statement.exportClause;
+  if (!clause) for (const name of reexported) starting.add(name);
+  if (!clause || !ts.isNamedExports(clause)) return;
+  for (const element of clause.elements) {
+    if (reexported.has((element.propertyName ?? element.name).text))
+      starting.add(element.name.text);
+  }
+}
+
+/**
+ * The names a module declares or re-exports whose call starts a container. Read by
+ * call, not by import: a file that takes only a constant from a harness starts nothing.
+ */
+function containerStartingNames(file: string): ReadonlySet<string> {
+  const cached = startingNames.get(file);
+  if (cached) return cached;
+  if (reading.has(file)) return new Set();
+  reading.add(file);
+  const source = sourceFile({ file, parents: false });
+  const bindings = bindingsOf({ source, file });
+  const starting = new Set<string>();
+  const isStarter = starterJudge({ bindings, local: starting });
+  growStarting({ declarations: declarationsOf(source), starting, isStarter });
   for (const statement of source.statements) {
-    if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
-    const specifier = statement.moduleSpecifier;
-    if (!specifier || !ts.isStringLiteral(specifier)) continue;
-    const target = resolveRelativeModule({ file, specifier: specifier.text });
-    if (!target) continue;
-    const reexported = containerStartingNames(target);
-    const clause = statement.exportClause;
-    if (!clause) for (const name of reexported) starting.add(name);
-    if (clause && ts.isNamedExports(clause)) {
-      for (const element of clause.elements) {
-        if (reexported.has((element.propertyName ?? element.name).text))
-          starting.add(element.name.text);
-      }
-    }
+    if (ts.isExportDeclaration(statement) && !statement.isTypeOnly)
+      addReexported({ statement, file, starting });
   }
   reading.delete(file);
   startingNames.set(file, starting);
