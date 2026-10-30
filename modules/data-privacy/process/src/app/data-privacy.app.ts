@@ -78,8 +78,9 @@ export interface DataPrivacyDirectoryReader {
   findScopeOrganizationId(input: { scope: DataPrivacyScope }): Promise<string | null>;
 }
 
-/** Main's worker read 250_000 characters per attribute before skipping one (its own constant). */
-const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
+/** Cumulative characters per span sent for PII analysis; a value that would exceed it is
+ *  skipped whole. Bounded by the analysis request's gateway timeout, not by accuracy. */
+const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 400_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyModule.dependencies,

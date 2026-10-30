@@ -694,7 +694,33 @@ describe("OtlpSpanPiiRedactionService", () => {
     });
 
     it("exports the default max attribute length constant", () => {
-      expect(DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH).toBe(250_000);
+      expect(DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH).toBe(400_000);
+    });
+
+    it("analyses a 400,000-character span and skips one character more, on the injected default", async () => {
+      const { mockBatchClearPII, batchSpy } = createMockBatchClearPII();
+      const defaulted = OtlpSpanPiiRedactionService.create({
+        transport: transportFor(mockBatchClearPII),
+        isLangevalsConfigured: async () => true,
+        isProduction: false,
+        nativePolicyEnforced: false,
+        dataPrivacy: new DataPrivacyResolutionFake(PLATFORM_DEFAULT_DATA_PRIVACY),
+        piiRedactionMaxAttributeLength: Number.NaN,
+      });
+      const overBudget = "y".repeat(400_001);
+      const atBudget = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: "x".repeat(400_000) } },
+      ]);
+      const pastBudget = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: overBudget } },
+      ]);
+
+      await defaulted.redactSpan({ span: atBudget, resource: null, piiRedactionLevel: "STRICT" });
+      await defaulted.redactSpan({ span: pastBudget, resource: null, piiRedactionLevel: "STRICT" });
+
+      expect(atBudget.attributes[0]!.value.stringValue).toBe("[REDACTED]");
+      expect(pastBudget.attributes[0]!.value.stringValue).toBe(overBudget);
+      expect(batchSpy).toHaveBeenCalledTimes(1);
     });
   });
 });
