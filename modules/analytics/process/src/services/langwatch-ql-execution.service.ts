@@ -46,7 +46,7 @@ type LangWatchQLExecutionDependencies = {
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch: () => number;
   readonly extraction: Pick<LangWatchQLExtractionService, "hydrate">;
-  /** Counts each answered run, shared with the service that counts the refused ones. */
+  /** Counts each answered run; the app's one instance, which counts its doors' refusals too. */
   readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered">;
 };
 

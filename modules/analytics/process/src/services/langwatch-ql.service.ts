@@ -62,7 +62,6 @@ const timeWindows = LangWatchQLTimeWindowService.create();
 const lwqlSchema = LangWatchQLSchemaService.create();
 const lwqlCompleteness = LangWatchQLCompletenessService.create();
 const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
-const lwqlRunTelemetry = LangWatchQLRunTelemetryService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -93,6 +92,11 @@ export interface LangWatchQLServiceDependencies {
   readonly judging?: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits">;
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch?: () => number;
+  /**
+   * Counts each answered run; the app passes the instance its doors count refused runs on.
+   * Absent only in a suite that builds this service alone, which then counts on its own.
+   */
+  readonly runTelemetry?: Pick<LangWatchQLRunTelemetryService, "recordAnswered">;
 }
 
 export class LangWatchQLService {
@@ -119,7 +123,7 @@ export class LangWatchQLService {
         hydration: deps.hydration,
         judging: deps.judging,
       }),
-      runTelemetry: lwqlRunTelemetry,
+      runTelemetry: deps.runTelemetry ?? LangWatchQLRunTelemetryService.create(),
     });
   }
 

@@ -27,6 +27,7 @@ import {
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
+  type LangWatchQLRunTelemetry,
   LangWatchQLProjectNotFoundError,
   type LangWatchQLRunCaller,
   type LangWatchQLAcceptedStatement,
@@ -139,10 +140,10 @@ import type {
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
-/** Counts and logs every LangWatchQL run that does not answer, at whichever gate it stopped. */
-const lwqlRunTelemetry = LangWatchQLRunTelemetryService.create();
-
 const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
+
+/** The key door's caller, on its runs that answer and on those refused before the engine. */
+const REST_API_RUN: LangWatchQLRunTelemetry = { caller: "rest_api" };
 
 /** Waiting analytics reads per tenant; only a tenant flooding the process is refused. */
 const TENANT_ANALYTICS_MAX_QUEUED = 64;
@@ -193,6 +194,11 @@ interface AnalyticsAppDependencies {
   /** The host's filter catalogue; see {@link AnalyticsFilterOptionsLookup}. */
   filterOptions: AnalyticsFilterOptionsLookup;
   langWatchQL: LangWatchQLService;
+  /**
+   * Counts every LangWatchQL run: the answered ones inside `langWatchQL`, the refused ones at
+   * this app's doors. One instance, so both halves write the same series.
+   */
+  runTelemetry: LangWatchQLRunTelemetryService;
   /** One hydration stage, shared by the synchronous query and a run's text pages. */
   hydration: LangWatchQLHydrationService;
   /** The Workbench's rollout gate and its two independent protection sources. */
@@ -491,11 +497,13 @@ export class AnalyticsModule
       // The page is a pass: the statement re-validated, then read inside its wrapper.
       runner: { executeLangWatchQLPass: (input) => app.executeLangWatchQLPass(input) },
     });
+    const runTelemetry = LangWatchQLRunTelemetryService.create();
     const langWatchQL = LangWatchQLServiceClass.create({
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
       hydration,
       judging: setup.channels.judge,
+      runTelemetry,
     });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
     const app = new AnalyticsModule(
@@ -504,6 +512,7 @@ export class AnalyticsModule
         hydration,
         filterOptions: FilterService.create({ repository: setup.repositories.filterOptions }),
         langWatchQL,
+        runTelemetry,
         featureFlags: setup.dependencies.featureFlags,
         authz: setup.dependencies.authz,
         dataPrivacy: setup.dependencies.dataPrivacy,
@@ -755,7 +764,11 @@ export class AnalyticsModule
     try {
       return await this.#runLangWatchQLForKey(input);
     } catch (error) {
-      lwqlRunTelemetry.recordFailed({ telemetry: { caller: "rest_api" }, sql: input.sql, error });
+      this.#dependencies.runTelemetry.recordFailed({
+        telemetry: REST_API_RUN,
+        sql: input.sql,
+        error,
+      });
       throw error;
     }
   }
@@ -788,7 +801,7 @@ export class AnalyticsModule
       ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
       ...(sources ? { sources } : {}),
       ...(signal ? { signal } : {}),
-      telemetry: { caller: "rest_api" },
+      telemetry: REST_API_RUN,
       isInstantEvalsEnabled:
         statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
     });
@@ -874,7 +887,11 @@ export class AnalyticsModule
     } catch (error) {
       // Every refusal on the way counts, the window and the project scope included, not only
       // the database's: a gate that turns most widget runs away is the failure worth an alert.
-      lwqlRunTelemetry.recordFailed({ telemetry: input.telemetry, sql: input.sql, error });
+      this.#dependencies.runTelemetry.recordFailed({
+        telemetry: input.telemetry,
+        sql: input.sql,
+        error,
+      });
       throw error;
     }
   }

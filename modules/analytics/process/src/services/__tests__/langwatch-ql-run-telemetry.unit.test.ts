@@ -43,6 +43,7 @@ import {
 } from "../../repositories/langwatch-ql-executor.repository.ts";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { langWatchQLQueryHash } from "../../rules/langwatch-ql-run-telemetry.rules.ts";
+import type { LangWatchQLRunTelemetryService } from "../langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
@@ -260,6 +261,34 @@ describe("LangWatchQL run telemetry", () => {
         metrics.valueOf("lwql_queries_total", { caller: "dashboard_widget", outcome: code }),
       ).toBe(1);
       expect(logged.info.some(({ message }) => message === "LangWatchQL executed")).toBe(false);
+    });
+  });
+
+  describe("given the app's one telemetry instance", () => {
+    /** @scenario "Telemetry: query metrics carry only low-cardinality labels" */
+    it("counts an answered run on the instance the service is given, not one of its own", async () => {
+      const answered: unknown[] = [];
+      const runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered"> = {
+        recordAnswered: (input) => {
+          answered.push(input);
+          return "ok";
+        },
+      };
+      const service = LangWatchQLService.create({
+        executor: new AnsweringExecutor([{ n: 1 }]),
+        database: "analytics",
+        runTelemetry,
+      });
+
+      await service.execute({
+        project: { id: "project-1", lwqlKey: "key-1" },
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+        sql: SQL,
+        telemetry: WIDGET_RUN,
+      });
+
+      expect(answered).toHaveLength(1);
+      expect(metrics.recorded).toEqual([]);
     });
   });
 
