@@ -168,13 +168,13 @@ Feature: A package's integration suite runs in CI when it declares one
       Then the browser suite and the integration suite never overlap
       And the unit suites still run alongside either of them
 
-    # The rule above covers a suite's containers only while the suite runs. Ryuk removed
-    # a suite's leftover containers, and itself, about ten seconds after the suite exited,
-    # when a browser suite may have started. With Ryuk off, a suite stops its own containers
-    # or reuses them (clickhouse-test-endpoints.ts), and those run until the runner ends.
+    # Ryuk's own container, and any it reaps, was removed about ten seconds after the
+    # last client disconnected, aborting browser loads. With Ryuk off, reused ClickHouse
+    # containers are never reaped, and Redis and Postgres stop in afterAll. The one late
+    # removal left is a stop() that outlives its suite (a hook timeout, say), and nothing guards it.
     @unit @regression
-    Scenario: No container is removed after its suite has ended
-      Given testcontainers' Ryuk removes a suite's leftover containers after the suite exits
+    Scenario: Ryuk is off for every suite
+      Given testcontainers' Ryuk can remove containers after their suite exits
       When the package suites job starts any suite
       Then the suite runs with Ryuk turned off
 
