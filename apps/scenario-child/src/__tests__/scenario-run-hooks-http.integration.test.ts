@@ -11,6 +11,7 @@ import { fetchValidatedDestination } from "@langwatch/egress/ssrf/fenced-fetch";
 import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
 import { createLogger } from "@langwatch/observability";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
+import type * as Undici from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -26,7 +27,7 @@ import {
 // The network is the only stub: the validator and the fenced fetch are the real ones.
 const network = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("undici", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("undici")>()),
+  ...(await importOriginal<typeof Undici>()),
   fetch: network.fetch,
 }));
 
