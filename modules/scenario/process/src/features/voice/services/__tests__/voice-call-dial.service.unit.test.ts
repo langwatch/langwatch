@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { MemoryTwilioCallControlChannel } from "../../../../channels/memory/memory.twilio-call-control.channel.ts";
-import { PENDING_VOICE_CALL_TTL_SECONDS } from "../../../../repositories/pending-voice-call.repository.ts";
 import { MemoryPendingVoiceCallRepository } from "../../../../repositories/memory/memory.pending-voice-call.repository.ts";
+import { PENDING_VOICE_CALL_TTL_SECONDS } from "../../../../repositories/pending-voice-call.repository.ts";
 import { VoiceCallDialService } from "../voice-call-dial.service.ts";
 
 const DIAL = { projectId: "project-1", scenarioRunId: "run-1", nonce: "nonce-1", to: "+15550100" };
@@ -33,9 +33,9 @@ describe("VoiceCallDialService", () => {
         found: true,
         call: CALL,
       });
-      await expect(pending.cancel({ scenarioRunId: "run-1", tombstoneTtlSeconds: 60 })).resolves.toEqual(
-        { state: "pending", callSid: "CAnonce-1" },
-      );
+      await expect(
+        pending.cancel({ scenarioRunId: "run-1", tombstoneTtlSeconds: 60 }),
+      ).resolves.toEqual({ state: "pending", callSid: "CAnonce-1" });
     });
 
     it("stores the call before it dials, so a pod can claim as soon as Twilio connects", async () => {

@@ -9,17 +9,9 @@ export type VoiceCallDialResult =
   | { dialed: false; reason: "already-dialed" | "cancelled" | "expired" };
 
 /**
- * The worker dials a run's call (https://github.com/langwatch/tasks/issues/1002, slice 3). The
- * pending call is stored before the dial, so any pod can claim it as soon as Twilio connects.
- *
- * At most one dial per `{scenarioRunId, nonce}`: the caller must pass the same nonce on every
- * retry of one run's dial, for example a nonce made once when the dial job is enqueued and kept
- * in the job data. A retry then finds its own pending or claimed call and answers
- * `already-dialed`. This holds for retries in sequence; two dials racing for one key can both
- * dial, so the caller runs one dial job per key (queue job id = the key).
- *
- * A dial that throws leaves its call pending, so a retry does not dial again; the run fails at
- * the claim deadline (`expirePendingVoiceCallIfUnclaimed`). Not wired into the app yet.
+ * The worker dials a run's call (tasks#1002 slice 3): stores the call, then dials, so any pod can
+ * claim as soon as Twilio connects. Reuse one `nonce` per run across retries, or a retry answers
+ * `already-dialed` instead of dialing twice. Known limits are in the PR description.
  */
 export class VoiceCallDialService {
   static create(input: {
@@ -51,7 +43,10 @@ export class VoiceCallDialService {
       ttlSeconds: PENDING_VOICE_CALL_TTL_SECONDS,
     });
     if (!stored.stored) {
-      return { dialed: false, reason: stored.reason === "claimed" ? "already-dialed" : "cancelled" };
+      return {
+        dialed: false,
+        reason: stored.reason === "claimed" ? "already-dialed" : "cancelled",
+      };
     }
 
     const { callSid } = await this.callControl.placeCall({ projectId, to, nonce });

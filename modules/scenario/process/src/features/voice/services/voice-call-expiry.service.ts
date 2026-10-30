@@ -1,11 +1,7 @@
 /*
- * The claim deadline for a dialled call (https://github.com/langwatch/tasks/issues/1002, slice 3).
- *
- * A plain function, deliberately not an eventing command and not on a job queue yet. A new
- * command type needs a new command, schema and version in @langwatch/scenario-contract and a
- * pipeline registration; scheduling the delay needs the queue that only scenario.app.ts builds.
- * Both are outside this unwired slice. When the dial is wired, the caller schedules this
- * `VOICE_CALL_CLAIM_DEADLINE_SECONDS` after the dial and fails the run on `expired`.
+ * The claim deadline for a dialled call (tasks#1002 slice 3). A plain function, not an eventing
+ * command or queue entry: both need pieces outside this unwired slice. When wired, the caller
+ * schedules this after the dial and fails the run on `expired`.
  */
 import type { PendingVoiceCallRepository } from "../../../repositories/pending-voice-call.repository.ts";
 import type { VoiceCallCancelService } from "./voice-call-cancel.service.ts";
@@ -20,12 +16,9 @@ export const VOICE_CALL_CLAIM_DEADLINE_SECONDS = 90;
 export type VoiceCallExpiryOutcome = "expired" | "already-claimed" | "already-cancelled";
 
 /**
- * Gives up a call that no pod claimed by the deadline: takes the claim itself, so a pod that
- * connects at the same moment either wins the call or is refused, then cancels the run, which
- * ends the call at Twilio. Answers `expired` only when it took the call.
- *
- * A crash between the claim and the cancel leaves the call ringing until Twilio's own timeout;
- * a retry then answers `already-claimed`.
+ * Gives up a call nobody claimed by the deadline: claims it itself (a racing pod wins or is
+ * refused), cancels the run to end the call at Twilio, and answers `expired` only then.
+ * A crash between claim and cancel leaves it ringing; a retry then answers `already-claimed`.
  */
 export async function expirePendingVoiceCallIfUnclaimed(input: {
   projectId: string;
