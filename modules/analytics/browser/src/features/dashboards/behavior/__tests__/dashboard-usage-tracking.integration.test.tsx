@@ -38,6 +38,7 @@ import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import type { BoardTemplate } from "../../templates/index.ts";
+import { BlockPickerDialog } from "../../ui/sections/block-picker-dialog.tsx";
 import { useBoardFromTemplate } from "../use-board-from-template.ts";
 import { useBoardWidgets } from "../use-board-widgets.ts";
 import { useDashboardViewed } from "../use-dashboard-viewed.ts";
@@ -311,6 +312,37 @@ describe("given a member asking Langy from a board", () => {
 
     expect(names()).toEqual(["langy.asked.question"]);
     expect(tracked.events[0]?.attributes).toEqual({ surface: "ask_bar" });
+  });
+
+  /** @scenario "Telemetry: asking Langy from a board sends langy.asked.question with where it was asked" */
+  it.each([
+    ["a typed question", "cost by model"],
+    ["an empty ask, which the member still pressed", ""],
+  ])("sends one add_widget ask for %s in Add a widget", async (_case, typed) => {
+    const user = userEvent.setup();
+    renderDashboards({
+      element: (
+        <BlockPickerDialog
+          board={board}
+          period={period}
+          onAddWidgets={() => Promise.resolve(true)}
+          onSkip={() => void 0}
+          onClose={() => void 0}
+        />
+      ),
+      host: new StubAnalyticsHost({
+        flags: { release_dashboards: true, release_langy_enabled: true },
+        permissions: [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"],
+      }),
+      answer: inMemoryServer().answer,
+    });
+
+    const search = await screen.findByRole("searchbox", { name: "What do you want to know?" });
+    if (typed !== "") await user.type(search, typed);
+    await user.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+    expect(names()).toEqual(["langy.asked.question"]);
+    expect(tracked.events[0]?.attributes).toEqual({ surface: "add_widget" });
   });
 
   /** @scenario "Telemetry: a draft the app seeds in Langy sends no ask" */

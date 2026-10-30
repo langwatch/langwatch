@@ -152,3 +152,49 @@ export function mountQueryDoor({
       app.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
+
+/**
+ * The query family over a real application rather than a fake: for what the application does
+ * around a run, such as counting one it refuses before the engine.
+ */
+export function mountQueryDoorOverApp({
+  app,
+  reach,
+}: {
+  app: AnalyticsQueryApi;
+  reach: () => LangWatchQLKeyReach;
+}): { fetch: (path: string, init?: RequestInit) => Promise<Response> } {
+  const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity: {
+      authenticate: () => ({
+        actor: { type: "api_key", id: "key-asking" },
+        scope: { tier: "organization" as const, id: "org-1" },
+      }),
+      identify: () => ({
+        actor: { type: "api_key", id: "key-asking" },
+        scope: { tier: "organization" as const, id: "org-1" },
+      }),
+    },
+  });
+  const apis = new LocalFeatureApis();
+  apis.declare(AnalyticsQueryApi);
+  apis.bind(AnalyticsQueryApi, app);
+  apis.ready();
+  const mounted = new Hono().route(
+    "/",
+    runtime.mount(queryRest.router(), {
+      app: () => apis.reference(AnalyticsQueryApi),
+      onError: canonicalErrorResponse,
+      middlewareContext: [
+        bindMiddlewareContext(langWatchQLKeyReach, () => reach()),
+        bindMiddlewareContext(langWatchQLKeyDoor, (request) =>
+          keyDoorOfClient({ client: censusClientOf((name) => request.headers.get(name)).client }),
+        ),
+      ],
+    }),
+  );
+  return {
+    fetch: async (path, init) => mounted.fetch(new Request(`http://api.test${path}`, init)),
+  };
+}

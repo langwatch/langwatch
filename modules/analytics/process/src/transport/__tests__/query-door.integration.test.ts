@@ -9,19 +9,32 @@ import {
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { resolveRequestBound } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { AnalyticsModule } from "../../app/analytics.app.ts";
 import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture.ts";
 import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
+import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
-import { mountQueryDoor } from "./query-door.harness.ts";
+import { mountQueryDoor, mountQueryDoorOverApp } from "./query-door.harness.ts";
 
 const DATABASE = "analytics";
 const TENANT = { id: "project-a", lwqlKey: "lwql-key-a" };
@@ -270,6 +283,77 @@ describe("given the query door over the real service", () => {
       await run({ sql }, { "User-Agent": "curl/8.5.0" });
 
       expect(doors).toEqual(["cli", "cli", "mcp", "mcp", "rest_api", "rest_api"]);
+    });
+  });
+
+  describe("when an MCP server's query is refused before the engine", () => {
+    /** @scenario "Telemetry: a key's query is counted by the client that sent it" */
+    it("counts the refusal under the mcp caller", async () => {
+      const metrics = createRecordingMeterProvider();
+      metrics.install();
+      try {
+        // An organization with no project the key may read: refused before any statement runs.
+        const app = await AnalyticsModule.create({
+          dependencies: {
+            featureFlags: createApiFixture<FeatureFlagApi>(),
+            authz: createApiFixture<AuthzApi>(),
+            dataPrivacy: createApiFixture<DataPrivacyApi>(),
+            projects: createApiFixture<ProjectApi>({
+              getOrganizationId: async () => "org-1",
+              listByOrganization: ({ limit }) =>
+                Promise.resolve({ data: [], pagination: { page: 1, limit, total: 0 } }),
+            }),
+            plans: createApiFixture<EntitlementApi>({
+              requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "ENTERPRISE")),
+            }),
+            traces: createApiFixture<TraceApi>(),
+            retention: createApiFixture<DataRetentionApi>(),
+          },
+          channels: { judge: createApiFixture<InstantEvalApi>() },
+          repositories: MemoryAnalyticsRepositories.create(),
+          config: {
+            langwatchQl: {
+              url: void 0,
+              username: void 0,
+              database: void 0,
+              tenantSetting: void 0,
+              postgresHost: void 0,
+              accessModelMode: void 0,
+              sqlSingleNode: void 0,
+              clickhouseCluster: void 0,
+              aggregateMaxMembers: void 0,
+            },
+            tenantAnalyticsConcurrency: 4,
+            publicBaseUrl: "https://app.langwatch.test",
+          },
+          resources: { own: () => void 0, ownService: () => void 0 },
+          secrets: {} as never,
+        });
+        const door = mountQueryDoorOverApp({
+          app,
+          reach: () => ({
+            kind: "apiKey",
+            apiKeyId: "key-mcp",
+            userId: null,
+            organizationId: "org-1",
+          }),
+        });
+
+        const response = await door.fetch("/api/v1/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-LangWatch-SDK-Name": "langwatch-mcp" },
+          body: JSON.stringify({ sql: `SELECT TraceId FROM ${DATABASE}.traces LIMIT 5` }),
+        });
+        const { code } = refusalSchema.parse(await response.json());
+
+        expect(response.status).toBeGreaterThanOrEqual(400);
+        expect(metrics.valueOf("lwql_queries_total", { caller: "mcp", outcome: code })).toBe(1);
+        expect(metrics.valueOf("lwql_queries_total", { caller: "rest_api", outcome: code })).toBe(
+          0,
+        );
+      } finally {
+        metrics.uninstall();
+      }
     });
   });
 

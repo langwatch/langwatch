@@ -63,6 +63,8 @@ it. The outcome panel shows aborts as their own line.
 - **Questions the app sends for a member**: a question from the ask bar or "Add
   a widget" is counted once, where it was asked. When the Langy panel then
   sends it, or sends a card's follow-up, it counts nothing more.
+  An empty ask from "Add a widget" counts, because the member pressed ask:
+  Langy gets "Help me build a dashboard".
 
 ## The query hash is not a privacy control
 

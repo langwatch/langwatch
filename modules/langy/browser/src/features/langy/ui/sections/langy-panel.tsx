@@ -415,7 +415,7 @@ function LangyPanel({
     sendMessage: engine.sendMessage,
     restoreDraftOnFailure,
   });
-  // Stable like `send`: only what the member types here counts as a question asked.
+  // Stable like `send`: only what the member types or picks here counts as a question asked.
   const sendFromComposer = useCallback(
     (text: string) => void send(text, { askedFrom: "composer" }),
     [send],
@@ -699,7 +699,8 @@ function LangyPanel({
                         empty: {
                           panelWidth: placement.floatingPanelWidth,
                           suggestions: emptySuggestions,
-                          onPick: (prompt) => void send(prompt),
+                          // A picked suggestion is the member's question, asked from the composer.
+                          onPick: sendFromComposer,
                         },
                       })}
                       transcript={transcript}

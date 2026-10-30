@@ -50,6 +50,7 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then "langy.asked.question" is sent once
     And its surface is "ask_bar" or "add_widget"
     And it carries no question text
+    And an empty ask from "Add a widget" counts, because the member pressed ask
 
   @integration
   Scenario: Telemetry: a question typed in Langy's composer sends langy.asked.question
