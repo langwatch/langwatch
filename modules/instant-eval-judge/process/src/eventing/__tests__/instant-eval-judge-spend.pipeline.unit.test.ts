@@ -93,6 +93,28 @@ describe("given the judge's spend pipeline", () => {
     });
   });
 
+  describe("when a routed call billed output alone, with no input tokens", () => {
+    /** @scenario "A routed cost with no input tokens is still billed" */
+    it("accepts the fact through the real command and writes its spend row", async () => {
+      const { facts, append } = harness();
+      const fact: InstantEvalJudgeSpendPricedEventData = {
+        tenantId: ORGANIZATION_ID,
+        occurredAt: NOW,
+        organizationId: ORGANIZATION_ID,
+        projectId: PROJECT_ID,
+        requestId: "request-output-only",
+        model: "langwatch-judge",
+        rateVersion: "instant_eval_judge_router@testx1.3",
+        inputTokens: 0,
+        costNanoUsd: 5_000,
+        priceNanoUsd: 6_500,
+      };
+
+      await append(fact);
+      await vi.waitFor(async () => expect((await total(facts)).spendNanoUsd).toBe(6_500n));
+    });
+  });
+
   describe("when one request is priced twice", () => {
     it("keeps one row for it", async () => {
       const { facts, append } = harness();

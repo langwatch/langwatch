@@ -8,6 +8,7 @@ import {
   InstantEvalJudgeStoppedError,
   type InstantEvalJudgement,
   type InstantEvalJudgeSpendPricedEventData,
+  instantEvalJudgeSpendPricedEventDataSchema,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -131,9 +132,11 @@ function harness({
     routePricing,
     limiter,
     isCloud,
-    // The spend pipeline's subscriber, stood in: one row per request, never rewritten.
+    // The spend pipeline's subscriber, stood in: one row per request, never rewritten. The fact
+    // goes through the event schema first, as the real command's send does, so a fact production
+    // would refuse fails here too.
     recordSpendPriced: async (fact) => {
-      recorded.push(fact);
+      recorded.push(instantEvalJudgeSpendPricedEventDataSchema.parse(fact));
       await repositories.spend.create({
         organizationId: fact.organizationId,
         requestId: fact.requestId,
