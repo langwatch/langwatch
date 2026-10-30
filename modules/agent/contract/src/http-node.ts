@@ -514,7 +514,9 @@ export function httpSecretsKeepingStored<T extends HttpSecrets>(input: {
   );
   const auth = incoming.auth && authKeepingStored({ stored: stored.auth, incoming: incoming.auth });
   const hooksSigningSecret =
-    incoming.hooksSigningSecret === "" ? stored.hooksSigningSecret : incoming.hooksSigningSecret;
+    incoming.hooksSigningSecret === "" || incoming.hooksSigningSecret === undefined
+      ? stored.hooksSigningSecret
+      : incoming.hooksSigningSecret;
 
   return {
     ...incoming,

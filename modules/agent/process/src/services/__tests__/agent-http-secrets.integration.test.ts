@@ -111,4 +111,19 @@ describe("a hooks signing secret typed into an HTTP agent", () => {
     });
     expect(values.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET_2).toBe("whsec_rotated");
   });
+
+  /** @scenario An update that omits the hooks signing secret keeps the stored reference */
+  it("keeps its reference when an update omits the secret altogether", async () => {
+    const { secrets, values } = secretStoreFixture();
+    const { app } = createAgentAppFixture({ secrets });
+    await app.create(withHooks(SIGNING_SECRET));
+    const { hooksSigningSecret: _omitted, ...config } = withHooks(SIGNING_SECRET).config;
+
+    const updated = await app.update({ ...withHooks(SIGNING_SECRET), name: "Renamed", config });
+
+    expect(updated.config).toMatchObject({
+      hooksSigningSecret: "{{ secrets.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET }}",
+    });
+    expect(Object.keys(values)).toEqual(["HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET"]);
+  });
 });
