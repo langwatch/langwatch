@@ -48,6 +48,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
+    "@langwatch/webhook-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "zod": "catalog:"
   },

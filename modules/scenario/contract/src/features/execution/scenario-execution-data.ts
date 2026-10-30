@@ -1,4 +1,4 @@
-import { agentHooksSchema } from "@langwatch/agent-contract";
+import { agentHooksSchema, previousSigningSecretSchema } from "@langwatch/agent-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -141,6 +141,8 @@ const HttpAgentDataSchemaDefinition = z.object({
   hooks: agentHooksSchema.optional(),
   /** The signing secret's `{{ secrets.NAME }}` reference, resolved against `secrets`. */
   hooksSigningSecret: z.string().optional(),
+  /** The secret a rotation replaced; a hook call is signed with it too until it expires. */
+  hooksPreviousSigningSecret: previousSigningSecretSchema.optional(),
 });
 export interface HttpAgentDataSchema extends Named<typeof HttpAgentDataSchemaDefinition> {}
 export const HttpAgentDataSchema: HttpAgentDataSchema = HttpAgentDataSchemaDefinition;

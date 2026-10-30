@@ -9,6 +9,7 @@ import { createHmac } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
 import { encodeScenarioEgressPolicy, type HttpAgentData } from "@langwatch/scenario-contract";
+import { verifyWebhookSignature } from "@langwatch/webhook-verify";
 import type * as Undici from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +31,8 @@ vi.mock("undici", async (importOriginal) => ({
   fetch: network.fetch,
 }));
 
-const SIGNING_SECRET = "whsec_test";
+const SIGNING_SECRET = "whsec_test_current_secret_value";
+const PREVIOUS_SECRET = "whsec_test_previous_secret_value";
 
 const baseConfig: HttpAgentData = {
   type: "http",
@@ -44,12 +46,38 @@ const baseConfig: HttpAgentData = {
   outputPath: "$.reply",
   secrets: {
     HTTP_SHOP_AUTH_TOKEN: "tok_live",
-    HTTP_SHOP_HOOKS_SIGNING_SECRET: SIGNING_SECRET,
+    HTTP_SHOP_HOOKS_SIGNING_SECRET_2: SIGNING_SECRET,
+    HTTP_SHOP_HOOKS_SIGNING_SECRET: PREVIOUS_SECRET,
   },
   hooksUrl: "https://shop.example.com/hooks",
   hooks: { setup: true, teardown: true },
-  hooksSigningSecret: "{{ secrets.HTTP_SHOP_HOOKS_SIGNING_SECRET }}",
+  hooksSigningSecret: "{{ secrets.HTTP_SHOP_HOOKS_SIGNING_SECRET_2 }}",
 };
+
+/** The same agent inside a rotation window that closes at `expiresAt`. */
+function rotatedConfig(expiresAt: string): HttpAgentData {
+  return {
+    ...baseConfig,
+    hooksPreviousSigningSecret: {
+      secret: "{{ secrets.HTTP_SHOP_HOOKS_SIGNING_SECRET }}",
+      expiresAt,
+    },
+  };
+}
+
+/** How the published verifier judges a call held by a receiver that knows only `secret`. */
+async function verdictFor(sent: Sent | undefined, secret: string): Promise<string> {
+  try {
+    await verifyWebhookSignature({
+      body: sent?.body ?? "",
+      header: sent?.headers["X-LangWatch-Signature"],
+      secret,
+    });
+    return "valid";
+  } catch (error) {
+    return (error as { code?: string }).code ?? "thrown";
+  }
+}
 
 type Sent = { url: string; headers: Record<string, string>; body: string };
 type Reply = { status: number; body: string } | "hang";
@@ -202,6 +230,7 @@ describe("ScenarioRunHooksService over the HTTP channel", () => {
         createHmac("sha256", SIGNING_SECRET).update(`${t}.${setup.body}`).digest("hex"),
       );
       expect(Math.abs(Date.now() / 1000 - Number(t))).toBeLessThan(300);
+      expect(await verdictFor(setup, SIGNING_SECRET)).toBe("valid");
       expect(setup.headers["Idempotency-Key"]).toBe("run_1:attempt_1:setup");
       expect(egress.sent[2]?.headers["Idempotency-Key"]).toBe("run_1:attempt_1:teardown");
       expect(setup.headers.Authorization).toBe("Bearer tok_live");
@@ -259,6 +288,41 @@ describe("ScenarioRunHooksService over the HTTP channel", () => {
       expect(names.filter((name) => name === "idempotency-key")).toHaveLength(1);
       expect(egress.sent[0]?.headers["X-LangWatch-Signature"]).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
       expect(egress.sent[0]?.headers["X-Tenant"]).toBe("acme");
+    });
+  });
+
+  describe("when the signing secret was rotated less than 24 hours ago", () => {
+    /** @scenario "Rotating the hooks signing secret keeps the old one valid for 24 hours" */
+    it("signs with the new secret first and the old one second, and both verify", async () => {
+      const egress = fakeEgress();
+      const channel = channelOver(egress, rotatedConfig("2999-01-01T00:00:00Z"));
+
+      await hooksFor(channel).around(oneTurn(channel));
+
+      const setup = egress.sent[0];
+      const signature = setup?.headers["X-LangWatch-Signature"] ?? "";
+      const [, t, newest, oldest] =
+        /^t=(\d+),v1=([0-9a-f]{64}),v1=([0-9a-f]{64})$/.exec(signature) ?? [];
+      const hmac = (secret: string) =>
+        createHmac("sha256", secret).update(`${t}.${setup?.body}`).digest("hex");
+      expect([newest, oldest]).toEqual([hmac(SIGNING_SECRET), hmac(PREVIOUS_SECRET)]);
+      expect(await verdictFor(setup, SIGNING_SECRET)).toBe("valid");
+      expect(await verdictFor(setup, PREVIOUS_SECRET)).toBe("valid");
+      expect(await verdictFor(egress.sent[2], PREVIOUS_SECRET)).toBe("valid");
+    });
+  });
+
+  describe("when the rotation window has closed", () => {
+    /** @scenario "The replaced hooks signing secret stops signing and is deleted once it expires" */
+    it("signs with the new secret alone, so the old one no longer verifies", async () => {
+      const egress = fakeEgress();
+      const channel = channelOver(egress, rotatedConfig("2000-01-01T00:00:00Z"));
+
+      await hooksFor(channel).around(oneTurn(channel));
+
+      expect(egress.sent[0]?.headers["X-LangWatch-Signature"]).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+      expect(await verdictFor(egress.sent[0], SIGNING_SECRET)).toBe("valid");
+      expect(await verdictFor(egress.sent[0], PREVIOUS_SECRET)).toBe("invalid_signature");
     });
   });
 
@@ -477,6 +541,39 @@ describe("ScenarioRunHooksService over the worker's SSRF-fenced egress", () => {
         expect(setup?.error).toMatch(/private|local|internal|not allowed/i);
       },
     );
+  });
+
+  describe("when the deployment allows local addresses", () => {
+    /** @scenario "Plain http reaches a hooks URL only at a local address where local addresses are allowed" */
+    it("sends plain http to a loopback hooks URL", async () => {
+      network.fetch.mockResolvedValue(
+        new Response('{"customerId":"c_1"}', {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      const channel = HttpSerializedHttpAgentChannel.create({
+        config: { ...baseConfig, hooksUrl: "http://127.0.0.1:8123/hooks" },
+        parameters: {},
+        httpPort: workerEgress({ blockLocal: false }),
+        logger: createLogger("test"),
+        run: { scenarioRunId: "run_1" },
+      });
+
+      const { state } = await channel.callHook({ kind: "setup", timeoutMs: 5_000 });
+
+      expect(network.fetch).toHaveBeenCalledTimes(1);
+      expect(state).toEqual({ customerId: "c_1" });
+    });
+
+    /** @scenario "Plain http reaches a hooks URL only at a local address where local addresses are allowed" */
+    it("refuses plain http to a public address and sends nothing", async () => {
+      const setup = await setupError("http://93.184.216.34/hooks", false);
+
+      expect(network.fetch).not.toHaveBeenCalled();
+      expect(setup).toMatchObject({ status: "failed" });
+      expect(setup?.error).toContain("must use https://");
+    });
   });
 
   describe("when the hooks URL answers a redirect", () => {

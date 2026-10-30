@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../../packages/webhook-signing/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

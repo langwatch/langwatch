@@ -11,7 +11,10 @@ import {
   type AgentWithFields,
   type HttpAgentConfig,
   type HttpAuth,
+  type PreviousSigningSecret,
 } from "@langwatch/agent-contract";
+import { Temporal, type Instant } from "@langwatch/time";
+import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "@langwatch/webhook-contract";
 import { isSameOrigin } from "@langwatch/workflow-contract";
 
 type HttpSecrets = Pick<HttpAgentConfig, "headers" | "auth">;
@@ -110,38 +113,49 @@ function carriesStoredReference(input: {
   return credentialValues(input.incoming).some((value) => stored.has(value));
 }
 
-/**
- * Hook calls go where credentials were trusted: the stored hooks URL, else the turn URL. A hooks
- * URL on another origin takes no stored credential, blank or as its reference: the person types
- * the headers and auth again and rotates the signing secret.
- */
-function movesStoredSecretsToHooksUrl(input: {
-  stored: HttpDestination;
-  incoming: HttpDestination;
-}): boolean {
-  const { stored, incoming } = input;
-  if (!incoming.hooksUrl) return false;
-  const trusted = stored.hooksUrl || stored.url;
-  if (isSameOrigin({ requested: incoming.hooksUrl, saved: trusted })) return false;
+/** Where hook calls went with the stored credentials: the stored hooks URL, else the turn URL. */
+function trustedHooksOrigin(stored: HttpDestination): string {
+  return stored.hooksUrl || stored.url;
+}
+
+/** Whether the write sends hook calls to another origin than credentials were trusted to. */
+function movesHooksUrl(input: { stored: HttpDestination; incoming: HttpDestination }): boolean {
+  const { hooksUrl } = input.incoming;
 
   return (
-    fillsStoredSecrets(input) || fillsStoredSigningSecret(input) || carriesStoredReference(input)
+    Boolean(hooksUrl) &&
+    !isSameOrigin({ requested: hooksUrl ?? "", saved: trustedHooksOrigin(input.stored) })
   );
 }
 
 /**
  * Whether a write's blank credentials would carry stored values to another origin than the saved
- * one, for the turn URL or the hooks URL.
+ * one, for the turn URL or the hooks URL. Safe to ask after the save stored typed values as
+ * references: storing never fills a blank.
  */
-export function movesStoredSecrets(input: {
+export function movesBlankStoredSecrets(input: {
   stored: HttpDestination;
   incoming: HttpDestination;
 }): boolean {
   const movesToTurnUrl =
     !isSameOrigin({ requested: input.incoming.url, saved: input.stored.url }) &&
     fillsStoredSecrets(input);
+  const movesToHooksUrl =
+    movesHooksUrl(input) && (fillsStoredSecrets(input) || fillsStoredSigningSecret(input));
 
-  return movesToTurnUrl || movesStoredSecretsToHooksUrl(input);
+  return movesToTurnUrl || movesToHooksUrl;
+}
+
+/**
+ * Whether a write, as typed, would carry a stored credential to another origin: a blank one, or
+ * (for the hooks URL) its `{{ secrets.NAME }}` reference sent back. Ask it before any secret is
+ * stored: once stored, a typed value equal to the stored one reads as its reference.
+ */
+export function movesStoredSecrets(input: {
+  stored: HttpDestination;
+  incoming: HttpDestination;
+}): boolean {
+  return movesBlankStoredSecrets(input) || (movesHooksUrl(input) && carriesStoredReference(input));
 }
 
 /**
@@ -156,15 +170,23 @@ export function configForCopy(input: {
 }): Agent["config"] {
   const { source, current } = input;
   if (source.type !== "http" || source.projectId === input.targetProjectId) return source.config;
-  const blank = httpConfigBlanking(source.config, () => "");
+  // The source's rotation window names a secret of its own project: never carried across.
+  const { hooksPreviousSigningSecret: _sourceWindow, ...blank } = httpConfigBlanking(
+    source.config,
+    () => "",
+  );
   if (
     current?.type !== "http" ||
     !isSameOrigin({ requested: blank.url, saved: current.config.url })
   ) {
     return blank;
   }
+  const { hooksPreviousSigningSecret } = current.config;
 
-  return httpSecretsKeepingStored({ stored: current.config, incoming: blank });
+  return {
+    ...httpSecretsKeepingStored({ stored: current.config, incoming: blank }),
+    ...(hooksPreviousSigningSecret ? { hooksPreviousSigningSecret } : {}),
+  };
 }
 
 /**
@@ -181,9 +203,9 @@ export function withoutHooklessSigningSecret<
 }
 
 /**
- * The signing secrets a save left unused (none or one): the one named before, when the saved
- * config names another or none. Only a name the save made for this agent, never one the person
- * picked or another agent still names (a copy in the same project keeps the reference).
+ * The signing secrets a save left unused: the current or previous one named before that the saved
+ * config names nowhere. Only a name the save made for this agent, never one the person picked or
+ * another agent still names (a copy in the same project keeps the reference).
  */
 export function replacedSigningSecretNames(input: {
   agentId: string;
@@ -193,16 +215,68 @@ export function replacedSigningSecretNames(input: {
 }): string[] {
   const { agentId, before, after } = input;
   if (before.type !== "http") return [];
-  const previous = readSecretReference(before.config.hooksSigningSecret ?? "");
-  if (!previous.isReference) return [];
-  const { name } = previous;
-  if (!isStoredSecretNameFor({ name, owner: agentId, field: HOOKS_SIGNING_SECRET_FIELD })) {
-    return [];
-  }
-  const reference = new RegExp(`secrets\\.${name}(?![A-Z0-9_])`);
-  const named = (agent: Agent) => reference.test(JSON.stringify(agent.config));
-  if (named(after)) return [];
-  const stillNamed = input.projectAgents.some((agent) => agent.id !== agentId && named(agent));
+  const held = [
+    before.config.hooksSigningSecret,
+    before.config.hooksPreviousSigningSecret?.secret,
+  ].map((value) => readSecretReference(value ?? ""));
+  const owned = held.flatMap((read) =>
+    read.isReference &&
+    isStoredSecretNameFor({ name: read.name, owner: agentId, field: HOOKS_SIGNING_SECRET_FIELD })
+      ? [read.name]
+      : [],
+  );
 
-  return stillNamed ? [] : [name];
+  return [...new Set(owned)].filter((name) => {
+    const reference = new RegExp(`secrets\\.${name}(?![A-Z0-9_])`);
+    const named = (agent: Agent) => reference.test(JSON.stringify(agent.config));
+
+    return (
+      !named(after) && !input.projectAgents.some((agent) => agent.id !== agentId && named(agent))
+    );
+  });
+}
+
+type SigningWindowConfig = Pick<
+  HttpAgentConfig,
+  "url" | "hooksUrl" | "hooksSigningSecret" | "hooksPreviousSigningSecret"
+>;
+
+function isOpen(window: PreviousSigningSecret, now: Instant): boolean {
+  try {
+    return Temporal.Instant.compare(Temporal.Instant.from(window.expiresAt), now) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The rotation window a save leaves, as webhook endpoints keep one: never a third secret, none on
+ * a moved or removed hooks URL (the old secret was trusted to the old receiver only), and never
+ * the window a write sends. Spec: scenario-run-hooks.feature, "Hooks on an HTTP agent".
+ */
+export function withPreviousSigningSecret<Config extends SigningWindowConfig>(input: {
+  stored: SigningWindowConfig;
+  saved: Config;
+  now: Instant;
+}): Config {
+  const { stored, saved, now } = input;
+  const { hooksPreviousSigningSecret: _sent, ...config } = saved;
+  const keepsOrigin =
+    Boolean(saved.hooksUrl?.trim()) &&
+    saved.hooksSigningSecret !== undefined &&
+    isSameOrigin({ requested: saved.hooksUrl ?? "", saved: trustedHooksOrigin(stored) });
+  if (!keepsOrigin) return config as Config;
+  // Only a stored reference is kept: the window is read back, so it must never hold a value.
+  const rotated =
+    readSecretReference(stored.hooksSigningSecret ?? "").isReference &&
+    stored.hooksSigningSecret !== saved.hooksSigningSecret;
+  const window: PreviousSigningSecret | undefined = rotated
+    ? {
+        secret: stored.hooksSigningSecret ?? "",
+        expiresAt: now.add({ milliseconds: WEBHOOK_PREVIOUS_SECRET_TTL_MS }).toString(),
+      }
+    : stored.hooksPreviousSigningSecret;
+  if (!window || !isOpen(window, now)) return config as Config;
+
+  return { ...config, hooksPreviousSigningSecret: window } as Config;
 }
