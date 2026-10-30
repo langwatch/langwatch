@@ -94,10 +94,23 @@ function toUiCacheKeys(payload: unknown): Pick<UiSessionReading, "cacheKey" | "p
  * Spec: specs/auth/sign-out-leaves-the-page.feature
  */
 export async function signOutUi(): Promise<void> {
-  clearReaderUiStorage();
-  clearSessionUiStorage();
-  await clearPersistedUiQueries();
+  await forget("this device's stored preferences", clearReaderUiStorage);
+  await forget("this tab's stored state", clearSessionUiStorage);
+  await forget("this device's mirrored reads", clearPersistedUiQueries);
   uiLeaveTo(UI_SIGN_OUT_PATH);
+}
+
+/**
+ * One thing this device remembered. A clear is tried on its own and its failure
+ * reported rather than raised: the session is already dead, so a device that
+ * cannot forget must still be left, and the next sign-in sweeps what stayed.
+ */
+async function forget(what: string, clear: () => void | Promise<void>): Promise<void> {
+  try {
+    await clear();
+  } catch (error) {
+    console.debug(`Signing out could not clear ${what}`, error);
+  }
 }
 
 /** The one status that answers "nobody is signed in" by refusing the read. */
