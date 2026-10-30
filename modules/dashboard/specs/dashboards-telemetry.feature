@@ -145,6 +145,8 @@ Feature: Dashboards telemetry: product events and query telemetry
     And a widget's run also carries its dashboardId, widgetId and templateId when it has them
     And queryHash is a keyed hash of the whitespace-normalised SQL, never the SQL text
     And its key is derived from the deployment secret, never the secret itself
+    And the secret is API_KEY_PEPPER, else CREDENTIALS_SECRET, else NEXTAUTH_SECRET
+    And the app refuses to start when none of the three is set
     And outcome is "ok" when rows came back and "empty" when none did
 
   @unit
