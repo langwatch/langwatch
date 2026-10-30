@@ -1,5 +1,6 @@
 import {
   fillsStoredSecrets,
+  isPreviousSigningSecretOpen,
   HOOKS_SIGNING_SECRET_FIELD,
   httpSecretsKeepingStored,
   isCredentialHeader,
@@ -13,7 +14,7 @@ import {
   type HttpAuth,
   type PreviousSigningSecret,
 } from "@langwatch/agent-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "@langwatch/webhook-contract";
 import { isSameOrigin } from "@langwatch/workflow-contract";
 
@@ -241,14 +242,6 @@ type SigningWindowConfig = Pick<
   "url" | "hooksUrl" | "hooksSigningSecret" | "hooksPreviousSigningSecret"
 >;
 
-function isOpen(window: PreviousSigningSecret, now: Instant): boolean {
-  try {
-    return Temporal.Instant.compare(Temporal.Instant.from(window.expiresAt), now) > 0;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * The rotation window a save leaves, as webhook endpoints keep one: never a third secret, none on
  * a moved or removed hooks URL (the old secret was trusted to the old receiver only), and never
@@ -276,7 +269,7 @@ export function withPreviousSigningSecret<Config extends SigningWindowConfig>(in
         expiresAt: now.add({ milliseconds: WEBHOOK_PREVIOUS_SECRET_TTL_MS }).toString(),
       }
     : stored.hooksPreviousSigningSecret;
-  if (!window || !isOpen(window, now)) return config as Config;
+  if (!window || !isPreviousSigningSecretOpen(window, now)) return config as Config;
 
   return { ...config, hooksPreviousSigningSecret: window } as Config;
 }
