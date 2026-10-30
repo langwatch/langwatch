@@ -54,9 +54,9 @@ import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi, type PaginatedProjects } from "@langwatch/project-contract";
 import {
+  apiKeyPepper,
   credentialsSecret,
   credentialsSecretPrevious,
-  Secret,
   sessionSecret,
   type ScopedSecrets,
 } from "@langwatch/secrets";
@@ -181,7 +181,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
 
   /** Main's pepper chain, first set wins: API_KEY_PEPPER, CREDENTIALS_SECRET, NEXTAUTH_SECRET. */
   static readonly secrets = {
-    pepper: Secret.load("API_KEY_PEPPER", { optional: true }),
+    pepper: apiKeyPepper,
     pepperFallback: credentialsSecret,
     pepperLastFallback: sessionSecret,
     /** Verifies keys hashed before a CREDENTIALS_SECRET rotation; each re-hashes on next use. */

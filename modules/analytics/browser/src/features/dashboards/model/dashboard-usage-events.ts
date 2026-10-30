@@ -12,11 +12,6 @@ import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 /** The boundary every Dashboards product event is sent under. */
 export const DASHBOARDS_BOUNDARY = "dashboards";
 
-/** The id a From LangWatch board's runs are logged under: it has no stored board of its own. */
-export function curatedBoardTelemetryId(templateId: string): string {
-  return `curated/${templateId}`;
-}
-
 /** A board the member made and can change, or a From LangWatch board read live. */
 export type DashboardKind = "stored" | "curated";
 

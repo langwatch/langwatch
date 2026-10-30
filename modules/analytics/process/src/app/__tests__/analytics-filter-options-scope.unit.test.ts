@@ -19,8 +19,7 @@ import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fix
 import { FilterOptionsClickHouseRepository } from "../../repositories/clickhouse/clickhouse.filter-options.repository.ts";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
-
-type Setup = Parameters<typeof AnalyticsModule.create>[0];
+import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
 async function appOver() {
   const translateLegacyFilters = vi.fn<TraceApi["translateLegacyFilters"]>(() => ({
@@ -66,7 +65,7 @@ async function appOver() {
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: createApiFixture<Setup["secrets"]>(),
+    secrets: analyticsTestSecrets(),
   });
   return { app, translateLegacyFilters, statements };
 }
