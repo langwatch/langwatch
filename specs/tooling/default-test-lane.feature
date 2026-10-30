@@ -4,7 +4,7 @@ Feature: The default test lane finishes without live services
   scenario suite drives live services and may wait an hour; in the default
   lane it looks exactly like a hung run and holds a parallel slot while it waits.
 
-  Rule: `default-test-lane` refuses a package whose `test` script's vitest lane
+  Rule: `default-test-lane` refuses a package whose default vitest lane (`test:unit` if declared, else `test`)
     collects a `*.scenario.test.*` file or waits more than two minutes per test.
     It also refuses one that starts a container, where the package suites job runs it
     (specs/ci/package-suite-integration-lane.feature).
