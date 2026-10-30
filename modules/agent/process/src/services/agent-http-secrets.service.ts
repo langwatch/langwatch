@@ -3,6 +3,7 @@ import {
   createSecretReferencer,
   httpAgentConfigStoringSecrets,
   httpAgentConfigSchema,
+  AgentHooksUrlTemplatedOriginError,
   AgentStoredCredentialsDestinationError,
   type CreateAgentCommand,
   type UpdateAgentCommand,
@@ -14,6 +15,7 @@ import { nextAgentId } from "../rules/agent-id.rules.ts";
 import {
   movesStoredSecrets,
   replacedSigningSecretNames,
+  templatesHooksOrigin,
   withoutHooklessSigningSecret,
 } from "../rules/agent-secrets.rules.ts";
 import type { AgentService } from "./agent.service.ts";
@@ -25,6 +27,14 @@ type AgentHttpSecretsOptions = {
   agents: Pick<AgentService, "getById" | "getAll">;
 };
 
+/** A hooks URL's scheme and host are fixed at save; the most specific refusal comes first. */
+function refuseTemplatedHooksOrigin(config: unknown): void {
+  const parsed = httpAgentConfigSchema.safeParse(config);
+  if (parsed.success && templatesHooksOrigin(parsed.data.hooksUrl)) {
+    throw new AgentHooksUrlTemplatedOriginError();
+  }
+}
+
 /** Stores the token typed into an HTTP agent as a project secret named from the agent's id,
  * leaving its reference. */
 export class AgentHttpSecretsService {
@@ -34,8 +44,9 @@ export class AgentHttpSecretsService {
 
   private constructor(private readonly options: AgentHttpSecretsOptions) {}
 
-  forCreate(command: CreateAgentCommand): Promise<CreateAgentCommand> {
-    if (command.type !== "http") return Promise.resolve(command);
+  async forCreate(command: CreateAgentCommand): Promise<CreateAgentCommand> {
+    if (command.type !== "http") return command;
+    refuseTemplatedHooksOrigin(command.config);
     const id = command.id ?? nextAgentId();
 
     return this.stored({ command: { ...command, id }, owner: id });
@@ -50,6 +61,7 @@ export class AgentHttpSecretsService {
 
     if ((command.type ?? existing.type) !== "http") return command;
     // Refuse before any secret is created, so a refused save leaves nothing behind.
+    refuseTemplatedHooksOrigin(command.config);
     const incoming = httpAgentConfigSchema.safeParse(command.config);
     if (
       incoming.success &&
