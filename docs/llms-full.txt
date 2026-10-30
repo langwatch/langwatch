@@ -39346,7 +39346,7 @@ Open the agent, then open the **Hooks** tab.
 
 | Field | What it does |
 |---|---|
-| **Hooks URL** | Where LangWatch POSTs both hooks. Leave it empty for no hooks. It must use `https://`. Plain `http://` is allowed only for a loopback host: `localhost`, a name that ends in `.localhost`, `127.x.x.x` or `[::1]`. LangWatch checks this when a hook runs, not when you save: a hook whose URL is refused fails and sends nothing. A loopback receiver works only when LangWatch runs on the same machine, as a self-hosted or local install does; hosted deployments block local addresses. The URL can read run parameters and project secrets, as the agent's own URL does. |
+| **Hooks URL** | Where LangWatch POSTs both hooks. Leave it empty for no hooks. It must use `https://`. Plain `http://` is allowed only for a loopback host: `localhost`, a name that ends in `.localhost`, `127.x.x.x` or `[::1]`. LangWatch checks this when a hook runs, not when you save: a hook whose URL is refused fails before any request is sent. A loopback receiver works only when LangWatch runs on the same machine, as a self-hosted or local install does; hosted deployments block local addresses. The URL can read run parameters and project secrets, as the agent's own URL does. |
 | **Call setup** | Tick it to call setup before the first turn. |
 | **Call teardown** | Tick it to call teardown after the last turn. |
 | **Signing secret** | Signs every hook call. LangWatch shows it once, when you first type the hooks URL. Copy it before you save. After that, the form shows only that a secret is set. **Rotate** makes a new one and shows it once. When you save, the old secret stops working and LangWatch deletes it from the project secrets. A secret you set through the API must be at least 16 characters. |
@@ -39504,6 +39504,7 @@ def is_signed(header: str | None, raw_body: bytes) -> bool:
     given = parts.get("v1", "")
     if not (t.isascii() and t.isdigit()) or not given:
         return False
+
     # Reject a timestamp too old or too far in the future
     if abs(time.time() - int(t)) > WINDOW_SECONDS:
         return False
