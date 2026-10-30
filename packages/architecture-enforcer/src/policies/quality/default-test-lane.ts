@@ -106,11 +106,12 @@ function collects(lane: Lane, file: string): boolean {
   return included && !lane.exclude.some((pattern) => matchesGlob(file, pattern));
 }
 
+/** The script CI runs as the unit lane: `test:unit` wins over `test`, as in run-package-suites. */
 function testScriptOf(directory: string): string | undefined {
   const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
   };
-  const script = manifest.scripts?.test;
+  const script = manifest.scripts?.["test:unit"] ?? manifest.scripts?.test;
   return script?.includes("vitest") ? script : undefined;
 }
 
