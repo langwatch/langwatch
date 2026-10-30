@@ -7,10 +7,8 @@
 
 import { createHmac } from "node:crypto";
 
-import { fetchValidatedDestination } from "@langwatch/egress/ssrf/fenced-fetch";
-import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
 import { createLogger } from "@langwatch/observability";
-import type { HttpAgentData } from "@langwatch/scenario-contract";
+import { encodeScenarioEgressPolicy, type HttpAgentData } from "@langwatch/scenario-contract";
 import type * as Undici from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +17,7 @@ import {
   type ScenarioHttp,
   type ScenarioHttpResponse,
 } from "../channels/http/http.serialized-http-agent.channel.ts";
+import { WorkerScenarioChildHttp } from "../channels/http/http.worker-egress.channel.ts";
 import {
   ScenarioRunHooksError,
   ScenarioRunHooksService,
@@ -100,6 +99,7 @@ function channelOver(egress: ReturnType<typeof fakeEgress>, config: HttpAgentDat
     httpPort: egress.port,
     logger: createLogger("test"),
     run: { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" },
+    attemptId: "attempt_1",
   });
 }
 
@@ -202,14 +202,129 @@ describe("ScenarioRunHooksService over the HTTP channel", () => {
         createHmac("sha256", SIGNING_SECRET).update(`${t}.${setup.body}`).digest("hex"),
       );
       expect(Math.abs(Date.now() / 1000 - Number(t))).toBeLessThan(300);
-      expect(setup.headers["Idempotency-Key"]).toBe("run_1:setup");
-      expect(egress.sent[2]?.headers["Idempotency-Key"]).toBe("run_1:teardown");
+      expect(setup.headers["Idempotency-Key"]).toBe("run_1:attempt_1:setup");
+      expect(egress.sent[2]?.headers["Idempotency-Key"]).toBe("run_1:attempt_1:teardown");
       expect(setup.headers.Authorization).toBe("Bearer tok_live");
       expect(JSON.parse(setup.body)).toEqual({
         kind: "setup",
         run: { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" },
+        idempotencyKey: "run_1:attempt_1:setup",
         params: { loyalty_tier: "gold" },
       });
+    });
+
+    /** @scenario "A run executed again gets a new idempotency key" */
+    it("gives a run executed again a new key, the same for its setup and teardown", async () => {
+      const first = fakeEgress();
+      const again = fakeEgress();
+      const run = { scenarioRunId: "run_1" };
+      const firstChannel = HttpSerializedHttpAgentChannel.create({
+        config: baseConfig,
+        httpPort: first.port,
+        run,
+      });
+      const againChannel = HttpSerializedHttpAgentChannel.create({
+        config: baseConfig,
+        httpPort: again.port,
+        run,
+      });
+
+      await hooksFor(firstChannel).around(oneTurn(firstChannel));
+      await hooksFor(againChannel).around(oneTurn(againChannel));
+
+      const keyOf = (sent: Sent | undefined) => sent?.headers["Idempotency-Key"] ?? "";
+      const [, firstAttempt] = /^run_1:(.+):setup$/.exec(keyOf(first.sent[0])) ?? [];
+      expect(firstAttempt).toBeTruthy();
+      expect(keyOf(first.sent[2])).toBe(`run_1:${firstAttempt}:teardown`);
+      expect(keyOf(again.sent[0])).toMatch(/^run_1:.+:setup$/);
+      expect(keyOf(again.sent[0])).not.toBe(keyOf(first.sent[0]));
+    });
+
+    /** @scenario "A customer header cannot stand in for the LangWatch signature" */
+    it("drops a customer header spelled like the signature or the key", async () => {
+      const egress = fakeEgress();
+      const channel = channelOver(egress, {
+        ...baseConfig,
+        headers: [
+          { key: "x-langwatch-signature", value: "t=1,v1=forged" },
+          { key: "IDEMPOTENCY-KEY", value: "mine" },
+          { key: "X-Tenant", value: "acme" },
+        ],
+      });
+
+      await hooksFor(channel, { setup: true, teardown: false }).around(oneTurn(channel));
+
+      const names = Object.keys(egress.sent[0]?.headers ?? {}).map((name) => name.toLowerCase());
+      expect(names.filter((name) => name === "x-langwatch-signature")).toHaveLength(1);
+      expect(names.filter((name) => name === "idempotency-key")).toHaveLength(1);
+      expect(egress.sent[0]?.headers["X-LangWatch-Signature"]).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+      expect(egress.sent[0]?.headers["X-Tenant"]).toBe("acme");
+    });
+  });
+
+  describe("when the hooks URL is plain http to a host that is not loopback", () => {
+    /** @scenario "An HTTP hooks URL must use https" */
+    it("sends nothing and fails naming https", async () => {
+      const egress = fakeEgress();
+      const channel = channelOver(egress, {
+        ...baseConfig,
+        hooksUrl: "http://shop.example.com/hooks",
+      });
+
+      const error = (await hooksFor(channel, { setup: true, teardown: false })
+        .around(oneTurn(channel))
+        .catch((caught: unknown) => caught)) as ScenarioRunHooksError;
+
+      expect(egress.sent).toEqual([]);
+      expect(error.hooks.setup?.error).toContain("must use https://");
+    });
+  });
+
+  describe("when setup answers an object holding a secret value", () => {
+    /** @scenario "An HTTP hook answer is measured and parsed before secrets are scrubbed" */
+    it("parses the answer as it came, then scrubs the secret from the state", async () => {
+      const egress = fakeEgress({
+        setup: { status: 200, body: '{"customerId":"c_1","echo":"tok_live"}' },
+      });
+      const channel = channelOver(egress);
+
+      const { hooks } = await hooksFor(channel).around(oneTurn(channel));
+
+      expect(hooks.setup?.state).toEqual({ customerId: "c_1", echo: "[redacted]" });
+    });
+  });
+
+  describe("when setup streams an answer past the state cap", () => {
+    /** @scenario "An HTTP hook answer over the state cap is cut off while it is read" */
+    it("stops reading at the cap and fails the hook", async () => {
+      let pulled = 0;
+      const chunk = new Uint8Array(16 * 1024).fill(0x61);
+      const port: ScenarioHttp = {
+        fetch: async () => ({
+          ...response({ status: 200, body: "" }),
+          body: {
+            getReader: () => ({
+              read: async () => {
+                pulled += 1;
+                return { done: false, value: chunk };
+              },
+              cancel: async () => undefined,
+            }),
+          },
+        }),
+      };
+      const channel = HttpSerializedHttpAgentChannel.create({
+        config: baseConfig,
+        httpPort: port,
+        run: { scenarioRunId: "run_1" },
+      });
+
+      const error = (await hooksFor(channel, { setup: true, teardown: false })
+        .around(oneTurn(channel))
+        .catch((caught: unknown) => caught)) as ScenarioRunHooksError;
+
+      expect(error.hooks.setup?.error).toMatch(/more than 65536 bytes, over the 65536-byte cap/);
+      expect(pulled).toBe(5);
     });
   });
 
@@ -304,19 +419,22 @@ describe("ScenarioRunHooksService over the HTTP channel", () => {
   });
 });
 
-/** The worker's egress port (apps/scenario-child/src/main.ts), under the production policy. */
+/** The worker's real egress port, as main.ts builds it, under the production policy. */
 function workerEgress({ blockLocal }: { blockLocal: boolean }): ScenarioHttp {
-  const validate = createSsrfUrlValidator({ blockLocal, allowedHosts: [] });
-  return {
-    fetch: async ({ url, init }) =>
-      fetchValidatedDestination(await validate(url), init, { rejectUnauthorized: true }),
-  };
+  return new WorkerScenarioChildHttp({
+    egressPolicy: encodeScenarioEgressPolicy({ blockLocal, allowedHosts: [] }),
+    rejectUnauthorized: true,
+  });
 }
 
 describe("ScenarioRunHooksService over the worker's SSRF-fenced egress", () => {
-  beforeEach(() => network.fetch.mockReset());
+  // A block body: a function returned from beforeEach is run as its cleanup, and mockReset returns
+  // the mock, so the arrow form called the fake fetch once more after every test.
+  beforeEach(() => {
+    network.fetch.mockReset();
+  });
 
-  async function setupError(hooksUrl: string, blockLocal = true) {
+  async function setupError(hooksUrl: string, blockLocal = true, timeoutMs?: number) {
     const channel = HttpSerializedHttpAgentChannel.create({
       config: { ...baseConfig, hooksUrl },
       parameters: {},
@@ -324,7 +442,7 @@ describe("ScenarioRunHooksService over the worker's SSRF-fenced egress", () => {
       logger: createLogger("test"),
       run: { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" },
     });
-    const error = (await hooksFor(channel, { setup: true, teardown: false })
+    const error = (await hooksFor(channel, { setup: true, teardown: false }, timeoutMs)
       .around(oneTurn(channel))
       .catch((caught: unknown) => caught)) as ScenarioRunHooksError;
     return error.hooks.setup;
@@ -332,7 +450,7 @@ describe("ScenarioRunHooksService over the worker's SSRF-fenced egress", () => {
 
   describe("when blockLocal is on and the hooks URL is a private address", () => {
     /** @scenario "An HTTP hooks URL on a private address is refused before any request" */
-    it.each(["http://10.0.0.5/hooks", "http://127.0.0.1/hooks"])(
+    it.each(["https://10.0.0.5/hooks", "http://127.0.0.1/hooks"])(
       "refuses %s and sends nothing",
       async (hooksUrl) => {
         const setup = await setupError(hooksUrl);
@@ -351,11 +469,33 @@ describe("ScenarioRunHooksService over the worker's SSRF-fenced egress", () => {
         new Response(null, { status: 302, headers: { location: "https://other.example.com/x" } }),
       );
 
-      const setup = await setupError("http://93.184.216.34/hooks");
+      const setup = await setupError("https://93.184.216.34/hooks");
 
       expect(network.fetch).toHaveBeenCalledTimes(1);
       expect(setup).toMatchObject({ status: "failed" });
       expect(setup?.error).toMatch(/redirect/i);
+    });
+  });
+
+  describe("when the hooks URL never answers", () => {
+    /** @scenario "An HTTP hook that does not answer in time times out" */
+    it("aborts the request at the hook timeout, not at undici's 300 s", async () => {
+      network.fetch.mockImplementation(
+        (_url: unknown, init: { signal?: AbortSignal }) =>
+          new Promise((_, reject) => {
+            init.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
+              once: true,
+            });
+          }),
+      );
+      const started = performance.now();
+
+      const setup = await setupError("https://93.184.216.34/hooks", true, 1_000);
+
+      expect(network.fetch).toHaveBeenCalledTimes(1);
+      expect(network.fetch.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+      expect(setup).toMatchObject({ status: "timed_out", error: "hook timed out after 1 s" });
+      expect(performance.now() - started).toBeLessThan(5_000);
     });
   });
 });

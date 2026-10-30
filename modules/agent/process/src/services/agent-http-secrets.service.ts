@@ -1,18 +1,23 @@
 import {
+  type Agent,
   createSecretReferencer,
   httpAgentConfigStoringSecrets,
   httpAgentConfigSchema,
   type CreateAgentCommand,
   type UpdateAgentCommand,
 } from "@langwatch/agent-contract";
+import { createLogger } from "@langwatch/observability";
 import type { SecretApi } from "@langwatch/secret-contract";
 
 import { nextAgentId } from "../rules/agent-id.rules.ts";
+import { replacedSigningSecretNames } from "../rules/agent-secrets.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 
+const logger = createLogger("langwatch:agents:http-secrets");
+
 type AgentHttpSecretsOptions = {
-  secrets: Pick<SecretApi, "list" | "getValuesByName" | "create">;
-  agents: Pick<AgentService, "getById">;
+  secrets: Pick<SecretApi, "list" | "getValuesByName" | "create" | "delete">;
+  agents: Pick<AgentService, "getById" | "getAll">;
 };
 
 /** Stores the token typed into an HTTP agent as a project secret named from the agent's id,
@@ -41,6 +46,34 @@ export class AgentHttpSecretsService {
     return (command.type ?? existing.type) === "http"
       ? this.stored({ command, owner: command.id })
       : command;
+  }
+
+  /**
+   * Deletes the hooks signing secret a save replaced (a rotation, or hooks removed). Runs after the
+   * save landed, so a failed save never loses the secret it still names; a failed delete is
+   * logged and the save stands.
+   */
+  async dropReplacedSigningSecret(input: { before: Agent; after: Agent }): Promise<void> {
+    const { before, after } = input;
+    const { projectId } = after;
+    try {
+      const names = replacedSigningSecretNames({
+        agentId: after.id,
+        before,
+        after,
+        projectAgents: await this.options.agents.getAll({ projectId }),
+      });
+      if (names.length === 0) return;
+      const rows = await this.options.secrets.list({ projectId });
+      for (const row of rows.filter(({ name }) => names.includes(name))) {
+        await this.options.secrets.delete({ projectId, id: row.id });
+      }
+    } catch (error) {
+      logger.warn(
+        { err: error, projectId, agentId: after.id },
+        "could not delete the replaced hooks signing secret",
+      );
+    }
   }
 
   private async stored<Command extends { projectId: string; config?: unknown }>(input: {
