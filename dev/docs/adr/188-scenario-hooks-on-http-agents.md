@@ -23,14 +23,14 @@ We will add an optional **hooks URL** to the HTTP agent. The platform calls it a
 
 - One URL. The body says which hook: `{ "kind": "setup" | "teardown", "run": { scenarioRunId, scenarioName, batchRunId }, "params": {...}, "state"?: {...} }`. Setup gets no `state`. Teardown gets the state setup returned.
 - Setup answers `2xx` with a JSON object. That object is the state.
-- Teardown answers `2xx`, with an optional JSON object that the run shows. Teardown never changes the score.
-- A non-`2xx` answer, a body that is not a JSON object, or a timeout fails the hook. The error is the status and the first 1,000 characters of the body.
-- The agent form gets two checkboxes, "Call setup" and "Call teardown". A run calls only the hooks that are checked. With no hooks URL, the agent runs as today and is marked "No hooks".
+- Teardown answers `2xx`, with an optional JSON object that the run shows. An empty `2xx` body (including `204 No Content`) succeeds with no returned object. Teardown never changes the score.
+- A non-`2xx` answer or a non-empty body that is not a JSON object fails the hook. The error is the status and the first 1,000 characters of the body. A timeout fails the hook with status `timed_out`, as in ADR-180, and the error `hook timed out after 60 s`.
+- The agent form gets two checkboxes, "Call setup" and "Call teardown". A run calls only the hooks that are checked. With no hooks URL, or with both boxes unchecked, the agent runs as today and is marked "No hooks".
 
 ### Security
 
 - A hook call sends the agent's configured headers and auth, as a turn does. The URL may use the same `{{ }}` template variables as the turn URL.
-- Every call carries `X-LangWatch-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "t.body">`, with a signing secret per agent. The secret is shown once when the hooks URL is first saved, and can be rotated. The receiver should reject a call whose `t` is more than 5 minutes old.
+- Every call carries `X-LangWatch-Signature: t=<unix seconds>,v1=<signature>`, with a signing secret per agent. The signature is the lower-case hex HMAC-SHA256, keyed with the secret, over the UTF-8 bytes of `<t>.<raw request body>`: the decimal `t`, a `.`, then the body exactly as sent. The secret is shown once when the hooks URL is first saved, and can be rotated. The receiver should compare signatures in constant time and reject a call whose `t` is more than 5 minutes away from its own clock, in either direction.
 - Every call carries `Idempotency-Key: <scenarioRunId>:<kind>`. A retry of the same hook sends the same key, so a receiver can make test data once.
 - The hooks URL goes through the same outbound URL checks as the turn URL.
 
@@ -42,7 +42,7 @@ We will add an optional **hooks URL** to the HTTP agent. The platform calls it a
 
 ### Reused from ADR-180
 
-60 s default timeout per hook, the 64 KiB cap on state and on teardown's returned object, the 1,000-character error cut, "Not scored" when setup fails, teardown attempted in a `finally`, the Setup and Teardown bands on the run, and the hook event and record. Retries: none in v1, as in ADR-180.
+A fixed 60 s timeout per hook (no per-scenario override yet), the 64 KiB cap on state and on teardown's returned object, the 1,000-character error cut, "Not scored" when setup fails, teardown attempted in a `finally`, the Setup and Teardown bands on the run, and the hook event and record. Retries: none in v1, as in ADR-180.
 
 ### Langy in prod
 
