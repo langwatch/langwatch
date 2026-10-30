@@ -12,6 +12,9 @@
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
+      "path": "../../../../modules/insight/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {

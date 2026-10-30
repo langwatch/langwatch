@@ -60,6 +60,9 @@ export const triggerDigestMail = z.object({
 
 export type TriggerDigestMail = z.infer<typeof triggerDigestMail>;
 
+/** The alert marker the app counts a landing by; automation-contract's `ALERT_LINK_PARAM`. */
+const ALERT_LINK_MARKER = "lw_from=alert";
+
 /**
  * Where a row points: a graph automation's match is a chart threshold, not
  * one trace, so it links to the chart. `#` is deliberate for neither case —
@@ -69,13 +72,15 @@ const linkFor = (
   entry: TriggerDigestEntry,
   { projectSlug, baseHost }: { projectSlug: string; baseHost: string },
 ): string => {
-  if (entry.graphId) return `${baseHost}/${projectSlug}/analytics/custom/${entry.graphId}`;
+  if (entry.graphId) {
+    return `${baseHost}/${projectSlug}/analytics/custom/${entry.graphId}?${ALERT_LINK_MARKER}`;
+  }
   if (entry.traceId) {
     const trace = `${baseHost}/${projectSlug}/traces/${entry.traceId}`;
     const hint = entry.occurredAtMs;
     return hint !== undefined && Number.isFinite(hint) && hint > 0
-      ? `${trace}?t=${Math.floor(hint)}`
-      : trace;
+      ? `${trace}?t=${Math.floor(hint)}&${ALERT_LINK_MARKER}`
+      : `${trace}?${ALERT_LINK_MARKER}`;
   }
   return "#";
 };

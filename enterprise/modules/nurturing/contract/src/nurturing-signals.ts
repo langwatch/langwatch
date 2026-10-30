@@ -1,10 +1,11 @@
-import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Every signal an owner records for nurturing: ids plus what the owner's event
  * holds, one member per kind main sent. Nurturing fetches nothing.
  * @see enterprise/modules/nurturing/specs/nurturing.feature
  */
+import { insightFiledViaSchema, insightToneSchema } from "@langwatch/insight-contract";
+import type { Named } from "@langwatch/module";
 import {
   guidedOnboardingStateSchema,
   guidedPathSchema,
@@ -58,6 +59,9 @@ export interface SelfHostedOrgTraitsSchema extends Named<
 > {}
 export const selfHostedOrgTraitsSchema: SelfHostedOrgTraitsSchema =
   selfHostedOrgTraitsSchemaDefinition;
+
+/** The insight acts nurturing tells PostHog of: renewed names no person, so it is left out. */
+export const INSIGHT_ACTS = ["filed", "seen", "archived", "kept"] as const;
 
 /** An organization-wide count taken by the owner when it recorded, this one included. */
 const countIncludingThis = z.number().int().positive();
@@ -331,6 +335,17 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     ...signalSource,
     userId: id,
     page: id,
+  }),
+  z.object({
+    /** A person's act on their own insight; a filing carries its bounded facts, never its text. */
+    kind: z.literal("insight_acted"),
+    ...signalSource,
+    userId: id,
+    projectId: id,
+    act: z.enum(INSIGHT_ACTS),
+    filedVia: insightFiledViaSchema.nullish(),
+    tone: insightToneSchema.nullish(),
+    fromBoard: z.boolean().nullish(),
   }),
   z.object({
     kind: z.literal("sessions_page_viewed"),

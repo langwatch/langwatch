@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../../../modules/insight/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/workflow/contract/tsconfig.build.json"
     },
     {

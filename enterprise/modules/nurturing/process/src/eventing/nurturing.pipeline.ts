@@ -52,6 +52,11 @@ import {
   experimentRanEventDataSchema,
 } from "@langwatch/experiment-contract";
 import {
+  INSIGHT_EVENT_TYPES,
+  insightFiledEventDataSchema,
+  insightReaderEventDataSchema,
+} from "@langwatch/insight-contract";
+import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
   type GuidedOnboardingTurnFailedEventData,
   guidedOnboardingTurnFailedEventDataSchema,
@@ -109,6 +114,10 @@ import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
 import { appOpenedSignals } from "../rules/nurturing-app-opened.rules.ts";
+import {
+  insightFiledSignal,
+  insightReaderSignal,
+} from "../rules/nurturing-insight-signals.rules.ts";
 import {
   checkoutCompletedSignal,
   evaluationRanSignal,
@@ -527,6 +536,30 @@ export function buildNurturingPipeline(deps: {
         eventType: APP_PAGE_OPENED_EVENT_TYPE,
         data: appPageOpenedEventDataSchema,
         handle: (data) => deliverEach(appOpenedSignals({ data })),
+      })
+      // Insight's facts for PostHog: one signal per event, never its words or ids.
+      .withPeerSubscriber("insightFiled", {
+        eventType: INSIGHT_EVENT_TYPES.FILED,
+        data: insightFiledEventDataSchema,
+        handle: (data, context) => deliverEach(insightFiledSignal({ data, context })),
+      })
+      .withPeerSubscriber("insightSeen", {
+        eventType: INSIGHT_EVENT_TYPES.SEEN,
+        data: insightReaderEventDataSchema,
+        handle: (data, context) =>
+          deliverSignal(insightReaderSignal({ act: "seen", data, context })),
+      })
+      .withPeerSubscriber("insightArchived", {
+        eventType: INSIGHT_EVENT_TYPES.ARCHIVED,
+        data: insightReaderEventDataSchema,
+        handle: (data, context) =>
+          deliverSignal(insightReaderSignal({ act: "archived", data, context })),
+      })
+      .withPeerSubscriber("insightKept", {
+        eventType: INSIGHT_EVENT_TYPES.KEPT,
+        data: insightReaderEventDataSchema,
+        handle: (data, context) =>
+          deliverSignal(insightReaderSignal({ act: "kept", data, context })),
       })
       .withCommand("recordSignal", RecordNurturingSignalCommand)
       .withLaneAliases(MAIN_NURTURING_LANE_ALIASES)

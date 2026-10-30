@@ -84,7 +84,7 @@ describe("buildGraphAlertTemplateContext", () => {
       });
       expect(ctx.graph.url).toBe(
         "https://app.langwatch.ai/acme/analytics/custom/graph_42" +
-          "?startDate=2026-06-21T09%3A00%3A00.000Z&endDate=2026-06-21T10%3A00%3A00.000Z",
+          "?startDate=2026-06-21T09%3A00%3A00.000Z&endDate=2026-06-21T10%3A00%3A00.000Z&lw_from=alert",
       );
     });
   });
@@ -116,7 +116,9 @@ describe("buildGraphAlertTemplateContext", () => {
       const ctx = buildGraphAlertTemplateContext(baseArgs);
       expect(ctx.graph.id).toBe("graph_42");
       expect(ctx.graph.name).toBe("Errors per minute");
-      expect(ctx.graph.url).toBe("https://app.langwatch.ai/acme/analytics/custom/graph_42");
+      expect(ctx.graph.url).toBe(
+        "https://app.langwatch.ai/acme/analytics/custom/graph_42?lw_from=alert",
+      );
     });
 
     it("serializes the occurredAt timestamp to ISO-8601", () => {

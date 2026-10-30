@@ -36,6 +36,7 @@ function capturingAdapter() {
 describe("SlackWebhookDeliveryChannel.deliver", () => {
   describe("when the trigger matches a trace with a known start time", () => {
     /** @scenario "Notification links carry the timestamp" */
+    /** @scenario "Slack and template links to a trace or a chart carry the marker" */
     it("links the trace with its start time, so the drawer opens in one pruned read", async () => {
       const { adapter, sent } = capturingAdapter();
 
@@ -59,7 +60,7 @@ describe("SlackWebhookDeliveryChannel.deliver", () => {
       expect(sent).toHaveLength(1);
       const payload = sent[0];
       const text = payload && "text" in payload ? payload.text : "";
-      expect(text).toContain(`/demo/traces/trace-1?t=${STARTED_AT}|trace-1>`);
+      expect(text).toContain(`/demo/traces/trace-1?t=${STARTED_AT}&lw_from=alert|trace-1>`);
       expect(text).toContain("*Input:* user question");
       expect(text).toContain("*Output:* assistant answer");
     });

@@ -2,6 +2,7 @@ import {
   isSlackWebhookUrl,
   type AlertType,
   type SlackPayload,
+  withAlertLinkMarker,
 } from "@langwatch/automation-contract";
 import { DispatchError, toDispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
@@ -26,10 +27,11 @@ function linkFor({
   trace: LinkedTrace;
 }): string {
   if (trace.graphId) {
-    return `${baseHost}/${projectSlug}/analytics/custom/${trace.graphId}`;
+    return withAlertLinkMarker(`${baseHost}/${projectSlug}/analytics/custom/${trace.graphId}`);
   }
   if (trace.traceId) {
-    return `${baseHost}/${projectSlug}${tracePath({ traceId: trace.traceId, occurredAtMs: trace.occurredAtMs })}`;
+    const path = tracePath({ traceId: trace.traceId, occurredAtMs: trace.occurredAtMs });
+    return withAlertLinkMarker(`${baseHost}/${projectSlug}${path}`);
   }
   return "#";
 }

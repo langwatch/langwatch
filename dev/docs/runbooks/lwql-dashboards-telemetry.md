@@ -8,13 +8,15 @@
 
 ## What is counted
 
-| Signal                        | Kind      | Labels or attributes                        | Written by                            |
-| ----------------------------- | --------- | ------------------------------------------- | ------------------------------------- |
-| `lwql_queries_total`          | counter   | `caller`, `outcome`                         | `LangWatchQLRunTelemetryService`      |
-| `lwql_query_duration_seconds` | histogram | `caller`                                    | same                                  |
-| `lwql_rows_read`              | histogram | `caller`                                    | same                                  |
-| one log line per run          | log       | `caller`, `queryHash`, board and widget ids | same                                  |
-| `dashboards.<action>.<name>`  | PostHog   | attributes we set: no raw ids, SQL or text  | `dashboard-usage-events.ts` (browser) |
+| Signal                          | Kind      | Labels or attributes                        | Written by                            |
+| ------------------------------- | --------- | ------------------------------------------- | ------------------------------------- |
+| `lwql_queries_total`            | counter   | `caller`, `outcome`                         | `LangWatchQLRunTelemetryService`      |
+| `lwql_query_duration_seconds`   | histogram | `caller`                                    | same                                  |
+| `lwql_rows_read`                | histogram | `caller`                                    | same                                  |
+| one log line per run            | log       | `caller`, `queryHash`, board and widget ids | same                                  |
+| `dashboards.<action>.<name>`    | PostHog   | attributes we set: no raw ids, SQL or text  | `dashboard-usage-events.ts` (browser) |
+| `insights.<act>.insight`        | PostHog   | a filing: `filedVia`, `tone`, `fromBoard`   | nurturing, from insight's events      |
+| `automations.opened.alert_link` | PostHog   | `landedOn`: `trace`, `graph` or `other`     | `use-alert-link-opened.ts` (shell)    |
 
 `caller` is one of `dashboard_widget`, `workbench`, `rest_api`, `saved_chart`,
 `source_presence`, or `unnamed` when a run names none.
@@ -87,6 +89,24 @@ only in the log line, which Prometheus never reads.
 - **Cost**: the metrics add the fixed series above. Log and PostHog volume
   grow with runs and with board views; measure both after the first production
   week before adding sampling.
+
+## Insights and alerts
+
+Insight's own events reach PostHog through nurturing, once per event, on the
+person who acted: `filed` (on the owner), `seen`, `archived` and `kept`. No
+title, body, query, board name or insight id is sent. `renewed` is not sent: a
+renewal names no person, so there is nobody to count it on.
+
+An alert's links to a trace or a chart (templates, Slack, digest emails) carry
+`lw_from=alert`. A signed-in member who opens one sends one
+`automations.opened.alert_link`, and the marker is then dropped from the
+address, so a reload is not counted again. Report links are not marked.
+
+Not counted yet, because automation has no event for them: an automation
+created, changed, turned on or off, fired, or delivered on a channel. Triggers
+are stored rows with no event log, and a delivery is a step inside a process,
+not an event. `lw.automation.trigger.match_recorded` exists, but it is one per
+matched trace, not one per alert sent, so it is not used as "fired".
 
 ## Not done yet
 

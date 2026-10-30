@@ -58,7 +58,9 @@ describe("alert-default email rendering", () => {
       expect(email.html).toContain("500");
       expect(email.html).toContain("last 1 hour");
       expect(email.html).toContain("712");
-      expect(email.html).toContain('href="https://app.langwatch.ai/acme/analytics/custom/graph_1"');
+      expect(email.html).toContain(
+        'href="https://app.langwatch.ai/acme/analytics/custom/graph_1?lw_from=alert"',
+      );
     });
 
     it("renders the chrome footer with the project + edit-automation links", async () => {

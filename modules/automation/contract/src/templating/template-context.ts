@@ -1,5 +1,6 @@
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
+import { withAlertLinkMarker } from "../alert-link.ts";
 import type { AlertType } from "../trigger.ts";
 
 /**
@@ -300,9 +301,11 @@ export function buildGraphAlertTemplateContext({
     projectSlug: project.slug,
     graphId: graph.id,
   });
-  const graphUrl = window
-    ? `${baseGraphUrl}?startDate=${encodeURIComponent(toDate(window.start).toISOString())}&endDate=${encodeURIComponent(toDate(window.end).toISOString())}`
-    : baseGraphUrl;
+  const graphUrl = withAlertLinkMarker(
+    window
+      ? `${baseGraphUrl}?startDate=${encodeURIComponent(toDate(window.start).toISOString())}&endDate=${encodeURIComponent(toDate(window.end).toISOString())}`
+      : baseGraphUrl,
+  );
   const historyPoints: GraphAlertHistoryPoint[] = (history ?? []).map((point) => ({
     timestamp:
       typeof point.timestamp === "string" ? point.timestamp : toDate(point.timestamp).toISOString(),
@@ -446,12 +449,14 @@ export function buildTemplateContext({
       id: match.traceId ?? null,
       input: match.input ?? "",
       output: match.output ?? "",
-      url: matchUrl({
-        baseHost,
-        projectSlug: project.slug,
-        traceId: match.traceId,
-        graphId: match.graphId,
-      }),
+      url: withAlertLinkMarker(
+        matchUrl({
+          baseHost,
+          projectSlug: project.slug,
+          traceId: match.traceId,
+          graphId: match.graphId,
+        }),
+      ),
       metadata: match.metadata ?? {},
     },
     evaluation: match.evaluation ?? null,
