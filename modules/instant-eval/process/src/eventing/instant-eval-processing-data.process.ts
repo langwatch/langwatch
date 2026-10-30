@@ -29,6 +29,13 @@ export const INSTANT_EVAL_STALL_THRESHOLD_MS = 15 * 60 * 1000;
  */
 export const INSTANT_EVAL_CANCEL_GRACE_MS = 2 * 60 * 1000;
 
+/**
+ * How long a routed late page is held waiting for its run's finished event. The finish lands in
+ * seconds, so a finish that has not landed by then failed to record it. The held pages are then
+ * billed without it, so they are never lost. Longer than a finish's retries take.
+ */
+export const INSTANT_EVAL_LATE_PAGE_HOLD_MS = INSTANT_EVAL_STALL_THRESHOLD_MS;
+
 /** What a run is doing. */
 const INSTANT_EVAL_PHASES = ["idle", "planning", "running", "cancelling", "terminal"] as const;
 
@@ -87,6 +94,8 @@ export const instantEvalBillLatePageIntentSchema = z.object({
   ...instantEvalLatePageSchema.shape,
   runId: z.string(),
   projectId: z.string(),
+  /** Set when the run's finish never landed and the hold ran out, so the page bills without it. */
+  isFinishMissing: z.boolean().optional(),
 });
 export type InstantEvalBillLatePageIntent = z.infer<typeof instantEvalBillLatePageIntentSchema>;
 
@@ -116,6 +125,8 @@ export const instantEvalProcessStateSchema = z.object({
   isFinishRecorded: z.boolean().default(false),
   /** Routed pages that reported after the run ended, waiting for its finish to be recorded. */
   unbilledLatePages: z.array(instantEvalLatePageSchema).default([]),
+  /** When held late pages stop waiting and are billed without the finish; null when none wait. */
+  lateHoldUntilMs: z.number().nullable().default(null),
 });
 export type InstantEvalProcessState = z.infer<typeof instantEvalProcessStateSchema>;
 
@@ -135,6 +146,7 @@ export const INITIAL_INSTANT_EVAL_STATE: InstantEvalProcessState = {
   cancelRequestedAtMs: null,
   isFinishRecorded: false,
   unbilledLatePages: [],
+  lateHoldUntilMs: null,
 };
 
 /**

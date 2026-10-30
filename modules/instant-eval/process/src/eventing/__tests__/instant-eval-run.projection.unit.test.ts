@@ -307,4 +307,12 @@ describe("given a routed run that finished while a page was still judging", () =
 
     expect(state).toMatchObject({ costUsd: 0.000004, priceUsd: 0.0000052 });
   });
+
+  /** @scenario "A held late page is billed even when its run's finish never lands" */
+  it("counts a held page billed without its finish once, on top of the running total", () => {
+    const earlier = page({ page: 2, rows: 4, costNanoUsd: 4000 });
+    const state = fold([requested(), planned(1000), earlier, late, bill]);
+
+    expect(state).toMatchObject({ status: "RUNNING", costUsd: 0.000009, priceUsd: 0.0000065 });
+  });
 });

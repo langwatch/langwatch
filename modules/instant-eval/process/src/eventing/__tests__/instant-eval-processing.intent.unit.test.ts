@@ -7,7 +7,7 @@
 
 import type { IntentContext } from "@langwatch/eventing";
 import { InstantEvalQueryInvalidError } from "@langwatch/instant-eval-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createInstantEvalBillLatePageHandler,
@@ -351,6 +351,58 @@ describe("given a routed page that reported after its run finished", () => {
 
       expect(commands.finishes).toEqual([]);
       expect(commands.latePages).toEqual([]);
+    });
+  });
+
+  describe("when its spend is written but the run row update fails", () => {
+    /** @scenario "A held late page is billed even when its run's finish never lands" */
+    it("rethrows while attempts remain, so the row gets another chance to match the spend", async () => {
+      const { deps: dispatch } = deps({
+        commands: new RecordingCommands(new Error("bus is away")),
+      });
+
+      await expect(
+        createInstantEvalBillLatePageHandler(dispatch)(LATE_PAYLOAD, intentContext(1)),
+      ).rejects.toThrow("bus is away");
+    });
+
+    /** @scenario "A held late page is billed even when its run's finish never lands" */
+    it("logs the page's amounts at error on the final attempt", async () => {
+      const logger = { error: vi.fn() };
+      const { deps: dispatch } = deps({
+        commands: new RecordingCommands(new Error("bus is away")),
+      });
+
+      await createInstantEvalBillLatePageHandler({ ...dispatch, logger })(
+        LATE_PAYLOAD,
+        intentContext(3),
+      );
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 3, costNanoUsd: 5000, priceUsd: 0.0000065 }),
+        expect.stringContaining("could not be added to the run row"),
+      );
+    });
+  });
+
+  describe("when its run's finish never landed and the hold ran out", () => {
+    /** @scenario "A held late page is billed even when its run's finish never lands" */
+    it("logs the held page's amounts at error and still bills it", async () => {
+      const logger = { error: vi.fn() };
+      const { deps: dispatch, commands } = deps();
+
+      await createInstantEvalBillLatePageHandler({ ...dispatch, logger })(
+        { ...LATE_PAYLOAD, isFinishMissing: true },
+        intentContext(1),
+      );
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ runId: RUN_ID, page: 3, costNanoUsd: 5000, requests: 4 }),
+        expect.stringContaining("finish never landed"),
+      );
+      expect(commands.latePages).toEqual([
+        expect.objectContaining({ page: 3, costUsd: 0.000005, priceUsd: 0.0000065 }),
+      ]);
     });
   });
 });

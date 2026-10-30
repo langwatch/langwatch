@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   INITIAL_INSTANT_EVAL_STATE,
   INSTANT_EVAL_CANCEL_GRACE_MS,
+  INSTANT_EVAL_LATE_PAGE_HOLD_MS,
   INSTANT_EVAL_STALL_THRESHOLD_MS,
 } from "../instant-eval-processing-data.process.ts";
 import {
@@ -313,6 +314,48 @@ describe("given a run that ended while a routed page was still judging", () => {
       ]);
       expect(again.state).toEqual(first.state);
       expect(first.nextWakeAt).toBeNull();
+    });
+  });
+
+  describe("when the page is held and the run's finish never lands", () => {
+    /** @scenario "A held late page is billed even when its run's finish never lands" */
+    it("wakes when the hold runs out and bills the page without the finish, once", () => {
+      const { ctx, emitted } = context();
+      const held = handleInstantEvalPageJudged(ended, latePage, ctx);
+      expect(held.nextWakeAt).toBe(NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS);
+
+      const early = instantEvalWake(held.state, context(NOW + 1_000).ctx);
+      expect(early).toMatchObject({ nextWakeAt: NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS });
+
+      const late = context(NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS);
+      const flushed = instantEvalWake(held.state, late.ctx);
+      expect(late.emitted).toEqual([
+        {
+          messageKey: `late-page:${RUN_ID}:3`,
+          intentType: "billLatePage",
+          payload: { ...billed, isFinishMissing: true },
+        },
+      ]);
+      expect(flushed.state).toMatchObject({ unbilledLatePages: [], lateHoldUntilMs: null });
+      expect(flushed.nextWakeAt).toBeNull();
+
+      // A finish that lands after all finds nothing held, so the page is not billed twice.
+      const finished = handleInstantEvalFinished(flushed.state, view(), late.ctx);
+      expect(late.emitted).toHaveLength(1);
+      expect(finished.state).toMatchObject({ isFinishRecorded: true });
+      expect(emitted).toEqual([]);
+    });
+
+    /** @scenario "A held late page is billed even when its run's finish never lands" */
+    it("keeps the hold's wake through a terminal no-op", () => {
+      const { ctx } = context();
+      const held = handleInstantEvalPageJudged(ended, latePage, ctx);
+
+      const redelivered = handleInstantEvalPageJudged(held.state, latePage, ctx);
+      const cancelled = handleInstantEvalCancelRequested(held.state, view(), ctx);
+
+      expect(redelivered.nextWakeAt).toBe(NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS);
+      expect(cancelled.nextWakeAt).toBe(NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS);
     });
   });
 

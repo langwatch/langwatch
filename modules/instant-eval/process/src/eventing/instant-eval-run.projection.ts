@@ -132,11 +132,17 @@ export function applyInstantEvalRunEvent(
       };
 
     case INSTANT_EVAL_EVENT_TYPES.LATE_PAGE_BILLED:
-      // Billed only once the finish landed, so this adds to the total the finish set, and the
-      // row's cost and price stay what its spend rows bill.
+      // Billed once the finish landed, so this adds to the total the finish set, and the row's
+      // cost and price stay what its spend rows bill. A run whose finish never landed bills its
+      // held page anyway; the page's routed cost is already in the running total then, so only
+      // the billed cost beyond it is added.
       return {
         ...state,
-        costUsd: toNanoUsdPrecision(state.costUsd + event.data.costUsd),
+        costUsd: toNanoUsdPrecision(
+          state.costUsd +
+            event.data.costUsd -
+            (state.finishedAtMs === null ? routedCostUsdOf(event.data) : 0),
+        ),
         priceUsd: toNanoUsdPrecision(state.priceUsd + event.data.priceUsd),
       };
 

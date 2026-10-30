@@ -7,7 +7,7 @@
 import type { IntentContext, IntentExecutor } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type {
@@ -168,6 +168,8 @@ export interface InstantEvalDispatchDeps {
   commands: () => InstantEvalOutcomeCommands;
   maxAttempts?: number;
   clock?: () => number;
+  /** Where a late page's billing failures are logged; the module's own logger when absent. */
+  logger?: Pick<Logger, "error">;
 }
 
 /** Whatever of an error is safe to log. */
@@ -416,29 +418,38 @@ export function createInstantEvalFinishHandler(
 }
 
 /**
- * A routed page that reported after its run finished. Its spend row is retried like a finish;
- * past the last attempt it is logged with what it spent, never silently dropped. The run is
- * already over, so nothing here fails it.
+ * A routed page that reported after its run finished. Its spend row and its run-row update retry
+ * like a finish, idempotent per page, so a retry bills nothing twice. Past the last attempt it is
+ * logged with what it spent, never silently dropped. The run is over, so nothing here fails it.
  */
 export function createInstantEvalBillLatePageHandler(
   deps: InstantEvalDispatchDeps,
 ): IntentExecutor<InstantEvalBillLatePageIntent> {
   return async (payload, intentContext) => {
+    const log = deps.logger ?? logger;
     const context = { runId: payload.runId, projectId: payload.projectId, page: payload.page };
+    const amounts = {
+      inputTokens: payload.inputTokens,
+      requests: payload.requests,
+      costNanoUsd: payload.costNanoUsd,
+      routedInputTokens: payload.routedInputTokens,
+    };
+    const isFinalAttempt = intentContext.attempt >= (deps.maxAttempts ?? INSTANT_EVAL_MAX_ATTEMPTS);
+    if (payload.isFinishMissing && intentContext.attempt === 1) {
+      // The run's finished event never landed, so its row stays unfinished; the page is billed
+      // on its own spend row regardless, and this names what it came to.
+      log.error(
+        { ...context, ...amounts },
+        "Instant Eval run finish never landed; billing its held late page without it",
+      );
+    }
     let spend: InstantEvalSpend;
     try {
       spend = await deps.executor.billLatePage(payload);
     } catch (error) {
-      const maxAttempts = deps.maxAttempts ?? INSTANT_EVAL_MAX_ATTEMPTS;
-      if (intentContext.attempt < maxAttempts) throw error;
-      logger.error(
-        {
-          ...context,
-          inputTokens: payload.inputTokens,
-          costNanoUsd: payload.costNanoUsd,
-          routedInputTokens: payload.routedInputTokens,
-          error: instantEvalErrorText(error),
-        },
+      if (!isFinalAttempt) throw error;
+      log.error(
+        { ...context, ...amounts, error: instantEvalErrorText(error) },
         "Instant Eval late page spend could not be recorded on its final attempt",
       );
 
@@ -459,8 +470,11 @@ export function createInstantEvalBillLatePageHandler(
         priceUsd: spend.priceUsd,
       });
     } catch (error) {
-      logger.error(
-        { ...context, ...spend, error: instantEvalErrorText(error) },
+      // The spend row is written; retrying writes it again under the same request id, which is
+      // one row, and gives the run row its second chance to match it.
+      if (!isFinalAttempt) throw error;
+      log.error(
+        { ...context, ...amounts, ...spend, error: instantEvalErrorText(error) },
         "Instant Eval late page was billed but could not be added to the run row",
       );
     }

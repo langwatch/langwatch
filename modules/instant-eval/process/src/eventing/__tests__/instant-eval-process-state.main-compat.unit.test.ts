@@ -43,6 +43,7 @@ describe("process state stored by the main release", () => {
       cancelRequestedAtMs: null,
       isFinishRecorded: false,
       unbilledLatePages: [],
+      lateHoldUntilMs: null,
     });
   });
 });
