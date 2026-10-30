@@ -6,6 +6,7 @@ import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
+import { PII_ANALYSIS_TEXT_BUDGET } from "../../rules/pii-analysis.rules.ts";
 import type { PiiClearing } from "../../rules/pii-analysis.rules.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 import type { PIICheckOptions } from "../pii-redaction-policy.service.ts";
@@ -692,12 +693,16 @@ describe("OtlpSpanPiiRedactionService", () => {
       expect(statusAttr).toBeDefined();
       expect(statusAttr!.value.stringValue).toBe("partial");
     });
+  });
 
-    it("exports the default max attribute length constant", () => {
+  describe("when no finite per-span budget is injected", () => {
+    /** @scenario "A span at the budget is analysed and one character more is not" */
+    it("falls back to the exported default budget", () => {
       expect(DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH).toBe(400_000);
     });
 
-    it("analyses a 400,000-character span and skips one character more, on the injected default", async () => {
+    /** @scenario "A span at the budget is analysed and one character more is not" */
+    it("analyses a span at exactly the default budget and skips one character more", async () => {
       const { mockBatchClearPII, batchSpy } = createMockBatchClearPII();
       const defaulted = OtlpSpanPiiRedactionService.create({
         transport: transportFor(mockBatchClearPII),
@@ -721,6 +726,84 @@ describe("OtlpSpanPiiRedactionService", () => {
       expect(atBudget.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       expect(pastBudget.attributes[0]!.value.stringValue).toBe(overBudget);
       expect(batchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when one value is longer than a single analysis pass", () => {
+    const budgetedService = () => {
+      const { mockBatchClearPII, batchSpy } = createMockBatchClearPII();
+      return {
+        batchSpy,
+        service: OtlpSpanPiiRedactionService.create({
+          transport: transportFor(mockBatchClearPII),
+          isLangevalsConfigured: async () => true,
+          isProduction: false,
+          nativePolicyEnforced: false,
+          dataPrivacy: new DataPrivacyResolutionFake(PLATFORM_DEFAULT_DATA_PRIVACY),
+          piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
+        }),
+      };
+    };
+
+    const statusOf = (span: OtlpSpan) =>
+      span.attributes.find((a) => a.key === "langwatch.reserved.pii_redaction_status")?.value
+        .stringValue;
+
+    /** @scenario "A value longer than one analysis pass leaves the span partly scanned" */
+    it("marks the span partial although the value fitted the per-span budget", async () => {
+      const { service: budgeted, batchSpy } = budgetedService();
+      const span = createMockOtlpSpan([
+        {
+          key: "gen_ai.prompt",
+          value: { stringValue: "x".repeat(PII_ANALYSIS_TEXT_BUDGET + 1) },
+        },
+      ]);
+
+      await budgeted.redactSpan({ span, resource: null, piiRedactionLevel: "STRICT" });
+
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
+      expect(statusOf(span)).toBe("partial");
+    });
+
+    /** @scenario "A value longer than one analysis pass leaves the span partly scanned" */
+    it("marks the span partial for an oversized status message", async () => {
+      const { service: budgeted } = budgetedService();
+      const span = createMockOtlpSpan([]);
+      span.status = { message: "m".repeat(PII_ANALYSIS_TEXT_BUDGET + 1) };
+
+      await budgeted.redactSpan({ span, resource: null, piiRedactionLevel: "STRICT" });
+
+      expect(statusOf(span)).toBe("partial");
+    });
+
+    /** @scenario "A value longer than one analysis pass leaves the span partly scanned" */
+    it("marks the span partial for an oversized resource attribute", async () => {
+      const { service: budgeted } = budgetedService();
+      const span = createMockOtlpSpan([]);
+      const resource = createMockResource([
+        {
+          key: "langwatch.metadata.custom",
+          value: { stringValue: "r".repeat(PII_ANALYSIS_TEXT_BUDGET + 1) },
+        },
+      ]);
+
+      await budgeted.redactSpan({ span, resource, piiRedactionLevel: "STRICT" });
+
+      expect(statusOf(span)).toBe("partial");
+    });
+
+    /** @scenario "A value longer than one analysis pass leaves the span partly scanned" */
+    it("leaves a value at exactly one analysis pass unmarked", async () => {
+      const { service: budgeted } = budgetedService();
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: "x".repeat(PII_ANALYSIS_TEXT_BUDGET) } },
+      ]);
+
+      await budgeted.redactSpan({ span, resource: null, piiRedactionLevel: "STRICT" });
+
+      expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
+      expect(statusOf(span)).toBeUndefined();
     });
   });
 });

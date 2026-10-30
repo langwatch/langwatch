@@ -37,6 +37,7 @@ import { OtlpSpanContentDropService } from "../services/otlp-span-content-drop.s
 import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction.service.ts";
 import { PiiAnalysisMetricsOtelService } from "../services/pii-analysis-metrics-otel.service.ts";
 import { PiiAnalysisService } from "../services/pii-analysis.service.ts";
+import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../services/pii-redaction-policy.service.ts";
 import { PresidioRedactionService } from "../services/presidio-redaction.service.ts";
 
 /** A project's place in the organization chain, plus the name it renders under. */
@@ -77,10 +78,6 @@ export interface DataPrivacyDirectoryReader {
    */
   findScopeOrganizationId(input: { scope: DataPrivacyScope }): Promise<string | null>;
 }
-
-/** Cumulative characters per span sent for PII analysis; a value that would exceed it is
- *  skipped whole. Bounded by the analysis request's gateway timeout, not by accuracy. */
-const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 400_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyModule.dependencies,
@@ -175,7 +172,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
         transport: analysis,
         isLangevalsConfigured: () => analysis.isPresidioConfigured(),
         isProduction: config.nodeEnvironment === "production",
-        piiRedactionMaxAttributeLength: PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
+        piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
         nativePolicyEnforced: config.enforcement !== "off",
         dataPrivacy: privacy,
         featureFlags: dependencies.featureFlags,
