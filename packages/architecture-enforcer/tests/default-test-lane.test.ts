@@ -140,8 +140,29 @@ describe("default test lanes", () => {
     });
   });
 
-  describe("when the default lane reads a script CI does not run", () => {
-    it("reports a test:unit lane that collects a container starter while test stays clean", () => {
+  describe("when test and test:unit split the lanes", () => {
+    const starter =
+      'import { RedisContainer } from "@testcontainers/redis";\nawait new RedisContainer("redis").start();';
+    const clean =
+      'vitest run --exclude "**/*.integration.test.ts" --exclude "**/*.scenario.test.ts"';
+
+    /** @scenario "A split test and test:unit are each checked for what they run" */
+    it("reports a scenario suite in test while test:unit stays clean", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": clean },
+        }),
+        "tools/probe/_tests/live.scenario.test.ts": "",
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("_tests/live.scenario.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A split test and test:unit are each checked for what they run" */
+    it("reports a test:unit lane that collects a container starter, naming test:unit", () => {
       workspace({
         "tools/probe/package.json": JSON.stringify({
           name: "@langwatch/probe",
@@ -150,12 +171,41 @@ describe("default test lanes", () => {
             "test:unit": "vitest run",
           },
         }),
-        "tools/probe/src/store.integration.test.ts":
-          'import { RedisContainer } from "@testcontainers/redis";\nawait new RedisContainer("redis").start();',
+        "tools/probe/src/store.integration.test.ts": starter,
       });
 
       expect(lint().map((violation) => violation.message)).toEqual([
-        expect.stringContaining("src/store.integration.test.ts"),
+        expect.stringContaining("`test:unit` lane collects src/store.integration.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A split test and test:unit are each checked for what they run" */
+    it("falls back to test when test:unit is empty", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "" },
+        }),
+        "tools/probe/src/store.integration.test.ts": starter,
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test` lane collects src/store.integration.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A split test and test:unit are each checked for what they run" */
+    it("checks the test lane for containers when test:unit does not run vitest", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "pnpm test" },
+        }),
+        "tools/probe/src/store.integration.test.ts": starter,
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test` lane collects src/store.integration.test.ts"),
       ]);
     });
   });
