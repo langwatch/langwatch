@@ -3,6 +3,8 @@
  * the schema production actually deploys. One endpoint name is shared across every suite here --
  * migrations are slow and tenant ids keep rows apart -- and the run is memoised per URL/process.
  */
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { type ClickHouseClient, ClickHouseError, createClient } from "@clickhouse/client";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import {
@@ -275,6 +277,49 @@ export async function releaseMigratedCaches(client: ClickHouseClient): Promise<v
     await client.command({ query: `SYSTEM DROP ${cache}` }).catch(ignoreUnsupported);
   }
   await client.command({ query: "SYSTEM JEMALLOC PURGE" }).catch(ignoreUnsupported);
+}
+
+const QUIET_POLLS = 3;
+const QUIET_POLL_MS = 1_000;
+
+/**
+ * Waits until the endpoint's database runs no merge or mutation and `tables` hold no outdated
+ * part. The cap counts whole-process RSS, so a seed or a capped query must not overlap this
+ * database's background work or held old parts. Other databases are not ours to drain.
+ */
+export async function waitForQuietMigratedServer({
+  client,
+  tables,
+  timeoutMs = 120_000,
+}: {
+  client: ClickHouseClient;
+  tables: readonly string[];
+  timeoutMs?: number;
+}): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (let quietPolls = 0; quietPolls < QUIET_POLLS;) {
+    if (Date.now() > deadline) {
+      throw new Error(
+        `ClickHouse still merging, mutating or holding old parts after ${timeoutMs} ms`,
+      );
+    }
+    const [row] = await (
+      await client.query({
+        query: `
+          SELECT
+            (SELECT count() FROM system.merges WHERE database = currentDatabase())
+            + (SELECT count() FROM system.mutations WHERE database = currentDatabase() AND NOT is_done)
+            + (SELECT count() FROM system.parts
+               WHERE database = currentDatabase() AND NOT active AND has({tables:Array(String)}, table))
+            AS busy
+        `,
+        query_params: { tables },
+        format: "JSONEachRow",
+      })
+    ).json<{ busy: string }>();
+    quietPolls = Number(row?.busy) === 0 ? quietPolls + 1 : 0;
+    if (quietPolls < QUIET_POLLS) await sleep(QUIET_POLL_MS);
+  }
 }
 
 /** A server built without JIT or jemalloc has no such cache to release, which is not a failure. */

@@ -12,7 +12,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   deleteMigratedTenantRows,
+  releaseMigratedCaches,
   startMigratedClickHouse,
+  waitForQuietMigratedServer,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
 import {
   buildTimeseriesQuery,
@@ -69,6 +71,15 @@ const SEEDED_TABLES = ["trace_analytics", "trace_summaries", "stored_spans"] as 
  * part, and the server merges four at once. 64 KiB buffers fit the test server's 1 GiB.
  */
 const SEED_COMPRESS_BLOCK_BYTES = 65_536;
+
+/** The seeded tables and the id-index tables their views write into. */
+const SEED_WRITTEN_TABLES = SEEDED_TABLES.flatMap((table) => [table, `${table}_id_index`]);
+
+/**
+ * Seconds a merged-away or deleted part stays loaded (default 480). The seed's merges and the
+ * cleanup's deletes leave thousands, ~165 MiB a run, which a rerun inside 8 minutes inherited.
+ */
+const SEED_OLD_PARTS_LIFETIME_SECONDS = 1;
 
 const end = new Date(Math.floor(Date.now() / DAY_MS) * DAY_MS);
 const start = new Date(end.getTime() - RANGE_DAYS * DAY_MS);
@@ -195,6 +206,14 @@ describe("dashboard panels under a memory cap", () => {
         query: `ALTER TABLE ${table} MODIFY SETTING max_compress_block_size = ${SEED_COMPRESS_BLOCK_BYTES}`,
       });
     }
+    for (const table of SEED_WRITTEN_TABLES) {
+      await ch.command({
+        query: `ALTER TABLE ${table} MODIFY SETTING old_parts_lifetime = ${SEED_OLD_PARTS_LIFETIME_SECONDS}`,
+      });
+    }
+    // A reused server may still be deleting an earlier run's rows.
+    await waitForQuietMigratedServer({ client: ch, tables: SEED_WRITTEN_TABLES });
+    await releaseMigratedCaches(ch);
 
     // Trace t occurs t * 60d / N before `end`, so the traces fill both
     // windows evenly. Even traces get a second, newer version.
@@ -262,6 +281,9 @@ describe("dashboard panels under a memory cap", () => {
       query_params: params,
       clickhouse_settings: SEED_SETTINGS,
     });
+    // The panels read merged parts on a server running nothing else.
+    await waitForQuietMigratedServer({ client: ch, tables: SEED_WRITTEN_TABLES });
+    await releaseMigratedCaches(ch);
 
     // Ground truth straight from the seed, without any dedup machinery: the
     // second version of a trace keeps its OccurredAt. Each figure is a grouped
@@ -305,15 +327,32 @@ describe("dashboard panels under a memory cap", () => {
     if (expected.currentTraces < 400_000) {
       throw new Error(`seed produced ${expected.currentTraces} traces in the current window`);
     }
-  }, 240_000);
+  }, 360_000);
 
   afterAll(async () => {
     if (!ch) return;
-    await deleteMigratedTenantRows({ client: ch, tenantId: TENANT_ID, tables: SEEDED_TABLES });
-    for (const table of SEEDED_TABLES) {
-      await ch.command({ query: `ALTER TABLE ${table} RESET SETTING max_compress_block_size` });
+    const errors: unknown[] = [];
+    try {
+      await deleteMigratedTenantRows({ client: ch, tenantId: TENANT_ID, tables: SEEDED_TABLES });
+      // The deletes finish, and their rewritten parts unload, before the next suite starts.
+      await waitForQuietMigratedServer({ client: ch, tables: SEED_WRITTEN_TABLES });
+      await releaseMigratedCaches(ch);
+    } catch (error) {
+      errors.push(error);
     }
-  }, 120_000);
+    // Reset even when the cleanup fails, so no later suite inherits the seed's table settings.
+    // Every reset is tried; one failure does not skip the rest.
+    const resets = [
+      ...SEEDED_TABLES.map((table) => `ALTER TABLE ${table} RESET SETTING max_compress_block_size`),
+      ...SEED_WRITTEN_TABLES.map(
+        (table) => `ALTER TABLE ${table} RESET SETTING old_parts_lifetime`,
+      ),
+    ];
+    for (const query of resets) {
+      await ch.command({ query }).catch((error: unknown) => errors.push(error));
+    }
+    if (errors.length > 0) throw new AggregateError(errors, "memory-budget cleanup failed");
+  }, 180_000);
 
   describe("when the trace count summary compares against the previous period", () => {
     /** @scenario Dashboard panels on a high-volume project answer under a memory cap */
