@@ -14,6 +14,7 @@ import {
   type HttpAuth,
   type PreviousSigningSecret,
 } from "@langwatch/agent-contract";
+import { referencedSecretNames } from "@langwatch/secret-contract";
 import type { Instant } from "@langwatch/time";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "@langwatch/webhook-contract";
 import { isSameOrigin } from "@langwatch/workflow-contract";
@@ -100,23 +101,35 @@ function credentialValues(config: HttpDestination): string[] {
 }
 
 /**
- * Whether the write sends back a `{{ secrets.NAME }}` reference the stored config holds. A read
- * of the agent keeps references, so the form saves them back unchanged: that is a stored secret
- * carried along just as a blank one is.
+ * Whether the write sends back a `{{ secrets.NAME }}` reference the stored config holds (a read
+ * keeps references, so the form saves them back). Compared by name as the engine resolves it: a
+ * spelling the save rewrites (spacing, the case of a scheme) is the same stored secret.
  */
 function carriesStoredReference(input: {
   stored: HttpDestination;
   incoming: HttpDestination;
 }): boolean {
-  const stored = new Set(
-    credentialValues(input.stored).filter((value) => readSecretReference(value).isReference),
-  );
-  return credentialValues(input.incoming).some((value) => stored.has(value));
+  const stored = new Set(referencedSecretNames(credentialValues(input.stored)));
+  return referencedSecretNames(credentialValues(input.incoming)).some((name) => stored.has(name));
 }
 
 /** Where hook calls went with the stored credentials: the stored hooks URL, else the turn URL. */
 function trustedHooksOrigin(stored: HttpDestination): string {
   return stored.hooksUrl || stored.url;
+}
+
+/** A URL as typed up to its path, query or fragment: the scheme and the authority. */
+const SCHEME_AND_AUTHORITY = /^[^/?#]*(?:\/\/[^/?#]*)?/;
+
+/**
+ * Whether a hooks URL has a template (or an encoded brace) in its scheme or authority. Those render
+ * per run, so run parameters could send a hook call, with the agent's credentials and signature, to
+ * any host; a template in the path or the query cannot move it. Spec: scenario-run-hooks.feature.
+ */
+export function templatesHooksOrigin(hooksUrl: string | undefined): boolean {
+  const schemeAndAuthority = SCHEME_AND_AUTHORITY.exec(hooksUrl?.trim() ?? "")?.[0] ?? "";
+
+  return /\{|%7B/i.test(schemeAndAuthority);
 }
 
 /** Whether the write sends hook calls to another origin than credentials were trusted to. */
@@ -160,9 +173,9 @@ export function movesStoredSecrets(input: {
 }
 
 /**
- * A source agent's config as a copy in another project takes it: every credential blank,
- * references too, except what the copy already holds for the same origin. In the source's
- * own project the config travels unchanged.
+ * A source agent's config as a copy in another project takes it: every credential blank, except
+ * what the copy holds where the turn URL and the hooks URL both keep the origin its credentials
+ * and rotation window were trusted to. In the source's own project it travels unchanged.
  */
 export function configForCopy(input: {
   source: Agent;
@@ -178,7 +191,8 @@ export function configForCopy(input: {
   );
   if (
     current?.type !== "http" ||
-    !isSameOrigin({ requested: blank.url, saved: current.config.url })
+    !isSameOrigin({ requested: blank.url, saved: current.config.url }) ||
+    movesHooksUrl({ stored: current.config, incoming: blank })
   ) {
     return blank;
   }

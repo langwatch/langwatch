@@ -462,6 +462,22 @@ Feature: Scenario run hooks: setup and teardown
       Given a saved HTTP agent whose authentication and signing secret are "{{ secrets.NAME }}" references
       When an update moves the hooks URL to another origin and sends one of those references back
       Then the update is refused for sending stored credentials to another origin
+      And a reference sent back with other spacing or another case of its scheme is refused the same way
+
+    @integration
+    Scenario: A copy updated from its source takes no stored credential to a hooks URL on another origin
+      Given a copy in another project that holds its own credentials and signing secret
+      When its source sets a hooks URL on another origin than the copy's hooks URL, or its turn URL
+      And the source is pushed to the copy, or the copy is synced from it
+      Then the copy's credentials and signing secret arrive blank, with no previous signing secret
+      But a source hooks URL on the copy's hooks origin keeps the copy's credentials and window
+
+    @integration
+    Scenario: A hooks URL with a template in its scheme or host is refused on save
+      Given an HTTP agent whose hooks URL is "https://{{ params.host }}/hooks"
+      When it is created or updated
+      Then the save is refused, naming the scheme and host, and no project secret is made
+      But a template in the path or the query of the hooks URL is saved
 
     @unit
     Scenario: Rotating the hooks signing secret keeps the old one valid for 24 hours
