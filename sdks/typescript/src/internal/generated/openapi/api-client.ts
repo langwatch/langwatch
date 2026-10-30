@@ -2016,6 +2016,12 @@ export interface operations {
                                 value: string;
                             };
                         };
+                        hooksUrl?: string;
+                        hooks?: {
+                            setup: boolean;
+                            teardown: boolean;
+                        };
+                        hooksSigningSecret?: string;
                         devTunnel?: {
                             previousUrl?: string;
                             connectedAt?: string;

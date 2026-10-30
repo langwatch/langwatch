@@ -7499,6 +7499,27 @@
                               ]
                             }
                           },
+                          "hooksUrl": {
+                            "type": "string"
+                          },
+                          "hooks": {
+                            "type": "object",
+                            "properties": {
+                              "setup": {
+                                "type": "boolean"
+                              },
+                              "teardown": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "setup",
+                              "teardown"
+                            ]
+                          },
+                          "hooksSigningSecret": {
+                            "type": "string"
+                          },
                           "devTunnel": {
                             "type": "object",
                             "properties": {

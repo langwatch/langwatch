@@ -7,9 +7,11 @@
 
 import { createHmac } from "node:crypto";
 
+import { fetchValidatedDestination } from "@langwatch/egress/ssrf/fenced-fetch";
+import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
 import { createLogger } from "@langwatch/observability";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   HttpSerializedHttpAgentChannel,
@@ -20,6 +22,13 @@ import {
   ScenarioRunHooksError,
   ScenarioRunHooksService,
 } from "../services/scenario-run-hooks.service.ts";
+
+// The network is the only stub: the validator and the fenced fetch are the real ones.
+const network = vi.hoisted(() => ({ fetch: vi.fn() }));
+vi.mock("undici", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("undici")>()),
+  fetch: network.fetch,
+}));
 
 const SIGNING_SECRET = "whsec_test";
 
@@ -290,6 +299,62 @@ describe("ScenarioRunHooksService over the HTTP channel", () => {
 
       expect(kindsOf(egress.sent)).toEqual(["turn", "teardown"]);
       expect(JSON.parse(egress.sent[1]?.body ?? "")).not.toHaveProperty("state");
+    });
+  });
+});
+
+/** The worker's egress port (apps/scenario-child/src/main.ts), under the production policy. */
+function workerEgress({ blockLocal }: { blockLocal: boolean }): ScenarioHttp {
+  const validate = createSsrfUrlValidator({ blockLocal, allowedHosts: [] });
+  return {
+    fetch: async ({ url, init }) =>
+      fetchValidatedDestination(await validate(url), init, { rejectUnauthorized: true }),
+  };
+}
+
+describe("ScenarioRunHooksService over the worker's SSRF-fenced egress", () => {
+  beforeEach(() => network.fetch.mockReset());
+
+  async function setupError(hooksUrl: string, blockLocal = true) {
+    const channel = HttpSerializedHttpAgentChannel.create({
+      config: { ...baseConfig, hooksUrl },
+      parameters: {},
+      httpPort: workerEgress({ blockLocal }),
+      logger: createLogger("test"),
+      run: { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" },
+    });
+    const error = (await hooksFor(channel, { setup: true, teardown: false })
+      .around(oneTurn(channel))
+      .catch((caught: unknown) => caught)) as ScenarioRunHooksError;
+    return error.hooks.setup;
+  }
+
+  describe("when blockLocal is on and the hooks URL is a private address", () => {
+    /** @scenario "An HTTP hooks URL on a private address is refused before any request" */
+    it.each(["http://10.0.0.5/hooks", "http://127.0.0.1/hooks"])(
+      "refuses %s and sends nothing",
+      async (hooksUrl) => {
+        const setup = await setupError(hooksUrl);
+
+        expect(network.fetch).not.toHaveBeenCalled();
+        expect(setup).toMatchObject({ status: "failed" });
+        expect(setup?.error).toMatch(/private|local|internal|not allowed/i);
+      },
+    );
+  });
+
+  describe("when the hooks URL answers a redirect", () => {
+    /** @scenario "An HTTP hooks URL that answers a redirect is refused" */
+    it("refuses it even to a public address", async () => {
+      network.fetch.mockResolvedValue(
+        new Response(null, { status: 302, headers: { location: "https://other.example.com/x" } }),
+      );
+
+      const setup = await setupError("http://93.184.216.34/hooks");
+
+      expect(network.fetch).toHaveBeenCalledTimes(1);
+      expect(setup).toMatchObject({ status: "failed" });
+      expect(setup?.error).toMatch(/redirect/i);
     });
   });
 });
