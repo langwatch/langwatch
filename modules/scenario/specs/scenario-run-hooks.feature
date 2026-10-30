@@ -319,3 +319,49 @@ Feature: Scenario run hooks: setup and teardown
       Given a scenario child that writes a result line naming a setup and a teardown result
       When the processor runs the job and the child exits
       Then the run records both hooks
+
+  Rule: The hooks line in the app
+    One muted line under a connected agent says which hooks its code declares,
+    with a "Learn more" link to the hooks docs. HTTP agents and prompts show no line.
+
+    @integration
+    Scenario: An online agent that declares both hooks is named with both and a docs link
+      Given an online connected agent that declares setup and teardown
+      When a person opens its drawer
+      Then the hooks line says the agent declares setup and teardown hooks
+      And the line links "Learn more" to the setup and teardown hooks docs
+
+    @integration
+    Scenario: An online agent that declares one hook is named with that hook
+      Given an online connected agent that declares teardown and not setup
+      When a person opens its drawer
+      Then the hooks line says the agent declares a teardown hook
+
+    @integration
+    Scenario: An online agent that declares no hooks says none are declared
+      Given an online connected agent that declares no hooks
+      When a person opens its drawer
+      Then the hooks line says "No setup or teardown hooks declared"
+
+    @integration
+    Scenario: An offline agent gets the general hooks line
+      Given an offline connected agent
+      When a person opens its drawer
+      Then the hooks line says hooks run from the agent's code
+
+    @integration
+    Scenario: The run dialog shows the hooks line for the selected connected agent
+      Given an online connected agent that declares setup
+      When a person selects it in the run dialog
+      Then the hooks line says the agent declares a setup hook
+
+    @integration
+    Scenario: The scenario editor shows the hooks line for a connected target
+      Given a scenario whose target is a connected agent that declares both hooks
+      When a person opens the scenario editor
+      Then the hooks line says the agent declares setup and teardown hooks
+
+    @integration
+    Scenario: No hooks line shows for an HTTP agent, a prompt or no target
+      When the selected target is an HTTP agent, a prompt or nothing
+      Then no hooks line shows

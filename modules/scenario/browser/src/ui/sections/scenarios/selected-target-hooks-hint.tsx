@@ -14,5 +14,7 @@ export function SelectedTargetHooksHint({ target }: { target: TargetValue }) {
   if (target?.type !== "connected") return null;
 
   const agent = agents?.find((candidate) => candidate.id === target.id);
-  return <ConnectedAgentHooksHint status={agent?.status} config={agent?.config} />;
+  if (!agent) return null;
+
+  return <ConnectedAgentHooksHint status={agent.status} config={agent.config} />;
 }

@@ -15,8 +15,9 @@ export function connectedAgentHooksCopy({
   if (hooks?.setup && hooks.teardown) {
     return "This agent's code declares setup and teardown hooks; they run before and after each scenario run.";
   }
-  if (hooks?.setup)
+  if (hooks?.setup) {
     return "This agent's code declares a setup hook; it runs before each scenario run.";
+  }
   if (hooks?.teardown) {
     return "This agent's code declares a teardown hook; it runs after each scenario run.";
   }

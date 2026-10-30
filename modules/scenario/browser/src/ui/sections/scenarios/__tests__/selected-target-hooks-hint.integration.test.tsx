@@ -30,6 +30,7 @@ import { SelectedTargetHooksHint } from "../selected-target-hooks-hint.tsx";
 describe("given the scenario editor hooks line", () => {
   afterEach(cleanup);
 
+  /** @scenario "The scenario editor shows the hooks line for a connected target" */
   it("shows the declared hooks for a connected target", () => {
     renderWithDesignSystem(
       <SelectedTargetHooksHint target={{ type: "connected", id: "connected-1" }} />,
@@ -40,10 +41,12 @@ describe("given the scenario editor hooks line", () => {
     );
   });
 
+  /** @scenario "No hooks line shows for an HTTP agent, a prompt or no target" */
   it.each([
     ["an HTTP agent", { type: "http", id: "http-1" } as const],
     ["a prompt", { type: "prompt", id: "prompt-1" } as const],
     ["no target", null],
+    ["a connected agent the project does not have", { type: "connected", id: "gone" } as const],
   ])("is absent for %s", (_name, target) => {
     renderWithDesignSystem(<SelectedTargetHooksHint target={target} />);
 

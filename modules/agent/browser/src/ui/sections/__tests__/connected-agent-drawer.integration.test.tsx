@@ -190,6 +190,7 @@ describe("the connected agent drawer", () => {
     });
   });
   describe("given the hooks line under the title", () => {
+    /** @scenario "An online agent that declares both hooks is named with both and a docs link" */
     it("names both hooks an online agent declares, with a docs link", () => {
       renderDrawer(connectedAgent({ config: { hooks: { setup: true, teardown: true } } }));
       const hint = screen.getByTestId("connected-agent-hooks-hint");
@@ -201,6 +202,7 @@ describe("the connected agent drawer", () => {
       );
     });
 
+    /** @scenario "An online agent that declares one hook is named with that hook" */
     it("names the one hook an online agent declares", () => {
       renderDrawer(connectedAgent({ config: { hooks: { setup: false, teardown: true } } }));
 
@@ -209,6 +211,7 @@ describe("the connected agent drawer", () => {
       );
     });
 
+    /** @scenario "An online agent that declares no hooks says none are declared" */
     it("says none are declared when an online agent has no hooks", () => {
       renderDrawer(connectedAgent());
 
@@ -217,6 +220,7 @@ describe("the connected agent drawer", () => {
       );
     });
 
+    /** @scenario "An offline agent gets the general hooks line" */
     it("gives the general line when the agent is offline", () => {
       renderDrawer(connectedAgent({ status: "offline", instances: [] }));
 

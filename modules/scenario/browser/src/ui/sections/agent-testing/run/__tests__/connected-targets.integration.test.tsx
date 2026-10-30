@@ -98,6 +98,7 @@ describe("connected agents in the run dialog", () => {
   });
 
   describe("given the hooks line under the cards", () => {
+    /** @scenario "The run dialog shows the hooks line for the selected connected agent" */
     it("names the hooks the selected online connected agent declares", () => {
       const rows = [
         { ...connectedRow({ id: "agent_h" }), config: { hooks: { setup: true, teardown: false } } },
@@ -120,6 +121,7 @@ describe("connected agents in the run dialog", () => {
       );
     });
 
+    /** @scenario "No hooks line shows for an HTTP agent, a prompt or no target" */
     it("is absent when nothing is selected or the selected agent is not connected", () => {
       renderSection(agentsFor([connectedRow({ id: "agent_n" })]));
       expect(screen.queryByTestId("connected-agent-hooks-hint")).not.toBeInTheDocument();
