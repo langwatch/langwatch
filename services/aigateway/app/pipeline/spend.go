@@ -222,13 +222,14 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 		}
 		return customertracebridge.EndUserIDFromBody(call.Request.Body)
 	case domain.RequestTypePassthrough, domain.RequestTypeTranscription,
-		domain.RequestTypeRealtimeSession:
+		domain.RequestTypeRealtimeSession, domain.RequestTypeDecisions:
 		// Passthrough carries a provider-native body shape, transcription is
 		// multipart form, not JSON, and a session mint declares a socket
 		// rather than a completion: none exposes the OpenAI `user` field
 		// this reads, so header-only attribution (resolved above) is all
-		// these types get. The image edit route is also multipart and still
-		// reads the field above, because its synthesized body states it.
+		// these types get. A Decisions body carries no `user` field either.
+		// The image edit route is also multipart and still reads the field
+		// above, because its synthesized body states it.
 		return ""
 	}
 	return ""

@@ -565,7 +565,8 @@ func endUserID(ctx context.Context, params aitrace.Params) string {
 		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		return EndUserIDFromBody(params.RequestBody)
 	case aitrace.RequestTypeMessages, aitrace.RequestTypePassthrough,
-		aitrace.RequestTypeTranscription, aitrace.RequestTypeRealtimeSession:
+		aitrace.RequestTypeTranscription, aitrace.RequestTypeRealtimeSession,
+		aitrace.RequestTypeDecisions:
 		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
 		// messages body carries attribution under metadata.user_id, passthrough
 		// bodies are provider-shaped and forwarded verbatim, transcription
@@ -615,7 +616,7 @@ func clientSessionID(ctx context.Context, params aitrace.Params) string {
 	case aitrace.RequestTypeChat, aitrace.RequestTypeEmbeddings, aitrace.RequestTypePassthrough,
 		aitrace.RequestTypeSpeech, aitrace.RequestTypeTranscription,
 		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit,
-		aitrace.RequestTypeRealtimeSession:
+		aitrace.RequestTypeRealtimeSession, aitrace.RequestTypeDecisions:
 		// No inline session id on these request shapes (audio and image bodies
 		// carry no session field at all, and a realtime mint's session id is
 		// the one the gateway itself hands back); the header lifted above
@@ -638,6 +639,10 @@ func extractInputMessages(body []byte, reqType aitrace.RequestType) string {
 		return ""
 	}
 	switch reqType {
+	case aitrace.RequestTypeDecisions:
+		// Never captured: decision inputs are often private messages under
+		// review, so the span keeps model, usage and cost only.
+		return ""
 	case aitrace.RequestTypePassthrough:
 		// Gemini-native /v1beta bodies carry `contents` not `messages`.
 		// Convert to a synthetic chat-completion `messages` shape so the
@@ -875,6 +880,9 @@ func extractOutputMessages(body []byte, reqType aitrace.RequestType) string {
 	// stream extractor first for every type, then fall back to the
 	// single-object JSON shape for non-streamed (sync) responses.
 	switch reqType {
+	case aitrace.RequestTypeDecisions:
+		// Never captured, for the same reason as the input.
+		return ""
 	case aitrace.RequestTypeChat:
 		return streamedOrSync(body, openAIChatOutputFromSSE, openAIChatOutputFromJSON)
 	case aitrace.RequestTypeMessages:
