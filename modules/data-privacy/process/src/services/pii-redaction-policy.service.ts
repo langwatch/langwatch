@@ -33,9 +33,9 @@ export type PIICheckOptions = {
 };
 
 /**
- * Cumulative characters per span sent for PII analysis, used when the injected budget is
- * not a finite non-negative number. One analysis request must answer inside the gateway
- * timeout, so the ceiling here is latency, not how much of a value gets scanned.
+ * Cumulative characters per span sent for PII analysis: the budget the app injects, and the one
+ * used when the injected value is not a finite non-negative number. The ceiling is the gateway
+ * timeout one analysis request must answer inside, not how much of a value gets scanned.
  */
 export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 400_000;
 

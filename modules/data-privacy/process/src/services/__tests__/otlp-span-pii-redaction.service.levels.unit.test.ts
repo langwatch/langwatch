@@ -697,11 +697,6 @@ describe("OtlpSpanPiiRedactionService", () => {
 
   describe("when no finite per-span budget is injected", () => {
     /** @scenario "A span at the budget is analysed and one character more is not" */
-    it("falls back to the exported default budget", () => {
-      expect(DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH).toBe(400_000);
-    });
-
-    /** @scenario "A span at the budget is analysed and one character more is not" */
     it("analyses a span at exactly the default budget and skips one character more", async () => {
       const { mockBatchClearPII, batchSpy } = createMockBatchClearPII();
       const defaulted = OtlpSpanPiiRedactionService.create({
