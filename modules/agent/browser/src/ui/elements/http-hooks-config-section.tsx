@@ -8,6 +8,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { format } from "@langwatch/time";
+import type { ReactNode } from "react";
 
 import type { HooksMoveNotice } from "../../behavior/use-http-agent-editor.ts";
 import { CopyButton } from "./http-test-components.tsx";
@@ -23,6 +25,8 @@ export type HttpHooksConfigSectionProps = {
   onRotateSigningSecret: () => void;
   /** Set when the hooks URL is on another origin than the stored credentials were saved for. */
   moveNotice: HooksMoveNotice | null;
+  /** When the previous signing secret of a rotation stops working, while it still works. */
+  previousSigningSecretValidUntil: string | null;
 };
 
 /** The hooks URL a scenario run calls before and after its turns (ADR-188). */
@@ -35,6 +39,7 @@ export function HooksConfigSection({
   hasStoredSigningSecret,
   onRotateSigningSecret,
   moveNotice,
+  previousSigningSecretValidUntil,
 }: HttpHooksConfigSectionProps) {
   const hasUrl = hooksUrl.trim() !== "";
 
@@ -52,6 +57,10 @@ export function HooksConfigSection({
           placeholder="https://api.example.com/scenario-hooks"
           data-testid="hooks-url-input"
         />
+        <Text fontSize="sm" color="fg.muted" data-testid="hooks-url-https-rule">
+          Use https. Plain http reaches only a local address, and only on deployments that allow
+          local addresses. This is checked when the hook runs.
+        </Text>
       </Field.Root>
       {moveNotice ? <MoveNotice notice={moveNotice} /> : null}
       <HStack gap={6}>
@@ -75,6 +84,14 @@ export function HooksConfigSection({
         newSigningSecret={newSigningSecret}
         hasStoredSigningSecret={hasStoredSigningSecret}
         onRotate={onRotateSigningSecret}
+        overlap={
+          hasUrl && !moveNotice ? (
+            <SigningSecretOverlap
+              isRotated={hasStoredSigningSecret && newSigningSecret !== null}
+              previousValidUntil={previousSigningSecretValidUntil}
+            />
+          ) : null
+        }
       />
     </VStack>
   );
@@ -91,7 +108,52 @@ function MoveNotice({ notice }: { notice: HooksMoveNotice }) {
       This hooks URL is on another host than the saved address, so stored credentials are not sent
       to it. {retype.length > 0 ? `Type ${retype.join(" and ")} again before you save. ` : ""}A new
       signing secret is made for it below.
+      {notice.replacesSigningSecret
+        ? " The stored signing secret stops working when you save: a move to another host keeps no old secret, so update your receiver at the same time."
+        : ""}
     </Text>
+  );
+}
+
+/**
+ * How long the secret a same-origin rotation replaces keeps working, so the receiver can switch:
+ * 24 hours after the save, and only the latest one (a second rotation ends the one before).
+ */
+function SigningSecretOverlap({
+  isRotated,
+  previousValidUntil,
+}: {
+  isRotated: boolean;
+  previousValidUntil: string | null;
+}) {
+  const until = previousValidUntil ? format(previousValidUntil, "MMM d, yyyy HH:mm") : null;
+
+  return (
+    <>
+      {isRotated ? (
+        <Text
+          fontSize="sm"
+          color="fg.muted"
+          marginTop={1}
+          data-testid="hooks-signing-secret-overlap"
+        >
+          After you save, the old secret stays valid for 24 hours, so your receiver can switch to
+          the new one.
+        </Text>
+      ) : null}
+      {until ? (
+        <Text
+          fontSize="sm"
+          color="fg.muted"
+          marginTop={1}
+          data-testid="hooks-previous-signing-secret"
+        >
+          {isRotated
+            ? `The previous secret, valid until ${until}, stops working when you save.`
+            : `The previous secret stays valid until ${until}, so your receiver can switch.`}
+        </Text>
+      ) : null}
+    </>
   );
 }
 
@@ -138,11 +200,13 @@ function SigningSecret({
   newSigningSecret,
   hasStoredSigningSecret,
   onRotate,
+  overlap,
 }: {
   hasUrl: boolean;
   newSigningSecret: string | null;
   hasStoredSigningSecret: boolean;
   onRotate: () => void;
+  overlap: ReactNode;
 }) {
   if (!hasUrl && !hasStoredSigningSecret) return null;
 
@@ -165,11 +229,7 @@ function SigningSecret({
       >
         Rotate
       </Button>
-      {hasUrl ? (
-        <Text fontSize="sm" color="fg.muted" marginTop={1}>
-          The old secret stops working when you save. Update your receiver at the same time.
-        </Text>
-      ) : null}
+      {overlap}
     </Field.Root>
   );
 }

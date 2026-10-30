@@ -451,6 +451,10 @@ describe("AgentHttpEditorDrawer", () => {
           "Type the auth token on the Auth tab again before you save.",
         );
         expect(notice).toHaveTextContent("A new signing secret is made for it below.");
+        expect(notice).toHaveTextContent(
+          "The stored signing secret stops working when you save: a move to another host keeps no old secret",
+        );
+        expect(screen.queryByTestId("hooks-signing-secret-overlap")).not.toBeInTheDocument();
       });
 
       /** @scenario "The agent form explains a hooks URL on another origin than the stored credentials" */
@@ -510,6 +514,110 @@ describe("AgentHttpEditorDrawer", () => {
         expect(saved[1]).toMatchObject({
           hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}",
         });
+      });
+    });
+
+    describe("when the person rotates a stored signing secret", () => {
+      const withStoredSecret = (config: Record<string, unknown> = {}) =>
+        savedAgent({
+          scenarioMappings: { input: { type: "source", sourceId: "dataset", path: ["input"] } },
+          hooksUrl: "https://example.com/hooks",
+          hooks: { setup: true, teardown: true },
+          hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}",
+          ...config,
+        });
+
+      async function openHooksTab() {
+        fireEvent.mouseDown(await screen.findByRole("tab", { name: "Hooks" }));
+        fireEvent.click(screen.getByRole("tab", { name: "Hooks" }));
+      }
+
+      /** @scenario "The agent form says the old signing secret stays valid for 24 hours after a rotation" */
+      it("says the old secret stays valid for 24 hours after saving", async () => {
+        const agent = withStoredSecret();
+        renderEditor({ agent, agentId: agent.id });
+        await openHooksTab();
+        expect(screen.queryByTestId("hooks-signing-secret-overlap")).not.toBeInTheDocument();
+
+        fireEvent.click(await screen.findByTestId("rotate-signing-secret-button"));
+
+        expect(await screen.findByTestId("hooks-signing-secret-overlap")).toHaveTextContent(
+          "After you save, the old secret stays valid for 24 hours, so your receiver can switch to the new one.",
+        );
+      });
+
+      /** @scenario "The agent form says the old signing secret stays valid for 24 hours after a rotation" */
+      it("says until when the previous secret stays valid once saved", async () => {
+        const agent = withStoredSecret({
+          hooksPreviousSigningSecret: {
+            secret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET_PREVIOUS }}",
+            expiresAt: "2999-01-02T12:00:00.000Z",
+          },
+        });
+        renderEditor({ agent, agentId: agent.id });
+        await openHooksTab();
+
+        const previous = await screen.findByTestId("hooks-previous-signing-secret");
+        expect(previous).toHaveTextContent("The previous secret stays valid until");
+        expect(previous).toHaveTextContent("2999");
+        expect(document.body.textContent).not.toContain("SIGNING_SECRET_PREVIOUS");
+      });
+
+      /** @scenario "The agent form says the old signing secret stays valid for 24 hours after a rotation" */
+      it("says nothing of a previous secret whose window closed", async () => {
+        const agent = withStoredSecret({
+          hooksPreviousSigningSecret: {
+            secret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET_PREVIOUS }}",
+            expiresAt: "2020-01-01T00:00:00.000Z",
+          },
+        });
+        renderEditor({ agent, agentId: agent.id });
+        await openHooksTab();
+
+        expect(await screen.findByTestId("hooks-stored-signing-secret")).toBeInTheDocument();
+        expect(screen.queryByTestId("hooks-previous-signing-secret")).not.toBeInTheDocument();
+      });
+
+      /** @scenario "The agent form says the old signing secret stays valid for 24 hours after a rotation" */
+      it("never sends the previous signing secret back", async () => {
+        const saved: Record<string, unknown>[] = [];
+        const agent = withStoredSecret({
+          hooksPreviousSigningSecret: {
+            secret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET_PREVIOUS }}",
+            expiresAt: "2999-01-02T12:00:00.000Z",
+          },
+        });
+        renderEditor({
+          agent,
+          agentId: agent.id,
+          onUpdate: async (input) => {
+            saved.push(input.config);
+            return agent;
+          },
+        });
+        await openHooksTab();
+
+        fireEvent.click(await screen.findByTestId("rotate-signing-secret-button"));
+        screen.getByRole("button", { name: "Save Changes" }).click();
+
+        await waitFor(() => expect(saved).toHaveLength(1));
+        expect(saved[0]).not.toHaveProperty("hooksPreviousSigningSecret");
+        expect(JSON.stringify(saved[0])).not.toContain("SIGNING_SECRET_PREVIOUS");
+      });
+    });
+
+    describe("when the Hooks tab is open", () => {
+      /** @scenario "The agent form states the hooks URL https rule" */
+      it("says https is needed and plain http reaches only a local address where allowed", async () => {
+        renderEditor();
+        fireEvent.mouseDown(await screen.findByRole("tab", { name: "Hooks" }));
+        fireEvent.click(screen.getByRole("tab", { name: "Hooks" }));
+
+        const rule = await screen.findByTestId("hooks-url-https-rule");
+        expect(rule).toHaveTextContent("Use https.");
+        expect(rule).toHaveTextContent(
+          "Plain http reaches only a local address, and only on deployments that allow local addresses. This is checked when the hook runs.",
+        );
       });
     });
 
