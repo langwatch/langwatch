@@ -11,6 +11,12 @@ export const sessionSecret = Secret.load("NEXTAUTH_SECRET", { optional: true });
 export const credentialsSecret = Secret.load("CREDENTIALS_SECRET", { optional: true });
 
 /**
+ * The dedicated key pepper, ahead of CREDENTIALS_SECRET: api-key hashes keys with it, analytics
+ * derives its query-hash key from it.
+ */
+export const apiKeyPepper = Secret.load("API_KEY_PEPPER", { optional: true });
+
+/**
  * The value CREDENTIALS_SECRET held before a rotation. It only reads: stores open old values
  * with it, api-key, scim and slack match old hashes with it, and nothing is written under it.
  */

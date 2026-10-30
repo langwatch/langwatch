@@ -237,6 +237,7 @@ describe("given a From LangWatch board's widget whose query reads cost", () => {
               layout: { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 },
             }}
             frameId="costs-cost"
+            templateId="costs"
             boardName="Running costs"
             projectId="proj-1"
             projectSlug="test-project"

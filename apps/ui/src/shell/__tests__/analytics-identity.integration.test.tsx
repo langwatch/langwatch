@@ -22,12 +22,21 @@ import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { FirstTouchAttributionToken } from "@langwatch/onboarding-client";
 import { cleanup, render } from "@testing-library/react";
+import { type ReactNode, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetSignedInTracking, useAnalyticsIdentity } from "../use-analytics-identity";
 
 class RecordingAnalytics extends UiAnalytics {
   readonly calls: string[] = [];
+  /** Register and unregister calls, in order. */
+  readonly superProperties: string[] = [];
+  override register(properties: Readonly<Record<string, unknown>>): void {
+    this.superProperties.push(`register ${JSON.stringify(properties)}`);
+  }
+  override unregister(property: string): void {
+    this.superProperties.push(`unregister ${property}`);
+  }
   readonly tracked: UiAnalyticsEvent[] = [];
   /** Identify and track calls in the order they were made. */
   readonly order: string[] = [];
@@ -86,6 +95,7 @@ class PersonSession extends UiSession {
   constructor(
     private readonly user: UiActor | null,
     private readonly organizationId: string | undefined,
+    private readonly projectId?: string,
   ) {
     super();
   }
@@ -101,7 +111,9 @@ class PersonSession extends UiSession {
         status: "ready",
         organization: this.organizationId ? { id: this.organizationId } : undefined,
         team: undefined,
-        project: undefined,
+        project: this.projectId
+          ? { id: this.projectId, slug: this.projectId, name: this.projectId }
+          : undefined,
       },
       permissions: {
         status: "ready",
@@ -128,6 +140,7 @@ function hostServices(
   organizationId: string | undefined,
   analytics: UiAnalytics,
   attribution: Readonly<Record<string, string>> = CAMPAIGN,
+  projectId?: string,
 ): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create(),
@@ -136,7 +149,7 @@ function hostServices(
     route: new BareRoute(),
     rpc: new SilentRpc(),
     scope: new OrgScope(organizationId),
-    session: new PersonSession(user, organizationId),
+    session: new PersonSession(user, organizationId, projectId),
     analytics,
     declarations: uiDeclarations([
       {
@@ -311,5 +324,100 @@ describe("the signed_in event the shell sends for an identified person", () => {
     const analytics = new RecordingAnalytics();
     draw(null, undefined, analytics);
     expect(analytics.tracked).toEqual([]);
+  });
+});
+
+describe("the project every later event carries", () => {
+  function inProject(analytics: UiAnalytics, projectId: string | undefined) {
+    return (
+      <UiHostServicesContextProvider
+        value={hostServices(ADA, "org_1", analytics, CAMPAIGN, projectId)}
+      >
+        <Probe />
+      </UiHostServicesContextProvider>
+    );
+  }
+
+  /** @scenario "Telemetry: every later event carries the project in scope" */
+  it("registers the project in view, moves it with the member, and drops it with none", () => {
+    const analytics = new RecordingAnalytics();
+    const { rerender } = render(inProject(analytics, "project_checkout"));
+    rerender(inProject(analytics, "project_search"));
+    rerender(inProject(analytics, undefined));
+
+    expect(analytics.superProperties).toEqual([
+      'register {"projectId":"project_checkout"}',
+      "unregister projectId",
+      'register {"projectId":"project_search"}',
+      "unregister projectId",
+      "unregister projectId",
+    ]);
+  });
+
+  /** @scenario "Telemetry: every later event carries the project in scope" */
+  it("registers the project before a screen below the shell sends its first event on mount", () => {
+    /** Keeps what each event would carry: its own attributes over the registered properties. */
+    class CarryingAnalytics extends RecordingAnalytics {
+      readonly registered: Record<string, unknown> = {};
+      readonly carried: Record<string, unknown>[] = [];
+      override register(properties: Readonly<Record<string, unknown>>): void {
+        Object.assign(this.registered, properties);
+      }
+      override unregister(property: string): void {
+        delete this.registered[property];
+      }
+      override track(event: UiAnalyticsEvent): void {
+        this.carried.push({ name: event.name, ...this.registered });
+      }
+    }
+    /** A board screen, as Dashboards mounts one: it sends its view from a passive effect. */
+    function BoardScreen({ analytics }: { analytics: UiAnalytics }) {
+      useEffect(() => analytics.track({ name: "dashboard", action: "viewed" }), [analytics]);
+      return null;
+    }
+    /** The shell, which sets who is reading, with the screen it mounts below it. */
+    function Shell({ children }: { children: ReactNode }) {
+      useAnalyticsIdentity();
+      return children;
+    }
+    const analytics = new CarryingAnalytics();
+
+    render(
+      <UiHostServicesContextProvider
+        value={hostServices(ADA, "org_1", analytics, CAMPAIGN, "project_checkout")}
+      >
+        <Shell>
+          <BoardScreen analytics={analytics} />
+        </Shell>
+      </UiHostServicesContextProvider>,
+    );
+
+    expect(analytics.carried.find(({ name }) => name === "dashboard")).toEqual({
+      name: "dashboard",
+      projectId: "project_checkout",
+    });
+  });
+
+  /** @scenario "Telemetry: a reload with no project in scope drops the projectId kept from before" */
+  it("unregisters a projectId an earlier load left, as soon as a page with no project mounts", () => {
+    const analytics = new RecordingAnalytics();
+
+    render(inProject(analytics, undefined));
+
+    expect(analytics.superProperties).toEqual(["unregister projectId"]);
+  });
+
+  /** @scenario "Telemetry: every later event carries the project in scope" */
+  it("registers no project for an anonymous visitor, and drops any kept from before", () => {
+    const analytics = new RecordingAnalytics();
+    render(
+      <UiHostServicesContextProvider
+        value={hostServices(null, undefined, analytics, CAMPAIGN, "project_checkout")}
+      >
+        <Probe />
+      </UiHostServicesContextProvider>,
+    );
+
+    expect(analytics.superProperties).toEqual(["unregister projectId"]);
   });
 });

@@ -28,6 +28,7 @@ import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.t
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
+import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
@@ -116,6 +117,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
   const { widgets } = boardWidgets;
+  useDashboardViewed({
+    dashboardId: board.id,
+    dashboardKind: "stored",
+    widgetCount: widgets.length,
+    isLoaded: boardWidgets.status === "success",
+  });
   const subject = boardSubject({ board, widgets });
   const langy = useLangyAsk();
   useBoardLangyChip(boardContextChip({ board: subject, range, period }));

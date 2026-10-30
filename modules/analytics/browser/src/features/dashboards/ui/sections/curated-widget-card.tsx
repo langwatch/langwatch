@@ -7,6 +7,7 @@
 import { useState } from "react";
 
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
+import { curatedBoardTelemetryId } from "../../../dashboard-widget/model/widget-run-telemetry.ts";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
@@ -19,6 +20,7 @@ import { WidgetExportMenu } from "../blocks/widget-export-menu.tsx";
 export function CuratedWidgetCard({
   widget,
   frameId,
+  templateId,
   boardName,
   projectId,
   projectSlug,
@@ -31,6 +33,8 @@ export function CuratedWidgetCard({
   widget: BoardTemplateWidget;
   /** The frame's id on this board: the template's id and the widget's key. */
   frameId: string;
+  /** The board's template, which its runs are logged under as `curated/<templateId>`. */
+  templateId: string;
   /** The board's name, which an exported file is named for. */
   boardName: string;
   projectId: string;
@@ -69,6 +73,11 @@ export function CuratedWidgetCard({
         projectId={projectId}
         projectSlug={projectSlug}
         widgetName={name}
+        telemetry={{
+          dashboardId: curatedBoardTelemetryId(templateId),
+          widgetId: widget.key,
+          templateId: widget.key,
+        }}
         maxHeight={widgetBodyHeightPx(rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}

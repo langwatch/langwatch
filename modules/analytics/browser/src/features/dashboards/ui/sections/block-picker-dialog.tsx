@@ -4,6 +4,7 @@
  * and drafts its prompt in Langy (AC141); "I'll build it myself" goes to the widget editor instead.
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -43,6 +44,7 @@ import {
   NO_CATALOGUE_FILTERS,
   trunkCounts,
 } from "../../model/catalogue-filter.ts";
+import { langyAsked } from "../../model/dashboard-usage-events.ts";
 import type { WidgetQuestion, WidgetQuestionIcon } from "../../model/widget-questions.ts";
 import {
   AgentKindChips,
@@ -84,6 +86,7 @@ export function BlockPickerDialog({
   onClose: () => void;
 }) {
   const langy = useLangyAsk();
+  const analytics = useUiAnalytics();
   // Closed here first: the address that unmounts the picker commits in a transition, which a
   // board busy drawing the picked widget holds back for seconds.
   const [isOpen, setIsOpen] = useState(true);
@@ -112,6 +115,8 @@ export function BlockPickerDialog({
   const askLangy = (text: string) => {
     const question = text.trim() === "" ? "Help me build a dashboard" : text;
     langy.ask(boardQuestion({ question, board, period }));
+    // A question the member put to Langy; the drafts seeded after an add send nothing.
+    analytics.track(langyAsked());
     onClose();
   };
 

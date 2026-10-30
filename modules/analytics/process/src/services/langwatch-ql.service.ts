@@ -4,6 +4,8 @@
  * a bare statement gets the default `LIMIT`, and an oversized result is `lwql_result_too_large`.
  */
 
+import { randomBytes } from "node:crypto";
+
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
@@ -49,6 +51,7 @@ import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import { LangWatchQLTimeWindowService } from "./langwatch-ql-time-window.service.ts";
 import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service.ts";
@@ -91,6 +94,12 @@ export interface LangWatchQLServiceDependencies {
   readonly judging?: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits">;
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch?: () => number;
+  /**
+   * Counts each answered run; the app passes the instance its doors count refused runs on.
+   * Absent only in a suite that builds this service alone, which then counts on its own, its
+   * query hash keyed by a random key of its own.
+   */
+  readonly runTelemetry?: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
 }
 
 export class LangWatchQLService {
@@ -117,6 +126,9 @@ export class LangWatchQLService {
         hydration: deps.hydration,
         judging: deps.judging,
       }),
+      runTelemetry:
+        deps.runTelemetry ??
+        LangWatchQLRunTelemetryService.create({ queryHashKey: randomBytes(32) }),
     });
   }
 
@@ -392,6 +404,7 @@ export class LangWatchQLService {
     memberWindows,
     isInstantEvalsEnabled,
     signal,
+    telemetry,
   }: LangWatchQLProjectSetExecuteInput &
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
@@ -446,6 +459,7 @@ export class LangWatchQLService {
       ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
+      telemetry,
     });
     // After the main query, never beside it: a refused or failed query costs no second read.
     const completeness = await lwqlCompleteness.assess({

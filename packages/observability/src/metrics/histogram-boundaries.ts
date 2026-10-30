@@ -81,6 +81,11 @@ export const HISTOGRAM_BOUNDARIES: Readonly<Record<string, readonly number[]>> =
   clickhouse_query_duration_seconds: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60],
   clickhouse_statement_wait_seconds: [0.0005, 0.005, 0.025, 0.1, 0.5, 1, 5, 15, 60],
 
+  // --- LangWatchQL ---
+  // A run is refused past its execution ceiling, so the top bucket stays near it.
+  lwql_query_duration_seconds: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60],
+  lwql_rows_read: [1, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000],
+
   // --- identity ---
   identity_commit_duration_seconds: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
 

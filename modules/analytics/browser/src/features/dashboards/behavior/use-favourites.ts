@@ -4,14 +4,17 @@
  * member's stars never show to another. Failures travel raw to the host (#5984).
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import type { DashboardStar } from "@langwatch/dashboard-contract";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import { dashboardFavourited } from "../model/dashboard-usage-events.ts";
 import { type MemberStar, sameStar, starRefOf, swapShownStars } from "../model/sidebar-boards.ts";
 
 export function useFavourites() {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const projectId = host.project()?.id ?? "";
   const utils = analyticsApi.useUtils();
 
@@ -49,11 +52,15 @@ export function useFavourites() {
   const isStarred = (star: DashboardStar) => refs.some((ref) => sameStar(ref, star));
 
   const toggleStar = (star: DashboardStar) => {
-    const mutation = isStarred(star) ? unstarMutation : starMutation;
+    const starred = !isStarred(star);
+    const mutation = starred ? starMutation : unstarMutation;
     mutation.mutate(
       { projectId, star },
       {
-        onSuccess: () => void refresh(),
+        onSuccess: () => {
+          analytics.track(dashboardFavourited({ starred }));
+          void refresh();
+        },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change your stars" }),
       },
     );

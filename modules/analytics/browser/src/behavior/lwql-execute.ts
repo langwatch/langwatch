@@ -6,6 +6,7 @@
 
 import type {
   LangWatchQLQueryResult,
+  LangWatchQLRunTelemetryRequest,
   LangWatchQLTimeWindow,
   TraceSource,
 } from "@langwatch/analytics-contract";
@@ -21,6 +22,7 @@ export interface LangWatchQLQueryInput {
   timeWindow?: LangWatchQLTimeWindow;
   sources?: TraceSource[] | null;
   projects?: string[];
+  telemetry?: LangWatchQLRunTelemetryRequest | undefined;
 }
 
 const isoInstant = (epochMs: number): string =>

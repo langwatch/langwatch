@@ -306,6 +306,31 @@ export type LangWatchQLRunContext = Readonly<{
   userId?: string;
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
   signal?: AbortSignal;
+  /** Who ran it, for its log line and metrics only; it never changes what the query reads. */
+  telemetry?: LangWatchQLRunTelemetry;
+}>;
+
+/**
+ * The door a run came in by, named by the server and never by the browser: the `caller` of its
+ * log line and the one label its metrics split by besides the outcome.
+ * @see modules/dashboard/specs/dashboards-telemetry.feature
+ */
+export const LWQL_TELEMETRY_CALLERS = [
+  "dashboard_widget",
+  "workbench",
+  "rest_api",
+  "saved_chart",
+  "source_presence",
+] as const;
+/** One door a run can come in by. */
+export type LangWatchQLTelemetryCaller = (typeof LWQL_TELEMETRY_CALLERS)[number];
+
+/** Where a run came from, as its log line records it. The ids never become metric labels. */
+export type LangWatchQLRunTelemetry = Readonly<{
+  caller: LangWatchQLTelemetryCaller;
+  dashboardId?: string;
+  widgetId?: string;
+  templateId?: string;
 }>;
 
 /** Input shared by every restricted LangWatchQL execution surface. */
