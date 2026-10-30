@@ -10,6 +10,7 @@ import type { WidgetFace } from "../../../../model/dashboard-widget/widget-compl
 import { curatedBoardTelemetryId } from "../../../dashboard-widget/model/widget-run-telemetry.ts";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
+import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import { widgetSourcesLine } from "../../model/widget-sources.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
@@ -51,10 +52,12 @@ export function CuratedWidgetCard({
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
   const canAskLangy = onAskLangy !== undefined && face !== "no_access";
   const csvExport = useWidgetCsvExport({ board: boardName, widget: name });
+  const viewRef = useWidgetViewed({ widgetSource: "curated" });
   const hasControls = canAskLangy || csvExport.item !== undefined;
 
   return (
     <WidgetCardShell
+      viewRef={viewRef}
       name={name}
       description={definition.description}
       footer={widgetSourcesLine(definition.queries)}

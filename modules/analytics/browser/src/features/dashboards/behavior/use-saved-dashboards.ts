@@ -11,7 +11,11 @@ import { useRef, useState } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { dashboardsPath, untitledBoardName } from "../model/boards.ts";
-import { dashboardCreated, dashboardDeleted } from "../model/dashboard-usage-events.ts";
+import {
+  dashboardCreated,
+  dashboardDeleted,
+  dashboardEdited,
+} from "../model/dashboard-usage-events.ts";
 import { withBlockPickerOpen } from "./use-block-picker-address.ts";
 
 /** One stored board, as the list answers it. */
@@ -137,7 +141,10 @@ export function useSavedDashboards() {
     rename.mutate(
       { projectId, dashboardId, name },
       {
-        onSuccess: () => void refresh(),
+        onSuccess: () => {
+          analytics.track(dashboardEdited({ change: "rename" }));
+          void refresh();
+        },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't rename the dashboard" }),
       },
     );

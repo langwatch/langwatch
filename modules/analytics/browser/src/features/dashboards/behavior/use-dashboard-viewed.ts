@@ -1,13 +1,18 @@
 /**
  * Sends "dashboards.viewed.dashboard" once per board opened, as soon as its widgets are known,
- * so the count it carries is the board's and not the loading state's.
+ * so the count it carries is the board's and not the loading state's. It carries the board's
+ * one-way key, never its id, so repeat opens of one board count together.
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useEffect, useRef } from "react";
 
-import { type DashboardKind, dashboardViewed } from "../model/dashboard-usage-events.ts";
+import {
+  type DashboardKind,
+  dashboardKey,
+  dashboardViewed,
+} from "../model/dashboard-usage-events.ts";
 
 /** Sends one view for the board on screen, once its widgets have loaded. */
 export function useDashboardViewed({
@@ -30,12 +35,11 @@ export function useDashboardViewed({
   useEffect(() => {
     if (!isLoaded || sentFor.current === dashboardId) return;
     sentFor.current = dashboardId;
-    analytics.track(
-      dashboardViewed({
-        dashboardKind,
-        widgetCount,
-        ...(templateId === void 0 ? {} : { templateId }),
-      }),
+    const view = { dashboardKind, widgetCount, ...(templateId === void 0 ? {} : { templateId }) };
+    // A view whose key cannot be made is still a view: it is sent without the key.
+    void dashboardKey(dashboardId).then(
+      (key) => analytics.track(dashboardViewed({ ...view, dashboardKey: key })),
+      () => analytics.track(dashboardViewed(view)),
     );
   }, [analytics, dashboardId, dashboardKind, widgetCount, isLoaded, templateId]);
 }

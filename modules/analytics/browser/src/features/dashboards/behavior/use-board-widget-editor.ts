@@ -5,13 +5,16 @@
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
-import { useMemo } from "react";
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { useEffect, useMemo, useRef } from "react";
 
 import { useWidgetDraft } from "../../dashboard-widget/behavior/use-widget-draft.ts";
 import { useWidgetPreview } from "../../dashboard-widget/behavior/use-widget-preview.ts";
 import { BLANK_WIDGET } from "../model/blank-widget.ts";
 import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
+import { editorOpened, queryRan } from "../model/dashboard-usage-events.ts";
 
 export function useBoardWidgetEditor({
   widget,
@@ -46,9 +49,24 @@ export function useBoardWidgetEditor({
     ...(widget ? { widgetId: widget.id, widgetName: widget.name } : {}),
   });
 
+  const analytics = useUiAnalytics();
+  // The editor's LangWatchQL events: it mounts once per open, so one open sends one.
+  const opened = useRef(false);
+  const widgetIs = widget ? "existing" : "new";
+  useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    analytics.track(editorOpened({ widgetIs }));
+  }, [analytics, widgetIs]);
+  const runStandalone = (query: DashboardWidgetQuery) => {
+    analytics.track(queryRan());
+    return preview.runStandalone(query);
+  };
+
   return {
     ...draft,
     ...preview,
+    runStandalone,
     /** A new widget can always be saved; a saved one once something changed. */
     canSave: widget === null || draft.isDirty,
     /** What Save writes. */

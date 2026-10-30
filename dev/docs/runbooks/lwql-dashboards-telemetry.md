@@ -34,6 +34,14 @@ question text. Two ids still reach PostHog:
 
 Removing them would change every module's events, not only Dashboards'.
 
+## A widget seen
+
+`dashboards.viewed.widget` is sent the first time half of a widget's card is on
+screen, once per card per board view. A card that is half visible only while
+the board is still laying out (before a banner pushes it down) also counts.
+On boards that load slowly this can raise the count. If the numbers look
+high, require the card to stay on screen for about 500 ms before sending.
+
 ## Aborted runs
 
 A run its caller hung up on (a widget unmounted, a request cancelled) is

@@ -4,6 +4,7 @@
  * (AC13). Live rolls; a fixed range re-ends on refresh.
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { nowInstant } from "@langwatch/time";
 import { useMemo, useState } from "react";
 
@@ -19,10 +20,12 @@ import {
   parseBoardPeriodGrain,
   parseBoardPeriodRange,
 } from "../model/board-period.ts";
+import { periodChanged } from "../model/dashboard-usage-events.ts";
 
 /** The address's range and grain, and the writes the header control makes. */
 export function useBoardRange() {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const query = host.route().query;
   const range = parseBoardPeriodRange(query.range);
   const grain = parseBoardPeriodGrain(query.grain);
@@ -32,11 +35,17 @@ export function useBoardRange() {
     grain,
     // Live and a range the grain cannot carry both go back to auto (AC19b, AC19c).
     setRange: (next: BoardPeriodRange) => {
+      if (next === range) return;
       const resets =
         grain !== "auto" && (next === "live" || !boardGrainFits({ range: next, grain }));
       host.setQuery(resets ? { ...query, range: next, grain: "auto" } : { ...query, range: next });
+      analytics.track(periodChanged({ range: next, grain: resets ? "auto" : grain }));
     },
-    setGrain: (next: BoardPeriodGrain) => host.setQuery({ ...query, grain: next }),
+    setGrain: (next: BoardPeriodGrain) => {
+      if (next === grain) return;
+      host.setQuery({ ...query, grain: next });
+      analytics.track(periodChanged({ range, grain: next }));
+    },
   };
 }
 
