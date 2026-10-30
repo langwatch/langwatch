@@ -118,8 +118,6 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
   return <WidgetFrameOverWindow key={`${props.id}:${queries}`} {...props} parsed={parsed} />;
 }
 
-/** The outcome of reading a row's graph, parsed once by the caller. */
-
 /**
  * `granularitySeconds`, when given, is the step the reserved parameters carry.
  * What its queries report decides its face (features/dashboards/WIDGET_STANDARD.md).
