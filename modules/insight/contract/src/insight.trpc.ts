@@ -19,10 +19,12 @@ import {
 } from "./insight.constants.ts";
 import {
   fileInsightInputSchema,
+  insightActionRunSchema,
   insightEntrySchema,
   insightProjectScopeSchema,
   insightScopeSchema,
   markInsightsSeenInputSchema,
+  runInsightActionInputSchema,
 } from "./insight.ts";
 
 export const insightTrpc = defineTrpcContract("insights")
@@ -45,6 +47,10 @@ export const insightTrpc = defineTrpcContract("insights")
   .mutation("keep")
   .withInput(insightScopeSchema)
   .withOutput(z.void())
+
+  .mutation("runAction")
+  .withInput(runInsightActionInputSchema)
+  .withOutput(insightActionRunSchema)
 
   // The caller's own daily run on one board; refetched when it is set or a run of it settles.
   .query("getBoardDailyRun", { invalidatedBy: INSIGHT_DAILY_RUN_SETTING_EVENT_TYPES })

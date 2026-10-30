@@ -29,6 +29,8 @@ export type StubInsightHostOptions = {
   project?: InsightHostProject | undefined;
   /** `release_insights`; on unless a test says otherwise. */
   enabled?: boolean | undefined;
+  /** `release_insight_actions`; off, as it ships, unless a test says otherwise. */
+  actionsEnabled?: boolean | undefined;
   /** A viewer unless a test says otherwise: `analytics:view` is all insight asks for. */
   permissions?: readonly string[];
   query?: Readonly<Record<string, string | undefined>>;
@@ -43,6 +45,8 @@ export class StubInsightHost extends InsightHostApi {
   readonly navigations: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
   readonly langyAsks: LangyAskRequest[] = [];
+  /** Every Langy conversation the screen opened, oldest first. */
+  readonly openedConversations: string[] = [];
   /** Every text written to the clipboard, oldest first. */
   readonly clipboard: string[] = [];
 
@@ -56,6 +60,10 @@ export class StubInsightHost extends InsightHostApi {
 
   isEnabled(): boolean | undefined {
     return "enabled" in this.options ? this.options.enabled : true;
+  }
+
+  isActionsEnabled(): boolean | undefined {
+    return this.options.actionsEnabled ?? false;
   }
 
   hasPermission(permission: string): boolean {
@@ -90,6 +98,10 @@ export class StubInsightHost extends InsightHostApi {
 
   askLangy(request: LangyAskRequest): void {
     this.langyAsks.push(request);
+  }
+
+  openLangyConversation(conversationId: string): void {
+    this.openedConversations.push(conversationId);
   }
 }
 
@@ -149,6 +161,7 @@ export function insightEntry(overrides: Partial<InsightEntry> = {}): InsightEntr
     ownerUserId: "user-filer",
     filedByUserId: "user-filer",
     findingKey: null,
+    actions: [],
     filedAt: nowInstant().epochMilliseconds,
     renewedAt: null,
     seenAt: null,

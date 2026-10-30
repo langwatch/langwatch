@@ -43,6 +43,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_dashboards",
   // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
   "release_insights",
+  // The action buttons Langy proposes on an insight card, on top of release_insights.
+  "release_insight_actions",
   // LangWatchQL; with release_dashboards, the reports page's widget drawer.
   "release_lwql_workbench",
   // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the

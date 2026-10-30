@@ -14,7 +14,7 @@ import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLentOperations } from "@langwatch/browser-host/lent";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { type LangyAsk, LangyAskToken } from "@langwatch/langy-client";
-import type { LangyAskRequest } from "@langwatch/langy-contract";
+import { LANGY_CONVERSATION_PARAM, type LangyAskRequest } from "@langwatch/langy-contract";
 import { type ReactNode, useMemo } from "react";
 
 import {
@@ -44,6 +44,7 @@ class CapabilityInsightHost extends InsightHostApi {
     private readonly deps: {
       project: InsightHostProject | undefined;
       enabled: boolean | undefined;
+      actionsEnabled: boolean | undefined;
       session: UiSession;
       route: UiRoute;
       navigation: UiNavigation;
@@ -60,6 +61,10 @@ class CapabilityInsightHost extends InsightHostApi {
 
   isEnabled(): boolean | undefined {
     return this.deps.enabled;
+  }
+
+  isActionsEnabled(): boolean | undefined {
+    return this.deps.actionsEnabled;
   }
 
   hasPermission(permission: string): boolean {
@@ -94,6 +99,15 @@ class CapabilityInsightHost extends InsightHostApi {
     if (!this.deps.langy) return;
     void this.deps.langy().then((langy) => langy.ask(request));
   }
+
+  /** Langy's own deep-link reader opens the panel on it and strips the parameter again. */
+  openLangyConversation(conversationId: string): void {
+    const { query } = this.deps.route.reading();
+    this.deps.route.setQuery(
+      { ...query, [LANGY_CONVERSATION_PARAM]: conversationId },
+      { replace: true },
+    );
+  }
 }
 
 /** One provider above the routed tree; default-exported because `mounts.load` resolves it. */
@@ -101,7 +115,9 @@ export default function InsightHostMount({ children }: { children?: ReactNode })
   const { session, route, navigation, feedback } = useUiHostServices();
   const langy = useLentOperations(LangyAskToken);
   // Read as a primitive: the flags service hands a new object on every render.
-  const enabled = useUiFlags().flag(FrontendFlags.release_insights);
+  const flags = useUiFlags();
+  const enabled = flags.flag(FrontendFlags.release_insights);
+  const actionsEnabled = flags.flag(FrontendFlags.release_insight_actions);
   const scopeProject = session.snapshot().scope.project;
   const projectId = scopeProject?.id;
   const projectSlug = scopeProject?.slug;
@@ -119,13 +135,25 @@ export default function InsightHostMount({ children }: { children?: ReactNode })
               }
             : void 0,
         enabled,
+        actionsEnabled,
         session,
         route,
         navigation,
         feedback,
         langy,
       }),
-    [projectId, projectSlug, projectKind, enabled, session, route, navigation, feedback, langy],
+    [
+      projectId,
+      projectSlug,
+      projectKind,
+      enabled,
+      actionsEnabled,
+      session,
+      route,
+      navigation,
+      feedback,
+      langy,
+    ],
   );
   return <InsightHostProvider value={host}>{children}</InsightHostProvider>;
 }

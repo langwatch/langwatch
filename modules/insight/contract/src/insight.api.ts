@@ -9,10 +9,18 @@ import type {
   RequestInsightDailyRunInput,
   TurnOffInsightDailyRunInput,
 } from "./insight-daily-run.ts";
-import type { FileInsightInput, InsightEntry } from "./insight.ts";
+import type {
+  FileInsightInput,
+  InsightActionRun,
+  InsightEntry,
+  RunInsightActionInput,
+} from "./insight.ts";
 
 /** Who is asking. An insight is read and acted on by its owner alone. */
 type Reader = { userId: string };
+
+/** The person behind a click as their session proved them; Langy's turn runs as them. */
+type Clicker = Reader & { name: string | null; email: string | null };
 
 /**
  * Each person's own insights in a project. Every operation refuses with
@@ -32,6 +40,12 @@ export interface InsightApi {
   archiveInsight(input: { projectId: string; insightId: string } & Reader): Promise<void>;
   /** "Still relevant": back in the reader's inbox, whatever its validity says. */
   keepInsight(input: { projectId: string; insightId: string } & Reader): Promise<void>;
+  /**
+   * Sends one stored action to Langy as the clicker, in their own conversation: the source, a
+   * fork of it, or a new one when it is gone. `insight_actions_not_enabled` while the flag is
+   * off; `insight_action_from_run` for an insight a run filed or saved from a run's conversation.
+   */
+  runInsightAction(input: RunInsightActionInput & Clicker): Promise<InsightActionRun>;
   /**
    * Asks for one daily insights run now, for a person on a board. The answer names the request,
    * never a run: the worker starts none for it while a run is in flight for that board.

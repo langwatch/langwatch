@@ -28,8 +28,11 @@ import { useState } from "react";
 
 import { useInsightActions, useMarkShownSeen } from "../../behavior/use-insight-actions.ts";
 import { useInsightInbox } from "../../behavior/use-insight-inbox.ts";
+import { useRunInsightAction } from "../../behavior/use-run-insight-action.ts";
 import { useInsightHost } from "../../model/insight-host.ts";
+import { ACTIONS_NEED_LANGY, shownInsightActions } from "../../model/insight-presentation.ts";
 import { type FolderCount, FolderRail } from "../blocks/folder-rail.tsx";
+import { InsightActionButtons } from "../blocks/insight-action-buttons.tsx";
 import { type InsightDensity, InsightRow } from "../blocks/insight-row.tsx";
 import { InsightBoardTrail } from "./insight-board-trail.tsx";
 import { InsightEvidence } from "./insight-evidence.tsx";
@@ -163,6 +166,9 @@ function FolderView({
 }) {
   const host = useInsightHost();
   const actions = useInsightActions({ projectId });
+  const runAction = useRunInsightAction({ projectId });
+  const isActionsEnabled = host.isActionsEnabled() === true;
+  const actionsDisabledReason = host.hasPermission("langy:create") ? null : ACTIONS_NEED_LANGY;
   // The dots you came to see stay for this visit, even after the visit marks them seen.
   const [unreadThisVisit] = useState(
     () => new Set([...inbox.inbox, ...inbox.stale].filter(isUnseen).map((entry) => entry.id)),
@@ -204,6 +210,14 @@ function FolderView({
                 now={now}
                 boardTrail={entry.board ? <InsightBoardTrail board={entry.board} /> : void 0}
                 evidence={<InsightEvidence entry={entry} />}
+                proposedActions={
+                  <InsightActionButtons
+                    actions={shownInsightActions({ entry, isEnabled: isActionsEnabled })}
+                    disabledReason={actionsDisabledReason}
+                    pendingActionId={runAction.pendingActionId(entry.id)}
+                    onRun={(actionId) => runAction.run({ insightId: entry.id, actionId })}
+                  />
+                }
                 actions={{
                   onDone: () => actions.markDone(entry.id),
                   onKeep: () => actions.keep(entry.id),

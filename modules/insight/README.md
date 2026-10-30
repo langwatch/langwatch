@@ -25,8 +25,13 @@ filing is the module's own write (ADR-004). A person turns the run on for a boar
 and it then starts once a day, around the hour they chose, in their time zone. An
 operator asks for one run with the `insight-daily-run-request` task.
 
-Behind the `release_insights` flag. Requirements: [the inbox](./specs/insight-inbox.feature)
-and [the daily run](./specs/insight-daily-run.feature). Decisions: [ADRs](./adrs/README.md).
+An insight saved from a chat may carry up to four actions Langy proposed. A click sends the
+stored prompt to Langy as the clicker, continuing the conversation the insight came from, a
+fork of it, or a new seeded one when it is gone (ADR-005). Behind `release_insight_actions`.
+
+Behind the `release_insights` flag. Requirements: [the inbox](./specs/insight-inbox.feature),
+[the daily run](./specs/insight-daily-run.feature) and [the actions](./specs/insight-actions.feature).
+Decisions: [ADRs](./adrs/README.md).
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
@@ -37,7 +42,7 @@ and [the daily run](./specs/insight-daily-run.feature). Decisions: [ADRs](./adrs
 | Classification | core (`modules/catalogue.json`)                                                                       |
 | Subjects       | insight                                                                                               |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                              |
-| Api token      | `InsightApi` = `moduleApi<InsightApi>()("insight")`, `contract/src/insight.api.ts:58` (11 operations) |
+| Api token      | `InsightApi` = `moduleApi<InsightApi>()("insight")`, `contract/src/insight.api.ts:72` (12 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                            |
 
 ## What insight owns

@@ -7,6 +7,7 @@
  */
 
 import {
+  bindTrpcMiddlewareContext,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
@@ -23,7 +24,7 @@ import {
   OTHER_MEMBER,
 } from "../../app/__tests__/insight-daily-run.fixture.ts";
 import { PROJECT } from "../../app/__tests__/insight.fixture.ts";
-import { insightTrpcTransport } from "../insight.trpc.ts";
+import { insightSessionPersonContext, insightTrpcTransport } from "../insight.trpc.ts";
 
 type TestContext = { actor: { id: string } };
 
@@ -81,7 +82,11 @@ async function project({ isEnabled = true }: { isEnabled?: boolean } = {}) {
         ...(isOnAggregate ? { overrides: ON_AGGREGATE } : {}),
       }),
     })
-      .mount(insightTrpcTransport, () => daily.app)
+      .mount(insightTrpcTransport, () => daily.app, {
+        middlewareContext: [
+          bindTrpcMiddlewareContext(insightSessionPersonContext, (_ctx: TestContext) => null),
+        ],
+      })
       .createCaller({ actor: { id: userId } });
   };
 

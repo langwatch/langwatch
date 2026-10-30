@@ -2409,6 +2409,9 @@ model InsightProjection {
   /// and files no twin. NULL for an insight saved from a chat and on a row folded before
   /// the column existed.
   findingKey               String?
+  /// The actions a click sends to Langy: `[{ id, label, prompt }]`, at most four. NULL on a
+  /// row folded before the column existed, which reads as no actions.
+  actions                  Json?
 
   @@index([projectId, filedAt])
   @@index([projectId, ownerUserId, filedAt])
