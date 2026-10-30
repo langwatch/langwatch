@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable model-provider operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/model-provider.api.ts:196`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/model-provider.api.ts:197`; nothing else in this package is public.
 
 #### `estimateCost`
 
@@ -220,10 +220,18 @@ resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderRe
 
 #### `resolveDecisionModel`
 
-What the project's Instant Evals run on: LangWatch's classifier, or the organization's own decision model with its decrypted key. An own model that cannot run answers `own_unavailable`, never `langwatch` (ADR-182 decisions 4 and 5). The answer is kept a minute per project.
+What the project's Instant Evals run on, or `model` when a caller picked one: LangWatch's classifier, or the organization's own decision model with its key. One that cannot run answers `own_unavailable`, never `langwatch`; a non-decision model id is ignored (ADR-182).
 
 ```typescript
-resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution>;
+resolveDecisionModel(input: { projectId: string; model?: string; }): Promise<DecisionModelResolution>;
+```
+
+#### `listDecisionModelsForProject`
+
+The decision models this project may be offered, hosted first; see `resolveDecisionModel`.
+
+```typescript
+listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]>;
 ```
 
 #### `findAlternateModel`
@@ -582,6 +590,7 @@ Contract `../contract/src/model-provider.trpc.ts:43`, router `src/transport/mode
 | `modelProvider.getAllForProject`                  | query    | Permission `project:view`                                                                                                                                                                                                                                              | `modelProviderProjectTrpcInputSchema`                  | `modelProviderListEntryMapTrpcSchema`     |
 | `modelProvider.getAllForProjectForFrontend`       | query    | Permission `project:view`                                                                                                                                                                                                                                              | `modelProviderProjectTrpcInputSchema`                  | `modelProviderListEntryMapTrpcSchema`     |
 | `modelProvider.listAllForProjectForFrontend`      | query    | Permission `project:view`                                                                                                                                                                                                                                              | `modelProviderProjectTrpcInputSchema`                  | inline                                    |
+| `modelProvider.listDecisionModelsForProject`      | query    | Permission `project:view`                                                                                                                                                                                                                                              | `modelProviderProjectTrpcInputSchema`                  | inline                                    |
 | `modelProvider.listAllForOrganizationForFrontend` | query    | Permission `organization:view`                                                                                                                                                                                                                                         | `modelProviderOrganizationTrpcInputSchema`             | inline                                    |
 | `modelProvider.update`                            | mutation | Service-authorized: PROVIDER_WRITE_PERMISSIONS; the tenant anchor is data: a project when one is named, otherwise the organization the provider belongs to, and the application's per-scope assertCanWrite is what checks it                                           | `modelProviderUpdateTrpcInputSchema`                   | `modelProviderListEntrySchema`            |
 | `modelProvider.delete`                            | mutation | Service-authorized: PROVIDER_WRITE_PERMISSIONS; the tenant anchor is data: a project when one is named, otherwise the organization the provider belongs to, and the application's per-scope assertCanWrite is what checks it                                           | `modelProviderDeleteTrpcInputSchema`                   | –                                         |
@@ -617,12 +626,20 @@ type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contrac
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
 // Output: z.array(modelProviderListEntrySchema) (inline, ../contract/src/model-provider.trpc.ts:57)
 
+// modelProvider.listDecisionModelsForProject
+type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
+// Output: inline, ../contract/src/model-provider.trpc.ts:65
+type Output = {
+  value: string;
+  label: string;
+}[];
+
 // modelProvider.listAllForOrganizationForFrontend
 // Input: modelProviderOrganizationTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:77
 interface Input {
   organizationId: string;
 }
-// Output: z.array(modelProviderListEntrySchema) (inline, ../contract/src/model-provider.trpc.ts:62)
+// Output: z.array(modelProviderListEntrySchema) (inline, ../contract/src/model-provider.trpc.ts:70)
 
 // modelProvider.update
 type Input = z.infer<typeof modelProviderUpdateTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:142
@@ -749,7 +766,7 @@ interface Input {
   projectId: string;
   featureKey: string;
 }
-// Output: inline, ../contract/src/model-provider.trpc.ts:114
+// Output: inline, ../contract/src/model-provider.trpc.ts:122
 type Output = {
   model: string;
   source: "feature_override" | "role_default" | "inferred";
@@ -859,8 +876,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:255`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:256`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:256`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:257`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |

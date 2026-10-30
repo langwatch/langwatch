@@ -26,4 +26,14 @@ export {
   curatedBoardWidgetById,
   templateWidgetId,
 } from "./model/curated-boards.ts";
+export {
+  canFollowSources,
+  namedViews,
+  PRESENCE_QUERY,
+  readsSourcesParameter,
+  SOURCE_VIEWS,
+  SOURCES_PLACEHOLDER,
+  TRACE_VIEWS,
+  VIEWS_WITH_ORIGIN,
+} from "./model/sources-parameter.ts";
 export type { WidgetQuestion, WidgetQuestionIcon } from "./model/widget-questions.ts";

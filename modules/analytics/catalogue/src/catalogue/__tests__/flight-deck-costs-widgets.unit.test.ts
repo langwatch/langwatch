@@ -149,14 +149,14 @@ describe("given the Running costs widgets", () => {
     expect(queries.main).toContain("max(ifNull(ParentSpanId, '') = '' AND StatusCode = 2)");
     expect(queries.main).toContain("sumIf(calls - 1, is_tool AND calls >= 3)");
     expect(queries.main).toContain("NOT failed AND repeats = 0 AND retries > 0");
-    expect(queries.main).toContain("Origin IN ('', 'application', 'gateway')");
+    expect(queries.main).not.toContain("Origin IN");
     expect(code).toContain('" of production spend"');
   });
 
   /** @scenario "AC31 Running costs: Cost per call shows speech as not priced" */
   it("shows the LLM cost per production call and speech as not priced", () => {
     const { code, queries } = build("voice-cost-per-call");
-    expect(queries.total).toContain("Origin IN ('', 'application', 'gateway')");
+    expect(queries.total).not.toContain("Origin IN");
     expect(code).toContain('value="Not priced"');
   });
 

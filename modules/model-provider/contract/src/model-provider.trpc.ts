@@ -56,6 +56,14 @@ export const modelProviderTrpc = defineTrpcContract("modelProvider")
   .withInput(modelProviderProjectTrpcInputSchema)
   .withOutput(z.array(modelProviderListEntrySchema))
 
+  /**
+   * The decision models a judge may be offered for this project, hosted first. The
+   * own-decision-model flag and the provider keys are weighed here, never in the browser.
+   */
+  .query("listDecisionModelsForProject")
+  .withInput(modelProviderProjectTrpcInputSchema)
+  .withOutput(z.array(z.object({ value: z.string(), label: z.string() })))
+
   /** Org-wide variant: every provider anywhere in the organization, env-fed rows included. */
   .query("listAllForOrganizationForFrontend")
   .withInput(modelProviderOrganizationTrpcInputSchema)

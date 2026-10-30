@@ -90,6 +90,8 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   /** Told which face the frame draws, so the card offers only what that face allows. */
   readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
+  /** Told the messages of what the server limited in the run, joined; "" when it limited none. */
+  readonly onLimitsChange?: (limits: string) => void;
   /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
   readonly onExportChange?: (widgetExport: WidgetExport) => void;
   /** Told whether the card shows none of the widget's data, so a board can offer to set it up. */
@@ -125,6 +127,7 @@ function WidgetFrameOverWindow({
   granularitySeconds,
   onAskLangyToSetUp,
   onFaceChange,
+  onLimitsChange,
   onExportChange,
   onEmptyChange,
   parsed,
@@ -138,14 +141,14 @@ function WidgetFrameOverWindow({
   // crashing the grid.
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
-  const { executeQuery: runQuery, params: hostParams } = useDashboardWidgetExecutor(
-    projectId,
-    definition.queries,
-    {
-      timeWindow,
-      ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
-    },
-  );
+  const {
+    executeQuery: runQuery,
+    params: hostParams,
+    limits,
+  } = useDashboardWidgetExecutor(projectId, definition.queries, {
+    timeWindow,
+    ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
+  });
   const { executeQuery, records, results, reset } = useWidgetQueryRecords({
     executeQuery: runQuery,
     timeWindow,
@@ -153,6 +156,8 @@ function WidgetFrameOverWindow({
   const face = useMemo(() => widgetFace(records), [records]);
   usePublishWidgetCompleteness(face.kind === "chart" ? face.completeness : null);
   useEffect(() => onFaceChange?.(face.kind), [onFaceChange, face.kind]);
+  const limitsLine = limits.join(" · ");
+  useEffect(() => onLimitsChange?.(limitsLine), [onLimitsChange, limitsLine]);
 
   const hasQueries = definition.queries.length > 0;
   const widgetExport = useMemo(

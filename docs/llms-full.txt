@@ -19807,7 +19807,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command except `query run` when the sessions live in a team project instead. `query run` takes the projects to read from `--projects <id,id>` (Step 3), and refuses `--project` beside it.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -19836,11 +19836,11 @@ Ask the user, or check on their machine: run `claude -p "hello" --output-format 
 
 ## Step 3: Pull the Data
 
-Every query below is LangWatchQL, run with `langwatch query run "<sql>" -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
+Every query below is LangWatchQL, run with `langwatch query run "<sql>" --projects <id,id> -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
 
 `langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
-Without `--project`, a query reads every project the login can reach, so check the scope first:
+A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach: page through `langwatch projects list` until it has no more, since it lists 50 at a time.
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
@@ -42889,12 +42889,17 @@ origin, or pick one from **Add source**:
 - `langy`: your conversations with Langy.
 - `other`: any origin not listed above.
 
-A new widget counts `application`, and so does a widget saved before sources
-existed. A widget about Langy's failed requests adds `langy`. The preview runs
+A new widget counts `application`, and a stock widget from the template
+does too. A widget about Langy's failed requests adds `langy`. The preview runs
 again when you change the sources, and each card names its sources in a quiet
 line underneath. A query with no source picked returns no rows, and its widget
-says **No sources picked**. Widgets on From LangWatch dashboards count every
-origin except `langy`.
+says **No sources picked**.
+
+Sources only apply where the SQL reads the parameter. A query that does not read
+`{dashboard_context_sources:Array(String)}` counts every origin, and its card
+says **Sources: all sources**. A widget saved before this release keeps its SQL,
+so it counts every origin until you edit it to read the parameter or add it
+again from the template.
 
 ## Who can see a dashboard
 
@@ -42964,6 +42969,15 @@ widget's name, its queries and the period.
 
 All dashboard data is read with LangWatchQL, LangWatch's query layer over your
 traces, evaluations and cost data.
+
+A widget query has two settings beside its SQL. `sources` lists the trace sources `{dashboard_context_sources:Array(String)}` is bound to (`application` by default), and a query is kept to them only where its SQL uses that parameter in a condition, such as `WHERE Source IN {dashboard_context_sources:Array(String)}`. A query that does not use it is not filtered by `sources` and counts every source, and its card says "all sources".
+
+`projects` lists the projects the query reads, bound to `{dashboard_context_projects:Array(String)}`; a query that names none reads its board's project.
+
+A project you cannot read makes that card draw "You can't read a project this widget uses" without naming it. When the server cut a run's rows, such as a project shared only from a date, the card shows one (i) line saying so.
+
+Rolling back to a release before this one shows multi-project widgets for the board's
+project only. A rollback is not supported for this feature.
 
 ## Build dashboards from your own AI agent
 
@@ -44172,8 +44186,20 @@ the offending field and the fields that exist.
 langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
 FROM analytics.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
-GROUP BY day ORDER BY day"
+GROUP BY day ORDER BY day" --projects <project id>
 ```
+
+A key that reaches several projects must name the projects to read with `--projects` (the `projects` field over REST and in `run_query`). Without them the run is refused with `projects_required` (422): "Name the projects to query: send `projects`, a list of project ids, or \"all\"". A project API key, or any key that can read exactly one project, reads that project and needs none.
+
+Send `"all"` (the string, in any case; `--projects all` on the CLI) to read every project the key can read. It must stand alone: a list that holds it is refused with a 422: "all" stands alone; send it by itself, or list project ids. Only projects it holds `analytics:view` on, in its own organization, are read. `params.dashboard_context_projects` lists the projects that were read, in id order.
+
+If the key reads no project and it sends `"all"` or names no project, the run is refused with `projects_unreadable` (422); ask an admin to grant it `analytics:view` on one. A project it names and cannot read is refused with `project_not_found` (404). A member who reads none gets `project_not_found` (404). If it reads more than 10,000, the run is refused with a 422 asking you to name the projects. A widget does not store `"all"`; name its project ids.
+
+Every REST answer carries `params`: each placeholder the statement declares, by its SQL name, with the value it ran with (for example `dashboard_context_sources` and `dashboard_context_projects`), plus the `period` it followed. The CLI returns the same `params` and the `diagnostics` beside the rows in `-o json` and `--format json` (one object with `rows`, `params` and `diagnostics`). For CSV and JSON lines it prints `params` as one JSON line on stderr, and the table format adds a line under the table.
+
+The placeholder does not filter by itself: write a condition such as `WHERE Source IN {dashboard_context_sources:Array(String)}`. A statement that never uses `{dashboard_context_sources:Array(String)}` counts every origin. When the request named `sources`, the answer says so with a `SOURCES_IGNORED` diagnostic; a request that named none gets no note. When the period is too long for the step asked, the query runs at a coarser step and the answer carries a `GRANULARITY_COARSENED` diagnostic.
+
+`--sources` (`sources`) sets the origins that parameter is bound to; the default is `application`, which applies only to a statement that uses the parameter.
 
 The statement runs exactly as submitted. Filter on the dataset's time column, as
 every example does: without that predicate the read touches every partition your
@@ -44184,7 +44210,7 @@ parameter the statement declares, and `--start` with `--end` fills the reserved
 period parameters.
 
 ```bash
-langwatch query --sql-file report.sql --param days=30 -f json
+langwatch query --sql-file report.sql --param days=30 --projects <project id> -f json
 ```
 
 ## Exporting rows
@@ -44194,7 +44220,7 @@ back into real values, which is the shape a training-data reader expects.
 `--format csv` writes a header row with RFC 4180 escaping. `--out` writes to a file.
 
 ```bash
-langwatch query --sql-file export.sql --format jsonl --out train.jsonl
+langwatch query --sql-file export.sql --projects <project id> --format jsonl --out train.jsonl
 ```
 
 The query endpoint has no cursor of its own, so a result larger than one
@@ -44212,7 +44238,7 @@ LIMIT 1000
 ```
 
 ```bash
-langwatch query --sql-file export.sql --page-by keyset --format jsonl --out train.jsonl
+langwatch query --sql-file export.sql --projects <project id> --page-by keyset --format jsonl --out train.jsonl
 ```
 
 ## From an MCP client
@@ -57226,7 +57252,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command except `query run` when the sessions live in a team project instead. `query run` takes the projects to read from `--projects <id,id>` (Step 3), and refuses `--project` beside it.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -57255,11 +57281,11 @@ Ask the user, or check on their machine: run `claude -p "hello" --output-format 
 
 ## Step 3: Pull the Data
 
-Every query below is LangWatchQL, run with `langwatch query run "<sql>" -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
+Every query below is LangWatchQL, run with `langwatch query run "<sql>" --projects <id,id> -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
 
 `langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
-Without `--project`, a query reads every project the login can reach, so check the scope first:
+A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach: page through `langwatch projects list` until it has no more, since it lists 50 at a time.
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
@@ -61259,11 +61285,14 @@ Read the datasets, their grain, their time column, and which columns are `availa
 
 ## Step 2: Write the queries file
 
-`--queries-file` is a JSON array of named queries: `{ name, sql, parameters?, sources? }`. A widget's code calls a query by `name` — the two files are one unit.
+`--queries-file` is a JSON array of named queries: `{ name, sql, parameters?, sources?, projects? }`. A widget's code calls a query by `name` — the two files are one unit.
 
 - `parameters` declares what a `LW.query` call may pass for this query: each entry is `{ name, type, default? }`, where `type` is one of `"string" | "number" | "boolean"` (the JS type of the value, not the SQL type). Any key the widget code passes that is **not** declared here is rejected before any request fires — declare it or don't pass it.
 - The reserved bound names `{dashboard_context_period_start:DateTime}`, `{dashboard_context_period_end:DateTime}`, `{dashboard_context_granularity_seconds:UInt32}` are opt-in: use them in a query's SQL and the executor fills them from the page's own time window automatically. The `dashboard_context_` prefix is reserved — supplied by the dashboard, read-only; author-declared params are separate. **Do not** add them to that query's `parameters` array, and never pass them yourself in a `LW.query` call — either mistake is refused with `dashboard_widget_query_reserved_param` / a schema validation error. On the dashboard-widgets authoring page, that window comes from a session-only range chip (1h / 24h / 7d / 30d, default 24h, resets on reload) — a query using the reserved bounds automatically re-runs when the chip changes. On a dashboard, a pinned widget instead follows that dashboard's own period selector.
-- `sources` lists the trace origins the query counts, from `application`, `simulation`, `evaluation`, `sample`, `coding_agent`, `ai_tool`, `gateway`, `workflow`, `playground`, `langy` and `other` (any origin not listed). A query that names none counts `["application"]`, and a new widget is stored with that. Add an origin when the question is about those traces: `langy` for the user's own conversations with Langy (`TraceName = 'langy.turn'`, Langy's failed or refused requests), `simulation` for scenario runs. Without it, such a widget is always empty. An unknown name is refused.
+- `sources` lists the trace origins `{dashboard_context_sources:Array(String)}` is bound to, from `application`, `simulation`, `evaluation`, `sample`, `coding_agent`, `ai_tool`, `gateway`, `workflow`, `playground`, `langy` and `other` (any origin not listed). A query that names none counts `["application"]`, and a new widget is stored with that. Add an origin when the question is about those traces: `langy` for the user's own conversations with Langy (`TraceName = 'langy.turn'`, Langy's failed or refused requests), `simulation` for scenario runs. Without it, such a widget is always empty. An unknown name is refused.
+- A query is kept to its `sources` **only where its SQL reads `{dashboard_context_sources:Array(String)}`**, for example `WHERE Source IN {dashboard_context_sources:Array(String)}` (the `Source` column of `trace_metrics` and `evaluation_metrics` is the origin: `application` for a missing one, `other` for an unlisted one; reach the other views through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)})`). A query that does not read it counts every origin, and the editor says "The SQL does not read {dashboard_context_sources}". Every run answers with `params`, a flat map of each placeholder the SQL declares by its SQL name (`dashboard_context_sources`, `dashboard_context_projects`, your own) plus the `period`. Read `diagnostics` too: `SOURCES_IGNORED` means the query counts every origin whatever `sources` holds, `SHARE_WINDOW_LIMITED` means a project shared only from some date on, so the rows start later than the period asked for, and `GRANULARITY_COARSENED` means the step ran coarser than asked.
+- `projects` lists the project ids the query reads, bound to `{dashboard_context_projects:Array(String)}`. A query that names none reads its board's project. Name only projects the user can read; a project the writer cannot read, one that does not exist and one of another organization are all refused with `project_not_found` (404) and no id. A widget does not store `"all"` (it is for `langwatch query --projects all` and `run_query`, never in a queries file or `widget add --projects`); name the ids.
+- `{dashboard_context_sources:Array(String)}` and `{dashboard_context_projects:Array(String)}` are reserved like the period names: type `Array(String)`, never in `parameters`, never passed by you, and never assigned or aliased in the SQL (`SET param_…`, `WITH … AS dashboard_context_projects`) — all are refused with `lwql_reserved_parameter_supplied`.
 - Your own bind parameters use the same ClickHouse-style SQL placeholder syntax as `lwql-charts` (`{since:DateTime}`, `{model:String}`, …), declared with their JS type in `parameters`.
 
 ```json
@@ -61351,6 +61380,7 @@ langwatch dashboard widget get <dashboardId> <widgetId> -f json   # code, querie
 langwatch dashboard widget add <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
 langwatch dashboard widget update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
 langwatch dashboard widget update <dashboardId> <widgetId> --sources application,langy   # every query counts these
+langwatch dashboard widget update <dashboardId> <widgetId> --projects A,B   # every query reads these projects
 langwatch dashboard widget delete <dashboardId> <widgetId>
 ```
 
@@ -61362,7 +61392,7 @@ langwatch dashboard widget delete <dashboardId> <widgetId>
 - **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.
 - The project needs Dashboards switched on. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
 
-`--sources` on `widget add` or `update` sets the same list on every query of the widget, and overrides `sources` in the queries file. `widget update` accepts `--name`, `--description` or `--sources` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+`--sources` and `--projects A,B` on `widget add` or `update` set the same list on every query of the widget, and override `sources` and `projects` in the queries file. `widget update` accepts `--name`, `--description`, `--sources` or `--projects` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
 ## Worked example: bar chart of daily trace counts
 

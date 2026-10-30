@@ -40,6 +40,8 @@ export interface LangWatchQLExecuteRequest {
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   /** The trace origins a dashboard query counts (AC200); every origin when absent. */
   readonly sources?: RunSources;
+  /** The projects a dashboard query reads (AC207); the board's project when absent. */
+  readonly projects?: readonly string[];
 }
 
 /** How a submission reaches the server. */

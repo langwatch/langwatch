@@ -234,6 +234,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
         // The run is the key: a repeat with the same brief is answered with the same turn.
         idempotencyKey: `insight-daily-run:${scheduleId}:${runId}`,
         text: buildDailyRunBrief({
+          projectId,
           board: gate.board,
           widgets: gate.widgets,
           windows,
