@@ -5,7 +5,7 @@
 
 import { Box, Textarea } from "@langwatch/design-system/primitives";
 import type { InlineDeclaration, InlineDeclarationStatus } from "@langwatch/scenario-contract";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useLayoutEffect, useRef } from "react";
 
 import { DIALOG_FIELD_STYLE } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 
@@ -73,6 +73,14 @@ export function SituationInput({
   maxHeight: string;
 }) {
   const mirrorRef = useRef<HTMLDivElement>(null);
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+
+  // A paste or undo can move the field's scroll without a scroll event.
+  useLayoutEffect(() => {
+    if (mirrorRef.current && fieldRef.current) {
+      mirrorRef.current.scrollTop = fieldRef.current.scrollTop;
+    }
+  }, [value]);
 
   return (
     <Box position="relative" borderRadius="lg" background="bg.panel">
@@ -83,6 +91,8 @@ export function SituationInput({
         position="absolute"
         inset={0}
         overflow="hidden"
+        // Both reserve the scrollbar's width, so they wrap lines alike.
+        css={{ scrollbarGutter: "stable" }}
         pointerEvents="none"
         borderWidth="1px"
         borderColor="transparent"
@@ -95,11 +105,13 @@ export function SituationInput({
         {highlightedText({ text: value, declarations })}
       </Box>
       <Textarea
+        ref={fieldRef}
         {...DIALOG_FIELD_STYLE}
         background="transparent"
         color="transparent"
         caretColor="var(--chakra-colors-fg)"
         position="relative"
+        css={{ scrollbarGutter: "stable" }}
         autoresize
         resize="none"
         rows={2}

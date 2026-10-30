@@ -72,6 +72,13 @@ export function useCaseCustomizeBlocks({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedCount]);
 
+  // A situation that declares a parameter opens the block for good, so text
+  // typed in the line never hides when the declaration is deleted.
+  useEffect(() => {
+    if (!hasInlineParameters) return;
+    setOpen((current) => (current.parameters ? current : { ...current, parameters: true }));
+  }, [hasInlineParameters]);
+
   const removeParameters = useCallback(() => {
     setOpen((current) => ({ ...current, parameters: false }));
     setDraft({ parameters: "" });

@@ -42,7 +42,9 @@ function InlineParameterDetail({ declaration }: { declaration: InlineDeclaration
       return (
         <Text color="fg.muted">
           Stored parameter wins
-          {status.storedDefault === undefined ? "" : `, default ${String(status.storedDefault)}`}
+          {status.storedDefault === undefined
+            ? ", with no default; a run must give a value"
+            : `, default ${String(status.storedDefault)}`}
         </Text>
       );
     case "declared":

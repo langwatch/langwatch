@@ -977,6 +977,18 @@ describe("the scenario dialog", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("keeps the parameters open, with their line, after the declaration is deleted", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await writeSituation(user, "A { plan: free } customer");
+      await user.type(screen.getByLabelText("Parameters"), "tone=calm");
+
+      await writeSituation(user, "A customer");
+
+      expect(screen.getByTestId("case-parameters-block")).toBeInTheDocument();
+      expect(screen.getByLabelText("Parameters")).toHaveValue("tone=calm");
+    });
+
     /** @scenario "The editor shows a stored parameter winning over an inline one" */
     it("keeps the stored line and lists the inline one as overridden", async () => {
       const user = userEvent.setup();
