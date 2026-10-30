@@ -288,6 +288,24 @@ describe("AgentHttpEditorDrawer", () => {
           /whsec_[0-9a-f]{64}/,
         );
       });
+
+      /** @scenario "The agent form shows a new signing secret once and can rotate it" */
+      it("disables Rotate when the hooks URL is empty", async () => {
+        const agent = savedAgent({
+          ...mapped,
+          hooksUrl: "https://example.com/hooks",
+          hooks: { setup: true, teardown: false },
+          hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}",
+        });
+        renderEditor({ agent, agentId: agent.id });
+        await openHooksTab();
+        const rotate = await screen.findByTestId("rotate-signing-secret-button");
+        expect(rotate).toBeEnabled();
+
+        fireEvent.change(screen.getByTestId("hooks-url-input"), { target: { value: "" } });
+
+        expect(screen.getByTestId("rotate-signing-secret-button")).toBeDisabled();
+      });
     });
   });
 });
