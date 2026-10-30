@@ -1930,6 +1930,9 @@ importers:
       '@langwatch/automation-browser':
         specifier: workspace:*
         version: link:../../modules/automation/browser
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../modules/automation/contract
       '@langwatch/browser':
         specifier: workspace:*
         version: link:../../packages/browser
@@ -3949,6 +3952,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../../../modules/experiment/contract
+      '@langwatch/insight-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/insight/contract
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../../../modules/langy/contract

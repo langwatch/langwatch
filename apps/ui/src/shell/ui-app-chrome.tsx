@@ -14,6 +14,7 @@ import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 import { UiNavigationHost } from "./navigation-host-provider";
 import { UiScreenErrorBoundary } from "./ui-error-page";
 import type { UiRootHostServices } from "./ui-root-host-services";
+import { useAlertLinkOpened } from "./use-alert-link-opened";
 import { useAnalyticsIdentity } from "./use-analytics-identity";
 
 export default function UiAppChrome({
@@ -58,6 +59,7 @@ function UiAppChromeFrame({
   isDevelopment: boolean;
 }) {
   useAnalyticsIdentity();
+  useAlertLinkOpened();
   useNavigationTracking();
   scope.useUiOrgQueryParamSelection();
   return (

@@ -8,13 +8,15 @@
 
 ## What is counted
 
-| Signal                        | Kind      | Labels or attributes                        | Written by                            |
-| ----------------------------- | --------- | ------------------------------------------- | ------------------------------------- |
-| `lwql_queries_total`          | counter   | `caller`, `outcome`                         | `LangWatchQLRunTelemetryService`      |
-| `lwql_query_duration_seconds` | histogram | `caller`                                    | same                                  |
-| `lwql_rows_read`              | histogram | `caller`                                    | same                                  |
-| one log line per run          | log       | `caller`, `queryHash`, board and widget ids | same                                  |
-| `dashboards.<action>.<name>`  | PostHog   | attributes we set: no raw ids, SQL or text  | `dashboard-usage-events.ts` (browser) |
+| Signal                          | Kind      | Labels or attributes                        | Written by                            |
+| ------------------------------- | --------- | ------------------------------------------- | ------------------------------------- |
+| `lwql_queries_total`            | counter   | `caller`, `outcome`                         | `LangWatchQLRunTelemetryService`      |
+| `lwql_query_duration_seconds`   | histogram | `caller`                                    | same                                  |
+| `lwql_rows_read`                | histogram | `caller`                                    | same                                  |
+| one log line per run            | log       | `caller`, `queryHash`, board and widget ids | same                                  |
+| `dashboards.<action>.<name>`    | PostHog   | attributes we set: no raw ids, SQL or text  | `dashboard-usage-events.ts` (browser) |
+| `insights.<act>.insight`        | PostHog   | a filing: `filedVia`, `tone`, `fromBoard`   | nurturing, from insight's events      |
+| `automations.opened.alert_link` | PostHog   | `landedOn`: `trace`, `graph` or `other`     | `use-alert-link-opened.ts` (shell)    |
 
 `caller` is one of `dashboard_widget`, `workbench`, `rest_api`, `saved_chart`,
 `source_presence`, or `unnamed` when a run names none.
@@ -94,6 +96,35 @@ only in the log line, which Prometheus never reads.
 - **Cost**: the metrics add the fixed series above. Log and PostHog volume
   grow with runs and with board views; measure both after the first production
   week before adding sampling.
+
+## Insights and alerts
+
+Insight's own events reach PostHog through nurturing, once per event, on the
+person who acted: `filed` (on the owner, else the filer), `seen`, `archived` and `kept`. No
+title, body, query, board name or insight id is sent. `renewed` is not sent: a
+renewal names no person, so there is nobody to count it on.
+
+An alert's default email (the digest mail) and its default Slack message
+mark their links to our own app's traces and charts with
+`lw_from=alert`. Webhook bodies, custom templates and links to other sites are
+sent unchanged. A signed-in member who opens a marked link sends one
+`automations.opened.alert_link`, and the app's router then replaces the
+current history entry without the marker, so Back, a reload, a copied link or
+a later search update does not carry it or send the event again.
+
+Not counted yet:
+
+- **Triggers created, changed, turned on or off, fired or delivered.** Triggers
+  have no change events, and a send is recorded only as a step of the trigger
+  settlement outbox (`notifyDigest`), not as an event nurturing can subscribe
+  to. These need their own plan.
+  `lw.automation.trigger.match_recorded` is one per matched trace, not one per
+  alert sent, so it is not used as "fired".
+- **Report schedules configured, paused, resumed or settled.** Their events
+  name no person: no actor is on the event or its envelope, and `configured` is
+  also sent by the reconcile backfill. Sending them needs a person to send them
+  on first, either the acting person added to the events or the organization's
+  admin, which is a decision still to make.
 
 ## Not done yet
 
