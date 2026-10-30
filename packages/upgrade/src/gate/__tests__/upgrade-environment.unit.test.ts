@@ -1,11 +1,12 @@
 /**
  * The gate counts ClickHouse targets from the environment the upgrade it triggers runs under:
- * a route at the shared URL folds into "shared" for both. Spec: specs/upgrade/serving-gate.feature.
+ * a route at the shared URL folds into "shared" for both.
+ * Spec: specs/upgrade/serving-gate.feature.
  */
 import { describe, expect, it } from "vitest";
 
 import { configuredClickHouseTargets } from "../../runner/image-upgrade.ts";
-import { upgradeEnvironmentOver } from "../serving-upgrade-gate.ts";
+import { gateClickHouseTargets, upgradeEnvironmentOver } from "../serving-upgrade-gate.ts";
 
 const SHARED_URL = "http://clickhouse:8123/langwatch";
 
@@ -39,6 +40,28 @@ describe("upgradeEnvironmentOver", () => {
       });
 
       expect(upgradeEnvironment).toEqual({ ...environment, DATABASE_URL: databaseUrl });
+    });
+
+    /** @scenario "The gate reads its ClickHouse targets from the environment the upgrade runs under" */
+    it("counts the gate's targets over that environment, not the one it was handed", () => {
+      expect(gateClickHouseTargets({ environment, databaseUrl, clickhouse: SHARED_URL })).toEqual([
+        "shared",
+      ]);
+    });
+
+    /** @scenario "The gate reads its ClickHouse targets from the environment the upgrade runs under" */
+    it("counts a route at another URL as its own private target", () => {
+      const privateEnvironment = {
+        CLICKHOUSE_URL__acme__org_1: "http://private-clickhouse:8123/langwatch",
+      };
+
+      expect(
+        gateClickHouseTargets({
+          environment: privateEnvironment,
+          databaseUrl,
+          clickhouse: SHARED_URL,
+        }),
+      ).toEqual(["shared", "private:org_1"]);
     });
   });
 });
