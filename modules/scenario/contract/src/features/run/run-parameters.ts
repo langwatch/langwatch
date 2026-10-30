@@ -6,8 +6,8 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { renderScenarioContent } from "../../scenario-content-template.ts";
-import { declaredScenarioParameters } from "../../scenario-inline-parameters.ts";
 import {
+  declaredScenarioParameters,
   findUnknownParameterKeys,
   mergeRunParameters,
   partitionParameterDefinitions,

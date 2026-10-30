@@ -5,7 +5,6 @@ export * from "./http-template-engine.ts";
 export * from "./features/run/run-parameters.ts";
 export * from "./features/run/run-note.ts";
 export * from "./scenario-content-template.ts";
-export * from "./scenario-inline-parameters.ts";
 export * from "./scenario-dev-tunnel-error.ts";
 export * from "./features/execution/scenario-failure-results.ts";
 export * from "./scenario-criterion-result.ts";

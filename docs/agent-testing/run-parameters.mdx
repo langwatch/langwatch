@@ -73,6 +73,7 @@ This declares `plan` with the default `free` and `region` with the default `eu-c
 - A parameter declared in the **Parameters** dialog with the same name keeps that declaration and its default.
 - Other braces stay as text: `{}`, `{ no colon }` and JSON such as `{"order_id": "123"}` are not declarations.
 - Do not put the declaration inside `{{ }}`. `{{ plan: free }}` is not a valid template.
+- A situation written before this feature that has text like `{ word: something }` now declares a parameter `word`. Quote it or reword it if you meant it as text.
 
 ## Parameters declared by the agent
 

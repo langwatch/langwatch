@@ -9,10 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { resolveRunParameters } from "../features/run/run-parameters.ts";
 import { renderScenarioContent } from "../scenario-content-template.ts";
-import {
-  declaredScenarioParameters,
-  extractInlineRunParameters,
-} from "../scenario-inline-parameters.ts";
+import { declaredScenarioParameters, extractInlineRunParameters } from "../scenario.parameters.ts";
 import type { ScenarioRunConfig } from "../scenario.ts";
 
 function scenario(overrides: Partial<ScenarioRunConfig> = {}): ScenarioRunConfig {
