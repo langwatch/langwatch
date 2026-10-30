@@ -15,7 +15,7 @@
 | `lwql_rows_read`              | histogram | `caller`                                       | same                                  |
 | one log line per run          | log       | `caller`, `queryHash`, board and widget ids    | same                                  |
 | `dashboards.<action>.<name>`  | PostHog   | attributes we set: no raw ids, SQL or text     | `dashboard-usage-events.ts` (browser) |
-| `langy.asked.question`        | PostHog   | `surface`: `composer`, `ask_bar`, `add_widget` | `langy-question-asked.ts` (browser)   |
+| `langy.asked.question`        | PostHog   | `surface`: `composer`, `ask_bar`, `add_widget` | `langy-ask.ts` (browser)              |
 
 `caller` is one of `dashboard_widget`, `workbench`, `rest_api`, `cli`, `mcp`,
 `langy`, `saved_chart`, `source_presence`, or `unnamed` when a run names none.
