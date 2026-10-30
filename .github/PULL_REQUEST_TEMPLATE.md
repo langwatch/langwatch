@@ -18,7 +18,7 @@ Closes #
 
 ## How it works
 
-<!-- Only if the "what" isn't obvious. Explain the mechanism, trade-offs, or why you chose this approach over alternatives. Skip this section for straightforward changes. -->
+<!-- Only if the "what" isn't obvious. Explain the mechanism. The choices and their alternatives go in the Decisions table above. Skip this section for straightforward changes. -->
 
 ## Acceptance criteria
 
