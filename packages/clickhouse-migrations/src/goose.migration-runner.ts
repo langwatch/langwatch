@@ -110,6 +110,19 @@ export class MigrationError extends Error {
   }
 }
 
+/** The code the unversioned-tables refusal carries, so a caller matches it without its prose. */
+export const UNVERSIONED_TABLES_CODE = "clickhouse_migrations.unversioned_tables";
+
+/** The bootstrap refusal a database restored without its version history earns, by that code. */
+export class UnversionedTablesError extends MigrationError {
+  readonly code = UNVERSIONED_TABLES_CODE;
+
+  constructor(message: string) {
+    super(message, "bootstrap");
+    this.name = "UnversionedTablesError";
+  }
+}
+
 async function withClient<T>(
   url: string,
   fn: (client: ClickHouseClient) => Promise<T>,
@@ -672,7 +685,7 @@ async function refuseUnversionedTables({
   });
   const versions = Number((await counted.json<{ versions: number | string }>())[0]?.versions ?? 0);
   const refusal = unversionedTablesRefusal({ database: config.database, versions, tables });
-  if (refusal) throw new MigrationError(refusal, "bootstrap");
+  if (refusal) throw new UnversionedTablesError(refusal);
 }
 
 /**

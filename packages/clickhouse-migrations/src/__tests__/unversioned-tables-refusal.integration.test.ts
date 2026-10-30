@@ -10,7 +10,7 @@ import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { runMigrations } from "../goose.migration-runner.ts";
+import { runMigrations, UNVERSIONED_TABLES_CODE } from "../goose.migration-runner.ts";
 
 /** The table a restore leaves behind, named so no migration of ours ever claims it. */
 const RESTORED_TABLE = "restored_customer_rows";
@@ -64,9 +64,11 @@ describe("given a ClickHouse database restored without its goose version history
   describe("when the migration run is given that database", () => {
     /** @scenario "A real database restored without its version history refuses the run" */
     it("refuses the run, names the version history to restore, and leaves the table alone", async () => {
-      await expect(runMigrations({ connectionUrl: url })).rejects.toThrow(
-        /goose_db_version records no migration/,
-      );
+      // The code pins the refusal; the prose check is the restoration advice this scenario names.
+      await expect(runMigrations({ connectionUrl: url })).rejects.toMatchObject({
+        code: UNVERSIONED_TABLES_CODE,
+        message: expect.stringContaining(`restore ${database}.goose_db_version from the same copy`),
+      });
 
       const engines = await client.query({
         query: `SELECT engine FROM system.tables
