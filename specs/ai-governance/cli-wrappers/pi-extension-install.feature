@@ -33,7 +33,7 @@
 # extension are met with signal aliases in pi's definition instead, which is
 # data, not an install.
 #
-# `langwatch ingest install pi` is what writes the file, not the `langwatch pi`
+# `langwatch ingest install pi_cli` is what writes the file, not the `langwatch pi`
 # wrapper: the wrapper installs no session-context seam for any agent, and the
 # install command is where every other agent's seam is written. pi therefore
 # has to be an accepted tool of that command and take the plugin arm of it,
@@ -47,7 +47,7 @@
 # it is the user's and we leave it alone.
 #
 # EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is accepted; none of what it describes is built. Tagging these @unit
+# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
 # or @integration now would report a binding that does not exist. Each scenario
 # names the tag it becomes in a comment above it, and the commit that makes one
 # pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
@@ -75,7 +75,7 @@
 # LEGACY_INERT in packages/architecture-enforcer/src/tools/check-feature-parity.ts.
 # The commit that binds the first scenario here deletes that line with it.
 
-Feature: `langwatch ingest install pi` writes a first-party extension that speaks pi's own telemetry
+Feature: `langwatch ingest install pi_cli` writes a first-party extension that speaks pi's own telemetry
 
   Background:
     Given the user has completed `langwatch login --device` for org "acme"
@@ -86,7 +86,7 @@ Feature: `langwatch ingest install pi` writes a first-party extension that speak
     @unimplemented
     Scenario: The first install writes the extension into pi's extension directory
       Given pi's extension directory holds no LangWatch extension
-      When the user runs `langwatch ingest install pi`
+      When the user runs `langwatch ingest install pi_cli`
       Then the LangWatch extension is written into pi's extension directory
       And its first line carries LangWatch's own marker
       And it is registered as a telemetry target for logout
@@ -94,7 +94,7 @@ Feature: `langwatch ingest install pi` writes a first-party extension that speak
     # becomes @unit
     @unimplemented
     Scenario: Installing for pi takes the plugin arm, never the hook-entries fallback
-      When the user runs `langwatch ingest install pi`
+      When the user runs `langwatch ingest install pi_cli`
       Then the extension is written into pi's extension directory
       And no hook entries are written into any file pi does not read
 
@@ -102,7 +102,7 @@ Feature: `langwatch ingest install pi` writes a first-party extension that speak
     @unimplemented
     Scenario: A second install leaves an unchanged extension alone
       Given the file at pi's extension path is byte for byte what this CLI writes
-      When the user runs `langwatch ingest install pi`
+      When the user runs `langwatch ingest install pi_cli`
       Then the extension file is left as it is
       And exactly one set of pi event handlers is registered
 
@@ -111,14 +111,14 @@ Feature: `langwatch ingest install pi` writes a first-party extension that speak
     Scenario: An extension left by an older CLI is rewritten
       Given the file at pi's extension path carries LangWatch's marker
       And its contents differ from what this CLI writes
-      When the user runs `langwatch ingest install pi`
+      When the user runs `langwatch ingest install pi_cli`
       Then the file is rewritten with this CLI's extension
 
     # becomes @unit
     @unimplemented
     Scenario: A file at that path without our marker is never overwritten
       Given a file at pi's extension path that carries no LangWatch marker
-      When the user runs `langwatch ingest install pi`
+      When the user runs `langwatch ingest install pi_cli`
       Then the file is left exactly as it is
       And nothing of ours is installed over it
 
@@ -134,7 +134,7 @@ Feature: `langwatch ingest install pi` writes a first-party extension that speak
     @unimplemented
     Scenario: An installed pi below the minimum version is left uninstrumented
       Given the installed pi reports a version below the minimum the extension was written against
-      When the user runs `langwatch ingest install pi`
+      When the user runs `langwatch ingest install pi_cli`
       Then no extension is written into pi's extension directory
       And one notice names the pi version the extension needs
 

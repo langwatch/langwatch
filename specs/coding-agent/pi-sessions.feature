@@ -36,7 +36,7 @@
 # specs/ai-governance/cli-wrappers/session-context-hook.feature.
 #
 # EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is accepted; none of what it describes is built. Tagging these @unit
+# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
 # or @integration now would report a binding that does not exist. Each scenario
 # names the tag it becomes in a comment above it, and the commit that makes one
 # pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
@@ -44,18 +44,17 @@
 # is work that was not done.
 #
 # WHAT BLOCKS THESE, AS OF 2026-10-30:
-#   1. NO pi DEFINITION EXISTS. CODING_AGENT_REGISTRY
-#      (modules/coding-agent/contract/src/telemetry/index.ts) holds six agents
-#      and none of them is pi, so nothing detects a pi span, admits one or
-#      folds one. Every Rule below waits on that one definition.
-#   2. THE WORKER MARKER IS UNCHOSEN. The last Rule needs something on our own
-#      worker's spans to match on. ADR-188 Decision 13 marks that marker
-#      UNVERIFIED: the worker exports no telemetry at all today, so it has no
-#      scope name and no service name to pick. Whoever wires an exporter there
-#      chooses it. Note the constraint the record found: service identity is
-#      NOT passed at admission (coding-agent-span-admission.ts calls
-#      detectCodingAgent with the record name and scope only), so a service
-#      marker re-attributes an already admitted span rather than refusing it.
+#   NO pi DEFINITION EXISTS. CODING_AGENT_REGISTRY
+#   (modules/coding-agent/contract/src/telemetry/index.ts) holds six agents and
+#   none of them is pi, so nothing detects a pi span, admits one or folds one.
+#   Every Rule below waits on that one definition.
+#
+# NOT SPECIFIED HERE: keeping our own in-house use of pi out of a customer's
+# session list. ADR-188 Decision 13 carries that hazard and marks its marker
+# UNVERIFIED, because the worker that embeds pi exports no telemetry at all
+# today and so has no scope name and no service name to match on. A scenario
+# written now would name a marker nobody has chosen, so there is none until the
+# commit that gives that worker an exporter chooses it.
 #
 # The file yields no enforced scenario while that holds, so it is listed in
 # LEGACY_INERT in packages/architecture-enforcer/src/tools/check-feature-parity.ts.
@@ -72,8 +71,9 @@ Feature: pi sessions
 
   Out of scope: instrumenting the pi harness our own worker runs, which is
   product internals rather than a customer's coding agent, and the pi VS Code
-  extension, which has not been captured. Keeping our own use of pi out of a
-  customer's session list is in scope, and is the last Rule below.
+  extension, which has not been captured. Also out of scope, for now, is keeping
+  our own use of pi out of a customer's session list: see the header above for
+  why no scenario can be written for it yet.
 
 Rule: Only pi's own namespace joins a pi session
 
@@ -126,31 +126,6 @@ Rule: Only pi's own namespace joins a pi session
     When the session span gate decides on it
     Then it is not admitted
     And the session row records nothing for it
-
-Rule: Our own in-house use of pi never becomes a customer session
-
-  # Our worker embeds pi's extension API, so a `pi.*` span could one day leave
-  # our own process. It is kept apart by a registry record of its own listed
-  # BEFORE pi's, the shape the registry already uses for Claude Cowork ahead of
-  # Claude Code, rather than by narrowing pi's predicate. Order decides because
-  # detection is first match wins.
-
-  # becomes @unit
-  @unimplemented
-  Scenario: A pi span carrying our worker's own marker is attributed to our worker, not to pi
-    Given a pi.harness.run span carrying the marker that identifies our own worker
-    And our worker's record is registered ahead of pi's
-    When the agent behind it is detected
-    Then it is detected as our own worker
-    And no pi session row is folded for it
-
-  # becomes @unit
-  @unimplemented
-  Scenario: A customer pi span is still pi once our worker has a record of its own
-    Given our worker's record is registered ahead of pi's
-    And a pi.harness.run span carrying no such marker
-    When the agent behind it is detected
-    Then it is detected as pi
 
 Rule: One row per pi session, keyed by pi's own session id
 

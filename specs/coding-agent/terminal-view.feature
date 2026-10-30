@@ -97,7 +97,7 @@ Feature: Coding agent terminal view
   # less than a Claude or Copilot one, and the transcript has to render that
   # honestly rather than leave empty argument and result panes behind.
 
-  # Parked 2026-10-30: ADR-188 is accepted and nothing of pi is built, so no pi
+  # Parked 2026-10-30: ADR-188 is proposed and nothing of pi is built, so no pi
   # span ever reaches this view. It binds with the pi definition in
   # CODING_AGENT_REGISTRY. The rest of this file stays enforced.
   # becomes @unit
@@ -109,7 +109,7 @@ Feature: Coding agent terminal view
     And each tool execution shows its name and whether it errored
     And no empty arguments or result pane is shown for it
 
-  # Parked 2026-10-30: ADR-188 is accepted and nothing of pi is built, so no pi
+  # Parked 2026-10-30: ADR-188 is proposed and nothing of pi is built, so no pi
   # span ever reaches this view. It binds with the pi definition in
   # CODING_AGENT_REGISTRY. The rest of this file stays enforced.
   # becomes @unit
@@ -120,7 +120,7 @@ Feature: Coding agent terminal view
     Then each model call appears once with the tokens it used
     And none of them appears among the tool runs
 
-  # Parked 2026-10-30: ADR-188 is accepted and nothing of pi is built, so no pi
+  # Parked 2026-10-30: ADR-188 is proposed and nothing of pi is built, so no pi
   # span ever reaches this view. It binds with the pi definition in
   # CODING_AGENT_REGISTRY. The rest of this file stays enforced.
   # becomes @unit

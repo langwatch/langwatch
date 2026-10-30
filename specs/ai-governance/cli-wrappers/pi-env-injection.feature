@@ -16,7 +16,7 @@
 # Motivation: pi ships no OTel environment of its own, so the wrapper injects
 # the standard `OTEL_EXPORTER_OTLP_*` names and the extension reads them as its
 # backend. The wrapper injects the env and nothing else: the extension itself is
-# written by `langwatch ingest install pi`, specified in
+# written by `langwatch ingest install pi_cli`, specified in
 # specs/ai-governance/cli-wrappers/pi-extension-install.feature.
 #
 # pi has no gateway path. Every model's address is fixed in pi's own build, so
@@ -37,7 +37,7 @@
 # nothing else; pi has no built-in exporter to accommodate.
 #
 # EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is accepted; none of what it describes is built. Tagging these @unit
+# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
 # or @integration now would report a binding that does not exist. Each scenario
 # names the tag it becomes in a comment above it, and the commit that makes one
 # pass swaps that tag and adds the `@scenario "<title>"` annotation in the same

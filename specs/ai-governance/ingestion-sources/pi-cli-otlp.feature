@@ -23,14 +23,14 @@
 # token usage on its own.
 #
 # A thin pi extractor registers after it and lifts only what the conventions
-# have no name for: cache-write and reasoning tokens, pi's reported cost, its
-# stop reason and error type, and the session, turn and tool identifiers its
-# harness spans carry. It reuses the shared extraction primitives and never
+# have no name for: cache-write and reasoning tokens, pi's reported cost under
+# pi's own key rather than as the charge, its stop reason and error type, and
+# the session, turn and tool identifiers its harness spans carry. It reuses the shared extraction primitives and never
 # re-reads an attribute the GenAI canonicaliser already consumed, because
 # reading a figure twice is how a token count ends up doubled.
 #
 # EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is accepted; none of what it describes is built. Tagging these @unit
+# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
 # or @integration now would report a binding that does not exist. Each scenario
 # names the tag it becomes in a comment above it, and the commit that makes one
 # pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
@@ -95,13 +95,13 @@ Feature: pi CLI OTLP spans canonicalise on the unified substrate
 
     # becomes @unit
     @unimplemented
-    Scenario: pi's reported cost is lifted as a reported figure, not recomputed
+    Scenario: pi's reported cost survives beside the computed cost, never as it
       Given a span named "pi.ai.request"
       And attribute "pi.ai.usage.cost" is "0.0875"
       When the canonicalisation chain runs
-      Then the recorded span attributes contain:
-        | attribute          | value  |
-        | langwatch.cost.usd | 0.0875 |
+      Then the canonical span still carries "pi.ai.usage.cost" with value "0.0875"
+      And nothing lifts that figure onto "langwatch.cost.usd"
+      And the charge for the call is still the catalogue price of its own tokens
 
     # becomes @unit
     @unimplemented
