@@ -678,13 +678,10 @@ const LEGACY_INERT: string[] = [
   "specs/workflows/studio-llm-node-drawer.feature",
   "specs/workflows/studio-local-state.feature",
   "specs/workflows/studio-usage-limits.feature",
-  // 2026-10-30, ADR-188 (pi as a natively instrumented coding agent): PLANNED,
-  // NOT YET BUILT. No pi definition is in CODING_AGENT_REGISTRY, `pi` is not a
-  // wrapped tool in otel-env-block.ts, and the extension that would emit pi's
-  // spans does not exist, so every scenario in these five is @unimplemented and
-  // each names the tag it becomes. The change that binds a file's first
-  // scenario DELETES THAT LINE in the same commit. A line still here when
-  // ADR-188 is called done means ADR-188 is not done.
+  // 2026-10-30: planned, not yet built. See ADR-188. Every scenario in these
+  // five is @unimplemented and names the tag it becomes; the change that binds
+  // a file's first scenario deletes that line in the same commit, so a line
+  // still here when ADR-188 is called done means ADR-188 is not done.
   "specs/ai-governance/cli-wrappers/pi-env-injection.feature",
   "specs/ai-governance/cli-wrappers/pi-extension-install.feature",
   "specs/ai-governance/ingestion-sources/pi-cli-otlp.feature",
