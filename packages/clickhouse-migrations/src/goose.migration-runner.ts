@@ -636,7 +636,7 @@ const GOOSE_VERSION_TABLE = "goose_db_version";
 /**
  * A database holding tables with no version history at all: adopting it at version 0 replays every
  * migration over them, and a migration that swaps a table in (00065) then discards its contents.
- * The refusal names reconciliation; restoring the history is the operator's call, not a replay's.
+ * Restoring the history is the operator's call. Any table but goose's own counts, ours or not.
  */
 export function unversionedTablesRefusal({
   database,
@@ -648,7 +648,7 @@ export function unversionedTablesRefusal({
   tables: readonly string[];
 }): string | null {
   if (versions > 0 || tables.length === 0) return null;
-  return `Database "${database}" holds ${tables.length} table(s) (${tables.slice(0, 5).join(", ")}) but ${GOOSE_VERSION_TABLE} records no migration, so a run would replay every migration over them and the table swaps among them would discard what they hold. Nothing was changed. This is a database whose migration history was not restored with its data: restore ${database}.${GOOSE_VERSION_TABLE} from the same copy, or insert the version rows the data was written at, then run again.`;
+  return `Database "${database}" holds ${tables.length} table(s) (${tables.slice(0, 5).join(", ")}) but ${GOOSE_VERSION_TABLE} records no migration, so a run would replay every migration over them and the table swaps among them would discard what they hold. No table was read or written, and no migration ran; only ${GOOSE_VERSION_TABLE} itself may have been created, empty. This is a database whose migration history was not restored with its data: restore ${database}.${GOOSE_VERSION_TABLE} from the same copy, or insert the version rows the data was written at, then run again.`;
 }
 
 /** Reads the counts the refusal decides on; on a cluster, after every replica has caught up. */
