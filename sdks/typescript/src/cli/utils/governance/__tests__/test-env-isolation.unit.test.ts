@@ -8,7 +8,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appSettingsTargetFor } from "../app-settings";
 
@@ -40,6 +40,21 @@ describe("test run environment isolation", () => {
   describe("given the suite is loaded inside a Claude Code or Codex session", () => {
     it("when the tests start then no tool config dir is inherited", () => {
       expect(atLoad).toEqual({ claude: undefined, codex: undefined, cli: undefined });
+    });
+  });
+
+  describe("given the tool config dirs are set when the setup file runs", () => {
+    it("when the setup file runs then it removes all three", async () => {
+      process.env.CLAUDE_CONFIG_DIR = "/sentinel/claude";
+      process.env.CODEX_HOME = "/sentinel/codex";
+      process.env.LANGWATCH_CLI_CONFIG = "/sentinel/cli/config.json";
+      vi.resetModules();
+      await import("../../../../../test-setup");
+      expect({
+        claude: process.env.CLAUDE_CONFIG_DIR,
+        codex: process.env.CODEX_HOME,
+        cli: process.env.LANGWATCH_CLI_CONFIG,
+      }).toEqual({ claude: undefined, codex: undefined, cli: undefined });
     });
   });
 
