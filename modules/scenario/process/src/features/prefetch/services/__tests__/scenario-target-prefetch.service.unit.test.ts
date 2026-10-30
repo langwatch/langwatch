@@ -313,6 +313,40 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
     });
   });
 
+  describe("given an http agent with a hooks URL", () => {
+    const withHooks = (hooks: { setup: boolean; teardown: boolean }) =>
+      httpAgent({
+        url: "https://acme.test/chat",
+        method: "POST",
+        hooksUrl: "https://acme.test/hooks",
+        hooks,
+        hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}",
+      });
+
+    it("packs the hooks and the signing secret the child signs with", async () => {
+      const service = serviceAnswering({
+        agent: withHooks({ setup: true, teardown: false }),
+        projectSecrets: { HTTP_AGENT_1_HOOKS_SIGNING_SECRET: "whsec_test" },
+      });
+
+      await expect(fetchFor(service, "http")).resolves.toMatchObject({
+        hooksUrl: "https://acme.test/hooks",
+        hooks: { setup: true, teardown: false },
+        hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}",
+        secrets: { HTTP_AGENT_1_HOOKS_SIGNING_SECRET: "whsec_test" },
+      });
+    });
+
+    it("packs no hooks when both are unchecked", async () => {
+      const service = serviceAnswering({ agent: withHooks({ setup: false, teardown: false }) });
+
+      const adapter = await fetchFor(service, "http");
+
+      expect(adapter).not.toHaveProperty("hooksUrl");
+      expect(adapter).not.toHaveProperty("hooks");
+    });
+  });
+
   describe("given a connected agent", () => {
     it("packs the platform endpoint and caps the child adapter timeout", async () => {
       const service = serviceAnswering({ agent: connectedAgent(999_999) });

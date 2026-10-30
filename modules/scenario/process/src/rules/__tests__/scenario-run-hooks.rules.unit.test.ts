@@ -89,3 +89,38 @@ describe("adapterDeclaresHooks()", () => {
     });
   });
 });
+
+describe("adapterDeclaresHooks() on an HTTP agent", () => {
+  const http = {
+    type: "http" as const,
+    agentId: "agent_http",
+    url: "https://shop.example.com/chat",
+    method: "POST",
+    headers: [],
+    secrets: {},
+  };
+
+  describe("when the agent has hooks checked and no hooks URL", () => {
+    /** @scenario "An HTTP agent with no hooks URL calls no hooks" */
+    it("calls no hooks and needs no Node child", () => {
+      const withoutUrl = { ...http, hooks: { setup: true, teardown: true } };
+
+      expect(adapterDeclaresHooks(withoutUrl)).toBe(false);
+      expect(hookCallsEnvironment(withoutUrl)).toEqual({});
+    });
+  });
+
+  describe("when the agent has a hooks URL", () => {
+    it("calls hooks only when one is checked", () => {
+      const hooksUrl = "https://shop.example.com/hooks";
+
+      expect(adapterDeclaresHooks({ ...http, hooksUrl })).toBe(false);
+      expect(
+        adapterDeclaresHooks({ ...http, hooksUrl, hooks: { setup: false, teardown: false } }),
+      ).toBe(false);
+      expect(
+        hookCallsEnvironment({ ...http, hooksUrl, hooks: { setup: true, teardown: false } }),
+      ).toEqual({ callsHooks: true });
+    });
+  });
+});

@@ -59,3 +59,56 @@ describe("a token typed into an HTTP agent", () => {
     });
   });
 });
+
+describe("a hooks signing secret typed into an HTTP agent", () => {
+  const SIGNING_SECRET = "whsec_0123456789abcdef0123456789abcdef";
+  const withHooks = (hooksSigningSecret: string) => {
+    const agent = httpAgent("{{ secrets.HTTP_AGENT_HTTP_AUTH_TOKEN }}");
+    return {
+      ...agent,
+      config: {
+        ...agent.config,
+        hooksUrl: "https://support.example/hooks",
+        hooks: { setup: true, teardown: true },
+        hooksSigningSecret,
+      },
+    };
+  };
+
+  /**
+   * @scenario "The hooks signing secret is saved as a project secret and never read back"
+   */
+  it("is stored as a project secret, and a read shows only the reference", async () => {
+    const { secrets, values } = secretStoreFixture();
+    const { app } = createAgentAppFixture({ secrets });
+
+    const created = await app.create(withHooks(SIGNING_SECRET));
+    const read = agentWithoutSecrets(
+      await app.getById({ id: "agent_http", projectId: "project_1" }),
+    );
+
+    expect(values).toEqual({ HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET: SIGNING_SECRET });
+    expect(JSON.stringify(created)).not.toContain(SIGNING_SECRET);
+    expect(JSON.stringify(read)).not.toContain(SIGNING_SECRET);
+    expect(read.config).toMatchObject({
+      hooksSigningSecret: "{{ secrets.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET }}",
+    });
+  });
+
+  it("keeps its reference on a save with the secret left blank, and rotates to a new one", async () => {
+    const { secrets, values } = secretStoreFixture();
+    const { app } = createAgentAppFixture({ secrets });
+    await app.create(withHooks(SIGNING_SECRET));
+
+    const kept = await app.update(withHooks(""));
+    expect(kept.config).toMatchObject({
+      hooksSigningSecret: "{{ secrets.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET }}",
+    });
+
+    const rotated = await app.update(withHooks("whsec_rotated"));
+    expect(rotated.config).toMatchObject({
+      hooksSigningSecret: "{{ secrets.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET_2 }}",
+    });
+    expect(values.HTTP_AGENT_HTTP_HOOKS_SIGNING_SECRET_2).toBe("whsec_rotated");
+  });
+});

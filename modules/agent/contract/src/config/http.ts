@@ -1,6 +1,7 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { agentHooksSchema } from "../connected-agent.protocol.ts";
 import { agentInputBindingSchema } from "../fields.ts";
 import { baseAgentConfigSchema } from "./code.ts";
 
@@ -41,6 +42,12 @@ const httpAgentConfigSchemaDefinition = z.object({
   sessionPath: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
   scenarioMappings: z.record(z.string(), agentInputBindingSchema).optional(),
+  /** Where a scenario run POSTs its setup and teardown; absent means no hooks (ADR-188). */
+  hooksUrl: z.string().optional(),
+  /** The hooks a scenario run calls; only a checked one is called. */
+  hooks: agentHooksSchema.optional(),
+  /** Signs every hook call. Saved as a project secret, so the config keeps its reference. */
+  hooksSigningSecret: z.string().optional(),
   devTunnel: z
     .object({
       previousUrl: z.string().optional(),

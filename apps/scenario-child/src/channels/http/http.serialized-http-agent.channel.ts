@@ -20,6 +20,19 @@ import { nowInstant } from "@langwatch/time";
 import { JSONPath } from "jsonpath-plus";
 
 import { applyAuthentication } from "../../rules/http-auth.rules.ts";
+import {
+  hookAnswer,
+  hookIdempotencyKey,
+  hookRequestBody,
+  hookSignature,
+  hookTimeoutMessage,
+  HttpHookError,
+  IDEMPOTENCY_HEADER,
+  SIGNATURE_HEADER,
+  type HttpHookKind,
+  type HttpHookObject,
+  type HttpHookRun,
+} from "../../rules/http-hook.rules.ts";
 import * as ScenarioSecretReferenceAdapter from "../../rules/scenario-secret-reference.rules.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
@@ -40,7 +53,13 @@ export interface ScenarioHttpResponse {
 export interface ScenarioHttp {
   fetch(input: {
     url: string;
-    init: { method: string; headers: Record<string, string>; body?: string };
+    init: {
+      method: string;
+      headers: Record<string, string>;
+      body?: string;
+      /** Ends the request, redirects included, when a hook's budget runs out. */
+      signal?: AbortSignal;
+    };
   }): Promise<ScenarioHttpResponse>;
 }
 
@@ -159,6 +178,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     logger?: Logger;
     parameters?: RunParameterValues;
     httpPort?: ScenarioHttp;
+    run?: HttpHookRun;
   }): HttpSerializedHttpAgentChannel {
     return new HttpSerializedHttpAgentChannel(options);
   }
@@ -169,25 +189,42 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
   private readonly logger: Logger;
   private readonly parameters: RunParameterValues;
   private readonly httpPort: ScenarioHttp | undefined;
+  private readonly run: HttpHookRun;
+  /** What setup returned; an HTTP turn never changes it (ADR-188). */
+  private state: HttpHookObject | null = null;
 
   constructor({
     config,
     logger,
     parameters,
     httpPort,
+    run,
   }: {
     config: HttpAgentData;
     logger?: Logger;
     /** The run's resolved values, read from url and body as `params.NAME`. */
     parameters?: RunParameterValues;
     httpPort?: ScenarioHttp;
+    /** The scenario run the hook calls name; absent outside a scenario run. */
+    run?: HttpHookRun;
   }) {
     super();
     this.name = "SerializedHttpAgentAdapter";
     this.config = config;
     this.parameters = parameters ?? {};
     this.httpPort = httpPort;
+    this.run = run ?? {};
     this.logger = logger ?? createLogger("langwatch:scenarios:http-adapter");
+  }
+
+  /** The run's state as turns and teardown see it, or nothing before setup answered. */
+  get runState(): HttpHookObject | null {
+    return this.state;
+  }
+
+  /** The state a turn template reads, bound only for an agent with a hooks URL. */
+  private get templateState(): { state?: HttpHookObject | null } {
+    return this.config.hooksUrl ? { state: this.state } : {};
   }
 
   /** The project secrets this target may reference, never empty-undefined. */
@@ -209,6 +246,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
         parameters: this.parameters,
         traceContext: { traceId, traceparent },
         session: this.sessionOf(input.threadId),
+        ...this.templateState,
       });
       const url = this.buildUrl(templateContext);
       const headers = this.buildRequestHeaders(templateContext, propagationHeaders);
@@ -221,6 +259,119 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
       return this.extractResponseContent(responseData);
     } catch (error) {
       throw this.scrubErrorChain(error);
+    }
+  }
+
+  /**
+   * POSTs one setup or teardown to the hooks URL, signed (ADR-188). Setup's object becomes the
+   * run's state; teardown's is returned and not kept.
+   * @throws HttpHookError when the hook fails, times out or answers without a JSON object.
+   */
+  async callHook({
+    kind,
+    timeoutMs,
+  }: {
+    kind: HttpHookKind;
+    timeoutMs: number;
+  }): Promise<{ state?: HttpHookObject }> {
+    try {
+      const answer = await this.sendHook({ kind, timeoutMs });
+      if (kind === "setup") this.state = answer ?? null;
+      return answer ? { state: answer } : {};
+    } catch (error) {
+      throw this.scrubErrorChain(error);
+    }
+  }
+
+  private async sendHook({
+    kind,
+    timeoutMs,
+  }: {
+    kind: HttpHookKind;
+    timeoutMs: number;
+  }): Promise<HttpHookObject | undefined> {
+    const { hooksUrl } = this.config;
+    if (!hooksUrl) throw new HttpHookError({ message: "The agent has no hooks URL." });
+    const secret = this.signingSecret();
+    const { headers: propagationHeaders, traceId } = injectTraceContextHeaders({ headers: {} });
+    const context = buildTemplateContext({
+      input: { messages: [] },
+      parameters: this.parameters,
+      traceContext: { traceId, traceparent: propagationHeaders.traceparent },
+      state: this.state,
+    });
+    const url = this.buildUrl(context, hooksUrl);
+    const body = hookRequestBody({
+      kind,
+      run: this.run,
+      params: this.parameters,
+      state: this.state,
+    });
+    const idempotencyKey = hookIdempotencyKey({ run: this.run, kind });
+    const headers = {
+      ...this.buildRequestHeaders(context, propagationHeaders),
+      [SIGNATURE_HEADER]: hookSignature({
+        secret,
+        body,
+        timestampSeconds: Math.floor(nowInstant().epochMilliseconds / 1000),
+      }),
+      ...(idempotencyKey ? { [IDEMPOTENCY_HEADER]: idempotencyKey } : {}),
+    };
+    const { status, text } = await this.postHook({ url, headers, body, timeoutMs });
+    this.logger.info(
+      { kind, url: this.scrub(redactUrlForLogs(url)), status },
+      "http hook answered",
+    );
+    return hookAnswer({ kind, status, body: this.scrub(text) });
+  }
+
+  /** The resolved signing secret; a hook is never sent unsigned. */
+  private signingSecret(): string {
+    const reference = this.config.hooksSigningSecret ?? "";
+    const secret = ScenarioSecretReferenceAdapter.resolve({
+      value: reference,
+      secrets: this.secrets,
+    });
+    if (secret === "" || secret.includes("{{")) {
+      throw new HttpHookError({
+        message: "The hooks signing secret is missing. Rotate it in the agent's Hooks tab.",
+      });
+    }
+    return secret;
+  }
+
+  private async postHook({
+    url,
+    headers,
+    body,
+    timeoutMs,
+  }: {
+    url: string;
+    headers: Record<string, string>;
+    body: string;
+    timeoutMs: number;
+  }): Promise<{ status: number; text: string }> {
+    if (!this.httpPort)
+      throw new Error("Serialized HTTP scenario adapter requires a ScenarioHttpPort");
+    const signal = AbortSignal.timeout(timeoutMs);
+    try {
+      const response = await this.httpPort.fetch({
+        url,
+        init: { method: "POST", headers, body, signal },
+      });
+      return { status: response.status, text: await response.text() };
+    } catch (error) {
+      if (signal.aborted) {
+        throw new HttpHookError({
+          message: hookTimeoutMessage(timeoutMs),
+          isTimeout: true,
+        });
+      }
+      throw new HttpAgentTransportError({
+        host: hostForMessage(url),
+        reason: this.scrub(flattenErrorMessages(error)),
+        cause: error,
+      });
     }
   }
 
@@ -296,9 +447,9 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
    * the url engine binds, so rendering first would turn `{{ secrets.AGENT_TOKEN }}` into an empty
    * string and send an unauthenticated request.
    */
-  private buildUrl(context: Record<string, unknown>): string {
+  private buildUrl(context: Record<string, unknown>, urlTemplate = this.config.url): string {
     const { template, restore } = ScenarioSecretReferenceAdapter.fence({
-      template: this.config.url,
+      template: urlTemplate,
       secrets: this.secrets,
     });
     return restore(renderUrlTemplate({ template, context }));

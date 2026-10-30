@@ -1,5 +1,6 @@
 import {
   AgentNotFoundError,
+  agentHooksSchema,
   DEFAULT_CALL_TIMEOUT_MS,
   MAX_CALL_TIMEOUT_MS,
   type Agent,
@@ -263,6 +264,7 @@ export class ScenarioTargetPrefetchService {
       sessionPath: config.sessionPath,
       scenarioMappings: config.scenarioMappings,
       secrets: secretValues,
+      ...httpHookFields(config),
     };
   }
 
@@ -401,7 +403,19 @@ const HttpAgentConfigSchema = z.object({
   outputPath: z.string().optional(),
   sessionPath: z.string().optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  hooksUrl: z.string().optional(),
+  hooks: agentHooksSchema.optional(),
+  hooksSigningSecret: z.string().optional(),
 });
+
+/** An HTTP agent's hook fields for the job: only with a hooks URL and a checked hook (ADR-188). */
+function httpHookFields(
+  config: z.infer<typeof HttpAgentConfigSchema>,
+): Pick<HttpAgentData, "hooksUrl" | "hooks" | "hooksSigningSecret"> {
+  const { hooksUrl, hooks, hooksSigningSecret } = config;
+  if (!hooksUrl?.trim() || !(hooks?.setup || hooks?.teardown)) return {};
+  return { hooksUrl, hooks, ...(hooksSigningSecret ? { hooksSigningSecret } : {}) };
+}
 
 /**
  * Zod schema for code agent config validation.

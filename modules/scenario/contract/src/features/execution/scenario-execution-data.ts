@@ -136,6 +136,11 @@ const HttpAgentDataSchemaDefinition = z.object({
    * http targets still parses.
    */
   secrets: z.record(z.string(), z.string()).default({}),
+  /** Where setup and teardown are POSTed; set only when a hook is checked (ADR-188). */
+  hooksUrl: z.string().optional(),
+  hooks: agentHooksSchema.optional(),
+  /** The signing secret's `{{ secrets.NAME }}` reference, resolved against `secrets`. */
+  hooksSigningSecret: z.string().optional(),
 });
 export interface HttpAgentDataSchema extends Named<typeof HttpAgentDataSchemaDefinition> {}
 export const HttpAgentDataSchema: HttpAgentDataSchema = HttpAgentDataSchemaDefinition;

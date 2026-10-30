@@ -19,7 +19,10 @@ import {
   type ConnectedCallRun,
   HttpSerializedConnectedAgentChannel,
 } from "../channels/http/http.serialized-connected-agent.channel.ts";
-import type { ScenarioHttp } from "../channels/http/http.serialized-http-agent.channel.ts";
+import {
+  HttpSerializedHttpAgentChannel,
+  type ScenarioHttp,
+} from "../channels/http/http.serialized-http-agent.channel.ts";
 import { litellmModelChannels } from "../channels/litellm-model-channels.registry.ts";
 import type { NlpFetchTimeouts } from "../channels/nlp-fetch.channel.ts";
 import {
@@ -37,7 +40,11 @@ import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptService } from "./agent-test-script.service.ts";
 import { RunStateRolesService } from "./run-state-roles.service.ts";
-import { ScenarioRunHooksError, ScenarioRunHooksService } from "./scenario-run-hooks.service.ts";
+import {
+  type ScenarioHookCaller,
+  ScenarioRunHooksError,
+  ScenarioRunHooksService,
+} from "./scenario-run-hooks.service.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
@@ -203,8 +210,8 @@ function buildMaxTurnsRunConfig({
 }
 
 /**
- * The connected agent a scenario run calls hooks on, with the hooks it declared, or null when the
- * run calls none. An agent test calls none.
+ * The agent a scenario run calls hooks on (a connected agent, or an HTTP agent with a hooks URL),
+ * with the hooks it declared, or null when the run calls none. An agent test calls none.
  */
 function hookTargetOf({
   jobData,
@@ -212,13 +219,17 @@ function hookTargetOf({
 }: {
   jobData: ChildProcessJobData;
   adapter: ScenarioRunner.AgentAdapter;
-}): { caller: HttpSerializedConnectedAgentChannel; declared: AgentHooks } | null {
+}): { caller: ScenarioHookCaller; declared: AgentHooks } | null {
   const { adapterData } = jobData;
-  if (jobData.script || adapterData.type !== "connected") return null;
+  if (jobData.script) return null;
+  if (adapterData.type === "http" && !adapterData.hooksUrl) return null;
+  if (adapterData.type !== "connected" && adapterData.type !== "http") return null;
   const declared = adapterData.hooks;
   if (!declared?.setup && !declared?.teardown) return null;
-  if (!(adapter instanceof HttpSerializedConnectedAgentChannel)) return null;
-  return { caller: adapter, declared };
+  const isHookCaller =
+    adapter instanceof HttpSerializedConnectedAgentChannel ||
+    adapter instanceof HttpSerializedHttpAgentChannel;
+  return isHookCaller ? { caller: adapter, declared } : null;
 }
 
 /** The scenario run every connected agent call names (ADR-180). */

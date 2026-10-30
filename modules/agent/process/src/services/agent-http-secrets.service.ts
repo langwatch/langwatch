@@ -52,7 +52,7 @@ export class AgentHttpSecretsService {
     if (!parsed.success) return command;
 
     const { projectId } = command;
-    const { headers, auth } = await httpAgentConfigStoringSecrets({
+    const { headers, auth, hooksSigningSecret } = await httpAgentConfigStoringSecrets({
       config: parsed.data,
       owner,
       reference: createSecretReferencer({
@@ -73,6 +73,7 @@ export class AgentHttpSecretsService {
         ...parsed.data,
         ...(headers ? { headers } : {}),
         ...(auth ? { auth } : {}),
+        ...(hooksSigningSecret ? { hooksSigningSecret } : {}),
       },
     };
   }

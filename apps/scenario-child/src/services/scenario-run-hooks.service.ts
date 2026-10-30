@@ -16,7 +16,7 @@ import { isSpanContextValid, SpanStatusCode, trace } from "@opentelemetry/api";
 type HookKind = "setup" | "teardown";
 type RunState = Record<string, unknown>;
 
-/** The agent the hooks are called on: the connected agent's channel, which holds the state. */
+/** The agent the hooks are called on: its channel, which holds the state (ADR-180, ADR-188). */
 export interface ScenarioHookCaller {
   readonly runState: RunState | null;
   callHook(input: { kind: HookKind; timeoutMs: number }): Promise<{ state?: RunState }>;

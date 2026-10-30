@@ -28,7 +28,7 @@ function authBlanking(auth: HttpAuth, blank: BlankCredential): HttpAuth {
 }
 
 function httpConfigBlanking(config: HttpAgentConfig, blank: BlankCredential): HttpAgentConfig {
-  const { headers, auth } = config;
+  const { headers, auth, hooksSigningSecret } = config;
 
   return {
     ...config,
@@ -41,6 +41,7 @@ function httpConfigBlanking(config: HttpAgentConfig, blank: BlankCredential): Ht
         }
       : {}),
     ...(auth ? { auth: authBlanking(auth, blank) } : {}),
+    ...(hooksSigningSecret ? { hooksSigningSecret: blank(hooksSigningSecret) } : {}),
   };
 }
 

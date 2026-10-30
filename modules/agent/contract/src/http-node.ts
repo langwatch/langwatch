@@ -458,11 +458,13 @@ async function authStoringSecrets(input: {
 
 /** An HTTP agent's config with each literal credential stored as a project secret. */
 export async function httpAgentConfigStoringSecrets<
-  Config extends Pick<HttpAgentConfig, "headers" | "auth">,
+  Config extends Pick<HttpAgentConfig, "headers" | "auth" | "hooksSigningSecret">,
 >(input: { config: Config; owner: string; reference: SecretReferencer }): Promise<Config> {
   const store = credentialStorer(input);
-  const { headers, auth } = input.config;
+  const { headers, auth, hooksSigningSecret } = input.config;
   const storedAuth = auth && (await authStoringSecrets({ auth, store }));
+  const storedSigningSecret =
+    hooksSigningSecret && (await store("hooks_signing_secret", hooksSigningSecret));
   const entries = await entriesStoringSecrets({
     entries: (headers ?? []).map(({ key, value }): [string, unknown] => [key, value]),
     entryField: HEADER_ENTRY_FIELD,
@@ -477,10 +479,11 @@ export async function httpAgentConfigStoringSecrets<
     ...input.config,
     ...(headers ? { headers: storedHeaders } : {}),
     ...(storedAuth ? { auth: storedAuth } : {}),
+    ...(storedSigningSecret ? { hooksSigningSecret: storedSigningSecret } : {}),
   };
 }
 
-type HttpSecrets = Pick<HttpAgentConfig, "headers" | "auth">;
+type HttpSecrets = Pick<HttpAgentConfig, "headers" | "auth" | "hooksSigningSecret">;
 
 function authKeepingStored(input: { stored: HttpAuth | undefined; incoming: HttpAuth }): HttpAuth {
   const { stored, incoming } = input;
@@ -510,11 +513,14 @@ export function httpSecretsKeepingStored<T extends HttpSecrets>(input: {
       : header,
   );
   const auth = incoming.auth && authKeepingStored({ stored: stored.auth, incoming: incoming.auth });
+  const hooksSigningSecret =
+    incoming.hooksSigningSecret === "" ? stored.hooksSigningSecret : incoming.hooksSigningSecret;
 
   return {
     ...incoming,
     ...(headers ? { headers } : {}),
     ...(auth ? { auth } : {}),
+    ...(hooksSigningSecret !== undefined ? { hooksSigningSecret } : {}),
   };
 }
 

@@ -1,5 +1,5 @@
 Feature: Scenario run hooks: setup and teardown
-  As a person who tests a connected agent with scenarios
+  As a person who tests a connected or HTTP agent with scenarios
   I want the platform to run the agent's setup before the turns and its teardown after
   So that a scenario starts from known test data and leaves none behind.
 
@@ -7,7 +7,8 @@ Feature: Scenario run hooks: setup and teardown
     The order is setup, turns, teardown. Hooks run for scenario runs only.
     Parameters come from the run parameters, one value per name per run.
     The child sends each hook's result on its result line; the parent records
-    it as a platform event folded into the run. Decided in ADR-180.
+    it as a platform event folded into the run. Decided in ADR-180; an HTTP
+    agent calls its hooks over a hooks URL, decided in ADR-188.
 
   Rule: Order and state
 
@@ -219,8 +220,8 @@ Feature: Scenario run hooks: setup and teardown
       And the run shows "No hooks"
 
     @unit
-    Scenario: HTTP and code agents never call hooks
-      Given an HTTP agent
+    Scenario: An HTTP agent without a hooks URL and a code agent never call hooks
+      Given an HTTP agent without a hooks URL
       When a scenario runs against it
       Then the run shows "No hooks"
 
@@ -319,3 +320,99 @@ Feature: Scenario run hooks: setup and teardown
       Given a scenario child that writes a result line naming a setup and a teardown result
       When the processor runs the job and the child exits
       Then the run records both hooks
+
+  # Decided in ADR-188: an HTTP agent gets the same hooks over one signed hooks URL.
+  Rule: Hooks on an HTTP agent
+
+    @integration
+    Scenario: An HTTP agent with a hooks URL calls setup, then the turns, then teardown
+      Given an HTTP agent with a hooks URL and both hooks checked
+      When a scenario runs against it
+      Then the hooks URL gets the setup call, the turn URL gets the turns, and the hooks URL gets the teardown call
+      And the teardown call carries the state setup returned
+
+    @integration
+    Scenario: An HTTP setup that fails leaves the run not scored
+      Given an HTTP agent whose setup answers HTTP 500
+      When a scenario runs against it
+      Then no turn is called
+      And the setup records the status and the body as its error
+      And teardown was called once
+
+    @integration
+    Scenario: An HTTP teardown that fails does not change the score
+      Given a passing run whose HTTP teardown answers HTTP 500
+      Then the run verdict is still success
+      And the teardown records its error
+
+    @unit
+    Scenario: An HTTP hook answer that is not a JSON object fails the hook
+      Given a setup that answers HTTP 200 with a body that is not a JSON object
+      Then the hook fails with the status and the first 1000 characters of the body
+
+    @unit
+    Scenario: An HTTP hook that does not answer in time times out
+      Given a setup that does not answer within its timeout
+      Then the hook records the status timed_out
+
+    @unit
+    Scenario: An HTTP hook call is signed so the receiver can verify it
+      Given an HTTP agent whose signing secret is "whsec_test"
+      When a hook is called
+      Then it carries "X-LangWatch-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of t.body>"
+      And the receiver recomputes the same signature with "whsec_test"
+
+    @unit
+    Scenario: An HTTP hook is never sent unsigned
+      Given an HTTP agent with a hooks URL and no signing secret
+      When a hook is called
+      Then no request is sent and the hook fails naming the missing secret
+
+    @unit
+    Scenario: An HTTP hook call carries the run's idempotency key
+      When the setup hook of the run "run_1" is called
+      Then it carries "Idempotency-Key: run_1:setup"
+
+    @unit
+    Scenario: An HTTP hook call sends the agent's headers, auth and run parameters
+      Given an HTTP agent with a bearer token and the run parameter loyalty_tier "gold"
+      When a hook is called
+      Then it carries the bearer token
+      And its body names the kind, the run and the parameter loyalty_tier "gold"
+
+    @unit
+    Scenario: An unchecked HTTP hook is not called
+      Given an HTTP agent with a hooks URL and only teardown checked
+      When a scenario runs against it
+      Then no setup call is made
+
+    @unit
+    Scenario: An HTTP agent with no hooks URL calls no hooks
+      Given an HTTP agent with hooks checked and no hooks URL
+      Then the run calls no hooks and needs no Node child
+
+    @unit
+    Scenario: An HTTP turn template reads the state setup returned
+      Given a setup that returned { "customer_id": "c_1" }
+      When a turn body renders "{{ state.customer_id }}" and "{{ state }}"
+      Then it sends "c_1" and the whole state as JSON
+
+    @unit
+    Scenario: An HTTP turn cannot change the state
+      Given a setup that returned { "customer_id": "c_1" }
+      When a turn answers with a body that names another state
+      Then the teardown still carries { "customer_id": "c_1" }
+
+    @unit
+    Scenario: The hooks signing secret is saved as a project secret and never read back
+      Given a hooks signing secret typed into an HTTP agent
+      When the agent is saved
+      Then the config keeps a "{{ secrets.NAME }}" reference to a new project secret
+      And a read of the agent shows the reference, never the secret
+
+    @integration
+    Scenario: The agent form shows a new signing secret once and can rotate it
+      Given an HTTP agent form with no hooks URL
+      When the person types a hooks URL
+      Then the form shows a new signing secret to copy before saving
+      And after the agent is saved, the form shows only that a secret is set, with a Rotate button

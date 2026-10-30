@@ -146,6 +146,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         parameters: input.parameters,
         httpPort: input.httpPort,
         logger: input.logger,
+        run: input.run,
       }),
   }),
   code: runtime({
