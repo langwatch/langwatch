@@ -9,9 +9,10 @@ import {
 } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import { computeBestMatchMappings, hasScenarioInputMapping } from "@langwatch/scenario-contract";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
+import { newHooksSigningSecret } from "../model/hooks-signing-secret.ts";
 
 export const HTTP_FIXED_VARIABLES: Field[] = [
   { identifier: "threadId", type: "str" },
@@ -35,6 +36,10 @@ interface HttpAgentDraft {
   headers: HttpHeader[];
   auth: HttpAuth | undefined;
   scenarioMappings: Record<string, AgentInputBinding>;
+  hooksUrl: string;
+  hooks: { setup: boolean; teardown: boolean };
+  /** The stored secret's reference, or a new secret not yet saved. */
+  hooksSigningSecret: string;
 }
 
 type SaveHttpAgentInput = { projectId: string; name: string; config: HttpAgentConfig };
@@ -92,12 +97,19 @@ function initialDraft(
     headers: config?.headers ?? [],
     auth: config?.auth ?? { type: "none" },
     scenarioMappings: Object.keys(savedMappings).length > 0 ? savedMappings : mappings,
+    hooksUrl: config?.hooksUrl ?? "",
+    hooks: config?.hooks ?? { setup: true, teardown: true },
+    hooksSigningSecret: config?.hooksSigningSecret ?? "",
   };
 }
 
 function toConfig(draft: HttpAgentDraft): HttpAgentConfig {
+  const hooksUrl = draft.hooksUrl.trim();
   return {
     ...draft,
+    hooksUrl: hooksUrl || void 0,
+    hooks: hooksUrl ? draft.hooks : void 0,
+    hooksSigningSecret: draft.hooksSigningSecret || void 0,
     name: "HTTP",
     description: "HTTP API endpoint",
     sessionPath: draft.sessionPath.trim() || void 0,
@@ -120,6 +132,9 @@ const HTTP_EDITOR_KEYS = [
   "headers",
   "auth",
   "scenarioMappings",
+  "hooksUrl",
+  "hooks",
+  "hooksSigningSecret",
 ] as const;
 
 /**
@@ -194,6 +209,54 @@ function unmappedVariableIds(input: {
     : new Set<string>();
 }
 
+/**
+ * The hooks signing secret the form shows: one made in this session is shown until the drawer
+ * closes, then never again. Clearing the hooks URL drops an unsaved one, so no project secret is
+ * made for an agent without hooks.
+ */
+function useHooksSigningSecret({
+  draftSecret,
+  savedSecret,
+  change,
+}: {
+  draftSecret: string;
+  savedSecret: string | undefined;
+  change: (values: Partial<HttpAgentDraft>) => void;
+}) {
+  const [newSigningSecret, setNewSigningSecret] = useState<string | null>(null);
+  const forget = useCallback(() => setNewSigningSecret(null), []);
+
+  function rotateSigningSecret() {
+    const secret = newHooksSigningSecret();
+    setNewSigningSecret(secret);
+    change({ hooksSigningSecret: secret });
+  }
+
+  function changeHooksUrl(hooksUrl: string) {
+    const isCleared = hooksUrl.trim() === "";
+    if (isCleared && newSigningSecret !== null) {
+      setNewSigningSecret(null);
+      change({ hooksUrl, hooksSigningSecret: savedSecret ?? "" });
+      return;
+    }
+    if (!isCleared && draftSecret === "") {
+      const secret = newHooksSigningSecret();
+      setNewSigningSecret(secret);
+      change({ hooksUrl, hooksSigningSecret: secret });
+      return;
+    }
+    change({ hooksUrl });
+  }
+
+  return {
+    newSigningSecret,
+    hasStoredSigningSecret: Boolean(savedSecret),
+    changeHooksUrl,
+    rotateSigningSecret,
+    forget,
+  };
+}
+
 export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const savedConfig = readHttpConfig(options.agent);
   const isUnavailable = Boolean(options.agentId) && !savedConfig;
@@ -206,6 +269,12 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const [activeTab, setActiveTab] = useState(options.showVariables ? "variables" : "body");
   const initialized = useRef<string | undefined>(void 0);
   const identity = options.agentId ?? "new";
+  const hooks = useHooksSigningSecret({
+    draftSecret: draft.hooksSigningSecret,
+    savedSecret: savedConfig?.hooksSigningSecret,
+    change,
+  });
+  const { forget: forgetSigningSecret } = hooks;
 
   const [mappingsFrom, setMappingsFrom] = useState(inputMappings);
   if (mappingsFrom !== inputMappings) {
@@ -220,9 +289,18 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
     if (initialized.current === identity || options.isLoadingAgent || isUnavailable) return;
 
     setDraft(initialDraft(options.agent, defaults));
+    forgetSigningSecret();
     setDirty(false);
     initialized.current = identity;
-  }, [options.open, options.agent, options.isLoadingAgent, defaults, identity, isUnavailable]);
+  }, [
+    options.open,
+    options.agent,
+    options.isLoadingAgent,
+    defaults,
+    identity,
+    isUnavailable,
+    forgetSigningSecret,
+  ]);
 
   const variables = [...HTTP_FIXED_VARIABLES, ...customVariables];
   const hasAtLeastOneMapping = variables.some(({ identifier }) => localMappings[identifier]);
@@ -278,6 +356,7 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
       }));
       setDirty(true);
     },
+    hooks,
     stored: {
       authType: savedConfig?.auth?.type,
       headerKeys: savedConfig?.headers?.map(({ key }) => key) ?? [],

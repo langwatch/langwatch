@@ -220,5 +220,74 @@ describe("AgentHttpEditorDrawer", () => {
         expect(field).toHaveValue("");
       });
     });
+
+    describe("when the person types a hooks URL", () => {
+      const mapped = {
+        scenarioMappings: { input: { type: "source", sourceId: "dataset", path: ["input"] } },
+      };
+
+      async function openHooksTab() {
+        fireEvent.mouseDown(await screen.findByRole("tab", { name: "Hooks" }));
+        fireEvent.click(screen.getByRole("tab", { name: "Hooks" }));
+      }
+
+      /** @scenario "The agent form shows a new signing secret once and can rotate it" */
+      it("shows a new signing secret and saves it with the hooks URL", async () => {
+        const saved: Record<string, unknown>[] = [];
+        const agent = savedAgent(mapped);
+        renderEditor({
+          agent,
+          agentId: agent.id,
+          onUpdate: async (input) => {
+            saved.push(input.config);
+            return agent;
+          },
+        });
+        await openHooksTab();
+        expect(screen.queryByTestId("hooks-new-signing-secret")).not.toBeInTheDocument();
+
+        fireEvent.change(await screen.findByTestId("hooks-url-input"), {
+          target: { value: "https://example.com/hooks" },
+        });
+
+        const shown = (await screen.findByTestId("hooks-new-signing-secret")).textContent ?? "";
+        const secret = /whsec_[0-9a-f]{64}/.exec(shown)?.[0];
+        expect(secret).toBeDefined();
+        expect(shown).toContain("You will not see it again after you save.");
+
+        screen.getByRole("button", { name: "Save Changes" }).click();
+
+        await waitFor(() => expect(saved).toHaveLength(1));
+        expect(saved[0]).toMatchObject({
+          hooksUrl: "https://example.com/hooks",
+          hooks: { setup: true, teardown: true },
+          hooksSigningSecret: secret,
+        });
+      });
+
+      /** @scenario "The agent form shows a new signing secret once and can rotate it" */
+      it("shows only that a stored secret is set, and rotates it to a new one", async () => {
+        const reference = "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}";
+        const agent = savedAgent({
+          ...mapped,
+          hooksUrl: "https://example.com/hooks",
+          hooks: { setup: true, teardown: false },
+          hooksSigningSecret: reference,
+        });
+        renderEditor({ agent, agentId: agent.id });
+        await openHooksTab();
+
+        expect(await screen.findByTestId("hooks-stored-signing-secret")).toHaveTextContent(
+          "A signing secret is set.",
+        );
+        expect(document.body.textContent).not.toContain(reference);
+
+        fireEvent.click(screen.getByTestId("rotate-signing-secret-button"));
+
+        expect(await screen.findByTestId("hooks-new-signing-secret")).toHaveTextContent(
+          /whsec_[0-9a-f]{64}/,
+        );
+      });
+    });
   });
 });
