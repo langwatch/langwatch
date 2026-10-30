@@ -194,6 +194,18 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
           renderScenarioMappings={props.renderScenarioMappings}
           renderVariables={props.renderVariables}
           explainTestError={props.explainTestError}
+          hooks={{
+            hooksUrl: form.draft.hooksUrl,
+            onHooksUrlChange: form.hooks.changeHooksUrl,
+            hooks: form.draft.hooks,
+            onHooksChange: (value) => form.change({ hooks: value }),
+            newSigningSecret: form.hooks.newSigningSecret,
+            hasStoredSigningSecret: form.hooks.hasStoredSigningSecret,
+            onRotateSigningSecret: form.hooks.rotateSigningSecret,
+            moveNotice: form.hooks.moveNotice,
+            hooksUrlError: form.hooks.hooksUrlError,
+            previousSigningSecretValidUntil: form.hooks.previousSigningSecretValidUntil,
+          }}
         />
         {props.agentId && props.projectId ? (
           <Box paddingX={6} paddingY={4} borderTopWidth="1px" borderColor="border">

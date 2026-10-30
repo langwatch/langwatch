@@ -15,6 +15,10 @@ import { knownResponseShape, responseShape } from "../../model/known-response-sh
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
 import { BodyTemplateEditor } from "../elements/http-body-template-editor.tsx";
 import { HeadersConfigSection } from "../elements/http-headers-config-section.tsx";
+import {
+  HooksConfigSection,
+  type HttpHooksConfigSectionProps,
+} from "../elements/http-hooks-config-section.tsx";
 import { OUTPUT_PATH_INPUT_ID, OutputPathInput } from "../elements/http-output-path-input.tsx";
 import { SessionPathInput } from "../elements/http-session-path-input.tsx";
 import { HttpTestPanel } from "./http-test-panel.tsx";
@@ -64,6 +68,7 @@ export type AgentHttpEditorTabsProps = {
   renderScenarioMappings: (input: RenderScenarioMappingsInput) => ReactNode;
   renderVariables: (input: RenderAgentVariablesInput) => ReactNode;
   explainTestError: HttpTestErrorExplanation;
+  hooks: HttpHooksConfigSectionProps;
 };
 
 export function AgentHttpEditorTabs({
@@ -96,6 +101,7 @@ export function AgentHttpEditorTabs({
   renderScenarioMappings,
   renderVariables,
   explainTestError,
+  hooks,
 }: AgentHttpEditorTabsProps) {
   const [lastResponse, setLastResponse] = useState<unknown>(undefined);
   const testedShape = responseShape({ response: lastResponse });
@@ -195,6 +201,11 @@ export function AgentHttpEditorTabs({
           {...(stored ? { storedKeys: stored.headerKeys } : {})}
         />
       ),
+    },
+    {
+      value: "hooks",
+      label: "Hooks",
+      content: <HooksConfigSection {...hooks} />,
     },
     {
       value: "test",

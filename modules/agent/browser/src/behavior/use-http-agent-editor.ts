@@ -1,5 +1,9 @@
 import {
+  AgentHooksUrlTemplatedOriginError,
   httpAgentConfigSchema,
+  isCredentialHeader,
+  isPreviousSigningSecretOpen,
+  templatesHooksOrigin,
   type AgentInputBinding,
   type Field,
   type HttpAgentConfig,
@@ -8,10 +12,14 @@ import {
   type HttpMethod,
 } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { computeBestMatchMappings, hasScenarioInputMapping } from "@langwatch/scenario-contract";
-import { useEffect, useRef, useState } from "react";
+import { nowInstant } from "@langwatch/time";
+import { isSameOrigin } from "@langwatch/workflow-contract";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
+import { newHooksSigningSecret } from "../model/hooks-signing-secret.ts";
 
 export const HTTP_FIXED_VARIABLES: Field[] = [
   { identifier: "threadId", type: "str" },
@@ -35,6 +43,10 @@ interface HttpAgentDraft {
   headers: HttpHeader[];
   auth: HttpAuth | undefined;
   scenarioMappings: Record<string, AgentInputBinding>;
+  hooksUrl: string;
+  hooks: { setup: boolean; teardown: boolean };
+  /** The stored secret's reference, or a new secret not yet saved. */
+  hooksSigningSecret: string;
 }
 
 type SaveHttpAgentInput = { projectId: string; name: string; config: HttpAgentConfig };
@@ -92,12 +104,20 @@ function initialDraft(
     headers: config?.headers ?? [],
     auth: config?.auth ?? { type: "none" },
     scenarioMappings: Object.keys(savedMappings).length > 0 ? savedMappings : mappings,
+    hooksUrl: config?.hooksUrl ?? "",
+    hooks: config?.hooks ?? { setup: true, teardown: true },
+    hooksSigningSecret: config?.hooksSigningSecret ?? "",
   };
 }
 
 function toConfig(draft: HttpAgentDraft): HttpAgentConfig {
+  const hooksUrl = draft.hooksUrl.trim();
   return {
     ...draft,
+    hooksUrl: hooksUrl || void 0,
+    hooks: hooksUrl ? draft.hooks : void 0,
+    // No hooks URL, no signing secret: the save then deletes the stored one.
+    hooksSigningSecret: (hooksUrl && draft.hooksSigningSecret) || void 0,
     name: "HTTP",
     description: "HTTP API endpoint",
     sessionPath: draft.sessionPath.trim() || void 0,
@@ -120,11 +140,17 @@ const HTTP_EDITOR_KEYS = [
   "headers",
   "auth",
   "scenarioMappings",
+  "hooksUrl",
+  "hooks",
+  "hooksSigningSecret",
 ] as const;
+
+/** Keys only the server writes: a value a save sends is ignored, so the editor never sends one. */
+const HTTP_SERVER_KEYS = ["hooksPreviousSigningSecret"] as const;
 
 /**
  * An edited HTTP config over the stored one: what the editor wrote wins, and what it does not
- * edit (a timeout, a dev tunnel, declared inputs) stays as stored.
+ * edit (a timeout, a dev tunnel, declared inputs) stays as stored. Server-only keys are dropped.
  */
 export function httpConfigKeepingStored({
   stored,
@@ -136,7 +162,7 @@ export function httpConfigKeepingStored({
   if (!stored) return edited;
 
   const kept: Partial<HttpAgentConfig> = { ...stored };
-  for (const key of HTTP_EDITOR_KEYS) delete kept[key];
+  for (const key of [...HTTP_EDITOR_KEYS, ...HTTP_SERVER_KEYS]) delete kept[key];
   return { ...kept, ...edited };
 }
 
@@ -151,12 +177,31 @@ function replaceMapping(
   return next;
 }
 
+/** The hooks URL's template refusal, as the field says it, or null for any other failure. */
+function hooksUrlRefusalFor(error: unknown): string | null {
+  return readHandledError(error)?.code === "agent_hooks_url_templated_origin"
+    ? new AgentHooksUrlTemplatedOriginError().message
+    : null;
+}
+
+/**
+ * The message at the hooks URL field: the save's refusal, else a warning for a template before
+ * the path while it is typed. Both say the same thing, so they read alike.
+ */
+function hooksUrlErrorFor(input: { refusal: string | null; hooksUrl: string }): string | null {
+  if (input.refusal) return input.refusal;
+  return templatesHooksOrigin(input.hooksUrl)
+    ? new AgentHooksUrlTemplatedOriginError().message
+    : null;
+}
+
+/** Saves the agent. Returns the hooks URL refusal to show at its field, or null. */
 async function saveHttpAgent(
   options: HttpAgentEditorOptions,
   draft: HttpAgentDraft,
   isValid: boolean,
-) {
-  if (!options.projectId || !isValid || options.isSaving) return;
+): Promise<string | null> {
+  if (!options.projectId || !isValid || options.isSaving) return null;
 
   const input = {
     projectId: options.projectId,
@@ -169,16 +214,18 @@ async function saveHttpAgent(
   const result = options.agentId
     ? options.onUpdate({ ...input, id: options.agentId })
     : options.onCreate(input);
-  await result
+  return result
     .then((agent) => {
       options.onSave?.(agent);
       options.onClose();
+      return null;
     })
     .catch((error: unknown) => {
       options.onSaveError({
         error,
         fallbackTitle: options.agentId ? "Couldn't save agent" : "Couldn't create agent",
       });
+      return hooksUrlRefusalFor(error);
     });
 }
 
@@ -194,6 +241,104 @@ function unmappedVariableIds(input: {
     : new Set<string>();
 }
 
+/** The stored credentials a hooks URL on another origin does not take, to be typed again. */
+export interface HooksMoveNotice {
+  retypeAuth: boolean;
+  retypeHeaders: boolean;
+  /** A move keeps no previous signing secret: the stored one stops working on save. */
+  replacesSigningSecret: boolean;
+}
+
+/**
+ * The notice for a hooks URL on another origin than the one the stored credentials were saved
+ * for (the saved hooks URL, else the turn URL), or null. The server refuses to send them there,
+ * so the form says which ones to type again (agent-secrets.rules.ts, movesStoredSecrets).
+ */
+function hooksMoveNotice(input: {
+  hooksUrl: string;
+  saved: HttpAgentConfig | undefined;
+}): HooksMoveNotice | null {
+  const { hooksUrl, saved } = input;
+  if (!saved || hooksUrl.trim() === "") return null;
+  const retypeAuth = Boolean(saved.auth && saved.auth.type !== "none");
+  const retypeHeaders = (saved.headers ?? []).some(({ key }) => isCredentialHeader(key));
+  if (!retypeAuth && !retypeHeaders && !saved.hooksSigningSecret) return null;
+  if (isSameOrigin({ requested: hooksUrl.trim(), saved: saved.hooksUrl || saved.url })) {
+    return null;
+  }
+
+  return { retypeAuth, retypeHeaders, replacesSigningSecret: Boolean(saved.hooksSigningSecret) };
+}
+
+/**
+ * When the previous signing secret a same-origin rotation left stops working, while it still
+ * works; else null. The server keeps it for HOOKS_PREVIOUS_SECRET_TTL_MS (agent-secrets.rules.ts,
+ * withPreviousSigningSecret).
+ */
+function previousSigningSecretValidUntil(saved: HttpAgentConfig | undefined): string | null {
+  const previous = saved?.hooksPreviousSigningSecret;
+  if (!previous || !isPreviousSigningSecretOpen(previous, nowInstant())) return null;
+
+  return previous.expiresAt;
+}
+
+/**
+ * The hooks signing secret the form shows: one made in this session is shown until the drawer
+ * closes. Clearing the hooks URL drops an unsaved one. A hooks URL on another origin gets a new
+ * one by itself, as the stored one stays with the saved address, which takes it back again.
+ */
+function useHooksSigningSecret({
+  draftSecret,
+  saved,
+  change,
+}: {
+  draftSecret: string;
+  saved: HttpAgentConfig | undefined;
+  change: (values: Partial<HttpAgentDraft>) => void;
+}) {
+  const savedSecret = saved?.hooksSigningSecret;
+  const [newSigningSecret, setNewSigningSecret] = useState<string | null>(null);
+  const [madeForMove, setMadeForMove] = useState(false);
+  const forget = useCallback(() => {
+    setNewSigningSecret(null);
+    setMadeForMove(false);
+  }, []);
+
+  function makeSigningSecret(input: { hooksUrl?: string; forMove: boolean }) {
+    const secret = newHooksSigningSecret();
+    setNewSigningSecret(secret);
+    setMadeForMove(input.forMove);
+    const { hooksUrl } = input;
+    change({ ...(hooksUrl === undefined ? {} : { hooksUrl }), hooksSigningSecret: secret });
+  }
+
+  function keepStoredSigningSecret(hooksUrl: string) {
+    forget();
+    change({ hooksUrl, hooksSigningSecret: savedSecret ?? "" });
+  }
+
+  function changeHooksUrl(hooksUrl: string) {
+    const isCleared = hooksUrl.trim() === "";
+    const moves = Boolean(savedSecret) && hooksMoveNotice({ hooksUrl, saved }) !== null;
+    const dropsNewSecret = isCleared ? newSigningSecret !== null : !moves && madeForMove;
+    if (dropsNewSecret) {
+      keepStoredSigningSecret(hooksUrl);
+    } else if (!isCleared && (draftSecret === "" || (moves && draftSecret === savedSecret))) {
+      makeSigningSecret({ hooksUrl, forMove: moves });
+    } else {
+      change({ hooksUrl });
+    }
+  }
+
+  return {
+    newSigningSecret,
+    hasStoredSigningSecret: Boolean(savedSecret),
+    changeHooksUrl,
+    rotateSigningSecret: () => makeSigningSecret({ forMove: false }),
+    forget,
+  };
+}
+
 export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const savedConfig = readHttpConfig(options.agent);
   const isUnavailable = Boolean(options.agentId) && !savedConfig;
@@ -203,9 +348,15 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const [dirty, setDirty] = useState(false);
   const [localMappings, setLocalMappings] = useState(inputMappings);
   const [customVariables, setCustomVariables] = useState<Field[]>([]);
+  const [hooksUrlRefusal, setHooksUrlRefusal] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(options.showVariables ? "variables" : "body");
   const initialized = useRef<string | undefined>(void 0);
   const identity = options.agentId ?? "new";
+  const { forget: forgetSigningSecret, ...signingSecret } = useHooksSigningSecret({
+    draftSecret: draft.hooksSigningSecret,
+    saved: savedConfig,
+    change,
+  });
 
   const [mappingsFrom, setMappingsFrom] = useState(inputMappings);
   if (mappingsFrom !== inputMappings) {
@@ -220,9 +371,18 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
     if (initialized.current === identity || options.isLoadingAgent || isUnavailable) return;
 
     setDraft(initialDraft(options.agent, defaults));
+    forgetSigningSecret();
     setDirty(false);
     initialized.current = identity;
-  }, [options.open, options.agent, options.isLoadingAgent, defaults, identity, isUnavailable]);
+  }, [
+    options.open,
+    options.agent,
+    options.isLoadingAgent,
+    defaults,
+    identity,
+    isUnavailable,
+    forgetSigningSecret,
+  ]);
 
   const variables = [...HTTP_FIXED_VARIABLES, ...customVariables];
   const hasAtLeastOneMapping = variables.some(({ identifier }) => localMappings[identifier]);
@@ -251,7 +411,7 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   return {
     draft,
     change,
-    save: () => saveHttpAgent(options, draft, isValid),
+    save: () => saveHttpAgent(options, draft, isValid).then(setHooksUrlRefusal),
     close,
     activeTab,
     setActiveTab,
@@ -277,6 +437,16 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
         scenarioMappings: replaceMapping(previous.scenarioMappings, identifier, value),
       }));
       setDirty(true);
+    },
+    hooks: {
+      ...signingSecret,
+      changeHooksUrl: (hooksUrl: string) => {
+        setHooksUrlRefusal(null);
+        signingSecret.changeHooksUrl(hooksUrl);
+      },
+      hooksUrlError: hooksUrlErrorFor({ refusal: hooksUrlRefusal, hooksUrl: draft.hooksUrl }),
+      moveNotice: hooksMoveNotice({ hooksUrl: draft.hooksUrl, saved: savedConfig }),
+      previousSigningSecretValidUntil: previousSigningSecretValidUntil(savedConfig),
     },
     stored: {
       authType: savedConfig?.auth?.type,

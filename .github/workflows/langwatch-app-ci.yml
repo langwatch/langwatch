@@ -700,7 +700,7 @@ jobs:
       contents: read
       actions: write
     # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, a heavy
-    # suite alone, integration and browser suites one at a time (run-package-suites.ts).
+    # suite alone, and one integration or browser suite at a time (run-package-suites.ts).
     # Parallel across legs: over two hundred package suites run one after
     # another take well past two hours, so the list is split by measured weight
     # (PACKAGE_SUITES_SHARD, .github/package-suites.weights) over separate runners.

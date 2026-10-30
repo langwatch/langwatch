@@ -56,6 +56,7 @@ export const APP_ERROR_CODES = [
   "agent_register_refused",
   "agent_report_rate_limited",
   "agent_session_unknown",
+  "agent_stored_credentials_destination_mismatch",
   "agent_test_refused",
   "aggregate_project_admin_only",
   "aggregate_project_has_no_credential",
