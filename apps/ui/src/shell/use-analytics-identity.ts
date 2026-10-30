@@ -6,7 +6,7 @@ import {
   FirstTouchAttributionToken,
   type FirstTouchAttribution,
 } from "@langwatch/onboarding-client";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 const SIGNED_IN_STORAGE_KEY = "lw_posthog.signed_in";
 
@@ -94,7 +94,9 @@ export function useAnalyticsIdentity(): void {
 
   // Every later event carries the project in view, so a board's events read per project.
   const projectId = scope.project?.id;
-  useEffect(() => {
+  // A layout effect, so it lands before any screen's own passive effects: React runs a child's
+  // passive effects before its parent's, and a board's first viewed event must carry the project.
+  useLayoutEffect(() => {
     // PostHog keeps a registered property across reloads, so a page that loads with no project
     // in view drops the one an earlier load left, rather than trusting an unmount that never ran.
     if (!userId || !projectId) {

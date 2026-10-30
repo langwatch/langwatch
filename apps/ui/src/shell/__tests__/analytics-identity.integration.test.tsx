@@ -22,6 +22,7 @@ import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { FirstTouchAttributionToken } from "@langwatch/onboarding-client";
 import { cleanup, render } from "@testing-library/react";
+import { type ReactNode, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetSignedInTracking, useAnalyticsIdentity } from "../use-analytics-identity";
@@ -351,6 +352,50 @@ describe("the project every later event carries", () => {
       "unregister projectId",
       "unregister projectId",
     ]);
+  });
+
+  /** @scenario "Telemetry: every later event carries the project in scope" */
+  it("registers the project before a screen below the shell sends its first event on mount", () => {
+    /** Keeps what each event would carry: its own attributes over the registered properties. */
+    class CarryingAnalytics extends RecordingAnalytics {
+      readonly registered: Record<string, unknown> = {};
+      readonly carried: Record<string, unknown>[] = [];
+      override register(properties: Readonly<Record<string, unknown>>): void {
+        Object.assign(this.registered, properties);
+      }
+      override unregister(property: string): void {
+        delete this.registered[property];
+      }
+      override track(event: UiAnalyticsEvent): void {
+        this.carried.push({ name: event.name, ...this.registered });
+      }
+    }
+    /** A board screen, as Dashboards mounts one: it sends its view from a passive effect. */
+    function BoardScreen({ analytics }: { analytics: UiAnalytics }) {
+      useEffect(() => analytics.track({ name: "dashboard", action: "viewed" }), [analytics]);
+      return null;
+    }
+    /** The shell, which sets who is reading, with the screen it mounts below it. */
+    function Shell({ children }: { children: ReactNode }) {
+      useAnalyticsIdentity();
+      return children;
+    }
+    const analytics = new CarryingAnalytics();
+
+    render(
+      <UiHostServicesContextProvider
+        value={hostServices(ADA, "org_1", analytics, CAMPAIGN, "project_checkout")}
+      >
+        <Shell>
+          <BoardScreen analytics={analytics} />
+        </Shell>
+      </UiHostServicesContextProvider>,
+    );
+
+    expect(analytics.carried.find(({ name }) => name === "dashboard")).toEqual({
+      name: "dashboard",
+      projectId: "project_checkout",
+    });
   });
 
   /** @scenario "Telemetry: a reload with no project in scope drops the projectId kept from before" */

@@ -9,6 +9,7 @@ import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboa
 import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
+/** The boundary every Dashboards product event is sent under. */
 export const DASHBOARDS_BOUNDARY = "dashboards";
 
 /** The id a From LangWatch board's runs are logged under: it has no stored board of its own. */
@@ -33,6 +34,7 @@ function dashboardsEvent(
   return { boundary: DASHBOARDS_BOUNDARY, name, action, attributes };
 }
 
+/** A board opened, once its widgets are known: "dashboards.viewed.dashboard". */
 export function dashboardViewed({
   dashboardKind,
   widgetCount,
@@ -49,6 +51,7 @@ export function dashboardViewed({
   });
 }
 
+/** A board made, and how: "dashboards.created.dashboard". */
 export function dashboardCreated({
   createdFrom,
   templateId,
@@ -62,14 +65,17 @@ export function dashboardCreated({
   });
 }
 
+/** A board the server agreed to delete: "dashboards.deleted.dashboard". */
 export function dashboardDeleted(): UiAnalyticsEvent {
   return dashboardsEvent("dashboard", "deleted");
 }
 
+/** A board or template starred or unstarred: "dashboards.favourited.dashboard". */
 export function dashboardFavourited({ starred }: { starred: boolean }): UiAnalyticsEvent {
   return dashboardsEvent("dashboard", "favourited", { starred });
 }
 
+/** Widgets that landed on a board, and from where: "dashboards.added.widget". */
 export function widgetAdded({
   addedFrom,
   widgetCount = 1,
@@ -80,10 +86,12 @@ export function widgetAdded({
   return dashboardsEvent("widget", "added", { addedFrom, widgetCount });
 }
 
+/** A widget's edit saved: "dashboards.edited.widget". */
 export function widgetEdited(): UiAnalyticsEvent {
   return dashboardsEvent("widget", "edited");
 }
 
+/** A widget the server agreed to delete: "dashboards.deleted.widget". */
 export function widgetDeleted(): UiAnalyticsEvent {
   return dashboardsEvent("widget", "deleted");
 }

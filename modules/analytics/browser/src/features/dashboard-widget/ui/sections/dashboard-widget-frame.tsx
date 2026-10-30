@@ -169,14 +169,9 @@ function WidgetFrameOverWindow({
   // crashing the grid.
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
-  // Kept by value, so a re-render with the same ids does not start the queries over.
-  const telemetryKey = JSON.stringify(
-    given ?? placedWidgetTelemetry({ dashboardId, widgetId: id, parsed }) ?? null,
-  );
-  const telemetry = useMemo(
-    () => (JSON.parse(telemetryKey) as LangWatchQLRunTelemetryRequest | null) ?? void 0,
-    [telemetryKey],
-  );
+  // A new object each render is fine: the executor reads it by its ids, so a re-render with the
+  // same ids does not start the queries over.
+  const telemetry = given ?? placedWidgetTelemetry({ dashboardId, widgetId: id, parsed });
   const {
     executeQuery: runQuery,
     params: hostParams,

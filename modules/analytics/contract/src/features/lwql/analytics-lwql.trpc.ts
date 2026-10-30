@@ -43,11 +43,14 @@ const lwqlRunTelemetryRequestSchemaDefinition = z
     templateId: telemetryIdSchema.optional(),
   })
   .strict();
+/** The named type of {@link lwqlRunTelemetryRequestSchema}. */
 export interface LwqlRunTelemetryRequestSchema extends Named<
   typeof lwqlRunTelemetryRequestSchemaDefinition
 > {}
+/** The widget ids a query request may carry for its log line; it can name no caller. */
 export const lwqlRunTelemetryRequestSchema: LwqlRunTelemetryRequestSchema =
   lwqlRunTelemetryRequestSchemaDefinition;
+/** What the browser says of the widget a run is for. */
 export type LangWatchQLRunTelemetryRequest = z.infer<typeof lwqlRunTelemetryRequestSchema>;
 
 /**

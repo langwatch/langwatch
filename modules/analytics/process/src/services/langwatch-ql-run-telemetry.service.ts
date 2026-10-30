@@ -23,7 +23,9 @@ import {
 
 const logger = createLogger("langwatch:analytics:lwql");
 
+/** The LangWatchQL run counter, histograms and failure log line; one instance per app. */
 export class LangWatchQLRunTelemetryService {
+  /** Declares the three instruments; their series are written on first use. */
   static create(): LangWatchQLRunTelemetryService {
     return new LangWatchQLRunTelemetryService(
       counter({

@@ -268,7 +268,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Share of runs refused or failed, and share that answered no rows. A run its caller hung up on (aborted) is not an error. The red line is the error-rate alert threshold.",
+      "description": "Share of runs refused or failed, and share that answered no rows. A run its caller hung up on (aborted) is not an error. A caller with no errors or no empty runs reads 0 rather than dropping off. The red line is the error-rate alert threshold.",
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
@@ -322,7 +322,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\",outcome!~\"ok|empty|aborted\"}[$__rate_interval])) / sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\"}[$__rate_interval]))",
+          "expr": "(sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\",outcome!~\"ok|empty|aborted\"}[$__rate_interval])) or (sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\"}[$__rate_interval])) * 0)) / sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\"}[$__rate_interval]))",
           "legendFormat": "errors {{caller}}",
           "range": true,
           "refId": "A"
@@ -333,7 +333,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\",outcome=\"empty\"}[$__rate_interval])) / sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\"}[$__rate_interval]))",
+          "expr": "(sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\",outcome=\"empty\"}[$__rate_interval])) or (sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\"}[$__rate_interval])) * 0)) / sum by (caller) (rate(lwql_queries_total{caller=~\"$caller\"}[$__rate_interval]))",
           "legendFormat": "empty {{caller}}",
           "range": true,
           "refId": "B"
@@ -422,7 +422,7 @@
         "type": "cloudwatch",
         "uid": "${DS_CLOUDWATCH}"
       },
-      "description": "The slowest statements by their hash, from the \"LangWatchQL executed\" log line. The hash never carries the SQL text; find the widget by its widgetId.",
+      "description": "The slowest statements from the \"LangWatchQL executed\" log line, one row per query hash, caller, dashboard and widget, so a slow hash names the widget that runs it. A run that is no widget's has no dashboardId or widgetId. The hash never carries the SQL text.",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -447,7 +447,7 @@
             }
           ],
           "refId": "A",
-          "expression": "fields queryHash, caller, elapsedMs, widgetId, dashboardId\n| filter msg = \"LangWatchQL executed\"\n| stats max(elapsedMs) as slowestMs, avg(elapsedMs) as averageMs, count(*) as runs by queryHash, caller\n| sort slowestMs desc\n| limit 20"
+          "expression": "fields queryHash, caller, elapsedMs, widgetId, dashboardId\n| filter msg = \"LangWatchQL executed\"\n| stats max(elapsedMs) as slowestMs, avg(elapsedMs) as averageMs, count(*) as runs by queryHash, caller, dashboardId, widgetId\n| sort slowestMs desc\n| limit 20"
         }
       ],
       "title": "Top 20 slowest query hashes",

@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 
 import { type DashboardKind, dashboardViewed } from "../model/dashboard-usage-events.ts";
 
+/** Sends one view for the board on screen, once its widgets have loaded. */
 export function useDashboardViewed({
   dashboardId,
   dashboardKind,

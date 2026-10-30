@@ -322,6 +322,7 @@ export const LWQL_TELEMETRY_CALLERS = [
   "saved_chart",
   "source_presence",
 ] as const;
+/** One door a run can come in by. */
 export type LangWatchQLTelemetryCaller = (typeof LWQL_TELEMETRY_CALLERS)[number];
 
 /** Where a run came from, as its log line records it. The ids never become metric labels. */
