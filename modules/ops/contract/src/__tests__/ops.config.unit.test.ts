@@ -1,7 +1,7 @@
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { opsBrowserConfig, opsConfig } from "../ops.config.ts";
+import { opsBrowserConfig, opsConfig, opsSecrets } from "../ops.config.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "ops", config: opsConfig }], environment }).ops;
@@ -90,5 +90,12 @@ describe("ops server configuration", () => {
         opsBrowserConfig.project(config, { offersCloudOps: () => true }),
       ).resolves.toEqual({ cloudOps: true });
     });
+  });
+});
+
+describe("given the bug-report bot token is declared as a secret", () => {
+  it("is read from SLACK_BUG_REPORTS_BOT_TOKEN and optional, so a missing token never blocks boot", () => {
+    expect(opsSecrets.slackBugReportsBotToken.id).toBe("SLACK_BUG_REPORTS_BOT_TOKEN");
+    expect(opsSecrets.slackBugReportsBotToken.optional).toBe(true);
   });
 });
