@@ -7,6 +7,7 @@
 
 import {
   isPreviousSigningSecretOpen,
+  readHooksOrigin,
   STATE_MAX_BYTES,
   type PreviousSigningSecret,
 } from "@langwatch/agent-contract";
@@ -129,6 +130,27 @@ export function hooksUrlRefusal(
   if (parsed.protocol === "https:") return null;
   if (parsed.protocol === "http:" && localAddressesAllowed) return null;
   return PLAIN_HTTP_REFUSAL;
+}
+
+const TEMPLATED_ORIGIN_REFUSAL =
+  "The hooks URL's scheme and host must be fixed: a template cannot choose the host a hook is sent to.";
+
+/**
+ * Why a hook call is refused for leaving the saved hooks URL's origin, or null. The save refuses a
+ * template in the scheme or host, but a hooks URL saved before that rule (or one the parser reads
+ * differently) could still render to any host, with the agent's headers, auth and signature.
+ */
+export function hookOriginRefusal({
+  hooksUrl,
+  rendered,
+}: {
+  hooksUrl: string;
+  rendered: string;
+}): string | null {
+  const saved = readHooksOrigin(hooksUrl);
+  const sent = readHooksOrigin(rendered);
+  if (!saved.isFixed || !sent.isFixed) return TEMPLATED_ORIGIN_REFUSAL;
+  return sent.origin === saved.origin ? null : TEMPLATED_ORIGIN_REFUSAL;
 }
 
 /**

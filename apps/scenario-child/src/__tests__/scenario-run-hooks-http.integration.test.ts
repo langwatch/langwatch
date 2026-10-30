@@ -361,6 +361,26 @@ describe("ScenarioRunHooksService over the HTTP channel", () => {
     });
   });
 
+  describe("when a saved hooks URL lets a parameter choose the host", () => {
+    /** @scenario "A hook whose rendered URL leaves the saved hooks origin is refused before any request" */
+    it.each([
+      "https:///{{params.loyalty_tier}}.example.com/hooks",
+      "https:/\\{{params.loyalty_tier}}.example.com/hooks",
+      "https://{{params.loyalty_tier}}.example.com/hooks",
+    ])("sends nothing to %s and fails naming the host", async (hooksUrl) => {
+      const egress = fakeEgress();
+      const channel = channelOver(egress, { ...baseConfig, hooksUrl });
+
+      const error = (await hooksFor(channel, { setup: true, teardown: false })
+        .around(oneTurn(channel))
+        .catch((caught: unknown) => caught)) as ScenarioRunHooksError;
+
+      expect(egress.sent).toEqual([]);
+      expect(error.hooks.setup).toMatchObject({ status: "failed" });
+      expect(error.hooks.setup?.error).toMatch(/hooks URL.*host/i);
+    });
+  });
+
   describe("when setup answers an object holding a secret value", () => {
     /** @scenario "An HTTP hook answer is measured and parsed before secrets are scrubbed" */
     it("parses the answer as it came, then scrubs the secret from the state", async () => {
