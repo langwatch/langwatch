@@ -252,4 +252,16 @@ describe("given a routed run", () => {
   it("leaves an unrouted running row's cost at zero until it finishes", () => {
     expect(fold([requested(), planned(1000), page({})]).costUsd).toBe(0);
   });
+
+  /** @scenario "A page event without a routed cost still reads and prices from tokens" */
+  it("reads a replayed pre-router page with no routed cost as zero, never NaN", () => {
+    // Replay folds the stored JSON unparsed, so a page written before the router has no field.
+    const { costNanoUsd: _dropped, ...preRouter } = page({ inputTokens: 500 }).data as Record<
+      string,
+      unknown
+    >;
+    const replayed = { ...page({}), data: preRouter } as unknown as InstantEvalProcessingEvent;
+
+    expect(fold([requested(), planned(1000), replayed]).costUsd).toBe(0);
+  });
 });

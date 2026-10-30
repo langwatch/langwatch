@@ -102,7 +102,10 @@ export function applyInstantEvalRunEvent(
         skipped: state.skipped + event.data.skipped,
         tokens: state.tokens + event.data.inputTokens,
         // A routed run's cost so far, so the page budget check reads it; finish sets the total.
-        costUsd: toNanoUsdPrecision(state.costUsd + event.data.costNanoUsd / NANO_USD_PER_USD),
+        // Replay folds stored JSON unparsed, so a page written before the router has no cost.
+        costUsd: toNanoUsdPrecision(
+          state.costUsd + (event.data.costNanoUsd ?? 0) / NANO_USD_PER_USD,
+        ),
         startedAtMs: state.startedAtMs ?? event.occurredAt,
       };
 

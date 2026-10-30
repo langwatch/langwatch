@@ -1,6 +1,15 @@
+import type { InstantEvalProcessingEvent } from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
-import { instantEvalProcessStateSchema } from "../instant-eval-processing-data.process.ts";
+import {
+  instantEvalProcessEventViewSchema,
+  instantEvalProcessStateSchema,
+} from "../instant-eval-processing-data.process.ts";
+import {
+  buildInstantEvalProcessEventView,
+  handleInstantEvalPageJudged,
+} from "../instant-eval-processing-evolution.process.ts";
+import { context, running } from "./instant-eval-process.fixtures.ts";
 
 describe("process state stored by the main release", () => {
   it("parses an instant evaluation state as main stored it", () => {
@@ -32,6 +41,28 @@ describe("process state stored by the main release", () => {
       routedInputTokens: 0,
       lastActivityAtMs: 1,
       cancelRequestedAtMs: null,
+    });
+  });
+});
+
+describe("a page_judged event stored by the main release, folded on replay", () => {
+  /** @scenario "A page event without a routed cost still reads and prices from tokens" */
+  it("reads its missing routed cost and routed tokens as zero, never NaN", () => {
+    // Replay hands the fold the stored JSON unparsed: main wrote neither routed field.
+    const event = {
+      aggregateId: "instanteval_1",
+      type: "lw.obs.instant_eval.page_judged",
+      data: { runId: "instanteval_1", page: 2, rows: 5, inputTokens: 200, requests: 5 },
+    } as unknown as InstantEvalProcessingEvent;
+    const payload = instantEvalProcessEventViewSchema.parse(buildInstantEvalProcessEventView(event));
+    const { ctx } = context();
+
+    const evolution = handleInstantEvalPageJudged(running, payload, ctx);
+
+    expect(evolution.state).toMatchObject({
+      inputTokens: running.inputTokens + 200,
+      costNanoUsd: 0,
+      routedInputTokens: 0,
     });
   });
 });
