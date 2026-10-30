@@ -10,6 +10,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
+import type { ReactNode } from "react";
 
 import type { HooksMoveNotice } from "../../behavior/use-http-agent-editor.ts";
 import { CopyButton } from "./http-test-components.tsx";
