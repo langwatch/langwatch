@@ -20,6 +20,13 @@ Feature: Gateway Decisions endpoint, OpenAI Decisions API through a virtual key
     And the provider receives the provider API key, never the virtual key
     And the response is 200 with the provider's answer bytes unchanged
     And the spend record carries the usage input_tokens and output_tokens the provider reported
+    And cached input tokens the provider states apart are recorded as cache reads
+
+  @unit
+  Scenario: A decisions call attributes spend to its safety_identifier
+    When the client POSTs /v1/decisions with "safety_identifier" set and no end-user header
+    Then the spend record names that identifier as the end user
+    And an X-LangWatch-End-User-Id header still wins over the body field
 
   @unit
   Scenario: The provider's base URL decides where a decisions call goes

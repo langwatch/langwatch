@@ -32,7 +32,8 @@ const decisionsRequest = `{"model":"openai/gpt-6-luna","input":"Release the key 
 
 const decisionsAnswer = `{"answers":[{"type":"choice","name":"release","choice":"allow",` +
 	`"probabilities":[{"value":"allow","probability":0.9},{"value":"deny","probability":0.1}],"confidence":0.9},` +
-	`{"type":"predicate","name":"requester_backs_it","probability":0.8}],"usage":{"input_tokens":1234,"output_tokens":7}}`
+	`{"type":"predicate","name":"requester_backs_it","probability":0.8}],` +
+	`"usage":{"input_tokens":1234,"input_tokens_details":{"cached_tokens":1000},"output_tokens":7}}`
 
 // decisionsVendor stands in for OpenAI and records what reached it.
 type decisionsVendor struct {
@@ -113,11 +114,14 @@ func newDecisionsGateway(t *testing.T, setup decisionsSetup) *decisionsGateway {
 	return gw
 }
 
-func (g *decisionsGateway) post(t *testing.T, body string) *httptest.ResponseRecorder {
+func (g *decisionsGateway) post(t *testing.T, body string, headers ...string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/v1/decisions", strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	req.Header.Set("Content-Type", "application/json")
+	for i := 0; i+1 < len(headers); i += 2 {
+		req.Header.Set(headers[i], headers[i+1])
+	}
 	rec := httptest.NewRecorder()
 	g.router.ServeHTTP(rec, req)
 	return rec
@@ -148,7 +152,33 @@ func TestDecisions_RelayedAndMetered(t *testing.T) {
 	require.Len(t, confirms, 1, "fails: %+v", fails)
 	assert.Equal(t, 1234, confirms[0].Usage.PromptTokens)
 	assert.Equal(t, 7, confirms[0].Usage.CompletionTokens)
+	assert.Equal(t, 1000, confirms[0].Usage.CacheReadTokens)
 	assert.Equal(t, "gpt-6-luna", confirms[0].Model)
+}
+
+// @scenario "A decisions call attributes spend to its safety_identifier"
+func TestDecisions_SafetyIdentifierAttributesSpend(t *testing.T) {
+	withID := strings.Replace(decisionsRequest, `"input":`, `"safety_identifier":"member-42","input":`, 1)
+	cases := map[string]struct {
+		headers []string
+		want    string
+	}{
+		"body field alone": {want: "member-42"},
+		"header wins":      {headers: []string{"X-LangWatch-End-User-Id", "member-from-header"}, want: "member-from-header"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			vendor := newDecisionsVendor(t, http.StatusOK, decisionsAnswer)
+			gw := newDecisionsGateway(t, decisionsSetup{vendor: vendor, creds: []domain.Credential{openAICred(nil)}})
+
+			rec := gw.post(t, withID, tc.headers...)
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+			confirms, _ := gw.spend.settled(t)
+			require.Len(t, confirms, 1)
+			assert.Equal(t, tc.want, confirms[0].Attribution.EndUserID)
+		})
+	}
 }
 
 // @scenario "The provider's base URL decides where a decisions call goes"

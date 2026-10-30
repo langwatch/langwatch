@@ -564,9 +564,10 @@ func endUserID(ctx context.Context, params aitrace.Params) string {
 		aitrace.RequestTypeResponses, aitrace.RequestTypeSpeech,
 		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		return EndUserIDFromBody(params.RequestBody)
+	case aitrace.RequestTypeDecisions:
+		return DecisionsEndUserIDFromBody(params.RequestBody)
 	case aitrace.RequestTypeMessages, aitrace.RequestTypePassthrough,
-		aitrace.RequestTypeTranscription, aitrace.RequestTypeRealtimeSession,
-		aitrace.RequestTypeDecisions:
+		aitrace.RequestTypeTranscription, aitrace.RequestTypeRealtimeSession:
 		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
 		// messages body carries attribution under metadata.user_id, passthrough
 		// bodies are provider-shaped and forwarded verbatim, transcription
@@ -585,6 +586,15 @@ func endUserID(ctx context.Context, params aitrace.Params) string {
 func EndUserIDFromBody(body []byte) string {
 	if user := gjson.GetBytes(body, "user").String(); user != "" {
 		return SanitizeEndUserID(user)
+	}
+	return ""
+}
+
+// DecisionsEndUserIDFromBody reads the Decisions API's `safety_identifier`,
+// its end-user field, through the same sanitizer as EndUserIDFromBody.
+func DecisionsEndUserIDFromBody(body []byte) string {
+	if id := gjson.GetBytes(body, "safety_identifier").String(); id != "" {
+		return SanitizeEndUserID(id)
 	}
 	return ""
 }

@@ -76,10 +76,17 @@ func (r *BifrostRouter) dispatchDecisions(
 	return out, nil
 }
 
-// decisionsUsage reads the token counts a Decisions answer reports. The API
-// states input_tokens, and output_tokens when the model produced any.
+// decisionsUsage reads the token counts a Decisions answer reports:
+// input_tokens (cached ones included, stated apart under
+// input_tokens_details), and output_tokens when the model produced any.
 func decisionsUsage(body []byte) domain.Usage {
 	in := int(gjson.GetBytes(body, "usage.input_tokens").Int())
 	out := int(gjson.GetBytes(body, "usage.output_tokens").Int())
-	return domain.Usage{PromptTokens: in, CompletionTokens: out, TotalTokens: in + out}
+	cached := int(gjson.GetBytes(body, "usage.input_tokens_details.cached_tokens").Int())
+	return domain.Usage{
+		PromptTokens:     in,
+		CompletionTokens: out,
+		TotalTokens:      in + out,
+		CacheReadTokens:  min(cached, in),
+	}
 }
