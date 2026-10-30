@@ -709,6 +709,26 @@ Feature: Redacting personal data from traces
     When a trace is ingested whose input is a long opaque token
     Then the stored input is byte-for-byte what was sent
 
+  # Finding an address used to take time that grew with the square of the
+  # value's length: the address pattern was retried from every position of a
+  # long run of letters and digits. One large span (an embedded image, a token
+  # or a hash beside an "@") held a worker for over a minute, and every other
+  # job on it waited. The address is now found in one pass, and it finds the
+  # same addresses the pattern did.
+  #
+  # Bindings: packages/redaction/src/__tests__/essentialPii.emailScan.unit.test.ts
+  @unit
+  Scenario: A large value beside an address marker does not hold up the worker
+    When a trace is ingested whose input is the largest value redaction scans,
+      one long run of letters and digits with an "@" beside it
+    Then redaction of that value finishes within a second
+
+  @unit
+  Scenario: An address is redacted exactly where the old pattern found one
+    When a trace is ingested whose input packs addresses against each other
+      and against text that only looks like an address
+    Then the same addresses are redacted as before, and nothing else
+
   # Phone numbers are the same idea again, counted in digits rather than in
   # characters: text whose longest run of digits is shorter than any phone
   # number is skipped. A trace full of version numbers, token counts and
