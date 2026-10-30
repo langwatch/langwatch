@@ -26,28 +26,40 @@ const logger = createLogger("langwatch:analytics:lwql");
 /** The LangWatchQL run counter, histograms and failure log line; one instance per app. */
 export class LangWatchQLRunTelemetryService {
   /** Declares the three instruments; their series are written on first use. */
-  static create(): LangWatchQLRunTelemetryService {
-    return new LangWatchQLRunTelemetryService(
-      counter({
+  static create({ queryHashKey }: { queryHashKey: Uint8Array }): LangWatchQLRunTelemetryService {
+    return new LangWatchQLRunTelemetryService({
+      queryHashKey,
+      runs: counter({
         name: "lwql_queries_total",
         description: "LangWatchQL runs by caller and outcome (ok, empty, or the error code)",
       }),
-      histogram({
+      duration: histogram({
         name: "lwql_query_duration_seconds",
         description: "LangWatchQL run time, the database's plus hydration's, by caller",
       }),
-      histogram({
+      rowsRead: histogram({
         name: "lwql_rows_read",
         description: "Rows the database read for one LangWatchQL run, by caller",
       }),
-    );
+    });
   }
 
-  private constructor(
-    private readonly runs: CounterHandle,
-    private readonly duration: HistogramHandle,
-    private readonly rowsRead: HistogramHandle,
-  ) {}
+  private readonly queryHashKey: Uint8Array;
+  private readonly runs: CounterHandle;
+  private readonly duration: HistogramHandle;
+  private readonly rowsRead: HistogramHandle;
+
+  private constructor(parts: {
+    queryHashKey: Uint8Array;
+    runs: CounterHandle;
+    duration: HistogramHandle;
+    rowsRead: HistogramHandle;
+  }) {
+    this.queryHashKey = parts.queryHashKey;
+    this.runs = parts.runs;
+    this.duration = parts.duration;
+    this.rowsRead = parts.rowsRead;
+  }
 
   /** A run that answered: counted as ok or empty, with its time and the rows it read. */
   recordAnswered({
@@ -69,6 +81,17 @@ export class LangWatchQLRunTelemetryService {
     return outcome;
   }
 
+  /** A run's own log-line fields: the caller, the widget's ids, and the keyed query hash. */
+  fieldsFor({
+    telemetry,
+    sql,
+  }: {
+    telemetry: LangWatchQLRunTelemetry | undefined;
+    sql: string;
+  }): Readonly<Record<string, string>> {
+    return langWatchQLTelemetryFields({ telemetry, sql, queryHashKey: this.queryHashKey });
+  }
+
   /** A run refused or failed anywhere on its way: logged and counted under its error code. */
   recordFailed({
     telemetry,
@@ -81,9 +104,6 @@ export class LangWatchQLRunTelemetryService {
   }): void {
     const outcome = langWatchQLFailureOutcome(error);
     this.runs.inc({ caller: langWatchQLTelemetryCaller(telemetry), outcome });
-    logger.info(
-      { ...langWatchQLTelemetryFields({ telemetry, sql }), outcome },
-      "LangWatchQL failed",
-    );
+    logger.info({ ...this.fieldsFor({ telemetry, sql }), outcome }, "LangWatchQL failed");
   }
 }

@@ -7,11 +7,11 @@
 import { useState } from "react";
 
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
+import { curatedBoardTelemetryId } from "../../../dashboard-widget/model/widget-run-telemetry.ts";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
-import { curatedBoardTelemetryId } from "../../model/dashboard-usage-events.ts";
 import { widgetSourcesLine } from "../../model/widget-sources.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";

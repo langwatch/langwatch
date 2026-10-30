@@ -1,0 +1,86 @@
+---
+title: POST /v1/decisions
+description: OpenAI Decisions API through the LangWatch AI Gateway.
+sidebarTitle: Decisions
+---
+
+## Endpoint
+
+```http
+POST /v1/decisions
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: application/json
+```
+
+The body is an OpenAI Decisions API request: an `input` and a list of typed `questions`. The gateway resolves `model` through the virtual key, then forwards the body to the OpenAI provider bound to the key, with the resolved model and the provider's API key in place of the virtual key. The answer comes back as OpenAI wrote it.
+
+## Request
+
+```bash
+curl https://gateway.langwatch.ai/v1/decisions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-6-luna",
+    "input": "Can the deploy agent read the production database password?",
+    "questions": [
+      {
+        "type": "choice",
+        "name": "release",
+        "instructions": "Decide whether to release the secret.",
+        "choices": [
+          { "value": "allow", "description": "Release it" },
+          { "value": "deny", "description": "Keep it" }
+        ]
+      },
+      { "type": "predicate", "name": "requester_backs_it", "instructions": "Does the requester back the request?" }
+    ]
+  }'
+```
+
+## Response
+
+```json
+{
+  "answers": [
+    {
+      "type": "choice",
+      "name": "release",
+      "choice": "allow",
+      "probabilities": [
+        { "value": "allow", "probability": 0.9 },
+        { "value": "deny", "probability": 0.1 }
+      ],
+      "confidence": 0.9
+    },
+    { "type": "predicate", "name": "requester_backs_it", "probability": 0.8 }
+  ],
+  "usage": { "input_tokens": 1234 }
+}
+```
+
+## Which providers serve it
+
+Only an OpenAI provider. A key with no OpenAI provider answers `400 model_provider_not_bound`. The request goes to the provider's base URL: with none set it goes to `https://api.openai.com`, and with `https://eu.api.openai.com` (with or without `/v1`) it goes to OpenAI's EU endpoint.
+
+## Metering and tracing
+
+Budgets are checked before the call; a key over its budget answers `402 budget_exceeded` and the provider is not called. `usage.input_tokens` and `usage.output_tokens` are charged at the model's price, on the key's spend and budgets.
+
+The trace span records the model, provider, status, latency, token usage and cost. It never records the `input`, the `questions` or the `answers`.
+
+Guardrails are separate from tracing. When the key has guardrails, the request body goes to the guardrail check and its evaluator can record what it scores. For private input, use a key without guardrails. See [Guardrails boundaries](/ai-gateway/guardrails#boundaries).
+
+## End-user attribution
+
+The `X-LangWatch-End-User-Id` header names the end user for spend and per-user budgets. Without it, the body's `safety_identifier` is used.
+
+## Streaming
+
+This endpoint does not stream.
+
+## Errors
+
+Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `bad_request` (all `400`), `budget_exceeded` (`402`) and `payload_too_large` (`413`, a body over the gateway's request size cap). The checks every gateway route runs can also answer, depending on the key's settings: `end_user_required`, `rate_limited`, `policy_violation`, `guardrail_blocked`, `guardrail_upstream_unavailable`. The full table is on [Errors](/ai-gateway/api/errors).
+
+A provider's own error is forwarded with its status and body. When a call runs long enough for a keep-alive byte, the response carries `X-LangWatch-Heartbeat-Active: true` and the status is already `200`; a later error then arrives in the body, so read the body for an `error` key.

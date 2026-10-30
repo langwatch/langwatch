@@ -52,6 +52,7 @@ import {
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { type Authorization, type RestCredentialPrincipal } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { ConfigParseError } from "@langwatch/config";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -62,7 +63,13 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { isAggregateProjectKind, ProjectApi } from "@langwatch/project-contract";
-import { Secret } from "@langwatch/secrets";
+import {
+  apiKeyPepper,
+  credentialsSecret,
+  Secret,
+  sessionSecret,
+  type ScopedSecrets,
+} from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
@@ -100,6 +107,7 @@ import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } fro
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
+import { langWatchQLQueryHashKey } from "../rules/langwatch-ql-run-telemetry.rules.ts";
 import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
@@ -367,6 +375,28 @@ type AnalyticsSetup = FeatureSetup<
 >;
 
 /**
+ * The deployment secret the query-hash key derives from, first set wins: API_KEY_PEPPER,
+ * CREDENTIALS_SECRET, NEXTAUTH_SECRET, as api-key peppers keys. None refuses the boot rather
+ * than logging a hash anyone can recompute.
+ */
+async function queryHashSecret(secrets: ScopedSecrets): Promise<string> {
+  const { queryHashKey, queryHashKeyFallback, queryHashKeyLastFallback } = AnalyticsModule.secrets;
+  const secret = await secrets.into(queryHashKey, (primary) =>
+    secrets.into(queryHashKeyFallback, (credentials) =>
+      secrets.into(queryHashKeyLastFallback, (session) =>
+        [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
+      ),
+    ),
+  );
+  if (secret === void 0) {
+    throw new ConfigParseError([
+      "analytics.queryHashKey ← API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET: none is set",
+    ]);
+  }
+  return secret;
+}
+
+/**
  * The two reads hydration makes, in the Trace peer's own vocabulary: it names
  * traces and threads where hydration names keys.
  */
@@ -416,10 +446,16 @@ export class AnalyticsModule
     retention: DataRetentionApi,
   };
   static readonly config = analyticsServerConfig;
-  /** The restricted identity's password and the PostgreSQL reader's (ADR-132). */
+  /**
+   * The restricted identity's password and the PostgreSQL reader's (ADR-132), and the chain the
+   * LangWatchQL query-hash key derives from.
+   */
   static readonly secrets = {
     lwqlClickHousePassword: Secret.load("LWQL_CLICKHOUSE_PASSWORD", { optional: true }),
     lwqlPostgresReaderPassword: Secret.load("LWQL_POSTGRES_READER_PASSWORD", { optional: true }),
+    queryHashKey: apiKeyPepper,
+    queryHashKeyFallback: credentialsSecret,
+    queryHashKeyLastFallback: sessionSecret,
   } as const;
 
   static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
@@ -497,7 +533,9 @@ export class AnalyticsModule
       // The page is a pass: the statement re-validated, then read inside its wrapper.
       runner: { executeLangWatchQLPass: (input) => app.executeLangWatchQLPass(input) },
     });
-    const runTelemetry = LangWatchQLRunTelemetryService.create();
+    const runTelemetry = LangWatchQLRunTelemetryService.create({
+      queryHashKey: langWatchQLQueryHashKey(await queryHashSecret(setup.secrets)),
+    });
     const langWatchQL = LangWatchQLServiceClass.create({
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,

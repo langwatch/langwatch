@@ -61,13 +61,20 @@ it. The outcome panel shows aborts as their own line.
   "Add a widget", not questions typed in Langy's own composer. Widgets Langy
   makes on the server send no browser event.
 
-## The query hash is not a privacy control
+## The query hash is keyed
 
-`queryHash` is the first 16 hex characters of an unsalted SHA-256 of the
-statement with its whitespace collapsed. It only groups the same slow query in
-the logs. Anyone with the log line can confirm a guessed statement, literals
-included, so treat the hash like the query text: internal logs only, never in
-a product event or a customer-facing surface.
+`queryHash` is the first 16 hex characters of an HMAC-SHA256 of the statement
+with its whitespace collapsed. The key is derived from the deployment secret
+(`API_KEY_PEPPER`, else `CREDENTIALS_SECRET`, else `NEXTAUTH_SECRET`) under the
+label `lwql-query-hash`, never the secret itself. The same query groups within
+one deployment. Without the secret, a log line cannot confirm a guessed
+statement or its literals. A deployment with none of the three refuses to boot,
+as api-key already does.
+
+The hash still groups queries, so keep it in internal logs only, never in a
+product event or a customer-facing surface. Rotating the secret starts new
+groups. Whether hashes and ids belong in logs and PostHog at all is still an
+open question with Drew.
 
 ## Cardinality
 

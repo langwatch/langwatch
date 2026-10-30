@@ -4,6 +4,8 @@
  * a bare statement gets the default `LIMIT`, and an oversized result is `lwql_result_too_large`.
  */
 
+import { randomBytes } from "node:crypto";
+
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
@@ -94,9 +96,10 @@ export interface LangWatchQLServiceDependencies {
   readonly stopwatch?: () => number;
   /**
    * Counts each answered run; the app passes the instance its doors count refused runs on.
-   * Absent only in a suite that builds this service alone, which then counts on its own.
+   * Absent only in a suite that builds this service alone, which then counts on its own, its
+   * query hash keyed by a random key of its own.
    */
-  readonly runTelemetry?: Pick<LangWatchQLRunTelemetryService, "recordAnswered">;
+  readonly runTelemetry?: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
 }
 
 export class LangWatchQLService {
@@ -123,7 +126,9 @@ export class LangWatchQLService {
         hydration: deps.hydration,
         judging: deps.judging,
       }),
-      runTelemetry: deps.runTelemetry ?? LangWatchQLRunTelemetryService.create(),
+      runTelemetry:
+        deps.runTelemetry ??
+        LangWatchQLRunTelemetryService.create({ queryHashKey: randomBytes(32) }),
     });
   }
 

@@ -143,7 +143,8 @@ Feature: Dashboards telemetry: product events and query telemetry
     When a LangWatchQL query runs
     Then its "LangWatchQL executed" log line carries caller, outcome and queryHash
     And a widget's run also carries its dashboardId, widgetId and templateId when it has them
-    And queryHash is a hash of the whitespace-normalised SQL, never the SQL text
+    And queryHash is a keyed hash of the whitespace-normalised SQL, never the SQL text
+    And its key is derived from the deployment secret, never the secret itself
     And outcome is "ok" when rows came back and "empty" when none did
 
   @unit
