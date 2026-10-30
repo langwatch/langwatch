@@ -123,8 +123,35 @@ declare const URL: new (input: string) => {
   origin: string;
 };
 
-/** Liquid output and tags, the two things a hooks URL renders per run. */
-const TEMPLATE = /\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/g;
+/**
+ * Replaces each Liquid output `{{ ... }}` and tag `{% ... %}` with the placeholder, the two things
+ * a hooks URL renders per run. Left to right, each opener takes the first closer after it. One
+ * scan: a `/\{\{[\s\S]*?\}\}/` regex retries from every unclosed opener, quadratic on long input.
+ */
+function renderTemplates(hooksUrl: string, placeholder: string): string {
+  let out = "";
+  let i = 0;
+  let outputUnclosed = false;
+  let tagUnclosed = false;
+  while (i < hooksUrl.length) {
+    let close = -1;
+    if (!outputUnclosed && hooksUrl.startsWith("{{", i)) {
+      close = hooksUrl.indexOf("}}", i + 2);
+      if (close < 0) outputUnclosed = true;
+    } else if (!tagUnclosed && hooksUrl.startsWith("{%", i)) {
+      close = hooksUrl.indexOf("%}", i + 2);
+      if (close < 0) tagUnclosed = true;
+    }
+    if (close < 0) {
+      out += hooksUrl[i];
+      i += 1;
+    } else {
+      out += placeholder;
+      i = close + 2;
+    }
+  }
+  return out;
+}
 
 /** A brace, raw or percent-encoded: a template, or what renders into one. */
 const BRACE = /[{}]|%7B|%7D/i;
@@ -136,10 +163,17 @@ const BRACE = /[{}]|%7B|%7D/i;
  */
 const SCHEME_AND_AUTHORITY = /^(?:[a-z][a-z0-9+.-]*:)?[/\\]*[^/\\?#]*/i;
 
-/** The value the URL parser reads: C0 controls and spaces trimmed, tabs and newlines removed. */
+/**
+ * The value the URL parser reads: C0 controls and spaces trimmed, tabs and newlines removed. The
+ * trim is an index scan, not a regex: a `[\u0000- ]+$` pattern backtracks quadratically on a long
+ * control run.
+ */
 function asParsed(hooksUrl: string): string {
-  // eslint-disable-next-line no-control-regex -- the parser strips exactly these
-  return hooksUrl.replace(/^[\u0000- ]+|[\u0000- ]+$/g, "").replace(/[\t\n\r]/g, "");
+  let start = 0;
+  let end = hooksUrl.length;
+  while (start < end && hooksUrl.charCodeAt(start) <= 0x20) start += 1;
+  while (end > start && hooksUrl.charCodeAt(end - 1) <= 0x20) end -= 1;
+  return hooksUrl.slice(start, end).replace(/[\t\n\r]/g, "");
 }
 
 /** Where a URL sends a call once its templates render as a placeholder, if it parses. */
@@ -147,7 +181,7 @@ type Destination = { parses: true; key: string; origin: string } | { parses: fal
 
 function destination(hooksUrl: string, placeholder: string): Destination {
   try {
-    const url = new URL(hooksUrl.replace(TEMPLATE, placeholder));
+    const url = new URL(renderTemplates(hooksUrl, placeholder));
     // Scheme, user, password and host: what a template must not choose.
     return {
       parses: true,

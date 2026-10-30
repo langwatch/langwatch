@@ -85,3 +85,44 @@ describe("readHooksOrigin", () => {
     });
   });
 });
+
+describe("hooks URL trimming", () => {
+  it("reads a 100k-char hostile control-character run in under 100 ms", () => {
+    const hostile = "a" + "\u0000".repeat(100_000) + "x";
+    const started = Date.now();
+    readHooksOrigin(hostile);
+    templatesHooksOrigin(hostile);
+    expect(Date.now() - started).toBeLessThan(100);
+  });
+
+  it("reads a 100k-char hostile control-and-at-sign repeat in under 100 ms", () => {
+    const hostile = "\u0000@".repeat(50_000) + "x";
+    const started = Date.now();
+    readHooksOrigin(hostile);
+    templatesHooksOrigin(hostile);
+    expect(Date.now() - started).toBeLessThan(100);
+  });
+
+  it("trims leading and trailing C0 controls and spaces", () => {
+    expect(readHooksOrigin("\u0001 \t\u001f https://support.example/hooks\u0000 \u001f ")).toEqual({
+      isFixed: true,
+      origin: "https://support.example",
+    });
+  });
+
+  it("trims a leading NUL and a trailing space before the template check", () => {
+    expect(templatesHooksOrigin("\u0000https:///{{p.h}}/hook")).toBe(true);
+    expect(templatesHooksOrigin("https://support.example/hooks/{{ params.id }} \u0000")).toBe(
+      false,
+    );
+  });
+});
+
+describe("hooks URL template scan", () => {
+  it("scans 50k unclosed Liquid openers in under 100 ms", () => {
+    const hostile = "https://support.example/" + "{{".repeat(50_000);
+    const started = Date.now();
+    templatesHooksOrigin(hostile);
+    expect(Date.now() - started).toBeLessThan(100);
+  });
+});
