@@ -67,12 +67,12 @@ class StandInIntersectionObserver {
   }
 }
 
-/** Tells every live observer whether its card is on screen. */
-function cardsShow({ onScreen }: { onScreen: boolean }) {
+/** Tells every live observer how much of its card is on screen, 0 to 1. */
+function cardShows({ share }: { share: number }) {
   act(() => {
     for (const observer of observers.filter(({ disconnected }) => !disconnected)) {
       observer.callback(
-        [{ isIntersecting: onScreen } as IntersectionObserverEntry],
+        [{ isIntersecting: share > 0, intersectionRatio: share } as IntersectionObserverEntry],
         {} as IntersectionObserver,
       );
     }
@@ -122,11 +122,11 @@ describe("given a board's widget card", () => {
   /** @scenario "Telemetry: a widget on screen sends dashboards.viewed.widget once per board view" */
   it("sends nothing until the card shows, then one view with where the widget came from", () => {
     storedCard(widget);
-    cardsShow({ onScreen: false });
+    cardShows({ share: 0 });
     expect(viewed()).toEqual([]);
 
-    cardsShow({ onScreen: true });
-    cardsShow({ onScreen: true });
+    cardShows({ share: 1 });
+    cardShows({ share: 1 });
 
     expect(viewed()).toEqual([
       {
@@ -139,9 +139,21 @@ describe("given a board's widget card", () => {
   });
 
   /** @scenario "Telemetry: a widget on screen sends dashboards.viewed.widget once per board view" */
+  it("sends nothing while less than half the card shows, and one view once half of it does", () => {
+    storedCard(widget);
+    cardShows({ share: 0.13 });
+    expect(viewed()).toEqual([]);
+
+    cardShows({ share: 0.5 });
+    cardShows({ share: 0.8 });
+
+    expect(viewed()).toHaveLength(1);
+  });
+
+  /** @scenario "Telemetry: a widget on screen sends dashboards.viewed.widget once per board view" */
   it("counts a widget saved before its source was kept as unknown", () => {
     storedCard({ ...widget, definition: DEFINITION });
-    cardsShow({ onScreen: true });
+    cardShows({ share: 1 });
 
     expect(viewed().map(({ attributes }) => attributes)).toEqual([{ widgetSource: "unknown" }]);
   });
@@ -149,10 +161,10 @@ describe("given a board's widget card", () => {
   /** @scenario "Telemetry: a widget on screen sends dashboards.viewed.widget once per board view" */
   it("sends a view again when the board is opened again", () => {
     storedCard(widget);
-    cardsShow({ onScreen: true });
+    cardShows({ share: 1 });
     cleanup();
     storedCard(widget);
-    cardsShow({ onScreen: true });
+    cardShows({ share: 1 });
 
     expect(viewed()).toHaveLength(2);
   });
@@ -183,7 +195,7 @@ describe("given a From LangWatch board's widget card", () => {
       host: new StubAnalyticsHost(),
       answer: NO_ANSWER,
     });
-    cardsShow({ onScreen: true });
+    cardShows({ share: 1 });
 
     expect(viewed().map(({ attributes }) => attributes)).toEqual([{ widgetSource: "curated" }]);
   });

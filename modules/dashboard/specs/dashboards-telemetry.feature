@@ -98,10 +98,10 @@ Feature: Dashboards telemetry: product events and query telemetry
   @integration
   Scenario: Telemetry: a widget on screen sends dashboards.viewed.widget once per board view
     Given a member has a board open
-    When a widget's card first shows on screen
+    When half of the widget's card first shows on screen
     Then "dashboards.viewed.widget" is sent once with widgetSource "catalogue", "langy", "code", "api", "curated" or "unknown"
     And the card showing again in the same view sends nothing more
-    And a card that never shows on screen sends nothing
+    And a card with less than half of the widget on screen sends nothing
 
   @integration
   Scenario: Telemetry: picking a board period sends dashboards.changed.period

@@ -27,7 +27,7 @@ export function useWidgetViewed({
     if (!node || sent.current || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (sent.current || !entries.some((entry) => entry.isIntersecting)) return;
+        if (sent.current || !entries.some((entry) => entry.intersectionRatio >= SEEN_SHARE)) return;
         sent.current = true;
         observer.disconnect();
         analytics.track(widgetViewed({ widgetSource }));
