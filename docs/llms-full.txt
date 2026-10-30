@@ -2866,7 +2866,7 @@ This endpoint does not stream.
 
 ## Errors
 
-Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `bad_request` (all `400`) and `budget_exceeded` (`402`). The checks every gateway route runs can also answer, depending on the key's settings: `end_user_required`, `rate_limited`, `policy_violation`, `guardrail_blocked`, `guardrail_upstream_unavailable`. The full table is on [Errors](/ai-gateway/api/errors).
+Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `bad_request` (all `400`), `budget_exceeded` (`402`) and `payload_too_large` (`413`, a body over the gateway's request size cap). The checks every gateway route runs can also answer, depending on the key's settings: `end_user_required`, `rate_limited`, `policy_violation`, `guardrail_blocked`, `guardrail_upstream_unavailable`. The full table is on [Errors](/ai-gateway/api/errors).
 
 A provider's own error is forwarded with its status and body. When a call runs long enough for a keep-alive byte, the response carries `X-LangWatch-Heartbeat-Active: true` and the status is already `200`; a later error then arrives in the body, so read the body for an `error` key.
 
