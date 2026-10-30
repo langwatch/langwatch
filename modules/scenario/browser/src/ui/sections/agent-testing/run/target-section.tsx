@@ -6,12 +6,13 @@
  */
 
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { chakra, VStack } from "@langwatch/design-system/primitives";
+import { Box, chakra, VStack } from "@langwatch/design-system/primitives";
 import { getRoutePath } from "@langwatch/workflow-contract";
 
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
+import { ConnectedAgentHooksHint } from "../../../elements/connected-agent-hooks-hint.tsx";
 import { type PromptEntry, PromptPicker } from "./prompt-picker.tsx";
 import type { RunDialogMode } from "./run-dialog-types.ts";
 import { AgentBlocks, type RunDialogAgent, SetupAgentBox } from "./run-target-picker.tsx";
@@ -57,6 +58,10 @@ export function TargetSection(props: TargetSectionProps) {
   const showsPromptPicker = mode === "prompts";
   const showsAgentBlocks = !showsPromptPicker && agents.length > 0;
   const showsAgentSetup = !showsPromptPicker && agents.length === 0;
+  const selectedConnected =
+    showsAgentBlocks && target?.type === "connected"
+      ? agents.find((agent) => agent.id === target.id)
+      : undefined;
 
   return (
     <VStack align="stretch" gap={0} data-testid="run-dialog-target-section">
@@ -75,6 +80,14 @@ export function TargetSection(props: TargetSectionProps) {
         <PromptPicker prompts={prompts} selected={target} onSelect={onSelect} />
       )}
       {showsAgentBlocks && <AgentBlocks agents={agents} selected={target} onSelect={onSelect} />}
+      {selectedConnected && (
+        <Box marginTop={2}>
+          <ConnectedAgentHooksHint
+            status={selectedConnected.status}
+            config={selectedConnected.config}
+          />
+        </Box>
+      )}
       {showsAgentSetup && <SetupAgentBox onSetup={props.onSetupAgent} />}
     </VStack>
   );

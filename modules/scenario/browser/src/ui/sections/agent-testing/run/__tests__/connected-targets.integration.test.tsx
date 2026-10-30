@@ -15,6 +15,7 @@ import {
   OFFLINE_AGENT_SELECT_COPY,
   scenarioAgentsOf,
 } from "../../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
+import type { TargetValue } from "../../../../../model/scenario-target.ts";
 import { OfflineTargetsNotice } from "../offline-targets-notice.tsx";
 import type { RunDialogAgent } from "../run-target-picker.tsx";
 import { TargetSection } from "../target-section.tsx";
@@ -59,13 +60,13 @@ function agentsFor(rows: ReturnType<typeof connectedRow>[]): RunDialogAgent[] {
   });
 }
 
-function renderSection(agents: RunDialogAgent[]) {
+function renderSection(agents: RunDialogAgent[], target: TargetValue = null) {
   return renderWithDesignSystem(
     <TargetSection
       mode="agents"
       agents={agents}
       prompts={[]}
-      target={null}
+      target={target}
       onSelect={vi.fn()}
       onRemovePromptPicker={vi.fn()}
       onSetupAgent={vi.fn()}
@@ -93,6 +94,40 @@ describe("connected agents in the run dialog", () => {
       expect(screen.getByTestId("agent-presence-agent_on")).toBeInTheDocument();
       expect(screen.getByText("Online")).toBeInTheDocument();
       expect(screen.getByText("Offline")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the hooks line under the cards", () => {
+    it("names the hooks the selected online connected agent declares", () => {
+      const rows = [
+        { ...connectedRow({ id: "agent_h" }), config: { hooks: { setup: true, teardown: false } } },
+      ];
+      renderSection(agentsFor(rows), { type: "connected", id: "agent_h" });
+
+      expect(screen.getByTestId("connected-agent-hooks-hint")).toHaveTextContent(
+        "declares a setup hook",
+      );
+    });
+
+    it("says none are declared for an online agent without hooks", () => {
+      renderSection(agentsFor([connectedRow({ id: "agent_n" })]), {
+        type: "connected",
+        id: "agent_n",
+      });
+
+      expect(screen.getByTestId("connected-agent-hooks-hint")).toHaveTextContent(
+        "No setup or teardown hooks declared",
+      );
+    });
+
+    it("is absent when nothing is selected or the selected agent is not connected", () => {
+      renderSection(agentsFor([connectedRow({ id: "agent_n" })]));
+      expect(screen.queryByTestId("connected-agent-hooks-hint")).not.toBeInTheDocument();
+      cleanup();
+
+      const http = { ...connectedRow({ id: "agent_http" }), type: "http" };
+      renderSection(agentsFor([http]), { type: "http", id: "agent_http" });
+      expect(screen.queryByTestId("connected-agent-hooks-hint")).not.toBeInTheDocument();
     });
   });
 

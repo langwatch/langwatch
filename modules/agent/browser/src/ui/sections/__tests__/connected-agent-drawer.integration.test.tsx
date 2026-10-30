@@ -189,4 +189,40 @@ describe("the connected agent drawer", () => {
       expect(result).toHaveTextContent("Hello from the agent");
     });
   });
+  describe("given the hooks line under the title", () => {
+    it("names both hooks an online agent declares, with a docs link", () => {
+      renderDrawer(connectedAgent({ config: { hooks: { setup: true, teardown: true } } }));
+      const hint = screen.getByTestId("connected-agent-hooks-hint");
+
+      expect(hint).toHaveTextContent("declares setup and teardown hooks");
+      expect(within(hint).getByRole("link", { name: "Learn more" })).toHaveAttribute(
+        "href",
+        "https://langwatch.ai/docs/agent-testing/setup-and-teardown-hooks",
+      );
+    });
+
+    it("names the one hook an online agent declares", () => {
+      renderDrawer(connectedAgent({ config: { hooks: { setup: false, teardown: true } } }));
+
+      expect(screen.getByTestId("connected-agent-hooks-hint")).toHaveTextContent(
+        "declares a teardown hook",
+      );
+    });
+
+    it("says none are declared when an online agent has no hooks", () => {
+      renderDrawer(connectedAgent());
+
+      expect(screen.getByTestId("connected-agent-hooks-hint")).toHaveTextContent(
+        "No setup or teardown hooks declared. Add them in the agent's code.",
+      );
+    });
+
+    it("gives the general line when the agent is offline", () => {
+      renderDrawer(connectedAgent({ status: "offline", instances: [] }));
+
+      expect(screen.getByTestId("connected-agent-hooks-hint")).toHaveTextContent(
+        "Setup and teardown hooks run from this agent's code",
+      );
+    });
+  });
 });
