@@ -14,6 +14,7 @@ import {
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
+import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
@@ -47,6 +48,13 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
     widgets: board.widgets,
   });
   useBoardOnScreen({ boardId: subject.id });
+  useDashboardViewed({
+    dashboardId: subject.id,
+    dashboardKind: "curated",
+    widgetCount: board.widgets.length,
+    isLoaded: true,
+    templateId: board.templateId,
+  });
   const langy = useLangyAsk();
   const empty = useEmptyWidgets();
   const emptyWidgetNames = empty.emptyNames({ widgets: board.widgets, keyOf: ({ key }) => key });

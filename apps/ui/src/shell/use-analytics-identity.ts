@@ -92,6 +92,14 @@ export function useAnalyticsIdentity(): void {
     analytics.group({ id: organizationId, name: organizationName });
   }, [analytics, userId, organizationId, organizationName]);
 
+  // Every later event carries the project in view, so a board's events read per project.
+  const projectId = scope.project?.id;
+  useEffect(() => {
+    if (!userId || !projectId) return;
+    analytics.register({ projectId });
+    return () => analytics.unregister("projectId");
+  }, [analytics, userId, projectId]);
+
   useEffect(() => () => analytics.reset(), [analytics]);
 }
 
