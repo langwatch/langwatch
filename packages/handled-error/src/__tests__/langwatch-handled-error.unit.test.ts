@@ -542,6 +542,7 @@ describe("parseHandledError, given a failure the platform did NOT name", () => {
     expect(parsed.isHandled).toBe(false);
   });
 
+  /** @scenario "an unnamed 403 is read as forbidden" */
   it.each([null, "Forbidden", "<html>Forbidden</html>"])(
     "reads an unnamed 403 as forbidden (%j)",
     (body) => {
@@ -568,6 +569,7 @@ describe("parseHandledError, given a failure the platform did NOT name", () => {
     expect(parsed).toMatchObject({ code, kind: code });
   });
 
+  /** @scenario "a 403 the platform named keeps its own code" */
   it.each(["api_key_permission_denied", "resource_limit_exceeded"])(
     "keeps a 403 the platform named %s",
     (code) => {
