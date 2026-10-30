@@ -45,7 +45,7 @@ Start from the widget's stored query. Write a query of your own only when no sto
 
 ## What counts as a finding
 
-A finding is what changed, got worse, got better or needs attention in the window. Quote real numbers from the query results.
+A finding is what changed, got worse or needs attention in the window, and what the person should do about it. Report a finding only when you can name a concrete next step, and say that step in its body. Quote real numbers from the query results.
 
 Before you report a total for the whole window, read its hourly steps. When most of a change falls in one or a few hours, that is the finding: name the hours and their numbers.
 
@@ -53,9 +53,10 @@ Report the most important finding first, and never more than the brief's maximum
 
 Each finding carries a verdict, its `tone`:
 
-- `bad`: it got worse, or it needs action.
-- `watch`: it moved and is worth a look.
-- `good`: it got better.
+- `bad`: it got worse or it is broken. The body says what to do.
+- `watch`: it may matter. The body says exactly what to check.
+
+Never report an improvement on its own: a finding that only says something got better names no next step. Never mark an improvement as `watch` to get it filed.
 
 ## A finding the person already has
 
@@ -78,7 +79,7 @@ Say in a line or two what you read. Then end the answer with exactly one card, a
     {
       "title": "Checkout errors doubled",
       "tone": "bad",
-      "body": "Errors on checkout rose from 41 to 96 against the day before. 71 of the 96 fell between 14:00 and 15:00 UTC.",
+      "body": "Errors on checkout rose from 41 to 96 against the day before. 71 of the 96 fell between 14:00 and 15:00 UTC. Open the checkout traces with errors from that hour and fix the call that fails most.",
       "topic": "errors",
       "validDays": 7,
       "widgetId": "a-widget-id-from-the-list",
@@ -96,8 +97,8 @@ Copy the shape, never the example: an answer that hands the example finding back
 - `kind` and `blockId` are written exactly as shown.
 - `board` is the dashboard's id and name from the brief. `window` is the brief's window in epoch milliseconds, with the brief's step as `granularitySeconds`.
 - `title` (required, at most 120 characters): the reader decides in one sentence whether to care.
-- `tone` (required): `bad`, `watch` or `good`.
-- `body` (required, plain text, at most 4,000 characters): what happened, with the numbers.
+- `tone` (required): `bad` or `watch`.
+- `body` (required, plain text, at most 4,000 characters): what happened, with the numbers, and the next step: what to do for `bad`, what to check for `watch`.
 - `topic` (optional): one word.
 - `validDays` (optional, 1 to 90): how many days the finding stays true.
 - `widgetId` and `widgetName` (optional): the id and the name of the listed widget the finding came from.

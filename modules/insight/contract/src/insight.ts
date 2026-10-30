@@ -6,6 +6,18 @@ export const INSIGHT_TONES = ["bad", "watch", "good"] as const;
 export const insightToneSchema = z.enum(INSIGHT_TONES);
 export type InsightTone = z.infer<typeof insightToneSchema>;
 
+/**
+ * The verdicts a new insight is filed with: each names a next step.
+ * `good` names none, so only insights stored before it was retired still carry it.
+ */
+export const ACTIONABLE_INSIGHT_TONES = ["bad", "watch"] as const satisfies readonly InsightTone[];
+export type ActionableInsightTone = (typeof ACTIONABLE_INSIGHT_TONES)[number];
+
+/** Whether a verdict names a next step, so a new insight may be filed with it. */
+export function isActionableTone(tone: InsightTone): tone is ActionableInsightTone {
+  return (ACTIONABLE_INSIGHT_TONES as readonly InsightTone[]).includes(tone);
+}
+
 export const insightTitleSchema = z.string().trim().min(1).max(200);
 /** Markdown-lite: paragraphs split on blank lines, a paragraph of only `**Header**` is a header. */
 export const insightBodySchema = z.string().trim().min(1).max(20_000);
@@ -126,7 +138,8 @@ const fileInsightInputSchemaDefinition = z
     ...insightProjectScopeSchema.shape,
     title: insightTitleSchema,
     body: insightBodySchema,
-    tone: insightToneSchema,
+    // Nothing new is filed `good`: a filing names a next step. Stored entries keep it.
+    tone: z.enum(ACTIONABLE_INSIGHT_TONES),
     topic: insightTopicSchema.optional(),
     validDays: insightValidDaysSchema.default(DEFAULT_INSIGHT_VALID_DAYS),
     lwql: z.string().trim().min(1).max(20_000).optional(),

@@ -103,6 +103,15 @@ Feature: The daily-insights skill
       And asks for a key on every finding that stays the same when the finding is found again
 
     @unit
+    Scenario: The skill asks only for findings that name a next step
+      Given the daily-insights skill
+      When it is read
+      Then it tells Langy to report a finding only when it can name a concrete next step, and to say that step in the body
+      And it asks bad findings to say what to do, and watch findings to say exactly what to check
+      And it tells Langy never to report an improvement on its own
+      And it offers bad and watch as the only tones
+
+    @unit
     Scenario: The skill asks for no link in a finding
       Given the daily-insights skill
       When it is read

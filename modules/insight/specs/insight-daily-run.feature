@@ -218,7 +218,7 @@ Feature: The daily insights run
 
     @unit
     Scenario: A card that fails a run's checks is not rescued by a fenced block
-      Given an answer whose card holds a finding over a run's limits, and a good fenced block
+      Given an answer whose card holds a finding over a run's limits, and a valid fenced block
       When the run is carried out
       Then no insight is filed
       And the run is recorded as failed with the reason bad_output
@@ -260,14 +260,14 @@ Feature: The daily insights run
 
     @unit
     Scenario: One finding over the limits fails the whole answer
-      Given an answer with one good finding and one whose title is 300 characters long
+      Given an answer with one valid finding and one whose title is 300 characters long
       When the answer is checked
       Then the answer is refused whole
       And no finding is taken from it
 
     @unit
     Scenario: A finding longer than a run may file fails the whole answer
-      Given an answer with one good finding and one whose title is 121 characters or whose body is 4,001
+      Given an answer with one valid finding and one whose title is 121 characters or whose body is 4,001
       When the answer is checked
       Then the answer is refused whole
 
@@ -279,14 +279,14 @@ Feature: The daily insights run
 
     @unit
     Scenario: An answer with a web address files nothing
-      Given Langy answers one good finding and one whose body holds a link
+      Given Langy answers one valid finding and one whose body holds a link
       When the run is carried out
       Then no insight is filed
       And the run is recorded as failed with the reason finding_has_url
 
     @unit
     Scenario: A bad answer files nothing
-      Given Langy answers one good finding and one whose title is 300 characters long
+      Given Langy answers one valid finding and one whose title is 300 characters long
       When the run is carried out
       Then no insight is filed
       And the run is recorded as failed with the reason bad_output
@@ -322,7 +322,7 @@ Feature: The daily insights run
       Given the daily-insights skill as the manager embeds it
       When it is read beside the run's own limits
       Then it names the 120 and 4,000 character limits of a title and a body, and the 80 of a key
-      And the three tones, the card's fence and the reserved period parameters by their names
+      And the two tones a run files, the card's fence and the reserved period parameters by their names
 
     @unit
     Scenario: Two findings blocks in one answer are refused
@@ -372,6 +372,33 @@ Feature: The daily insights run
       Then the first is filed with no query and no window
       And the second keeps its query and the run's window
       And each query was validated with the protections of the person the run is for
+
+  Rule: A run files only findings that name a next step
+    An insight says what to do (bad) or exactly what to check (watch). Good news names no next step: the skill asks for none, and the run drops
+    a good finding before the cut to the maximum, so a model slip files nothing. Insights
+    stored with the good tone still read.
+
+    @unit
+    Scenario: A good finding in a run's answer is dropped and not filed
+      Given Langy answers a bad finding, a watch finding and a good finding
+      When the run is carried out
+      Then the bad and the watch findings are filed with their tones
+      And no insight is filed for the good finding
+      And the run's row reads filed with a count of 2
+
+    @unit
+    Scenario: A good finding takes no place among the maximum
+      Given an answer whose first finding is good, followed by more actionable findings than the maximum
+      When the answer is checked
+      Then the good finding is dropped and counted as dropped
+      And the maximum is taken from the actionable findings after it
+
+    @unit
+    Scenario: A run whose findings are all good files nothing
+      Given Langy answers only good findings
+      When the run is carried out
+      Then no insight is filed
+      And the run is recorded as nothing
 
   Rule: A finding that repeats an insight renews it
 
