@@ -11,6 +11,7 @@ import {
   HOOK_ERROR_BODY_CHARS,
   hookAnswer,
   hookIdempotencyKey,
+  hookOriginRefusal,
   hookRequestBody,
   hookSigningSecretReferences,
   hooksUrlRefusal,
@@ -157,6 +158,36 @@ describe("hooksUrlRefusal()", () => {
 
   it("refuses a value that is not a URL", () => {
     expect(hooksUrlRefusal("not a url")).toMatch(/not a valid URL/);
+  });
+});
+
+describe("hookOriginRefusal()", () => {
+  it("accepts a rendered URL on the saved hooks URL's origin", () => {
+    expect(
+      hookOriginRefusal({
+        hooksUrl: "https://shop.example.com/hooks/{{ params.tenant }}?run={{ params.run }}",
+        rendered: "https://shop.example.com/hooks/gold?run=r1",
+      }),
+    ).toBeNull();
+  });
+
+  /** @scenario "A hook whose rendered URL leaves the saved hooks origin is refused before any request" */
+  it.each([
+    ["https:///{{ params.host }}/hooks", "https:///attacker.test/hooks"],
+    ["https:/\\{{ params.host }}/hooks", "https:/\\attacker.test/hooks"],
+    ["https://{{ params.host }}/hooks", "https://attacker.test/hooks"],
+    ["{{ params.base }}/hooks", "https://attacker.test/hooks"],
+  ])("refuses %j, whose origin a template chooses", (hooksUrl, rendered) => {
+    expect(hookOriginRefusal({ hooksUrl, rendered })).toMatch(/hooks URL.*host/i);
+  });
+
+  it("refuses a rendered URL on another origin than the saved one", () => {
+    expect(
+      hookOriginRefusal({
+        hooksUrl: "https://shop.example.com/hooks",
+        rendered: "https://attacker.test/hooks",
+      }),
+    ).toMatch(/hooks URL.*host/i);
   });
 });
 

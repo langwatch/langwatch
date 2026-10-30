@@ -301,7 +301,12 @@ describe("a hooks signing secret typed into an HTTP agent", () => {
       "{{ params.scheme }}://support.example/hooks",
       "{{ params.base }}/hooks",
       "https://user:{{ params.password }}@support.example/hooks",
-    ])("refuses %s, on create and on update, before any secret is made", async (hooksUrl) => {
+      "https:///{{ params.host }}/hooks",
+      "https:/{{ params.host }}/hooks",
+      "https:/\\{{ params.host }}/hooks",
+      "HTTPS:\\/{{ params.host }}/hooks",
+      " https:////{{ params.host }}",
+    ])("refuses %j, on create and on update, before any secret is made", async (hooksUrl) => {
       const { secrets, values } = secretStoreFixture({ HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN });
       const { app } = createAgentAppFixture({ secrets });
       const templated = { ...withHooks(SIGNING_SECRET).config, hooksUrl };
