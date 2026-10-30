@@ -26,6 +26,7 @@ import { applyAuthentication } from "../../rules/http-auth.rules.ts";
 import {
   hookAnswer,
   hookIdempotencyKey,
+  hookOriginRefusal,
   hookRequestBody,
   hookSigningSecretReferences,
   hooksUrlRefusal,
@@ -328,7 +329,8 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     });
     const url = this.buildUrl(context, hooksUrl);
     // A template can render to a host the raw value did not show.
-    const renderedRefusal = hooksUrlRefusal(url, urlPolicy);
+    const renderedRefusal =
+      hooksUrlRefusal(url, urlPolicy) ?? hookOriginRefusal({ hooksUrl, rendered: url });
     if (renderedRefusal) throw new HttpHookError({ message: renderedRefusal });
     const idempotencyKey = hookIdempotencyKey({
       run: this.run,

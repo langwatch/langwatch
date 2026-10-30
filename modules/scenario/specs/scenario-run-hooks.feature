@@ -477,7 +477,15 @@ Feature: Scenario run hooks: setup and teardown
       Given an HTTP agent whose hooks URL is "https://{{ params.host }}/hooks"
       When it is created or updated
       Then the save is refused, naming the scheme and host, and no project secret is made
+      And a spelling the URL parser reads as a host, such as "https:///{{ params.host }}/hooks" or "https:/\{{ params.host }}/hooks", is refused the same way
       But a template in the path or the query of the hooks URL is saved
+
+    @integration
+    Scenario: A hook whose rendered URL leaves the saved hooks origin is refused before any request
+      Given an HTTP agent saved with a hooks URL whose host a template chooses, such as "https:///{{ params.host }}/hooks"
+      When a hook is called
+      Then no request is sent and the hook fails naming the hooks URL's host
+      And a rendered hooks URL on another origin than the saved one is refused the same way
 
     @unit
     Scenario: Rotating the hooks signing secret keeps the old one valid for 24 hours
