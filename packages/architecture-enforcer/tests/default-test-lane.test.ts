@@ -109,6 +109,18 @@ describe("default test lanes", () => {
         "an `export * from` re-export",
         'import { startStore } from "./support/star-barrel.ts";\nawait startStore();',
       ],
+      [
+        "a namespace import of the ClickHouse endpoint starter",
+        'import * as ch from "@langwatch/clickhouse-client/testing";\nawait ch.startTestClickHouseEndpoints({ suite: "s", names: ["a"], environment: {} });',
+      ],
+      [
+        "a namespace import of testcontainers",
+        'import * as tc from "testcontainers";\nawait new tc.GenericContainer("redis").start();',
+      ],
+      [
+        "a namespace import of a scoped testcontainers module",
+        'import * as tc from "@testcontainers/redis";\nawait new tc.RedisContainer("redis").start();',
+      ],
     ])("reports the file when it starts one through %s", (_name, test) => {
       workspace({
         "tools/probe/package.json": manifest("vitest run"),
@@ -120,6 +132,26 @@ describe("default test lanes", () => {
           'export { startStore as boot } from "./store.harness.ts";',
         "tools/probe/src/support/star-barrel.ts": 'export * from "./store.harness.ts";',
         "tools/probe/src/store.integration.test.ts": test,
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("src/store.integration.test.ts"),
+      ]);
+    });
+  });
+
+  describe("when the default lane reads a script CI does not run", () => {
+    it("reports a test:unit lane that collects a container starter while test stays clean", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: {
+            test: 'vitest run --exclude "**/*.integration.test.ts"',
+            "test:unit": "vitest run",
+          },
+        }),
+        "tools/probe/src/store.integration.test.ts":
+          'import { RedisContainer } from "@testcontainers/redis";\nawait new RedisContainer("redis").start();',
       });
 
       expect(lint().map((violation) => violation.message)).toEqual([

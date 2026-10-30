@@ -97,16 +97,21 @@ function callsStarter({
 /** Whether `namespace.name(...)` calls a starter of the module the namespace import names. */
 function namespaceCallStarts({
   callee,
+  constructs,
   bindings,
 }: {
   callee: ts.PropertyAccessExpression;
+  constructs: boolean;
   bindings: ReadonlyMap<string, Binding>;
 }) {
   if (!ts.isIdentifier(callee.expression)) return false;
   const namespace = bindings.get(callee.expression.text);
-  return namespace?.name === "*" && namespace.file !== undefined
-    ? containerStartingNames(namespace.file).has(callee.name.text)
-    : false;
+  if (namespace?.name !== "*") return false;
+  if (namespace.testcontainers) return constructs;
+  if (NAMED_STARTERS.has(callee.name.text)) return true;
+  return (
+    namespace.file !== undefined && containerStartingNames(namespace.file).has(callee.name.text)
+  );
 }
 
 /** Whether calling an imported name starts a container. */
@@ -125,7 +130,8 @@ function starterJudge({
   local: ReadonlySet<string>;
 }) {
   return ({ callee, constructs }: { callee: ts.Expression; constructs: boolean }): boolean => {
-    if (ts.isPropertyAccessExpression(callee)) return namespaceCallStarts({ callee, bindings });
+    if (ts.isPropertyAccessExpression(callee))
+      return namespaceCallStarts({ callee, constructs, bindings });
     if (!ts.isIdentifier(callee)) return false;
     if (local.has(callee.text)) return true;
     const binding = bindings.get(callee.text);
