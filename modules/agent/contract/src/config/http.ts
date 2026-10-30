@@ -1,4 +1,5 @@
 import type { Named } from "@langwatch/module";
+import { Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { agentHooksSchema } from "../connected-agent.protocol.ts";
@@ -42,6 +43,21 @@ export interface PreviousSigningSecretSchema extends Named<
 export const previousSigningSecretSchema: PreviousSigningSecretSchema =
   previousSigningSecretSchemaDefinition;
 export type PreviousSigningSecret = z.infer<typeof previousSigningSecretSchema>;
+
+/**
+ * Whether a replaced signing secret still signs at `now`. Open only strictly before `expiresAt`;
+ * an expiry that cannot be parsed counts as closed.
+ */
+export function isPreviousSigningSecretOpen(
+  previous: PreviousSigningSecret,
+  now: Instant,
+): boolean {
+  try {
+    return Temporal.Instant.compare(Temporal.Instant.from(previous.expiresAt), now) > 0;
+  } catch {
+    return false;
+  }
+}
 
 export const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
 

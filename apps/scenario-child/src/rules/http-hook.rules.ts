@@ -5,12 +5,16 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
-import { STATE_MAX_BYTES, type PreviousSigningSecret } from "@langwatch/agent-contract";
+import {
+  isPreviousSigningSecretOpen,
+  STATE_MAX_BYTES,
+  type PreviousSigningSecret,
+} from "@langwatch/agent-contract";
 import {
   isPrivateOrLocalhostIP,
   type SsrfValidationResult,
 } from "@langwatch/egress/ssrf/url-validator";
-import { Temporal, type Instant } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import { WEBHOOK_SIGNATURE_HEADER } from "@langwatch/webhook-signing";
 
 import type { ScenarioCallRun } from "./scenario-call-run.rules.ts";
@@ -84,13 +88,7 @@ export function hookSigningSecretReferences({
   now: Instant;
 }): string[] {
   if (!previous) return [current];
-  let isOpen: boolean;
-  try {
-    isOpen = Temporal.Instant.compare(Temporal.Instant.from(previous.expiresAt), now) > 0;
-  } catch {
-    isOpen = false;
-  }
-  return isOpen ? [current, previous.secret] : [current];
+  return isPreviousSigningSecretOpen(previous, now) ? [current, previous.secret] : [current];
 }
 
 /**
