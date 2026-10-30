@@ -1,7 +1,11 @@
 import type { Agent, HttpAgentConfig } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 
-import { movesStoredSecrets, replacedSigningSecretNames } from "../agent-secrets.rules.ts";
+import {
+  movesStoredSecrets,
+  replacedSigningSecretNames,
+  withoutHooklessSigningSecret,
+} from "../agent-secrets.rules.ts";
 
 const stored: HttpAgentConfig = {
   url: "https://agent.example.com/chat",
@@ -171,5 +175,21 @@ describe("replacedSigningSecretNames", () => {
         projectAgents: [after, copy],
       }),
     ).toEqual([]);
+  });
+});
+
+describe("withoutHooklessSigningSecret", () => {
+  /** @scenario Removing the hooks URL deletes the hooks signing secret */
+  it("drops the signing secret from a config with no hooks URL", () => {
+    const config = { ...stored, hooksUrl: "  " };
+
+    expect(withoutHooklessSigningSecret(config)).not.toHaveProperty("hooksSigningSecret");
+    expect(withoutHooklessSigningSecret(config)).toMatchObject({ auth: stored.auth });
+  });
+
+  it("keeps the signing secret while a hooks URL is set", () => {
+    const config = { ...stored, hooksUrl: "https://agent.example.com/hooks" };
+
+    expect(withoutHooklessSigningSecret(config)).toBe(config);
   });
 });

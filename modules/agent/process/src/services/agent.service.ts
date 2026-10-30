@@ -31,7 +31,7 @@ import {
 
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
-import { movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
+import { movesStoredSecrets, withoutHooklessSigningSecret } from "../rules/agent-secrets.rules.ts";
 import { workflowFieldsKeepingStored } from "../rules/agent-view.rules.ts";
 
 export class AgentService {
@@ -127,7 +127,9 @@ export class AgentService {
       if (movesStoredSecrets({ stored, incoming: checked.data.config })) {
         throw new AgentStoredCredentialsDestinationError();
       }
-      config = httpSecretsKeepingStored({ stored, incoming: checked.data.config });
+      config = withoutHooklessSigningSecret(
+        httpSecretsKeepingStored({ stored, incoming: checked.data.config }),
+      );
     }
     if (checked.data.type === "workflow" && existing.type === "workflow") {
       config = workflowFieldsKeepingStored({

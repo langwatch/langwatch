@@ -464,6 +464,13 @@ Feature: Scenario run hooks: setup and teardown
       But a secret the person picked, or one another agent still names, is kept
 
     @unit
+    Scenario: Removing the hooks URL deletes the hooks signing secret
+      Given a saved HTTP agent whose signing secret is the project secret the save made for it
+      When the hooks URL is cleared and the agent is saved, with or without the secret's reference
+      Then the config holds no signing secret
+      And the project secret is deleted
+
+    @unit
     Scenario: An HTTP hook call sends the agent's headers, auth and run parameters
       Given an HTTP agent with a bearer token and the run parameter loyalty_tier "gold"
       When a hook is called
