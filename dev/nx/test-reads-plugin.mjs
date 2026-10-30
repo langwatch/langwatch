@@ -119,6 +119,7 @@ export const reads = {
   ],
   "@langwatch/dashboard-process": ["docs/features/dashboards.mdx"],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
+  "@langwatch/webhook-signing": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
     ".oxlintrc.native.jsonc",
