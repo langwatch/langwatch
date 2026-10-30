@@ -527,6 +527,24 @@ void describe("given a shard that runs several suites at once", () => {
     });
   });
 
+  void describe("when one package declares a browser suite and another an integration suite", () => {
+    /** @scenario "A browser suite never runs beside an integration suite" */
+    void it("never overlaps them, while the unit suites still run alongside", async () => {
+      const browsers = ["a", "b"].map((name) => pkg(`@fix/${name}`, ["test:browser"]));
+      const integrations = ["c", "d"].map((name) => pkg(`@fix/${name}`, ["test:integration"]));
+      const units = ["e", "f"].map((name) => pkg(`@fix/${name}`, ["test"]));
+      const { overlaps, peak } = await pool(
+        jobsFor([...browsers, ...integrations, ...units], new Map()),
+        3,
+      );
+      for (const running of overlaps) {
+        const lanes = running.filter((id) => !id.endsWith(" test"));
+        assert.ok(lanes.length <= 1, running.join());
+      }
+      assert.ok(peak > 1);
+    });
+  });
+
   void describe("when a package has a unit suite and an integration suite", () => {
     /** @scenario "A package's own suites run one after another, in order" */
     void it("starts its integration suite only after its unit suite finished", async () => {
@@ -767,7 +785,14 @@ void describe("given the job is split into shards", () => {
         scripts: ["test", "test:integration", "test:browser"],
       });
       assert.deepEqual(load, { alone: 0, shared: 60, integration: 20, browser: 20 });
-      assert.equal(wallTimeOf({ load, concurrency: 2 }), 30);
+      // The integration and browser lanes run one after the other: 20 + 20, not 60 / 2.
+      assert.equal(wallTimeOf({ load, concurrency: 2 }), 40);
+    });
+
+    /** @scenario "Shards are balanced by the wall time each package adds" */
+    void it("adds a shard's integration and browser lanes, since neither runs beside the other", () => {
+      const load = { alone: 0, shared: 180, integration: 90, browser: 90 };
+      assert.equal(wallTimeOf({ load, concurrency: 2 }), 180);
     });
 
     /** @scenario "Every shard computes the same split" */

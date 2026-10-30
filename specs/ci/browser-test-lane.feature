@@ -18,6 +18,10 @@ Feature: The real-browser test lane runs, and only where React is
   # by construction, and a lane whose glob matches nothing fails instead of
   # passing.
 
+  # The lane never runs beside an integration suite, whose containers change the
+  # runner's network and make Chromium abort its page loads: see "A browser suite
+  # never runs beside an integration suite" in package-suite-integration-lane.feature.
+
   Background:
     Given the browser lane runs in a real Chromium through Playwright
     And the jsdom lane remains the default for component tests

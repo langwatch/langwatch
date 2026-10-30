@@ -72,15 +72,15 @@ Feature: A package's integration suite runs in CI when it declares one
 
     # A shard's wall time is the sum of its heavy suites, which run alone, plus
     # its light suites divided by the concurrency, since they share the shard,
-    # unless its integration or browser lane is longer: each runs one suite at a
-    # time. Measured on main that model is within 1% of every shard, and
+    # unless its integration and browser lanes together are longer: one suite of
+    # either runs at a time. Measured on main that model is within 1% of every shard, and
     # balancing raw seconds instead let one shard run 1073s while another ran 473s.
     @unit
     Scenario: Shards are balanced by the wall time each package adds
       Given a heavy package that runs alone and light packages that share the shard
       When the packages are split over the shards
       Then a heavy package counts for all of its seconds and a light one for its share of the concurrency
-      And a shard's integration and browser lanes count at full weight, one suite at a time
+      And a shard's integration and browser lanes count at full weight, added together, one suite at a time
 
     @unit
     Scenario: Every shard computes the same split
@@ -136,6 +136,14 @@ Feature: A package's integration suite runs in CI when it declares one
     # for that reason. Browser suites stay one at a time because each installs its
     # browser through apt, which holds a machine-wide lock. Each suite's output is
     # held back and printed as one group when it ends, so two never interleave.
+    #
+    # A browser suite never runs beside an integration suite either. In CI an
+    # integration suite starts containers (testcontainers' ClickHouse among them),
+    # and each one adds a network interface to the runner. Chromium aborts every
+    # request in flight with ERR_NETWORK_CHANGED when the interfaces change, and has
+    # no switch to ignore that, so a browser suite loading its modules at that moment
+    # failed with "Failed to fetch dynamically imported module". It failed five runs
+    # in five on one pull request whose shard put the two side by side.
 
     @unit
     Scenario: A shard runs several suites at once
@@ -154,6 +162,13 @@ Feature: A package's integration suite runs in CI when it declares one
       Given two packages that each declare a browser suite
       When the package suites job runs them concurrently
       Then their browser suites never overlap
+
+    @unit @regression
+    Scenario: A browser suite never runs beside an integration suite
+      Given one package that declares a browser suite and another that declares an integration suite
+      When the package suites job runs them concurrently
+      Then the browser suite and the integration suite never overlap
+      And the unit suites still run alongside either of them
 
     @unit
     Scenario: A heavy suite runs alone
