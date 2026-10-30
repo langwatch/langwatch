@@ -6,10 +6,10 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { renderScenarioContent } from "../../scenario-content-template.ts";
+import { declaredScenarioParameters } from "../../scenario-inline-parameters.ts";
 import {
   findUnknownParameterKeys,
   mergeRunParameters,
-  parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
   type RunParameterValues,
   type ScenarioParameterDefinition,
@@ -150,17 +150,20 @@ function assertEverySecretHasAValue({
  */
 async function assertScenarioTextRenders({
   scenario,
+  situation,
   parameters,
   declaredNames,
   secretNames,
 }: {
   scenario: ScenarioRunConfig;
+  /** The situation with its inline declarations already read out. */
+  situation: string;
   parameters: RunParameterValues;
   declaredNames: string[];
   secretNames: Set<string>;
 }): Promise<void> {
   const rendered = await renderScenarioContent({
-    situation: scenario.situation,
+    situation,
     criteria: scenario.criteria,
     parameters,
     declaredNames,
@@ -221,9 +224,11 @@ export async function resolveRunParameters({
   const targetPlain = targetDefinitions.filter((definition) => definition.secret !== true);
   const definitionsByScenarioId = new Map(
     scenarios.map((scenario) => {
-      const own = partitionParameterDefinitions(
-        parseScenarioParameterDefinitions(scenario.parameters),
-      );
+      const declared = declaredScenarioParameters({
+        parameters: scenario.parameters,
+        situation: scenario.situation,
+      });
+      const own = partitionParameterDefinitions(declared.definitions);
       // The agent's definitions sit before the scenario's own, and a later
       // default overwrites an earlier one in the merge, so the scenario's
       // own default is the one the run reads.
@@ -233,6 +238,7 @@ export async function resolveRunParameters({
           plain: [...targetPlain, ...own.plain],
           secret: own.secret,
           own: [...own.plain, ...own.secret],
+          situation: declared.situation,
         },
       ];
     }),
@@ -263,9 +269,10 @@ export async function resolveRunParameters({
 
   const resolved = new Map<string, ResolvedScenarioParameters>();
   for (const scenario of scenarios) {
-    const { plain, secret } = definitionsByScenarioId.get(scenario.id) ?? {
+    const { plain, secret, situation } = definitionsByScenarioId.get(scenario.id) ?? {
       plain: [],
       secret: [],
+      situation: scenario.situation,
     };
     const parameters = mergeRunParameters({
       definitions: plain,
@@ -276,6 +283,7 @@ export async function resolveRunParameters({
 
     await assertScenarioTextRenders({
       scenario,
+      situation,
       parameters,
       declaredNames: [...plain, ...secret].map((definition) => definition.name),
       secretNames,

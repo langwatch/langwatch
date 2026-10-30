@@ -11,7 +11,7 @@ import {
 import { toaster } from "@langwatch/design-system/toaster";
 import { scenarioClient } from "@langwatch/scenario-client";
 import {
-  parseScenarioParameterDefinitions,
+  declaredScenarioParameters,
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
@@ -55,20 +55,34 @@ export type ParameterDeclaringAgent = {
   parameters?: readonly ScenarioParameterDefinition[];
 };
 
+/** A scenario of the run, as far as its parameters go. */
+type ParameterDeclaringScenario = {
+  id: string;
+  parameters: unknown;
+  /** Read for `{ key: value }` declarations written inline. */
+  situation?: string;
+};
+
 /**
- * The parameters the scenarios of the run declare, keyed by name.
+ * The parameters the scenarios of the run declare, stored and inline, keyed by name.
  */
 function scenarioDeclaredParameters({
   scenarioIds,
   scenarios,
 }: {
   scenarioIds: string[];
-  scenarios: readonly { id: string; parameters: unknown }[];
+  scenarios: readonly ParameterDeclaringScenario[];
 }): Map<string, DeclaredParameter> {
   const inRun = new Set(scenarioIds);
   const declared = scenarios
     .filter((scenario) => inRun.has(scenario.id))
-    .flatMap((scenario) => parseScenarioParameterDefinitions(scenario.parameters));
+    .flatMap(
+      (scenario) =>
+        declaredScenarioParameters({
+          parameters: scenario.parameters,
+          situation: scenario.situation ?? "",
+        }).definitions,
+    );
 
   const union = new Map<string, DeclaredParameter>();
   for (const definition of declared) {
@@ -110,7 +124,7 @@ export function unionParameterDefinitions({
   agents = [],
 }: {
   scenarioIds: string[];
-  scenarios: readonly { id: string; parameters: unknown }[];
+  scenarios: readonly ParameterDeclaringScenario[];
   /** The agents the run goes against, for the parameters they declare. */
   agents?: readonly ParameterDeclaringAgent[];
 }): DeclaredParameter[] {
