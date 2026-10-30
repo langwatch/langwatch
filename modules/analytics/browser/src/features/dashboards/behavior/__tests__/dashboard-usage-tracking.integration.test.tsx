@@ -5,27 +5,14 @@
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 
-import type * as BrowserHostAnalytics from "@langwatch/browser-host/analytics";
-import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
+import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const tracked = vi.hoisted(() => ({ events: [] as UiAnalyticsEvent[] }));
-
-vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
-  const actual = await importActual<typeof BrowserHostAnalytics>();
-  const recorder = {
-    track: (event: UiAnalyticsEvent) => tracked.events.push(event),
-    register: () => void 0,
-    unregister: () => void 0,
-    identify: () => void 0,
-    group: () => void 0,
-    reset: () => void 0,
-  };
-  return { ...actual, useUiAnalytics: () => recorder };
-});
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../../testing.tsx";
 import {
@@ -43,6 +30,35 @@ import { useBoardWidgets } from "../use-board-widgets.ts";
 import { useDashboardViewed } from "../use-dashboard-viewed.ts";
 import { useFavourites } from "../use-favourites.ts";
 import { useSavedDashboards } from "../use-saved-dashboards.ts";
+
+/** The analytics destination the shell installs, recording instead of sending. */
+class RecordingUiAnalytics extends UiAnalytics {
+  readonly events: UiAnalyticsEvent[] = [];
+
+  track(event: UiAnalyticsEvent): void {
+    this.events.push(event);
+  }
+
+  identify(): void {}
+
+  group(): void {}
+
+  reset(): void {}
+}
+
+const tracked = new RecordingUiAnalytics();
+
+/** Puts the recording destination above the element, through the real host-service seam. */
+function withTracking(element: ReactElement) {
+  const services = {
+    ...createUiHostServicesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => void 0,
+    }),
+    analytics: tracked,
+  };
+  return <UiHostServicesContextProvider value={services}>{element}</UiHostServicesContextProvider>;
+}
 
 const DASHBOARD_ID = "board-1";
 const CODE = "export default function Widget() { return null; }";
@@ -103,7 +119,11 @@ function mount<T>(hook: () => T, { refuse = false }: { refuse?: boolean } = {}) 
   const host = new StubAnalyticsHost({
     flags: { release_dashboards: true, release_langy_enabled: true },
   });
-  renderDashboards({ element: <Probe />, host, answer: inMemoryServer({ refuse }).answer });
+  renderDashboards({
+    element: withTracking(<Probe />),
+    host,
+    answer: inMemoryServer({ refuse }).answer,
+  });
   return { latest: () => latest.current!, host };
 }
 
@@ -297,8 +317,8 @@ describe("given a member asking Langy from a board", () => {
   it("sends one ask when the member puts a suggested question to Langy", async () => {
     const user = userEvent.setup();
     renderDashboards({
-      element: (
-        <BoardLangy board={board} period={period} withSuggestions onOpenPicker={() => void 0} />
+      element: withTracking(
+        <BoardLangy board={board} period={period} withSuggestions onOpenPicker={() => void 0} />,
       ),
       host: new StubAnalyticsHost({
         flags: { release_dashboards: true, release_langy_enabled: true },

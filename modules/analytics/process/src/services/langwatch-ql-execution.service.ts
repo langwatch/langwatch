@@ -21,7 +21,6 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { hydratableProjects, scopeLangWatchQL } from "../rules/langwatch-ql-query-scope.rules.ts";
-import { langWatchQLTelemetryFields } from "../rules/langwatch-ql-run-telemetry.rules.ts";
 import {
   langWatchQLExecutionParameters,
   langWatchQLRowLimitedSql,
@@ -47,7 +46,7 @@ type LangWatchQLExecutionDependencies = {
   readonly stopwatch: () => number;
   readonly extraction: Pick<LangWatchQLExtractionService, "hydrate">;
   /** Counts each answered run; the app's one instance, which counts its doors' refusals too. */
-  readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered">;
+  readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
 };
 
 type LangWatchQLExecutionInput = {
@@ -123,7 +122,7 @@ export class LangWatchQLExecutionService {
     });
     logger.info(
       {
-        ...langWatchQLTelemetryFields({ telemetry, sql: run.sql }),
+        ...this.deps.runTelemetry.fieldsFor({ telemetry, sql: run.sql }),
         outcome,
         projectIds: projects.map((project) => project.id),
         tables: validation.tables,

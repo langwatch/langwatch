@@ -36,20 +36,34 @@ vi.mock("@langwatch/observability", async (importActual) => {
   };
 });
 
+import { createHmac } from "node:crypto";
+
+import { ConfigParseError } from "@langwatch/config";
+
+import {
+  analyticsTestSecrets,
+  TEST_SESSION_SECRET,
+} from "../../app/__tests__/analytics-secrets.fixture.ts";
 import { AnalyticsModule } from "../../app/analytics.app.ts";
 import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
-import { langWatchQLQueryHash } from "../../rules/langwatch-ql-run-telemetry.rules.ts";
-import type { LangWatchQLRunTelemetryService } from "../langwatch-ql-run-telemetry.service.ts";
+import {
+  langWatchQLQueryHash,
+  langWatchQLQueryHashKey,
+} from "../../rules/langwatch-ql-run-telemetry.rules.ts";
+import { LangWatchQLRunTelemetryService } from "../langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 /** A literal a customer might write, which must never reach the logs. */
 const LITERAL = "acme-checkout-flow";
 const SQL = `SELECT count() AS n FROM analytics.spans WHERE SpanName = '${LITERAL}' LIMIT 1`;
+/** The key the app derives from the deployment secret the fixture sets. */
+const QUERY_HASH_KEY = langWatchQLQueryHashKey(TEST_SESSION_SECRET);
+const hashOf = (sql: string) => langWatchQLQueryHash({ sql, key: QUERY_HASH_KEY });
 const WIDGET_RUN: LangWatchQLRunTelemetry = {
   caller: "dashboard_widget",
   dashboardId: "dashboard-1",
@@ -84,6 +98,7 @@ async function run({
   const service = LangWatchQLService.create({
     executor: new AnsweringExecutor(rows),
     database: "analytics",
+    runTelemetry: LangWatchQLRunTelemetryService.create({ queryHashKey: QUERY_HASH_KEY }),
   });
   return service.execute({
     project: { id: "project-1", lwqlKey: "key-1" },
@@ -98,20 +113,11 @@ async function run({
   });
 }
 
-/**
- * One run through the app's member door, as the workbench and widget routes call it, with no
- * LangWatchQL identity provisioned. Resolves the code it was refused with.
- */
-async function refusedAtTheDoor({
-  sql,
-  telemetry,
-  projects,
-}: {
-  sql: string;
-  telemetry: LangWatchQLRunTelemetry;
-  projects?: string;
-}): Promise<string> {
-  const app = await AnalyticsModule.create({
+/** The app as boot builds it over memory twins, its secrets from `environment`. */
+function analyticsApp(
+  environment: Readonly<Record<string, string>> = { NEXTAUTH_SECRET: TEST_SESSION_SECRET },
+): Promise<AnalyticsModule> {
+  return AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       authz: createApiFixture<AuthzApi>(),
@@ -141,8 +147,43 @@ async function refusedAtTheDoor({
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: {} as never,
+    secrets: analyticsTestSecrets(environment),
   });
+}
+
+/**
+ * One statement through the key door, as `POST /api/v1/query` calls it, carrying a value the run
+ * scope refuses before any project resolves. Resolves the code it was refused with.
+ */
+async function refusedAtTheKeyDoor({ sql }: { sql: string }): Promise<string> {
+  const app = await analyticsApp();
+  return app
+    .runLangWatchQLForKey({
+      reach: { kind: "project", projectId: "project-1" },
+      sql,
+      // A stray value, as a client could send it: the run scope refuses it with a 422.
+      projects: "al" as never,
+    })
+    .then(
+      () => "answered",
+      (error: unknown) => (error as { code: string }).code,
+    );
+}
+
+/**
+ * One run through the app's member door, as the workbench and widget routes call it, with no
+ * LangWatchQL identity provisioned. Resolves the code it was refused with.
+ */
+async function refusedAtTheDoor({
+  sql,
+  telemetry,
+  projects,
+}: {
+  sql: string;
+  telemetry: LangWatchQLRunTelemetry;
+  projects?: string;
+}): Promise<string> {
+  const app = await analyticsApp();
   const run = app.executeLangWatchQL({
     project: { id: "project-1", lwqlKey: "key-1" },
     protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
@@ -187,7 +228,7 @@ describe("LangWatchQL run telemetry", () => {
         dashboardId: "dashboard-1",
         widgetId: "widget-1",
         templateId: "llm-cost",
-        queryHash: langWatchQLQueryHash(SQL),
+        queryHash: hashOf(SQL),
         outcome: "ok",
       });
       expect(JSON.stringify(line)).not.toContain(LITERAL);
@@ -240,7 +281,7 @@ describe("LangWatchQL run telemetry", () => {
       expect(code).toMatch(/^lwql_/);
       expect(lineNamed("LangWatchQL failed")).toMatchObject({
         caller: "workbench",
-        queryHash: langWatchQLQueryHash(refused),
+        queryHash: hashOf(refused),
         outcome: code,
       });
       expect(metrics.valueOf("lwql_queries_total", { caller: "workbench", outcome: code })).toBe(1);
@@ -268,11 +309,12 @@ describe("LangWatchQL run telemetry", () => {
     /** @scenario "Telemetry: query metrics carry only low-cardinality labels" */
     it("counts an answered run on the instance the service is given, not one of its own", async () => {
       const answered: unknown[] = [];
-      const runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered"> = {
+      const runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor"> = {
         recordAnswered: (input) => {
           answered.push(input);
           return "ok";
         },
+        fieldsFor: () => ({ caller: "dashboard_widget" }),
       };
       const service = LangWatchQLService.create({
         executor: new AnsweringExecutor([{ n: 1 }]),
@@ -292,16 +334,110 @@ describe("LangWatchQL run telemetry", () => {
     });
   });
 
+  describe("given a run refused at the key door", () => {
+    /** @scenario "Telemetry: a failed query is logged and counted with its error code" */
+    /** @scenario "Telemetry: the caller is set by the server from the door the query came in by" */
+    it("logs it and counts it under rest_api with the refusal's code", async () => {
+      const code = await refusedAtTheKeyDoor({ sql: SQL });
+
+      expect(code).not.toBe("answered");
+      const line = lineNamed("LangWatchQL failed");
+      expect(line).toMatchObject({ caller: "rest_api", queryHash: hashOf(SQL), outcome: code });
+      expect(JSON.stringify(line)).not.toContain(LITERAL);
+      expect(metrics.valueOf("lwql_queries_total", { caller: "rest_api", outcome: code })).toBe(1);
+    });
+  });
+
+  describe("given a run that is cancelled, or fails with an error no module handled", () => {
+    const telemetry = LangWatchQLRunTelemetryService.create({ queryHashKey: QUERY_HASH_KEY });
+
+    /** @scenario "Telemetry: a failed query is logged and counted with its error code" */
+    it("counts a cancelled run as aborted, not as an error", () => {
+      telemetry.recordFailed({
+        telemetry: WIDGET_RUN,
+        sql: SQL,
+        error: new DOMException("The run was cancelled", "AbortError"),
+      });
+
+      expect(lineNamed("LangWatchQL failed")).toMatchObject({ outcome: "aborted" });
+      expect(
+        metrics.valueOf("lwql_queries_total", { caller: "dashboard_widget", outcome: "aborted" }),
+      ).toBe(1);
+    });
+
+    /** @scenario "Telemetry: a failed query is logged and counted with its error code" */
+    it("counts an error with no handled code as unhandled", () => {
+      telemetry.recordFailed({
+        telemetry: { caller: "workbench" },
+        sql: SQL,
+        error: new TypeError("Cannot read properties of undefined"),
+      });
+
+      expect(lineNamed("LangWatchQL failed")).toMatchObject({ outcome: "unhandled" });
+      expect(
+        metrics.valueOf("lwql_queries_total", { caller: "workbench", outcome: "unhandled" }),
+      ).toBe(1);
+    });
+  });
+
   describe("given two statements that differ only in their whitespace", () => {
     /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
     it("hashes them alike, and a different statement differently", () => {
-      expect(langWatchQLQueryHash("SELECT 1\n  FROM t ")).toBe(
-        langWatchQLQueryHash("SELECT 1 FROM t"),
-      );
-      expect(langWatchQLQueryHash("SELECT 2 FROM t")).not.toBe(
-        langWatchQLQueryHash("SELECT 1 FROM t"),
-      );
-      expect(langWatchQLQueryHash("SELECT 1 FROM t")).toMatch(/^[0-9a-f]{16}$/);
+      expect(hashOf("SELECT 1\n  FROM t ")).toBe(hashOf("SELECT 1 FROM t"));
+      expect(hashOf("SELECT 2 FROM t")).not.toBe(hashOf("SELECT 1 FROM t"));
+      expect(hashOf("SELECT 1 FROM t")).toMatch(/^[0-9a-f]{16}$/);
+    });
+  });
+
+  describe("given the deployment secret the query hash is keyed from", () => {
+    const statement = "SELECT 1 FROM t";
+
+    /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+    it("hashes a statement alike under the same secret, and differently under another", () => {
+      const other = langWatchQLQueryHashKey("another-deployment-secret");
+
+      expect(
+        langWatchQLQueryHash({ sql: statement, key: langWatchQLQueryHashKey(TEST_SESSION_SECRET) }),
+      ).toBe(hashOf(statement));
+      expect(langWatchQLQueryHash({ sql: statement, key: other })).not.toBe(hashOf(statement));
+    });
+
+    /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+    it("never keys the hash with the secret itself, as api-key's pepper hash does", () => {
+      const underTheSecretItself = createHmac("sha256", TEST_SESSION_SECRET)
+        .update(statement)
+        .digest("hex")
+        .slice(0, 16);
+
+      expect(hashOf(statement)).not.toBe(underTheSecretItself);
+    });
+
+    /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+    it("refuses to start when no deployment secret is set, rather than hashing unkeyed", async () => {
+      await expect(analyticsApp({})).rejects.toBeInstanceOf(ConfigParseError);
+    });
+
+    /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+    it("keys from API_KEY_PEPPER first, then CREDENTIALS_SECRET, then NEXTAUTH_SECRET", async () => {
+      const app = await analyticsApp({
+        API_KEY_PEPPER: "pepper",
+        CREDENTIALS_SECRET: "credentials",
+        NEXTAUTH_SECRET: TEST_SESSION_SECRET,
+      });
+      const refused = "SELECT * FROM system.tables";
+
+      await app
+        .executeLangWatchQL({
+          project: { id: "project-1", lwqlKey: "key-1" },
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+          sql: refused,
+          telemetry: { caller: "workbench" },
+        })
+        .catch(() => void 0);
+
+      expect(lineNamed("LangWatchQL failed")).toMatchObject({
+        queryHash: langWatchQLQueryHash({ sql: refused, key: langWatchQLQueryHashKey("pepper") }),
+      });
     });
   });
 });

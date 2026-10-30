@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.1.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.0.0...typescript-sdk@v2.1.0) (2026-10-30)
+
+
+### Features
+
+* **dashboards:** per-widget "Langy traces" setting in the query editor ([#9137](https://github.com/langwatch/langwatch/issues/9137)) ([5e82c1e](https://github.com/langwatch/langwatch/commit/5e82c1ebc1d2dbfda817cf175f3aba62e485a0d8))
+* **dashboards:** widget queries take sources and projects as params ([#9171](https://github.com/langwatch/langwatch/issues/9171)) ([af5a9c3](https://github.com/langwatch/langwatch/commit/af5a9c342951371a1cf547188cff78f9cd50bcc1))
+* **experiment:** accept a per-run concurrency on the experiment run API ([#9023](https://github.com/langwatch/langwatch/issues/9023)) ([640d0f6](https://github.com/langwatch/langwatch/commit/640d0f6e21afd19e46eaed9312d4c04c121b9a4b))
+
+
+### Bug Fixes
+
+* **langy:** pick an existing test suite before creating a scenario ([#9158](https://github.com/langwatch/langwatch/issues/9158)) ([42a13b7](https://github.com/langwatch/langwatch/commit/42a13b7f97128db7cf1570ba86b7f238fdc9d33a))
+
 ## [2.0.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.20.0...typescript-sdk@v2.0.0) (2026-10-28)
 
 

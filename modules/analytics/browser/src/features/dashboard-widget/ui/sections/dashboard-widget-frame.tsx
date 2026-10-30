@@ -49,6 +49,7 @@ import { useDashboardRefreshedAt } from "../../../../ui/sections/use-dashboard-a
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useSlowLoading } from "../../behavior/use-slow-loading.ts";
+import { type ParsedDefinition, placedWidgetTelemetry } from "../../model/widget-run-telemetry.ts";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 
@@ -69,25 +70,6 @@ export interface DashboardWidgetFrameProps {
    * its board and its id; a frame on no board, such as the editor's preview, sends nothing.
    */
   readonly telemetry?: LangWatchQLRunTelemetryRequest;
-}
-
-/** A placed widget's own ids, with the catalogue widget it was built from where it says. */
-function placedWidgetTelemetry({
-  dashboardId,
-  widgetId,
-  parsed,
-}: {
-  dashboardId: string | undefined;
-  widgetId: string;
-  parsed: ParsedDefinition;
-}): LangWatchQLRunTelemetryRequest | undefined {
-  if (dashboardId === void 0) return void 0;
-  const source = parsed.success ? parsed.data.source : void 0;
-  return {
-    dashboardId,
-    widgetId,
-    ...(source?.kind === "catalogue" ? { templateId: source.catalogueId } : {}),
-  };
 }
 
 /** A widget over the page's period selector, as the analytics dashboard draws it. */
@@ -137,7 +119,6 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
 }
 
 /** The outcome of reading a row's graph, parsed once by the caller. */
-type ParsedDefinition = ReturnType<typeof dashboardWidgetDefinitionSchema.safeParse>;
 
 /**
  * `granularitySeconds`, when given, is the step the reserved parameters carry.

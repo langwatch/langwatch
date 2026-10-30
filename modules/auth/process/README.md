@@ -925,15 +925,15 @@ Run by the tasks process, before serve.
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
 | secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:276`                            |
-| secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
-| secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
-| secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
-| secret | `azureAdClientSecret`         | `AZURE_AD_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:55` |
-| secret | `auth0ClientSecret`           | `AUTH0_CLIENT_SECRET`                     | `../../../packages/secrets/src/shared-secrets.ts:56` |
-| secret | `oktaClientSecret`            | `OKTA_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:57` |
-| secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
-| secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
-| secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
+| secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:58` |
+| secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:59` |
+| secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:60` |
+| secret | `azureAdClientSecret`         | `AZURE_AD_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:61` |
+| secret | `auth0ClientSecret`           | `AUTH0_CLIENT_SECRET`                     | `../../../packages/secrets/src/shared-secrets.ts:62` |
+| secret | `oktaClientSecret`            | `OKTA_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:63` |
+| secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:64` |
+| secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:65` |
+| secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:66` |
 | secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:279`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
