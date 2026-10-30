@@ -349,11 +349,21 @@ describe("the project every later event carries", () => {
       "unregister projectId",
       'register {"projectId":"project_search"}',
       "unregister projectId",
+      "unregister projectId",
     ]);
   });
 
+  /** @scenario "Telemetry: a reload with no project in scope drops the projectId kept from before" */
+  it("unregisters a projectId an earlier load left, as soon as a page with no project mounts", () => {
+    const analytics = new RecordingAnalytics();
+
+    render(inProject(analytics, undefined));
+
+    expect(analytics.superProperties).toEqual(["unregister projectId"]);
+  });
+
   /** @scenario "Telemetry: every later event carries the project in scope" */
-  it("registers nothing for an anonymous visitor", () => {
+  it("registers no project for an anonymous visitor, and drops any kept from before", () => {
     const analytics = new RecordingAnalytics();
     render(
       <UiHostServicesContextProvider
@@ -363,6 +373,6 @@ describe("the project every later event carries", () => {
       </UiHostServicesContextProvider>,
     );
 
-    expect(analytics.superProperties).toEqual([]);
+    expect(analytics.superProperties).toEqual(["unregister projectId"]);
   });
 });

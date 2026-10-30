@@ -4,7 +4,10 @@
  * row IS the widget, so the dashboard's list query already has it live.
  */
 
-import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLAcceptedGranularityStep,
+  LangWatchQLRunTelemetryRequest,
+} from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
   NavigableTarget,
@@ -61,6 +64,30 @@ export interface DashboardWidgetFrameProps {
   readonly dashboardId?: string;
   /** The widget's own name, for LW.dashboardContext.widgetName. */
   readonly widgetName?: string;
+  /**
+   * What the widget's runs say they are for, on their log line. Absent, a placed widget sends
+   * its board and its id; a frame on no board, such as the editor's preview, sends nothing.
+   */
+  readonly telemetry?: LangWatchQLRunTelemetryRequest;
+}
+
+/** A placed widget's own ids, with the catalogue widget it was built from where it says. */
+function placedWidgetTelemetry({
+  dashboardId,
+  widgetId,
+  parsed,
+}: {
+  dashboardId: string | undefined;
+  widgetId: string;
+  parsed: ParsedDefinition;
+}): LangWatchQLRunTelemetryRequest | undefined {
+  if (dashboardId === void 0) return void 0;
+  const source = parsed.success ? parsed.data.source : void 0;
+  return {
+    dashboardId,
+    widgetId,
+    ...(source?.kind === "catalogue" ? { templateId: source.catalogueId } : {}),
+  };
 }
 
 /** A widget over the page's period selector, as the analytics dashboard draws it. */
@@ -123,6 +150,7 @@ function WidgetFrameOverWindow({
   maxHeight,
   dashboardId,
   widgetName,
+  telemetry: given,
   timeWindow,
   granularitySeconds,
   onAskLangyToSetUp,
@@ -141,15 +169,13 @@ function WidgetFrameOverWindow({
   // crashing the grid.
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
-  const source = parsed.success ? parsed.data.source : void 0;
-  const templateId = source?.kind === "catalogue" ? source.catalogueId : void 0;
   // Kept by value, so a re-render with the same ids does not start the queries over.
+  const telemetryKey = JSON.stringify(
+    given ?? placedWidgetTelemetry({ dashboardId, widgetId: id, parsed }) ?? null,
+  );
   const telemetry = useMemo(
-    () =>
-      dashboardId === void 0
-        ? void 0
-        : { dashboardId, widgetId: id, ...(templateId === void 0 ? {} : { templateId }) },
-    [dashboardId, id, templateId],
+    () => (JSON.parse(telemetryKey) as LangWatchQLRunTelemetryRequest | null) ?? void 0,
+    [telemetryKey],
   );
   const {
     executeQuery: runQuery,

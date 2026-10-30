@@ -138,6 +138,7 @@ function curatedCard({ answer }: { answer: UiProcedureAnswer }) {
           layout: { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 },
         }}
         frameId="costs-spend"
+        templateId="costs"
         boardName="Running costs"
         projectId="proj-1"
         projectSlug="test-project"

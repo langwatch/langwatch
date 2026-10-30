@@ -59,6 +59,7 @@ export function CuratedWidgetsGrid({
           <CuratedWidgetCard
             widget={widget}
             frameId={`${templateId}-${graphId}`}
+            templateId={templateId}
             boardName={boardName}
             projectId={projectId}
             projectSlug={projectSlug}

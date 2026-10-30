@@ -8,7 +8,8 @@
 import type * as BrowserHostAnalytics from "@langwatch/browser-host/analytics";
 import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
-import { act, cleanup, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const tracked = vi.hoisted(() => ({ events: [] as UiAnalyticsEvent[] }));
@@ -26,12 +27,15 @@ vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
   return { ...actual, useUiAnalytics: () => recorder };
 });
 
-import { StubAnalyticsHost } from "../../../../testing.tsx";
+import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../../testing.tsx";
 import {
   NO_PROCEDURES,
   renderDashboards,
 } from "../../__tests__/render-dashboards.test-helpers.tsx";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import { boardSubject, SUGGESTED_QUESTIONS } from "../../langy/model/board-langy.ts";
+import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
+import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import type { BoardTemplate } from "../../templates/index.ts";
 import { useBoardFromTemplate } from "../use-board-from-template.ts";
@@ -282,17 +286,40 @@ describe("given a member starring a board", () => {
 });
 
 describe("given a member asking Langy from a board", () => {
+  const board = boardSubject({ board: { id: DASHBOARD_ID, name: "Weekly" }, widgets: [] });
+  const period: BoardPeriod = {
+    periodStart: Date.UTC(2026, 9, 1),
+    periodEnd: Date.UTC(2026, 9, 2),
+    granularitySeconds: 3600,
+  };
+
   /** @scenario "Telemetry: asking Langy from a board sends dashboards.asked.langy" */
-  it("sends whether the ask was a question or a draft", () => {
+  it("sends one ask when the member puts a suggested question to Langy", async () => {
+    const user = userEvent.setup();
+    renderDashboards({
+      element: (
+        <BoardLangy board={board} period={period} withSuggestions onOpenPicker={() => void 0} />
+      ),
+      host: new StubAnalyticsHost({
+        flags: { release_dashboards: true, release_langy_enabled: true },
+        permissions: [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"],
+      }),
+      answer: inMemoryServer().answer,
+    });
+
+    await user.click(screen.getByRole("button", { name: SUGGESTED_QUESTIONS[0] }));
+
+    expect(names()).toEqual(["dashboards.asked.langy"]);
+  });
+
+  /** @scenario "Telemetry: a draft the app seeds in Langy sends no ask" */
+  it("sends nothing for a draft or question the app seeds by itself", () => {
     const { latest } = mount(useLangyAsk);
 
-    act(() => latest().ask({ draft: "Explain this board", context: [] }));
-    act(() => latest().ask({ question: "Why did cost go up?", context: [] }));
+    act(() => latest().ask({ draft: "Explain this widget", context: [] }));
+    act(() => latest().ask({ question: "Build this widget", context: [] }));
 
-    expect(tracked.events.map(({ attributes }) => attributes)).toEqual([
-      { askKind: "draft" },
-      { askKind: "question" },
-    ]);
+    expect(tracked.events).toEqual([]);
   });
 });
 

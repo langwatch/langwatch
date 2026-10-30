@@ -46,9 +46,14 @@ Feature: Dashboards telemetry: product events and query telemetry
 
   @unit
   Scenario: Telemetry: asking Langy from a board sends dashboards.asked.langy
-    When a member asks Langy from a board or a widget
-    Then "dashboards.asked.langy" is sent
-    And it says whether the ask was sent as a question or seeded as a draft
+    When a member puts a question to Langy from a board: a suggested question under the ask bar, or the question typed in "Add a widget"
+    Then "dashboards.asked.langy" is sent once
+
+  @unit
+  Scenario: Telemetry: a draft the app seeds in Langy sends no ask
+    Given the app seeds a Langy draft by itself
+    When a widget is added from the catalogue, "Edit code" opens, "Duplicate to edit" makes a copy, or a template board is made
+    Then no "dashboards.asked.langy" is sent
 
   @unit
   Scenario: Telemetry: changing whether a widget counts Langy traces sends dashboards.toggled.langy_traces
@@ -70,6 +75,12 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then projectId changes to the new project
     When no project is in scope
     Then projectId is no longer registered
+
+  @integration
+  Scenario: Telemetry: a reload with no project in scope drops the projectId kept from before
+    Given analytics kept projectId from an earlier page load
+    When the app loads with no project in scope
+    Then analytics unregisters projectId straight away
 
   # ---------------------------------------------------------------------------
   # Query telemetry (#1005)
@@ -95,6 +106,14 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then lwql_queries_total counts it by caller and outcome
     And lwql_query_duration_seconds and lwql_rows_read record it by caller
     And no metric label carries a project, dashboard or widget id
+
+  @integration
+  Scenario: Telemetry: a From LangWatch board's widgets count as dashboard widgets
+    Given a member opens a From LangWatch board
+    When its widgets run their queries
+    Then each run sends the board as "curated/<template id>", the widget's key as its widgetId and as its templateId
+    And the server counts it under the caller "dashboard_widget"
+    And only the widget editor's preview and the workbench count as "workbench"
 
   @unit
   Scenario: Telemetry: the caller is set by the server from the door the query came in by

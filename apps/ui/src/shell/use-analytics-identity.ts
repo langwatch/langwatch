@@ -95,7 +95,12 @@ export function useAnalyticsIdentity(): void {
   // Every later event carries the project in view, so a board's events read per project.
   const projectId = scope.project?.id;
   useEffect(() => {
-    if (!userId || !projectId) return;
+    // PostHog keeps a registered property across reloads, so a page that loads with no project
+    // in view drops the one an earlier load left, rather than trusting an unmount that never ran.
+    if (!userId || !projectId) {
+      analytics.unregister("projectId");
+      return;
+    }
     analytics.register({ projectId });
     return () => analytics.unregister("projectId");
   }, [analytics, userId, projectId]);

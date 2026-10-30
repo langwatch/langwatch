@@ -575,6 +575,32 @@ describe("given a From LangWatch board", () => {
   });
 });
 
+describe("given a From LangWatch board's widget card", () => {
+  /** @scenario "Telemetry: a From LangWatch board's widgets count as dashboard widgets" */
+  it("sends the curated board and the widget's key with its run, so it counts as a widget's", async () => {
+    const server = boardServer();
+    const host = new StubAnalyticsHost({
+      flags: FLAGS,
+      permissions: MEMBER,
+      project: PROJECT,
+      route: { params: { templateId: "release" }, query: {} },
+    });
+    const widgets = curatedBoardById("release")?.widgets ?? [];
+    renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
+    await screen.findByRole("heading", { name: "Release check" });
+    const frame = screen.getAllByTestId("sandboxed-frame")[0]!;
+    const widget = widgets.find(({ definition }) => definition.code === frames.get(frame)?.code)!;
+
+    await frameRuns({ frame, queryName: widget.definition.queries[0]!.name });
+
+    expect(server.runs()[0]?.telemetry).toEqual({
+      dashboardId: "curated/release",
+      widgetId: widget.key,
+      templateId: widget.key,
+    });
+  });
+});
+
 const LANGY_TURN_WIDGET = {
   ...WIDGET,
   name: "Langy requests",

@@ -69,9 +69,8 @@ describe("the Dashboards product events", () => {
   });
 
   /** @scenario "Telemetry: asking Langy from a board sends dashboards.asked.langy" */
-  it("names a Langy ask and whether it was sent or seeded", () => {
-    expect(composed(langyAsked({ askKind: "draft" }))).toBe("dashboards.asked.langy");
-    expect(langyAsked({ askKind: "question" }).attributes).toEqual({ askKind: "question" });
+  it("names a Langy ask", () => {
+    expect(composed(langyAsked())).toBe("dashboards.asked.langy");
   });
 
   /** @scenario "Telemetry: starring a board sends dashboards.favourited.dashboard" */

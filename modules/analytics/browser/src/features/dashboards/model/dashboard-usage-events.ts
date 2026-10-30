@@ -11,6 +11,11 @@ import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 export const DASHBOARDS_BOUNDARY = "dashboards";
 
+/** The id a From LangWatch board's runs are logged under: it has no stored board of its own. */
+export function curatedBoardTelemetryId(templateId: string): string {
+  return `curated/${templateId}`;
+}
+
 /** A board the member made and can change, or a From LangWatch board read live. */
 export type DashboardKind = "stored" | "curated";
 
@@ -19,9 +24,6 @@ export type DashboardCreatedFrom = "blank" | "template" | "duplicate" | "duplica
 
 /** How a widget landed on a board. */
 export type WidgetAddedFrom = "catalogue" | "editor" | "duplicate";
-
-/** Whether a Langy ask was sent outright or seeded into the composer for the member to send. */
-export type LangyAskKind = "question" | "draft";
 
 function dashboardsEvent(
   name: string,
@@ -86,8 +88,9 @@ export function widgetDeleted(): UiAnalyticsEvent {
   return dashboardsEvent("widget", "deleted");
 }
 
-export function langyAsked({ askKind }: { askKind: LangyAskKind }): UiAnalyticsEvent {
-  return dashboardsEvent("langy", "asked", { askKind });
+/** A question a member submitted in a board's Langy box; never a draft the app seeds. */
+export function langyAsked(): UiAnalyticsEvent {
+  return dashboardsEvent("langy", "asked");
 }
 
 /** Whether any of a widget's queries counts Langy's own traces; a query storing none does not. */
