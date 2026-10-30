@@ -55,7 +55,7 @@ describe("a save from the form that moves the hooks URL to another origin", () =
         ...read.config,
         hooksUrl: "https://other.example.net/hooks",
         auth: { type: "bearer", token: "tok_live_other" },
-        hooksSigningSecret: "whsec_rotated",
+        hooksSigningSecret: "whsec_test_rotated_secret",
       }),
     );
 
