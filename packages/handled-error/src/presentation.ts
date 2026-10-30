@@ -698,12 +698,11 @@ const presentations = {
       "The new order wasn't saved. Reload to see the current list, then arrange it again.",
   },
   lwql_unavailable: {
-    // Names the workspace administrator first: on a self-hosted deployment
-    // the reader's own operator controls whether this is provisioned, and
-    // LangWatch support cannot switch it on there.
+    // Usually a setup step that did not finish on the deployment, not a
+    // setting the workspace left off: say what failed and who can retry it.
     title: "Analytics SQL isn't available here",
     describe: () =>
-      "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
+      "The analytics query layer on this deployment isn't ready. An admin can retry its setup from Ops > Upgrades. Otherwise, ask an admin or contact support.",
   },
   lwql_provisioning_incomplete: {
     // Deliberately does NOT name the workspace administrator: unlike
