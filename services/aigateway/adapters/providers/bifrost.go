@@ -306,6 +306,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchEmbeddings(ctx, req, provider, model, cred)
 	}
 
+	if req.Type == domain.RequestTypeDecisions {
+		return r.dispatchDecisions(ctx, req, provider, model, cred)
+	}
+
 	if req.Type == domain.RequestTypeSpeech {
 		return r.dispatchSpeech(ctx, req, provider, model, cred)
 	}

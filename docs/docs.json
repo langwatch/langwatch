@@ -766,6 +766,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/responses",
               "ai-gateway/api/embeddings",
+              "ai-gateway/api/decisions",
               "ai-gateway/api/audio",
               "ai-gateway/api/images",
               "ai-gateway/api/elevenlabs",
