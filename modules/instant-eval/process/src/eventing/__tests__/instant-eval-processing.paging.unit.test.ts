@@ -275,3 +275,61 @@ describe("given a finished run", () => {
     });
   });
 });
+
+describe("given a run that ended while a routed page was still judging", () => {
+  const ended = { ...running, phase: "terminal" as const, page: 2 };
+  const latePage = view({ page: 3, rows: 4, inputTokens: 0, requests: 4, costNanoUsd: 5000 });
+  const spent = { page: 3, inputTokens: 0, requests: 4, costNanoUsd: 5000, routedInputTokens: 0 };
+  const billed = { ...spent, runId: RUN_ID, projectId: "project-1" };
+
+  describe("when the page reports before the finish has landed", () => {
+    /** @scenario "A routed page that reports after its run finished is billed on its own" */
+    it("holds the page's spend, and bills it once the finish lands", () => {
+      const { ctx, emitted } = context();
+
+      const held = handleInstantEvalPageJudged(ended, latePage, ctx);
+      expect(emitted).toEqual([]);
+      expect(held.state).toMatchObject({ page: 3, unbilledLatePages: [spent] });
+
+      const finished = handleInstantEvalFinished(held.state, view(), ctx);
+      expect(finished.state).toMatchObject({ isFinishRecorded: true, unbilledLatePages: [] });
+      expect(emitted).toEqual([
+        { messageKey: `late-page:${RUN_ID}:3`, intentType: "billLatePage", payload: billed },
+      ]);
+    });
+  });
+
+  describe("when the page reports after the finish has landed", () => {
+    /** @scenario "A routed page that reports after its run finished is billed on its own" */
+    it("bills the page at once, and a redelivery of it changes nothing", () => {
+      const { ctx, emitted } = context();
+      const recorded = { ...ended, isFinishRecorded: true };
+
+      const first = handleInstantEvalPageJudged(recorded, latePage, ctx);
+      const again = handleInstantEvalPageJudged(first.state, latePage, ctx);
+
+      expect(emitted).toEqual([
+        { messageKey: `late-page:${RUN_ID}:3`, intentType: "billLatePage", payload: billed },
+      ]);
+      expect(again.state).toEqual(first.state);
+      expect(first.nextWakeAt).toBeNull();
+    });
+  });
+
+  describe("when the late page carries no routed spend", () => {
+    /** @scenario "A routed page that reports after its run finished is billed on its own" */
+    it("changes nothing and asks for nothing, as before the router", () => {
+      const { ctx, emitted } = context();
+      const recorded = { ...ended, isFinishRecorded: true };
+
+      const evolution = handleInstantEvalPageJudged(
+        recorded,
+        view({ page: 3, rows: 4, inputTokens: 900, requests: 4 }),
+        ctx,
+      );
+
+      expect(evolution.state).toEqual(recorded);
+      expect(emitted).toEqual([]);
+    });
+  });
+});

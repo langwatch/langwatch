@@ -6,6 +6,7 @@
 import {
   instantEvalCancelRequestedEventSchema,
   instantEvalFinishedEventSchema,
+  instantEvalLatePageBilledEventSchema,
   instantEvalPageJudgedEventSchema,
   instantEvalPlannedEventSchema,
   instantEvalRequestedEventSchema,
@@ -89,6 +90,21 @@ const finished = (data: Record<string, unknown>, occurredAt = AT): InstantEvalPr
       requests: 0,
       costUsd: 0,
       priceUsd: 0,
+      ...data,
+    },
+  });
+
+const latePageBilled = (data: Record<string, unknown>): InstantEvalProcessingEvent =>
+  instantEvalLatePageBilledEventSchema.parse({
+    ...envelope("lw.obs.instant_eval.late_page_billed", AT),
+    version: "2026-10-30",
+    data: {
+      runId: RUN_ID,
+      page: 3,
+      inputTokens: 0,
+      requests: 4,
+      costNanoUsd: 5000,
+      routedInputTokens: 0,
       ...data,
     },
   });
@@ -263,5 +279,32 @@ describe("given a routed run", () => {
     const replayed = { ...page({}), data: preRouter } as unknown as InstantEvalProcessingEvent;
 
     expect(fold([requested(), planned(1000), replayed]).costUsd).toBe(0);
+  });
+});
+
+describe("given a routed run that finished while a page was still judging", () => {
+  const finishedRun = finished({ outcome: "cancelled", costUsd: 0.000004, priceUsd: 0.0000052 });
+  const late = page({ page: 3, rows: 4, costNanoUsd: 5000 });
+  const bill = latePageBilled({ costUsd: 0.000005, priceUsd: 0.0000065 });
+
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("adds the late page's billed cost and price to the finished row, and nothing else does", () => {
+    const state = fold([requested(), planned(1000), finishedRun, late, bill]);
+
+    expect(state).toMatchObject({ status: "CANCELLED", costUsd: 0.000009, priceUsd: 0.0000117 });
+  });
+
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("keeps the row equal to the bill when the late page lands before the finish", () => {
+    const state = fold([requested(), planned(1000), late, finishedRun, bill]);
+
+    expect(state).toMatchObject({ costUsd: 0.000009, priceUsd: 0.0000117 });
+  });
+
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("leaves the finished row alone for a late page that was never billed", () => {
+    const state = fold([requested(), planned(1000), finishedRun, late]);
+
+    expect(state).toMatchObject({ costUsd: 0.000004, priceUsd: 0.0000052 });
   });
 });

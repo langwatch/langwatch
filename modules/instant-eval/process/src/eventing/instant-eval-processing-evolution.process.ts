@@ -9,13 +9,16 @@ import type {
   IntentSpec,
   ProcessEvolution,
   ProcessHandlerContext,
+  ProcessIntent,
   WakeHandler,
 } from "@langwatch/eventing";
 import type { InstantEvalProcessingEvent } from "@langwatch/instant-eval-contract";
+import { pickInstantEvalRoutedSpend } from "@langwatch/instant-eval-judge-contract";
 
 import {
   INSTANT_EVAL_CANCEL_GRACE_MS,
   INSTANT_EVAL_STALL_THRESHOLD_MS,
+  type instantEvalBillLatePageIntentSchema,
   type instantEvalFinishIntentSchema,
   type instantEvalJudgePageIntentSchema,
   type instantEvalPlanIntentSchema,
@@ -29,6 +32,7 @@ export type InstantEvalIntents = {
   plan: IntentSpec<typeof instantEvalPlanIntentSchema>;
   judgePage: IntentSpec<typeof instantEvalJudgePageIntentSchema>;
   finish: IntentSpec<typeof instantEvalFinishIntentSchema>;
+  billLatePage: IntentSpec<typeof instantEvalBillLatePageIntentSchema>;
 };
 
 type InstantEvalContext = ProcessHandlerContext<InstantEvalIntents>;
@@ -41,6 +45,64 @@ const instantEvalPageIntentKey = ({ runId, page }: { runId: string; page: number
 
 const instantEvalFinishKey = ({ runId, reason }: { runId: string; reason: string }): string =>
   `finish:${runId}:${reason}`;
+
+const instantEvalLatePageKey = ({ runId, page }: { runId: string; page: number }): string =>
+  `late-page:${runId}:${page}`;
+
+type InstantEvalLatePage = InstantEvalProcessState["unbilledLatePages"][number];
+
+function instantEvalBillLatePage({
+  ctx,
+  runId,
+  late,
+}: {
+  ctx: InstantEvalContext;
+  runId: string;
+  late: InstantEvalLatePage;
+}): ProcessIntent {
+  return ctx.intent("billLatePage", instantEvalLatePageKey({ runId, page: late.page }), {
+    ...late,
+    runId,
+    projectId: ctx.projectId,
+  });
+}
+
+/**
+ * A page that reports after the run ended: the finish already summed the run without it. A routed
+ * page is paid for, so it is billed on its own once the finish has landed, never dropped. A page
+ * with no routed spend changes nothing, as before the router (the finish never bills it).
+ */
+function instantEvalLatePageJudged({
+  state,
+  data,
+  ctx,
+}: {
+  state: InstantEvalProcessState;
+  data: InstantEvalProcessEventView;
+  ctx: InstantEvalContext;
+}): ProcessEvolution<InstantEvalProcessState> {
+  if (data.page <= state.page) return instantEvalUnchanged(state);
+  if (!pickInstantEvalRoutedSpend(data)) return instantEvalUnchanged(state);
+  const late: InstantEvalLatePage = {
+    page: data.page,
+    inputTokens: data.inputTokens,
+    requests: data.requests,
+    costNanoUsd: data.costNanoUsd,
+    routedInputTokens: data.routedInputTokens,
+  };
+  const counted = { ...state, page: data.page };
+  if (!state.isFinishRecorded) {
+    return {
+      state: { ...counted, unbilledLatePages: [...state.unbilledLatePages, late] },
+      ...instantEvalWakeFor(counted),
+    };
+  }
+  return {
+    state: counted,
+    ...instantEvalWakeFor(counted),
+    intents: [instantEvalBillLatePage({ ctx, runId: data.runId, late })],
+  };
+}
 
 /** Schedule from the later of the input's instant and now. */
 function instantEvalSchedulingRef(ctx: InstantEvalContext): number {
@@ -209,7 +271,7 @@ export const handleInstantEvalPageJudged: EventHandler<
   InstantEvalIntents
 > = (state, payload, ctx) => {
   const data = instantEvalProcessEventViewSchema.parse(payload);
-  if (state.phase === "terminal") return instantEvalUnchanged(state);
+  if (state.phase === "terminal") return instantEvalLatePageJudged({ state, data, ctx });
   // A page the run already counted: the inbox dedups an exact redelivery, and
   // this catches the rest, so a page arriving twice cannot advance the cursor
   // twice or spend the run's remaining rows twice.
@@ -296,11 +358,29 @@ export const handleInstantEvalCancelRequested: EventHandler<
   return { state: cancelling, ...instantEvalWakeFor(cancelling) };
 };
 
+/**
+ * The run's outcome landed: nothing more is judged, and routed pages that reported after it ended
+ * are billed now, so their cost lands on the finished row after the finish set its total.
+ */
 export const handleInstantEvalFinished: EventHandler<
   InstantEvalProcessState,
   unknown,
   InstantEvalIntents
-> = (state) => ({ state: { ...state, phase: "terminal" }, nextWakeAt: null });
+> = (state, payload, ctx) => {
+  const finished: InstantEvalProcessState = {
+    ...state,
+    phase: "terminal",
+    isFinishRecorded: true,
+    unbilledLatePages: [],
+  };
+  if (state.unbilledLatePages.length === 0) return { state: finished, nextWakeAt: null };
+  const { runId } = instantEvalProcessEventViewSchema.parse(payload);
+  return {
+    state: finished,
+    nextWakeAt: null,
+    intents: state.unbilledLatePages.map((late) => instantEvalBillLatePage({ ctx, runId, late })),
+  };
+};
 
 export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIntents> = (
   state,

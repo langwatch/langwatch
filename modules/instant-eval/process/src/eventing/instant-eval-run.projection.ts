@@ -68,6 +68,11 @@ function addCounts(
   return summed;
 }
 
+/** A page's routed cost; replay folds stored JSON unparsed, so a pre-router page has none. */
+function routedCostUsdOf(data: { costNanoUsd?: number }): number {
+  return (data.costNanoUsd ?? 0) / NANO_USD_PER_USD;
+}
+
 const OUTCOME_STATUS: Readonly<Record<string, InstantEvalStoredStatus>> = {
   finished: "FINISHED",
   failed: "FAILED",
@@ -102,10 +107,11 @@ export function applyInstantEvalRunEvent(
         skipped: state.skipped + event.data.skipped,
         tokens: state.tokens + event.data.inputTokens,
         // A routed run's cost so far, so the page budget check reads it; finish sets the total.
-        // Replay folds stored JSON unparsed, so a page written before the router has no cost.
-        costUsd: toNanoUsdPrecision(
-          state.costUsd + (event.data.costNanoUsd ?? 0) / NANO_USD_PER_USD,
-        ),
+        // A page after the finish is not added here: its own billing adds its cost and price.
+        costUsd:
+          state.finishedAtMs === null
+            ? toNanoUsdPrecision(state.costUsd + routedCostUsdOf(event.data))
+            : state.costUsd,
         startedAtMs: state.startedAtMs ?? event.occurredAt,
       };
 
@@ -123,6 +129,15 @@ export function applyInstantEvalRunEvent(
         costUsd: event.data.costUsd,
         priceUsd: event.data.priceUsd,
         finishedAtMs: state.finishedAtMs ?? event.occurredAt,
+      };
+
+    case INSTANT_EVAL_EVENT_TYPES.LATE_PAGE_BILLED:
+      // Billed only once the finish landed, so this adds to the total the finish set, and the
+      // row's cost and price stay what its spend rows bill.
+      return {
+        ...state,
+        costUsd: toNanoUsdPrecision(state.costUsd + event.data.costUsd),
+        priceUsd: toNanoUsdPrecision(state.priceUsd + event.data.priceUsd),
       };
 
     default:

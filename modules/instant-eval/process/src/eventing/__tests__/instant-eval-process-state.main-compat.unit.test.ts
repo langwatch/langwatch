@@ -41,6 +41,8 @@ describe("process state stored by the main release", () => {
       routedInputTokens: 0,
       lastActivityAtMs: 1,
       cancelRequestedAtMs: null,
+      isFinishRecorded: false,
+      unbilledLatePages: [],
     });
   });
 });

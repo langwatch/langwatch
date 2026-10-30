@@ -51,6 +51,7 @@ export function context(now = NOW): {
         plan: factory("plan"),
         judgePage: factory("judgePage"),
         finish: factory("finish"),
+        billLatePage: factory("billLatePage"),
       }),
     },
   };

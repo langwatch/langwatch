@@ -244,3 +244,52 @@ describe("given a routed run", () => {
     expect(recorded[0]).not.toHaveProperty("costNanoUsd");
   });
 });
+
+describe("given a routed page that reported after its run finished", () => {
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("bills the page on a record of its own, and holds nothing to release", async () => {
+    const { service, recorded, released } = finishing();
+
+    const spend = await service.billLatePage({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      page: 3,
+      inputTokens: 1_000_000,
+      requests: 4,
+      costNanoUsd: 5_000_000,
+      routedInputTokens: 1_000_000,
+    });
+
+    expect(spend).toEqual({ costUsd: 0.005, priceUsd: 0.0065 });
+    expect(recorded).toEqual([
+      {
+        projectId: PROJECT_ID,
+        runId: RUN_ID,
+        latePage: 3,
+        inputTokens: 1_000_000,
+        requests: 4,
+        costNanoUsd: 5_000_000,
+        routedInputTokens: 1_000_000,
+        occurredAt: AT,
+      },
+    ]);
+    expect(released).toEqual([]);
+  });
+
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("raises a bill it cannot record, so the intent retries it", async () => {
+    const { service } = finishing({ recorderFails: true });
+
+    await expect(
+      service.billLatePage({
+        runId: RUN_ID,
+        projectId: PROJECT_ID,
+        page: 3,
+        inputTokens: 0,
+        requests: 4,
+        costNanoUsd: 5000,
+        routedInputTokens: 0,
+      }),
+    ).rejects.toThrow("the spend spine is away");
+  });
+});

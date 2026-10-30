@@ -21,6 +21,8 @@ export interface InstantEvalJudgedSpend {
   readonly projectId: string;
   /** The run this spend belongs to; every attempt of a run records under the run's own id. */
   readonly runId?: string;
+  /** A routed page billed after its run finished, recorded under an id of its own. */
+  readonly latePage?: number;
   /** Input tokens the classifier billed for. */
   readonly inputTokens: number;
   /** Classifications made, which is one per judged text. */
@@ -51,6 +53,7 @@ export class InstantEvalJudgedSpendService {
   async recordSpend({
     projectId,
     runId,
+    latePage,
     inputTokens,
     requests,
     costNanoUsd,
@@ -67,7 +70,10 @@ export class InstantEvalJudgedSpendService {
       return;
     }
 
-    const requestId = instantEvalSpendRequestId(runId ? { runId } : {});
+    const requestId = instantEvalSpendRequestId({
+      ...(runId ? { runId } : {}),
+      ...(latePage === undefined ? {} : { latePage }),
+    });
     await this.peers.judges.recordSpend({
       organizationId,
       projectId,

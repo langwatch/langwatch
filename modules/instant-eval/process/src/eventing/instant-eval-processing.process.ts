@@ -19,6 +19,7 @@ import {
   instantEvalProcessEventViewSchema,
   instantEvalProcessStateSchema,
   INSTANT_EVAL_PROCESS_INTENT_TYPES,
+  instantEvalBillLatePageIntentSchema,
   instantEvalFinishIntentSchema,
   instantEvalJudgePageIntentSchema,
   instantEvalPlanIntentSchema,
@@ -33,6 +34,7 @@ import {
   instantEvalWake,
 } from "./instant-eval-processing-evolution.process.ts";
 import {
+  createInstantEvalBillLatePageHandler,
   createInstantEvalFinishHandler,
   createInstantEvalJudgePageHandler,
   createInstantEvalPlanHandler,
@@ -62,6 +64,11 @@ export function instantEvalProcessManager(
         INSTANT_EVAL_PROCESS_INTENT_TYPES.FINISH,
         instantEvalFinishIntentSchema,
         createInstantEvalFinishHandler(dispatch),
+      )
+      .intent(
+        INSTANT_EVAL_PROCESS_INTENT_TYPES.BILL_LATE_PAGE,
+        instantEvalBillLatePageIntentSchema,
+        createInstantEvalBillLatePageHandler(dispatch),
       )
       .toPayload(instantEvalProcessEventViewSchema, buildInstantEvalProcessEventView)
       .on(instantEvalRequestedEventSchema, handleInstantEvalRequested)

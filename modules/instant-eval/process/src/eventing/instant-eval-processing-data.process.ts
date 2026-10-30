@@ -13,6 +13,7 @@ export const INSTANT_EVAL_PROCESS_INTENT_TYPES = {
   PLAN: "plan",
   JUDGE_PAGE: "judgePage",
   FINISH: "finish",
+  BILL_LATE_PAGE: "billLatePage",
 } as const;
 
 /**
@@ -69,6 +70,25 @@ export const instantEvalFinishIntentSchema = z.object({
 });
 export type InstantEvalFinishIntent = z.infer<typeof instantEvalFinishIntentSchema>;
 
+/** A routed page that reported after its run finished, and what it spent. */
+const instantEvalLatePageSchema = z.object({
+  page: z.number().int().positive(),
+  inputTokens: z.number().int().nonnegative(),
+  requests: z.number().int().nonnegative(),
+  costNanoUsd: z.number().int().nonnegative(),
+  routedInputTokens: z.number().int().nonnegative(),
+});
+
+/**
+ * Bills a routed page the finish did not count: its own spend row, then its cost and price on the
+ * finished run's row. Emitted only once the run's finish is recorded, so the row adds it last.
+ */
+export const instantEvalBillLatePageIntentSchema = instantEvalLatePageSchema.extend({
+  runId: z.string(),
+  projectId: z.string(),
+});
+export type InstantEvalBillLatePageIntent = z.infer<typeof instantEvalBillLatePageIntentSchema>;
+
 /** What the process remembers between one input and the next. */
 export const instantEvalProcessStateSchema = z.object({
   phase: z.enum(INSTANT_EVAL_PHASES),
@@ -91,6 +111,10 @@ export const instantEvalProcessStateSchema = z.object({
   /** When the run last did something, which is what the stall wake measures. */
   lastActivityAtMs: z.number(),
   cancelRequestedAtMs: z.number().nullable(),
+  /** Whether the run's finished event has landed; a late page is billed only after it. */
+  isFinishRecorded: z.boolean().default(false),
+  /** Routed pages that reported after the run ended, waiting for its finish to be recorded. */
+  unbilledLatePages: z.array(instantEvalLatePageSchema).default([]),
 });
 export type InstantEvalProcessState = z.infer<typeof instantEvalProcessStateSchema>;
 
@@ -108,6 +132,8 @@ export const INITIAL_INSTANT_EVAL_STATE: InstantEvalProcessState = {
   routedInputTokens: 0,
   lastActivityAtMs: 0,
   cancelRequestedAtMs: null,
+  isFinishRecorded: false,
+  unbilledLatePages: [],
 };
 
 /**

@@ -515,6 +515,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         pages.discardReadAhead({ runId: input.runId });
         return finishes.finish(input);
       },
+      billLatePage: (input) => finishes.billLatePage(input),
     };
   }
 

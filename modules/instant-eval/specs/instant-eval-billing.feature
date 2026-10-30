@@ -77,6 +77,16 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When a run's spend is recorded
       Then the failure is raised so the finish is delivered again
 
+    @unit
+    Scenario: A routed page that reports after its run finished is billed on its own
+      Given a routed run that finished while one of its pages was still judging
+      When that page reports its routed spend after the finish
+      Then the page is billed on a spend record of its own, beside the run's record
+      And only once the run's finish has landed, whichever reported first
+      And its cost and price are added to the finished run's row
+      So the row's cost and price always equal what the run's spend records bill
+      And a late page that carries no routed spend changes nothing, as before the router
+
   Rule: The spend page names the judged rows
 
     @unit

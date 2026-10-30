@@ -59,12 +59,19 @@ export interface InstantEvalSpendAttribution {
 /**
  * A run's id is derived from the run, so a finish delivered twice appends the
  * same request and the spine's own idempotency key drops the second. A query
- * mints a fresh one, so a retry is a second query — which is what it is.
+ * mints a fresh one, so a retry is a second query, which is what it is. A
+ * routed page billed after its run finished has its own id beside the run's.
  */
-export function instantEvalSpendRequestId({ runId }: { runId?: string }): string {
-  return runId
-    ? `${RUN_REQUEST_ID_PREFIX}${runId}`
-    : generate(INSTANT_EVAL_QUERY_KSUID_RESOURCE).toString();
+export function instantEvalSpendRequestId({
+  runId,
+  latePage,
+}: {
+  runId?: string;
+  latePage?: number;
+}): string {
+  if (!runId) return generate(INSTANT_EVAL_QUERY_KSUID_RESOURCE).toString();
+  const runRequestId = `${RUN_REQUEST_ID_PREFIX}${runId}`;
+  return latePage === undefined ? runRequestId : `${runRequestId}_late_page_${latePage}`;
 }
 
 /** The hold a synchronous query takes on the free budget while it judges; one per query. */
