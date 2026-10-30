@@ -15,6 +15,7 @@ import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
+import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
@@ -77,6 +78,7 @@ export function BoardWidgetCard({
   const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
   const clipboard = useWidgetClipboard({ dashboardId });
   const csvExport = useWidgetCsvExport({ board: boardName, widget: widget.name });
+  const viewRef = useWidgetViewed({ widgetSource: widget.definition.source?.kind ?? "unknown" });
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
   const [limits, setLimits] = useState("");
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
@@ -90,6 +92,7 @@ export function BoardWidgetCard({
 
   return (
     <WidgetCardShell
+      viewRef={viewRef}
       name={widget.name}
       description={widget.definition.description}
       footer={widgetCardFooter({

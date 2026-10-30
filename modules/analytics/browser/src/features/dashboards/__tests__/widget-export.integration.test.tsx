@@ -8,6 +8,8 @@
 
 import type { QueryCompleteness } from "@langwatch/analytics-contract";
 import { LWQL_MAX_RESULT_ROWS } from "@langwatch/analytics-contract/langwatch-ql-limits";
+import type * as BrowserHostAnalytics from "@langwatch/browser-host/analytics";
+import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import {
   UiProcedureRefusal,
   type UiProcedureAnswer,
@@ -18,9 +20,23 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-const { frameProps } = vi.hoisted(() => ({
+const { frameProps, tracked } = vi.hoisted(() => ({
   frameProps: vi.fn<(props: SandboxedChartFrameProps) => void>(),
+  tracked: { events: [] as UiAnalyticsEvent[] },
 }));
+
+vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
+  const actual = await importActual<typeof BrowserHostAnalytics>();
+  const recorder = {
+    track: (event: UiAnalyticsEvent) => tracked.events.push(event),
+    register: () => void 0,
+    unregister: () => void 0,
+    identify: () => void 0,
+    group: () => void 0,
+    reset: () => void 0,
+  };
+  return { ...actual, useUiAnalytics: () => recorder };
+});
 
 vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
   SandboxedChartFrame: (props: SandboxedChartFrameProps) => {
@@ -159,6 +175,7 @@ let lastBlob: Blob | undefined;
 
 beforeEach(() => {
   downloads.length = 0;
+  tracked.events.length = 0;
   window.URL.createObjectURL = vi.fn((blob: Blob) => {
     lastBlob = blob;
     return "blob:test";
@@ -220,6 +237,27 @@ describe("given a stored board's widget whose query answered with rows", () => {
       ]);
       expect(server.calls).toHaveLength(queriesRun);
       expect(host.successes).toEqual([{ title: "CSV downloaded" }]);
+    });
+  });
+
+  describe("when the reader downloads the CSV", () => {
+    /** @scenario "Telemetry: exporting a widget sends dashboards.exported.widget" */
+    it("sends one export event with its format", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      storedCard({ answer: answering({ rows: ROWS }).answer });
+      await frameRunsItsQuery();
+
+      await openMenu(user);
+      await user.click(exportItem());
+
+      expect(tracked.events.filter(({ action }) => action === "exported")).toEqual([
+        {
+          boundary: "dashboards",
+          name: "widget",
+          action: "exported",
+          attributes: { format: "csv" },
+        },
+      ]);
     });
   });
 

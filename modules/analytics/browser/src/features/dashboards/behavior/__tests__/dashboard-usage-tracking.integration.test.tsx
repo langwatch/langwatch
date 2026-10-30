@@ -27,6 +27,7 @@ vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
   return { ...actual, useUiAnalytics: () => recorder };
 });
 
+import type { AnalyticsRouteReading } from "../../../../model/analytics-host.ts";
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../../testing.tsx";
 import {
   NO_PROCEDURES,
@@ -39,12 +40,16 @@ import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import type { BoardTemplate } from "../../templates/index.ts";
 import { useBoardFromTemplate } from "../use-board-from-template.ts";
+import { useBoardRange } from "../use-board-period.ts";
+import { useBoardWidgetEditor } from "../use-board-widget-editor.ts";
 import { useBoardWidgets } from "../use-board-widgets.ts";
 import { useDashboardViewed } from "../use-dashboard-viewed.ts";
 import { useFavourites } from "../use-favourites.ts";
 import { useSavedDashboards } from "../use-saved-dashboards.ts";
 
 const DASHBOARD_ID = "board-1";
+/** The stored widget dropped one card to the right. */
+const MOVED = { graphId: "widget-1", gridColumn: 4, gridRow: 0, colSpan: 4, rowSpan: 3 };
 const CODE = "export default function Widget() { return null; }";
 
 const storedWidget = (sources: readonly string[] | null) => ({
@@ -94,7 +99,10 @@ function inMemoryServer({ refuse = false }: { refuse?: boolean } = {}) {
 }
 
 /** Mounts one hook on the board and hands back its latest answer. */
-function mount<T>(hook: () => T, { refuse = false }: { refuse?: boolean } = {}) {
+function mount<T>(
+  hook: () => T,
+  { refuse = false, route }: { refuse?: boolean; route?: AnalyticsRouteReading } = {},
+) {
   const latest: { current: T | undefined } = { current: void 0 };
   function Probe() {
     latest.current = hook();
@@ -102,6 +110,7 @@ function mount<T>(hook: () => T, { refuse = false }: { refuse?: boolean } = {}) 
   }
   const host = new StubAnalyticsHost({
     flags: { release_dashboards: true, release_langy_enabled: true },
+    ...(route ? { route } : {}),
   });
   renderDashboards({ element: <Probe />, host, answer: inMemoryServer({ refuse }).answer });
   return { latest: () => latest.current!, host };
@@ -325,7 +334,7 @@ describe("given a member asking Langy from a board", () => {
 
 describe("given a member opening a board", () => {
   /** @scenario "Telemetry: opening a board sends dashboards.viewed.dashboard" */
-  it("sends nothing while the widgets load, and one view once they are known", () => {
+  it("sends nothing while the widgets load, and one view once they are known", async () => {
     let props: Parameters<typeof useDashboardViewed>[0] = {
       dashboardId: DASHBOARD_ID,
       dashboardKind: "stored",
@@ -342,8 +351,153 @@ describe("given a member opening a board", () => {
     props = { ...props, widgetCount: 3, isLoaded: true };
     cleanup();
     mount(() => useDashboardViewed(props));
+    await waitFor(() => expect(tracked.events).toHaveLength(1));
     expect(tracked.events.map(({ attributes }) => attributes)).toEqual([
-      { dashboardKind: "stored", widgetCount: 3 },
+      {
+        dashboardKind: "stored",
+        widgetCount: 3,
+        dashboardKey: expect.stringMatching(/^[0-9a-f]{16}$/),
+      },
     ]);
+  });
+
+  /** @scenario "Telemetry: a board view carries a one-way board key, never the board id" */
+  it("sends the same key for each open of one board, and never the board id", async () => {
+    const props = {
+      dashboardId: DASHBOARD_ID,
+      dashboardKind: "stored" as const,
+      widgetCount: 1,
+      isLoaded: true,
+    };
+    mount(() => useDashboardViewed(props));
+    await waitFor(() => expect(tracked.events).toHaveLength(1));
+    cleanup();
+    mount(() => useDashboardViewed(props));
+    await waitFor(() => expect(tracked.events).toHaveLength(2));
+
+    const keys = tracked.events.map(({ attributes }) => attributes?.dashboardKey);
+    expect(keys[0]).toBe(keys[1]);
+    expect(JSON.stringify(tracked.events)).not.toContain(DASHBOARD_ID);
+  });
+});
+
+describe("given a member changing a board's period", () => {
+  /** @scenario "Telemetry: picking a board period sends dashboards.changed.period" */
+  it("sends the range and grain now in use, and nothing for the one already in use", () => {
+    const { latest } = mount(useBoardRange, {
+      route: { params: {}, query: { range: "30d", grain: "1d" } },
+    });
+
+    act(() => latest().setRange("30d"));
+    act(() => latest().setGrain("1d"));
+    expect(tracked.events).toEqual([]);
+
+    act(() => latest().setRange("7d"));
+    act(() => latest().setGrain("1h"));
+    act(() => latest().setRange("live"));
+
+    expect(names()).toEqual([
+      "dashboards.changed.period",
+      "dashboards.changed.period",
+      "dashboards.changed.period",
+    ]);
+    expect(tracked.events.map(({ attributes }) => attributes)).toEqual([
+      { range: "7d", grain: "1d" },
+      { range: "30d", grain: "1h" },
+      // Live sends the grain back to auto, and the event says what is now in use.
+      { range: "live", grain: "auto" },
+    ]);
+  });
+});
+
+describe("given a member editing a board itself", () => {
+  /** @scenario "Telemetry: renaming a board or saving its layout sends dashboards.edited.dashboard" */
+  it("sends a rename once the server agrees", async () => {
+    const { latest } = mount(useSavedDashboards);
+
+    act(() => latest().renameBoard({ dashboardId: DASHBOARD_ID, name: "Costs" }));
+
+    await waitFor(() => expect(tracked.events).toHaveLength(1));
+    expect(tracked.events[0]).toEqual({
+      boundary: "dashboards",
+      name: "dashboard",
+      action: "edited",
+      attributes: { change: "rename" },
+    });
+  });
+
+  /** @scenario "Telemetry: renaming a board or saving its layout sends dashboards.edited.dashboard" */
+  it("sends one layout edit per saved drop", async () => {
+    const { latest } = mount(() => useBoardWidgets({ dashboardId: DASHBOARD_ID }));
+    await waitFor(() => expect(latest().widgets).toHaveLength(1));
+
+    await act(() => latest().commitPlacements([MOVED]));
+
+    expect(
+      tracked.events.map(({ action, name, attributes }) => [action, name, attributes]),
+    ).toEqual([["edited", "dashboard", { change: "layout" }]]);
+  });
+
+  /** @scenario "Telemetry: renaming a board or saving its layout sends dashboards.edited.dashboard" */
+  it("sends nothing for a rename or layout the server refuses", async () => {
+    const saved = mount(useSavedDashboards, { refuse: true });
+    act(() => saved.latest().renameBoard({ dashboardId: DASHBOARD_ID, name: "Costs" }));
+    await waitFor(() => expect(saved.host.failures.length).toBeGreaterThan(0));
+    cleanup();
+
+    const board = mount(() => useBoardWidgets({ dashboardId: DASHBOARD_ID }), { refuse: true });
+    await waitFor(() => expect(board.latest().widgets).toHaveLength(1));
+    await act(() => board.latest().commitPlacements([MOVED]));
+
+    expect(tracked.events).toEqual([]);
+  });
+});
+
+describe("given a member in the widget editor", () => {
+  const PERIOD: BoardPeriod = { periodStart: 0, periodEnd: 86_400_000, granularitySeconds: 3_600 };
+  const saved: BoardWidget = {
+    id: "widget-1",
+    name: "Cost",
+    definition: { version: 1, code: CODE, queries: [{ name: "main", sql: "SELECT 1" }] },
+    placement: { graphId: "widget-1", gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 3 },
+  };
+  const editor = (widget: BoardWidget | null) => () =>
+    useBoardWidgetEditor({
+      widget,
+      projectId: "proj-1",
+      projectSlug: "test-project",
+      dashboardId: DASHBOARD_ID,
+      period: PERIOD,
+    });
+
+  /** @scenario "Telemetry: opening the widget editor sends lwql.opened.workbench" */
+  it("sends one open for a new widget and one for a saved one", () => {
+    const { latest } = mount(editor(null));
+    act(() => latest().setDraftName("Renamed"));
+    cleanup();
+    mount(editor(saved));
+
+    expect(names()).toEqual(["lwql.opened.workbench", "lwql.opened.workbench"]);
+    expect(tracked.events.map(({ attributes }) => attributes)).toEqual([
+      { widgetIs: "new" },
+      { widgetIs: "existing" },
+    ]);
+  });
+
+  /** @scenario "Telemetry: running a query in the widget editor sends lwql.ran.query" */
+  it("sends one run per Run, carrying nothing of the query", async () => {
+    const { latest } = mount(editor(saved));
+    tracked.events.length = 0;
+
+    await act(async () => {
+      await latest()
+        .runStandalone({ name: "main", sql: "SELECT secret FROM traces" })
+        .catch(() => undefined);
+    });
+
+    expect(tracked.events).toEqual([
+      { boundary: "lwql", name: "query", action: "ran", attributes: {} },
+    ]);
+    expect(JSON.stringify(tracked.events)).not.toContain("SELECT");
   });
 });

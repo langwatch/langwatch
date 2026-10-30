@@ -83,6 +83,58 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then analytics unregisters projectId straight away
 
   # ---------------------------------------------------------------------------
+  # Engagement events: what a member does on a board after opening it
+  # Sources: the owner's review of the telemetry PR, the "PR 1" rows of the event table in
+  # https://github.com/langwatch/langwatch/pull/9190#issuecomment-6520995840.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Telemetry: a board view carries a one-way board key, never the board id
+    When a member opens a board
+    Then "dashboards.viewed.dashboard" carries a dashboardKey of 16 hex characters
+    And the same board always gives the same dashboardKey
+    And the dashboardKey is not the board id
+
+  @integration
+  Scenario: Telemetry: a widget on screen sends dashboards.viewed.widget once per board view
+    Given a member has a board open
+    When a widget's card first shows on screen
+    Then "dashboards.viewed.widget" is sent once with widgetSource "catalogue", "langy", "code", "api", "curated" or "unknown"
+    And the card showing again in the same view sends nothing more
+    And a card that never shows on screen sends nothing
+
+  @integration
+  Scenario: Telemetry: picking a board period sends dashboards.changed.period
+    When a member picks another range or grain on a board
+    Then "dashboards.changed.period" is sent with the range and grain now in use
+    And picking the range or grain already in use sends nothing
+
+  @integration
+  Scenario: Telemetry: exporting a widget sends dashboards.exported.widget
+    When a member downloads a widget's rows as CSV
+    Then "dashboards.exported.widget" is sent with format "csv"
+
+  @integration
+  Scenario: Telemetry: renaming a board or saving its layout sends dashboards.edited.dashboard
+    When a member renames a board and the server agrees
+    Then "dashboards.edited.dashboard" is sent with change "rename"
+    When a member drops a widget in a new place and the layout is saved
+    Then "dashboards.edited.dashboard" is sent once with change "layout"
+    And a rename or layout the server refuses sends nothing
+
+  @integration
+  Scenario: Telemetry: opening the widget editor sends lwql.opened.workbench
+    # The widget editor is the product's LangWatchQL workbench: its Queries tab runs queries.
+    When a member opens the editor on a new widget or a saved one
+    Then "lwql.opened.workbench" is sent once with widgetIs "new" or "existing"
+
+  @integration
+  Scenario: Telemetry: running a query in the widget editor sends lwql.ran.query
+    When a member presses Run on a query in the widget editor
+    Then "lwql.ran.query" is sent once
+    And it carries no query text and no SQL
+
+  # ---------------------------------------------------------------------------
   # Query telemetry (#1005)
   # ---------------------------------------------------------------------------
 

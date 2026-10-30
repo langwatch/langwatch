@@ -31,6 +31,7 @@ import {
   duplicateSlot,
 } from "../model/board-widgets.ts";
 import {
+  dashboardEdited,
   langyTracesToggled,
   widgetAdded,
   widgetDeleted,
@@ -332,7 +333,7 @@ export function useBoardWidgets({
   const commitPlacements = (next: readonly ChartGridPlacement[]) =>
     undoable({
       title: "Layout saved",
-      events: [],
+      events: [dashboardEdited({ change: "layout" })],
       change: () =>
         write({
           fallbackTitle: "Couldn't save the layout",
