@@ -11,9 +11,9 @@ Analytics reads: timeseries, feedback and most-used documents over trace and eva
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | analytics                                                                                                      |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                    |
-| Api token      | `AnalyticsApi` = `moduleApi<AnalyticsApi>()("analytics")`, `contract/src/analytics.api.ts:236` (31 operations) |
+| Api token      | `AnalyticsApi` = `moduleApi<AnalyticsApi>()("analytics")`, `contract/src/analytics.api.ts:250` (32 operations) |
 | Other token    | `AnalyticsLegacyApi`, `process/src/transport/analytics-legacy.rest.ts:33`                                      |
-| Other token    | `AnalyticsLwqlApi`, `process/src/transport/analytics-lwql.trpc.ts:64`                                          |
+| Other token    | `AnalyticsLwqlApi`, `process/src/transport/analytics-lwql.trpc.ts:70`                                          |
 | Other token    | `AnalyticsQueryApi`, `process/src/transport/query.rest.ts:53`                                                  |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                     |
 

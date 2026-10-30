@@ -1,10 +1,14 @@
+import {
+  LWQL_MAX_MEMBER_PROJECTS,
+  LWQL_MAX_WIDGET_PROJECTS,
+} from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { PROJECT_KIND, type Project, type ProjectApi } from "@langwatch/project-contract";
 /**
  * The query door's scope: which projects one API key reads, and what it sees of them.
  * @see specs/lwql/api.feature
@@ -13,6 +17,7 @@ import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "../langwatch-ql-capability.service.ts";
 import { LangWatchQLQueryScopeService } from "../langwatch-ql-query-scope.service.ts";
 import { project } from "./project.fixture.ts";
 
@@ -49,26 +54,55 @@ const INPUT_HIDDEN_FROM_THE_PUBLIC: ResolvedDataPrivacy = {
 function scopeOver(input: {
   projects: readonly Project[];
   grants: Readonly<Record<string, readonly string[]>>;
+  /** What authz answers per project, when it is not just the grants. */
+  decisions?: Readonly<Record<string, boolean>>;
   privacy?: Readonly<Record<string, ResolvedDataPrivacy>>;
+  /** Reshapes the rows the project read answers, e.g. to repeat one as an unstable page would. */
+  rows?: (data: Project[]) => Project[];
+  /** The organization of a project that is not in the default one. */
+  orgs?: Readonly<Record<string, string>>;
 }) {
+  const orgOf = (id: string) => input.orgs?.[id] ?? ORGANIZATION_ID;
   const asked: { projectId: string; permission: string }[] = [];
+  const batches: string[][] = [];
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
-      listByOrganization: ({ organizationId, limit, projectIds }) => {
-        const data = input.projects.filter(
+      findOrganizationId: (id) => Promise.resolve(orgOf(id)),
+      listByOrganization: ({ organizationId, page, limit, projectIds }) => {
+        const matching = input.projects.filter(
           (p) =>
-            organizationId === ORGANIZATION_ID &&
+            organizationId === orgOf(p.id) &&
             !p.archivedAt &&
+            // The real read drops governance projects unless asked, so the service need not.
+            p.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
             (!projectIds || projectIds.includes(p.id)),
         );
-        return Promise.resolve({ data, pagination: { page: 1, limit, total: data.length } });
+        const data = (input.rows ?? ((rows) => rows))(
+          matching.slice((page - 1) * limit, page * limit),
+        );
+        return Promise.resolve({ data, pagination: { page, limit, total: matching.length } });
       },
     }),
     authz: createApiFixture<AuthzApi>({
       hasApiKeyPermission: ({ scope, permission }) => {
         asked.push({ projectId: scope.id, permission });
         return Promise.resolve(input.grants[scope.id]?.includes(permission) === true);
+      },
+      canBatchByIds: ({ projects, permission }) => {
+        batches.push(projects.map(({ projectId }) => projectId));
+        return Promise.resolve({
+          teams: new Map(),
+          // The gate itself is authz's (its own test); this fake only answers what the test sets.
+          projects: new Map(
+            projects.map(({ projectId }) => [
+              projectId,
+              input.decisions?.[projectId] ??
+                input.grants[projectId]?.includes(permission) === true,
+            ]),
+          ),
+          organizationRole: null,
+        });
       },
       getScope: ({ projectId = "" }) =>
         Promise.resolve({
@@ -103,7 +137,7 @@ function scopeOver(input: {
     }),
   });
 
-  return { service, asked };
+  return { service, asked, batches };
 }
 
 describe("given an API key that reaches several projects of its organization", () => {
@@ -218,7 +252,7 @@ describe("given a run that names one project", () => {
         privacy: { b: INPUT_HIDDEN_FROM_THE_PUBLIC },
       });
 
-      const scope = await service.resolve({ reach: KEY, projectId: "a" });
+      const scope = await service.resolve({ reach: KEY, projects: ["a"] });
 
       expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
       expect(scope.protections.canSeeCapturedInput).toBe(true);
@@ -251,9 +285,33 @@ describe("given a run that names one project", () => {
         grants: { a: ["analytics:view"], b: ["cost:view"] },
       });
 
-      await expect(service.resolve({ reach: KEY, projectId: "b" })).rejects.toMatchObject({
+      await expect(service.resolve({ reach: KEY, projects: ["b"] })).rejects.toMatchObject({
         code: "project_not_found",
       });
+    });
+
+    /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+    it("refuses the same project when asked whether a write may store it", async () => {
+      const { service } = scopeOver({
+        projects: [project("a"), project("b")],
+        grants: { a: ["analytics:view"], b: ["cost:view"] },
+      });
+
+      await expect(
+        service.assertReadableByKey({ reach: KEY, projectIds: ["a"] }),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.assertReadableByKey({ reach: KEY, projectIds: ["a", "b"] }),
+      ).rejects.toMatchObject({ code: "project_not_found" });
+    });
+
+    it("refuses a widget union over the widget cap", async () => {
+      const { service } = scopeOver({ projects: [project("a")], grants: {} });
+      const ids = Array.from({ length: LWQL_MAX_WIDGET_PROJECTS + 1 }, (_, index) => `p${index}`);
+
+      await expect(service.assertReadableByKey({ reach: KEY, projectIds: ids })).rejects.toThrow(
+        `Name at most ${LWQL_MAX_WIDGET_PROJECTS} projects.`,
+      );
     });
 
     it("refuses a project outside its organization exactly like one that does not exist", async () => {
@@ -263,9 +321,9 @@ describe("given a run that names one project", () => {
       });
       const otherOrganization = service.resolve({
         reach: { ...KEY, organizationId: "org-2" },
-        projectId: "a",
+        projects: ["a"],
       });
-      const missing = service.resolve({ reach: KEY, projectId: "nope" });
+      const missing = service.resolve({ reach: KEY, projects: ["nope"] });
 
       await expect(otherOrganization).rejects.toMatchObject({ code: "project_not_found" });
       await expect(missing).rejects.toMatchObject({ code: "project_not_found" });
@@ -277,7 +335,7 @@ describe("given a run that names one project", () => {
         grants: { gov: ["analytics:view"] },
       });
 
-      await expect(service.resolve({ reach: KEY, projectId: "gov" })).rejects.toMatchObject({
+      await expect(service.resolve({ reach: KEY, projects: ["gov"] })).rejects.toMatchObject({
         code: "project_not_found",
       });
     });
@@ -289,7 +347,7 @@ describe("given a run that names one project", () => {
 
       const scope = await service.resolve({
         reach: { kind: "project", projectId: "a" },
-        projectId: "a",
+        projects: ["a"],
       });
 
       expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
@@ -300,8 +358,525 @@ describe("given a run that names one project", () => {
       const { service } = scopeOver({ projects: [project("a"), project("b")], grants: {} });
 
       await expect(
-        service.resolve({ reach: { kind: "project", projectId: "a" }, projectId: "b" }),
+        service.resolve({ reach: { kind: "project", projectId: "a" }, projects: ["b"] }),
       ).rejects.toMatchObject({ code: "project_not_found" });
     });
+  });
+});
+
+describe("given a run that names projects", () => {
+  const PERMITTED = { a: ["analytics:view"], b: ["analytics:view"] };
+
+  /** @scenario "QP03b An organization, team or personal key that names no project is refused with a 422 naming the field" */
+  it("refuses an organization key that names none, when the door requires them", async () => {
+    const { service } = scopeOver({ projects: [project("a"), project("b")], grants: PERMITTED });
+
+    const refusal = await service
+      .resolve({ reach: KEY, requireProjects: true })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({
+      code: "projects_required",
+      httpStatus: 422,
+      message: 'Name the projects to query: send `projects`, a list of project ids, or "all"',
+    });
+  });
+
+  /** @scenario "QP03 A project key reads its own project by default" */
+  it("lets a project key read its own project without naming it", async () => {
+    const { service } = scopeOver({ projects: [project("a")], grants: {} });
+
+    const scope = await service.resolve({
+      reach: { kind: "project", projectId: "a" },
+      requireProjects: true,
+    });
+
+    expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
+  });
+
+  /** @scenario "QP03 A project key reads its own project by default" */
+  it("lets a key whose scope is exactly one project read it without naming it", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("b")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    const scope = await service.resolve({ reach: KEY, requireProjects: true });
+
+    expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
+  });
+
+  describe("when the organization has far more projects than the key reads", () => {
+    const BIG = Array.from({ length: 250 }, (_, index) =>
+      project(`p${String(index).padStart(3, "0")}`),
+    );
+    const grantsOn = (ids: readonly string[]) =>
+      Object.fromEntries(ids.map((id) => [id, ["analytics:view"]]));
+
+    /** @scenario "QP03 A project key reads its own project by default" */
+    it("defaults to the one project it reads, whatever the organization holds", async () => {
+      const { service } = scopeOver({ projects: BIG, grants: grantsOn(["p199"]) });
+
+      const scope = await service.resolve({ reach: KEY, requireProjects: true });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["p199"]);
+    });
+
+    /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+    it('reads the three it holds for "all", counting the cap against those three', async () => {
+      const { service } = scopeOver({ projects: BIG, grants: grantsOn(["p007", "p150", "p249"]) });
+
+      const scope = await service.resolveAll({ reach: KEY });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["p007", "p150", "p249"]);
+    });
+
+    /** @scenario "QP03b An organization, team or personal key that names no project is refused with a 422 naming the field" */
+    it("stops asking for grants once two projects settle that it must name them", async () => {
+      const { service, asked } = scopeOver({
+        projects: BIG,
+        grants: grantsOn(BIG.map((p) => p.id)),
+      });
+
+      await expect(service.resolve({ reach: KEY, requireProjects: true })).rejects.toMatchObject({
+        code: "projects_required",
+      });
+
+      expect(asked).toHaveLength(2);
+    });
+
+    /** @scenario "QP03j A key that reads no project is told so, not asked to name one" */
+    it("says it reads no project, and how to grant one, instead of a bare not found", async () => {
+      const { service } = scopeOver({ projects: BIG, grants: {} });
+
+      await expect(service.resolve({ reach: KEY, requireProjects: true })).rejects.toMatchObject({
+        code: "projects_unreadable",
+        message: expect.stringContaining("reads no project"),
+        tips: [expect.stringContaining("grant")],
+      });
+    });
+  });
+
+  describe("when the organization is larger than a run may read", () => {
+    const HUGE = Array.from({ length: LWQL_TENANT_CAPABILITY_MAX_PROJECTS + 1 }, (_, index) =>
+      project(`h${index}`),
+    );
+
+    /** @scenario "QP03h The word all that resolves to no project, or to more than the cap, is refused" */
+    it("refuses before any grant is read, saying the organization is too big", async () => {
+      const { service, asked } = scopeOver({ projects: HUGE, grants: PERMITTED });
+
+      await expect(service.resolveAll({ reach: KEY })).rejects.toMatchObject({
+        httpStatus: 422,
+        message: expect.stringContaining("This organization has more than"),
+      });
+
+      expect(asked).toEqual([]);
+    });
+
+    /** @scenario "QP03h The word all that resolves to no project, or to more than the cap, is refused" */
+    it("refuses a named list longer than the cap up front", async () => {
+      const { service, asked } = scopeOver({ projects: HUGE, grants: PERMITTED });
+
+      await expect(
+        service.resolve({ reach: KEY, projects: HUGE.map(({ id }) => id) }),
+      ).rejects.toMatchObject({ httpStatus: 422 });
+
+      expect(asked).toEqual([]);
+    });
+  });
+
+  describe("when a read repeats a project", () => {
+    /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+    it("judges and returns each project once, in id order", async () => {
+      const { service, asked } = scopeOver({
+        projects: [project("b"), project("a")],
+        grants: PERMITTED,
+        rows: (data) => [...data, ...data],
+      });
+
+      const scope = await service.resolveAll({ reach: KEY });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["a", "b"]);
+      expect(asked.filter(({ projectId }) => projectId === "a")).toHaveLength(1);
+    });
+  });
+
+  describe('when a statement asks for "all" the key can read', () => {
+    /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+    it("reads the projects it holds analytics:view on, in id order, and echoes that same set", async () => {
+      const { service } = scopeOver({
+        projects: [project("b"), project("a")],
+        grants: PERMITTED,
+      });
+
+      const scope = await service.resolveAll({ reach: KEY });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["a", "b"]);
+    });
+
+    /** @scenario "QP03g The word all never reaches a project the caller cannot read, or another organization" */
+    it("leaves out a project of its organization it holds no analytics:view on", async () => {
+      const { service } = scopeOver({
+        projects: [project("a"), project("b"), project("c")],
+        grants: { a: ["analytics:view"], b: ["analytics:view"], c: ["cost:view"] },
+      });
+
+      const scope = await service.resolveAll({ reach: KEY });
+
+      expect(scope.projects.map(({ id }) => id)).toEqual(["a", "b"]);
+    });
+
+    /** @scenario "QP03g The word all never reaches a project the caller cannot read, or another organization" */
+    it("never reads a project of another organization, which the key's organization lacks", async () => {
+      const { service } = scopeOver({ projects: [project("a")], grants: PERMITTED });
+
+      await expect(
+        service.resolveAll({ reach: { ...KEY, organizationId: "org-2" } }),
+      ).rejects.toMatchObject({ code: "projects_unreadable" });
+    });
+
+    /** @scenario "QP03h The word all that resolves to no project, or to more than the cap, is refused" */
+    it("refuses as a key that reads no project, the same as naming nothing", async () => {
+      const { service } = scopeOver({ projects: [project("a")], grants: {} });
+
+      await expect(service.resolveAll({ reach: KEY })).rejects.toMatchObject({
+        code: "projects_unreadable",
+        httpStatus: 422,
+      });
+    });
+  });
+
+  /** @scenario "QP12 A list that names one project twice reads it once, and params keeps the first place" */
+  it("reads each named project once, in the order named", async () => {
+    const { service } = scopeOver({ projects: [project("a"), project("b")], grants: PERMITTED });
+
+    const scope = await service.resolve({ reach: KEY, projects: ["b", "a", "b"] });
+
+    expect(scope.projects.map(({ id }) => id)).toEqual(["b", "a"]);
+  });
+
+  /** @scenario "QP09b The refusal for an unreadable project is byte-identical to the one for a missing project" */
+  it("answers an unreadable project and a missing one with the same body, naming neither", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"] },
+    });
+    const bodyOf = async (projects: string[]) => {
+      const refusal = await service
+        .resolve({ reach: KEY, projects })
+        .catch((error: unknown) => error);
+      const { code, message, meta, httpStatus } = refusal as Record<string, unknown>;
+
+      return JSON.stringify({ code, message, meta, httpStatus });
+    };
+
+    const unreadable = await bodyOf(["a", "c"]);
+    const missing = await bodyOf(["a", "z"]);
+
+    expect(unreadable).toBe(missing);
+    expect(unreadable).not.toMatch(/"c"|"z"|\bc\b|\bz\b/);
+  });
+
+  /** @scenario "QP09 One unreadable project in the list refuses the run" */
+  it("refuses the whole run when one named project is unreadable", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    await expect(service.resolve({ reach: KEY, projects: ["a", "c"] })).rejects.toMatchObject({
+      code: "project_not_found",
+      httpStatus: 404,
+    });
+  });
+
+  /** @scenario "QP03d A project key naming another project is refused" */
+  it("refuses a project key naming a project of its organization that is not its own", async () => {
+    const { service } = scopeOver({ projects: [project("a"), project("b")], grants: {} });
+
+    await expect(
+      service.resolve({ reach: { kind: "project", projectId: "a" }, projects: ["b"] }),
+    ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
+  });
+});
+
+describe("given a member's card that names projects", () => {
+  const body = (refusal: unknown) => {
+    const { code, message, meta, httpStatus } = refusal as Record<string, unknown>;
+
+    return JSON.stringify({ code, message, meta, httpStatus });
+  };
+  const refusalOf = (run: Promise<unknown>) => run.catch((error: unknown) => error);
+
+  /** @scenario "AC208d Project: a crafted card run naming another organization's project is refused" */
+  it("refuses a project the member cannot read, with the body of a missing one", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("z")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    const foreign = await refusalOf(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["a", "z"] }),
+    );
+    const missing = await refusalOf(
+      service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["a", "nope"],
+      }),
+    );
+
+    expect(foreign).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(body(foreign)).toBe(body(missing));
+  });
+
+  /** @scenario "AC208d Project: a crafted card run naming another organization's project is refused" */
+  it("refuses a project of another organization the member can read, as a missing one", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("y")],
+      grants: { a: ["analytics:view"], y: ["analytics:view"] },
+      orgs: { y: "org-y" },
+    });
+
+    const foreign = await refusalOf(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["a", "y"] }),
+    );
+    const missing = await refusalOf(
+      service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["a", "nope"],
+      }),
+    );
+
+    expect(foreign).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(body(foreign)).toBe(body(missing));
+  });
+
+  /** @scenario "QP10 A hand-made request naming another organization's project is refused" */
+  it("gives the key door and the card door the same body for the same refusal", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("z")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    const card = await refusalOf(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["z"] }),
+    );
+    const key = await refusalOf(service.resolve({ reach: KEY, projects: ["z"] }));
+
+    expect(body(card)).toBe(body(key));
+  });
+
+  /** @scenario "QP09c Every door gives the same refusal body for the same missing project" */
+  it("answers with the code and message alone, naming no project", async () => {
+    const { service } = scopeOver({ projects: [project("a")], grants: {} });
+
+    const refusal = await refusalOf(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["a"] }),
+    );
+
+    expect(JSON.parse(body(refusal))).toEqual({
+      code: "project_not_found",
+      message: "Project not found",
+      meta: {},
+      httpStatus: 404,
+    });
+  });
+
+  /** @scenario "QP10b A deleted or archived project is refused like a missing one" */
+  it("refuses a project gone from the live list as it refuses an unknown id", async () => {
+    const archived = { ...project("e"), archivedAt: new Date() } as Project;
+    const { service } = scopeOver({
+      projects: [project("a"), archived],
+      grants: { a: ["analytics:view"], e: ["analytics:view"] },
+    });
+
+    const gone = await refusalOf(service.resolve({ reach: KEY, projects: ["a", "e"] }));
+    const unknown = await refusalOf(service.resolve({ reach: KEY, projects: ["a", "x"] }));
+
+    expect(body(gone)).toBe(body(unknown));
+  });
+
+  /** @scenario "QP11 params.dashboard_context_projects is always a subset of the readable set" */
+  it("refuses a widget's stored project once its read access is revoked, and reads the rest", async () => {
+    const granted = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"], c: ["analytics:view"] },
+    });
+    const revoked = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    expect(
+      (await granted.service.resolve({ reach: KEY, projects: ["a", "c"] })).projects,
+    ).toHaveLength(2);
+    await expect(
+      revoked.service.resolve({ reach: KEY, projects: ["a", "c"] }),
+    ).rejects.toMatchObject({
+      code: "project_not_found",
+    });
+    expect((await revoked.service.resolve({ reach: KEY, projects: ["a"] })).projects).toEqual([
+      { id: "a", lwqlKey: "lwql-a" },
+    ]);
+  });
+
+  /** @scenario "AC207d Project: a project that gets read access later is read without a new save" */
+  it("reads a stored project once the member is given access, with no new save", async () => {
+    const before = scopeOver({ projects: [project("c")], grants: {} });
+    const after = scopeOver({ projects: [project("c")], grants: { c: ["analytics:view"] } });
+
+    await expect(
+      before.service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["c"],
+      }),
+    ).rejects.toMatchObject({ code: "project_not_found" });
+    expect(
+      await after.service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["c"],
+      }),
+    ).toEqual([{ id: "c", lwqlKey: "lwql-c" }]);
+  });
+
+  /** @scenario "AC208c Project: an alert or a scheduled report never reads a project its owner cannot" */
+  it("refuses a run as an owner without read access, reading nothing from the project", async () => {
+    const { service } = scopeOver({ projects: [project("a"), project("c")], grants: {} });
+
+    await expect(
+      service.resolveMemberProjects({ userId: "owner-1", anchorProjectId: "a", projectIds: ["c"] }),
+    ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
+  });
+
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("refuses a missing, a foreign and an unreadable project with one body, wherever it sits in the list", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"] },
+    });
+    const ask = (projectIds: string[]) =>
+      refusalOf(service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }));
+
+    // A project of another organization is one the member holds no grant on: same branch.
+    const [missing, unreadable, listedLate] = await Promise.all([
+      ask(["x"]),
+      ask(["c"]),
+      ask(["a", "x"]),
+    ]);
+
+    expect(body(missing)).toBe(body(unreadable));
+    expect(body(missing)).toBe(body(listedLate));
+    expect(JSON.parse(body(missing))).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(body(missing)).not.toMatch(/"x"|"c"/);
+  });
+
+  it("refuses an archived and a governance project as it refuses a missing one", async () => {
+    const archived = project("e", { archivedAt: new Date() });
+    const governance = project("g", { kind: "internal_governance" });
+    const { service } = scopeOver({
+      projects: [project("a"), archived, governance],
+      grants: { a: ["analytics:view"], e: ["analytics:view"], g: ["analytics:view"] },
+    });
+    const ask = (projectIds: string[]) =>
+      refusalOf(service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }));
+
+    const missing = body(await ask(["x"]));
+
+    expect(body(await ask(["e"]))).toBe(missing);
+    expect(body(await ask(["g"]))).toBe(missing);
+  });
+
+  /** @scenario "AC210f Compatibility: a member who is no admin cannot name an aggregate project in a widget" */
+  it("sends an aggregate project to authz and refuses it, as a missing one, when authz says no", async () => {
+    const { service, batches } = scopeOver({
+      projects: [project("a"), project("agg", { kind: "aggregate" as never })],
+      grants: { a: ["analytics:view"], agg: ["analytics:view"] },
+      decisions: { a: true, agg: false },
+    });
+    const ask = (projectIds: string[]) =>
+      refusalOf(service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }));
+
+    const aggregate = await ask(["a", "agg"]);
+    const missing = await ask(["a", "nope"]);
+
+    expect(batches[0]).toContain("agg");
+    expect(aggregate).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(body(aggregate)).toBe(body(missing));
+  });
+
+  it("accepts a widget's union of ids above a run's cap, and refuses one above the union cap", async () => {
+    const many = Array.from({ length: 120 }, (_, index) => project(`p${index}`));
+    const grants = Object.fromEntries(many.map(({ id }) => [id, ["analytics:view"]]));
+    const { service } = scopeOver({ projects: many, grants });
+    const ids = many.map(({ id }) => id);
+    const tooMany = Array.from({ length: LWQL_MAX_WIDGET_PROJECTS + 1 }, (_, index) => `x${index}`);
+
+    const read = await service.readableByMember({
+      userId: "user-1",
+      anchorProjectId: "p0",
+      projectIds: ids,
+    });
+
+    expect(read).toHaveLength(120);
+    await expect(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "p0", projectIds: tooMany }),
+    ).rejects.toThrow(`name at most ${LWQL_MAX_WIDGET_PROJECTS} projects`);
+  });
+
+  it("decides every listed project in one batch, so an early miss costs the same", async () => {
+    const { service, batches } = scopeOver({
+      projects: [project("a"), project("b")],
+      grants: { a: ["analytics:view"], b: ["analytics:view"] },
+    });
+
+    await refusalOf(
+      service.readableByMember({
+        userId: "user-1",
+        anchorProjectId: "a",
+        projectIds: ["x", "a", "b"],
+      }),
+    );
+
+    expect(batches).toHaveLength(1);
+    expect(batches[0]?.toSorted()).toEqual(["a", "b"]);
+  });
+
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
+  it("refuses a list over the member cap with a clear message, before any lookup", async () => {
+    const { service, batches } = scopeOver({ projects: [], grants: {} });
+    const projectIds = Array.from(
+      { length: LWQL_MAX_MEMBER_PROJECTS + 1 },
+      (_, index) => `p${index}`,
+    );
+
+    await expect(
+      service.resolveMemberProjects({ userId: "user-1", anchorProjectId: "a", projectIds }),
+    ).rejects.toThrow(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
+    expect(batches).toEqual([]);
+  });
+
+  it("lets an authz outage propagate instead of reading it as a missing project", async () => {
+    const outage = new Error("authz unavailable");
+    const failing = LangWatchQLQueryScopeService.create({
+      projects: createApiFixture<ProjectApi>({
+        findOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
+        listByOrganization: () =>
+          Promise.resolve({
+            data: [project("a")],
+            pagination: { page: 1, limit: 1, total: 1 },
+          }),
+      }),
+      authz: createApiFixture<AuthzApi>({ canBatchByIds: () => Promise.reject(outage) }),
+      dataPrivacy: createApiFixture<DataPrivacyApi>({}),
+    });
+
+    await expect(
+      failing.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds: ["a"] }),
+    ).rejects.toBe(outage);
   });
 });

@@ -7,7 +7,6 @@ import {
   type LangWatchQLMemberWindow,
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
-  TRACE_SOURCES,
 } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
@@ -32,7 +31,7 @@ const UNTENANTED: LangWatchQLViewDefinition = {
   columns: traces.columns.filter((column) => column.name !== "TenantId"),
 };
 const VIEWS = [...LWQL_VIEW_CATALOG, UNDATED, UNTENANTED];
-// A view with neither column is one the origin exclusion leaves as written.
+// A view with neither column is one the windows cannot reach through a trace.
 const POSTGRES_VIEW = LangWatchQLCatalogShapesService.create()
   .postgresViews(LWQL_VIEW_CATALOG)
   .find((view) => !view.columns.some(({ name }) => name === "Origin" || name === "TraceId"));
@@ -44,20 +43,14 @@ const MEMBERS = `(TenantId IN ('project_a') OR ${B_FROM})`;
 function scope({
   sql,
   memberWindows,
-  leftOut = [],
   timeWindow,
 }: {
   sql: string;
   memberWindows?: readonly LangWatchQLMemberWindow[];
-  /** The origins the run leaves out, sent as the sources left in. */
-  leftOut?: readonly string[];
   timeWindow?: { start: string; end: string };
 }): string {
   return scopeLangWatchQL({
     sql,
-    ...(leftOut.length > 0
-      ? { sources: TRACE_SOURCES.filter((source) => !leftOut.includes(source)) }
-      : {}),
     database: "analytics",
     views: VIEWS,
     ...(memberWindows ? { memberWindows } : {}),
@@ -133,16 +126,14 @@ describe("scopeLangWatchQL with member windows", () => {
       ).toBe("SELECT count() FROM (SELECT * FROM analytics.unknown WHERE 0) AS unknown");
     });
 
-    it("adds the window after the origins left out, on the same reference", () => {
+    it("adds the window alone, with no origin filter beside it", () => {
       const scoped = scope({
         sql: "SELECT count() FROM trace_metrics",
         memberWindows: [WHOLE_A, DATED_B],
-        leftOut: ["langy"],
       });
 
       expect(scoped).toBe(
         "SELECT count() FROM (SELECT * FROM trace_metrics WHERE " +
-          "ifNull(nullIf(Origin, ''), 'application') NOT IN ('langy') AND " +
           `(TenantId IN ('project_a') OR (TenantId = 'project_b' AND ` +
           `OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM}))))) AS trace_metrics`,
       );
@@ -310,19 +301,6 @@ describe("scopeLangWatchQL with member windows", () => {
     it("refuses FINAL on a PostgreSQL-resident view, which the store rejects", () => {
       const refusal = captureRefusal(() =>
         scope({ sql: `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`, memberWindows: [WHOLE_A] }),
-      );
-
-      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
-    });
-  });
-
-  describe("given an excluded origin and a PostgreSQL-resident view it does not narrow", () => {
-    it("refuses FINAL on that view, though the view is not rewritten", () => {
-      const refusal = captureRefusal(() =>
-        scope({
-          sql: `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`,
-          leftOut: ["langy"],
-        }),
       );
 
       expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);

@@ -41,7 +41,8 @@ const LEGACY_PROCEDURES = [analyticsTrpc, graphTrpc, dashboardTrpc, savedViewTrp
   ({ namespace, members }) => Object.keys(members).map((name) => `${namespace}.${name}`),
 );
 /** The board's own reads: its list, its stars and its widgets, none of them data. */
-const BOARD_PROCEDURES = /^(boards|dashboardWidgets)\./;
+// The card also reads the projects the member may name, to show a query's project names.
+const BOARD_PROCEDURES = /^(boards|dashboardWidgets|analytics\.lwql\.readableProjects)\.?/;
 
 const FLAGS = { release_dashboards: true };
 const BOARD = {

@@ -134,12 +134,17 @@ origin, or pick one from **Add source**:
 - `langy`: your conversations with Langy.
 - `other`: any origin not listed above.
 
-A new widget counts `application`, and so does a widget saved before sources
-existed. A widget about Langy's failed requests adds `langy`. The preview runs
+A new widget counts `application`, and a stock widget from the template
+does too. A widget about Langy's failed requests adds `langy`. The preview runs
 again when you change the sources, and each card names its sources in a quiet
 line underneath. A query with no source picked returns no rows, and its widget
-says **No sources picked**. Widgets on From LangWatch dashboards count every
-origin except `langy`.
+says **No sources picked**.
+
+Sources only apply where the SQL reads the parameter. A query that does not read
+`{dashboard_context_sources:Array(String)}` counts every origin, and its card
+says **Sources: all sources**. A widget saved before this release keeps its SQL,
+so it counts every origin until you edit it to read the parameter or add it
+again from the template.
 
 ## Who can see a dashboard
 
@@ -209,6 +214,15 @@ widget's name, its queries and the period.
 
 All dashboard data is read with LangWatchQL, LangWatch's query layer over your
 traces, evaluations and cost data.
+
+A widget query has two settings beside its SQL. `sources` lists the trace sources `{dashboard_context_sources:Array(String)}` is bound to (`application` by default), and a query is kept to them only where its SQL uses that parameter in a condition, such as `WHERE Source IN {dashboard_context_sources:Array(String)}`. A query that does not use it is not filtered by `sources` and counts every source, and its card says "all sources".
+
+`projects` lists the projects the query reads, bound to `{dashboard_context_projects:Array(String)}`; a query that names none reads its board's project.
+
+A project you cannot read makes that card draw "You can't read a project this widget uses" without naming it. When the server cut a run's rows, such as a project shared only from a date, the card shows one (i) line saying so.
+
+Rolling back to a release before this one shows multi-project widgets for the board's
+project only. A rollback is not supported for this feature.
 
 ## Build dashboards from your own AI agent
 
