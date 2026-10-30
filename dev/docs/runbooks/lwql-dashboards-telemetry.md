@@ -14,7 +14,7 @@
 | `lwql_query_duration_seconds` | histogram | `caller`                                    | same                                  |
 | `lwql_rows_read`              | histogram | `caller`                                    | same                                  |
 | one log line per run          | log       | `caller`, `queryHash`, board and widget ids | same                                  |
-| `dashboards.<action>.<name>`  | PostHog   | no raw ids, no SQL, no question text        | `dashboard-usage-events.ts` (browser) |
+| `dashboards.<action>.<name>`  | PostHog   | attributes we set: no raw ids, SQL or text  | `dashboard-usage-events.ts` (browser) |
 
 `caller` is one of `dashboard_widget`, `workbench`, `rest_api`, `saved_chart`,
 `source_presence`, or `unnamed` when a run names none.
@@ -22,6 +22,17 @@
 `outcome` is `ok`, `empty` (no rows), `aborted`, `unhandled`, or the code of the
 handled error that stopped the run. Handled codes are a fixed set in the code,
 so the label stays bounded.
+
+## Ids that still reach PostHog
+
+The attributes Dashboards sets carry no raw board or widget id, no SQL and no
+question text. Two ids still reach PostHog:
+
+- the browser host adds the page URL (`context.href`) to every event, and a
+  board's URL holds its id;
+- `projectId` is registered on every event, so events group per project.
+
+Removing them would change every module's events, not only Dashboards'.
 
 ## Aborted runs
 
