@@ -341,14 +341,14 @@ describe("given a member asking Langy from a board", () => {
   ])("sends one add_widget ask for %s in Add a widget", async (_case, typed) => {
     const user = userEvent.setup();
     renderDashboards({
-      element: (
+      element: withTracking(
         <BlockPickerDialog
           board={board}
           period={period}
           onAddWidgets={() => Promise.resolve(true)}
           onSkip={() => void 0}
           onClose={() => void 0}
-        />
+        />,
       ),
       host: new StubAnalyticsHost({
         flags: { release_dashboards: true, release_langy_enabled: true },

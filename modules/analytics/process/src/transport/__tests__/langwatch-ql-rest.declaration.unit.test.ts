@@ -68,12 +68,16 @@ describe("given the query REST family", () => {
       expect(reference?.access?.kind).toBe("authenticated");
     });
 
-    it("asks the process for the key it authenticated on every route, and nothing else", () => {
+    it("asks the process for the key it authenticated on every route, and the run for its client", () => {
       expect(
         declaration.routes.map((route) =>
           (route.middleware ?? []).map((middleware) => middleware.name),
         ),
-      ).toEqual([["langWatchQLKeyReach"], ["langWatchQLKeyReach"], ["langWatchQLKeyReach"]]);
+      ).toEqual([
+        ["langWatchQLKeyReach", "langWatchQLKeyDoor"],
+        ["langWatchQLKeyReach"],
+        ["langWatchQLKeyReach"],
+      ]);
     });
 
     /** @scenario "The OpenAPI descriptions for both query routes name the any-key scope rule" */

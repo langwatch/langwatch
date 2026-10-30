@@ -23,6 +23,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { analyticsTestSecrets } from "../../app/__tests__/analytics-secrets.fixture.ts";
 import { AnalyticsModule } from "../../app/analytics.app.ts";
 import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture.ts";
 import {
@@ -327,7 +328,7 @@ describe("given the query door over the real service", () => {
             publicBaseUrl: "https://app.langwatch.test",
           },
           resources: { own: () => void 0, ownService: () => void 0 },
-          secrets: {} as never,
+          secrets: analyticsTestSecrets(),
         });
         const door = mountQueryDoorOverApp({
           app,
