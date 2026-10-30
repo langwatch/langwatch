@@ -181,6 +181,25 @@ describe("hookOriginRefusal()", () => {
     expect(hookOriginRefusal({ hooksUrl, rendered })).toMatch(/hooks URL.*host/i);
   });
 
+  /** @scenario "A hook whose rendered URL leaves the saved hooks origin is refused before any request" */
+  it("refuses a rendered URL when the saved password is a template", () => {
+    expect(
+      hookOriginRefusal({
+        hooksUrl: "https://user:{{ params.password }}@shop.example.com/hooks",
+        rendered: "https://user:secret@shop.example.com/hooks",
+      }),
+    ).toMatch(/hooks URL.*host/i);
+  });
+
+  it("accepts a rendered URL when the saved password is static", () => {
+    expect(
+      hookOriginRefusal({
+        hooksUrl: "https://user:pw@shop.example.com/hooks",
+        rendered: "https://user:pw@shop.example.com/hooks",
+      }),
+    ).toBeNull();
+  });
+
   it("refuses a rendered URL on another origin than the saved one", () => {
     expect(
       hookOriginRefusal({

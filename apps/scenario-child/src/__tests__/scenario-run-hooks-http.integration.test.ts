@@ -379,6 +379,23 @@ describe("ScenarioRunHooksService over the HTTP channel", () => {
       expect(error.hooks.setup).toMatchObject({ status: "failed" });
       expect(error.hooks.setup?.error).toMatch(/hooks URL.*host/i);
     });
+
+    /** @scenario "A hook whose rendered URL leaves the saved hooks origin is refused before any request" */
+    it.each([
+      "https:///{{params.loyalty_tier}}.example.com/hooks",
+      "https://{{params.loyalty_tier}}.example.com/hooks",
+    ])("sends nothing for teardown on %s and fails naming the host", async (hooksUrl) => {
+      const egress = fakeEgress();
+      const channel = channelOver(egress, { ...baseConfig, hooksUrl });
+
+      const error = (await hooksFor(channel, { setup: false, teardown: true })
+        .around(oneTurn(channel))
+        .catch((caught: unknown) => caught)) as ScenarioRunHooksError;
+
+      expect(egress.sent.filter((sent) => sent.url.includes("/hooks"))).toEqual([]);
+      expect(error.hooks.teardown).toMatchObject({ status: "failed" });
+      expect(error.hooks.teardown?.error).toMatch(/hooks URL.*host/i);
+    });
   });
 
   describe("when setup answers an object holding a secret value", () => {
