@@ -643,7 +643,7 @@ void describe("given a suite the shard is about to start", () => {
   });
 
   void describe("when it may start containers", () => {
-    /** @scenario "No container is removed after its suite has ended" */
+    /** @scenario "Ryuk is off for every suite" */
     void it("turns testcontainers' Ryuk off for every lane, and keeps the worker count", () => {
       for (const script of ["test", "test:integration", "test:browser"]) {
         const env = suiteEnvFor({ job: job("@fix/trace", script), heavy: false, cores: 4 });
