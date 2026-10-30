@@ -1,6 +1,7 @@
 import {
   httpAgentConfigSchema,
   isCredentialHeader,
+  isPreviousSigningSecretOpen,
   type AgentInputBinding,
   type Field,
   type HttpAgentConfig,
@@ -10,7 +11,7 @@ import {
 } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import { computeBestMatchMappings, hasScenarioInputMapping } from "@langwatch/scenario-contract";
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 import { isSameOrigin } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -247,14 +248,14 @@ function hooksMoveNotice(input: {
 
 /**
  * When the previous signing secret a same-origin rotation left stops working, while it still
- * works; else null. The server keeps it 24 hours (agent-secrets.rules.ts,
+ * works; else null. The server keeps it for HOOKS_PREVIOUS_SECRET_TTL_MS (agent-secrets.rules.ts,
  * withPreviousSigningSecret).
  */
 function previousSigningSecretValidUntil(saved: HttpAgentConfig | undefined): string | null {
-  const expiresAt = saved?.hooksPreviousSigningSecret?.expiresAt;
-  if (!expiresAt) return null;
+  const previous = saved?.hooksPreviousSigningSecret;
+  if (!previous || !isPreviousSigningSecretOpen(previous, nowInstant())) return null;
 
-  return toEpochMs(expiresAt) > nowInstant().epochMilliseconds ? expiresAt : null;
+  return previous.expiresAt;
 }
 
 /**

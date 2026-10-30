@@ -1,3 +1,4 @@
+import { HOOKS_PREVIOUS_SECRET_TTL_MS } from "@langwatch/agent-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Box,
@@ -9,7 +10,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
-import type { ReactNode } from "react";
 
 import type { HooksMoveNotice } from "../../behavior/use-http-agent-editor.ts";
 import { CopyButton } from "./http-test-components.tsx";
@@ -62,7 +62,9 @@ export function HooksConfigSection({
           local addresses. This is checked when the hook runs.
         </Text>
       </Field.Root>
-      {moveNotice ? <MoveNotice notice={moveNotice} /> : null}
+      {moveNotice ? (
+        <MoveNotice notice={moveNotice} previousValidUntil={previousSigningSecretValidUntil} />
+      ) : null}
       <HStack gap={6}>
         <Checkbox
           checked={hooks.setup}
@@ -97,7 +99,13 @@ export function HooksConfigSection({
   );
 }
 
-function MoveNotice({ notice }: { notice: HooksMoveNotice }) {
+function MoveNotice({
+  notice,
+  previousValidUntil,
+}: {
+  notice: HooksMoveNotice;
+  previousValidUntil: string | null;
+}) {
   const retype = [
     ...(notice.retypeAuth ? ["the auth token on the Auth tab"] : []),
     ...(notice.retypeHeaders ? ["the credential headers on the Headers tab"] : []),
@@ -109,7 +117,7 @@ function MoveNotice({ notice }: { notice: HooksMoveNotice }) {
       to it. {retype.length > 0 ? `Type ${retype.join(" and ")} again before you save. ` : ""}A new
       signing secret is made for it below.
       {notice.replacesSigningSecret
-        ? " The stored signing secret stops working when you save: a move to another host keeps no old secret, so update your receiver at the same time."
+        ? ` The stored signing secret${previousValidUntil ? " and the previous one" : ""} stop${previousValidUntil ? "" : "s"} working when you save: a move to another host keeps no old secret, so update your receiver at the same time.`
         : ""}
     </Text>
   );
@@ -117,7 +125,8 @@ function MoveNotice({ notice }: { notice: HooksMoveNotice }) {
 
 /**
  * How long the secret a same-origin rotation replaces keeps working, so the receiver can switch:
- * 24 hours after the save, and only the latest one (a second rotation ends the one before).
+ * HOOKS_PREVIOUS_SECRET_TTL_MS after the save, and only the latest one (a second rotation ends
+ * the one before).
  */
 function SigningSecretOverlap({
   isRotated,
@@ -126,7 +135,10 @@ function SigningSecretOverlap({
   isRotated: boolean;
   previousValidUntil: string | null;
 }) {
-  const until = previousValidUntil ? format(previousValidUntil, "MMM d, yyyy HH:mm") : null;
+  const until = previousValidUntil
+    ? `${format(previousValidUntil, "MMM d, yyyy HH:mm")} (your time)`
+    : null;
+  const hours = HOOKS_PREVIOUS_SECRET_TTL_MS / (60 * 60 * 1000);
 
   return (
     <>
@@ -137,8 +149,8 @@ function SigningSecretOverlap({
           marginTop={1}
           data-testid="hooks-signing-secret-overlap"
         >
-          After you save, the old secret stays valid for 24 hours, so your receiver can switch to
-          the new one.
+          After you save, the old secret stays valid for {hours} hours, so your receiver can switch
+          to the new one.
         </Text>
       ) : null}
       {until ? (
