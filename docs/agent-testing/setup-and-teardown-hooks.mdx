@@ -1,20 +1,20 @@
 ---
 title: Setup and Teardown Hooks
 sidebarTitle: Setup and teardown hooks
-keywords: langwatch, agent simulations, scenario hooks, setup, teardown, fixtures, test data, connected agent, connectAgent, connect_agent, run parameters, cleanup
-description: Create the test data a scenario needs before its first turn and remove it after its last, with setup and teardown hooks on a connected agent.
+keywords: langwatch, agent simulations, scenario hooks, setup, teardown, fixtures, test data, connected agent, http agent, hooks url, signing secret, connectAgent, connect_agent, run parameters, cleanup
+description: Create the test data a scenario needs before its first turn and remove it after its last, with setup and teardown hooks on a connected agent or an HTTP agent.
 ---
 
 ## What are setup and teardown hooks
 
-Setup and teardown hooks are two optional functions you declare on a connected agent, which LangWatch calls around each scenario run. **Setup** runs before the first turn and returns the state the run starts with, such as the id of a test customer with a loyalty tier. **Teardown** runs after the last turn and gets that state, so it can delete what setup made.
+Setup and teardown hooks are two optional steps that LangWatch runs around each scenario run. You declare them as functions on a connected agent, or give an HTTP agent a hooks URL. **Setup** runs before the first turn and returns the state the run starts with, such as the id of a test customer with a loyalty tier. **Teardown** runs after the last turn and gets that state, so it can delete what setup made.
 
-Both hooks run in your own process, the one that already answers the agent's turns, so they can use your database, your secrets and your internal APIs the same way the agent does. LangWatch calls them over the connection the SDK already holds open.
+Both hooks run in your own code, the code that already answers the agent's turns, so they can use your database, your secrets and your internal APIs the same way the agent does. For a connected agent, LangWatch calls the functions over the connection the SDK already holds open. For an HTTP agent, it POSTs to your hooks URL.
 
 A run goes in this order: setup, then the turns, then teardown.
 
 <Note>
-  Hooks work on agents you connect with `connectAgent` (TypeScript) or `@langwatch.connect_agent` (Python), and only on scenario runs. HTTP agents, code agents, experiments, the Test button and `langwatch agent run` never call them.
+  Hooks work on agents you connect with `connectAgent` (TypeScript) or `@langwatch.connect_agent` (Python), and on [HTTP agents](#http-agents) that have a hooks URL. They run only on scenario runs. Code agents, experiments, the Test button and `langwatch agent run` never call them.
 </Note>
 
 ## Declare the hooks
@@ -101,6 +101,232 @@ In Python, a hook's keyword arguments join the agent's run parameters. If the ag
   In the Python SDK, `state` is a reserved turn field. Do not name a run parameter `state`: the argument receives the scenario state, and the name is not registered as a parameter.
 </Note>
 
+## HTTP agents
+
+An HTTP agent can use the same hooks without a process that stays online. Give the agent a **hooks URL**, and LangWatch POSTs setup to it before the turns and teardown after them. Use this when your agent is a plain HTTP endpoint and you have no SDK process to keep running.
+
+A run goes in the same order: setup, then the turns, then teardown.
+
+### Set up the hooks URL
+
+Open the agent, then open the **Hooks** tab.
+
+| Field | What it does |
+|---|---|
+| **Hooks URL** | Where LangWatch POSTs both hooks. Leave it empty for no hooks. It must use `https://`. Plain `http://` is allowed only on a deployment that allows local addresses, such as a self-hosted install, and only to a local address or to a host on the deployment's allowlist. LangWatch checks this when a hook runs, not when you save, and checks it again after the URL templates render. A hook whose URL is refused fails before any request is sent. LangWatch does not follow redirects. A deployment that blocks local addresses, as the hosted one does, always refuses plain `http://`. The URL can read run parameters, project secrets and `{{ state }}`, as the agent's own URL does. The scheme, user and host must be fixed text: templates are allowed only in the path, the query and the fragment. LangWatch refuses a template that could change the scheme, user or host when you save, with `agent_hooks_url_templated_origin`. This includes a template that is the whole base, such as `{{ params.base }}/hooks`. When a hook runs, the rendered URL must still have the same origin as the saved URL. If it does not, the hook fails and no request is sent. |
+| **Call setup** | Tick it to call setup before the first turn. |
+| **Call teardown** | Tick it to call teardown after the last turn. |
+| **Signing secret** | Signs every hook call. LangWatch shows it once, when you first type the hooks URL. Copy it before you save. After that, the form shows only that a secret is set. **Rotate** makes a new one and shows it once. A secret you set through the API needs only 16 characters. See [Rotate the signing secret](#rotate-the-signing-secret). |
+
+LangWatch calls only the hooks you tick. The signing secret is saved as a project secret. A hook is never sent unsigned: with no signing secret, the hook fails and no request goes out.
+
+To remove the hooks, clear the hooks URL and save. The Hooks tab says that saving deletes the signing secret. LangWatch deletes the current secret and the previous one from the project secrets when you save. It deletes only a secret stored under the name LangWatch gives to this agent's signing secret, and only when no other agent uses it. A secret that you picked yourself stays.
+
+#### Rotate the signing secret
+
+When you rotate on the same origin, the old secret stays valid for **24 hours**. For that time LangWatch signs every hook call with both secrets, so you can deploy the new value when you are ready. A second rotation inside the 24 hours drops the oldest secret at once. A secret that has expired is never used to sign. LangWatch deletes it the next time you save the agent.
+
+A rotation that moves the hooks URL to another origin keeps no old secret. Only the new secret signs. See [A hooks URL on another origin](#a-hooks-url-on-another-origin).
+
+#### A hooks URL on another origin
+
+LangWatch sends saved credentials (the auth token, credential headers and the signing secret) only to the origin they were saved for: the same scheme, host and port as the saved hooks URL or, for an agent that has no hooks URL yet, as the agent's own URL. For example, an agent at `https://api.example.com` that gets its first hooks URL at `https://hooks.example.com` moves to another origin.
+
+When you type a hooks URL on another origin, the Hooks tab says so and names what to type again: the auth token on the **Auth** tab and any credential headers on the **Headers** tab. The form makes a new signing secret by itself and shows it once, so copy it before you save.
+
+There is no overlap: the old secret does not sign calls to the new origin. If you change the URL back to the saved origin, the saved signing secret stays.
+
+If you type a credential again for the new host, the save works.
+
+If the save sends back a stored credential reference that the agent already had, in any spelling, or leaves a credential blank, LangWatch refuses the save with `agent_stored_credentials_destination_mismatch`. The message says: "This URL is on another host, so a stored credential is not sent to it. Type its value again: the auth token on the Auth tab, and any credential headers on the Headers tab. Then save." A hooks URL on the saved origin keeps the saved credentials.
+
+The same rule holds when an agent is pushed or synced to another project. If the source agent's hooks URL is on another origin than the copy's, the copy comes back with blank credentials and a blank signing secret, and with no 24-hour overlap. Type the credentials again, and give the receiver the new signing secret.
+
+### The request
+
+Each hook is a `POST` with a JSON body:
+
+```json
+{
+  "kind": "teardown",
+  "run": {
+    "scenarioRunId": "scenariorun_abc",
+    "scenarioName": "Gold customer asks for a refund",
+    "batchRunId": "batch_xyz"
+  },
+  "idempotencyKey": "scenariorun_abc:hookattempt_def:teardown",
+  "params": { "loyalty_tier": "gold" },
+  "state": { "customerId": "cus_123" }
+}
+```
+
+| Field | What it is |
+|---|---|
+| `kind` | `setup` or `teardown`. |
+| `run` | The run the call is for. |
+| `idempotencyKey` | The same value as the `Idempotency-Key` header. Read it from here: the signature covers the body, not the headers. See [Make test data once](#make-test-data-once). |
+| `params` | The [run parameters](/agent-testing/run-parameters) of the run. |
+| `state` | Teardown only, and only when setup returned a state. It is what setup answered. Setup's body has no `state`. |
+
+<Warning>
+  The body sends the run's plain parameters to the hooks URL, together with the agent's own headers and auth. Never put a secret-like value in a plain parameter. Use a [secret parameter](/agent-testing/run-parameters#secret-parameters) instead.
+</Warning>
+
+LangWatch sends these headers:
+
+| Header | Value |
+|---|---|
+| The agent's own headers and auth | The same ones the agent sends on a turn, such as a bearer token. An agent header named `X-LangWatch-Signature` or `Idempotency-Key`, in any letter case, is not sent. |
+| `X-LangWatch-Signature` | `t=<unix seconds>,v1=<signature>[,v1=<signature>]`. The same scheme as [webhooks](/features/webhooks#verifying-signatures). Each `v1` is the lower-case hex HMAC-SHA256 of `<t>.<raw request body>`, made with one valid signing secret. The HMAC key is the whole stored secret. A secret that LangWatch makes starts with `whsec_`, and that prefix is part of the key. There is one `v1` for each valid secret, newest first. |
+| `Idempotency-Key` | `<scenarioRunId>:<attemptId>:<kind>`, for example `scenariorun_abc:hookattempt_def:setup`. Every hook call has one. It is the same for every call of one hook in one attempt of a run, so a repeated call carries the same key. |
+
+### The answer
+
+| Hook | A good answer |
+|---|---|
+| Setup | A 2xx status and a JSON object. The object is the state. |
+| Teardown | An empty 2xx, including `204`, or a 2xx and a JSON object. The object shows under **Returned by teardown**. |
+
+Anything else fails the hook. For a status that is not 2xx, or a body that is not a JSON object, the run records the HTTP status and the answer. LangWatch cuts the whole recorded error to 1,000 characters. A body over 64 KiB (65,536 bytes) fails too: LangWatch stops reading the answer at the cap, and the error gives the size in bytes, for example "The setup hook answered more than 65536 bytes, over the 65536-byte cap."
+
+A hook that does not answer in 60 seconds ends as `timed_out`. The 60 seconds are fixed. You cannot change them.
+
+A failed setup runs no turn. The run shows **Not scored**, and LangWatch still calls teardown. A failed teardown does not change the score. See [What happens when a hook fails](#what-happens-when-a-hook-fails).
+
+### Read the state in a turn
+
+Setup's state is bound in the agent's URL, headers and body templates, but only for an agent with a hooks URL and at least one hook ticked. Use `{{ state }}` for the whole state as JSON, and `{{ state.NAME }}` for one key.
+
+```json
+{
+  "customer_id": "{{ state.customerId }}"
+}
+```
+
+A turn cannot change the state. Teardown always gets the state setup returned.
+
+### Check the signature
+
+Check the signature before you change any data. Anyone who knows the URL can call it otherwise.
+
+The signature is the same as the [webhook signature](/features/webhooks#verifying-signatures). The header is `X-LangWatch-Signature: t=<unix seconds>,v1=<hex>`. During a rotation it has one `v1` for each valid secret, newest first. Accept the call when any `v1` matches your secret.
+
+The package `@langwatch/webhook-verify` is not yet published to npm, so check the signature by hand. The steps and the code below match the signer LangWatch uses.
+
+#### Check it by hand
+
+Do these steps:
+
+1. Read the **raw** body bytes.
+2. Split `X-LangWatch-Signature` on commas. Read `t`, and every `v1`.
+3. Reject the call if `t` is missing, or more than 300 seconds from your clock, in the past or in the future.
+4. Compute the lower-case hex HMAC-SHA256 of `<t>.<raw body>`, with `t` exactly as the header gives it. The key is the whole signing secret, `whsec_` prefix included.
+5. Compare it with each `v1` in constant time. Accept the call when any one matches.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const SECRETS = [
+  process.env.LANGWATCH_HOOKS_SIGNING_SECRET!,
+  process.env.LANGWATCH_HOOKS_SIGNING_SECRET_PREVIOUS,
+].filter(Boolean) as string[];
+const WINDOW_SECONDS = 300;
+
+export function isSigned(header: string | undefined, rawBody: Buffer): boolean {
+  let t: string | undefined;
+  const candidates: string[] = [];
+  for (const piece of (header ?? "").split(",")) {
+    const eq = piece.indexOf("=");
+    if (eq <= 0) continue;
+    const key = piece.slice(0, eq).trim();
+    const value = piece.slice(eq + 1).trim();
+    if (key === "t") t = value;
+    else if (key === "v1") candidates.push(value);
+  }
+  if (!t || !/^\d+$/.test(t) || candidates.length === 0) return false;
+
+  // Reject a timestamp too old or too far in the future
+  if (Math.abs(Date.now() / 1000 - Number(t)) > WINDOW_SECONDS) return false;
+
+  let matched = false;
+
+  for (const secret of SECRETS) {
+    // Sign the `t` string as the header gives it, not a re-formatted number
+    const expected = Buffer.from(
+      createHmac("sha256", secret).update(`${t}.`).update(rawBody).digest("hex"),
+      "utf8",
+    );
+    for (const candidate of candidates) {
+      const given = Buffer.from(candidate, "utf8");
+      // timingSafeEqual throws on a different length, so check the length first
+      if (given.length === expected.length && timingSafeEqual(given, expected)) matched = true;
+    }
+  }
+  return matched;
+}
+```
+
+```python Python
+import hashlib
+import hmac
+import os
+import time
+
+SECRETS = [
+    s
+    for s in (
+        os.environ["LANGWATCH_HOOKS_SIGNING_SECRET"],
+        os.environ.get("LANGWATCH_HOOKS_SIGNING_SECRET_PREVIOUS"),
+    )
+    if s
+]
+WINDOW_SECONDS = 300
+
+
+def is_signed(header: str | None, raw_body: bytes) -> bool:
+    t = None
+    candidates = []
+    for piece in (header or "").split(","):
+        key, sep, value = piece.partition("=")
+        key, value = key.strip(), value.strip()
+        if not sep or not key:
+            continue
+        if key == "t":
+            t = value
+        elif key == "v1":
+            candidates.append(value)
+    if not t or not (t.isascii() and t.isdigit()) or not candidates:
+        return False
+
+    # Reject a timestamp too old or too far in the future
+    if abs(time.time() - int(t)) > WINDOW_SECONDS:
+        return False
+
+    matched = False
+    for secret in SECRETS:
+        # Sign the `t` string as the header gives it, not a re-formatted number
+        expected = hmac.new(secret.encode(), t.encode() + b"." + raw_body, hashlib.sha256).hexdigest()
+        for candidate in candidates:
+            # Compare bytes: a non-ASCII header then fails the check instead of raising
+            if hmac.compare_digest(candidate.encode(), expected.encode()):
+                matched = True
+    return matched
+```
+
+</CodeGroup>
+
+Call `isSigned` or `is_signed` with the raw body before you parse it, and answer `401` when it returns false. During a rotation, put both secrets in the list. Then read `idempotencyKey` from the parsed body.
+
+### Make test data once
+
+LangWatch does not retry a hook, but a call can still arrive more than once, for example when a proxy or the network retries it. The key is the same each time. Store the key with the data setup made. When a call arrives with a key you have seen, return the stored state and do not create the test data again. In teardown, delete what is there and treat "already gone" as success.
+
+Read the key from the body's `idempotencyKey`. The signature covers the body, so the key there is the one LangWatch sent. The `Idempotency-Key` header is a copy for proxies and logs, and is not signed.
+
+LangWatch can run a scenario run again under the same `scenarioRunId`, for example when a worker stops partway. That is a new attempt, with a new key, and its setup makes new data. Do not use `scenarioRunId` alone as the key: the first attempt's teardown may already have deleted the data it names.
+
 ## What do the simulated user and the judge see
 
 The simulated user and the judge get the current state on every turn, as a system message that starts with `Current test state:`, so they can check the agent's answers against the real test data. That message is part of their prompts, which means the state costs tokens and is sent to your model provider.
@@ -110,11 +336,17 @@ The simulated user and the judge get the current state on every turn, as a syste
 | Situation | What happens |
 |---|---|
 | Setup succeeds | The turns run with the state setup returned. |
-| Setup fails, times out, or the agent is offline | No turn runs. The run ends in `ERROR` with no verdict, shows as **Not scored**, and does not count towards the pass rate. LangWatch still calls teardown; if the agent is still offline, teardown shows as not run. |
+| Setup fails or times out, or a connected agent is offline | No turn runs. The run ends in `ERROR` with no verdict, shows as **Not scored**, and does not count towards the pass rate. LangWatch still calls teardown; if a connected agent is still offline, teardown shows as `not_run`. |
 | The turns pass or fail | Teardown runs either way. |
 | Teardown fails, times out, or does not run | The score does not change. The run shows the error, the state teardown was given, and "Test data may be left behind." |
-| Live instances of the agent exist, but none declared the hook | The call fails with `hook_not_declared`, and the agent function does not run. |
-| A state, or teardown's returned object, is over 64 kilobytes | The call fails with `agent_payload_too_large`. The cap applies to a turn's state update too. |
+| Connected agent: live instances exist, but none declared the hook | The call fails with `hook_not_declared`, and the agent function does not run. |
+| Connected agent: a state, or teardown's returned object, is over 64 KiB | The call fails with `agent_payload_too_large`. The cap applies to a turn's state update too. |
+| HTTP agent: the hooks URL answers too slowly and the call reaches 60 seconds | The hook is `timed_out`. |
+| HTTP agent: the host cannot be reached, or refuses the connection | The hook is `failed`, not `not_run`: an HTTP agent has no instances to be offline. |
+| HTTP agent: the answer is not 2xx, or not a JSON object | The hook is `failed`, with the HTTP status and the answer, cut to 1,000 characters in all. |
+| HTTP agent: the answer is over 64 KiB | The hook is `failed`, and the error gives the size, for example "The teardown hook answered more than 65536 bytes, over the 65536-byte cap." |
+| HTTP agent: the hooks URL uses plain `http://` where it is not allowed, or to an address that is not local | The hook is `failed` and no request goes out. |
+| HTTP agent: the rendered hooks URL has another origin than the saved hooks URL | The hook is `failed` and no request goes out. The error says: "The hooks URL's scheme and host must be fixed: a template cannot choose the host a hook is sent to." |
 
 Each hook has a 60 second timeout. The agent's per-turn timeout does not apply to hooks, and you cannot change the hook timeout per scenario.
 
@@ -122,13 +354,13 @@ A failed setup is not scored because a fault in your test data is not the agent 
 
 ## Where to see what a hook did
 
-Open the run in **Agent Testing** or in **Simulations**. For each hook, the run shows its status (`ok`, `failed`, `timed_out`, `skipped` or `not_run`), duration, state or returned object, and error, with a **Trace** button for the hook's own trace. The run keeps the first 1,000 characters of an error, and keeps no copy of a state over 64 kilobytes.
+Open the run in **Agent Testing** or in **Simulations**. For each hook, the run shows its status (`ok`, `failed`, `timed_out`, `skipped` or `not_run`), duration, state or returned object, and error, with a **Trace** button for the hook's own trace. The run keeps an error cut to 1,000 characters, and keeps no copy of a state over 64 KiB.
 
 ### Rerun and keep the test data
 
 To inspect the data a run made, open the run in **Simulations** and choose **Rerun and keep data**. The rerun skips teardown, and the run shows "Teardown skipped". The action appears only for a run that recorded a teardown.
 
-"Teardown not run" means LangWatch called teardown but no instance of the agent was online to take the call, so teardown did not happen even though no one asked to skip it.
+"Teardown not run" is for a connected agent: LangWatch called teardown but no instance of the agent was online to take the call, so teardown did not happen even though no one asked to skip it. An HTTP agent's teardown that cannot reach its hooks URL shows as failed instead.
 
 ### Limits
 
@@ -139,7 +371,7 @@ To inspect the data a run made, open the run in **Simulations** and choose **Rer
 
 **Create test data in setup and remove it in teardown.** Data made anywhere else, such as inside a turn, is not in the state, so teardown cannot know about it.
 
-**Return references, not data.** Put ids and URLs in the state, never whole records or secrets. The state goes into every call, into the prompts of the simulated user and the judge, and into the run record, and it is capped at 64 kilobytes.
+**Return references, not data.** Put ids and URLs in the state, never whole records or secrets. The state goes into every call, into the prompts of the simulated user and the judge, and into the run record, and it is capped at 64 KiB.
 
 **Name all test data with the run id.** Use `run.scenarioRunId` (`run.scenario_run_id` in Python) in a name or a tag, as the setup above does with `label`. Runs of a suite can overlap, so a unique name keeps one run's data apart from another's, and lets you find leftovers by name if a teardown is missed.
 
