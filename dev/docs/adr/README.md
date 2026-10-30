@@ -104,6 +104,7 @@ Reusable framework decisions live with their packages:
 | [185](./185-docs-session-credentials.md)                               | Short-lived credentials for the documentation playground                                                                   | Accepted                  |
 | [186](./186-test-changed-runs-the-tests-an-edit-reaches.md)            | `test:changed` runs the tests an edit reaches, from a kept import graph                                                    | Proposed                  |
 | [187](./187-async-inserts-waiting-for-a-slot-share-a-statement.md)     | Async inserts waiting for a statement slot share one statement                                                             | Proposed                  |
+| [188](./188-scenario-hooks-on-http-agents.md)                          | Scenario setup and teardown hooks on HTTP agents                                                                           | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
