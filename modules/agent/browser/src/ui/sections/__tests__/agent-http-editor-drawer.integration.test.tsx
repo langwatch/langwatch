@@ -1,6 +1,7 @@
 /* @vitest-environment jsdom */
 
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
+import { AgentHooksUrlTemplatedOriginError } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 
@@ -617,6 +618,63 @@ describe("AgentHttpEditorDrawer", () => {
         expect(rule).toHaveTextContent("Use https.");
         expect(rule).toHaveTextContent(
           "Plain http reaches only a local address, and only on deployments that allow local addresses. This is checked when the hook runs.",
+        );
+      });
+    });
+
+    describe("when the hooks URL has a template before its path", () => {
+      async function openHooksTab() {
+        fireEvent.mouseDown(await screen.findByRole("tab", { name: "Hooks" }));
+        fireEvent.click(screen.getByRole("tab", { name: "Hooks" }));
+      }
+
+      /** @scenario "The agent form says templates are allowed only in the path or query" */
+      it("says a template is allowed only in the path or the query", async () => {
+        renderEditor();
+        await openHooksTab();
+
+        expect(await screen.findByTestId("hooks-url-https-rule")).toHaveTextContent(
+          "Templates are allowed only in the path or the query, not in the scheme or host.",
+        );
+      });
+
+      /** @scenario "The agent form warns at the hooks URL field about a template in its scheme or host" */
+      it("warns at the hooks URL field before any save", async () => {
+        renderEditor();
+        await openHooksTab();
+
+        fireEvent.change(await screen.findByTestId("hooks-url-input"), {
+          target: { value: "https://{{ params.host }}/hooks" },
+        });
+
+        expect(await screen.findByTestId("hooks-url-error")).toHaveTextContent(
+          "The hooks URL cannot have a template in its scheme or host.",
+        );
+      });
+
+      /** @scenario "The agent form shows a refused hooks URL template at the hooks URL field" */
+      it("shows the refusal at the hooks URL field when the save is refused", async () => {
+        const agent = savedAgent({
+          scenarioMappings: { input: { type: "source", sourceId: "dataset", path: ["input"] } },
+          hooksUrl: "https://example.com/hooks",
+        });
+        renderEditor({
+          agent,
+          agentId: agent.id,
+          onUpdate: async () => {
+            throw new AgentHooksUrlTemplatedOriginError();
+          },
+        });
+        await openHooksTab();
+
+        fireEvent.change(await screen.findByTestId("hooks-url-input"), {
+          target: { value: "https://other.example.net/hooks" },
+        });
+        expect(screen.queryByTestId("hooks-url-error")).not.toBeInTheDocument();
+        screen.getByRole("button", { name: "Save Changes" }).click();
+
+        expect(await screen.findByTestId("hooks-url-error")).toHaveTextContent(
+          "The hooks URL cannot have a template in its scheme or host.",
         );
       });
     });

@@ -203,6 +203,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
             hasStoredSigningSecret: form.hooks.hasStoredSigningSecret,
             onRotateSigningSecret: form.hooks.rotateSigningSecret,
             moveNotice: form.hooks.moveNotice,
+            hooksUrlError: form.hooks.hooksUrlError,
             previousSigningSecretValidUntil: form.hooks.previousSigningSecretValidUntil,
           }}
         />

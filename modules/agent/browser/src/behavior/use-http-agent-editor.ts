@@ -1,7 +1,9 @@
 import {
+  AgentHooksUrlTemplatedOriginError,
   httpAgentConfigSchema,
   isCredentialHeader,
   isPreviousSigningSecretOpen,
+  templatesHooksOrigin,
   type AgentInputBinding,
   type Field,
   type HttpAgentConfig,
@@ -10,6 +12,7 @@ import {
   type HttpMethod,
 } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { computeBestMatchMappings, hasScenarioInputMapping } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 import { isSameOrigin } from "@langwatch/workflow-contract";
@@ -174,12 +177,31 @@ function replaceMapping(
   return next;
 }
 
+/** The hooks URL's template refusal, as the field says it, or null for any other failure. */
+function hooksUrlRefusalFor(error: unknown): string | null {
+  return readHandledError(error)?.code === "agent_hooks_url_templated_origin"
+    ? new AgentHooksUrlTemplatedOriginError().message
+    : null;
+}
+
+/**
+ * The message at the hooks URL field: the save's refusal, else a warning for a template before
+ * the path while it is typed. Both say the same thing, so they read alike.
+ */
+function hooksUrlErrorFor(input: { refusal: string | null; hooksUrl: string }): string | null {
+  if (input.refusal) return input.refusal;
+  return templatesHooksOrigin(input.hooksUrl)
+    ? new AgentHooksUrlTemplatedOriginError().message
+    : null;
+}
+
+/** Saves the agent. Returns the hooks URL refusal to show at its field, or null. */
 async function saveHttpAgent(
   options: HttpAgentEditorOptions,
   draft: HttpAgentDraft,
   isValid: boolean,
-) {
-  if (!options.projectId || !isValid || options.isSaving) return;
+): Promise<string | null> {
+  if (!options.projectId || !isValid || options.isSaving) return null;
 
   const input = {
     projectId: options.projectId,
@@ -192,16 +214,18 @@ async function saveHttpAgent(
   const result = options.agentId
     ? options.onUpdate({ ...input, id: options.agentId })
     : options.onCreate(input);
-  await result
+  return result
     .then((agent) => {
       options.onSave?.(agent);
       options.onClose();
+      return null;
     })
     .catch((error: unknown) => {
       options.onSaveError({
         error,
         fallbackTitle: options.agentId ? "Couldn't save agent" : "Couldn't create agent",
       });
+      return hooksUrlRefusalFor(error);
     });
 }
 
@@ -324,6 +348,7 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const [dirty, setDirty] = useState(false);
   const [localMappings, setLocalMappings] = useState(inputMappings);
   const [customVariables, setCustomVariables] = useState<Field[]>([]);
+  const [hooksUrlRefusal, setHooksUrlRefusal] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(options.showVariables ? "variables" : "body");
   const initialized = useRef<string | undefined>(void 0);
   const identity = options.agentId ?? "new";
@@ -386,7 +411,7 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   return {
     draft,
     change,
-    save: () => saveHttpAgent(options, draft, isValid),
+    save: () => saveHttpAgent(options, draft, isValid).then(setHooksUrlRefusal),
     close,
     activeTab,
     setActiveTab,
@@ -415,6 +440,11 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
     },
     hooks: {
       ...signingSecret,
+      changeHooksUrl: (hooksUrl: string) => {
+        setHooksUrlRefusal(null);
+        signingSecret.changeHooksUrl(hooksUrl);
+      },
+      hooksUrlError: hooksUrlErrorFor({ refusal: hooksUrlRefusal, hooksUrl: draft.hooksUrl }),
       moveNotice: hooksMoveNotice({ hooksUrl: draft.hooksUrl, saved: savedConfig }),
       previousSigningSecretValidUntil: previousSigningSecretValidUntil(savedConfig),
     },

@@ -593,3 +593,20 @@ Feature: Scenario run hooks: setup and teardown
       Given an HTTP agent form on the Hooks tab
       Then it says the hooks URL needs https
       And that plain http reaches only a local address, on deployments that allow local addresses, checked when the hook runs
+
+    @integration
+    Scenario: The agent form says templates are allowed only in the path or query
+      Given an HTTP agent form on the Hooks tab
+      Then it says a template is allowed only in the path or the query of the hooks URL
+
+    @integration
+    Scenario: The agent form warns at the hooks URL field about a template in its scheme or host
+      Given an HTTP agent form on the Hooks tab
+      When the person types a hooks URL with a template before its path
+      Then the hooks URL field says the scheme and host must be fixed, before any save
+
+    @integration
+    Scenario: The agent form shows a refused hooks URL template at the hooks URL field
+      Given an HTTP agent form on the Hooks tab
+      When the save is refused for a template in the hooks URL origin
+      Then the refusal is shown at the hooks URL field
