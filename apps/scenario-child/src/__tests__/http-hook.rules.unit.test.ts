@@ -131,7 +131,6 @@ describe("hookIdempotencyKey()", () => {
   });
 });
 
-/** @scenario "An HTTP hooks URL must use https" */
 describe("hooksUrlRefusal()", () => {
   it("accepts https", () => {
     expect(hooksUrlRefusal("https://shop.example.com/hooks")).toBeNull();
@@ -144,6 +143,7 @@ describe("hooksUrlRefusal()", () => {
     },
   );
 
+  /** @scenario "An HTTP hooks URL must use https" */
   it.each(["http://shop.example.com/hooks", "http://10.0.0.5/hooks", "ftp://shop.example.com"])(
     "refuses %s",
     (url) => {
