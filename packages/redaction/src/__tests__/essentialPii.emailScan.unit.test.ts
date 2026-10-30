@@ -16,7 +16,7 @@ function randomText({ seed, length }: { seed: number; length: number }): string 
   let state = seed;
   let text = "";
   for (let i = 0; i < length; i++) {
-    state = (state * 1103515245 + 12345) % 2147483648;
+    state = (Math.imul(state, 1103515245) + 12345) >>> 0;
     text += alphabet[state % alphabet.length];
   }
   return text;
@@ -24,7 +24,7 @@ function randomText({ seed, length }: { seed: number; length: number }): string 
 
 describe("given text holding addresses", () => {
   describe("when addresses sit packed against each other and against look-alikes", () => {
-    /** @scenario "An address is redacted exactly where the old pattern found one" */
+    /** @scenario "Every address in packed text is redacted, and look-alikes are left alone" */
     it.each([
       "ada@example.com",
       "a@b.co.uk and c@d",
@@ -39,7 +39,7 @@ describe("given text holding addresses", () => {
       expect(redactEmails(text)).toBe(previousRedaction(text));
     });
 
-    /** @scenario "An address is redacted exactly where the old pattern found one" */
+    /** @scenario "Every address in packed text is redacted, and look-alikes are left alone" */
     it("redacts the same addresses across generated text", () => {
       for (let seed = 1; seed <= 400; seed++) {
         const text = randomText({ seed, length: 200 });
@@ -58,9 +58,12 @@ describe("given the largest value redaction scans", () => {
         `contact @ "${run}"`,
         `${run}@`,
         `x@${"ab.".repeat(80_000)}1`,
-        `${run}@${run.slice(0, 10_000)}`,
+        `${run.slice(0, 240_000)}@${run.slice(0, 9_000)}`,
       ];
       for (const text of shapes) {
+        expect(text.length, "a shape over the scan cap is never scanned").toBeLessThanOrEqual(
+          250_000,
+        );
         const startedAt = performance.now();
         redactEmails(text);
         expect(performance.now() - startedAt, text.slice(0, 40)).toBeLessThan(1_000);

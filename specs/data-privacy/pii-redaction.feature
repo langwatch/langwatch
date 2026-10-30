@@ -724,10 +724,11 @@ Feature: Redacting personal data from traces
     Then redaction of that value finishes within a second
 
   @unit
-  Scenario: An address is redacted exactly where the old pattern found one
+  Scenario: Every address in packed text is redacted, and look-alikes are left alone
     When a trace is ingested whose input packs addresses against each other
       and against text that only looks like an address
-    Then the same addresses are redacted as before, and nothing else
+    Then each address is replaced by an address marker
+    And text with no domain ending after its "@" is left as it was
 
   # Phone numbers are the same idea again, counted in digits rather than in
   # characters: text whose longest run of digits is shorter than any phone
