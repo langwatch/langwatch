@@ -319,6 +319,9 @@ export const LWQL_TELEMETRY_CALLERS = [
   "dashboard_widget",
   "workbench",
   "rest_api",
+  "cli",
+  "mcp",
+  "langy",
   "saved_chart",
   "source_presence",
 ] as const;

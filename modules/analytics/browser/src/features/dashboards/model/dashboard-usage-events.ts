@@ -96,11 +96,6 @@ export function widgetDeleted(): UiAnalyticsEvent {
   return dashboardsEvent("widget", "deleted");
 }
 
-/** A question a member submitted in a board's Langy box; never a draft the app seeds. */
-export function langyAsked(): UiAnalyticsEvent {
-  return dashboardsEvent("langy", "asked");
-}
-
 /** Whether any of a widget's queries counts Langy's own traces; a query storing none does not. */
 function countsLangyTraces(queries: readonly Pick<DashboardWidgetQuery, "sources">[]): boolean {
   return queries.some((query) => query.sources?.includes(LANGY_TRACE_ORIGIN) === true);

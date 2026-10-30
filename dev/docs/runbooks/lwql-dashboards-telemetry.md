@@ -8,16 +8,23 @@
 
 ## What is counted
 
-| Signal                        | Kind      | Labels or attributes                        | Written by                            |
-| ----------------------------- | --------- | ------------------------------------------- | ------------------------------------- |
-| `lwql_queries_total`          | counter   | `caller`, `outcome`                         | `LangWatchQLRunTelemetryService`      |
-| `lwql_query_duration_seconds` | histogram | `caller`                                    | same                                  |
-| `lwql_rows_read`              | histogram | `caller`                                    | same                                  |
-| one log line per run          | log       | `caller`, `queryHash`, board and widget ids | same                                  |
-| `dashboards.<action>.<name>`  | PostHog   | attributes we set: no raw ids, SQL or text  | `dashboard-usage-events.ts` (browser) |
+| Signal                        | Kind      | Labels or attributes                           | Written by                            |
+| ----------------------------- | --------- | ---------------------------------------------- | ------------------------------------- |
+| `lwql_queries_total`          | counter   | `caller`, `outcome`                            | `LangWatchQLRunTelemetryService`      |
+| `lwql_query_duration_seconds` | histogram | `caller`                                       | same                                  |
+| `lwql_rows_read`              | histogram | `caller`                                       | same                                  |
+| one log line per run          | log       | `caller`, `queryHash`, board and widget ids    | same                                  |
+| `dashboards.<action>.<name>`  | PostHog   | attributes we set: no raw ids, SQL or text     | `dashboard-usage-events.ts` (browser) |
+| `langy.asked.question`        | PostHog   | `surface`: `composer`, `ask_bar`, `add_widget` | `langy-question-asked.ts` (browser)   |
 
-`caller` is one of `dashboard_widget`, `workbench`, `rest_api`, `saved_chart`,
-`source_presence`, or `unnamed` when a run names none.
+`caller` is one of `dashboard_widget`, `workbench`, `rest_api`, `cli`, `mcp`,
+`langy`, `saved_chart`, `source_presence`, or `unnamed` when a run names none.
+
+A query sent with an API key is split by the client that sent it. The server
+reads the identity headers the LangWatch CLI and the MCP servers already send:
+the CLI is `cli`, a local or hosted MCP server is `mcp`, and every other client
+(an SDK, a script, curl) is `rest_api`. A query sent with the session key Langy
+gets for a chat is `langy`, whichever client it came from.
 
 `outcome` is `ok`, `empty` (no rows), `aborted`, `unhandled`, or the code of the
 handled error that stopped the run. Handled codes are a fixed set in the code,
@@ -46,12 +53,16 @@ it. The outcome panel shows aborts as their own line.
   tRPC permission check refuse before the instrumented layer runs. The error
   rate is the share of runs that reached it, not of every attempt.
 - **Instant-eval passes**: `executePass` does not record telemetry.
-- **Langy's own API calls**: Langy calling LangWatchQL over MCP or REST counts
-  as `rest_api`. REST, CLI and MCP also share `rest_api`. A request marker that
-  splits them is planned with the Langy attribution follow-up.
-- **The Langy composer**: `dashboards.asked.langy` counts the board ask bar and
-  "Add a widget", not questions typed in Langy's own composer. Widgets Langy
-  makes on the server send no browser event.
+- **Clients that do not say who they are**: a script that copies the CLI's or
+  the MCP server's headers is counted as that client. The split is for usage,
+  not for security.
+- **Langy's widgets as widgets**: a widget Langy adds still runs its queries as
+  `dashboard_widget`. Boards and widgets Langy makes send no product event yet:
+  there is no "made by" field on a widget and no Dashboards event pipeline for
+  nurturing to read.
+- **Questions the app sends for a member**: a question from the ask bar or "Add
+  a widget" is counted once, where it was asked. When the Langy panel then
+  sends it, or sends a card's follow-up, it counts nothing more.
 
 ## The query hash is not a privacy control
 

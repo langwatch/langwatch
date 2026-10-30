@@ -293,7 +293,7 @@ describe("given a member asking Langy from a board", () => {
     granularitySeconds: 3600,
   };
 
-  /** @scenario "Telemetry: asking Langy from a board sends dashboards.asked.langy" */
+  /** @scenario "Telemetry: asking Langy from a board sends langy.asked.question with where it was asked" */
   it("sends one ask when the member puts a suggested question to Langy", async () => {
     const user = userEvent.setup();
     renderDashboards({
@@ -309,7 +309,8 @@ describe("given a member asking Langy from a board", () => {
 
     await user.click(screen.getByRole("button", { name: SUGGESTED_QUESTIONS[0] }));
 
-    expect(names()).toEqual(["dashboards.asked.langy"]);
+    expect(names()).toEqual(["langy.asked.question"]);
+    expect(tracked.events[0]?.attributes).toEqual({ surface: "ask_bar" });
   });
 
   /** @scenario "Telemetry: a draft the app seeds in Langy sends no ask" */

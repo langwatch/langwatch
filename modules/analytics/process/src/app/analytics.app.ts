@@ -24,6 +24,7 @@ import {
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
   type LangWatchQLPassInput,
+  type LangWatchQLKeyDoor,
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
@@ -99,6 +100,7 @@ import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.t
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
+import { keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
@@ -141,9 +143,6 @@ import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
 const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
-
-/** The key door's caller, on its runs that answer and on those refused before the engine. */
-const REST_API_RUN: LangWatchQLRunTelemetry = { caller: "rest_api" };
 
 /** Waiting analytics reads per tenant; only a tenant flooding the process is refused. */
 const TENANT_ANALYTICS_MAX_QUEUED = 64;
@@ -758,24 +757,30 @@ export class AnalyticsModule
    */
   async runLangWatchQLForKey(
     input: Readonly<
-      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
+      {
+        reach: LangWatchQLKeyReach;
+        door?: LangWatchQLKeyDoor;
+        signal?: AbortSignal;
+      } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
+    // The caller, on its runs that answer and on those refused before the engine.
+    const telemetry = keyRunTelemetry({ reach: input.reach, door: input.door ?? "rest_api" });
     try {
-      return await this.#runLangWatchQLForKey(input);
+      return await this.#runLangWatchQLForKey({ ...input, telemetry });
     } catch (error) {
-      this.#dependencies.runTelemetry.recordFailed({
-        telemetry: REST_API_RUN,
-        sql: input.sql,
-        error,
-      });
+      this.#dependencies.runTelemetry.recordFailed({ telemetry, sql: input.sql, error });
       throw error;
     }
   }
 
   async #runLangWatchQLForKey(
     input: Readonly<
-      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
+      {
+        reach: LangWatchQLKeyReach;
+        signal?: AbortSignal;
+        telemetry: LangWatchQLRunTelemetry;
+      } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
     const { reach, projectId, projects: asked, sql, parameters, timeWindow } = input;
@@ -801,7 +806,7 @@ export class AnalyticsModule
       ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
       ...(sources ? { sources } : {}),
       ...(signal ? { signal } : {}),
-      telemetry: REST_API_RUN,
+      telemetry: input.telemetry,
       isInstantEvalsEnabled:
         statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
     });

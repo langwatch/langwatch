@@ -74,10 +74,13 @@ function mountDoor({
     ...(reach ? { reach } : {}),
   });
 
-  const run = async (request: Record<string, unknown>) => {
+  const run = async (
+    request: Record<string, unknown>,
+    identity: Readonly<Record<string, string>> = {},
+  ) => {
     const response = await door.fetch("/api/v1/query", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...identity },
       body: JSON.stringify(request),
     });
 
@@ -92,7 +95,7 @@ function mountDoor({
     return { status: response.status, body: (await response.json()) as unknown };
   };
 
-  return { executor, run, get, reaches: door.reaches };
+  return { executor, run, get, reaches: door.reaches, doors: door.doors };
 }
 
 /** The refusal envelope as the caller reads it: code plus the meta the scenarios inspect. */
@@ -244,6 +247,29 @@ describe("given the query door over the real service", () => {
       expect([query.status, schema.status, reference.status]).toEqual([200, 200, 200]);
       expect(executor.requests).toHaveLength(1);
       expect(reaches).toEqual([langyReach, langyReach, langyReach]);
+    });
+  });
+
+  describe("when the CLI, an MCP server or any other client runs a query", () => {
+    /** @scenario "Telemetry: a key's query is counted by the client that sent it" */
+    it("names the CLI and both MCP servers apart, and every other client rest_api", async () => {
+      const { run, doors } = mountDoor();
+      const sql = `SELECT TraceId FROM ${DATABASE}.traces LIMIT 5`;
+
+      await run({ sql }, { "User-Agent": "langwatch-cli/1.4.0" });
+      await run(
+        { sql },
+        { "X-LangWatch-SDK-Name": "langwatch-client-sdk", "X-LangWatch-Surface": "cli" },
+      );
+      await run({ sql }, { "X-LangWatch-SDK-Name": "langwatch-mcp" });
+      await run(
+        { sql },
+        { "X-LangWatch-SDK-Name": "langwatch-mcp", "X-LangWatch-MCP-Host": "hosted" },
+      );
+      await run({ sql }, { "User-Agent": "langwatch-sdk-node/1.0.0" });
+      await run({ sql }, { "User-Agent": "curl/8.5.0" });
+
+      expect(doors).toEqual(["cli", "cli", "mcp", "mcp", "rest_api", "rest_api"]);
     });
   });
 

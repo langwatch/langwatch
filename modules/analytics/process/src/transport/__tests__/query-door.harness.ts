@@ -4,8 +4,10 @@
  * @vitest-environment node
  */
 import {
+  langWatchQLKeyDoor,
   langWatchQLKeyReach,
   MAX_LWQL_LENGTH,
+  type LangWatchQLKeyDoor,
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
@@ -14,12 +16,14 @@ import {
   canonicalErrorResponse,
   createRestRuntime,
 } from "@langwatch/api/rest";
+import { censusClientOf } from "@langwatch/observability/credential-census";
 import { LocalFeatureApis } from "@langwatch/process";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { Hono } from "hono";
 
 import { LWQL_EXAMPLE_DATABASE } from "../../rules/langwatch-ql-examples.rules.ts";
+import { keyDoorOfClient } from "../../rules/langwatch-ql-key-caller.rules.ts";
 import { buildQueryReference } from "../../rules/query-reference.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import type { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
@@ -58,8 +62,11 @@ export function mountQueryDoor({
   fetch: (path: string, init?: RequestInit) => Promise<Response>;
   /** Every key reach the door handed the application, in order. */
   reaches: LangWatchQLKeyReach[];
+  /** The client each query named, in order. */
+  doors: (LangWatchQLKeyDoor | undefined)[];
 } {
   const reaches: LangWatchQLKeyReach[] = [];
+  const doors: (LangWatchQLKeyDoor | undefined)[] = [];
   // An API key resolves its organization; the key-reach context below fans it out to the tenant.
   const keyScope = () => ({ tier: "organization" as const, id: `org-of-${tenant().id}` });
 
@@ -74,8 +81,16 @@ export function mountQueryDoor({
 
   // The scope a key resolves to, faked: the one authenticated tenant.
   const queryApi: AnalyticsQueryApi = {
-    runLangWatchQLForKey: ({ reach: asked, sql, parameters, timeWindow, granularitySeconds }) => {
+    runLangWatchQLForKey: ({
+      reach: asked,
+      door,
+      sql,
+      parameters,
+      timeWindow,
+      granularitySeconds,
+    }) => {
       reaches.push(asked);
+      doors.push(door);
       return service().executeForProjects({
         projects: [tenant()],
         protections,
@@ -120,12 +135,19 @@ export function mountQueryDoor({
     runtime.mount(queryRest.router(), {
       app: () => apis.reference(AnalyticsQueryApi),
       onError: canonicalErrorResponse,
-      middlewareContext: [bindMiddlewareContext(langWatchQLKeyReach, () => reach())],
+      middlewareContext: [
+        bindMiddlewareContext(langWatchQLKeyReach, () => reach()),
+        // As the analytics module resolves it, from the request's identity headers.
+        bindMiddlewareContext(langWatchQLKeyDoor, (request) =>
+          keyDoorOfClient({ client: censusClientOf((name) => request.headers.get(name)).client }),
+        ),
+      ],
     }),
   );
 
   return {
     reaches,
+    doors,
     fetch: async (path: string, init?: RequestInit) =>
       app.fetch(new Request(`http://api.test${path}`, init)),
   };

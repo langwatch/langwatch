@@ -32,7 +32,7 @@ import {
   SquarePen,
   Waves,
 } from "lucide-react";
-import { Profiler, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Profiler, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   attachedContextToChip,
@@ -415,6 +415,11 @@ function LangyPanel({
     sendMessage: engine.sendMessage,
     restoreDraftOnFailure,
   });
+  // Stable like `send`: only what the member types here counts as a question asked.
+  const sendFromComposer = useCallback(
+    (text: string) => void send(text, { askedFrom: "composer" }),
+    [send],
+  );
   const navigation = useLangyConversationNavigation({
     projectId,
     isBusy,
@@ -731,7 +736,7 @@ function LangyPanel({
                         pickModel(picked);
                         makeDefault.offer(picked);
                       }}
-                      onSend={send}
+                      onSend={sendFromComposer}
                       onStop={handleStop}
                       variant={floating ? "floating" : "sidebar"}
                       disabled={!projectId}

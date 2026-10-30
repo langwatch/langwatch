@@ -1,3 +1,5 @@
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { type LangyAskSurface, langyQuestionAsked } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { type RefObject, useCallback, useRef } from "react";
 
@@ -12,6 +14,8 @@ export interface LangySendOptions {
    * the reader's behalf: they never wrote it, so they must not be left holding it.
    */
   keepOnFailure?: boolean;
+  /** Where the member asked it; set only for a question they wrote, which is then counted once. */
+  askedFrom?: LangyAskSurface;
 }
 
 export type LangyPanelSend = (text: string, options?: LangySendOptions) => Promise<void>;
@@ -64,14 +68,19 @@ export function useLangyPanelSend({
   restoreDraftOnFailure: () => void;
 }): LangyPanelSend {
   const setDraft = useLangyStore((s) => s.setDraft);
+  const analytics = useUiAnalytics();
   const implementationRef = useRef<LangyPanelSend>(async () => undefined);
-  implementationRef.current = async (text, { keepOnFailure = true } = {}) => {
+  implementationRef.current = async (
+    text: string,
+    { keepOnFailure = true, askedFrom }: LangySendOptions = {},
+  ) => {
     if (!text.trim() || !projectId || isBusy) return;
     setDraft("");
     if (text.trim().toLowerCase() === "/feedback") {
       if (latestAssistantMessageId) useLangyStore.getState().pinFeedback(latestAssistantMessageId);
       return;
     }
+    if (askedFrom) analytics.track(langyQuestionAsked({ surface: askedFrom }));
     // A new question opens a new recovery chain: the attempt budget is per question.
     resetRecovery();
     // Remembered for restoreDraftOnFailure: `sendMessage` routes failures to useChat's `error`.
