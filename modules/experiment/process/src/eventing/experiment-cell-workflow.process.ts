@@ -381,6 +381,11 @@ const buildTargetNode = ({
           throw new Error(
             `Voice agent target ${targetConfig.id} cannot run inside an experiment workflow`,
           );
+        case "api_agent":
+          // Its slots run only in a scenario run, which owns the setup and teardown around them.
+          throw new Error(
+            `API agent target ${targetConfig.id} cannot run inside an experiment workflow`,
+          );
         default: {
           // Every declared agent type is handled above, so the narrowing has
           // nothing left here and `loadedData.agent` is itself `never`. The

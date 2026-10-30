@@ -13,6 +13,7 @@ import {
   ScenarioTargetNotFoundError,
 } from "@langwatch/scenario-contract";
 import type {
+  ApiAgentData,
   CodeAgentData,
   HttpAgentData,
   PromptConfigData,
@@ -105,6 +106,14 @@ export class ScenarioTargetPrefetchService {
 
     if (target.type === "code") {
       return this.fetchCodeAgentTarget(projectId, target.referenceId, runSecretValues);
+    }
+
+    if (target.type === "api_agent") {
+      return this.fetchApiAgentTarget({
+        projectId,
+        agentId: target.referenceId,
+        runSecretValues,
+      });
     }
 
     if (target.type === "connected") {
@@ -265,6 +274,36 @@ export class ScenarioTargetPrefetchService {
       scenarioMappings: config.scenarioMappings,
       secrets: secretValues,
       ...httpHookFields(config),
+    };
+  }
+
+  private async fetchApiAgentTarget({
+    projectId,
+    agentId,
+    runSecretValues,
+  }: {
+    projectId: string;
+    agentId: string;
+    runSecretValues: Record<string, string>;
+  }): Promise<ApiAgentData | null> {
+    const agent = await this.tryGetAgent(projectId, agentId);
+    if (agent?.type !== "api_agent") return null;
+
+    const { baseUrl, apiKey, turn, setup, teardown, fixturesDatasetId, timeoutMs } = agent.config;
+    // Every project secret travels, as for a code agent: the slots read `secrets.NAME` by any name.
+    const secrets = await this.executionSecrets({ projectId, runSecretValues });
+    return {
+      type: "api_agent",
+      agentId: agent.id,
+      baseUrl,
+      ...(apiKey ? { apiKey } : {}),
+      turn,
+      ...(setup ? { setup } : {}),
+      ...(teardown ? { teardown } : {}),
+      ...(fixturesDatasetId ? { fixturesDatasetId } : {}),
+      ...(timeoutMs ? { timeoutMs } : {}),
+      secrets,
+      hooks: { setup: Boolean(setup), teardown: Boolean(teardown) },
     };
   }
 

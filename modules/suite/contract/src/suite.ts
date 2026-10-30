@@ -49,6 +49,8 @@ export const suiteTargetTypeSchema = z.enum([
   // judge, so the target resolves to a call destination rather than an
   // endpoint.
   "voice",
+  // A Python-slot API agent with setup and teardown hooks; run through the API, not yet pickable.
+  "api_agent",
 ]);
 export type SuiteTargetType = z.infer<typeof suiteTargetTypeSchema>;
 

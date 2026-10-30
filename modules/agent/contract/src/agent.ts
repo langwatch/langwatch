@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   codeAgentConfigSchema,
   connectedAgentConfigSchema,
+  apiAgentConfigSchema,
   httpAgentConfigSchema,
   signatureAgentConfigSchema,
   voiceAgentConfigSchema,
@@ -69,6 +70,11 @@ const agentSchemaDefinition = z.discriminatedUnion("type", [
     type: z.literal("voice"),
     config: voiceAgentConfigSchema,
   }),
+  z.object({
+    ...agentRecordSchema.shape,
+    type: z.literal("api_agent"),
+    config: apiAgentConfigSchema,
+  }),
 ]);
 export interface AgentSchema extends Named<typeof agentSchemaDefinition> {}
 export const agentSchema: AgentSchema = agentSchemaDefinition;
@@ -103,6 +109,11 @@ const agentViewSchemaDefinition = z.discriminatedUnion("type", [
     ...agentViewRecordSchema.shape,
     type: z.literal("voice"),
     config: voiceAgentConfigSchema,
+  }),
+  z.object({
+    ...agentViewRecordSchema.shape,
+    type: z.literal("api_agent"),
+    config: apiAgentConfigSchema,
   }),
 ]);
 export interface AgentViewSchema extends Named<typeof agentViewSchemaDefinition> {}

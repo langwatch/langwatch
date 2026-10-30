@@ -118,7 +118,7 @@ export const agentListViewSchema: AgentListViewSchema = agentListViewSchemaDefin
 const archivedAgentViewSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(["signature", "code", "workflow", "http", "connected", "voice"]),
+  type: z.enum(["signature", "code", "workflow", "http", "connected", "voice", "api_agent"]),
   archivedAt: z.date(),
 });
 export interface ArchivedAgentViewSchema extends Named<typeof archivedAgentViewSchemaDefinition> {}

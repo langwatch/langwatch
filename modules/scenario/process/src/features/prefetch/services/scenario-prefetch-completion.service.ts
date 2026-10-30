@@ -279,6 +279,8 @@ export class ScenarioPrefetchCompletionService {
         return "HTTP agent";
       case "voice":
         return "Voice agent";
+      case "api_agent":
+        return "API agent";
     }
   }
 
@@ -301,7 +303,7 @@ export class ScenarioPrefetchCompletionService {
     startedByUserId: string | undefined;
     startedByApiKeyId: string | undefined;
   }): Promise<void> {
-    if (input.adapter.type !== "code") return;
+    if (input.adapter.type !== "code" && input.adapter.type !== "api_agent") return;
     try {
       input.adapter.sandboxApiKey = await this.options.runKeys.sandboxTokenFor(input);
     } catch (error) {

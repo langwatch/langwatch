@@ -34,6 +34,7 @@ export const agentTypeIcons: Record<AgentType, LucideIcon> = {
   workflow: Workflow,
   connected: Bot,
   voice: Mic,
+  api_agent: Code,
 };
 
 export const agentTypeLabels: Record<AgentType, string> = {
@@ -43,6 +44,7 @@ export const agentTypeLabels: Record<AgentType, string> = {
   workflow: "Workflow",
   connected: "Connected",
   voice: "Voice agent",
+  api_agent: "API agent",
 };
 
 /** The class that keeps a click inside the card menu out of the card click. */

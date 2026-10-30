@@ -5,7 +5,7 @@ import { useLocalStorage } from "usehooks-ts";
 import type { TargetValue } from "../../model/scenario-target.ts";
 
 interface PersistedTarget {
-  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "api_agent";
   id: string;
   timestamp: number;
 }

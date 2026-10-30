@@ -182,7 +182,7 @@ const agentNotFoundProblemSchema = z.object({
 const invalidAgentConfigProblemSchema = z.object({
   error: z.literal("invalid_agent_config"),
   message: z.string(),
-  agentType: z.enum(["signature", "code", "workflow", "http", "connected", "voice"]),
+  agentType: z.enum(["signature", "code", "workflow", "http", "connected", "voice", "api_agent"]),
   issues: z.unknown().optional(),
 });
 

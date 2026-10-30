@@ -23,7 +23,7 @@ import {
 import type { ScenarioTarget } from "../../model/scenario-target.ts";
 
 export type ScenarioTargetSelection = {
-  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "api_agent";
   id: string;
 };
 

@@ -462,3 +462,50 @@ Feature: Scenario run hooks: setup and teardown
       When the person types a hooks URL
       Then the form shows a new signing secret to copy before saving
       And after the agent is saved, the form shows only that a secret is set, with a Rotate button
+
+  Rule: Hooks on an API agent
+
+    An API agent is its own agent type: an API the customer already hosts, called through
+    Python slots (turn, setup, teardown) that LangWatch runs in its code sandbox. The customer
+    hosts nothing for the hooks. The hook behaviour is the connected agent's (ADR-180).
+
+    @unit
+    Scenario: An API agent declares the hooks whose slots it filled
+      Given an API agent with a setup slot and no teardown slot
+      Then the run calls a setup hook and no teardown hook
+      And an API agent with only a turn slot calls no hooks
+
+    @integration
+    Scenario: An API agent calls setup, then the turns, then teardown
+      Given an API agent with turn, setup and teardown slots
+      When a scenario runs against it
+      Then setup receives the run parameters and returns the state
+      And the turn receives the message, the history and the state
+      And teardown receives the state and the run parameters
+      And the run shows the state on setup and teardown's returned object on teardown
+
+    @integration
+    Scenario: An API agent setup that fails leaves the run not scored
+      Given an API agent whose setup slot raises "database is down"
+      When a scenario runs against it
+      Then no turn is played and setup records the error
+      And teardown is still called
+
+    @integration
+    Scenario: An API agent with only a turn slot calls no hook
+      Given an API agent with only a turn slot
+      When a scenario runs against it
+      Then only the turn is run
+      And the turn receives no state
+
+    @integration
+    Scenario: An API agent slot's error never shows the agent's key
+      Given a setup slot that raises with the agent's API key in its message
+      When a scenario runs against it
+      Then the recorded error does not contain the key
+
+    @unimplemented
+    Scenario: Setup receives a dataset row as a fixture
+      Given an API agent with a fixtures dataset and a run parameter naming a row
+      When setup runs
+      Then the slot receives that row beside the run parameters

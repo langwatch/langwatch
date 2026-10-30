@@ -24,6 +24,7 @@ export const TARGET_RESOURCE_CLASS = {
   code: "light",
   workflow: "light",
   connected: "light",
+  api_agent: "light",
   voice: "voice",
 } as const satisfies Record<ScenarioTargetType, ScenarioResourceClass>;
 
@@ -36,5 +37,6 @@ export const TARGET_STOP_SIGNAL = {
   code: "SIGTERM",
   workflow: "SIGTERM",
   connected: "SIGTERM",
+  api_agent: "SIGTERM",
   voice: "SIGTERM",
 } as const satisfies Record<ScenarioTargetType, ScenarioStopSignal>;

@@ -132,7 +132,7 @@ export const executeRunIntentSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   target: z.object({
-    type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+    type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice", "api_agent"]),
     referenceId: z.string(),
     scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   }),
@@ -200,7 +200,7 @@ export const simulationRunProcessEventViewSchema = z.object({
   name: z.string().nullable(),
   target: z
     .object({
-      type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+      type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice", "api_agent"]),
       referenceId: z.string(),
       scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
     })

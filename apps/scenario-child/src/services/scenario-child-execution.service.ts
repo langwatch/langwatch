@@ -15,6 +15,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
+import { HttpSerializedApiAgentChannel } from "../channels/http/http.serialized-api-agent.channel.ts";
 import {
   type ConnectedCallRun,
   HttpSerializedConnectedAgentChannel,
@@ -223,12 +224,19 @@ function hookTargetOf({
   const { adapterData } = jobData;
   if (jobData.script) return null;
   if (adapterData.type === "http" && !adapterData.hooksUrl) return null;
-  if (adapterData.type !== "connected" && adapterData.type !== "http") return null;
+  if (
+    adapterData.type !== "connected" &&
+    adapterData.type !== "http" &&
+    adapterData.type !== "api_agent"
+  ) {
+    return null;
+  }
   const declared = adapterData.hooks;
   if (!declared?.setup && !declared?.teardown) return null;
   const isHookCaller =
     adapter instanceof HttpSerializedConnectedAgentChannel ||
-    adapter instanceof HttpSerializedHttpAgentChannel;
+    adapter instanceof HttpSerializedHttpAgentChannel ||
+    adapter instanceof HttpSerializedApiAgentChannel;
   return isHookCaller ? { caller: adapter, declared } : null;
 }
 

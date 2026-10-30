@@ -15,6 +15,9 @@ export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawer {
       return "agentVoiceEditor";
     case "signature":
       throw new Error(`Unhandled agent type: ${type} — signature agents have no editor drawer`);
+    case "api_agent":
+      // Created through the API or CLI; hidden from the agents page until it has an editor.
+      throw new Error(`Unhandled agent type: ${type} — API agents have no editor drawer`);
     case "connected":
       // Declared by the customer's own code and registered from it, so the
       // platform shows a connected agent rather than editing it.

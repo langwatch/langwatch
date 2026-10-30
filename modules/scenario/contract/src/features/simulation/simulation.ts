@@ -73,7 +73,15 @@ export const simulationRunResultSchema: SimulationRunResultSchema =
   simulationRunResultSchemaDefinition;
 export type SimulationRunResult = z.infer<typeof simulationRunResultSchema>;
 
-const runTargetTypes = ["prompt", "http", "code", "workflow", "connected", "voice"] as const;
+const runTargetTypes = [
+  "prompt",
+  "http",
+  "code",
+  "workflow",
+  "connected",
+  "voice",
+  "api_agent",
+] as const;
 
 /** The reserved namespace the queue path stamps on a run. */
 const runLangwatchNamespaceSchema = z.looseObject({
@@ -408,7 +416,7 @@ export type SimulationStreamFrame = z.infer<typeof simulationStreamFrameSchema>;
  */
 
 const simulationTargetSchemaDefinition = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice", "api_agent"]),
   referenceId: z.string(),
 });
 export interface SimulationTargetSchema extends Named<typeof simulationTargetSchemaDefinition> {}

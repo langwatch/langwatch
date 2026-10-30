@@ -19,6 +19,23 @@ describe("agent config contract", () => {
     ).toMatchObject({ prompt: "Answer clearly" });
   });
 
+  it("accepts an API agent with a turn slot and optional hook slots", () => {
+    const config = {
+      baseUrl: "https://shop.example.com",
+      apiKey: "{{ secrets.SHOP_KEY }}",
+      turn: "def turn(api, message, history, state): return ''",
+      setup: "def setup(api, params): return {}",
+    };
+
+    expect(parseAgentConfig("api_agent", config)).toMatchObject(config);
+    expect(
+      createAgentRequestSchema.safeParse({ name: "Shop", type: "api_agent", config }).success,
+    ).toBe(true);
+    expect(() => parseAgentConfig("api_agent", { baseUrl: "https://x", turn: "" })).toThrow(
+      ZodError,
+    );
+  });
+
   it("rejects a code agent without a code parameter", () => {
     expect(() => parseAgentConfig("code", { parameters: [] })).toThrow(ZodError);
   });

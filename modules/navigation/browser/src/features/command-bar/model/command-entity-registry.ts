@@ -36,6 +36,7 @@ export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName
     case "connected":
       return "agentConnectedDetail";
     case "signature":
+    case "api_agent":
       return null;
   }
 }

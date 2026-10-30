@@ -124,3 +124,22 @@ describe("adapterDeclaresHooks() on an HTTP agent", () => {
     });
   });
 });
+
+describe("adapterDeclaresHooks() on an API agent", () => {
+  const api = {
+    type: "api_agent" as const,
+    agentId: "agent_api",
+    baseUrl: "https://shop.example.com",
+    turn: "def turn(api, message, history, state):\n    return ''",
+    secrets: {},
+  };
+
+  /** @scenario "An API agent declares the hooks whose slots it filled" */
+  it("calls a hook only for a slot the agent filled", () => {
+    expect(adapterDeclaresHooks(api)).toBe(false);
+    expect(adapterDeclaresHooks({ ...api, hooks: { setup: false, teardown: false } })).toBe(false);
+    expect(hookCallsEnvironment({ ...api, hooks: { setup: true, teardown: false } })).toEqual({
+      callsHooks: true,
+    });
+  });
+});

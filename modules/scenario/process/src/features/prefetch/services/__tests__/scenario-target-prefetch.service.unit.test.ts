@@ -360,6 +360,31 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
     });
   });
 
+  describe("given an API agent with a setup slot and no teardown slot", () => {
+    it("packs the slots, the secrets and the hooks the filled slots declare", async () => {
+      const service = serviceAnswering({
+        agent: {
+          ...connectedAgent(1),
+          type: "api_agent",
+          config: {
+            baseUrl: "https://shop.example.com",
+            apiKey: "{{ secrets.SHOP_KEY }}",
+            turn: "def turn(api, message, history, state): return ''",
+            setup: "def setup(api, params): return {}",
+          },
+        } as unknown as Agent,
+        projectSecrets: { SHOP_KEY: "key_live" },
+      });
+
+      await expect(fetchFor(service, "api_agent")).resolves.toMatchObject({
+        type: "api_agent",
+        baseUrl: "https://shop.example.com",
+        secrets: { SHOP_KEY: "key_live" },
+        hooks: { setup: true, teardown: false },
+      });
+    });
+  });
+
   describe("given the agent is not the type the target claims", () => {
     it("throws target not found", async () => {
       const service = serviceAnswering({

@@ -4,7 +4,7 @@
  * `ScenarioTarget` — both names exist so nothing reaches into the picker.
  */
 export type ScenarioTarget = {
-  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "api_agent";
   id: string;
 } | null;
 

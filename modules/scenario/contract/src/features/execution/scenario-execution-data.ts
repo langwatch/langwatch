@@ -298,6 +298,31 @@ export interface VoiceTargetSchema extends Named<typeof VoiceTargetSchemaDefinit
 export const VoiceTargetSchema: VoiceTargetSchema = VoiceTargetSchemaDefinition;
 export type VoiceTarget = z.infer<typeof VoiceTargetSchema>;
 
+/**
+ * Pre-fetched API agent configuration: the Python slots the sandbox runs against the customer's
+ * API. `apiKey` is a secret reference the child resolves against `secrets`; the hooks the agent
+ * declared are the slots it filled (ADR-180).
+ */
+const ApiAgentDataSchemaDefinition = z.object({
+  type: z.literal("api_agent"),
+  agentId: z.string(),
+  baseUrl: z.string(),
+  apiKey: z.string().optional(),
+  turn: z.string(),
+  setup: z.string().optional(),
+  teardown: z.string().optional(),
+  fixturesDatasetId: z.string().optional(),
+  /** The secrets `apiKey` and the slots read as `secrets.NAME`. */
+  secrets: z.record(z.string(), z.string()).default({}),
+  /** The run's own LangWatch credential, as for a code agent. */
+  sandboxApiKey: z.string().optional(),
+  timeoutMs: z.number().int().positive().optional(),
+  hooks: agentHooksSchema.optional(),
+});
+export interface ApiAgentDataSchema extends Named<typeof ApiAgentDataSchemaDefinition> {}
+export const ApiAgentDataSchema: ApiAgentDataSchema = ApiAgentDataSchemaDefinition;
+export type ApiAgentData = z.infer<typeof ApiAgentDataSchema>;
+
 /** Pre-fetched voice agent configuration for serialized execution. */
 const VoiceAgentDataSchemaDefinition = z.object({
   type: z.literal("voice"),
@@ -325,6 +350,7 @@ const TargetAdapterDataSchemaDefinition = z.discriminatedUnion("type", [
   CodeAgentDataSchema,
   WorkflowAgentDataSchema,
   ConnectedAgentDataSchema,
+  ApiAgentDataSchema,
   VoiceAgentDataSchema,
 ]);
 export interface TargetAdapterDataSchema extends Named<typeof TargetAdapterDataSchemaDefinition> {}
@@ -415,7 +441,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 const TargetConfigSchemaDefinition = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice", "api_agent"]),
   referenceId: z.string(),
   /** A suite prompt target's field mappings, pinned when the suite queued the run. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),

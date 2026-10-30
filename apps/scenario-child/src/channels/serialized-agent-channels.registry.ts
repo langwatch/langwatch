@@ -6,6 +6,7 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import {
+  ApiAgentDataSchema,
   CodeAgentDataSchema,
   ConnectedAgentDataSchema,
   type ExecuteSyncRoute,
@@ -26,6 +27,7 @@ import type { z } from "zod";
 
 import type { ExecuteSyncTransport } from "./execute-sync.channel.ts";
 import { childExecuteSyncTransport } from "./http/http.execute-sync.channel.ts";
+import { HttpSerializedApiAgentChannel } from "./http/http.serialized-api-agent.channel.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
 import {
   type ConnectedCallRun,
@@ -201,6 +203,23 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         parameters: input.parameters,
         logger: input.logger ?? createLogger("langwatch:scenarios:connected-adapter"),
         run: input.run,
+      });
+    },
+  }),
+  api_agent: runtime({
+    schema: ApiAgentDataSchema,
+    resourceClass: TARGET_RESOURCE_CLASS.api_agent,
+    stopSignal: TARGET_STOP_SIGNAL.api_agent,
+    factory: ({ data, input, nlpTimeouts }) => {
+      if (!input.projectApiKey) {
+        throw new Error("API agent adapter requires projectApiKey");
+      }
+      return HttpSerializedApiAgentChannel.create({
+        config: data,
+        projectApiKey: input.projectApiKey,
+        parameters: input.parameters,
+        timeouts: nlpTimeouts,
+        transport: executeSyncTransportOf({ input, projectApiKey: input.projectApiKey }),
       });
     },
   }),

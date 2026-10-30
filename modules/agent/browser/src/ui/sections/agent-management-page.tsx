@@ -155,7 +155,9 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
   const showEmptyState = !props.data.isLoading && !hasAgents;
   // Connected agents draw their own card via `connectedSection`; every other
   // type keeps the grid below.
-  const otherItems = props.data.items.filter((agent) => agent.type !== "connected");
+  const otherItems = props.data.items.filter(
+    (agent) => agent.type !== "connected" && agent.type !== "api_agent",
+  );
 
   return (
     <>
