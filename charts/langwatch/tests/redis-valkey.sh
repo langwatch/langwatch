@@ -63,8 +63,8 @@ test_command_and_probes_unchanged() {
 test_default_stays_redis() {
   local image
   image=$(image_of "$(render_redis "$DEFAULT")")
-  if [ "$image" != "redis:8.0" ]; then
-    fail "default image" "image is '$image', expected redis:8.0"
+  if [ "$image" != "redis:8.10.3" ]; then
+    fail "default image" "image is '$image', expected redis:8.10.3"
     return
   fi
   echo "ok   [default image] $image"

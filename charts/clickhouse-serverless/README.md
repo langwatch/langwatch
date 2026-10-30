@@ -212,7 +212,7 @@ has no kube-state-metrics series and cannot be watched from here.
 | `auth.secretKeys.passwordKey`      | Key name for the password in both autogen and existingSecret paths                                                                                               | `password`          |
 | `auth.secretKeys.clusterSecretKey` | Key name for the Keeper cluster secret                                                                                                                           | `clusterSecret`     |
 | `preflight.enabled`                | Run the pre-install/pre-upgrade Secret-keys Job when `auth.existingSecret` is set                                                                                | `true`              |
-| `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                           | `alpine/k8s:1.30.0` |
+| `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                           | `alpine/k8s:1.34.9` |
 | `preflight.activeDeadlineSeconds`  | Hard timeout for the preflight Job                                                                                                                               | `60`                |
 
 ### Users
