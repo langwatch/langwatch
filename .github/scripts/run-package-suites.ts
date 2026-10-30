@@ -172,12 +172,11 @@ export interface ShardLoad {
   alone: number;
   /** Every light suite, which shares the shard's concurrency slots. */
   shared: number;
-  /** Light integration and browser suites, one suite of either at a time. */
-  integration: number;
-  browser: number;
+  /** Light integration and browser suites, which run one at a time. */
+  serial: number;
 }
 
-const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, integration: 0, browser: 0 };
+const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, serial: 0 };
 
 /**
  * A shard's wall time, which the split balances. Heavy packages run alone.
@@ -185,7 +184,7 @@ const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, integration: 0, browser: 0 
  * The light part takes the longer of the two.
  */
 export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency: number }) =>
-  load.alone + Math.max(load.shared / concurrency, load.integration + load.browser);
+  load.alone + Math.max(load.shared / concurrency, load.serial);
 
 /**
  * `load` with one package added. The weights file records a package, not its
@@ -203,8 +202,7 @@ export const withPackage = ({
   if (weight >= HEAVY_SECONDS) return { ...load, alone: load.alone + weight };
   const next = { ...load, shared: load.shared + weight };
   for (const script of scripts) {
-    const lane = laneOf(script);
-    if (lane !== "shared") next[lane] += weight / scripts.length;
+    if (laneOf(script) !== "shared") next.serial += weight / scripts.length;
   }
   return next;
 };
@@ -339,7 +337,7 @@ export const laneOf = (script: string): "integration" | "browser" | "shared" =>
 export const KEEPS_LAUNCHER_WORKERS: ReadonlySet<string> = new Set(["@langwatch/design-system"]);
 
 /**
- * What a job adds to its environment. A heavy unit suite runs alone, so it takes
+ * The worker count a job adds to its environment. A heavy unit suite runs alone, so it takes
  * every core rather than the launcher's two. Integration and browser lanes keep
  * their own counts: their files share a datastore or an apt lock.
  */
@@ -355,6 +353,20 @@ export const workerEnvFor = ({
   heavy && cores > 2 && laneOf(job.script) === "shared" && !KEEPS_LAUNCHER_WORKERS.has(job.pkg.name)
     ? { VITEST_MAX_WORKERS: String(cores) }
     : {};
+
+/**
+ * What a job adds to its environment. Ryuk is off: it removes a suite's leftover
+ * containers, and itself, about ten seconds after the suite exits, when a browser
+ * suite may have started and Chromium aborts its loads. Suites stop or reuse their own.
+ */
+export const suiteEnvFor = (options: {
+  job: SuiteJob;
+  heavy: boolean;
+  cores: number;
+}): Record<string, string> => ({
+  TESTCONTAINERS_RYUK_DISABLED: "true",
+  ...workerEnvFor(options),
+});
 
 /** The scripts nx.json caches. They run through Nx, so an unchanged suite replays its pass. */
 const CACHED_SCRIPTS = new Set(["test", "test:unit"]);
@@ -466,7 +478,7 @@ export const runJobs = async ({
  */
 const SERIAL_LANES_KEY = "integration-or-browser";
 
-/** The shard-wide keys a job holds while it runs: its package, its lane, and heavy. */
+/** The shard-wide keys a job holds: its package, SERIAL_LANES_KEY if not shared, and heavy. */
 const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => [
   `package:${job.pkg.name}`,
   ...(laneOf(job.script) === "shared" ? [] : [SERIAL_LANES_KEY]),
@@ -814,7 +826,7 @@ if (isEntrypoint()) {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
-          ...workerEnvFor({ job, heavy: isHeavyPackage({ weightOf, pkg: job.pkg }), cores }),
+          ...suiteEnvFor({ job, heavy: isHeavyPackage({ weightOf, pkg: job.pkg }), cores }),
         },
       }),
     log: (line) => console.log(line),
