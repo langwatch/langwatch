@@ -30,7 +30,7 @@ async function savedWithHooks() {
     agent({
       auth: { type: "bearer", token: "tok_live_support" },
       hooksUrl: "https://support.example/hooks",
-      hooksSigningSecret: "whsec_0123456789abcdef",
+      hooksSigningSecret: "whsec_test_fixture_secret",
     }),
   );
   const read = agentWithoutSecrets(await app.getById({ id: "agent_1", projectId: "project_1" }));
@@ -55,7 +55,7 @@ describe("a save from the form that moves the hooks URL to another origin", () =
         ...read.config,
         hooksUrl: "https://other.example.net/hooks",
         auth: { type: "bearer", token: "tok_live_other" },
-        hooksSigningSecret: "whsec_rotated",
+        hooksSigningSecret: "whsec_test_rotated_secret",
       }),
     );
 
