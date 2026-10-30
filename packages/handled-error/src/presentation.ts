@@ -78,6 +78,47 @@ const str = (error: HandledErrorShape, key: string, fallback: string): string =>
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/** Whose limit a `budget_exceeded` names, by the gateway's `budget_scope`. */
+const BUDGET_SCOPE_OWNERS: Readonly<Record<string, string>> = {
+  organization: "Your organization's",
+  team: "Your team's",
+  project: "This project's",
+  virtual_key: "This key's",
+  principal: "Your personal",
+  group: "Your group's",
+  attributed_user: "This end user's",
+};
+
+/** The headline's period word, by the gateway's `budget_window`. */
+const BUDGET_WINDOW_ADJECTIVES: Readonly<Record<string, string>> = {
+  minute: "per-minute",
+  hour: "hourly",
+  day: "daily",
+  week: "weekly",
+  month: "monthly",
+};
+
+/** When a blocked window opens again. No calendar boundary: a budget can carry its own cycle anchor. */
+const BUDGET_WINDOW_RESETS: Readonly<Record<string, string>> = {
+  minute: "Requests are blocked until its per-minute window resets.",
+  hour: "Requests are blocked until its hourly window resets.",
+  day: "Requests are blocked until its daily window resets.",
+  week: "Requests are blocked until its weekly window resets.",
+  month: "Requests are blocked until its monthly window resets.",
+  total: "This limit never resets, so requests stay blocked until it is raised.",
+  manual: "Requests are blocked until an admin resets or raises it.",
+};
+
+/** One enumerated budget `meta` value mapped through a word table; unknown values map to nothing. */
+const budgetMetaWord = (
+  error: HandledErrorShape,
+  key: string,
+  words: Readonly<Record<string, string>>,
+): string | undefined => {
+  const value = str(error, key, "").toLowerCase();
+  return Object.hasOwn(words, value) ? words[value] : undefined;
+};
+
 /** The request field that sets each list name, which the supplied-parameter copy points at. */
 const LIST_REQUEST_FIELDS: Readonly<Record<string, string>> = {
   dashboard_context_sources: "sources",
@@ -5188,8 +5229,21 @@ const presentations = {
       "Codex runs on your OpenAI account, and its sign-in has expired. Sign in again to keep using it.",
   },
   budget_exceeded: {
-    title: "You've reached your spending limit",
-    describe: () => "Raise the limit in settings to keep going.",
+    // The gateway's 402. `budget_scope` and `budget_window` are enumerated, so
+    // the headline names whose limit ran out and the body says when it resets.
+    title: "Your AI spending limit is reached",
+    titleFor: (error) => {
+      const owner = budgetMetaWord(error, "budget_scope", BUDGET_SCOPE_OWNERS);
+      if (!owner) return undefined;
+      const period = budgetMetaWord(error, "budget_window", BUDGET_WINDOW_ADJECTIVES);
+      return `${owner} ${period ? `${period} ` : ""}AI spending limit is reached`;
+    },
+    describe: (error) => {
+      const reset =
+        budgetMetaWord(error, "budget_window", BUDGET_WINDOW_RESETS) ??
+        "Requests are blocked until the limit is raised.";
+      return `${reset} An admin can raise it in AI Gateway budgets.`;
+    },
   },
   end_user_required: {
     title: "This key needs a user on every request",
