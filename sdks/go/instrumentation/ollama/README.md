@@ -97,14 +97,13 @@ client := ollama.NewHTTPClient(
 go get github.com/langwatch/langwatch/sdks/go/instrumentation/ollama
 ```
 
-> **Version note.** This module pins `github.com/ollama/ollama v0.23.0`, the most
-> recent Ollama release whose module still declares `go 1.24.1` and is therefore
-> compatible with this module's `go 1.25.0` (matching the rest of the SDK). Ollama
-> `v0.23.1`+ and the whole `v0.30.x` line declare `go 1.26.0`; to build against
-> those, bump this module's `go` directive to `1.26.0` and run
-> `go get github.com/ollama/ollama/api@latest && go mod tidy`. The instrumentation
-> parses the wire format directly, which is byte-identical across these versions,
-> so no code changes are needed — only the `go` / dependency floors.
+> **Version note.** This module pins `github.com/ollama/ollama v0.23.0` and uses
+> only its `api` types. Newer Ollama releases (the `v0.40.x` line) declare a
+> `go 1.26.x` patch floor above this module's `go 1.26.0` (matching the rest of the
+> SDK), so taking them would raise the SDK's floor again. To build against one,
+> run `go get github.com/ollama/ollama/api@latest && go mod tidy` in your own
+> module. The instrumentation parses the wire format directly, which is
+> byte-identical across these versions, so no code changes are needed.
 
 ## Usage
 
