@@ -163,7 +163,7 @@ export async function trpcMutate<T>({
   return body.result.data as T;
 }
 
-/** The query half of the same wire: `GET ?input=<urlencoded JSON input>`. */
+/** The query half of the same wire: `GET ?input=<urlencoded input>`, plain JSON both ways. */
 export async function trpcQuery<T>({
   cookie,
   path,

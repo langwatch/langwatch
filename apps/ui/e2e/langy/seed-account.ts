@@ -18,6 +18,13 @@ const APP_DOTENV = path.resolve(__dirname, "../../../..", ".env");
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
+/**
+ * `.localhost` names are loopback by RFC 6761: haven serves each app under one.
+ * Only the app gets this: a database is a plain loopback address or nothing.
+ */
+const isLoopbackApp = (host: string | null): host is string =>
+  host !== null && (LOOPBACK_HOSTS.has(host) || host.endsWith(".localhost"));
+
 const hostOf = (address: string): string | null => {
   try {
     return new URL(address).hostname.toLowerCase();
@@ -55,7 +62,7 @@ export function resolveSeedDatabaseUrl({
   readDotenv: () => string | undefined;
 }): string {
   const appHost = hostOf(appBase);
-  if (!appHost || !LOOPBACK_HOSTS.has(appHost)) {
+  if (!isLoopbackApp(appHost)) {
     throw new Error(
       `A scenario's own account is only seeded on a local stack, and the app under test is on ${hostForError(appHost)}.`,
     );

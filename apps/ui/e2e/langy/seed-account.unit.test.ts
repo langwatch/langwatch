@@ -68,6 +68,16 @@ describe("seeding a scenario's own account", () => {
       expect(readDotenv).not.toHaveBeenCalled();
     });
 
+    it("takes a haven hostname under .localhost as this machine", () => {
+      expect(
+        resolveSeedDatabaseUrl({
+          appBase: "https://app.my-stack.langwatch.localhost",
+          env: { DATABASE_URL: LOCAL_DB },
+          readDotenv: () => undefined,
+        }),
+      ).toBe(LOCAL_DB);
+    });
+
     it("falls back to the app's own .env", () => {
       expect(
         resolveSeedDatabaseUrl({
@@ -152,6 +162,16 @@ describe("seeding a scenario's own account", () => {
           readDotenv: () => undefined,
         }),
       ).toThrow(/points at an address that does not parse\.$/);
+    });
+
+    it("refuses a database under .localhost, which loopback for the app does not extend to", () => {
+      expect(() =>
+        resolveSeedDatabaseUrl({
+          appBase: LOCAL_APP,
+          env: { DATABASE_URL: "postgresql://u@db.localhost:5432/x" },
+          readDotenv: () => undefined,
+        }),
+      ).toThrow(/points at db\.localhost\.$/);
     });
 
     it("does not take a loopback word inside the credentials for the host", () => {
