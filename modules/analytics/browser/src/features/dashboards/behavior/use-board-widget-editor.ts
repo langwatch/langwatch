@@ -14,7 +14,7 @@ import { useWidgetPreview } from "../../dashboard-widget/behavior/use-widget-pre
 import { BLANK_WIDGET } from "../model/blank-widget.ts";
 import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
-import { queryRan, workbenchOpened } from "../model/dashboard-usage-events.ts";
+import { editorOpened, queryRan } from "../model/dashboard-usage-events.ts";
 
 export function useBoardWidgetEditor({
   widget,
@@ -50,13 +50,13 @@ export function useBoardWidgetEditor({
   });
 
   const analytics = useUiAnalytics();
-  // The LangWatchQL workbench events: the editor mounts once per open, so one open sends one.
+  // The editor's LangWatchQL events: it mounts once per open, so one open sends one.
   const opened = useRef(false);
   const widgetIs = widget ? "existing" : "new";
   useEffect(() => {
     if (opened.current) return;
     opened.current = true;
-    analytics.track(workbenchOpened({ widgetIs }));
+    analytics.track(editorOpened({ widgetIs }));
   }, [analytics, widgetIs]);
   const runStandalone = (query: DashboardWidgetQuery) => {
     analytics.track(queryRan());

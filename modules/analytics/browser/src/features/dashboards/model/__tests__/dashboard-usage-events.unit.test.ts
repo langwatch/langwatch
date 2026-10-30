@@ -13,6 +13,7 @@ import {
   dashboardFavourited,
   dashboardKey,
   dashboardViewed,
+  editorOpened,
   langyAsked,
   langyTracesToggled,
   periodChanged,
@@ -22,7 +23,6 @@ import {
   widgetEdited,
   widgetExported,
   widgetViewed,
-  workbenchOpened,
 } from "../dashboard-usage-events.ts";
 
 /** The name every destination receives: `boundary.action.name`, as the host composes it. */
@@ -155,11 +155,11 @@ describe("the Dashboards product events", () => {
       expect(dashboardEdited({ change: "layout" }).attributes).toEqual({ change: "layout" });
     });
 
-    /** @scenario "Telemetry: opening the widget editor sends lwql.opened.workbench" */
-    it("names the workbench opened on a new or saved widget", () => {
-      const event = workbenchOpened({ widgetIs: "new" });
+    /** @scenario "Telemetry: opening the widget editor sends lwql.opened.editor" */
+    it("names the editor opened on a new or saved widget", () => {
+      const event = editorOpened({ widgetIs: "new" });
 
-      expect(composed(event)).toBe("lwql.opened.workbench");
+      expect(composed(event)).toBe("lwql.opened.editor");
       expect(event.attributes).toEqual({ widgetIs: "new" });
     });
 

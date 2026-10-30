@@ -123,10 +123,10 @@ Feature: Dashboards telemetry: product events and query telemetry
     And a rename or layout the server refuses sends nothing
 
   @integration
-  Scenario: Telemetry: opening the widget editor sends lwql.opened.workbench
-    # The widget editor is the product's LangWatchQL workbench: its Queries tab runs queries.
+  Scenario: Telemetry: opening the widget editor sends lwql.opened.editor
+    # The widget editor is where a member writes and runs LangWatchQL: its Queries tab runs queries.
     When a member opens the editor on a new widget or a saved one
-    Then "lwql.opened.workbench" is sent once with widgetIs "new" or "existing"
+    Then "lwql.opened.editor" is sent once with widgetIs "new" or "existing"
 
   @integration
   Scenario: Telemetry: running a query in the widget editor sends lwql.ran.query

@@ -1,7 +1,7 @@
 /**
  * The product events Dashboards sends, built here so every call site names them alike. Each is
  * `dashboards.<action>.<name>` once the host composes it; attributes carry no raw id and no SQL.
- * Pure.
+ * The widget editor's LangWatchQL events go under the `lwql` boundary instead. Pure.
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 
@@ -30,6 +30,17 @@ export type DashboardCreatedFrom = "blank" | "template" | "duplicate" | "duplica
 
 /** How a widget landed on a board. */
 export type WidgetAddedFrom = "catalogue" | "editor" | "duplicate";
+
+/** The boundary the widget editor's LangWatchQL events are sent under. */
+export const LWQL_BOUNDARY = "lwql";
+
+function lwqlEvent(
+  name: string,
+  action: string,
+  attributes: Readonly<Record<string, unknown>> = {},
+): UiAnalyticsEvent {
+  return { boundary: LWQL_BOUNDARY, name, action, attributes };
+}
 
 function dashboardsEvent(
   name: string,
@@ -177,15 +188,12 @@ export function langyTracesToggled({
   return dashboardsEvent("langy_traces", "toggled", { included });
 }
 
-/** The boundary the LangWatchQL editor's product events are sent under. */
-export const LWQL_BOUNDARY = "lwql";
-
-/** The widget editor, the product's LangWatchQL workbench, opened: "lwql.opened.workbench". */
-export function workbenchOpened({ widgetIs }: { widgetIs: "new" | "existing" }): UiAnalyticsEvent {
-  return { boundary: LWQL_BOUNDARY, name: "workbench", action: "opened", attributes: { widgetIs } };
+/** A widget editor, opened on a new widget or a saved one: "lwql.opened.editor". */
+export function editorOpened({ widgetIs }: { widgetIs: "new" | "existing" }): UiAnalyticsEvent {
+  return lwqlEvent("editor", "opened", { widgetIs });
 }
 
 /** A query the member ran from the editor: "lwql.ran.query". Never its text. */
 export function queryRan(): UiAnalyticsEvent {
-  return { boundary: LWQL_BOUNDARY, name: "query", action: "ran", attributes: {} };
+  return lwqlEvent("query", "ran");
 }

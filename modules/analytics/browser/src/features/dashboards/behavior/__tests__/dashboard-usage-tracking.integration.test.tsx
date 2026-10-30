@@ -470,14 +470,14 @@ describe("given a member in the widget editor", () => {
       period: PERIOD,
     });
 
-  /** @scenario "Telemetry: opening the widget editor sends lwql.opened.workbench" */
+  /** @scenario "Telemetry: opening the widget editor sends lwql.opened.editor" */
   it("sends one open for a new widget and one for a saved one", () => {
     const { latest } = mount(editor(null));
     act(() => latest().setDraftName("Renamed"));
     cleanup();
     mount(editor(saved));
 
-    expect(names()).toEqual(["lwql.opened.workbench", "lwql.opened.workbench"]);
+    expect(names()).toEqual(["lwql.opened.editor", "lwql.opened.editor"]);
     expect(tracked.events.map(({ attributes }) => attributes)).toEqual([
       { widgetIs: "new" },
       { widgetIs: "existing" },
