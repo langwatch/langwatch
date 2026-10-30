@@ -6,12 +6,20 @@
 
 import type { UiAuthClient } from "@langwatch/auth-contract";
 import type { UiActor } from "@langwatch/browser-host/capabilities";
+import { uiLeaveTo } from "@langwatch/browser-host/navigation";
 import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
 import { clearReaderUiStorage, clearSessionUiStorage } from "@langwatch/browser-host/storage";
 import { createAuthClient } from "better-auth/react";
 
 /** The session endpoint, relative to the auth client's own base URL. */
 export const UI_SESSION_PATH = "/session";
+
+/**
+ * The one route that ends the browser's session: a whole-page GET, because only
+ * it federates the logout out to the deployment's identity provider. Better
+ * Auth's own `POST /sign-out` clears our cookie and leaves theirs standing.
+ */
+export const UI_SIGN_OUT_PATH = "/api/auth/logout";
 
 /** The cache key the session read is kept under. Not a tRPC procedure. */
 export const UI_SESSION_QUERY_KEY: readonly string[] = ["langwatch-ui", "auth", "session"];
@@ -81,14 +89,28 @@ function toUiCacheKeys(payload: unknown): Pick<UiSessionReading, "cacheKey" | "p
 }
 
 /**
- * Fire-and-forget: the endpoint clears the cookie, and what the reader
- * sees next is decided by their redirect, not this promise. A refusal
- * leaves them signed in, which the next session read reports on its own.
+ * This device forgets the reader, then the tab leaves for the logout route,
+ * which also ends a federated provider's session and lands on sign in.
+ * Spec: specs/auth/sign-out-leaves-the-page.feature
  */
-export async function signOutUi(client: UiAuthClient = uiAuthClient()): Promise<void> {
-  clearReaderUiStorage();
-  clearSessionUiStorage();
-  await Promise.all([client.signOut(), clearPersistedUiQueries()]);
+export async function signOutUi(): Promise<void> {
+  await forget("this device's stored preferences", clearReaderUiStorage);
+  await forget("this tab's stored state", clearSessionUiStorage);
+  await forget("this device's mirrored reads", clearPersistedUiQueries);
+  uiLeaveTo(UI_SIGN_OUT_PATH);
+}
+
+/**
+ * One thing this device remembered. A clear is tried on its own and its failure
+ * reported rather than raised: the session is already dead, so a device that
+ * cannot forget must still be left, and the next sign-in sweeps what stayed.
+ */
+async function forget(what: string, clear: () => void | Promise<void>): Promise<void> {
+  try {
+    await clear();
+  } catch (error) {
+    console.debug(`Signing out could not clear ${what}`, error);
+  }
 }
 
 /** The one status that answers "nobody is signed in" by refusing the read. */
