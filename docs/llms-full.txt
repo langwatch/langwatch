@@ -39353,6 +39353,8 @@ Open the agent, then open the **Hooks** tab.
 
 LangWatch calls only the hooks you tick. The signing secret is saved as a project secret. A hook is never sent unsigned: with no signing secret, the hook fails and no request goes out.
 
+To move the hooks URL to another host, type the agent's headers, auth and signing secret again in the same save. LangWatch does not send saved secrets to a host they were not saved for, so it refuses the save otherwise. A hooks URL on the same host as the agent's URL keeps the saved secrets.
+
 ### The request
 
 Each hook is a `POST` with a JSON body:
