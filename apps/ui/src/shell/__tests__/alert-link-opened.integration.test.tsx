@@ -19,7 +19,7 @@ import {
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { cleanup, render } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { useAlertLinkOpened } from "../use-alert-link-opened";
@@ -111,14 +111,13 @@ function hostServices(user: UiActor | null, analytics: UiAnalytics): UiHostServi
   };
 }
 
-/** Mounts the hook at an address and keeps the address the router ends on. */
+/** Mounts the hook at an address the browser and the router both hold. */
 function open({ user, at }: { user: UiActor | null; at: string }) {
+  window.history.replaceState({ idx: 0 }, "", at);
   const analytics = new RecordingAnalytics();
-  const address = { current: "" };
+  const entriesBefore = window.history.length;
   function Probe() {
     useAlertLinkOpened();
-    const { pathname, search } = useLocation();
-    address.current = `${pathname}${search}`;
     return null;
   }
   render(
@@ -128,18 +127,20 @@ function open({ user, at }: { user: UiActor | null; at: string }) {
       </MemoryRouter>
     </UiHostServicesContextProvider>,
   );
-  return { analytics, address };
+  const address = () =>
+    `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return { analytics, address, entriesBefore };
 }
 
 afterEach(cleanup);
 
 describe("useAlertLinkOpened", () => {
   describe("when a signed-in member opens an alert's trace link", () => {
-    /** @scenario "Opening an alert link sends one event and drops the marker" */
-    it("sends one automations.opened.alert_link and drops the marker", () => {
-      const { analytics, address } = open({
+    /** @scenario "Opening an alert link sends one event and replaces the marker out of history" */
+    it("sends one automations.opened.alert_link and replaces the marker in place", () => {
+      const { analytics, address, entriesBefore } = open({
         user: ADA,
-        at: "/demo/traces/trace-1?t=1&lw_from=alert",
+        at: "/demo/traces/trace-1?t=1&lw_from=alert#spans",
       });
 
       expect(analytics.tracked).toEqual([
@@ -150,7 +151,9 @@ describe("useAlertLinkOpened", () => {
           attributes: { landedOn: "trace" },
         },
       ]);
-      expect(address.current).toBe("/demo/traces/trace-1?t=1");
+      expect(address()).toBe("/demo/traces/trace-1?t=1#spans");
+      expect(window.history.length).toBe(entriesBefore);
+      expect(window.history.state).toEqual({ idx: 0 });
       expect(JSON.stringify(analytics.tracked)).not.toContain("trace-1");
     });
   });
@@ -159,11 +162,12 @@ describe("useAlertLinkOpened", () => {
     /** @scenario "A page without the marker, or a signed-out reader, sends nothing" */
     it("sends nothing", () => {
       const plain = open({ user: ADA, at: "/demo/traces/trace-1?t=1" });
-      const signedOut = open({ user: null, at: "/demo/traces/trace-1?lw_from=alert" });
-
       expect(plain.analytics.tracked).toEqual([]);
+      cleanup();
+
+      const signedOut = open({ user: null, at: "/demo/traces/trace-1?lw_from=alert" });
       expect(signedOut.analytics.tracked).toEqual([]);
-      expect(signedOut.address.current).toBe("/demo/traces/trace-1?lw_from=alert");
+      expect(signedOut.address()).toBe("/demo/traces/trace-1?lw_from=alert");
     });
   });
 });

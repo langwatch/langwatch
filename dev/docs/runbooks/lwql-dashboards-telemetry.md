@@ -97,16 +97,26 @@ person who acted: `filed` (on the owner), `seen`, `archived` and `kept`. No
 title, body, query, board name or insight id is sent. `renewed` is not sent: a
 renewal names no person, so there is nobody to count it on.
 
-An alert's links to a trace or a chart in Slack's default message and in digest emails carry
-`lw_from=alert`. A signed-in member who opens one sends one
-`automations.opened.alert_link`, and the marker is then dropped from the
-address, so a reload is not counted again. Report links are not marked.
+An alert's default email (the digest mail) and its default Slack message
+mark their links to our own app's traces and charts with
+`lw_from=alert`. Webhook bodies, custom templates and links to other sites are
+sent unchanged. A signed-in member who opens a marked link sends one
+`automations.opened.alert_link`, and the marker is then replaced out of the
+current history entry, so Back, a reload or a copied link does not carry it.
 
-Not counted yet, because automation has no event for them: an automation
-created, changed, turned on or off, fired, or delivered on a channel. Triggers
-are stored rows with no event log, and a delivery is a step inside a process,
-not an event. `lw.automation.trigger.match_recorded` exists, but it is one per
-matched trace, not one per alert sent, so it is not used as "fired".
+Not counted yet:
+
+- **Triggers created, changed, turned on or off, fired or delivered.** Triggers
+  have no change events, and a send is recorded only as a step of the trigger
+  settlement outbox (`notifyDigest`), not as an event nurturing can subscribe
+  to. These need their own plan.
+  `lw.automation.trigger.match_recorded` is one per matched trace, not one per
+  alert sent, so it is not used as "fired".
+- **Report schedules configured, paused, resumed or settled.** Their events
+  name no person: no actor is on the event or its envelope, and `configured` is
+  also sent by the reconcile backfill. Sending them needs a person to send them
+  on first, either the acting person added to the events or the organization's
+  admin, which is a decision still to make.
 
 ## Not done yet
 

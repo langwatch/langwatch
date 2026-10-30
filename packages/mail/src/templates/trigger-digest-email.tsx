@@ -60,8 +60,17 @@ export const triggerDigestMail = z.object({
 
 export type TriggerDigestMail = z.infer<typeof triggerDigestMail>;
 
-/** The alert marker the app counts a landing by; automation-contract's `ALERT_LINK_PARAM`. */
-const ALERT_LINK_MARKER = "lw_from=alert";
+/**
+ * A row link with the alert marker the app counts a landing by, automation-contract's
+ * `withAlertLinkMarker`: set on our own app's links only, kept before any `#hash`.
+ */
+const markedAsAlert = ({ url, baseHost }: { url: string; baseHost: string }): string => {
+  if (!URL.canParse(url) || !URL.canParse(baseHost)) return url;
+  const link = new URL(url);
+  if (link.origin !== new URL(baseHost).origin) return url;
+  link.searchParams.set("lw_from", "alert");
+  return link.toString();
+};
 
 /**
  * Where a row points: a graph automation's match is a chart threshold, not
@@ -73,14 +82,17 @@ const linkFor = (
   { projectSlug, baseHost }: { projectSlug: string; baseHost: string },
 ): string => {
   if (entry.graphId) {
-    return `${baseHost}/${projectSlug}/analytics/custom/${entry.graphId}?${ALERT_LINK_MARKER}`;
+    const url = `${baseHost}/${projectSlug}/analytics/custom/${entry.graphId}`;
+    return markedAsAlert({ url, baseHost });
   }
   if (entry.traceId) {
     const trace = `${baseHost}/${projectSlug}/traces/${entry.traceId}`;
     const hint = entry.occurredAtMs;
-    return hint !== undefined && Number.isFinite(hint) && hint > 0
-      ? `${trace}?t=${Math.floor(hint)}&${ALERT_LINK_MARKER}`
-      : `${trace}?${ALERT_LINK_MARKER}`;
+    const url =
+      hint !== undefined && Number.isFinite(hint) && hint > 0
+        ? `${trace}?t=${Math.floor(hint)}`
+        : trace;
+    return markedAsAlert({ url, baseHost });
   }
   return "#";
 };

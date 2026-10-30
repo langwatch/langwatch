@@ -1,19 +1,23 @@
 Feature: A member landing from an alert's link is counted
 
-  An alert's own links (the trace or chart a notification points at, in a
-  template, a Slack message or a digest email) carry the marker `lw_from=alert`.
-  When a signed-in member opens one, the app sends one
-  `automations.opened.alert_link` event with the page it opened, then drops the
-  marker from the address. The event carries no trace, chart or automation id
-  and no URL.
+  The links an alert's email and default Slack message point at (a trace or a
+  chart in our own app) carry the marker `lw_from=alert`. Webhook bodies and
+  custom templates are sent byte for byte as before, without it. When a
+  signed-in member opens a marked link, the app sends one
+  `automations.opened.alert_link` event with the page it opened, then replaces
+  the marker out of the current history entry. The event carries no trace,
+  chart or automation id and no URL.
 
   @unit
-  Scenario: An alert link carries the marker after any query it already has
-    Given a trace link with the partition hint "?t=1700000000000"
-    When the alert marker is added
-    Then the link ends with "?t=1700000000000&lw_from=alert"
-    And a link with no query ends with "?lw_from=alert"
-    And a dead "#" link stays "#"
+  Scenario: An alert link carries the marker in its query, before any hash
+    Given links to our own app with no query, a query, a "#hash", and both
+    When the alert marker is set
+    Then each keeps its query and hash, with "lw_from=alert" in the query
+
+  @unit
+  Scenario: A link to another site, or no site, is left unchanged
+    When the marker is set on a link to another site, a relative link or "#"
+    Then the link is returned unchanged
 
   @unit
   Scenario: Slack's default message links to a trace carry the marker
@@ -25,12 +29,17 @@ Feature: A member landing from an alert's link is counted
     When a digest email links a trace with a partition hint and a chart
     Then both links carry "lw_from=alert"
 
+  @unit
+  Scenario: Webhook bodies and custom templates carry no marker
+    When a webhook body links a trace and a chart
+    Then neither link carries "lw_from"
+
   @integration
-  Scenario: Opening an alert link sends one event and drops the marker
+  Scenario: Opening an alert link sends one event and replaces the marker out of history
     Given a signed-in member
-    When they open "/demo/traces/trace-1?t=1&lw_from=alert"
+    When they open "/demo/traces/trace-1?t=1&lw_from=alert#spans"
     Then one automations.opened.alert_link is sent with landedOn "trace"
-    And the address becomes "/demo/traces/trace-1?t=1"
+    And the address becomes "/demo/traces/trace-1?t=1#spans" in the same history entry
     And no trace id or URL is in the event
 
   @integration

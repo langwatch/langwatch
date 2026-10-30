@@ -27,11 +27,12 @@ function linkFor({
   trace: LinkedTrace;
 }): string {
   if (trace.graphId) {
-    return withAlertLinkMarker(`${baseHost}/${projectSlug}/analytics/custom/${trace.graphId}`);
+    const url = `${baseHost}/${projectSlug}/analytics/custom/${trace.graphId}`;
+    return withAlertLinkMarker({ url, appBaseUrl: baseHost });
   }
   if (trace.traceId) {
     const path = tracePath({ traceId: trace.traceId, occurredAtMs: trace.occurredAtMs });
-    return withAlertLinkMarker(`${baseHost}/${projectSlug}${path}`);
+    return withAlertLinkMarker({ url: `${baseHost}/${projectSlug}${path}`, appBaseUrl: baseHost });
   }
   return "#";
 }
