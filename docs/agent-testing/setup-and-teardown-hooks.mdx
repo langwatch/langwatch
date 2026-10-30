@@ -113,14 +113,14 @@ Open the agent, then open the **Hooks** tab.
 
 | Field | What it does |
 |---|---|
-| **Hooks URL** | Where LangWatch POSTs both hooks. Leave it empty for no hooks. The URL can read run parameters and project secrets, as the agent's own URL does. |
+| **Hooks URL** | Where LangWatch POSTs both hooks. Leave it empty for no hooks. It must use `https://`; plain `http://` is allowed only for `localhost`, for a receiver on your own machine. The URL can read run parameters and project secrets, as the agent's own URL does. |
 | **Call setup** | Tick it to call setup before the first turn. |
 | **Call teardown** | Tick it to call teardown after the last turn. |
-| **Signing secret** | Signs every hook call. LangWatch shows it once, when you first type the hooks URL. Copy it before you save. After that, the form shows only that a secret is set. **Rotate** makes a new one and shows it once. |
+| **Signing secret** | Signs every hook call. LangWatch shows it once, when you first type the hooks URL. Copy it before you save. After that, the form shows only that a secret is set. **Rotate** makes a new one and shows it once. When you save, the old secret stops working and LangWatch deletes it from the project secrets. |
 
 LangWatch calls only the hooks you tick. The signing secret is saved as a project secret. A hook is never sent unsigned: with no signing secret, the hook fails and no request goes out.
 
-To move the hooks URL to another host, type the agent's headers, auth and signing secret again in the same save. LangWatch does not send saved secrets to a host they were not saved for, so it refuses the save otherwise. A hooks URL on the same host as the agent's URL keeps the saved secrets.
+To move the hooks URL to another host, type the agent's headers and auth again and **Rotate** the signing secret in the same save. LangWatch does not send saved secrets to a host they were not saved for, so it refuses the save otherwise. This includes a `{{ secrets.NAME }}` reference the agent already had. A hooks URL on the same host as the agent's URL keeps the saved secrets.
 
 ### The request
 
@@ -134,6 +134,7 @@ Each hook is a `POST` with a JSON body:
     "scenarioName": "Gold customer asks for a refund",
     "batchRunId": "batch_xyz"
   },
+  "idempotencyKey": "scenariorun_abc:hookattempt_def:teardown",
   "params": { "loyalty_tier": "gold" },
   "state": { "customerId": "cus_123" }
 }
@@ -143,6 +144,7 @@ Each hook is a `POST` with a JSON body:
 |---|---|
 | `kind` | `setup` or `teardown`. |
 | `run` | The run the call is for. |
+| `idempotencyKey` | The same value as the `Idempotency-Key` header. Read it from here: the signature covers the body, not the headers. See [Make test data once](#make-test-data-once). |
 | `params` | The [run parameters](/agent-testing/run-parameters) of the run. |
 | `state` | Teardown only, and only when setup returned a state. It is what setup answered. Setup's body has no `state`. |
 
@@ -154,9 +156,9 @@ LangWatch sends these headers:
 
 | Header | Value |
 |---|---|
-| The agent's own headers and auth | The same ones the agent sends on a turn, such as a bearer token. |
+| The agent's own headers and auth | The same ones the agent sends on a turn, such as a bearer token. An agent header named `X-LangWatch-Signature` or `Idempotency-Key`, in any letter case, is not sent. |
 | `X-LangWatch-Signature` | `t=<unix seconds>,v1=<signature>`. The signature is the lower-case hex HMAC-SHA256 of `<t>.<raw request body>`, made with the signing secret. |
-| `Idempotency-Key` | `<scenarioRunId>:<kind>`, for example `scenariorun_abc:setup`. It is the same for every call of one hook of one run, so a repeated call carries the same key. |
+| `Idempotency-Key` | `<scenarioRunId>:<attemptId>:<kind>`, for example `scenariorun_abc:hookattempt_def:setup`. Every hook call has one. It is the same for every call of one hook in one attempt of a run, so a repeated call carries the same key. |
 
 ### The answer
 
@@ -165,7 +167,7 @@ LangWatch sends these headers:
 | Setup | A 2xx status and a JSON object. The object is the state. |
 | Teardown | An empty 2xx, including `204`, or a 2xx and a JSON object. The object shows under **Returned by teardown**. |
 
-Anything else fails the hook. The run records the HTTP status and the first 1,000 characters of the answer. A body that is not a JSON object fails, and so does an object over 64 kilobytes.
+Anything else fails the hook. The run records the HTTP status and the first 1,000 characters of the answer. A body that is not a JSON object fails, and so does a body over 64 kilobytes: LangWatch stops reading the answer at 64 kilobytes.
 
 A hook that does not answer in 60 seconds ends as `timed_out`. The 60 seconds are fixed. You cannot change them.
 
@@ -226,8 +228,8 @@ app.post("/scenario-hooks", express.raw({ type: "*/*" }), async (req, res) => {
     res.status(401).end();
     return;
   }
-  const { kind, params, state } = JSON.parse(req.body.toString("utf8"));
-  const key = req.header("Idempotency-Key"); // "<scenarioRunId>:<kind>"
+  // Take the key from the signed body, not from the header
+  const { kind, idempotencyKey: key, params, state } = JSON.parse(req.body.toString("utf8"));
 
   if (kind === "setup") {
     const customer = await createTestCustomerOnce({ key, tier: params.loyalty_tier });
@@ -274,7 +276,7 @@ async def scenario_hooks(request: Request):
     if not is_signed(request.headers.get("X-LangWatch-Signature"), raw_body):
         raise HTTPException(status_code=401)
     payload = json.loads(raw_body)
-    key = request.headers.get("Idempotency-Key")  # "<scenarioRunId>:<kind>"
+    key = payload["idempotencyKey"]  # from the signed body, not from the header
 
     if payload["kind"] == "setup":
         customer = await create_test_customer_once(key=key, tier=payload["params"].get("loyalty_tier"))
@@ -289,7 +291,11 @@ async def scenario_hooks(request: Request):
 
 ### Make test data once
 
-LangWatch does not retry a hook, but a call can still arrive more than once, for example when a proxy or the network retries it. The `Idempotency-Key` is the same each time. Store the key with the data setup made. When a call arrives with a key you have seen, return the stored state and do not create the test data again. In teardown, delete what is there and treat "already gone" as success.
+LangWatch does not retry a hook, but a call can still arrive more than once, for example when a proxy or the network retries it. The key is the same each time. Store the key with the data setup made. When a call arrives with a key you have seen, return the stored state and do not create the test data again. In teardown, delete what is there and treat "already gone" as success.
+
+Read the key from the body's `idempotencyKey`. The signature covers the body, so the key there is the one LangWatch sent. The `Idempotency-Key` header is a copy for proxies and logs, and is not signed.
+
+LangWatch can run a scenario run again under the same `scenarioRunId`, for example when a worker stops partway. That is a new attempt, with a new key, and its setup makes new data. Do not use `scenarioRunId` alone as the key: the first attempt's teardown may already have deleted the data it names.
 
 ## What do the simulated user and the judge see
 
