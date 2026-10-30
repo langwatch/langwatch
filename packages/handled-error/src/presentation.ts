@@ -98,13 +98,13 @@ const BUDGET_WINDOW_ADJECTIVES: Readonly<Record<string, string>> = {
   month: "monthly",
 };
 
-/** When a blocked window opens again: calendar-aligned in UTC, as `GatewayWindow.nextResetAt`. */
+/** When a blocked window opens again. No calendar boundary: a budget can carry its own cycle anchor. */
 const BUDGET_WINDOW_RESETS: Readonly<Record<string, string>> = {
-  minute: "Requests are blocked until the next minute.",
-  hour: "Requests are blocked until the next hour starts.",
-  day: "Requests are blocked until the day resets at midnight UTC.",
-  week: "Requests are blocked until the week resets on Monday at midnight UTC.",
-  month: "Requests are blocked until the month resets on the 1st at midnight UTC.",
+  minute: "Requests are blocked until its per-minute window resets.",
+  hour: "Requests are blocked until its hourly window resets.",
+  day: "Requests are blocked until its daily window resets.",
+  week: "Requests are blocked until its weekly window resets.",
+  month: "Requests are blocked until its monthly window resets.",
   total: "This limit never resets, so requests stay blocked until it is raised.",
   manual: "Requests are blocked until an admin resets or raises it.",
 };

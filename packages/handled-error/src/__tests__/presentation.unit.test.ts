@@ -1262,7 +1262,7 @@ describe("budget_exceeded", () => {
 
       expect(copy.title).toBe("Your team's monthly AI spending limit is reached");
       expect(copy.description).toBe(
-        "Requests are blocked until the month resets on the 1st at midnight UTC. An admin can raise it in AI Gateway budgets.",
+        "Requests are blocked until its monthly window resets. An admin can raise it in AI Gateway budgets.",
       );
     });
 

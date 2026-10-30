@@ -629,7 +629,7 @@ describe("explainLangyError", () => {
         expect(presentation.kind).toBe("budget_exceeded");
         expect(presentation.title).toBe("Your team's monthly AI spending limit is reached");
         expect(presentation.description).toBe(
-          "Requests are blocked until the month resets on the 1st at midnight UTC. An admin can raise it in AI Gateway budgets.",
+          "Requests are blocked until its monthly window resets. An admin can raise it in AI Gateway budgets.",
         );
         expect(presentation.action).toEqual({ label: "View budgets", kind: "open-budgets" });
         expect(presentation.meta).toEqual({ budget_scope: "team", budget_window: "month" });
@@ -660,7 +660,7 @@ describe("explainLangyError", () => {
         );
 
         expect(presentation.title).toBe("This project's daily AI spending limit is reached");
-        expect(presentation.description).toContain("midnight UTC");
+        expect(presentation.description).toContain("daily window resets");
       });
     });
 
