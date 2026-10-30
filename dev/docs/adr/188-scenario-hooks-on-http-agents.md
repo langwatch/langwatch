@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-22
 
-**Status:** Accepted (owner, 2026-10-30)
+**Status:** Proposed
 
 ## Context
 
@@ -30,7 +30,7 @@ We will add an optional **hooks URL** to the HTTP agent. The platform calls it a
 ### Security
 
 - A hook call sends the agent's configured headers and auth, as a turn does. The URL may use the same `{{ }}` template variables as the turn URL.
-- Every call carries `X-LangWatch-Signature: t=<unix seconds>,v1=<signature>`, with a signing secret per agent. The signature is the lower-case hex HMAC-SHA256, keyed with the secret, over the UTF-8 bytes of `<t>.<raw request body>`: the decimal `t`, a `.`, then the body exactly as sent. The secret is shown once when the hooks URL is first saved, and can be rotated. The receiver should compare signatures in constant time and reject a call whose `t` is more than 5 minutes away from its own clock, in either direction.
+- Every call carries `X-LangWatch-Signature: t=<unix seconds>,v1=<signature>`, with a signing secret per agent. The signature is the lower-case hex HMAC-SHA256, keyed with the secret, over the UTF-8 bytes of `<t>.<raw request body>`: the decimal `t`, a `.`, then the body exactly as sent. The agent form makes the secret when a hooks URL is first typed and shows it once, until the agent is saved or the form is closed. It can be rotated. The receiver should compare signatures in constant time and reject a call whose `t` is more than 5 minutes away from its own clock, in either direction.
 - Every call carries `Idempotency-Key: <scenarioRunId>:<kind>`. A retry of the same hook sends the same key, so a receiver can make test data once.
 - The hooks URL goes through the same outbound URL checks as the turn URL.
 
@@ -69,7 +69,14 @@ For Langy, the hook service is still something to host. But a CI deploy keeps it
 - `apps/scenario-child` gains an HTTP hook caller next to `http.serialized-http-agent.channel.ts`, and the template context gains `state`.
 - The run-result UI does not change.
 - The docs gain an HTTP section on the hooks page, with a signature-check example (https://github.com/langwatch/langwatch/issues/8800).
-- Langy dogfood gains a hook service, its CI deploy, and the prod agent switch from connected to HTTP.
+
+### Future work
+
+The first PRs (https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194, https://github.com/langwatch/langwatch/pull/9195) do not build the "Langy in prod" part. It comes later:
+
+- The Langy hook service.
+- Its CI deploy.
+- The prod Langy agent switch from connected to HTTP.
 
 ## Open
 
