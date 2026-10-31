@@ -4,7 +4,8 @@
 #   packages/span-normalisation/src/genAiCanonicaliser.ts        (the convention attributes pi dual-writes)
 #   packages/span-normalisation/src/spanCanonicalisation.ts      (the ordered chain a pi extractor registers into)
 #   packages/span-normalisation/src/costAttribution.ts           (the catalogue price of a call's tokens)
-#   modules/coding-agent/process/src/eventing/coding-agent-session-log.projection.ts (where the reported figure accumulates)
+#   modules/coding-agent/process/src/eventing/coding-agent-session-span.projection.ts (where pi's reported figure accumulates)
+#   modules/coding-agent/process/src/eventing/coding-agent-cost-drift.subscriber.ts (where the two figures meet as a drift signal)
 #   modules/coding-agent/contract/src/telemetry/coding-agent-span.ts (which span names count as model calls)
 #   modules/coding-agent/contract/src/coding-agent-transcript-span.ts (model call versus tool run)
 #
@@ -34,26 +35,12 @@
 # figure is read off its spans: inventing one would bill a customer for a
 # product they did not buy.
 #
-# EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
-# or @integration now would report a binding that does not exist. Each scenario
-# names the tag it becomes in a comment above it, and the commit that makes one
-# pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
-# change. A scenario still carrying @unimplemented when ADR-188 is called done
-# is work that was not done.
-#
-# WHAT BLOCKS THESE, AS OF 2026-10-30:
-#   1. NO pi DEFINITION EXISTS. CODING_AGENT_REGISTRY
-#      (modules/coding-agent/contract/src/telemetry/index.ts) holds six agents
-#      and none of them is pi, so no span is ever read as a pi model call.
-#   2. NOTHING EMITS pi.ai.request YET. pi declares the span in its own schema
-#      and binds it to a no-op backend; the extension that would be the real
-#      backend is still unwritten, and its spec is
-#      specs/ai-governance/cli-wrappers/pi-extension-install.feature.
-#
-# The file yields no enforced scenario while that holds, so it is listed in
-# LEGACY_INERT in packages/architecture-enforcer/src/tools/check-feature-parity.ts.
-# The commit that binds the first scenario here deletes that line with it.
+# Bound in modules/coding-agent/process/src/eventing/__tests__/pi-session.unit.test.ts
+# and the cost-drift subscriber test. Three stay @unimplemented, each naming the
+# tag it becomes, for the reason above it: the coding-agent lane has no reasoning
+# token type, and a span-fed call's per-call row writes no stop reason and no
+# error type for any agent. A scenario still carrying @unimplemented when
+# ADR-188 is called done is work that was not done.
 
 Feature: pi model calls, tokens and cost
   Each call's attributes are dual-written. pi's own keys carry what the GenAI
@@ -63,15 +50,13 @@ Feature: pi model calls, tokens and cost
 
 Rule: A pi model call is read through the generic GenAI path
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi.ai.request span is recognised as a model call
     Given a pi.ai.request span carrying the dual-written GenAI attributes
     When the span is stamped, folded and shown in the trace browser
     Then all three treat it as a model call
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: Each model call writes one per-call row under its session
     Given a pi session with two model calls
     When they are folded
@@ -80,13 +65,14 @@ Rule: A pi model call is read through the generic GenAI path
 
 Rule: pi's full token taxonomy survives, including what the conventions cannot name
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: Cache read and cache write tokens are kept apart
     Given a pi.ai.request span reporting cache read and cache write tokens
     When the model-call facts are lifted
     Then the cache read and cache write counts are recorded separately
 
+  # Parked: the canonical gen_ai.usage.reasoning_tokens is not on the contribution allowlist,
+  # and neither the session row nor the per-call row has a reasoning count to put it in.
   # becomes @unit
   @unimplemented
   Scenario: Reasoning tokens are recorded rather than folded into output
@@ -94,8 +80,7 @@ Rule: pi's full token taxonomy survives, including what the conventions cannot n
     When the model-call facts are lifted
     Then the reasoning tokens are recorded as their own token type
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A call that reports a total but no breakdown is not double counted
     Given a pi.ai.request span reporting only a total token count
     When the model-call facts are lifted
@@ -107,24 +92,21 @@ Rule: The catalogue computes the charge and pi's own figure accumulates beside i
   # token-bearing span to compute from. pi has one on every call, so it is
   # charged the way every span-fed agent is.
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A call is charged the catalogue price of its tokens, not pi's figure
     Given a pi.ai.request span whose pi.ai.usage.cost differs from the catalogue price
     When the call is priced
     Then the charge is the catalogue price of its tokens
     And pi's reported figure does not change the charge
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: pi's reported cost accumulates on the session as a figure of its own
     Given a pi session whose two calls each carry pi.ai.usage.cost
     When the session is folded
     Then the session's reported figure is the sum of the two reported amounts
     And the session's cost is still the catalogue price of the same calls
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: The two figures disagreeing is readable, not reconciled away
     Given a folded pi session whose reported figure and computed cost differ
     When the session is read
@@ -132,23 +114,20 @@ Rule: The catalogue computes the charge and pi's own figure accumulates beside i
     # That is the alarm: either our price registry or pi's own pricing went
     # stale. Overwriting one with the other is what loses it.
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A model the catalogue does not price is recorded as unpriced, whatever pi costed it
     Given a pi.ai.request span carrying pi.ai.usage.cost for a model the catalogue does not price
     When the call is priced
     Then the call is recorded as unpriced rather than as zero
     And pi's reported amount still accumulates on the session
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: The session cost is the sum of its per-call charges
     Given a pi session of two priced calls
     When the session is folded
     Then the session cost equals the sum of the two per-call charges
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: pi sells no unit of its own, so no AI units are claimed from its spans
     Given a pi session of priced calls
     When the session is folded
@@ -157,6 +136,7 @@ Rule: The catalogue computes the charge and pi's own figure accumulates beside i
 
 Rule: pi's own response facts are not lost in the dual write
 
+  # Parked: a span-fed per-call row leaves its stop reason blank, and the fold reads only stop_reason.
   # becomes @unit
   @unimplemented
   Scenario: pi's stop reason is recorded as pi reported it
@@ -164,6 +144,7 @@ Rule: pi's own response facts are not lost in the dual write
     When the model-call facts are lifted
     Then each stop reason is recorded as pi's own value
 
+  # Parked: a span-fed per-call row leaves its error type blank and counts every call as a call.
   # becomes @unit
   @unimplemented
   Scenario: A failed provider call records pi's error type

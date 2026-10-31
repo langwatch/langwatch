@@ -74,9 +74,9 @@ Rule: The page lists my sessions with their context economics
     When the user opens their Sessions page
     Then the page says no sessions have been recorded yet
 
-  # Parked 2026-10-30: ADR-188 is proposed and nothing of pi is built, so no pi
-  # session can be folded to read a row from. It binds with the pi definition in
-  # CODING_AGENT_REGISTRY. The rest of this file stays enforced.
+  # Parked: the sessions-screen row schema carries no reported-cost field, and an
+  # unpriced call's cost reaches it as 0, not blank. The stored session row keeps
+  # both figures (pi-model-calls.feature); this screen does not show them yet.
   # becomes @unit
   @unimplemented
   Scenario: A pi session row keeps pi's reported cost apart from the catalogue's
@@ -168,11 +168,7 @@ Rule: A session is named by its generated title, else by its first prompt
   # unnamed. The risk is a fallback that reaches for the nearest string it can
   # find and prints a span name or a session id at a human.
 
-  # Parked 2026-10-30: ADR-188 is proposed and nothing of pi is built, so no pi
-  # session can be folded to read a row from. It binds with the pi definition in
-  # CODING_AGENT_REGISTRY. The rest of this file stays enforced.
-  # becomes @integration
-  @unimplemented
+  @integration
   Scenario: A pi session falls back to untitled rather than to a span name
     Given a pi session folded from pi's own spans
     When the user reads its row
