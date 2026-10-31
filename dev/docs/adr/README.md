@@ -104,6 +104,7 @@ Reusable framework decisions live with their packages:
 | [185](./185-docs-session-credentials.md)                                       | Short-lived credentials for the documentation playground                                                                   | Accepted                  |
 | [186](./186-test-changed-runs-the-tests-an-edit-reaches.md)                    | `test:changed` runs the tests an edit reaches, from a kept import graph                                                    | Proposed                  |
 | [187](./187-async-inserts-waiting-for-a-slot-share-a-statement.md)             | Async inserts waiting for a statement slot share one statement                                                             | Proposed                  |
+| [188](./188-scenario-hooks-on-http-agents.md)                                  | Scenario setup and teardown hooks on HTTP agents                                                                           | Proposed                  |
 | [190](./190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md) | A routed Instant Evals judgement is priced from the summed cost of its calls, at the one published markup                  | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
