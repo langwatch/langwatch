@@ -79,7 +79,10 @@ function commands(): LangyConversationCommands {
 }
 
 function composition(
-  members: Omit<LangyTurnTechnicalMembers, "tokenBuffer" | "accessStore" | "handoffStore">,
+  members: Omit<
+    LangyTurnTechnicalMembers,
+    "tokenBuffer" | "accessStore" | "handoffStore" | "localWork"
+  >,
 ) {
   const rows = MemoryLangyRepositories.create();
   const turns: LangyTurnTechnicalMembers = {
@@ -87,6 +90,7 @@ function composition(
     tokenBuffer: rows.tokenBuffer.open(),
     accessStore: rows.turnAccess,
     handoffStore: rows.turnHandoff,
+    localWork: { cancelTurn: async () => undefined },
   };
   return {
     commands: commands(),

@@ -1,8 +1,10 @@
 /**
- * Per-process composition of local control: repositories, presence, the workspace channel,
- * dispatcher, wait service, control requests and the skip policy (ADR-129). The tiers are
- * chosen by the process's own composition root (ADR-093/ADR-128); this only assembles them.
+ * Per-process composition of local control (ADR-129): repositories, presence, workspace channel,
+ * dispatcher, waits, control requests, skip policy. Tiers are chosen by the composition root
+ * (ADR-093/ADR-128); this assembles them, and `cancelTurn` only fans Stop out across them.
  */
+
+import { createLogger } from "@langwatch/observability";
 
 import type { LangyLocalWorkspaceChannel } from "../../../channels/langy-local-workspace.channel.ts";
 import type { LangyLocalCallRepository } from "../../../repositories/langy-local-call.repository.ts";
@@ -24,6 +26,8 @@ import {
 import { LocalSkipPolicyService } from "./langy-local-skip-policy.service.ts";
 import { UserWaitService } from "./langy-local-user-wait.service.ts";
 
+const logger = createLogger("langwatch:langy:local-control:runtime");
+
 /** One process's local-control composition (ADR-129). */
 export interface LocalControlRuntime {
   workspace: LangyLocalWorkspaceChannel;
@@ -32,6 +36,8 @@ export interface LocalControlRuntime {
   waits: UserWaitService;
   requests: ControlRequestService;
   skipPolicy: LocalSkipPolicyService;
+  /** Ends every call and waiting card of one turn, for Stop. */
+  cancelTurn(input: { conversationId: string; turnId: string }): Promise<void>;
 }
 
 /** The local-control state, one repository per record family. */
@@ -124,5 +130,37 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
       ...clock,
     });
     this.skipPolicy = LocalSkipPolicyService.create({ presence, workspace });
+  }
+
+  /**
+   * Ends every local call and every card of one turn, for Stop: the command line is told to
+   * cancel each call and each waiting card ends as cancelled. Idempotent, as the worker's own
+   * cancel route reaches the same records.
+   */
+  async cancelTurn({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<void> {
+    // Nothing about the calls, not even listing them, may leave the turn's cards open.
+    try {
+      const calls = await this.dispatcher.listPendingForTurn({ conversationId, turnId });
+      // One call failing to cancel must not leave the others running.
+      const settled = await Promise.allSettled(
+        calls.map((call) => this.dispatcher.cancel({ callId: call.callId })),
+      );
+      settled.forEach((result, index) => {
+        if (result.status === "rejected") {
+          logger.warn(
+            { callId: calls[index]?.callId, conversationId, turnId, error: result.reason },
+            "cancelling a local call failed; ending the rest of the turn's work anyway",
+          );
+        }
+      });
+    } finally {
+      await this.waits.cancelTurn({ conversationId, turnId });
+    }
   }
 }

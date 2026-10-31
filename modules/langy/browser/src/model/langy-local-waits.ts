@@ -33,6 +33,8 @@ export interface LangyLiveWait {
   kind: "permission" | "question";
   status: LangyWaitStatus;
   toolCallId?: string;
+  /** The turn this tab was streaming when the entry arrived, so a Stop closes only its cards. */
+  turnId?: string;
   callId?: string;
   summary?: string;
   pattern?: string;

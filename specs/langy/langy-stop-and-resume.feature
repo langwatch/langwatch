@@ -159,6 +159,79 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     And it settles to stopped only once the turn's terminal has been recorded
     And it never reports stopped while the turn is still running on the backend
 
+  # The stop's own answer arrives only once the terminal is recorded, so it is the
+  # confirmation. A tab that hears nothing else (a lost update signal, a record that
+  # lags) was left on Stopping with no way to send again.
+  @integration
+  Scenario: A confirmed stop hands the composer back even when no update reaches the tab
+    Given Langy is working on my message and I click Stop
+    And no conversation update reaches this tab afterwards
+    When the backend confirms the stop
+    Then the composer shows Send again
+    And I can send my next message
+
+  # The stop's answer can land after I moved on. It may only settle the turn it stopped.
+  @integration
+  Scenario: A late stop answer leaves a newer turn alone
+    Given I clicked Stop and then sent a new message, or opened another turn
+    When the backend confirms the earlier stop
+    Then the newer turn keeps its live lines and its working composer state
+
+  # The live stream that would close the card is the one Stop aborted, so the stop's
+  # own answer closes it. A reload already read it as closed; the live tab did not.
+  @integration
+  Scenario: The question card closes as soon as Stop is answered, without a reload
+    Given Langy asked a question and I clicked Stop before answering
+    When the backend confirms the stop
+    Then the question card's options can no longer be chosen
+    And a question card a newer turn raised stays open
+
+  # The server leaves a confirmation card the platform raised answerable after Stop,
+  # since its click is read in a later turn; the live tab must not lock it either.
+  @integration
+  Scenario: A confirmation card raised during the turn stays answerable after Stop
+    Given the turn raised a question card and a platform confirmation card, and I clicked Stop
+    When the backend confirms the stop
+    Then the question card's options can no longer be chosen
+    And the confirmation card stays answerable
+
+  # An untagged live card would make Stop close nothing, so the tag is pinned.
+  @integration
+  Scenario: A question card the stream raises is tied to the turn the tab is streaming
+    Given the tab is streaming a turn
+    When the stream raises a question card
+    Then the card is recorded against that turn
+
+  # The worker's abort only ends its own polling. A card or a command the turn left
+  # on my machine would otherwise wait for an answer nobody reads (ADR-129).
+  @unit
+  Scenario: Stopping a turn ends what it left open on my machine
+    Given the turn left a question card waiting and a command running on my machine
+    When I stop the turn
+    Then the card ends as cancelled and the command is told to stop
+    And cards and commands of other turns are left alone
+    And the stop is still recorded when ending them fails
+
+  # A stop the user chose is not a failure of the question tool.
+  @integration
+  Scenario: A question card I stopped reads as closed, not as failed
+    Given Langy asked a question and I stopped the turn before answering
+    When the reply is drawn
+    Then no failed-step line is drawn for the question
+
+  @integration
+  Scenario: A command I stopped reads as stopped, not as failed
+    Given a command was running on my machine and I stopped the turn
+    When the reply is drawn
+    Then no failed-step line is drawn for the command
+    And the command is drawn as an interrupted row
+
+  @integration
+  Scenario: A question I answered keeps my choice when the stop text lands after it
+    Given I answered a question and then stopped the turn
+    When the reply is drawn
+    Then the card still shows the option I chose
+
   @integration
   Scenario: Only someone who can control the conversation may stop its turn
     Given a conversation and turn I am not allowed to control

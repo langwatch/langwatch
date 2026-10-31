@@ -10,6 +10,7 @@ import type {
 import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
+  isLangyCallStoppedText,
 } from "@langwatch/langy-contract";
 import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import type { UIMessage } from "ai";
@@ -516,7 +517,11 @@ function callCardsOf({
         <LangyDerivedCardView
           card={questionPart.card}
           projectSlug={projectSlug}
-          choicesLockState={questionLockState({ part: questionPart, props })}
+          choicesLockState={questionLockState({
+            part: questionPart,
+            props,
+            stopped: isLangyCallStoppedText((part as { errorText?: unknown }).errorText),
+          })}
           onChoiceSelect={props.onChoiceSelect}
         />
       </LangyCardBoundary>
@@ -600,14 +605,18 @@ function AnswerCards({ props }: { props: MessageContentProps }) {
 function questionLockState({
   part,
   props,
+  stopped,
 }: {
   part: { blockId: string; card: LangyDerivedCard };
   props: MessageContentProps;
+  /** The user's Stop ended the call, so its options can no longer be chosen. */
+  stopped: boolean;
 }): LangyChoicesLockState {
-  return (
+  const recorded =
     questionWaitLockState({ blockId: part.blockId, card: part.card, waits: props.questionWaits }) ??
-    deriveLangyChoicesLockState({ blockId: part.blockId, timeline: props.choicesTimeline ?? [] })
-  );
+    deriveLangyChoicesLockState({ blockId: part.blockId, timeline: props.choicesTimeline ?? [] });
+  // An answer given before the Stop keeps its choice; only an unanswered card is superseded.
+  return stopped && recorded.status !== "answered" ? { status: "superseded" } : recorded;
 }
 
 /**

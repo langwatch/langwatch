@@ -7,13 +7,18 @@ import {
  * records regardless of what the worker does. Ported from origin/main's
  * `LangyTurnService.stopTurn`. See specs/langy/langy-stop-and-resume.feature.
  */
+import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   conversationDetail,
   langyTurnDependencies,
 } from "../../../../__tests__/support/langy-turn-deps.ts";
+import { MemoryLangyLocalWorkspaceChannel } from "../../../../channels/memory/memory.langy-local-workspace.channel.ts";
+import { MemoryLangyRepositories } from "../../../../repositories/memory/memory.langy.repositories.ts";
+import { LangyLocalPresenceRedisRepository } from "../../../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { LangyFinalPartsService } from "../../../../services/langy-final-parts.service.ts";
+import { LangyLocalControlRuntimeService } from "../../../local-control/services/langy-local-control-runtime.service.ts";
 import { LangyTurnStopService } from "../langy-turn-stop.service.ts";
 
 function makeStopDeps(
@@ -24,6 +29,9 @@ function makeStopDeps(
     deltas?: string[];
     cancelRejects?: boolean;
     emptyBuffer?: boolean;
+    localWork?: {
+      cancelTurn: (input: { conversationId: string; turnId: string }) => Promise<void>;
+    };
   } = {},
 ) {
   const finalizeTurn = vi.fn(async (_args: Record<string, unknown>) => ({ messageId: "a1" }));
@@ -54,12 +62,68 @@ function makeStopDeps(
     accessStore: { isTurnActor },
     messages: null,
     finalParts: LangyFinalPartsService.create(),
+    ...(over.localWork ? { localWork: over.localWork } : {}),
   });
 
   return {
     deps,
     mocks: { finalizeTurn, findByIdVisible, isTurnActor, markEnd, cancel, readTail },
   };
+}
+
+/** A real local-control runtime over memory stores, with a folder connected for `conv-1`. */
+async function localControlWithOpenWork() {
+  const repositories = MemoryLangyRepositories.create();
+  const ended: { waitId: string; outcome: string }[] = [];
+  const presence = LangyLocalPresenceRedisRepository.create({ store: memorySessionState() });
+  const runtime = LangyLocalControlRuntimeService.create({
+    calls: repositories.localCalls,
+    userWaits: repositories.localUserWaits,
+    controlRequests: repositories.localControlRequests,
+    presence,
+    workspace: MemoryLangyLocalWorkspaceChannel.create(),
+    projects: { getOrganizationId: async () => "org-1", getSlug: async () => "project" },
+    mintSessionKey: async () => ({ token: "sk-lw-test", apiKeyId: "key-1" }),
+    events: {
+      startUserWait: async () => undefined,
+      endUserWait: async (data) => void ended.push(data as { waitId: string; outcome: string }),
+    },
+    buffer: repositories.tokenBuffer.open(),
+  });
+  const now = Date.now();
+  await presence.register({
+    conversationId: "conv-1",
+    projectId: "p1",
+    userId: "user-1",
+    requestId: "lcr_1",
+    instanceId: "lci_1",
+    hostname: "dev-laptop",
+    connectedAt: now,
+    lastSeenAt: now,
+    workspace: { root: "/Users/dev/app", name: "app", os: "darwin" },
+  });
+  const question = await runtime.waits.startQuestion({
+    projectId: "p1",
+    conversationId: "conv-1",
+    turnId: "turn-1",
+    toolCallId: "toolu_q",
+    questions: [{ question: "Which file?", options: [{ label: "a.ts" }, { label: "b.ts" }] }],
+  });
+  const call = await runtime.dispatcher.start({
+    projectId: "p1",
+    conversationId: "conv-1",
+    turnId: "turn-1",
+    call: { tool: "local_ls", params: { path: "." } },
+    timeoutMs: 60_000,
+  });
+  const otherTurnsQuestion = await runtime.waits.startQuestion({
+    projectId: "p1",
+    conversationId: "conv-1",
+    turnId: "turn-0",
+    toolCallId: "toolu_old",
+    questions: [{ question: "Older?", options: [{ label: "yes" }] }],
+  });
+  return { runtime, ended, question, call, otherTurnsQuestion };
 }
 
 const stopArgs = {
@@ -171,6 +235,51 @@ describe("LangyTurnStopService.stopTurn", () => {
       await expect(LangyTurnStopService.create(deps).stopTurn(stopArgs)).resolves.toBeUndefined();
       expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
       expect(mocks.markEnd).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the turn left a question card open and a command running on my machine", () => {
+    /** @scenario Stopping a turn ends what it left open on my machine */
+    it("ends the card as cancelled and the command as stopped, and leaves other turns alone", async () => {
+      const local = await localControlWithOpenWork();
+      const { deps } = makeStopDeps({
+        localWork: { cancelTurn: (input) => local.runtime.cancelTurn(input) },
+      });
+
+      await LangyTurnStopService.create(deps).stopTurn(stopArgs);
+
+      expect(
+        await local.runtime.waits.listPending({ conversationId: "conv-1", turnId: "turn-1" }),
+      ).toEqual([]);
+      expect(local.ended).toEqual([
+        expect.objectContaining({ waitId: local.question.waitId, outcome: "cancelled" }),
+      ]);
+      expect(
+        await local.runtime.dispatcher.listPendingForTurn({
+          conversationId: "conv-1",
+          turnId: "turn-1",
+        }),
+      ).toEqual([]);
+      expect(
+        (await local.runtime.waits.listPending({ conversationId: "conv-1", turnId: "turn-0" })).map(
+          (wait) => wait.waitId,
+        ),
+      ).toEqual([local.otherTurnsQuestion.waitId]);
+    });
+
+    /** @scenario Stopping a turn ends what it left open on my machine */
+    it("still records the stop when ending the local work fails", async () => {
+      const { deps, mocks } = makeStopDeps({
+        localWork: {
+          cancelTurn: async () => {
+            throw new Error("redis connection reset");
+          },
+        },
+      });
+
+      await expect(LangyTurnStopService.create(deps).stopTurn(stopArgs)).resolves.toBeUndefined();
+      expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
+      expect(mocks.cancel).toHaveBeenCalledTimes(1);
     });
   });
 

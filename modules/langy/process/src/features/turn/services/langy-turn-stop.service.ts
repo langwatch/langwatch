@@ -31,7 +31,7 @@ export class LangyTurnStopService {
     turnId: string;
     userId: string;
   }): Promise<void> {
-    const { tokenBuffer, worker, conversations, accessStore } = this.deps;
+    const { tokenBuffer, worker, conversations, accessStore, localWork } = this.deps;
     const isActor = await accessStore.isTurnActor({
       projectId,
       conversationId,
@@ -76,9 +76,19 @@ export class LangyTurnStopService {
       parts: this.deps.finalParts.build({ text: partialText }),
       outcome: "stopped",
     });
-    await Promise.allSettled([
+    // Best-effort, after the terminal. The worker's abort only ends its own polling: the card
+    // and the command the turn left on the developer's machine end here (ADR-129).
+    const settled = await Promise.allSettled([
       tokenBuffer.markEnd({ conversationId, turnId }),
       worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
+      localWork.cancelTurn({ conversationId, turnId }),
     ]);
+    for (const outcome of settled) {
+      if (outcome.status !== "rejected") continue;
+      logger.warn(
+        { error: outcome.reason, projectId, conversationId, turnId },
+        "part of the langy stop failed after the stopped terminal was recorded",
+      );
+    }
   }
 }
