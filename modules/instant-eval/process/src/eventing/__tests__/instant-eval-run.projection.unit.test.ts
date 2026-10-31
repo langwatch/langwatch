@@ -315,4 +315,18 @@ describe("given a routed run that finished while a page was still judging", () =
 
     expect(state).toMatchObject({ status: "RUNNING", costUsd: 0.000009, priceUsd: 0.0000065 });
   });
+
+  /** @scenario "A held late page is billed even when its run's finish never lands" */
+  it("keeps a held page billed without its finish when that finish lands after all", () => {
+    const earlier = page({ page: 2, rows: 4, costNanoUsd: 4000 });
+    const delayedFinish = finished({
+      outcome: "finished",
+      costNanoUsd: 4000,
+      costUsd: 0.000004,
+      priceUsd: 0.0000052,
+    });
+    const state = fold([requested(), planned(1000), earlier, late, bill, delayedFinish]);
+
+    expect(state).toMatchObject({ status: "FINISHED", costUsd: 0.000009, priceUsd: 0.0000117 });
+  });
 });

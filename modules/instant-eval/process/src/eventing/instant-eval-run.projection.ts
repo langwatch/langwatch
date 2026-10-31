@@ -73,6 +73,23 @@ function routedCostUsdOf(data: { costNanoUsd?: number }): number {
   return (data.costNanoUsd ?? 0) / NANO_USD_PER_USD;
 }
 
+/**
+ * What held late pages billed before a finish that landed after their hold: the finish did not
+ * count them, so it adds them rather than overwrite them. Before a finish only such a bill sets
+ * a price, and the running cost is then the counted pages' routed cost plus those bills.
+ */
+function billedBeforeFinish(
+  state: InstantEvalRunProjectionState,
+  finish: { costNanoUsd?: number },
+): { costUsd: number; priceUsd: number } {
+  if (state.finishedAtMs !== null || state.priceUsd === 0) return { costUsd: 0, priceUsd: 0 };
+
+  return {
+    costUsd: Math.max(0, toNanoUsdPrecision(state.costUsd - routedCostUsdOf(finish))),
+    priceUsd: state.priceUsd,
+  };
+}
+
 const OUTCOME_STATUS: Readonly<Record<string, InstantEvalStoredStatus>> = {
   finished: "FINISHED",
   failed: "FAILED",
@@ -121,15 +138,18 @@ export function applyInstantEvalRunEvent(
       // caller would act on.
       return state;
 
-    case INSTANT_EVAL_EVENT_TYPES.FINISHED:
+    case INSTANT_EVAL_EVENT_TYPES.FINISHED: {
+      const billedBefore = billedBeforeFinish(state, event.data);
+
       return {
         ...state,
         status: OUTCOME_STATUS[event.data.outcome] ?? "FAILED",
         error: event.data.errorCode,
-        costUsd: event.data.costUsd,
-        priceUsd: event.data.priceUsd,
+        costUsd: toNanoUsdPrecision(event.data.costUsd + billedBefore.costUsd),
+        priceUsd: toNanoUsdPrecision(event.data.priceUsd + billedBefore.priceUsd),
         finishedAtMs: state.finishedAtMs ?? event.occurredAt,
       };
+    }
 
     case INSTANT_EVAL_EVENT_TYPES.LATE_PAGE_BILLED:
       // Billed once the finish landed, so this adds to the total the finish set, and the row's
