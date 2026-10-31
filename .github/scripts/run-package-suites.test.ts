@@ -24,6 +24,7 @@ import {
   workerEnvFor,
   scriptsFor,
   staleEntries,
+  suiteEnvFor,
   summarise,
   wallTimeOf,
   withPackage,
@@ -527,6 +528,29 @@ void describe("given a shard that runs several suites at once", () => {
     });
   });
 
+  void describe("when one package declares a browser suite and another an integration suite", () => {
+    /** @scenario "A browser suite never runs beside an integration suite" */
+    void it("never overlaps them, while the unit suites still run alongside", async () => {
+      const browser = pkg("@fix/a", ["test:browser"]);
+      const integration = pkg("@fix/b", ["test:integration"]);
+      const units = ["c", "d", "e", "f"].map((name) => pkg(`@fix/${name}`, ["test"]));
+      const { overlaps } = await pool(jobsFor([browser, integration, ...units], new Map()), 3);
+      for (const running of overlaps) {
+        const lanes = running.filter((id) => !id.endsWith(" test"));
+        assert.ok(lanes.length <= 1, running.join());
+      }
+      const besideAUnit = (lane: string) =>
+        overlaps.some(
+          (running) => running.includes(lane) && running.some((id) => id.endsWith(" test")),
+        );
+      assert.ok(besideAUnit("@fix/a test:browser"), "no unit suite ran beside the browser suite");
+      assert.ok(
+        besideAUnit("@fix/b test:integration"),
+        "no unit suite ran beside the integration suite",
+      );
+    });
+  });
+
   void describe("when a package has a unit suite and an integration suite", () => {
     /** @scenario "A package's own suites run one after another, in order" */
     void it("starts its integration suite only after its unit suite finished", async () => {
@@ -615,6 +639,20 @@ void describe("given a suite the shard is about to start", () => {
       for (const { job: suite, heavy } of cases) {
         assert.deepEqual(workerEnvFor({ job: suite, heavy, cores: 4 }), {});
       }
+    });
+  });
+
+  void describe("when it may start containers", () => {
+    /** @scenario "Ryuk is off for every suite" */
+    void it("turns testcontainers' Ryuk off for every lane, and keeps the worker count", () => {
+      for (const script of ["test", "test:integration", "test:browser"]) {
+        const env = suiteEnvFor({ job: job("@fix/trace", script), heavy: false, cores: 4 });
+        assert.deepEqual(env, { TESTCONTAINERS_RYUK_DISABLED: "true" });
+      }
+      assert.deepEqual(suiteEnvFor({ job: job("@fix/trace", "test"), heavy: true, cores: 4 }), {
+        TESTCONTAINERS_RYUK_DISABLED: "true",
+        VITEST_MAX_WORKERS: "4",
+      });
     });
   });
 });
@@ -762,12 +800,13 @@ void describe("given the job is split into shards", () => {
     /** @scenario "Shards are balanced by the wall time each package adds" */
     void it("spreads a light package's weight over its scripts' lanes", () => {
       const load = withPackage({
-        load: { alone: 0, shared: 0, integration: 0, browser: 0 },
+        load: { alone: 0, shared: 0, serial: 0 },
         weight: 60,
         scripts: ["test", "test:integration", "test:browser"],
       });
-      assert.deepEqual(load, { alone: 0, shared: 60, integration: 20, browser: 20 });
-      assert.equal(wallTimeOf({ load, concurrency: 2 }), 30);
+      // The integration and browser suites run one after the other: 20 + 20, not 60 / 2.
+      assert.deepEqual(load, { alone: 0, shared: 60, serial: 40 });
+      assert.equal(wallTimeOf({ load, concurrency: 2 }), 40);
     });
 
     /** @scenario "Every shard computes the same split" */
