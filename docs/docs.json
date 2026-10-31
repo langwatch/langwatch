@@ -766,6 +766,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/responses",
               "ai-gateway/api/embeddings",
+              "ai-gateway/api/decisions",
               "ai-gateway/api/audio",
               "ai-gateway/api/images",
               "ai-gateway/api/elevenlabs",
@@ -1818,7 +1819,7 @@
       "destination": "/api-reference/projects/get-a-dashboard"
     },
     {
-      "source": "/ci/cache/busted/1793288524",
+      "source": "/ci/cache/busted/1793371432",
       "destination": "/introduction"
     },
     {

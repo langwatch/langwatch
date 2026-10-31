@@ -9,13 +9,16 @@ import {
   canonicalErrorResponse,
   createRestRuntime,
 } from "@langwatch/api/rest";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { PermissionDeniedError, type Actor } from "@langwatch/authorization";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
-import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
 import {
-  dashboardWidgetCallerSource,
+  createDashboardTestAnalytics,
+  createDashboardTestApp,
+} from "../../app/__tests__/dashboard.fixture.ts";
+import {
+  dashboardWidgetCaller,
   dashboardWidgetRest,
   dashboardWidgetUrl,
 } from "../dashboard-widget.rest.ts";
@@ -31,12 +34,14 @@ function queryDeclaring(parameter: { name: string; type: string; default?: unkno
 function mountKey({
   app = createDashboardTestApp(),
   permits = () => true,
+  actor = { type: "api_key" as const, id: "key-of-project-1" },
 }: {
   app?: ReturnType<typeof createDashboardTestApp>;
   permits?: (permission: string) => boolean;
+  actor?: Actor;
 } = {}) {
   const caller = {
-    actor: { type: "api_key" as const, id: "key-of-project-1" },
+    actor,
     scope: { tier: "project" as const, id: "project-1" },
   };
   const runtime = createRestRuntime({
@@ -57,7 +62,7 @@ function mountKey({
     app: () => app,
     middlewareContext: [
       bindMiddlewareContext(dashboardWidgetUrl, () => "https://app.langwatch.test/dashboards"),
-      bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+      bindMiddlewareContext(dashboardWidgetCaller, () => ({ source: { kind: "api" as const } })),
     ],
     onError: canonicalErrorResponse,
   });
@@ -227,5 +232,37 @@ describe("given a key whose role only views analytics", () => {
 
     expect(patched.status).toBe(403);
     expect(read.json.definition.queries[0].sources).toEqual(["application"]);
+  });
+});
+
+describe("given a person's CLI access token naming a project in a widget", () => {
+  const person: Actor = { type: "user", id: "user-1" };
+  const named = [{ name: "traces", sql: SQL, projects: ["project-2"] }];
+
+  function appAsking() {
+    const asked: unknown[] = [];
+    const app = createDashboardTestApp({
+      dependencies: {
+        analytics: createDashboardTestAnalytics({
+          assertProjectsReadable: async (input) => void asked.push(input),
+        }),
+      },
+    });
+
+    return { app, asked };
+  }
+
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("is judged as that person on create, as on update", async () => {
+    const { app, asked } = appAsking();
+    const key = mountKey({ app, actor: person });
+
+    const created = await key.create({ name: "Traces", code: CODE, queries: named });
+    await key.update(created.json.id, { queries: named });
+
+    expect(asked).toEqual([
+      { userId: "user-1", projectIds: ["project-2"], anchorProjectId: "project-1" },
+      { userId: "user-1", projectIds: ["project-2"], anchorProjectId: "project-1" },
+    ]);
   });
 });

@@ -35,7 +35,7 @@ import { z } from "zod";
 
 import { authorOfActor, viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 import {
-  dashboardWidgetCallerSource,
+  dashboardWidgetCaller,
   dashboardWidgetUrl,
   widgetResource,
 } from "./dashboard-widget.rest.ts";
@@ -275,7 +275,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withParams(boardIdParamsSchema)
   .withInput(createDashboardWidgetSchema)
   .withPermission("analytics:create")
-  .withMiddlewareContext(dashboardWidgetUrl, dashboardWidgetCallerSource, boardsReleased)
+  .withMiddlewareContext(dashboardWidgetUrl, dashboardWidgetCaller, boardsReleased)
   .withOutput(dashboardWidgetResourceSchema)
   .withStatus(201)
   .withDocs({
@@ -289,9 +289,10 @@ export const boardRest = defineRestRouter(DashboardApi)
       201: { description: "The widget was saved on the dashboard" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, platformUrl, source) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl, caller) => {
     const widget = await app.createDashboardWidget({
       projectId: scope.id,
+      ...(caller.keyReach ? { keyReach: caller.keyReach } : {}),
       dashboardId: input.dashboardId,
       ...viewerOfActor({ actor }),
       name: input.name,
@@ -299,7 +300,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       queries: input.queries,
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
-      source: input.source ?? source,
+      source: input.source ?? caller.source,
     });
 
     return widgetResource(widget, platformUrl);
@@ -337,7 +338,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withParams(boardWidgetParamsSchema)
   .withInput(updateDashboardWidgetSchema)
   .withPermission("analytics:update")
-  .withMiddlewareContext(dashboardWidgetUrl, boardsReleased)
+  .withMiddlewareContext(dashboardWidgetUrl, dashboardWidgetCaller, boardsReleased)
   .withOutput(dashboardWidgetResourceSchema)
   .withDocs({
     summary: "Update a widget on a dashboard",
@@ -350,10 +351,11 @@ export const boardRest = defineRestRouter(DashboardApi)
       200: { description: "The updated widget" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl, caller) => {
     const { name, code, queries, description, source } = input;
     const widget = await app.updateDashboardWidget({
       projectId: scope.id,
+      ...(caller.keyReach ? { keyReach: caller.keyReach } : {}),
       id: input.widgetId,
       onDashboardId: input.dashboardId,
       ...viewerOfActor({ actor }),

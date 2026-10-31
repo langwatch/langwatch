@@ -32,6 +32,7 @@ import { Plus, Trash2, X } from "lucide-react";
 
 import { FieldTypeSelect } from "../../../../ui/sections/prompt/variables/variable-type/field-type-select.tsx";
 import { VariableTypeIcon } from "../../../../ui/sections/prompt/variables/variable-type/variable-type-icon.tsx";
+import type { QueryProjectsView } from "../../model/query-projects.ts";
 
 /** Structurally identical to prompt-web's own (unexported) `FieldTypeOption`. */
 type FieldTypeOption = { value: string; label: string };
@@ -79,6 +80,17 @@ export interface QuerySourcesVM {
   /** Every source, in the order the menu offers the ones not picked. */
   readonly all: readonly TraceSource[];
   readonly onChange: (next: TraceSource[]) => void;
+  /** Why the menu is off: the SQL never reads the parameter, so the list changes nothing. */
+  readonly disabledReason?: string;
+}
+
+/** A query's built-in `projects` row: the projects it reads, as removable pills (AC207). */
+export interface QueryProjectsVM {
+  readonly view: QueryProjectsView;
+  /** Named while the query stores none: the project the card reads then. */
+  readonly boardProjectName: string;
+  readonly onAdd: (projectId: string) => void;
+  readonly onRemove: (index: number) => void;
 }
 
 export interface QueryParametersPanelProps {
@@ -93,6 +105,8 @@ export interface QueryParametersPanelProps {
   onAdd: () => void;
   /** A dashboard query's `sources` row; absent where a query counts every origin. */
   sources?: QuerySourcesVM;
+  /** A dashboard query's `projects` row; absent where the query cannot name projects. */
+  projects?: QueryProjectsVM;
 }
 
 function DashboardContextRow({
@@ -139,7 +153,8 @@ function BuiltInBadge() {
   );
 }
 
-function SourcePill({ source, onRemove }: { source: TraceSource; onRemove: () => void }) {
+/** A removable pill: a label and the button that drops it. */
+function RemovablePill({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <HStack
       as="span"
@@ -153,7 +168,7 @@ function SourcePill({ source, onRemove }: { source: TraceSource; onRemove: () =>
       colorPalette="orange"
       textStyle="monoSm"
     >
-      {source}
+      {label}
       <Button
         size="2xs"
         variant="ghost"
@@ -162,7 +177,7 @@ function SourcePill({ source, onRemove }: { source: TraceSource; onRemove: () =>
         padding={0.5}
         borderRadius="full"
         color="fg.subtle"
-        aria-label={`Remove ${source}`}
+        aria-label={`Remove ${label}`}
         onClick={onRemove}
       >
         <X size={11} />
@@ -171,12 +186,19 @@ function SourcePill({ source, onRemove }: { source: TraceSource; onRemove: () =>
   );
 }
 
+/** A sources pill: one trace origin the query counts. */
+function SourcePill({ source, onRemove }: { source: TraceSource; onRemove: () => void }) {
+  return <RemovablePill label={source} onRemove={onRemove} />;
+}
+
 function AddSourceMenu({
   missing,
   onAdd,
+  disabledReason,
 }: {
   missing: readonly TraceSource[];
   onAdd: (source: TraceSource) => void;
+  disabledReason?: string;
 }) {
   return (
     <Menu.Root positioning={{ placement: "bottom-start" }}>
@@ -190,6 +212,8 @@ function AddSourceMenu({
           borderColor="border"
           color="fg.muted"
           paddingX={2.5}
+          disabled={disabledReason !== undefined}
+          title={disabledReason}
         >
           <Plus size={11} /> Add source
         </Button>
@@ -207,7 +231,7 @@ function AddSourceMenu({
 
 /** `sources = [pills] + Add source`, styled as a dashboard-context row (dashboards-v2 AC200). */
 function SourcesRow({ sources }: { sources: QuerySourcesVM }) {
-  const { picked, all, onChange } = sources;
+  const { picked, all, onChange, disabledReason } = sources;
   const missing = all.filter((source) => !picked.includes(source));
   return (
     <HStack gap={2} align="start" data-testid="query-sources">
@@ -229,8 +253,94 @@ function SourcesRow({ sources }: { sources: QuerySourcesVM }) {
           />
         ))}
         {missing.length > 0 && (
-          <AddSourceMenu missing={missing} onAdd={(source) => onChange([...picked, source])} />
+          <AddSourceMenu
+            missing={missing}
+            onAdd={(source) => onChange([...picked, source])}
+            {...(disabledReason === undefined ? {} : { disabledReason })}
+          />
         )}
+        {disabledReason !== undefined && (
+          <Text textStyle="caption" color="fg.warning" data-testid="sources-ignored-reason">
+            {disabledReason}
+          </Text>
+        )}
+      </HStack>
+      <BuiltInBadge />
+      <Box width="26px" flexShrink={0} />
+    </HStack>
+  );
+}
+
+function AddProjectMenu({
+  offered,
+  onAdd,
+}: {
+  offered: QueryProjectsView["offered"];
+  onAdd: (projectId: string) => void;
+}) {
+  return (
+    <Menu.Root positioning={{ placement: "bottom-start" }}>
+      <Menu.Trigger asChild>
+        <Button
+          size="2xs"
+          variant="ghost"
+          borderRadius="full"
+          borderWidth="1px"
+          borderStyle="dashed"
+          borderColor="border"
+          color="fg.muted"
+          paddingX={2.5}
+        >
+          <Plus size={11} /> Add project
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content minWidth="176px">
+        {offered.map((project) => (
+          <Menu.Item
+            key={project.id}
+            value={project.id}
+            textStyle="monoSm"
+            onClick={() => onAdd(project.id)}
+          >
+            {project.name}
+          </Menu.Item>
+        ))}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+/** `projects = [pills] + Add project`; the board's project while none is stored (AC207). */
+function ProjectsRow({ projects }: { projects: QueryProjectsVM }) {
+  const { view, boardProjectName, onAdd, onRemove } = projects;
+  return (
+    <HStack gap={2} align="start" data-testid="query-projects">
+      <Box flexShrink={0} paddingTop={1}>
+        <VariableTypeIcon type="list[str]" size={14} />
+      </Box>
+      <Text textStyle="monoSm" color="fg.muted" flexShrink={0} paddingTop={0.5}>
+        projects
+      </Text>
+      <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
+        =
+      </Text>
+      <HStack flex={1} minWidth={0} gap={1.5} wrap="wrap">
+        {view.followsBoard && (
+          <Text textStyle="caption" color="fg.muted" paddingTop={0.5}>
+            {boardProjectName} (the board's project)
+          </Text>
+        )}
+        {view.entries.map((entry) => (
+          <RemovablePill key={entry.id} label={entry.name} onRemove={() => onRemove(entry.index)} />
+        ))}
+        {view.hiddenAt.map((index) => (
+          <RemovablePill
+            key={`hidden-${index}`}
+            label="1 project you can't read"
+            onRemove={() => onRemove(index)}
+          />
+        ))}
+        {view.offered.length > 0 && <AddProjectMenu offered={view.offered} onAdd={onAdd} />}
       </HStack>
       <BuiltInBadge />
       <Box width="26px" flexShrink={0} />
@@ -327,6 +437,7 @@ export function QueryParametersPanel({
   typeOptions,
   onAdd,
   sources,
+  projects,
 }: QueryParametersPanelProps) {
   return (
     <VStack align="stretch" gap={3} width="full">
@@ -353,6 +464,7 @@ export function QueryParametersPanel({
         </Text>
         <Stack gap={2}>
           {sources && <SourcesRow sources={sources} />}
+          {projects && <ProjectsRow projects={projects} />}
           {rows.length === 0 && !sources && (
             <NoDataInfoBlock
               size="line"

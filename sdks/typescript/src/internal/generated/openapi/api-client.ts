@@ -93,9 +93,9 @@ export interface paths {
          *
          *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.
          *
-         *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+         *     A project API key, or any key that can read exactly one project, reads that project and needs none. A key that reaches several must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). A key that reads no project is refused with `projects_unreadable` (422) when it names no project or sends "all"; a project it names and cannot read is `project_not_found` (404). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
          *
-         *     To run over one project only, send its id as `projectId` in the body: the run then reads that project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same answer as a project that does not exist. Without `projectId` the run spans every project the key can read.
+         *     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of another organization and a project that does not exist are all refused with `project_not_found` (404), with one body that names no id. Send `sources` to bind `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to the projects read. The answer's `params` lists every placeholder the statement declares by its SQL name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
          *
          *     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
          *
@@ -3082,8 +3082,12 @@ export interface operations {
                         end: string | number;
                     };
                     granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
-                    /** @description Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read. */
+                    /** @description Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both. */
                     projectId?: string;
+                    /** @description The projects to read, each one the key holds analytics:view on, or the string "all" for every project the key can read. A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read. */
+                    projects?: string | string[];
+                    /** @description The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter by itself: the statement keeps its rows with a predicate such as WHERE Source IN {dashboard_context_sources:Array(String)}. A statement that never uses the placeholder counts every origin. */
+                    sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[];
                 };
             };
         };
@@ -3110,7 +3114,7 @@ export interface operations {
                         };
                         readonly diagnostics: {
                             /** @enum {string} */
-                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED" | "SHARE_WINDOW_LIMITED" | "SOURCES_IGNORED" | "GRANULARITY_COARSENED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -3138,6 +3142,9 @@ export interface operations {
                                 count: number;
                                 models: string[];
                             };
+                        };
+                        params?: {
+                            [key: string]: unknown;
                         };
                     };
                 };
@@ -5968,6 +5975,7 @@ export interface operations {
                                         default?: string | number | boolean;
                                     }[];
                                     sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                    projects?: string[] | null;
                                 }[];
                                 description?: string;
                                 prompt?: string;
@@ -6174,6 +6182,7 @@ export interface operations {
                             default?: string | number | boolean;
                         }[];
                         sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                        projects?: string[] | null;
                     }[];
                     description?: string;
                     prompt?: string;
@@ -6217,6 +6226,7 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                                 sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                projects?: string[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6432,6 +6442,7 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                                 sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                projects?: string[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6818,6 +6829,7 @@ export interface operations {
                             default?: string | number | boolean;
                         }[];
                         sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                        projects?: string[] | null;
                     }[];
                     description?: string;
                     source?: {
@@ -6860,6 +6872,7 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                                 sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                projects?: string[] | null;
                             }[];
                             description?: string;
                             prompt?: string;

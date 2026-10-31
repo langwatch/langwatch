@@ -14,6 +14,7 @@ export interface DashboardWidgetQueryInput {
   }[];
   /** The trace origins the query counts; `null` makes it unset, counting application. */
   sources?: WidgetSource[] | null;
+  projects?: string[] | null;
 }
 
 /** Where a widget came from, as the platform records it. */
