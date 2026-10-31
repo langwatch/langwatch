@@ -350,6 +350,63 @@ describe("explicit Prisma lifecycle", () => {
       expect(logger.error).not.toHaveBeenCalled();
     });
 
+    it("lands a P2002 unique-constraint race at warn, labelled as a warning", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+      const message = "Unique constraint failed on the fields: (`organizationId`,`name`)";
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: { target: "promptTag.create", message, timestamp },
+      });
+
+      expect(logger.warn).toHaveBeenCalledOnce();
+      expect(logger.warn).toHaveBeenCalledWith(
+        { target: "promptTag.create", message, timestamp },
+        "prisma warning",
+      );
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("lands a P2034 write-conflict or deadlock race at warn", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: {
+          target: "langyActiveTurn.findUnique",
+          message:
+            "Transaction failed due to a write conflict or a deadlock. Please retry your transaction",
+          timestamp,
+        },
+      });
+
+      expect(logger.warn).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("keeps a conflict-worded event emitted at info at info", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "info",
+        event: {
+          target: "x",
+          message: "Unique constraint failed on the fields: (`id`)",
+          timestamp,
+        },
+      });
+
+      expect(logger.info).toHaveBeenCalledOnce();
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
     it("lands a query event on the logger at debug, keyed by its SQL text", () => {
       const logger = fakeLogger();
       const timestamp = new Date("2026-09-09T00:00:00.000Z");
