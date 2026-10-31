@@ -498,8 +498,8 @@ catalogs:
       specifier: ^1.2.12
       version: 1.2.12
     motion:
-      specifier: ^12.42.2
-      version: 12.42.2
+      specifier: ^14.0.0
+      version: 14.0.0
     nanoid:
       specifier: ^6.0.0
       version: 6.0.0
@@ -3254,7 +3254,7 @@ importers:
         version: 1.22.0(react@19.2.8)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       numeral:
         specifier: 'catalog:'
         version: 2.0.6
@@ -5401,7 +5401,7 @@ importers:
         version: 1.22.0(react@19.2.8)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -5630,7 +5630,7 @@ importers:
         version: 1.22.0(react@19.2.8)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-router:
         specifier: 'catalog:'
         version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -5975,7 +5975,7 @@ importers:
         version: 1.22.0(react@19.2.8)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-feather:
         specifier: 'catalog:'
         version: 2.0.10(react@19.2.8)
@@ -8167,7 +8167,7 @@ importers:
         version: 1.2.12(monaco-editor@0.55.1)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       numeral:
         specifier: 'catalog:'
         version: 2.0.6
@@ -10401,7 +10401,7 @@ importers:
         version: 1.22.0(react@19.2.8)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -11821,7 +11821,7 @@ importers:
         version: 1.22.0(react@19.2.8)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-contextual-analytics:
         specifier: 'catalog:'
         version: 1.1.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -13104,7 +13104,7 @@ importers:
         version: 1.22.0(react@19.2.8)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       numeral:
         specifier: 'catalog:'
         version: 2.0.6
@@ -15536,7 +15536,7 @@ importers:
         version: 11.16.1
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       numeral:
         specifier: 'catalog:'
         version: 2.0.6
@@ -16506,7 +16506,7 @@ importers:
         version: 1.2.12(monaco-editor@0.55.1)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       numeral:
         specifier: 'catalog:'
         version: 2.0.6
@@ -17294,7 +17294,7 @@ importers:
         version: 1.22.0(react@19.2.8)
       motion:
         specifier: 'catalog:'
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       next-themes:
         specifier: 'catalog:'
         version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -26289,15 +26289,12 @@ packages:
     resolution: {integrity: sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow==}
     engines: {node: '>= 0.6'}
 
-  framer-motion@12.42.2:
-    resolution: {integrity: sha512-5XY9luDiu0oHfHBjpDthFMh0ES+122w6p/papSJBweMkO8Sn+PW2QaEgRblQBpWFnuvZS5qvarpt/hO2pjGmnw==}
+  framer-motion@14.0.0:
+    resolution: {integrity: sha512-QAtHmybrDFSliyW1sexMtSQTQd+1jw2ajibEmzpuI4XdPVzQkn+dAzJMm2sW3pl9MJuSS4xN51djQ7huhlP/VA==}
     peerDependencies:
-      '@emotion/is-prop-valid': '*'
       react: ^19.2.7
       react-dom: ^19.2.7
     peerDependenciesMeta:
-      '@emotion/is-prop-valid':
-        optional: true
       react:
         optional: true
       react-dom:
@@ -27574,21 +27571,18 @@ packages:
   moo@0.5.3:
     resolution: {integrity: sha512-m2fmM2dDm7GZQsY7KK2cme8agi+AAljILjQnof7p1ZMDe6dQ4bdnSMx0cPppudoeNv5hEFQirN6u+O4fDE0IWA==}
 
-  motion-dom@12.42.2:
-    resolution: {integrity: sha512-5gIMWLp/PycBtJRJWRgjxke5n8dlvkSn2DrYW+tr3XcqAZY1xZh6BJyooJXCM8wdfM7wfMjkBJNLge1CKPUIRA==}
+  motion-dom@14.0.0:
+    resolution: {integrity: sha512-aU3ApXo1yTpeUi3JU+jbDk2TELjxPE3MbBMUP7nZHlARb6RweJK+ojmLjpuB0YsY6zhbBl1YWGo8LMsI1/Llqw==}
 
-  motion-utils@12.39.0:
-    resolution: {integrity: sha512-8nadJAJjTtqRkmRF36FoJTrywK9nnFmnPwnSMyxaOCU7GDjN9RTMJIxx9De8ErM+vpPhMccr/6fo5WciyQLnMQ==}
+  motion-utils@14.0.0:
+    resolution: {integrity: sha512-jBsyjVxTTRZNeuvd/v+btVXr90LQkYl4HhRu9T2ARc+PMnvkmjsjRVeAg4Qm10b6TlTw+kykWI8gu/6LuvpLSQ==}
 
-  motion@12.42.2:
-    resolution: {integrity: sha512-Atvv11yUKIid41cVrRBDVX5m8tF8kNpExRSlbpt6APClhDjtwQssgFHhQzejxw7/7YYbjHSPKBVbHo05BuJT5Q==}
+  motion@14.0.0:
+    resolution: {integrity: sha512-oGc2lkge2lkRZCP+J8/JsnYu4NFjqP1MtXirNdetn3QbvK2JqwM9A200EdT4C598KfzDhjLT12zF21xDM4Oilw==}
     peerDependencies:
-      '@emotion/is-prop-valid': '*'
       react: ^19.2.7
       react-dom: ^19.2.7
     peerDependenciesMeta:
-      '@emotion/is-prop-valid':
-        optional: true
       react:
         optional: true
       react-dom:
@@ -38473,13 +38467,12 @@ snapshots:
 
   forwarded@0.2.0: {}
 
-  framer-motion@12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  framer-motion@14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      motion-dom: 12.42.2
-      motion-utils: 12.39.0
+      motion-dom: 14.0.0
+      motion-utils: 14.0.0
       tslib: 2.8.1
     optionalDependencies:
-      '@emotion/is-prop-valid': 1.4.0
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
@@ -40070,18 +40063,17 @@ snapshots:
 
   moo@0.5.3: {}
 
-  motion-dom@12.42.2:
+  motion-dom@14.0.0:
     dependencies:
-      motion-utils: 12.39.0
+      motion-utils: 14.0.0
 
-  motion-utils@12.39.0: {}
+  motion-utils@14.0.0: {}
 
-  motion@12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  motion@14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      framer-motion: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      framer-motion: 14.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       tslib: 2.8.1
     optionalDependencies:
-      '@emotion/is-prop-valid': 1.4.0
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
