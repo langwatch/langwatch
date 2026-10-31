@@ -46,10 +46,12 @@ import {
   type TrpcRequestContext,
 } from "@langwatch/api/trpc";
 import type { Logger } from "@langwatch/observability";
+import { noteRouteTemplate } from "@langwatch/observability/metrics";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { type Context, Hono } from "hono";
+import { matchedRoutes } from "hono/route";
 import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
@@ -362,6 +364,18 @@ const shareViewerContext = defineMiddlewareContext(
 );
 
 /**
+ * The most specific non-wildcard route that matched is the request's template;
+ * the mux labels its HTTP metric with it rather than the raw path.
+ */
+export function noteMatchedRouteTemplate(context: Context): void {
+  const template = matchedRoutes(context)
+    .map((route) => route.path)
+    .reverse()
+    .find((path) => path !== "*" && path !== "/*");
+  if (template) noteRouteTemplate(context.req.raw, template);
+}
+
+/**
  * The API's whole surface: the tRPC lanes, every REST family, then the 404 — mount order is
  * match order, and only here is every declaration known to have mounted (ARCHITECTURE.md §4).
  */
@@ -378,6 +392,8 @@ export function composeApiApplication(
 
   root.use("*", async (context, next) => {
     await next();
+
+    noteMatchedRouteTemplate(context);
 
     const policy =
       context.req.path === TrpcHost.path || context.req.path.startsWith(`${TrpcHost.path}/`)
