@@ -170,8 +170,8 @@ const suiteRunInputSchemaDefinition = z
     parameters: suiteRunParametersSchema.optional(),
     note: runNoteSchema,
     /**
-     * Who started the run. Every run of the batch records it. Absent when the surface names no
-     * person, and then the runs record no actor at all.
+     * Who started the run: a person, the key it was started with, or both. Every run of the batch
+     * records it. Absent when the surface names neither.
      * @see specs/scenarios/run-actor-on-runs.feature
      */
     actor: runActorSchema.optional(),

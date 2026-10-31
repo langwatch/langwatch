@@ -24,7 +24,9 @@ Feature: A run records who started it
     - the CLI or the REST API with a user-bound key: `cli` or `api`, with
       the user the key belongs to;
     - a project key that belongs to no user, and the SDK pushing its own run
-      events: no person, so no actor at all.
+      events: no person, so no actor at all. A key that belongs to no user
+      still records its own id as `actorApiKeyId`, so the run's child key is
+      minted under it; that is not an actor and no reader shows it.
 
     A run with no actor records nothing. It never records a placeholder, and
     no reader is ever shown one.
@@ -65,7 +67,7 @@ Feature: A run records who started it
     When the CLI declares itself on the request
     Then the actor is that person, through the CLI
     And a request that declares nothing is that person, through the API
-    And a request with no person behind it names no actor
+    And a request with no person behind it names only the key it was sent with
 
   @unit
   Scenario: The actor sits beside the scenario version, not at the top level
