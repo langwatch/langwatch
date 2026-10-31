@@ -3,11 +3,14 @@ import type { PlanInfo, PricingModel } from "@langwatch/entitlement-contract";
  * @vitest-environment node
  * Spec: specs/licensing/usage-enforcement-plan-resolution.feature.
  */
+import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
+import { MemoryUsageCacheRepository } from "../../repositories/memory/memory.usage-cache.repository.ts";
+import { RecentCountFailureError } from "../count-read-coalescer.service.ts";
 import { UsageCountingService } from "../usage-counting.service.ts";
 import {
   type EntitlementUsagePeers,
@@ -40,6 +43,12 @@ class TestOrganizations implements UsageOrganization {
   }
   getPricingModel(): Promise<{ pricingModel: null }> {
     return Promise.resolve({ pricingModel: null });
+  }
+}
+
+class TooManyQueriesInFlight extends HandledError {
+  constructor() {
+    super("clickhouse_overloaded", "Too many queries in flight", { httpStatus: 503 });
   }
 }
 
@@ -291,6 +300,7 @@ function eventsServiceOver({
     planResolver: async () => ({ ...plan(1_000), free: true }),
     meter,
     traceMeter: { countByProjects: refuseTraceCount },
+    caches: freshCaches(),
     peers: {
       billing: createApiFixture<EntitlementUsagePeers["billing"]>({
         getPricingModel: async () => ({ pricingModel: null }),
@@ -419,6 +429,7 @@ describe("UsageService over the trace count", () => {
       planResolver: async () => plan(allowance),
       meter: { countByProjects: refuseTraceCount },
       traceMeter: meter,
+      caches: freshCaches(),
       peers: {
         billing: createApiFixture<EntitlementUsagePeers["billing"]>({
           getPricingModel: async () => ({ pricingModel: null }),
@@ -457,3 +468,154 @@ describe("UsageService over the trace count", () => {
     },
   );
 });
+
+describe("given limit checks that read the counting store", () => {
+  class GatedCounter implements UsageVolumeCounter {
+    readonly reads: { resolve: (counts: ProjectUsageCounts) => void }[] = [];
+
+    getCountByProjects(): Promise<ProjectUsageCounts> {
+      return new Promise((resolve) => {
+        this.reads.push({ resolve });
+      });
+    }
+  }
+
+  function serviceOver({ counter, clock }: { counter: UsageVolumeCounter; clock: { ms: number } }) {
+    return UsageService.create({
+      organizations: new TestOrganizations(),
+      traceCounter: counter,
+      eventCounter: counter,
+      planResolver: vi.fn().mockResolvedValue(plan(1000)),
+      deployment: { isSaas: true },
+      now: () => clock.ms,
+    });
+  }
+
+  /** Lets the service's awaits before the store read run. */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  describe("when several checks for one organization arrive while its count is read", () => {
+    /** @scenario Concurrent limit checks for one organization share one count */
+    it("reads the store once and answers every check", async () => {
+      const counter = new GatedCounter();
+      const service = serviceOver({ counter, clock: { ms: 0 } });
+
+      const checks = [1, 2, 3].map(() =>
+        service.checkLimitForOrganization({ organizationId: "org-1" }),
+      );
+      await settle();
+      expect(counter.reads).toHaveLength(1);
+      counter.reads[0]!.resolve([{ projectId: "project-1", count: 5_000 }]);
+
+      const results = await Promise.all(checks);
+      expect(results.map((r) => r.exceeded)).toEqual([true, true, true]);
+      expect(counter.reads).toHaveLength(1);
+    });
+  });
+
+  describe("when the store failed to read the organization's count", () => {
+    /** @scenario A count that failed is not read again until its retry window passes */
+    it("answers the failure without reading until the window passes, then reads again", async () => {
+      const outOfMemory = Object.assign(new Error("memory limit exceeded"), { code: "241" });
+      const clock = { ms: 1_000_000 };
+      let reads = 0;
+      const counter: UsageVolumeCounter = {
+        getCountByProjects: async () => {
+          reads++;
+          if (reads === 1) throw outOfMemory;
+          return [{ projectId: "project-1", count: 10 }];
+        },
+      };
+      const service = serviceOver({ counter, clock });
+
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toBe(
+        outOfMemory,
+      );
+      clock.ms += 29_000;
+      const reused = service.checkLimitForOrganization({ organizationId: "org-1" });
+      await expect(reused).rejects.toBeInstanceOf(RecentCountFailureError);
+      await expect(reused).rejects.toThrow("memory limit exceeded");
+      expect(reads).toBe(1);
+
+      clock.ms += 1_000;
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).resolves.toEqual(
+        { exceeded: false },
+      );
+      expect(reads).toBe(2);
+    });
+  });
+
+  describe("when a limit check left a failed count behind", () => {
+    /** @scenario A failed enforcement count does not fail the usage display */
+    it("still reads the count for display", async () => {
+      let reads = 0;
+      const counter: UsageVolumeCounter = {
+        getCountByProjects: async () => {
+          reads++;
+          if (reads === 1) throw new Error("memory limit exceeded");
+          return [{ projectId: "project-1", count: 10 }];
+        },
+      };
+      const service = serviceOver({ counter, clock: { ms: 0 } });
+
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toThrow(
+        "memory limit exceeded",
+      );
+      await expect(
+        service.getCurrentMonthCountForDisplay({ organizationId: "org-1" }),
+      ).resolves.toBe(10);
+    });
+  });
+
+  describe("when a limit check left a failed count behind and the licence status reads it", () => {
+    /** @scenario A failed enforcement count does not fail the licence usage read */
+    it("reads the store instead of answering the failure", async () => {
+      let reads = 0;
+      const counter: UsageVolumeCounter = {
+        getCountByProjects: async () => {
+          reads++;
+          if (reads === 1) throw new Error("memory limit exceeded");
+          return [{ projectId: "project-1", count: 10 }];
+        },
+      };
+      const service = serviceOver({ counter, clock: { ms: 0 } });
+
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toThrow(
+        "memory limit exceeded",
+      );
+      await expect(service.getCurrentMonthCount({ organizationId: "org-1" })).resolves.toBe(10);
+      expect(reads).toBe(2);
+    });
+  });
+
+  describe("when the store refused the count as busy", () => {
+    /** @scenario A busy or unreachable store is asked again on the next check */
+    it("reads the store again on the next check", async () => {
+      const busy = new TooManyQueriesInFlight();
+      let reads = 0;
+      const counter: UsageVolumeCounter = {
+        getCountByProjects: async () => {
+          reads++;
+          if (reads === 1) throw busy;
+          return [{ projectId: "project-1", count: 10 }];
+        },
+      };
+      const service = serviceOver({ counter, clock: { ms: 0 } });
+
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toBe(
+        busy,
+      );
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).resolves.toEqual(
+        { exceeded: false },
+      );
+      expect(reads).toBe(2);
+    });
+  });
+});
+
+function freshCaches() {
+  return {
+    counts: MemoryUsageCacheRepository.create(),
+    decisions: MemoryUsageCacheRepository.create(),
+  };
+}

@@ -3,6 +3,7 @@ import type { MemberSeatRepository } from "./member-seat.repository.ts";
 import type { OrganizationSpendRepository } from "./organization-spend.repository.ts";
 import type { TenancyRepository } from "./tenancy.repository.ts";
 import type { TraceCountRepository } from "./trace-count.repository.ts";
+import type { UsageCacheRepository } from "./usage-cache.repository.ts";
 import type { UsageMembershipRepository } from "./usage-membership.repository.ts";
 
 export interface EntitlementRepositories {
@@ -15,4 +16,7 @@ export interface EntitlementRepositories {
   /** The billable-events meter and the trace count the month's count is read from. */
   readonly billableEvents: BillableEventsMeterRepository;
   readonly traces: TraceCountRepository;
+  /** Per-pod caches for the month's count and the meter decision enforcement asks per batch. */
+  readonly usageCounts: UsageCacheRepository;
+  readonly usageDecisions: UsageCacheRepository;
 }
