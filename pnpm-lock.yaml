@@ -9259,6 +9259,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -14253,6 +14256,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans

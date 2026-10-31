@@ -272,6 +272,26 @@ describe("recordVoiceCallTraces", () => {
       expect(span.span.startTimeUnixNano).toBe(String(1_100 * 1_000_000));
       expect(span.span.endTimeUnixNano).toBe(String(1_500 * 1_000_000));
     });
+
+    it("keeps sub-millisecond offsets instead of rounding them away", async () => {
+      const record = fakeRecord({
+        startedAt: 1_000,
+        endedAt: 9_000,
+        turns: [{ role: "caller", text: "hi", startMs: 100.125, endMs: 100.375 }],
+      });
+
+      await recordVoiceCallTraces({
+        projectId: "p1",
+        record,
+        scenarioRunId: "run_1",
+      });
+
+      const span = mockRecordSpan.mock.calls[0]?.[0] as {
+        span: { startTimeUnixNano: string; endTimeUnixNano: string };
+      };
+      expect(span.span.startTimeUnixNano).toBe("1100125000");
+      expect(span.span.endTimeUnixNano).toBe("1100375000");
+    });
   });
 
   describe("given a call where only some turns report offsets", () => {
