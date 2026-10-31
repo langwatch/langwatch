@@ -1,6 +1,6 @@
 /**
  * The unread pill beside the sidebar's Insights entry, lent through `InsightsNavCountToken`:
- * green when the unseen news skews good, red otherwise; nothing at zero.
+ * the unseen count in one neutral colour; nothing at zero.
  */
 
 import type { InsightsNavCountProps } from "@langwatch/insight-contract";
@@ -11,5 +11,5 @@ import { UnreadPill } from "../elements/unread-pill.tsx";
 export function InsightsNavCount(_props: InsightsNavCountProps) {
   const { available, inbox } = useInsightInbox();
   if (!available || !inbox) return null;
-  return <UnreadPill count={inbox.count} tone={inbox.tone} />;
+  return <UnreadPill count={inbox.count} />;
 }

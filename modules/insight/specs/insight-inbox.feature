@@ -8,19 +8,16 @@ Feature: The insights inbox
 
   Rule: Filing an insight
 
+    # The page has no "Save as insight" any more (#8998); a daily run files insights through
+    # the insight command, not this route. The filing route stays available, for insights
+    # stored with a Langy source.
     @integration
-    Scenario: A member saves a Langy answer as an insight
+    Scenario: A member files an insight through the filing route
       Given a member with analytics:view on the project
-      When they save a Langy answer as an insight with a title, a body and a tone
+      When they file an insight with a title, a body, a tone and the Langy answer it came from
       Then the insight is filed in the project, with them as its owner
       And it records the Langy conversation and message it came from
       And it shows at the top of their inbox
-
-    @integration
-    Scenario: Saving a Langy answer says only the saver sees the insight
-      Given a member with analytics:view and no more
-      When they save a Langy answer as an insight
-      Then they are told it is saved and that only they see it
 
     @unit
     Scenario: The member who files an insight has already seen it
@@ -189,34 +186,6 @@ Feature: The insights inbox
       Then under the title it reads "Saved from a chat with Langy"
       And an insight filed by a run reads "Daily run"
 
-    @integration
-    Scenario: Saving a Langy answer about a board passes the pointer and the window
-      Given a Langy answer that names the board, the widget, the query and the window it read
-      When a member saves it as an insight
-      Then the filing carries that board and widget, that query and that window
-      And an answer that names none of them is filed with none
-
-    @integration
-    Scenario: Saving a finding of an answer's insights card files its typed data
-      Given a Langy answer that carries an insights card with a board, a window and two findings
-      When a member saves the first finding as an insight
-      Then the filing carries that finding's title, body, tone, topic and valid days
-      And the card's board with the finding's widget, the finding's query and the card's window
-      And nothing of it is read from the answer's prose
-
-    @integration
-    Scenario: A member picks which finding of a card to save
-      Given a Langy answer that carries an insights card with two findings
-      When a member picks the second finding and saves it
-      Then the form starts again from that finding's own words
-      And the filing carries that finding and no query it does not hold
-
-    @integration
-    Scenario: An answer without an insights card is saved from its text
-      Given a Langy answer that carries no insights card, or a card with no finding
-      When a member saves it as an insight
-      Then the form starts from the answer's own text
-
   Rule: Evidence on fixed dates
     An insight keeps what to run, never the result: its query, the fixed window the query
     read and the values in force when it was filed.
@@ -318,6 +287,12 @@ Feature: The insights inbox
       When the badge is derived
       Then the count is 3
 
+    @integration
+    Scenario: The unread pill is a plain count in one neutral colour
+      Given unseen insights in the inbox that are bad and watch, or good only
+      When the sidebar draws the unread pill
+      Then it shows only the count, drawn the same neutral way whatever the verdicts
+
   Rule: Seen is marked once
 
     @unit
@@ -368,8 +343,16 @@ Feature: The insights inbox
       Given a project with no insights
       When a member opens Insights
       Then they see "Langy writes your brief here"
+      And that a board's Daily insights files them
       And that the brief is theirs alone
-      And an action that opens Langy
+      And an action that opens Dashboards
+
+    @integration
+    Scenario: The inbox is one list, newest first, whatever the verdict
+      Given insights in the inbox that are bad, watch and good, filed at different times
+      When a member opens Insights
+      Then they read one list with the newest first
+      And nothing groups or filters it by verdict
 
     @e2e
     Scenario: The bell lists new insights
@@ -398,6 +381,64 @@ Feature: The insights inbox
       When the reader opens the Archived folder and chooses Restore
       Then the insight is kept for that reader
       And it is back in their Inbox folder
+
+  Rule: The Insights entry in the side menu
+    Every product's side menu carries one Insights entry, at the bottom just above Settings
+    (above Support for a member who cannot see Settings), with the grey unread pill. The
+    Insights page itself lives in the Dashboards product, so the entry shows only while
+    release_dashboards is on too. Settings and the Admin console are no product and carry none.
+
+    @integration
+    Scenario: The Dashboards side menu holds the one Insights entry with its unread count
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      When they look at the Dashboards side menu
+      Then it holds one Insights entry at the bottom, just above Settings, with the unread pill
+      And the entry is marked current on the Insights page
+
+    @integration
+    Scenario: Every product's side menu holds the Insights entry above Settings
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      When they look at the LLM Ops, Gateway or Me side menu
+      Then it holds one Insights entry at the bottom, just above Settings, with the unread pill
+
+    @integration
+    Scenario: The Settings and Admin side menus hold no Insights entry
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      When they look at the Settings or the Admin console side menu
+      Then it holds no Insights entry
+
+    @integration
+    Scenario: Insights shows nothing while release_dashboards is off
+      Given the release_insights flag is on and the release_dashboards flag is off
+      When a member looks at the top bar
+      Then it holds no insights bell, because the Insights page is closed
+      And with both flags on the bell is there
+
+    @integration
+    Scenario: The Insights page is a 404 while release_dashboards is off
+      Given the release_insights flag is on and the release_dashboards flag is off
+      And a member with analytics:view
+      When they open the Insights page by its address
+      Then it answers not-found, with no product side menu around it
+
+    @integration
+    Scenario: The side menu shows no Insights entry while the flag is off
+      Given the release_insights or the release_dashboards flag is off, or a member without analytics:view
+      When they look at any product's side menu
+      Then it holds no Insights entry
+
+    @integration
+    Scenario: An aggregate project's side menu holds no Insights entry
+      Given release_insights is on and a member with analytics:view
+      And the project is an aggregate, which files no insight
+      When they look at the Dashboards side menu
+      Then it holds no Insights entry
+
+    @unit
+    Scenario: The Insights page stays in the Dashboards product
+      Given a member in Dashboards
+      When they open the Insights page
+      Then the page belongs to the Dashboards product, so the side menu stays the same
 
   Rule: The line under the title
 

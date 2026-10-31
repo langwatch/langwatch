@@ -9,7 +9,6 @@ import { projectNavigation } from "@langwatch/project-contract";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
 
-import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useAnalyticsEntry } from "../../behavior/use-analytics-entry.ts";
 import {
@@ -66,7 +65,6 @@ export const MainMenuSections = function MainMenuSections({
           showLabel={showExpanded}
         />
       )}
-      {navigation.home && <InsightsMenuLink {...sectionProps} />}
 
       <ObserveSection
         {...sectionProps}
@@ -89,27 +87,6 @@ interface ProjectSectionProps {
   showExpanded: boolean;
   project: NavigationProject | undefined;
   pathname: string;
-}
-
-/**
- * Insights sits first, under Home: the inbox is where a day in the product starts. Hidden
- * until `release_insights` answers on; the unread pill is the one insight lends.
- */
-function InsightsMenuLink({ showExpanded, project, pathname }: ProjectSectionProps) {
-  const host = useNavigationHost();
-  const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
-  if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
-  return (
-    <PageMenuLink
-      path={projectNavItems.insights.path}
-      icon={featureIcons.insights.icon}
-      label={projectNavItems.insights.title}
-      project={project}
-      isActive={pathname.startsWith(projectNavItems.insights.path)}
-      showLabel={showExpanded}
-      rightElement={<InsightsNavCount />}
-    />
-  );
 }
 
 function ObserveSection({

@@ -9,7 +9,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { insightEntry, renderWithInsightHost } from "../../../testing.tsx";
+import { insightEntry, renderWithInsightHost, StubInsightHost } from "../../../testing.tsx";
 import { InsightsBell } from "../insights-bell.tsx";
 
 const HOUR_MS = 3_600_000;
@@ -78,6 +78,40 @@ describe("given 2 insights in the inbox, both already seen", () => {
       await userEvent.click(screen.getByRole("button", { name: "Open inbox" }));
 
       expect(host.navigations).toEqual(["/acme/insights"]);
+    });
+  });
+});
+
+describe("given release_insights on and 2 unseen insights in the inbox", () => {
+  describe("when release_dashboards is off", () => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    it("shows no bell, because the Insights page is closed", async () => {
+      // The host-mount test covers how the two flags make this false.
+      const { host } = renderWithInsightHost({
+        element: <InsightsBell />,
+        host: new StubInsightHost({ enabled: false }),
+        answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
+      });
+
+      await Promise.resolve();
+      expect(screen.queryByRole("button", { name: "Inbox: new insights" })).not.toBeInTheDocument();
+      expect(host.navigations).toEqual([]);
+    });
+  });
+
+  describe("when release_dashboards is on too", () => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    it("shows the bell with the unread count", async () => {
+      renderWithInsightHost({
+        element: <InsightsBell />,
+        host: new StubInsightHost({ enabled: true }),
+        answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
+      });
+
+      expect(
+        await screen.findByRole("button", { name: "Inbox: new insights" }),
+      ).toBeInTheDocument();
+      expect(await screen.findByLabelText("2 unread")).toBeInTheDocument();
     });
   });
 });

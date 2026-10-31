@@ -3,9 +3,12 @@
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 
+import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
@@ -24,7 +27,12 @@ import {
   OPERATIONS_CONSOLE,
   type ProductId,
 } from "../../model/products.ts";
-import { dashboardsAreaAt, toProjectRoutePattern } from "../../model/project-nav-items.ts";
+import {
+  dashboardsAreaAt,
+  projectNavItems,
+  toProjectRoutePattern,
+} from "../../model/project-nav-items.ts";
+import { projectScopedDestination } from "../../model/project-scoped-nav.ts";
 import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
@@ -51,6 +59,11 @@ import { SidebarSection } from "./sidebar-section.tsx";
 import { UsageIndicator } from "./usage-indicator.tsx";
 
 export type SidebarSurface = ProductId | "settings" | "admin";
+
+/** Settings and the Admin console: no product, so a back row and no product-pinned entry. */
+function isDetour(surface: SidebarSurface): boolean {
+  return surface === "settings" || surface === "admin";
+}
 
 /** The sidebar a page outside every product draws: the Admin console on /ops, else Settings. */
 export function detourSurface(pathname: string): SidebarSurface {
@@ -102,16 +115,18 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 }
 
 /**
- * The pinned utility block at the bottom of every sidebar: usage, Settings,
- * Support and the theme control. The Settings sidebar drops its own entry
- * since the top bar already names it.
+ * The pinned block at the bottom of every sidebar: usage, Settings, Support and the theme
+ * control, with a product's own pinned entry just above Settings. The Settings sidebar drops
+ * its own entry since the top bar already names it.
  */
 function SidebarBottomBlock({
   showExpanded,
   shouldIncludeSettingsLink,
+  productPinned,
 }: {
   showExpanded: boolean;
   shouldIncludeSettingsLink: boolean;
+  productPinned?: ReactNode;
 }) {
   const host = useNavigationHost();
   const pathname = host.pathname();
@@ -132,6 +147,7 @@ function SidebarBottomBlock({
       paddingX={1}
     >
       <UsageIndicator showLabel={showExpanded} />
+      {productPinned}
       {shouldIncludeSettingsLink && host.hasPermission("organization:view") && (
         <SideMenuLink
           icon={featureIcons.settings.icon}
@@ -313,12 +329,50 @@ function SectionItemsNav({
  */
 function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
+  if (!showExpanded) return null;
   const pattern = toProjectRoutePattern({
     pathname: host.pathname(),
     projectSlug: host.project()?.slug,
   });
-  if (!showExpanded) return null;
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
+}
+
+/**
+ * The one Insights entry, in every product menu's bottom block just above Settings. Hidden
+ * until `release_insights` and `release_dashboards` answer on (the page lives in Dashboards),
+ * and on an aggregate project, which files no insight; the unread pill is lent by insight.
+ * @see modules/insight/specs/insight-inbox.feature
+ */
+function InsightsMenuLink({ showExpanded }: { showExpanded: boolean }) {
+  const host = useNavigationHost();
+  const insights = host.featureFlag(FrontendFlags.release_insights);
+  const dashboards = host.featureFlag(FrontendFlags.release_dashboards);
+  if (insights.isLoading || !insights.enabled) return null;
+  if (dashboards.isLoading || !dashboards.enabled) return null;
+  if (!host.hasPermission("analytics:view")) return null;
+  if (isAggregateProjectKind(host.project()?.kind)) return null;
+  const destination = projectScopedDestination({
+    path: projectNavItems.insights.path,
+    label: projectNavItems.insights.title,
+    project: host.project(),
+  });
+  return (
+    <SideMenuLink
+      icon={featureIcons.insights.icon}
+      label={projectNavItems.insights.title}
+      href={destination.href}
+      unavailableReason={destination.unavailableReason}
+      isActive={isPathUnder({
+        pathname: toProjectRoutePattern({
+          pathname: host.pathname(),
+          projectSlug: host.project()?.slug,
+        }),
+        base: projectNavItems.insights.path,
+      })}
+      showLabel={showExpanded}
+      rightElement={<InsightsNavCount />}
+    />
+  );
 }
 
 /**
@@ -414,7 +468,7 @@ export function SidebarContent({
         <QuickSearchMenuItem showLabel={showExpanded} />
       </Box>
 
-      {(surface === "settings" || surface === "admin") && (
+      {isDetour(surface) && (
         <Box
           data-testid="sidebar-back-row"
           width="full"
@@ -474,6 +528,9 @@ export function SidebarContent({
         <SidebarBottomBlock
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}
+          productPinned={
+            isDetour(surface) ? null : <InsightsMenuLink showExpanded={showExpanded} />
+          }
         />
       </Box>
     </VStack>

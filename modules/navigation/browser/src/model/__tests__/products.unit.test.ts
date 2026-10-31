@@ -79,11 +79,18 @@ describe("productFromPathname", () => {
     expect(productFromPathname("/[project]/dashboards/board_1")).toBe("dashboards");
   });
 
+  /** @scenario "The Insights page stays in the Dashboards product" */
+  it("maps a project's Insights page to the Dashboards product", () => {
+    expect(productFromPathname("/my-project/insights")).toBe("dashboards");
+    expect(productFromPathname("/[project]/insights")).toBe("dashboards");
+  });
+
   it("keeps every other project page in LLM Ops", () => {
     expect(productFromPathname("/my-project")).toBe("llm-ops");
     expect(productFromPathname("/my-project/analytics/dashboards")).toBe("llm-ops");
     expect(productFromPathname("/my-project/dashboards-old")).toBe("llm-ops");
     expect(productFromPathname("/dashboards")).toBe("llm-ops");
+    expect(productFromPathname("/my-project/insights-old")).toBe("llm-ops");
   });
 
   /** @scenario An ops page is never remembered as the last product */

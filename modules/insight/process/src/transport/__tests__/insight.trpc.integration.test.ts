@@ -115,7 +115,7 @@ async function refusalOf(request: Promise<unknown>) {
 
 describe("given the insights tRPC family", () => {
   describe("when a member with analytics:view saves a Langy answer as an insight", () => {
-    /** @scenario "A member saves a Langy answer as an insight" */
+    /** @scenario "A member files an insight through the filing route" */
     it("files it in the project as theirs, with its Langy source, at the top of their inbox", async () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2026-10-08T07:00:00.000Z"));
@@ -246,7 +246,6 @@ describe("given a member filed an insight with a query and a window", () => {
         archived: [],
         unseen: [],
         count: 0,
-        tone: "good",
       });
       // The owner still reads the evidence the other member was never handed.
       await expect(as({ userId: OWNER }).getAll({ projectId: PROJECT })).resolves.toEqual([
