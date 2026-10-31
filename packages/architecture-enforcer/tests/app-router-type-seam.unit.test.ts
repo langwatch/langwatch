@@ -16,8 +16,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 
 /**
  * 1,540 with `pnpm ensure:built` (#8795) once ops imports system-migrations types only.
- * 1,561 with ADR-185: the docs consent screen reads api-key's web config and docs origins.
- * 1,563 with ADR-188: pi's agent definition and canonicaliser join the registries the screens read.
+ * 1,561 with ADR-185 (docs consent reads api-key config); 1,563 with ADR-188 (pi's definition, canonicaliser).
  * A ceiling, not a target. Lower it when earned; never raise it without saying why.
  */
 const CEILING = 1_563;
