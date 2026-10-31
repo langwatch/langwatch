@@ -511,10 +511,16 @@ describe("pi session admission", () => {
 
     /** @scenario "A harness span pi declares but we do not list is dropped with nothing recorded" */
     it("is not admitted, and the session row is what it would be without it", () => {
-      expect(admitted(checkpoint)).toBe(false);
-      expect(foldSessions([...piSession, checkpoint]).get(SESSION)).toEqual(
-        foldSessions(piSession).get(SESSION),
-      );
+      // Each fold stamps createdAt/updatedAt from the clock; pinned so two folds compare.
+      vi.useFakeTimers({ now: 1_793_400_000_000 });
+      try {
+        expect(admitted(checkpoint)).toBe(false);
+        expect(foldSessions([...piSession, checkpoint]).get(SESSION)).toEqual(
+          foldSessions(piSession).get(SESSION),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });
