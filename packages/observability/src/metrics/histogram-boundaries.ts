@@ -85,9 +85,16 @@ export const HISTOGRAM_BOUNDARIES: Readonly<Record<string, readonly number[]>> =
   identity_commit_duration_seconds: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
 
   // --- group queue ---
-  gq_job_delay_milliseconds: [100, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000],
-  gq_retry_attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-  gq_retry_backoff_milliseconds: [100, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000],
+  // Delays and backoffs run to hours (a retry backs off up to 10 minutes): a top bucket
+  // of 60s hid every real delay in +Inf.
+  gq_job_delay_milliseconds: [
+    100, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000, 300_000, 900_000, 1_800_000, 3_600_000,
+    21_600_000, 86_400_000,
+  ],
+  gq_retry_attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 40, 61],
+  gq_retry_backoff_milliseconds: [
+    100, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000, 120_000, 300_000, 600_000,
+  ],
   gq_job_duration_milliseconds: [
     1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000, 120_000,
   ],
