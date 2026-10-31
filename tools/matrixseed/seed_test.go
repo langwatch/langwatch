@@ -52,8 +52,18 @@ func TestRunProvisionsOneOrganizationAndProject(t *testing.T) {
 	if got := exported(result)["LW_PROJECT_API_KEY"]; got != serviceKey {
 		t.Fatalf("LW_PROJECT_API_KEY = %q, want the project's service key", got)
 	}
-	if orgs[0].IdempotencyKey == "" || projects[0].IdempotencyKey == "" {
-		t.Fatal("every create must carry an Idempotency-Key")
+}
+
+/** @scenario "A seed create carries no Idempotency-Key" */
+func TestSeedCreatesCarryNoIdempotencyKey(t *testing.T) {
+	stub, server := newStub(t, nil)
+	run(t, server.URL, nil)
+	for _, path := range []string{"/api/v1/organizations", "/api/v1/projects"} {
+		for _, c := range stub.calls(http.MethodPost, path) {
+			if c.IdempotencyKey != "" {
+				t.Fatalf("POST %s carried an Idempotency-Key: the seed never retries, so it dedupes nothing", path)
+			}
+		}
 	}
 }
 
@@ -183,12 +193,13 @@ func TestRefusalForOneProviderStillSeedsTheOthers(t *testing.T) {
 	if err == nil || !errors.As(err, &refused) || refused.Status != http.StatusUnprocessableEntity {
 		t.Fatalf("want the refusal surfaced, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "anthropic") || !strings.Contains(err.Error(), "refused by the stub") {
-		t.Fatalf("want the error to name the provider and the answer, got %q", err)
+	if !strings.Contains(err.Error(), "anthropic") || !strings.Contains(err.Error(), "answered 422") {
+		t.Fatalf("want the error to name the provider and the status, got %q", err)
 	}
 }
 
 /** @scenario "A failed bootstrap exports nothing" */
+/** @scenario "The gateway and matrix run only once the seed has bootstrapped" */
 func TestFailedBootstrapExportsNothing(t *testing.T) {
 	_, server := newStub(t, map[string]int{"/api/v1/organizations": http.StatusUnauthorized})
 	result, err := Run(context.Background(), Options{BaseURL: server.URL, InstanceAdminKey: instanceKey, Env: envOf(allCredentials)})
@@ -200,5 +211,21 @@ func TestFailedBootstrapExportsNothing(t *testing.T) {
 	}
 	if _, err := Run(context.Background(), Options{BaseURL: server.URL, Env: envOf(nil)}); err == nil {
 		t.Fatal("want a run without an instance key refused")
+	}
+}
+
+/** @scenario "The Azure api version is stored when the job sets it" */
+func TestAzureKeepsAnAPIVersionWhenSet(t *testing.T) {
+	env := map[string]string{
+		"AZURE_OPENAI_API_KEY": "k", "AZURE_OPENAI_ENDPOINT": "https://x", "AZURE_OPENAI_API_VERSION": "2025-01-01-preview",
+	}
+	keys, missing := azureKeys(envOf(env))
+	if len(missing) != 0 || keys["AZURE_OPENAI_API_VERSION"] != "2025-01-01-preview" {
+		t.Fatalf("keys=%v missing=%v", keys, missing)
+	}
+	delete(env, "AZURE_OPENAI_API_VERSION")
+	keys, _ = azureKeys(envOf(env))
+	if _, ok := keys["AZURE_OPENAI_API_VERSION"]; ok {
+		t.Fatalf("an empty version must not be stored: %v", keys)
 	}
 }

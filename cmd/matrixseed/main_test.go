@@ -42,3 +42,27 @@ func TestEnvOrFallsBackOnlyWhenUnset(t *testing.T) {
 		t.Errorf("set: got %q", got)
 	}
 }
+
+/** @scenario "The gateway and matrix run only once the seed has bootstrapped" */
+func TestWriteBootstrappedAppendsTheStepOutput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "github_output")
+	if err := os.WriteFile(path, []byte("EARLIER=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeBootstrapped(path); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "EARLIER=1\nbootstrapped=true\n"; string(got) != want {
+		t.Errorf("output file = %q, want %q", got, want)
+	}
+}
+
+func TestWriteBootstrappedWithNoPathWritesNothing(t *testing.T) {
+	if err := writeBootstrapped(""); err != nil {
+		t.Fatal(err)
+	}
+}

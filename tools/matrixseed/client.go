@@ -3,8 +3,6 @@ package matrixseed
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,6 +29,9 @@ type route struct {
 	method, path string
 	body         any
 	want         int
+	// hasSensitiveRequestBody marks a call whose request held provider
+	// credentials: its refusal never prints the response body.
+	hasSensitiveRequestBody bool
 }
 
 // label names the call in errors.
@@ -38,12 +39,19 @@ func (r route) label() string { return r.method + " " + r.path }
 
 // RefusedError is a route answering anything but the status it promises.
 type RefusedError struct {
-	Call   string
-	Status int
-	Body   string
+	Call     string
+	Status   int
+	Body     string
+	Withheld bool
 }
 
 func (e *RefusedError) Error() string {
+	if e.Withheld {
+		return fmt.Sprintf("%s answered %d (body withheld)", e.Call, e.Status)
+	}
+	if e.Body == "" {
+		return fmt.Sprintf("%s answered %d (empty body)", e.Call, e.Status)
+	}
 	return fmt.Sprintf("%s answered %d: %s", e.Call, e.Status, e.Body)
 }
 
@@ -94,7 +102,7 @@ func (c *client) putModelProvider(ctx context.Context, provider string, keys map
 	}
 	call := "PUT /api/v1/model-providers/" + provider
 	if err := c.call(ctx, route{method: http.MethodPut, path: "/api/v1/model-providers/" + provider,
-		body: map[string]any{"enabled": true, "customKeys": keys}, want: http.StatusOK}, &out); err != nil {
+		body: map[string]any{"enabled": true, "customKeys": keys}, want: http.StatusOK, hasSensitiveRequestBody: true}, &out); err != nil {
 		return "", err
 	}
 	for _, row := range out {
@@ -137,9 +145,6 @@ func (c *client) call(ctx context.Context, r route, out any) error {
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/json")
-	if r.method == http.MethodPost {
-		req.Header.Set("Idempotency-Key", idempotencyKey())
-	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("%s: %w", name, err)
@@ -150,7 +155,11 @@ func (c *client) call(ctx context.Context, r route, out any) error {
 		return fmt.Errorf("%s: reading the answer: %w", name, err)
 	}
 	if resp.StatusCode != r.want {
-		return &RefusedError{Call: name, Status: resp.StatusCode, Body: snippet(raw)}
+		refused := &RefusedError{Call: name, Status: resp.StatusCode, Withheld: r.hasSensitiveRequestBody}
+		if !r.hasSensitiveRequestBody {
+			refused.Body = snippet(raw, append([]string{c.token}, stringValues(r.body)...))
+		}
+		return refused
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
 		return fmt.Errorf("%s: decoding the answer: %w", name, err)
@@ -158,18 +167,59 @@ func (c *client) call(ctx context.Context, r route, out any) error {
 	return nil
 }
 
-func idempotencyKey() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+// stringValues collects every string in a JSON-shaped request body.
+func stringValues(v any) []string {
+	switch v := v.(type) {
+	case string:
+		return []string{v}
+	case map[string]string:
+		var out []string
+		for _, s := range v {
+			out = append(out, s)
+		}
+		return out
+	case map[string]any:
+		var out []string
+		for _, s := range v {
+			out = append(out, stringValues(s)...)
+		}
+		return out
+	case []string:
+		return v
+	}
+	return nil
 }
 
-// snippet keeps a refusal readable in the log. The provider credentials it
-// could echo are repository secrets, which the runner masks already.
-func snippet(raw []byte) string {
+// snippet keeps a refusal readable in the log. It first removes every secret
+// the request submitted, raw and JSON-escaped, then truncates.
+func snippet(raw []byte, secrets []string) string {
 	s := strings.TrimSpace(string(raw))
+	for _, secret := range secrets {
+		if secret == "" {
+			continue
+		}
+		for _, form := range secretForms(secret) {
+			s = strings.ReplaceAll(s, form, "[redacted]")
+		}
+	}
 	if len(s) > 300 {
 		return s[:300] + "..."
 	}
 	return s
+}
+
+// secretForms is a secret as written raw and as a JSON string body, with and
+// without HTML escaping.
+func secretForms(secret string) []string {
+	forms := []string{secret}
+	for _, escapeHTML := range []bool{false, true} {
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(escapeHTML)
+		if enc.Encode(secret) == nil {
+			quoted := strings.TrimSpace(buf.String())
+			forms = append(forms, quoted[1:len(quoted)-1])
+		}
+	}
+	return forms
 }
