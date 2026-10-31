@@ -102,8 +102,8 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 19 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(19);
+  it("includes all 20 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(20);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");
@@ -120,6 +120,8 @@ describe("RETENTION_MANAGED_TABLES", () => {
     // (currently categorised "traces" until eval split-out lands).
     expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics");
     expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics_rollup");
+    // ADR-189: every Instant Evals judgment expires with its trace.
+    expect(RETENTION_MANAGED_TABLES).toContain("eval_results");
     expect(RETENTION_MANAGED_TABLES).toContain("langy_analytics_events");
     expect(RETENTION_MANAGED_TABLES).toContain("simulation_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("suite_runs");

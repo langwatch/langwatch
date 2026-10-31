@@ -19,6 +19,7 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   evaluation_runs: "traces",
   evaluation_analytics: "traces",
   evaluation_analytics_rollup: "traces",
+  eval_results: "traces",
   langy_analytics_events: "traces",
   dspy_steps: "traces",
   simulation_runs: "scenarios",
@@ -109,6 +110,7 @@ const TABLES_WITHOUT_SIZE_COLUMN = new Set<RetentionManagedTable>([
   "trace_analytics_rollup",
   "evaluation_analytics",
   "evaluation_analytics_rollup",
+  "eval_results",
 ]);
 
 export const PRODUCTION_STORAGE_METER_TABLES = RETENTION_MANAGED_TABLES.filter(
