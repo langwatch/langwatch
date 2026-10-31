@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.0.0](https://github.com/langwatch/langwatch/compare/skills@v1.5.0...skills@v2.0.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk:** client.dashboards and langwatch.dashboards now address the new Dashboards API, not the old Reports; use client.analyticsReports / langwatch.analytics_reports for those. MCP Reports tools are renamed platform_*_analytics_report(s).
+
+### Features
+
+* **coding-agent:** copilot CLI and VS Code sessions become rows ([#8884](https://github.com/langwatch/langwatch/issues/8884)) ([e5c5e8c](https://github.com/langwatch/langwatch/commit/e5c5e8c3eb372ac02eed8ad7e5bd1810fc3c3be1))
+* **dashboard:** add REST create and delete for Dashboards boards ([#8896](https://github.com/langwatch/langwatch/issues/8896)) ([fbc1469](https://github.com/langwatch/langwatch/commit/fbc1469027d6ef59c920243f63e2ebaf2264bcf8))
+* **dashboard:** move dashboards v2 onto its own tables ([#8707](https://github.com/langwatch/langwatch/issues/8707)) ([7f1f527](https://github.com/langwatch/langwatch/commit/7f1f527f85363fe97cdc93d300b7c469de4463eb))
+* **dashboards,insight:** dashboards and insights v1 ([#8545](https://github.com/langwatch/langwatch/issues/8545)) ([7b5e13d](https://github.com/langwatch/langwatch/commit/7b5e13dd84492d526f1442e3360005ff1ed08613))
+* **dashboards:** per-widget "Langy traces" setting in the query editor ([#9137](https://github.com/langwatch/langwatch/issues/9137)) ([5e82c1e](https://github.com/langwatch/langwatch/commit/5e82c1ebc1d2dbfda817cf175f3aba62e485a0d8))
+* **dashboards:** widget queries take sources and projects as params ([#9171](https://github.com/langwatch/langwatch/issues/9171)) ([af5a9c3](https://github.com/langwatch/langwatch/commit/af5a9c342951371a1cf547188cff78f9cd50bcc1))
+* **docs:** add a lightweight static docs app ([#8563](https://github.com/langwatch/langwatch/issues/8563)) ([395ed9c](https://github.com/langwatch/langwatch/commit/395ed9c2ce9de4f25497a3b90092a1e647018ac6))
+* **governance:** event-only aggregate reconcile; coding-agent-cost skill narrows by TenantId ([#8652](https://github.com/langwatch/langwatch/issues/8652)) ([ad90571](https://github.com/langwatch/langwatch/commit/ad9057171de3543a0cba75b07328ba348a8f2373))
+* **langy:** delete needs a confirmation click ([#7563](https://github.com/langwatch/langwatch/issues/7563)) ([a6ca678](https://github.com/langwatch/langwatch/commit/a6ca678d5dbde52f970df044cd27ae6f9627c450))
+* **sdk:** one product per dashboards path; dashboards means the new product everywhere ([#9089](https://github.com/langwatch/langwatch/issues/9089)) ([552534d](https://github.com/langwatch/langwatch/commit/552534d24487441ac5395d91c1af69ed072a0c00))
+
+
+### Bug Fixes
+
+* dashboards and insights v1 follow-ups ([#8648](https://github.com/langwatch/langwatch/issues/8648)) ([127182a](https://github.com/langwatch/langwatch/commit/127182af50d2716f03ecf9f4092c90cebf89cf56))
+* **langevals:** judges reach a verdict on gpt-6 reasoning models ([#9102](https://github.com/langwatch/langwatch/issues/9102)) ([d7b6238](https://github.com/langwatch/langwatch/commit/d7b623874e55e0b6af4d81ce9671114d54dfb2cc))
+* **langy:** never tell the user to sign in when the sandbox CLI fails ([#8775](https://github.com/langwatch/langwatch/issues/8775)) ([4f2dc72](https://github.com/langwatch/langwatch/commit/4f2dc7299f2cb5620dcd41f4509849863ed68708))
+* **langy:** pick an existing test suite before creating a scenario ([#9158](https://github.com/langwatch/langwatch/issues/9158)) ([42a13b7](https://github.com/langwatch/langwatch/commit/42a13b7f97128db7cf1570ba86b7f238fdc9d33a))
+* **langy:** say how old the newest data is when a time-bounded query returns nothing ([#8741](https://github.com/langwatch/langwatch/issues/8741)) ([bc05fd1](https://github.com/langwatch/langwatch/commit/bc05fd1683ef5cf702689118511de232af31e1e1))
+* **langy:** stop guided onboarding from promising work after it stalls ([#8714](https://github.com/langwatch/langwatch/issues/8714)) ([addfd4f](https://github.com/langwatch/langwatch/commit/addfd4fa1f60a9187d443b0e73641248ed7415db))
+
 ## [1.5.0](https://github.com/langwatch/langwatch/compare/skills@v1.4.0...skills@v1.5.0) (2026-09-30)
 
 
