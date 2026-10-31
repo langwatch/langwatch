@@ -5,7 +5,10 @@
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import {
+  pickInstantEvalRoutedSpend,
+  type InstantEvalJudgeApi,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
@@ -18,10 +21,15 @@ export interface InstantEvalJudgedSpend {
   readonly projectId: string;
   /** The run this spend belongs to; every attempt of a run records under the run's own id. */
   readonly runId?: string;
+  /** A routed page billed after its run finished, recorded under an id of its own. */
+  readonly latePage?: number;
   /** Input tokens the classifier billed for. */
   readonly inputTokens: number;
   /** Classifications made, which is one per judged text. */
   readonly requests: number;
+  /** The summed cost of routed calls, and the input tokens it covers; absent is unrouted. */
+  readonly costNanoUsd?: number;
+  readonly routedInputTokens?: number;
   readonly occurredAt: Instant;
 }
 
@@ -45,8 +53,11 @@ export class InstantEvalJudgedSpendService {
   async recordSpend({
     projectId,
     runId,
+    latePage,
     inputTokens,
     requests,
+    costNanoUsd,
+    routedInputTokens,
     occurredAt,
   }: InstantEvalJudgedSpend): Promise<void> {
     const organizationId = await this.peers.findOrganizationId({ projectId });
@@ -59,13 +70,17 @@ export class InstantEvalJudgedSpendService {
       return;
     }
 
-    const requestId = instantEvalSpendRequestId(runId ? { runId } : {});
+    const requestId = instantEvalSpendRequestId({
+      ...(runId ? { runId } : {}),
+      ...(latePage === undefined ? {} : { latePage }),
+    });
     await this.peers.judges.recordSpend({
       organizationId,
       projectId,
       requestId,
       inputTokens,
       requests,
+      ...pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens }),
       ...(runId ? { runId } : {}),
       occurredAt: occurredAt.epochMilliseconds,
     });

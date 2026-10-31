@@ -6,7 +6,12 @@
 
 import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalPriceUsd,
+  isInstantEvalSpendBillable,
+  pickInstantEvalRoutedSpend,
+  instantEvalSpentCostUsd,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -55,24 +60,29 @@ export class InstantEvalFinishService {
     outcome,
     inputTokens,
     requests,
+    costNanoUsd = 0,
+    routedInputTokens = 0,
   }: {
     runId: string;
     projectId: string;
     outcome: InstantEvalOutcome;
     inputTokens: number;
     requests: number;
+    /** A routed run's summed cost, and the input tokens it covers; none prices the tokens. */
+    costNanoUsd?: number;
+    routedInputTokens?: number;
   }): Promise<InstantEvalSpend> {
-    const costUsd = instantEvalCostUsd({ inputTokens, pricing: this.pricing });
-    const priceUsd = instantEvalPriceUsd({ costUsd, pricing: this.pricing });
+    const { costUsd, priceUsd } = this.#spendOf({ inputTokens, costNanoUsd, routedInputTokens });
 
     // A run that judged no row records no spend: a record of zero is one a
-    // customer has to read and dismiss.
-    if (inputTokens > 0) {
+    // customer has to read and dismiss. A routed cost with no input tokens is billed.
+    if (isInstantEvalSpendBillable({ inputTokens, costNanoUsd })) {
       await this.spend.recordSpend({
         projectId,
         runId,
         inputTokens,
         requests,
+        ...pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens }),
         occurredAt: this.now(),
       });
       logger.debug(
@@ -87,5 +97,64 @@ export class InstantEvalFinishService {
     await this.budget.release({ projectId, reservationId: runId });
 
     return { costUsd, priceUsd };
+  }
+
+  /**
+   * A routed page that reported after the run finished, which the finish did not count: billed on
+   * a spend row of its own beside the run's, priced as the finish prices. Its hold went with the
+   * finish, so there is none to release. Raised when it cannot be recorded, so the intent retries.
+   */
+  async billLatePage({
+    runId,
+    projectId,
+    page,
+    inputTokens,
+    requests,
+    costNanoUsd,
+    routedInputTokens,
+  }: {
+    runId: string;
+    projectId: string;
+    page: number;
+    inputTokens: number;
+    requests: number;
+    costNanoUsd: number;
+    routedInputTokens: number;
+  }): Promise<InstantEvalSpend> {
+    const spend = this.#spendOf({ inputTokens, costNanoUsd, routedInputTokens });
+    if (isInstantEvalSpendBillable({ inputTokens, costNanoUsd })) {
+      await this.spend.recordSpend({
+        projectId,
+        runId,
+        latePage: page,
+        inputTokens,
+        requests,
+        ...pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens }),
+        occurredAt: this.now(),
+      });
+      logger.debug({ projectId, runId, page, ...spend }, "Instant Eval late page spend recorded");
+    }
+
+    return spend;
+  }
+
+  #spendOf({
+    inputTokens,
+    costNanoUsd,
+    routedInputTokens,
+  }: {
+    inputTokens: number;
+    costNanoUsd: number;
+    routedInputTokens: number;
+  }): InstantEvalSpend {
+    const { pricing } = this;
+    const costUsd = instantEvalSpentCostUsd({
+      inputTokens,
+      costNanoUsd,
+      routedInputTokens,
+      pricing,
+    });
+
+    return { costUsd, priceUsd: instantEvalPriceUsd({ costUsd, pricing }) };
   }
 }

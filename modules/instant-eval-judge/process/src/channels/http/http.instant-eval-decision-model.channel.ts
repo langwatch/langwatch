@@ -38,18 +38,27 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   private constructor(
     private readonly dispatcher: Dispatcher | undefined,
     private readonly sleep: Sleep,
+    private readonly maxAttempts: number,
   ) {}
 
-  /** `dispatcher` is a suite's stand-in for the socket; undici's global pool otherwise. */
+  /**
+   * `dispatcher` is a suite's stand-in for the socket; undici's global pool otherwise.
+   * `maxAttempts` is 1 for a caller that paces every send itself, as the router's hosted leg does.
+   */
   static create({
     dispatcher,
     sleep = abortableSleep,
-  }: { dispatcher?: Dispatcher; sleep?: Sleep } = {}): HttpInstantEvalDecisionModelChannel {
-    return new HttpInstantEvalDecisionModelChannel(dispatcher, sleep);
+    maxAttempts = MAX_ATTEMPTS,
+  }: {
+    dispatcher?: Dispatcher;
+    sleep?: Sleep;
+    maxAttempts?: number;
+  } = {}): HttpInstantEvalDecisionModelChannel {
+    return new HttpInstantEvalDecisionModelChannel(dispatcher, sleep, maxAttempts);
   }
 
   async classify(
-    { text, questions, decisionModel }: InstantEvalDecisionModelRequest,
+    { text, questions, decisionModel, isBilledToLangWatch }: InstantEvalDecisionModelRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalJudgement> {
     const limits = INSTANT_EVAL_CLASSIFIER_LIMITS;
@@ -66,7 +75,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     );
 
     let lastReason: InstantEvalSkipReason = "classifier_provider_unavailable";
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       const sent = await this.send({
         endpoint: decisionModel.endpoint,
         apiKey: decisionModel.apiKey,
@@ -80,10 +89,9 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
             reason: "classifier_provider_unavailable",
             model: decisionModel.model,
           });
-        // The provider bills the organization, so nothing here is billed by LangWatch (ADR-182).
         return {
           verdicts: readClassifierVerdicts({ questions, response }),
-          inputTokens: 0,
+          ...billedTokensOf({ isBilledToLangWatch, response }),
           isTextTruncated: prepared.isTruncated,
         };
       }
@@ -95,7 +103,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
         });
       }
       lastReason = sent.kind === "failed" ? sent.failure.reason : "classifier_provider_unavailable";
-      if (attempt < MAX_ATTEMPTS)
+      if (attempt < this.maxAttempts)
         await this.sleep(waitMs({ attempt, retryAfter: sent.retryAfter }), signal);
     }
     return this.skip({ reason: lastReason, model: decisionModel.model });
@@ -158,6 +166,25 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     logger.warn({ model, reason, status }, "Own decision model call did not answer");
     return instantEvalSkipped(reason);
   }
+}
+
+/**
+ * An own model bills the organization, so LangWatch bills nothing for it (ADR-182). A send billed
+ * to LangWatch carries every token the provider reports, input and output alike.
+ */
+function billedTokensOf({
+  isBilledToLangWatch,
+  response,
+}: {
+  isBilledToLangWatch: boolean | undefined;
+  response: { usage?: { input_tokens?: number; output_tokens?: number } | undefined };
+}): { inputTokens: number; outputTokens?: number } {
+  if (!isBilledToLangWatch) return { inputTokens: 0 };
+  const outputTokens = response.usage?.output_tokens;
+  return {
+    inputTokens: response.usage?.input_tokens ?? 0,
+    ...(outputTokens === undefined ? {} : { outputTokens }),
+  };
 }
 
 function waitMs({ attempt, retryAfter }: { attempt: number; retryAfter: string | null }): number {

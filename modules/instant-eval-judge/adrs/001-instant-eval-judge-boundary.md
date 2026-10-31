@@ -6,6 +6,8 @@
 
 **Related:** [The Instant Evals judge call is metered](../../../dev/docs/adr/174-instant-evals-judge-call-is-metered.md),
 decision 13, and `dev/docs/ARCHITECTURE.md` section 5.
+[A routed judgement is priced from the summed cost of its calls](../../../dev/docs/adr/190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md) (ADR-190, proposed)
+supersedes ADR-174 decisions 6, 8 and 11 for routed calls and amends decision 13.
 
 ## Context
 
@@ -16,7 +18,9 @@ gateway and trace. Evaluation depending on Instant Evals would close a peer cycl
 ## Decision
 
 `instant-eval-judge` owns what a judge is asked and answers (questions, verdicts, skip reasons,
-the classifier's limits) and the pricing rule, moved from Instant Evals unchanged. Instant Evals and
+the classifier's limits) and two pricing rules: the classifier's input-token rule, moved from
+Instant Evals unchanged and used for unrouted calls, and the routed rule of ADR-190, which prices a
+judgement from the summed cost of its calls. Instant Evals and
 evaluation import them from this module's contract. It also owns LangWatch's cloud classifier client,
 its key, rate limits and settings, its own tables, the $1 check and the metered judge method
 (ADR-174 decisions 10, 13 and 14).
@@ -35,6 +39,13 @@ slice and the priced event's schema. There is no transport.
   refuses an organization that is not usage-billed once its spend rows reach $1
   (`instant_eval_free_budget_exhausted`), classifies, prices, and appends the priced fact. A refusal
   is returned, never thrown, and calls no classifier. The spend id comes from the caller's retry key.
+- `judge` and `classify` also take an optional route. A call with a route goes through the router,
+  which may call a decision model, Jev and an LLM judge, and answers with a judgement that carries
+  its cost and the input tokens that cost covers (`routedInputTokens`). A call without one takes
+  the single hosted classifier call.
+- `queryHoldPricing` returns the rate a judged query is held at: the dearest input rate any backend
+  the route table can reach, never below the classifier rate, at the one markup. It is computed
+  once at boot. It is a best-effort hold, not a hard cap on a routed query (ADR-190 decision 7).
 - `classify` is the unmetered call Instant Evals uses for its own runs and queries, which keep their
   own spend rule in wave 1.
 - `isClassifierConfigured` tells Instant Evals whether LangWatch's key is set, so it can choose this
@@ -89,6 +100,19 @@ A fact whose project has no team is logged and dropped; one gateway cannot write
 The cloud classifier is an HTTP channel built only when the key is set, wrapped in a Redis token
 bucket per project and one for the deployment. The module owns and closes it.
 
+The router adds two outbound HTTP channels, each built only when its key is set: the hosted
+decisions endpoint (`http.instant-eval-hosted-decisions.channel.ts`) and an LLM judge channel for
+Anthropic and OpenAI (`http.instant-eval-llm-judge.channel.ts`). The module owns and closes them.
+The leaf now has four upstreams. It still calls no peer Api.
+
+Pricing has two rules. An unrouted judgement is priced from its input tokens at the classifier's
+rate, under the model `jev`. A routed judgement is priced from the summed cost of its calls at
+the same markup, under the model `langwatch-judge` and the rate version
+`instant_eval_judge_router@<version>x<markup>`. A judgement that carries a cost, including 0, is a
+routed one. It also carries `routedInputTokens`, the input tokens its cost covers; a page or run
+costs its routed cost plus its other input tokens at the classifier's rate, so a run that mixes
+routed and unrouted calls is billed correctly. The flag `release_instant_evals_judge_router` gates routing per organization.
+
 ## Environment and configuration
 
 Moved from Instant Evals with the client, under the same names:
@@ -98,6 +122,17 @@ Moved from Instant Evals with the client, under the same names:
 - `JEV_BASE_URL` (https only) and `JEV_MODEL`.
 - `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` and `INSTANT_EVAL_TENANT_TOKENS_PER_SECOND`.
 - Whether the install is LangWatch cloud, from the shared config.
+
+Added by the router (ADR-190), all read on LangWatch cloud only:
+
+- `INSTANT_EVAL_JUDGE_ROUTES` (JSON, optional): the route table. Unset, every slot asks the hosted
+  classifier alone.
+- `INSTANT_EVAL_JUDGE_PRICING` (JSON, optional): per-backend input and output prices, with an
+  optional long-context tier and a version. A backend a route can reach with no price refuses boot.
+  Unset, the hosted classifier is priced at its published rate.
+- `INSTANT_EVAL_DECISIONS_API_KEY`, `INSTANT_EVAL_ANTHROPIC_API_KEY` and
+  `INSTANT_EVAL_OPENAI_API_KEY` (secrets, optional): LangWatch's keys for the router's decision
+  model, Anthropic and OpenAI legs.
 
 ## Errors
 
