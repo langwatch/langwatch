@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.0.0...mcp-server@v3.1.0) (2026-10-31)
+
+
+### Features
+
+* **dashboards:** widget queries take sources and projects as params ([#9171](https://github.com/langwatch/langwatch/issues/9171)) ([af5a9c3](https://github.com/langwatch/langwatch/commit/af5a9c342951371a1cf547188cff78f9cd50bcc1))
+
 ## [3.0.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.2.0...mcp-server@v3.0.0) (2026-10-30)
 
 
