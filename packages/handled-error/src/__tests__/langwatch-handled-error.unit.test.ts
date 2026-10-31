@@ -541,6 +541,46 @@ describe("parseHandledError, given a failure the platform did NOT name", () => {
 
     expect(parsed.isHandled).toBe(false);
   });
+
+  /** @scenario "an unnamed 403 is read as forbidden" */
+  it.each([null, "Forbidden", "<html>Forbidden</html>"])(
+    "reads an unnamed 403 as forbidden (%j)",
+    (body) => {
+      const parsed = parseHandledError({ status: 403, body });
+
+      expect(parsed).toMatchObject({
+        code: "forbidden",
+        kind: "forbidden",
+        httpStatus: 403,
+        isHandled: false,
+      });
+      expect(toCliErrorDocument(parsed).error.code).toBe("forbidden");
+    },
+  );
+
+  it.each([
+    [401, "unauthorized"],
+    [404, "not_found"],
+    [429, "rate_limited"],
+    [500, "internal_error"],
+  ] as const)("leaves an unnamed %s as %s", (status, code) => {
+    const parsed = parseHandledError({ status, body: null });
+
+    expect(parsed).toMatchObject({ code, kind: code });
+  });
+
+  /** @scenario "a 403 the platform named keeps its own code" */
+  it.each(["api_key_permission_denied", "resource_limit_exceeded"])(
+    "keeps a 403 the platform named %s",
+    (code) => {
+      const parsed = parseHandledError({
+        status: 403,
+        body: { code, kind: code, message: code, meta: {} },
+      });
+
+      expect(parsed).toMatchObject({ code, kind: code, httpStatus: 403, isHandled: true });
+    },
+  );
 });
 
 describe("the JSON error document round-trip", () => {
