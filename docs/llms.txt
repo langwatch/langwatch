@@ -79,6 +79,15 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Custom Events](https://langwatch.ai/docs/user-events/custom.md): Track custom user events in your LLM application using LangWatch to support analytics, evaluations, and agent testing workflows.
 
 - [Querying your data](https://langwatch.ai/docs/features/querying-your-data.md): LangWatch answers two query languages, analytics SQL and the trace filter. One endpoint describes both, and the CLI runs either without a browser.
+
+### LangWatchQL
+
+- [LangWatchQL](https://langwatch.ai/docs/features/langwatchql/overview.md): Read-only SQL over your traces, spans, evaluations, simulations and coding-agent sessions, from the REST API, the CLI or an MCP client.
+- [LangWatchQL first queries: one example per view](https://langwatch.ai/docs/features/langwatchql/first-query.md): Worked LangWatchQL statements for traces, spans, evaluations, simulations, per-minute rollups, conversations, coding-agent sessions and Instant Eval judgments.
+- [LangWatchQL extraction and eval functions: read and judge conversations](https://langwatch.ai/docs/features/langwatchql/extraction-functions.md): Pull conversation transcripts, model calls and whole traces into a query result, and ask a question of each one with an eval function.
+- [LangWatchQL limits, rate limits and cost](https://langwatch.ai/docs/features/langwatchql/limits-and-cost.md): How many rows a query returns, how large and long it can be, how many queries a plan runs per minute, and what is charged.
+- [LangWatchQL common questions: error messages and fixes](https://langwatch.ai/docs/features/langwatchql/common-questions.md): The messages LangWatchQL returns when it refuses or stops a query, and what to change in each case.
+
 - [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
 - [Alerts and Automations](https://langwatch.ai/docs/features/automations.md): Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
 - [Topic clustering](https://langwatch.ai/docs/features/topic-clustering.md): Group your traces into topics and subtopics automatically, choose the model it uses, and run it on demand from Settings.

@@ -1,0 +1,68 @@
+---
+title: "LangWatchQL extraction and eval functions: read and judge conversations"
+sidebarTitle: Extraction and eval functions
+keywords: langwatch, langwatchql, lwql, conversation, transcript, llm_messages, trace_json, eval, eval_passed, eval_score, eval_category, judge in sql
+description: Pull conversation transcripts, model calls and whole traces into a query result, and ask a question of each one with an eval function.
+---
+
+## What are extraction functions
+
+An extraction function reads the content of a conversation, a trace or a span and puts it into a column of your result. For example, `conversation_bounded(ConversationId, 8000, '')` returns each conversation as a transcript of at most 8,000 tokens, so you can export a week of chats to a file with one query.
+
+Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). Anywhere else, or without an alias, the query is refused. The one exception is an eval function: its text argument may hold one extraction function, but not a second level, as in the `eval` example below. Exact signatures are in the [extraction functions reference](/api-reference/query/extraction-functions).
+
+## Which function do I need
+
+{/* lwql-key-caps-start */}
+| You want | Use | Distinct keys one query may read |
+| --- | --- | --- |
+| The conversation as the chat view shows it | `conversation(thread_key)` | 200 conversations |
+| The same, cut to a token budget | `conversation_bounded(thread_key, max_tokens, until_trace_id)` | 200 conversations |
+| The conversation plus the agent's tool calls, results and retrievals | `llm_readable_thread(thread_key, max_tokens)` | 200 conversations |
+| The trace ids of a conversation, oldest first | `thread_traces(thread_key)` | 200 conversations |
+| A readable digest of the spans in one trace | `llm_readable_trace(trace_id, max_tokens)` | 1,000 traces |
+| The model call's input and output as JSON | `llm_messages(trace_id)` | 1,000 traces |
+| Only the request side, or only the response side | `llm_input_messages(trace_id)`, `llm_output_messages(trace_id)` | 1,000 traces |
+| The model call of one span | `llm_messages_span(trace_id, span_id)` | 1,000 spans |
+| The whole trace as JSON | `trace_json(trace_id)` | 1,000 traces |
+{/* lwql-key-caps-end */}
+
+The cap counts distinct conversations, traces or spans, not rows. A row that repeats a key does not count again, so a query grouping ten thousand rows onto 50 conversations reads 50. A query that needs more keys than the cap is refused with `lwql_app_function_key_cap`.
+
+These functions return message content, so your key needs both the `input` and the `output` permission. Two exceptions: `llm_input_messages` needs only `input`, and `thread_traces` returns only ids and needs neither.
+
+## Export a week of conversations
+
+```sql
+SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript
+FROM langwatch.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
+GROUP BY ConversationId
+ORDER BY ConversationId
+LIMIT 200
+```
+
+```bash
+langwatch query --sql-file transcripts.sql --format jsonl --out transcripts.jsonl
+```
+
+## What are eval functions
+
+An eval function asks a question in plain words of a text and returns the answer as a column. You can give it any text column, including the output of an extraction function, so one query can judge every conversation in a time window:
+
+```sql
+eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
+```
+
+| Function | Returns |
+| --- | --- |
+| `eval(text, instructions)` | A probability from 0 to 1 |
+| `eval_criteria(text, instructions, criteria)` | The same, with two entries saying what counts as yes and what does not |
+| `eval_passed(text, instructions, threshold)` | 1 or 0 |
+| `eval_score(text, instructions, min, max)` | A score on a scale of at most 10 levels |
+| `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
+| `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
+
+One query judges at most 1,000 distinct texts. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then carries the `INSTANT_EVAL_SKIPPED` diagnostic.
+
+**Also check:** [Instant Evals](/features/instant-evals/overview) runs the same kind of question from the CLI, and writes every verdict to the `judgments` view.

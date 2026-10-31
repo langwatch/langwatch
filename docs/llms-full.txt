@@ -43957,8 +43957,8 @@ SELECT
   t.Attributes['user.id'] AS user,
   sum(j.Passed) AS annoyed,
   count() AS conversations
-FROM analytics.judgments AS j
-JOIN analytics.traces AS t ON t.TraceId = j.TraceId
+FROM langwatch.judgments AS j
+JOIN langwatch.traces AS t ON t.TraceId = j.TraceId
 WHERE j.RunId = {run:String}
   AND j.QuestionId = 'annoyed'
   AND j.CreatedAt >= subtractDays(now(), 7)
@@ -44076,7 +44076,7 @@ SELECT
   Attributes['gen_ai.conversation.id'] AS ThreadId,
   OccurredAt,
   eval(llm_readable_trace(TraceId, 8000), 'the customer sounds annoyed') AS q1
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= {start_at:DateTime}
   AND OccurredAt < {end_at:DateTime}
 ORDER BY TraceId
@@ -44090,7 +44090,7 @@ SELECT
   m.ConversationId AS ThreadId,
   max(m.OccurredAt) AS OccurredAt,
   eval(llm_readable_thread(m.ConversationId, 18729), 'the customer sounds annoyed') AS q1
-FROM analytics.trace_metrics AS m
+FROM langwatch.trace_metrics AS m
 WHERE m.OccurredAt >= {start_at:DateTime}
   AND m.OccurredAt < {end_at:DateTime}
   AND m.ConversationId != ''
@@ -44106,14 +44106,14 @@ SELECT
   SpanId,
   StartTime AS OccurredAt,
   eval(llm_messages_span(TraceId, SpanId), 'the model was asked to do two things at once') AS q1
-FROM analytics.spans
+FROM langwatch.spans
 WHERE StartTime >= {start_at:DateTime}
   AND StartTime < {end_at:DateTime}
   AND SpanAttributes['langwatch.span.type'] = 'llm'
 ORDER BY TraceId, SpanId
 ```
 
-A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `analytics.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
+A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `langwatch.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
 
 ## What is the token budget per row
 
@@ -44193,6 +44193,545 @@ The same functions work in a plain `langwatch query`, which judges the rows the 
 
 ---
 
+# FILE: ./features/langwatchql/common-questions.mdx
+
+---
+title: "LangWatchQL common questions: error messages and fixes"
+sidebarTitle: Common questions
+keywords: langwatch, langwatchql, lwql, error, cannot be used here, not available to you, wildcard, limit, select only, timeout, rate limited
+description: The messages LangWatchQL returns when it refuses or stops a query, and what to change in each case.
+---
+
+When a statement is refused, the error lists each problem in `meta.violations`, often with the names you can use instead.
+
+## The function cannot be used here
+
+```text
+The function "<f>" cannot be used here. Rewrite the expression using one of the supported functions, listed under `functions` on GET /api/v1/query/schema...
+```
+
+LangWatchQL accepts a fixed list of ClickHouse functions. Rewrite the expression with one from the `allowedFunctions` list in the error, or from `langwatch query schema`. The [supported functions](/api-reference/query/overview#supported-functions) are also listed in the reference.
+
+## The view is not available to you
+
+```text
+The view "<v>" is not available to you. Use one of the views from the schema endpoint.
+```
+
+Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On a self-hosted deployment the prefix is the database named in `CLICKHOUSE_URL`, which is `langwatch` in the shipped chart and `.env.example`. Pick a view from the `availableViews` list in the violation, or from `langwatch query schema`. There is no `conversations` or `threads` view: group `langwatch.trace_metrics` by `ConversationId` instead.
+
+## The field is not available to you
+
+```text
+The field "<c>" is not available to you. Remove it from the query.
+```
+
+The column needs a permission your key does not have: `input` or `output` for message text, `cost:view` for cost columns. Remove the column, or use a key with that permission. The error lists the columns you can read in `availableColumns`.
+
+## A wildcard cannot be used here
+
+```text
+List the fields you need by name
+```
+
+The message goes on to say that a wildcard cannot be used, because some fields are not available to you.
+
+Replace `SELECT *` with the column names. `langwatch query schema` lists them.
+
+## The LIMIT is above the maximum
+
+```text
+The LIMIT of N rows is above the maximum of 10,000 rows this API returns per request. Lower it and page the rest with LIMIT/OFFSET and an ORDER BY.
+```
+
+Set `LIMIT 10000` or lower and page through the rest, as in [How do I get more than 10,000 rows](/features/langwatchql/limits-and-cost#how-do-i-get-more-than-10000-rows).
+
+## Only a single SELECT statement can be submitted
+
+```text
+Only a single SELECT statement, optionally with a WITH clause, can be submitted here.
+Only one statement can be submitted at a time. Send a single SELECT statement.
+```
+
+LangWatchQL is read-only. Send one `SELECT`, with no `INSERT`, `ALTER` or second statement after a `;`. `FORMAT`, `INTO OUTFILE`, table functions and system databases are refused too.
+
+## This is not valid ClickHouse SQL
+
+```text
+This is not valid ClickHouse SQL. Check the syntax and try again.
+```
+
+Check quotes, commas and brackets. Parameters are written `{name:Type}`, for example `{days:UInt32}`.
+
+## A SETTINGS clause cannot be used here
+
+```text
+A SETTINGS clause cannot be used here.
+```
+
+The message goes on to say that execution settings are fixed by the API.
+
+Remove the `SETTINGS` clause. Run time, memory and the other server limits are the same for every query, see [Limits and cost](/features/langwatchql/limits-and-cost#limits).
+
+## The query names a column that does not exist
+
+```text
+The query names a column that does not exist: X.
+```
+
+Check the column against `langwatch query schema`. Columns differ between views: for example, `HasError` is on `trace_metrics`, while `traces` has `ContainsErrorStatus`.
+
+## The query timed out or read too much data
+
+```text
+Query timed out (X.Xs)
+Query would read more data than its scan limit allows and was aborted
+```
+
+Narrow the time filter, filter on the view's time column if the query does not yet, or move a count or sum over time to `trace_metrics_by_minute` or `model_usage_by_minute`, which hold data already summed per minute.
+
+## Too many queries
+
+```text
+Too many LangWatchQL queries for this project.
+Too many LangWatchQL queries are running right now.
+```
+
+The first is the per-minute rate limit (429): wait the number of seconds in `meta.retryAfterSeconds`. The second means too many queries are running at once (503): retry after the running ones finish. Plan limits are in [Limits and cost](/features/langwatchql/limits-and-cost#how-many-queries-can-i-run-per-minute).
+
+---
+
+# FILE: ./features/langwatchql/extraction-functions.mdx
+
+---
+title: "LangWatchQL extraction and eval functions: read and judge conversations"
+sidebarTitle: Extraction and eval functions
+keywords: langwatch, langwatchql, lwql, conversation, transcript, llm_messages, trace_json, eval, eval_passed, eval_score, eval_category, judge in sql
+description: Pull conversation transcripts, model calls and whole traces into a query result, and ask a question of each one with an eval function.
+---
+
+## What are extraction functions
+
+An extraction function reads the content of a conversation, a trace or a span and puts it into a column of your result. For example, `conversation_bounded(ConversationId, 8000, '')` returns each conversation as a transcript of at most 8,000 tokens, so you can export a week of chats to a file with one query.
+
+Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). Anywhere else, or without an alias, the query is refused. The one exception is an eval function: its text argument may hold one extraction function, but not a second level, as in the `eval` example below. Exact signatures are in the [extraction functions reference](/api-reference/query/extraction-functions).
+
+## Which function do I need
+
+{/* lwql-key-caps-start */}
+| You want | Use | Distinct keys one query may read |
+| --- | --- | --- |
+| The conversation as the chat view shows it | `conversation(thread_key)` | 200 conversations |
+| The same, cut to a token budget | `conversation_bounded(thread_key, max_tokens, until_trace_id)` | 200 conversations |
+| The conversation plus the agent's tool calls, results and retrievals | `llm_readable_thread(thread_key, max_tokens)` | 200 conversations |
+| The trace ids of a conversation, oldest first | `thread_traces(thread_key)` | 200 conversations |
+| A readable digest of the spans in one trace | `llm_readable_trace(trace_id, max_tokens)` | 1,000 traces |
+| The model call's input and output as JSON | `llm_messages(trace_id)` | 1,000 traces |
+| Only the request side, or only the response side | `llm_input_messages(trace_id)`, `llm_output_messages(trace_id)` | 1,000 traces |
+| The model call of one span | `llm_messages_span(trace_id, span_id)` | 1,000 spans |
+| The whole trace as JSON | `trace_json(trace_id)` | 1,000 traces |
+{/* lwql-key-caps-end */}
+
+The cap counts distinct conversations, traces or spans, not rows. A row that repeats a key does not count again, so a query grouping ten thousand rows onto 50 conversations reads 50. A query that needs more keys than the cap is refused with `lwql_app_function_key_cap`.
+
+These functions return message content, so your key needs both the `input` and the `output` permission. Two exceptions: `llm_input_messages` needs only `input`, and `thread_traces` returns only ids and needs neither.
+
+## Export a week of conversations
+
+```sql
+SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript
+FROM langwatch.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
+GROUP BY ConversationId
+ORDER BY ConversationId
+LIMIT 200
+```
+
+```bash
+langwatch query --sql-file transcripts.sql --format jsonl --out transcripts.jsonl
+```
+
+## What are eval functions
+
+An eval function asks a question in plain words of a text and returns the answer as a column. You can give it any text column, including the output of an extraction function, so one query can judge every conversation in a time window:
+
+```sql
+eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
+```
+
+| Function | Returns |
+| --- | --- |
+| `eval(text, instructions)` | A probability from 0 to 1 |
+| `eval_criteria(text, instructions, criteria)` | The same, with two entries saying what counts as yes and what does not |
+| `eval_passed(text, instructions, threshold)` | 1 or 0 |
+| `eval_score(text, instructions, min, max)` | A score on a scale of at most 10 levels |
+| `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
+| `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
+
+One query judges at most 1,000 distinct texts. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then carries the `INSTANT_EVAL_SKIPPED` diagnostic.
+
+**Also check:** [Instant Evals](/features/instant-evals/overview) runs the same kind of question from the CLI, and writes every verdict to the `judgments` view.
+
+---
+
+# FILE: ./features/langwatchql/first-query.mdx
+
+---
+title: "LangWatchQL first queries: one example per view"
+sidebarTitle: Your first queries
+keywords: langwatch, langwatchql, lwql, sql examples, traces, spans, evaluations, simulations, trace_metrics, rollups, coding sessions, judgments
+description: Worked LangWatchQL statements for traces, spans, evaluations, simulations, per-minute rollups, conversations, coding-agent sessions and Instant Eval judgments.
+---
+
+Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. The one exception is the judgments statement, which has a `{run:String}` parameter that needs a value. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
+
+## Traces: the most recent failures
+
+`traces` has one row per trace, and its time column is `OccurredAt`.
+
+```sql
+SELECT TraceId, TraceName, OccurredAt, TotalDurationMs
+FROM langwatch.traces
+WHERE OccurredAt >= subtractDays(now(), 1)
+  AND ContainsErrorStatus
+ORDER BY OccurredAt DESC
+LIMIT 100
+```
+
+For latency, use `quantile` on the same view:
+
+```sql
+SELECT
+  quantile(0.5)(TotalDurationMs) AS p50_ms,
+  quantile(0.95)(TotalDurationMs) AS p95_ms,
+  quantile(0.99)(TotalDurationMs) AS p99_ms
+FROM langwatch.traces
+WHERE OccurredAt >= subtractDays(now(), 7)
+```
+
+## Spans: the slowest span in each trace
+
+`spans` has one row per span, and its time column is `StartTime`. When you join two views, filter the time column on both sides, because the join key does not narrow the read.
+
+```sql
+SELECT
+  t.TraceId AS TraceId,
+  t.TraceName AS TraceName,
+  count() AS spans,
+  max(s.DurationMs) AS slowest_span_ms
+FROM langwatch.traces AS t
+INNER JOIN langwatch.spans AS s
+  ON s.TenantId = t.TenantId AND s.TraceId = t.TraceId
+WHERE t.OccurredAt >= subtractDays(now(), 1)
+  AND s.StartTime >= subtractDays(now(), 1)
+GROUP BY TraceId, TraceName
+ORDER BY slowest_span_ms DESC
+LIMIT 50
+```
+
+## Evaluations: pass rate per evaluator
+
+`evaluations` has one row per evaluator result, and its time column is `ScheduledAt`. Filter on `Status = 'processed'`, because scheduled, skipped and errored rows have no verdict and would lower the rate.
+
+```sql
+SELECT
+  EvaluatorName,
+  count() AS evaluations,
+  countIf(Passed = 1) AS passed,
+  countIf(Passed = 1) / count() AS pass_rate
+FROM langwatch.evaluations
+WHERE ScheduledAt >= subtractDays(now(), 7)
+  AND Status = 'processed'
+GROUP BY EvaluatorName
+ORDER BY evaluations DESC
+LIMIT 50
+```
+
+## Simulations: runs that failed
+
+`simulations` has one row per scenario run, and its time column is `StartedAt`.
+
+```sql
+SELECT ScenarioRunId, Name, Verdict, StartedAt
+FROM langwatch.simulations
+WHERE StartedAt >= subtractDays(now(), 7)
+  AND Verdict = 'failure'
+ORDER BY StartedAt DESC
+LIMIT 50
+```
+
+## Rollups: traffic per hour and cost per model
+
+`trace_metrics_by_minute` and `model_usage_by_minute` hold one row per minute that is already summed, so a count or a sum over time reads far less here than over `traces`. Every measure is a sum, so divide by `TraceCount` when you want an average. Their time column is `BucketStart`.
+
+```sql
+SELECT
+  toStartOfHour(BucketStart) AS hour,
+  sum(TraceCount) AS traces,
+  sum(ErrorCount) AS errors
+FROM langwatch.trace_metrics_by_minute
+WHERE BucketStart >= subtractDays(now(), 2)
+GROUP BY hour
+ORDER BY hour
+```
+
+Cost columns need the `cost:view` permission on your key:
+
+```sql
+SELECT
+  Model,
+  sum(CostSum) AS cost_usd,
+  sum(PromptTokensSum + CompletionTokensSum) AS tokens
+FROM langwatch.model_usage_by_minute
+WHERE BucketStart >= subtractDays(now(), 7)
+GROUP BY Model
+ORDER BY cost_usd DESC
+LIMIT 50
+```
+
+## Conversations: the longest ones of the week
+
+There is no conversations view. A conversation is the group of traces that share a `ConversationId`, and `trace_metrics` is the view that has that column, along with `UserId`, `CustomerId` and `HasError`.
+
+```sql
+SELECT
+  ConversationId,
+  count() AS turns,
+  min(OccurredAt) AS started_at,
+  max(OccurredAt) AS last_turn
+FROM langwatch.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 7)
+  AND ConversationId IS NOT NULL
+GROUP BY ConversationId
+ORDER BY turns DESC
+LIMIT 50
+```
+
+## Coding-agent sessions: sessions per agent and repository
+
+`coding_sessions` has one row per coding-agent session, and its time column is `StartedAt`.
+
+```sql
+SELECT
+  Agent,
+  RepositoryName,
+  count() AS sessions
+FROM langwatch.coding_sessions
+WHERE StartedAt >= subtractDays(now(), 7)
+GROUP BY Agent, RepositoryName
+ORDER BY sessions DESC
+LIMIT 50
+```
+
+## Judgments: Instant Eval verdicts per question
+
+`judgments` has one row per [Instant Eval](/features/instant-evals/overview) run, trace and question, and its time column is `CreatedAt`. Rows with `Status` `skipped` or `failed` have no verdict, so the statement keeps only `judged` rows. Bind the run id as a parameter. With the CLI, add `--param run=<run-id>`. With REST, add `"parameters": {"run": "<run-id>"}` to the request body.
+
+```sql
+SELECT
+  QuestionId,
+  sum(Passed) AS yes,
+  count() AS judged
+FROM langwatch.judgments
+WHERE RunId = {run:String}
+  AND Status = 'judged'
+  AND CreatedAt >= subtractDays(now(), 7)
+GROUP BY QuestionId
+ORDER BY QuestionId
+```
+
+To read verdicts next to trace data, join `judgments` to `traces` on `TraceId`, as in [Reading the results](/features/instant-evals/results#the-judgments-dataset).
+
+**Also check:** `langwatch query examples` prints more worked statements, and the [Query API reference](/api-reference/query/overview#queryable-views) lists every view and column.
+
+---
+
+# FILE: ./features/langwatchql/limits-and-cost.mdx
+
+---
+title: LangWatchQL limits, rate limits and cost
+sidebarTitle: Limits and cost
+keywords: langwatch, langwatchql, lwql, row limit, 10000 rows, timeout, rate limit, queries per minute, result too large, billing, cost
+description: How many rows a query returns, how large and long it can be, how many queries a plan runs per minute, and what is charged.
+---
+
+## Limits
+
+{/* lwql-limits-start */}
+| What | Limit | Over the limit |
+| --- | --- | --- |
+| Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added at the end. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
+| Result size | About 8,000,000 bytes | 413 `lwql_result_too_large`. You never get a cut result. |
+| Statement length | 50,000 characters | The request is refused |
+| Run time | 10 seconds | 504 `query_timeout` |
+| Memory | 1 GB | 422 `query_memory_exceeded` |
+| Data read | 1,000,000,000 rows or 10,000,000,000 bytes | 422 `query_scan_limit_exceeded` |
+| Threads | 4 per query | |
+| Queries running at once | 10, shared by the whole deployment, not per project or per key | 503 `lwql_busy` |
+{/* lwql-limits-end */}
+
+Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. A `SETTINGS` clause that tries to change them is refused.
+
+## How many queries can I run per minute
+
+{/* lwql-rates-start */}
+| Plan | Queries per minute, per project |
+| --- | --- |
+| Free | 30 |
+| Paid | 60 |
+| Enterprise | 120 |
+{/* lwql-rates-end */}
+
+The window is a fixed 60 seconds. Over the limit the answer is 429 `lwql_rate_limited`, and `meta.retryAfterSeconds` in the error tells you how long to wait.
+
+## How do I get more than 10,000 rows
+
+Page through the result. Order by a time column and an id, alias those two columns to the cursor parameter names `after_ts` and `after_id`, and let the CLI rebind them for each page:
+
+```sql
+SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
+FROM langwatch.traces
+WHERE OccurredAt >= subtractDays(now(), 7)
+  AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
+ORDER BY OccurredAt, TraceId
+LIMIT 1000
+```
+
+```bash
+langwatch query --sql-file export.sql --page-by keyset --format jsonl --out export.jsonl
+```
+
+From the REST API, page with `LIMIT` and `OFFSET` and an `ORDER BY`. In a `UNION`, give every branch its own `LIMIT`, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`.
+
+## What does a query cost
+
+Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered and charged per query. The [extraction functions reference](/api-reference/query/extraction-functions#what-one-query-costs) has the details.
+
+## Error codes
+
+{/* lwql-error-codes-start */}
+| Status | Code | What it means |
+| --- | --- | --- |
+| 400 | `validation_error` | The request body is not valid |
+| 400 | `lwql_unparseable` | The statement is not valid ClickHouse SQL |
+| 400 | `lwql_not_permitted` | The statement uses something LangWatchQL does not allow, such as a second statement, a view or a function |
+| 400 | `lwql_unknown_identifier` | The statement names a column that does not exist |
+| 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
+| 403 | `api_key_permission_denied` | The key does not have `analytics:view` |
+| 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
+| 413 | `lwql_result_too_large` | The result is over the result size limit in [Limits](#limits) |
+| 422 | `query_scan_limit_exceeded`, `query_memory_exceeded` | The query reads too much data or uses too much memory |
+| 422 | `lwql_app_function_key_cap` | An extraction function needs more distinct keys than its cap |
+| 422 | `instant_eval_query_budget_exceeded` | The eval functions in the query are over their token budget |
+| 429 | `lwql_rate_limited` | Too many queries this minute for this project |
+| 503 | `lwql_busy` | Too many queries are running at once |
+| 504 | `query_timeout` | The query ran past the run time limit in [Limits](#limits) |
+{/* lwql-error-codes-end */}
+
+[Common questions](/features/langwatchql/common-questions) has the exact messages and how to fix each one.
+
+---
+
+# FILE: ./features/langwatchql/overview.mdx
+
+---
+title: LangWatchQL
+sidebarTitle: Overview
+keywords: langwatch, langwatchql, lwql, sql, clickhouse, query api, analytics sql, mcp, cli, run_query
+description: Read-only SQL over your traces, spans, evaluations, simulations and coding-agent sessions, from the REST API, the CLI or an MCP client.
+---
+
+## What is LangWatchQL
+
+LangWatchQL is the ClickHouse SQL dialect that LangWatch accepts over its analytics views. You send one `SELECT` statement, optionally with a `WITH` clause, and you get back columns and rows. The database runs it with `readonly = 1`, so a statement cannot change your data.
+
+On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name.
+
+A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`. That is `langwatch` in the shipped Helm chart and in `.env.example`. LangWatchQL is unavailable when `CLICKHOUSE_URL` names no database. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
+
+## What is LangWatchQL for
+
+Use LangWatchQL for a join across views, a percentile on one group of traces, rows exported to a file, or a question an agent asks from code. [Dashboards](/features/dashboards#how-the-data-is-read) read their data with LangWatchQL too: each widget runs named LangWatchQL statements.
+
+For finding individual traces with their spans and evaluations, use the trace filter instead. [Querying your data](/features/querying-your-data) compares the two languages.
+
+## How do I run a query
+
+You can send the same statement three ways. All three need the `analytics:view` permission. REST and the CLI use an API key. The hosted MCP server accepts OAuth sign-in or a personal API key, see [MCP](/integration/mcp).
+
+
+  ### REST
+
+    `POST /api/v1/query` takes the statement in the `sql` field and answers with `columns`, `rows`, `statistics` and `diagnostics`.
+
+    ```bash
+    curl -X POST https://app.langwatch.ai/api/v1/query \
+      -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs FROM langwatch.traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"}'
+    ```
+
+    Send `projectId` in the body to read one project only. Request fields, auth headers and status codes are in [Run a LangWatchQL query](/api-reference/query/run-a-langwatchql-query).
+
+  ### CLI
+
+    `langwatch query` runs a statement and prints a table. Add `--format json`, `jsonl` or `csv` for other formats, and `--out` to write a file.
+
+    ```bash
+    npm install -g langwatch
+    langwatch login
+    langwatch query "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs
+    FROM langwatch.traces
+    WHERE OccurredAt >= subtractDays(now(), 1)
+      AND ContainsErrorStatus
+    ORDER BY OccurredAt DESC
+    LIMIT 100"
+    ```
+
+    | Command | What it does |
+    | --- | --- |
+    | `langwatch query --sql-file <path>` | Reads the statement from a file |
+    | `langwatch query --param key=value` | Binds a `{key:Type}` parameter; repeat it for each one |
+    | `langwatch query --start <datetime> --end <datetime>` | Fills the reserved period parameters |
+    | `langwatch query --page-by keyset` | Pages through a large result, see [Limits and cost](/features/langwatchql/limits-and-cost#how-do-i-get-more-than-10000-rows) |
+    | `langwatch query schema` | Lists the views and columns your key can query |
+    | `langwatch query examples` | Prints the worked examples, filter them with `--tag` |
+    | `langwatch query reference` | Prints the full language reference |
+
+    `langwatch analytics query` is a different command for timeseries charts. It does not take LangWatchQL.
+
+  ### MCP
+
+    The [LangWatch MCP server](/integration/mcp) gives your coding agent two tools for LangWatchQL:
+
+    | Tool | What it does |
+    | --- | --- |
+    | `discover_schema` | With `category: "lwql"`, returns the views, columns and functions as markdown |
+    | `run_query` | Runs a statement, with optional `parameters`, and renders up to 50 rows as a table with the real row count, the time it took and any diagnostics |
+
+    Ask your agent a question such as "which model cost the most last week" and it can look up the schema, write the statement and run it.
+
+
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Your first queries" icon="play" href="/features/langwatchql/first-query">
+    One worked query for each main view
+  </Card>
+  <Card title="Read and judge conversations" icon="message-lines" href="/features/langwatchql/extraction-functions">
+    Pull transcripts and model calls into a result, and ask a question of each one
+  </Card>
+  <Card title="Limits and cost" icon="gauge" href="/features/langwatchql/limits-and-cost">
+    Row cap, timeouts, rate limits per plan and what is charged
+  </Card>
+  <Card title="Common questions" icon="circle-question" href="/features/langwatchql/common-questions">
+    The error messages you can get and how to fix each one
+  </Card>
+</CardGroup>
+
+---
+
 # FILE: ./features/querying-your-data.mdx
 
 ---
@@ -44209,6 +44748,9 @@ reaches attribute keys, span events and evaluator verdicts.
 Analytics SQL (LangWatchQL) answers questions about many traces at once: a
 count, a rate, a percentile, any of them grouped or over time, and joins across
 views. It returns columns, not traces.
+
+The [LangWatchQL guide](/features/langwatchql/overview) has worked queries for
+each view, the limits and rate limits, and fixes for common errors.
 
 | When you want                                              | Use           |
 | ---------------------------------------------------------- | ------------- |
@@ -44276,7 +44818,7 @@ the offending field and the fields that exist.
 
 ```bash
 langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
 GROUP BY day ORDER BY day" --projects <project id>
 ```
@@ -44322,7 +44864,7 @@ without changing a character of your statement.
 
 ```sql
 SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
 ORDER BY OccurredAt, TraceId
@@ -61220,7 +61762,7 @@ A chart that should follow the dashboard's period selector declares the reserved
 SELECT
   toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS traces
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket
@@ -75470,8 +76012,8 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
-FROM analytics.trace_metrics
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?', 0.7) AS refused
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId
 ```
@@ -75542,7 +76084,7 @@ Every judgement is also a row in the `judgments` analytics dataset, so a later q
 
 ```sql
 SELECT j.Label AS verdict, count() AS traces
-FROM analytics.judgments AS j
+FROM langwatch.judgments AS j
 WHERE j.RunId = {run:String} AND j.CreatedAt >= subtractDays(now(), 7)
 GROUP BY verdict
 ORDER BY traces DESC
@@ -76530,7 +77072,7 @@ A function call has to be an aliased entry in the top level `SELECT` list of a s
 
 ```sql
 SELECT ConversationId, conversation(ConversationId) AS transcript
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 20
@@ -76593,7 +77135,7 @@ Three things can shorten a result, and each one leaves a diagnostic behind:
 
 ```json
 {
-  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM analytics.trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
+  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM langwatch.trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
 }
 ```
 
@@ -76603,7 +77145,7 @@ Each row carries a conversation identifier and its transcript under roughly eigh
 
 ```json
 {
-  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1) AND HasError ORDER BY OccurredAt DESC LIMIT 100"
+  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM langwatch.traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"
 }
 ```
 
@@ -76617,7 +77159,7 @@ An eval function asks a question about a text and answers it per row. The text i
 SELECT
   ConversationId,
   eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -76629,7 +77171,7 @@ A question about what the agent did reads the agent's work, so it takes `llm_rea
 SELECT
   ConversationId,
   eval(llm_readable_thread(ConversationId, 16000), 'The agent quoted a price without calling get_price') AS unchecked_price
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -76661,7 +77203,7 @@ SELECT
     'What is the customer asking for',
     ['refund: wants money back', 'bug: reports something broken', 'other: anything else']
   ) AS intent
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100

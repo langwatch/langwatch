@@ -1694,3 +1694,31 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       Given a user with an API key
       When they query for the key's owner and scope
       Then they get the user, organization, projects and permissions the key carries
+
+  Rule: Read the limits that apply to me in the guide
+
+    @unit
+    Scenario: The guide's limits table carries the shipped resource limits and the statement length
+      Given docs/features/langwatchql/limits-and-cost.mdx
+      Then its limits table states each default resource limit and the maximum statement length the code enforces
+
+    @unit
+    Scenario: The guide's per-plan rate table carries each plan's queries per minute
+      Given docs/features/langwatchql/limits-and-cost.mdx
+      Then its rate table states the lwqlPerMinute bound of the Free, Paid and Enterprise plans
+
+    @unit
+    Scenario: The guide's extraction function page carries the key cap of each kind of key
+      Given docs/features/langwatchql/extraction-functions.mdx
+      Then it states the conversation, trace, span and distinct text caps the extraction functions enforce
+
+    @unit
+    Scenario: The guide's row limit figures outside the limits table match the shipped row limit
+      Given docs/features/langwatchql/limits-and-cost.mdx and docs/features/langwatchql/common-questions.mdx
+      Then every row count they state for a response, and every LIMIT they add or suggest, is the shipped maximum result rows
+
+    @unit
+    Scenario: The guide's error messages and error codes are the ones the code returns
+      Given docs/features/langwatchql/common-questions.mdx and the error codes table in docs/features/langwatchql/limits-and-cost.mdx
+      Then each quoted error message is text the LangWatchQL validator or error classes produce
+      And each error code in the table is a registered application error code

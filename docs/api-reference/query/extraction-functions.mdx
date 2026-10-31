@@ -15,7 +15,7 @@ A function call has to be an aliased entry in the top level `SELECT` list of a s
 
 ```sql
 SELECT ConversationId, conversation(ConversationId) AS transcript
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 20
@@ -78,7 +78,7 @@ Three things can shorten a result, and each one leaves a diagnostic behind:
 
 ```json
 {
-  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM analytics.trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
+  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM langwatch.trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
 }
 ```
 
@@ -88,7 +88,7 @@ Each row carries a conversation identifier and its transcript under roughly eigh
 
 ```json
 {
-  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1) AND HasError ORDER BY OccurredAt DESC LIMIT 100"
+  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM langwatch.traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"
 }
 ```
 
@@ -102,7 +102,7 @@ An eval function asks a question about a text and answers it per row. The text i
 SELECT
   ConversationId,
   eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -114,7 +114,7 @@ A question about what the agent did reads the agent's work, so it takes `llm_rea
 SELECT
   ConversationId,
   eval(llm_readable_thread(ConversationId, 16000), 'The agent quoted a price without calling get_price') AS unchecked_price
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -146,7 +146,7 @@ SELECT
     'What is the customer asking for',
     ['refund: wants money back', 'bug: reports something broken', 'other: anything else']
   ) AS intent
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
