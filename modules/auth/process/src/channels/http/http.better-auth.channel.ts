@@ -39,6 +39,7 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
+import { accountIssuerOf } from "../../rules/provider-account-issuer.rules.ts";
 import {
   ID_TOKEN_MAX_AGE_SECONDS,
   SIGN_IN_CLOCK_TOLERANCE_SECONDS,
@@ -609,6 +610,10 @@ export const createAuthOptions = ({
       idToken: "id_token",
       scope: "scope",
     },
+    /** LangWatch's issuer namespace (ADR-189), stamped by the create hook below and never input. */
+    additionalFields: {
+      issuer: { type: "string", required: false, input: false },
+    },
     /**
      * Allow an OAuth sign-in to link to an existing User row when the email matches AND that
      * User's `emailVerified` is true.
@@ -724,12 +729,22 @@ export const createAuthOptions = ({
             linkProposals: hooks.linkProposals,
           })(account, context);
           recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
+          // ADR-189: Better Auth keys the row by (providerId, accountId) and writes no issuer.
+          const issuer = accountIssuerOf({
+            account,
+            assertedIssuers: sessionClaims.evidence.findAssertedIssuers({
+              providerId: account.providerId,
+              providerAccountId: account.accountId,
+            }),
+            providerId: account.providerId,
+            idToken: account.idToken,
+          });
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
           // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
-          const pin = await identity.createAccountIdentifier(account);
-          return pin.pinned ? { data: pin.data } : undefined;
+          const pin = await identity.createAccountIdentifier({ ...account, issuer });
+          return { data: pin.pinned ? { ...pin.data, issuer } : { issuer } };
         },
         after: async (account, context) => {
           recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
@@ -936,6 +951,7 @@ function ssoPlugin({
         evidence.recordAuthenticatedSsoAccount({
           providerId: input.providerId,
           providerAccountId: input.accountKey.accountId,
+          issuer: input.accountKey.issuer,
         });
       }
       return resolution;

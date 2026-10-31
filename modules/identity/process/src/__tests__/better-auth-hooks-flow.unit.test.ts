@@ -15,6 +15,7 @@ import { IdentityCeremoniesService } from "../services/better-auth-identity-cere
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
+import type { AccountWithIssuer } from "./support/account-issuer.ts";
 import {
   InMemoryIdentityEventStore,
   inMemoryIdentityLedger,
@@ -221,16 +222,14 @@ describe("better-auth over the databaseHooks seam", () => {
         const userId = h.db.user?.[0]?.id as string;
         const before = h.commands.length;
 
-        await (
-          await h.auth.$context
-        ).internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
-          // better-auth 1.7 keys an account by `(issuer, accountId)`, and
-          // synthesises this issuer for a provider with none of its own.
+          // Our stamped namespace for a provider with no issuer of its own (ADR-189).
           issuer: "local:oauth:google",
           accountId: "sub-google-1",
-        });
+        };
+        await (await h.auth.$context).internalAdapter.linkAccount(account);
 
         expect(h.commands.slice(before).map((command) => command.type)).toEqual([
           "lw.identity.attach_identifier",

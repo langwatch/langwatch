@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
+import type { AccountWithIssuer } from "./support/account-issuer.ts";
 import type { AuthUnderTest, IdentityStack, MemoryDB } from "./support/storage-adapter-stack.ts";
 import {
   identityStack,
@@ -66,14 +67,15 @@ async function walk({ auth, db }: Stack): Promise<Transcript> {
 
   const context = await auth.$context;
 
-  await context.internalAdapter.linkAccount({
+  const account: AccountWithIssuer = {
     userId,
     providerId: "google",
     // better-auth 1.7 keys an account by `(issuer, accountId)`, and
     // synthesises this issuer for a provider that declares none of its own.
     issuer: "local:oauth:google",
     accountId: "sub-google-1",
-  });
+  };
+  await context.internalAdapter.linkAccount(account);
   const linked = await context.internalAdapter.findAccounts(userId);
   const google = linked.find((row) => row.providerId === "google");
 
@@ -185,18 +187,20 @@ describe("better-auth over the identity storage adapter", () => {
       const context = await identity.auth.$context;
       const userId = identity.db.user?.[0]?.id as string;
 
-      await context.internalAdapter.linkAccount({
+      const github: AccountWithIssuer = {
         userId,
         providerId: "github",
         issuer: "local:oauth:github",
         accountId: "sub-github-1",
-      });
-      await context.internalAdapter.linkAccount({
+      };
+      await context.internalAdapter.linkAccount(github);
+      const connection: AccountWithIssuer = {
         userId,
         providerId: "connection-acme",
         issuer: "https://login.acme.example",
         accountId: "subject-olga",
-      });
+      };
+      await context.internalAdapter.linkAccount(connection);
 
       expect(identity.db.account).toEqual(
         expect.arrayContaining([
@@ -225,12 +229,13 @@ describe("better-auth over the identity storage adapter", () => {
       const context = await identity.auth.$context;
       const userId = identity.db.user?.[0]?.id as string;
 
-      await context.internalAdapter.linkAccount({
+      const account: AccountWithIssuer = {
         userId,
         providerId: "connection-acme",
         issuer: "https://login.acme.example",
         accountId: "subject-olga",
-      });
+      };
+      await context.internalAdapter.linkAccount(account);
 
       const found = await context.adapter.findOne<{
         userId: string;

@@ -6,6 +6,8 @@ import type * as observabilityModule from "@langwatch/observability";
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { AccountWithIssuer } from "./support/account-issuer.ts";
+
 const logged = vi.hoisted(() => ({
   error: vi.fn(),
   warn: vi.fn(),
@@ -71,12 +73,13 @@ describe("given a finalized user on the identity branch", () => {
       await signUp(stack.auth, EMAIL);
       const userId = stack.db.user?.[0]?.id as string;
       const context = await stack.auth.$context;
-      await context.internalAdapter.linkAccount({
+      const account: AccountWithIssuer = {
         userId,
         providerId: "google",
         issuer: "local:oauth:google",
         accountId: "sub-google-1",
-      });
+      };
+      await context.internalAdapter.linkAccount(account);
       const google = (await context.internalAdapter.findAccounts(userId)).find(
         (row) => row.providerId === "google",
       );

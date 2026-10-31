@@ -763,3 +763,147 @@ describe("given the callback linking rule (ADR-117 section 3)", () => {
     });
   });
 });
+
+describe("given a connection subject that already has an account row", () => {
+  /** The person at the asserted address has confirmed it, so the resolver itself would link. */
+  const storedUnder = ({ issuer }: { issuer: string | null }) => {
+    const world = createWorld({ confirmed: true });
+    world.store.accounts.set(USER_ID, [
+      {
+        id: `account-${USER_ID}`,
+        provider: CONNECTION_ID,
+        issuer,
+        providerAccountId: SUBJECT,
+        createdAtMs: 0,
+      },
+    ]);
+    return world;
+  };
+
+  describe("when another issuer mints the same subject through the connection", () => {
+    /** @scenario A connection subject stored under another issuer is refused */
+    it.each([
+      ["another identity provider's issuer", "https://another-idp.test"],
+      ["no issuer", null],
+      ["the connection's own synthetic namespace", `local:oauth:${CONNECTION_ID}`],
+      ["the generic OIDC namespace", "local:oauth:oidc"],
+      ["another connection's namespace", "local:oauth:local_ssoc_another"],
+    ])("refuses a row stored with %s", async (_name, issuer) => {
+      const { service, proposals } = storedUnder({ issuer });
+
+      expect(await service.resolveUser(assertion())).toEqual(NOT_LINKED);
+      expect(proposals).toEqual([]);
+    });
+
+    it("refuses when the row belongs to someone the asserted address does not name", async () => {
+      const world = createWorld({ confirmed: true });
+      world.store.users.set("user_victim", {
+        id: "user_victim",
+        email: "victim@elsewhere.test",
+        emailVerified: true,
+        createdAtMs: 0,
+        userHashKey: null,
+        payload: {},
+      });
+      world.store.accounts.set("user_victim", [
+        {
+          id: "account-user_victim",
+          provider: CONNECTION_ID,
+          issuer: "https://idp.before-repoint.test",
+          providerAccountId: SUBJECT,
+          createdAtMs: 0,
+        },
+      ]);
+
+      const resolution = await world.service.resolveUser(
+        assertion({ email: "nobody@unmatched.test" }),
+      );
+
+      expect(resolution).toEqual(NOT_LINKED);
+      expect(world.proposals).toEqual([]);
+    });
+  });
+
+  describe("when the row was stored under the issuer that asserts it", () => {
+    /** @scenario A connection subject stored under its own issuer still signs in */
+    it.each([
+      ["the asserted issuer", ISSUER],
+      ["the same issuer with a trailing slash", `${ISSUER}/`],
+    ])("is not refused for a row with %s", async (_name, issuer) => {
+      const unbound = await createWorld({ confirmed: true }).service.resolveUser(assertion());
+
+      const resolution = await storedUnder({ issuer }).service.resolveUser(assertion());
+
+      expect(unbound).not.toEqual(NOT_LINKED);
+      expect(resolution).not.toEqual(NOT_LINKED);
+    });
+  });
+});
+
+describe("given a connection subject held by a live identifier with no account row yet", () => {
+  /** The callback reads a finalized person's account from the identifier, not the row. */
+  const heldUnder = ({
+    issuer,
+    state = "VERIFIED",
+  }: {
+    issuer: string | null;
+    state?: IdentifierFact["state"];
+  }) => {
+    const world = createWorld({ confirmed: true });
+    world.store.identifiers.set(
+      "identifier_subject",
+      identifier({
+        identifierId: "identifier_subject",
+        provider: "oidc",
+        accountId: `account-${USER_ID}`,
+        providerId: CONNECTION_ID,
+        issuer,
+        providerAccountId: SUBJECT,
+        state,
+        verifiedAtMs: 1,
+      }),
+    );
+    return world;
+  };
+
+  describe("when another issuer mints the same subject through the connection", () => {
+    /** @scenario A connection subject stored under another issuer is refused */
+    it.each([
+      ["another identity provider's issuer", "https://another-idp.test"],
+      ["no issuer", null],
+      ["the connection's own synthetic namespace", `local:oauth:${CONNECTION_ID}`],
+    ])("refuses an identifier stored with %s", async (_name, issuer) => {
+      const { service, proposals } = heldUnder({ issuer });
+
+      expect(await service.resolveUser(assertion())).toEqual(NOT_LINKED);
+      expect(proposals).toEqual([]);
+    });
+
+    /** @scenario A connection subject asserted under no issuer is refused */
+    it("refuses an assertion that names no issuer, even for a subject nothing holds", async () => {
+      const { service, proposals } = createWorld({ confirmed: true });
+
+      const resolution = await service.resolveUser(
+        assertion({ accountKey: { issuer: "", accountId: SUBJECT } }),
+      );
+
+      expect(resolution).toEqual(NOT_LINKED);
+      expect(proposals).toEqual([]);
+    });
+
+    it("does not count an identifier that was detached", async () => {
+      const { service } = heldUnder({ issuer: "https://another-idp.test", state: "DETACHED" });
+
+      expect(await service.resolveUser(assertion())).not.toEqual(NOT_LINKED);
+    });
+  });
+
+  describe("when the identifier was stored under the issuer that asserts it", () => {
+    /** @scenario A connection subject stored under its own issuer still signs in */
+    it("is not refused for its issuer", async () => {
+      const { service } = heldUnder({ issuer: ISSUER });
+
+      expect(await service.resolveUser(assertion())).not.toEqual(NOT_LINKED);
+    });
+  });
+});

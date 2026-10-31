@@ -1,7 +1,8 @@
 import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
 import type { SsoIssuerDirectory } from "./sso-registered-issuers.service.ts";
 
-/** The account row Better Auth writes, keyed as it looks one up: `(issuer, accountId)`. */
+/** The account row Better Auth writes, keyed `(providerId, accountId)`; `issuer` is ours
+ *  (ADR-189). */
 export type ProviderAccountRow = Readonly<{
   userId: string;
   providerId: string;

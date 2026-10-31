@@ -129,7 +129,10 @@ import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.re
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
-import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
+import {
+  type AccountWithIssuer,
+  providerAccountIssuer,
+} from "../rules/provider-account-issuer.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
@@ -1300,15 +1303,14 @@ function betterAuthCredentialAccounts(
       await (await context()).internalAdapter.updateAccount(accountId, { password: passwordHash });
     },
     linkPassword: async ({ userId, passwordHash }) => {
-      await (
-        await context()
-      ).internalAdapter.linkAccount({
+      const account: AccountWithIssuer = {
         userId,
         providerId: "credential",
         issuer: providerAccountIssuer({ connectionIssuer: undefined, provider: "credential" }),
         accountId: userId,
         password: passwordHash,
-      });
+      };
+      await (await context()).internalAdapter.linkAccount(account);
     },
     deleteAccount: async ({ accountId }) => {
       await (await context()).internalAdapter.deleteAccount(accountId);

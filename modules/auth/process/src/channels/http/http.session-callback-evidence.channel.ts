@@ -22,6 +22,9 @@ type PendingToken = Readonly<{
   assertedFactors: readonly string[];
 }>;
 
+/** The issuer one single sign-on subject was verified under, kept for its account row. */
+type AssertedIssuer = Readonly<{ providerId: string; providerAccountId: string; issuer: string }>;
+
 /** Whether this request's callback path is the provider's own; anything else earns nothing. */
 function isCallbackFor({ providerId, path }: { providerId: string; path: string }): boolean {
   const reading = signInProviderForPath({ path });
@@ -41,28 +44,49 @@ export class SessionCallbackEvidenceChannel {
   private readonly scope = new AsyncLocalStorage<{
     accepted: AcceptedCallbackAccount[];
     pendingToken: PendingToken | null;
+    assertedIssuer: AssertedIssuer | null;
   }>();
 
   private constructor() {}
 
   /** Opens the per-request slot; outside one, nothing is recorded or found. */
   runWithScope<T>(run: () => Promise<T>): Promise<T> {
-    return this.scope.run({ accepted: [], pendingToken: null }, run);
+    return this.scope.run({ accepted: [], pendingToken: null, assertedIssuer: null }, run);
   }
 
-  /** The account the SSO plugin's resolveUser seam admitted, before it mints a session. */
+  /** The account the SSO plugin's resolveUser seam admitted, and the issuer it was verified
+   *  under, before it writes an account row or mints a session (ADR-189). Identity refuses an
+   *  assertion naming no issuer, so one is always recorded. */
   recordAuthenticatedSsoAccount({
     providerId,
     providerAccountId,
+    issuer,
   }: {
     providerId: string;
     providerAccountId: string;
+    issuer: string;
   }): void {
     const slot = this.scope.getStore();
     if (!slot || !providerId || !providerAccountId) return;
     slot.accepted = [
       { providerId, providerAccountId, assertedFactors: [], verifiedTokenClaims: false },
     ];
+    slot.assertedIssuer = { providerId, providerAccountId, issuer };
+  }
+
+  /** The issuer the SSO seam verified this exact subject under: one entry, or none. */
+  findAssertedIssuers({
+    providerId,
+    providerAccountId,
+  }: {
+    providerId: string;
+    providerAccountId: string;
+  }): string[] {
+    const asserted = this.scope.getStore()?.assertedIssuer;
+    if (!asserted) return [];
+    const isThisSubject =
+      asserted.providerId === providerId && asserted.providerAccountId === providerAccountId;
+    return isThisSubject ? [asserted.issuer] : [];
   }
 
   /**

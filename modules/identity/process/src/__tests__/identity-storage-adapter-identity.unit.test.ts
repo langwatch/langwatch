@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
+import type { AccountWithIssuer } from "./support/account-issuer.ts";
 import {
   type IdentityStack,
   identityStack,
@@ -106,12 +107,13 @@ describe("better-auth over the identity storage adapter", () => {
           ).user.email,
         ).toBe(EMAIL);
 
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         expect(
           (await context.internalAdapter.findAccounts(userId))
             .map((row) => row.providerId)
@@ -343,16 +345,17 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "g-123",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         stack.db.account = [];
 
         const resolved = await context.internalAdapter.findAccountOwnerByKey({
-          issuer: oauthIssuer("google"),
+          providerId: "google",
           accountId: "g-123",
         });
 
@@ -365,7 +368,7 @@ describe("better-auth over the identity storage adapter", () => {
         stack.gate.open = () => false;
         expect(
           await context.internalAdapter.findAccountByKey({
-            issuer: oauthIssuer("google"),
+            providerId: "google",
             accountId: "g-123",
           }),
         ).toBeNull();
@@ -386,19 +389,18 @@ describe("better-auth over the identity storage adapter", () => {
         const userId = userIdOf(stack);
         const before = stack.commands.length;
 
-        await (
-          await stack.auth.$context
-        ).internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: GOOGLE_ISSUER,
           accountId: "sub-google-1",
-        });
+        };
+        await (await stack.auth.$context).internalAdapter.linkAccount(account);
 
         const google = statedIdentifiers(stack).find(
           (identifier) => identifier.providerId === "google",
         );
-        expect(google?.issuer).toBe(GOOGLE_ISSUER);
+        expect(google).toMatchObject({ issuer: GOOGLE_ISSUER });
         // The derivation would have produced this instead, and it is what a
         // fact that computed its own issuer would carry.
         expect(google?.issuer).not.toBe(oauthIssuer("google"));
@@ -412,23 +414,24 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: GOOGLE_ISSUER,
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         // Nothing in the legacy table, so a refusal cannot hide behind a
         // legacy answer: either the identity branch resolves this or the
         // sign-in fails.
         stack.db.account = [];
 
-        // The EXACT call better-auth 1.7 makes on an OAuth callback: two
-        // fields, no providerId and no userId. Naming no user is what makes
+        // The EXACT call better-auth 1.7.7 makes on an OAuth callback:
+        // `(providerId, accountId)` and no userId. Naming no user is what makes
         // it take the fleet-wide gate, so a refusal here fails the sign-in
         // of every user on the deployment and not just this one.
         const owner = await context.internalAdapter.findAccountOwnerByKey({
-          issuer: GOOGLE_ISSUER,
+          providerId: "google",
           accountId: "sub-google-1",
         });
 
@@ -443,12 +446,13 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: GOOGLE_ISSUER,
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         // Nothing in the legacy table, so the row below is the identity
         // branch's answer or there is no answer at all.
         stack.db.account = [];
@@ -456,7 +460,7 @@ describe("better-auth over the identity storage adapter", () => {
         const listed = await context.internalAdapter.findAccounts(userId);
 
         const google = listed.find((row) => row.providerId === "google");
-        expect(google?.issuer).toBe(GOOGLE_ISSUER);
+        expect(google).toMatchObject({ issuer: GOOGLE_ISSUER });
       });
 
       /** @scenario "An identifier attached without an issuer still answers better-auth" */
@@ -464,12 +468,13 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: GOOGLE_ISSUER,
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         // The shape of a fact stated before ADR-116 carried an issuer. The
         // row still has to come back with one, or 1.7 cannot key it at all.
         const google = statedIdentifiers(stack).find(
@@ -487,9 +492,9 @@ describe("better-auth over the identity storage adapter", () => {
 
         const listed = await context.internalAdapter.findAccounts(userId);
 
-        expect(listed.find((row) => row.providerId === "google")?.issuer).toBe(
-          oauthIssuer("google"),
-        );
+        expect(listed.find((row) => row.providerId === "google")).toMatchObject({
+          issuer: oauthIssuer("google"),
+        });
       });
     });
 
@@ -499,12 +504,13 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
 
         const listed = await context.internalAdapter.findAccounts(userId);
         const pinned = statedIdentifiers(stack).map((identifier) => identifier.accountId);
@@ -601,12 +607,13 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         const kept = (await context.internalAdapter.findAccounts(userId))[0];
 
         await expect(
@@ -630,12 +637,13 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         const google = (await context.internalAdapter.findAccounts(userId)).find(
           (row) => row.providerId === "google",
         );
@@ -671,12 +679,13 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         userId = userIdOf(stack);
         context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         google = (await context.internalAdapter.findAccounts(userId)).find(
           (row) => row.providerId === "google",
         );
@@ -737,12 +746,13 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         const google = (await context.internalAdapter.findAccounts(userId)).find(
           (row) => row.providerId === "google",
         );
@@ -984,12 +994,13 @@ describe("better-auth over the identity storage adapter", () => {
         const resolved = await context.internalAdapter.findUserByEmail(EMAIL);
         expect(resolved?.user.id).toBe(userId);
 
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
 
         // Nothing was stated and nothing entered identity storage: the next
         // backfill pass heals her projection, not the adapter.
@@ -1024,12 +1035,13 @@ describe("better-auth over the identity storage adapter", () => {
         const statedBefore = stack.commands.length;
         const credentialsBefore = stack.storage.credentials.size;
 
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         const google = (stack.db.account ?? []).find((row) => row.providerId === "google");
         await context.internalAdapter.updateAccount(google?.id as string, {
           accessToken: "at-2",
@@ -1159,18 +1171,19 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "auth0",
           issuer: oauthIssuer("auth0"),
           accountId: "auth0|abc123",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         // Every legacy row gone: whatever answers below came out of
         // `Identifier` joined to its credential, and nothing else.
         stack.db.account = [];
 
         const found = await context.internalAdapter.findAccountByKey({
-          issuer: oauthIssuer("auth0"),
+          providerId: "auth0",
           accountId: "auth0|abc123",
         });
 
@@ -1183,7 +1196,7 @@ describe("better-auth over the identity storage adapter", () => {
         // The same lookup through the callback's own entry point, which is
         // what better-auth actually calls when the IdP returns.
         const resolved = await context.internalAdapter.findAccountOwnerByKey({
-          issuer: oauthIssuer("auth0"),
+          providerId: "auth0",
           accountId: "auth0|abc123",
         });
         expect(resolved?.kind).toBe("owned");
@@ -1203,16 +1216,17 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const account: AccountWithIssuer = {
           userId,
           providerId: "okta",
           issuer: oauthIssuer("okta"),
           accountId: "00u1a2b3c4",
-        });
+        };
+        await context.internalAdapter.linkAccount(account);
         stack.db.account = [];
 
         const found = await context.internalAdapter.findAccountByKey({
-          issuer: oauthIssuer("okta"),
+          providerId: "okta",
           accountId: "00u1a2b3c4",
         });
 
@@ -1235,26 +1249,28 @@ describe("better-auth over the identity storage adapter", () => {
         await signUp(stack.auth, "olga@globex.com");
         const olgaId = idOfUser(stack, "olga@globex.com");
         const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
+        const samAuth0: AccountWithIssuer = {
           userId: samId,
           providerId: "auth0",
           issuer: oauthIssuer("auth0"),
           accountId: "user-1",
-        });
-        await context.internalAdapter.linkAccount({
+        };
+        await context.internalAdapter.linkAccount(samAuth0);
+        const olgaOkta: AccountWithIssuer = {
           userId: olgaId,
           providerId: "okta",
           issuer: oauthIssuer("okta"),
           accountId: "user-1",
-        });
+        };
+        await context.internalAdapter.linkAccount(olgaOkta);
         stack.db.account = [];
 
         const fromAuth0 = await context.internalAdapter.findAccountByKey({
-          issuer: oauthIssuer("auth0"),
+          providerId: "auth0",
           accountId: "user-1",
         });
         const fromOkta = await context.internalAdapter.findAccountByKey({
-          issuer: oauthIssuer("okta"),
+          providerId: "okta",
           accountId: "user-1",
         });
 
