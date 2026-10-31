@@ -64,7 +64,7 @@ jobs:
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
       - name: Build the documentation under /docs
         run: pnpm --filter @langwatch/docs-site build --base-path /docs
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: docs-site-lighthouse-all-build
           path: apps/docs/dist
@@ -92,7 +92,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "@langwatch/docs-site..."
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: docs-site-lighthouse-all-build
           path: apps/docs/dist
@@ -118,7 +118,7 @@ jobs:
           --recheck-below 0.9
           --skip-static --report-only
           --report-dir "$RUNNER_TEMP/docs-audit"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: docs-lighthouse-all-${{ matrix.form-factor }}-${{ matrix.shard }}
@@ -142,11 +142,11 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "@langwatch/docs-site..."
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: docs-site-lighthouse-all-build
           path: apps/docs/dist
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: docs-lighthouse-all-*-*
           path: ${{ runner.temp }}/shards
@@ -162,7 +162,7 @@ jobs:
           --report-dir "$RUNNER_TEMP/docs-lighthouse-all"
           --summary "$GITHUB_STEP_SUMMARY"
           --commit "$COMMIT" --full-report-url "$RUN_URL"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: docs-lighthouse-all-report
           path: ${{ runner.temp }}/docs-lighthouse-all
