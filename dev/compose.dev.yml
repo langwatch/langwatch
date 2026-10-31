@@ -156,13 +156,23 @@ services:
       - ./pnpm-lock.yaml:/pnpm-lock.yaml:ro
       - ./package.json:/package.json:ro
       - ./.npmrc:/.npmrc:ro
+      - ./feature-map.json:/feature-map.json:ro
+      - ./nx.json:/nx.json:ro
+      - ./tsconfig.base.json:/tsconfig.base.json:ro
+      - ./tsconfig.shared.json:/tsconfig.shared.json:ro
+      - ./tsconfig.emit.json:/tsconfig.emit.json:ro
+      - ./patches:/patches:ro
+      - ./vendor:/vendor:ro
       - ./packages:/packages
+      - ./modules:/modules
+      - ./enterprise:/enterprise
       - ./mcp/typescript:/mcp/typescript
       - mcp_server_modules:/mcp/typescript/node_modules
-      - ./skills/package.json:/skills/package.json:ro
+      - ./skills:/skills
+      - ./dev/nx:/dev/nx:ro
       - ./dev/tests/agentic-e2e/package.json:/dev/tests/agentic-e2e/package.json:ro
       - ./services/langevals:/services/langevals
-      - ./sdks/typescript:/sdks/typescript:ro
+      - ./sdks/typescript:/sdks/typescript
       - ./sdks/python:/sdks/python:ro
       # node_modules overlays: the STORE lives at the workspace root
       # (/node_modules/.pnpm) and each application's own node_modules holds only
@@ -173,6 +183,7 @@ services:
       - ui_modules:/apps/ui/node_modules
       - worker_modules:/apps/worker/node_modules
       - tasks_modules:/apps/tasks/node_modules
+      - sdk_typescript_modules:/sdks/typescript/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
       - goose_bin:/opt/goose-bin
     command: >
@@ -190,7 +201,7 @@ services:
           chmod +x /opt/goose-bin/goose &&
           printf '%s' \"$$GOOSE_MARKER\" > /opt/goose-bin/.goose-meta;
         fi &&
-        pnpm install --frozen-lockfile --filter '@langwatch/platform-api...' --filter '@langwatch/ui...' --filter '@langwatch/worker...' --filter '@langwatch/tasks...' &&
+        pnpm install --frozen-lockfile --filter '@langwatch/platform-api...' --filter '@langwatch/ui...' --filter '@langwatch/worker...' --filter '@langwatch/tasks...' --filter '@langwatch/mcp-server...' &&
         pnpm --filter @langwatch/mcp-server run build &&
         pnpm --filter @langwatch/prisma-client run prisma:generate
       "
@@ -216,18 +227,27 @@ services:
       - ./pnpm-lock.yaml:/pnpm-lock.yaml:ro
       - ./package.json:/package.json:ro
       - ./.npmrc:/.npmrc:ro
+      - ./feature-map.json:/feature-map.json:ro
+      - ./nx.json:/nx.json:ro
+      - ./tsconfig.base.json:/tsconfig.base.json:ro
+      - ./tsconfig.shared.json:/tsconfig.shared.json:ro
+      - ./tsconfig.emit.json:/tsconfig.emit.json:ro
       - ./packages:/packages
+      - ./modules:/modules
+      - ./enterprise:/enterprise
       - ./mcp/typescript:/mcp/typescript
       - mcp_server_modules:/mcp/typescript/node_modules
-      - ./skills/package.json:/skills/package.json:ro
+      - ./skills:/skills
+      - ./dev/nx:/dev/nx:ro
       - ./dev/tests/agentic-e2e/package.json:/dev/tests/agentic-e2e/package.json:ro
       - ./services/langevals:/services/langevals
-      - ./sdks/typescript:/sdks/typescript:ro
+      - ./sdks/typescript:/sdks/typescript
       - ./sdks/python:/sdks/python:ro
       - root_modules:/node_modules
       - api_modules:/apps/api/node_modules
       - ui_modules:/apps/ui/node_modules
       - worker_modules:/apps/worker/node_modules
+      - sdk_typescript_modules:/sdks/typescript/node_modules
     command: >
       sh -c "
         corepack enable &&
@@ -287,19 +307,28 @@ services:
       - ./pnpm-lock.yaml:/pnpm-lock.yaml:ro
       - ./package.json:/package.json:ro
       - ./.npmrc:/.npmrc:ro
+      - ./feature-map.json:/feature-map.json:ro
+      - ./nx.json:/nx.json:ro
+      - ./tsconfig.base.json:/tsconfig.base.json:ro
+      - ./tsconfig.shared.json:/tsconfig.shared.json:ro
+      - ./tsconfig.emit.json:/tsconfig.emit.json:ro
       - ./packages:/packages
+      - ./modules:/modules
+      - ./enterprise:/enterprise
       - ./mcp/typescript:/mcp/typescript
       - mcp_server_modules:/mcp/typescript/node_modules
-      - ./skills/package.json:/skills/package.json:ro
+      - ./skills:/skills
+      - ./dev/nx:/dev/nx:ro
       - ./dev/tests/agentic-e2e/package.json:/dev/tests/agentic-e2e/package.json:ro
       - ./services/langevals:/services/langevals
-      - ./sdks/typescript:/sdks/typescript:ro
+      - ./sdks/typescript:/sdks/typescript
       - ./sdks/python:/sdks/python:ro
       - root_modules:/node_modules
       - api_modules:/apps/api/node_modules
       - ui_modules:/apps/ui/node_modules
       - worker_modules:/apps/worker/node_modules
       - tasks_modules:/apps/tasks/node_modules
+      - sdk_typescript_modules:/sdks/typescript/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: >
       sh -c "
@@ -361,18 +390,24 @@ services:
       - ./pnpm-lock.yaml:/pnpm-lock.yaml:ro
       - ./package.json:/package.json:ro
       - ./.npmrc:/.npmrc:ro
+      - ./tsconfig.base.json:/tsconfig.base.json:ro
+      - ./tsconfig.shared.json:/tsconfig.shared.json:ro
+      - ./tsconfig.emit.json:/tsconfig.emit.json:ro
       - ./packages:/packages
+      - ./modules:/modules
+      - ./enterprise:/enterprise
       - ./mcp/typescript:/mcp/typescript
       - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
       - ./dev/tests/agentic-e2e/package.json:/dev/tests/agentic-e2e/package.json:ro
       - ./services/langevals:/services/langevals
-      - ./sdks/typescript:/sdks/typescript:ro
+      - ./sdks/typescript:/sdks/typescript
       - ./sdks/python:/sdks/python:ro
       - root_modules:/node_modules
       - api_modules:/apps/api/node_modules
       - ui_modules:/apps/ui/node_modules
       - worker_modules:/apps/worker/node_modules
+      - sdk_typescript_modules:/sdks/typescript/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do node --experimental-transform-types src/main.ts; sleep 1; done"
     environment:
@@ -493,6 +528,8 @@ volumes:
     name: ${VOLUME_PREFIX:-langwatch}-worker-modules
   tasks_modules:
     name: ${VOLUME_PREFIX:-langwatch}-tasks-modules
+  sdk_typescript_modules:
+    name: ${VOLUME_PREFIX:-langwatch}-sdk-typescript-modules
   # The workspace-root store (/node_modules/.pnpm). Since ADR-076 the install
   # root is the repo root, so this is where every real package body lives — each
   # application's node_modules (above) holds only symlinks into it.
