@@ -87,19 +87,17 @@ Feature: Coding agent terminal view
     When the trace read hands it to the transcript with those attributes nested by their dots
     Then the Terminal tab shows the tool run with its name, what it ran and its result
 
-  # pi's spans are in pi's own namespace, so the transcript has to be told which
-  # of them is a model call. Until it is, `pi.ai.request` falls through to the
-  # tool branch: a pi session then reads back as a run of tools with no model
-  # call and no model in its banner.
+  # pi's spans are in pi's own namespace, so the transcript is told by name that
+  # `pi.ai.request` is a model call (MODEL_CALL_SPAN_NAMES); anything else falls
+  # through to the tool branch.
 
   # pi declares no arguments and no result on pi.harness.tool, only the tool's
   # name, its call id and whether it errored. A pi tool run therefore shows
   # less than a Claude or Copilot one, and the transcript has to render that
   # honestly rather than leave empty argument and result panes behind.
 
-  # Parked 2026-10-30: ADR-188 is proposed and nothing of pi is built, so no pi
-  # span ever reaches this view. It binds with the pi definition in
-  # CODING_AGENT_REGISTRY. The rest of this file stays enforced.
+  # Parked: a pi tool run is dropped from the transcript, not shown. The tool-name
+  # reader (deriveToolName) reads gen_ai.tool.name only on an execute_tool span.
   # becomes @unit
   @unimplemented
   Scenario: A pi session reads back as a transcript, not as a span tree
@@ -109,20 +107,15 @@ Feature: Coding agent terminal view
     And each tool execution shows its name and whether it errored
     And no empty arguments or result pane is shown for it
 
-  # Parked 2026-10-30: ADR-188 is proposed and nothing of pi is built, so no pi
-  # span ever reaches this view. It binds with the pi definition in
-  # CODING_AGENT_REGISTRY. The rest of this file stays enforced.
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi model call is shown as a model call, not as a tool run
     Given a pi session whose model calls are pi.ai.request spans
     When the Terminal tab renders the session
     Then each model call appears once with the tokens it used
     And none of them appears among the tool runs
 
-  # Parked 2026-10-30: ADR-188 is proposed and nothing of pi is built, so no pi
-  # span ever reaches this view. It binds with the pi definition in
-  # CODING_AGENT_REGISTRY. The rest of this file stays enforced.
+  # Parked: the model half holds, but the banner's agent list in
+  # modules/trace/browser has no pi, so the top of the session reads unknown.
   # becomes @unit
   @unimplemented
   Scenario: The banner of a pi session names the model pi called

@@ -1031,6 +1031,26 @@ describe("PullRequestUsageService", () => {
       expect(usage.totals.costUsd).toBeCloseTo(5);
     });
 
+    /** @scenario "A pi session's billable lookup resolves through the catalogue slug, not the key's source type" */
+    it("asks the billable question of pi's catalogue slug and applies the answer to its cost", async () => {
+      const askedSources: string[] = [];
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow({ agent: "pi", costUsd: 2 })],
+        isSourceNonBillable: async ({ sourceType }) => {
+          askedSources.push(sourceType);
+          return sourceType === "pi";
+        },
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      // The ingest key's source type is "pi_cli"; the catalogue, and so the lookup, says "pi".
+      expect(askedSources).toEqual(["pi"]);
+      expect(usage.totals.nonBilledCostUsd).toBeCloseTo(2);
+      expect(usage.totals.billedCostUsd).toBe(0);
+    });
+
     /** @scenario "A viewer who may not price a project sees neither half of its cost" */
     it("leaves every half of the cost absent for a project the viewer may not price", async () => {
       const { service } = serviceWith({

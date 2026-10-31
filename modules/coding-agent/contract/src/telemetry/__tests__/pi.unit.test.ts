@@ -111,12 +111,14 @@ describe("the pi coding-agent definition", () => {
    * reason-carrying step and navigation arrive. `sessionSpanNames` is also the
    * admission list.
    */
+  /** @scenario "The compaction, step and navigation spans the extension emits join the pi session" */
   it("admits the harness spans the extension emits", () => {
     expect(piAgent.sessionSpanNames).toEqual(
       expect.arrayContaining(["pi.harness.compaction", "pi.harness.step", "pi.harness.navigation"]),
     );
   });
 
+  /** @scenario "A harness span pi declares but we do not list is dropped with nothing recorded" */
   it("does not admit the checkpoint span, which no pi event drives", () => {
     expect(piAgent.sessionSpanNames).not.toContain("pi.harness.checkpoint");
   });

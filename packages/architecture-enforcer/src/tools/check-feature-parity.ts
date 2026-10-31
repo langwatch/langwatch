@@ -678,14 +678,6 @@ const LEGACY_INERT: string[] = [
   "specs/workflows/studio-llm-node-drawer.feature",
   "specs/workflows/studio-local-state.feature",
   "specs/workflows/studio-usage-limits.feature",
-  // 2026-10-30: planned, not yet built. See ADR-188. Every scenario in these
-  // five is @unimplemented and names the tag it becomes; the change that binds
-  // a file's first scenario deletes that line in the same commit, so a line
-  // still here when ADR-188 is called done means ADR-188 is not done.
-  "specs/ai-governance/cli-wrappers/pi-env-injection.feature",
-  "specs/ai-governance/cli-wrappers/pi-extension-install.feature",
-  "specs/coding-agent/pi-model-calls.feature",
-  "specs/coding-agent/pi-sessions.feature",
 ];
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */

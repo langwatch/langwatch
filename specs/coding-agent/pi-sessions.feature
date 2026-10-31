@@ -35,19 +35,14 @@
 # opencode's shape exactly, see
 # specs/ai-governance/cli-wrappers/session-context-hook.feature.
 #
-# EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
-# or @integration now would report a binding that does not exist. Each scenario
-# names the tag it becomes in a comment above it, and the commit that makes one
-# pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
-# change. A scenario still carrying @unimplemented when ADR-188 is called done
-# is work that was not done.
-#
-# WHAT BLOCKS THESE, AS OF 2026-10-30:
-#   NO pi DEFINITION EXISTS. CODING_AGENT_REGISTRY
-#   (modules/coding-agent/contract/src/telemetry/index.ts) holds six agents and
-#   none of them is pi, so nothing detects a pi span, admits one or folds one.
-#   Every Rule below waits on that one definition.
+# Bound in modules/coding-agent/process/src/eventing/__tests__/pi-session.unit.test.ts
+# and the pull-request usage parity test. Three scenarios stay @unimplemented,
+# each naming the tag it becomes, and each for the one-line reason above it:
+#   - the aborted outcome: the session fold reads no run outcome for any agent;
+#   - the terminal banner: its agent list (modules/trace/browser) has no pi;
+#   - the coding-agent origin: a copy of the bound pi-cli-otlp.feature scenario.
+# A scenario still carrying @unimplemented when ADR-188 is called done is work
+# that was not done.
 #
 # NOT SPECIFIED HERE: keeping our own in-house use of pi out of a customer's
 # session list. ADR-188 Decision 13 carries that hazard and marks its marker
@@ -55,10 +50,6 @@
 # today and so has no scope name and no service name to match on. A scenario
 # written now would name a marker nobody has chosen, so there is none until the
 # commit that gives that worker an exporter chooses it.
-#
-# The file yields no enforced scenario while that holds, so it is listed in
-# LEGACY_INERT in packages/architecture-enforcer/src/tools/check-feature-parity.ts.
-# The commit that binds the first scenario here deletes that line with it.
 
 Feature: pi sessions
   pi names its spans in its own namespace, declared in
@@ -83,96 +74,92 @@ Rule: Only pi's own namespace joins a pi session
   # name, and "pi" is a substring of "copilot", of "anthropic" and of the plain
   # word "api", so a scope- or service-matching pi would claim their signals.
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A span in pi's namespace is admitted as a pi session span
     Given the run, turn and tool spans of one pi session
     When the session span gate decides on each
     Then each is admitted
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A copilot span is never claimed by pi
     Given a copilot span whose service name is "copilot-cli"
     When the agent behind it is detected
     Then it is detected as copilot
     And it is not detected as pi
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A span whose scope or service merely contains pi's two letters is not pi's
     Given a span whose service name is "anthropic"
     And a span whose instrumentation scope ends in "api"
     When the agent behind each is detected
     Then neither is detected as pi
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi span of an undeclared name is not admitted
     Given a span named "pi.internal.gossip"
     When the session span gate decides on it
     Then it is not admitted
 
-  # The declared list is the run and the turn only, so four harness spans pi
-  # declares are deliberately given up: compaction, step, checkpoint and
-  # navigation. Nothing is lost today, since pi fires no extension event for
-  # any of them. Compaction is the one to watch: it is already a canonical
-  # event we fold for other agents.
+  # The declared list is the run, the turn, compaction, step and navigation:
+  # pi 0.84.2 fires session_compact and session_tree, and the compaction reason
+  # rides a step. Checkpoint is the one harness span given up, since no pi
+  # extension event drives it.
 
-  # becomes @unit
-  @unimplemented
+  @unit
+  Scenario: The compaction, step and navigation spans the extension emits join the pi session
+    Given a pi session whose spans include pi.harness.compaction, pi.harness.step and pi.harness.navigation
+    When the session span gate decides on each
+    Then each is admitted
+    And each folds onto that session's one row
+
+  @unit
   Scenario: A harness span pi declares but we do not list is dropped with nothing recorded
-    Given a span named "pi.harness.compaction" in an otherwise admitted pi session
+    Given a span named "pi.harness.checkpoint" in an otherwise admitted pi session
     When the session span gate decides on it
     Then it is not admitted
     And the session row records nothing for it
 
 Rule: One row per pi session, keyed by pi's own session id
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session becomes one row keyed by pi's session id
     Given the spans of one pi session whose run carries pi.session.id
     When they are folded
     Then exactly one session row exists, keyed by that session id
     And the row shows the model and the input and output tokens
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: Two concurrent pi sessions fold into two rows
     Given the spans of two pi sessions interleaved in arrival order
     When they are folded
     Then two session rows exist, one per session id
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: Tokens are counted from the model calls, never again from the run
     Given a pi run whose usage is the rollup of its two model calls
     When the session is folded
     Then the row's tokens equal the sum of the two model calls
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: Tool runs are counted under pi's own tool names
     Given a pi session that executed "read" twice and "bash" once
     When the session is folded
     Then the row's tool counts are "read" twice and "bash" once
     And its tool call total is three
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: The run sets the row's start, whatever the arrival order
     Given a pi session whose run span arrives after its turns
     When the session is folded
     Then the row starts when the run started
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi span with no resolvable session mints no row
     Given a pi.harness.turn span carrying no session id and no admitted run
     When it is folded
     Then no session row is created for it
 
+  # Parked: the session root folds identity and title only; nothing reads pi.operation.outcome.
   # becomes @unit
   @unimplemented
   Scenario: A session the user aborted is not recorded as a failure
@@ -183,6 +170,7 @@ Rule: One row per pi session, keyed by pi's own session id
 
 Rule: pi sessions reach the trace explorer as pi, not as an unknown agent
 
+  # Parked: the banner's agent list in modules/trace/browser has no pi, so it reads unknown.
   # becomes @unit
   @unimplemented
   Scenario: A pi trace is detected as pi by the terminal banner
@@ -191,6 +179,7 @@ Rule: pi sessions reach the trace explorer as pi, not as an unknown agent
     Then it is pi
     And pi's own name and icon are shown, not the unknown-agent fallback
 
+  # Parked: duplicates the bound "A pi span ingested under its own key carries the coding-agent origin".
   # becomes @unit
   @unimplemented
   Scenario: pi spans are recognised as coding-agent origin, not a generic AI tool
@@ -200,16 +189,14 @@ Rule: pi sessions reach the trace explorer as pi, not as an unknown agent
 
 Rule: The context joins the spans only when the session id is the same string
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A context record and spans sharing one session id fold into one row with its branch
     Given a session-context record for session "s-1" naming a repository and head branch
     And pi.harness.run spans carrying pi.session.id "s-1"
     When they are folded
     Then the "s-1" row carries that repository and branch
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A context record under a different session id leaves the span session without a branch
     Given a session-context record for session "s-1" naming a repository and head branch
     And pi.harness.run spans carrying pi.session.id "s-2"
@@ -223,31 +210,27 @@ Rule: pi sessions feed pull requests on exactly the state the mapping reads
   # or a host no GitHub call can answer for, and the session is rejected before
   # a job is staged.
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session whose context named a repository and branch links to its pull request
     Given a folded pi session whose session-context record named a repository and head branch
     And an open pull request on that branch
     When pull requests are mapped
     Then the session is linked to that pull request
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session with no context record maps no pull requests
     Given a folded pi session whose spans arrived without any session-context record
     When pull requests are mapped
     Then the session is linked to no pull request
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session on a repository host the mapping cannot answer for is rejected
     Given a folded pi session whose context named a repository on a host outside GitHub
     When pull requests are mapped
     Then no mapping job is staged for it
     And the session is linked to no pull request
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session with a repository but no branch is rejected
     Given a folded pi session whose context named a repository host, owner and name
     And the session carries no branch
@@ -263,8 +246,7 @@ Rule: A pi session bills against a real source
   # the agent id unchanged, so pi already resolves to "pi". An arm mapping it to
   # "pi_cli" would break the lookup it was meant to fix.
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session's billable lookup resolves through the catalogue slug, not the key's source type
     Given a folded pi session whose spans arrived under sourceType "pi_cli"
     When its usage is prepared for billing
