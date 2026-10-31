@@ -16,9 +16,9 @@ packages:
   - dev/scripts
 
 catalog:
-  '@ai-sdk/anthropic': ^3.0.44
-  '@ai-sdk/openai': ^3.0.79
-  '@ai-sdk/openai-compatible': ^2.0.55
+  '@ai-sdk/anthropic': ^4.0.84
+  '@ai-sdk/openai': ^4.0.98
+  '@ai-sdk/openai-compatible': ^3.0.74
   '@aws-sdk/client-cloudwatch-logs': ^3.1080.0
   '@aws-sdk/client-lambda': ^3.1080.0
   '@aws-sdk/client-s3': ^3.1080.0
@@ -102,7 +102,7 @@ catalog:
   '@vitest/browser': ^5.0.1
   '@vitest/browser-playwright': ^5.0.1
   '@xyflow/react': ^12.11.1
-  ai: ^6.0.217
+  ai: ^7.0.147
   ajv: ^8.20.0
   bcrypt: ^6.0.0
   better-auth: ^1.7.1
