@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
-    "@aws-sdk/credential-providers": "^3.1080.0",
+    "@aws-sdk/credential-providers": "^3.1152.0",
     "@aws-sdk/s3-request-presigner": "catalog:",
     "@azure/identity": "catalog:",
     "@clickhouse/client": "catalog:",

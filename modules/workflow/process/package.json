@@ -29,7 +29,7 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "catalog:",
     "@aws-sdk/client-lambda": "catalog:",
-    "@aws-sdk/credential-providers": "^3.1080.0",
+    "@aws-sdk/credential-providers": "^3.1152.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",

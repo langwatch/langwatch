@@ -27,7 +27,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.1080.0",
+    "@aws-sdk/client-sqs": "^3.1152.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
