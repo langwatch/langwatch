@@ -10,6 +10,7 @@ import * as path from "node:path";
 import { appSettingsTargetFor } from "./app-settings";
 import { opencodePluginTarget } from "./opencode-plugin";
 import { SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
+import { piExtensionTarget } from "./pi-plugin";
 
 /** Where one agent's hook lives on disk. */
 export interface HooksTarget {
@@ -154,6 +155,15 @@ export const SESSION_CONTEXT_AGENTS = {
       kind: "owned-file",
       resolve: () => ownedHookFileIn({ homeVar: "GROK_HOME", homeDir: ".grok" }),
     },
+  },
+  pi: {
+    hookArgument: "pi",
+    agent: "pi",
+    keySourceTypes: ["pi_cli"],
+    keySourceType: only("pi_cli"),
+    // pi has no hook table at all, so our telemetry extension is the seam
+    // that runs the command. ADR-188 Decision 8.
+    hookTarget: { kind: "plugin", resolve: () => piExtensionTarget() },
   },
 } as const satisfies Record<string, SessionContextAgent>;
 

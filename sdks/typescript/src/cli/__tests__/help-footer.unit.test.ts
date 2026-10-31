@@ -51,6 +51,7 @@ describe("the coding-assistants help footer", () => {
       "gemini",
       "opencode",
       "grok",
+      "pi",
       "copilot-app",
       "instrument",
     ]);
