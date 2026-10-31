@@ -45,6 +45,7 @@ jobs:
           filters: |
             relevant:
               - 'infra/docker/Dockerfile.langwatch_nlp'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
               - 'services/nlpgo/**'
               - 'cmd/service/**'
               - 'pkg/**'

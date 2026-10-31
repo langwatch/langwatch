@@ -597,7 +597,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/o4-mini-deep-research": {
       "id": "openai/o4-mini-deep-research",
@@ -619,7 +620,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.3-chat": {
       "id": "openai/gpt-5.3-chat",
@@ -641,7 +643,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "mistralai/devstral-2512": {
       "id": "mistralai/devstral-2512",

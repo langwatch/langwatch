@@ -58,6 +58,37 @@ describe("Reasoning Config", () => {
       expect(config?.allowedValues).toEqual(["low", "medium", "high"]);
     });
 
+    describe("when the model is GPT-5.4 or later", () => {
+      const NONE_TO_XHIGH = ["none", "low", "medium", "high", "xhigh"];
+      const NONE_TO_MAX = [...NONE_TO_XHIGH, "max"];
+
+      /** @scenario "GPT 5.4 and later models offer the reasoning efforts OpenAI documents" */
+      it.each([
+        ["openai/gpt-6-astra", ["low", "medium", "high", "xhigh", "max"], "medium"],
+        ["openai/gpt-6.1-sol:batch", ["low", "medium", "high", "xhigh", "max"], "medium"],
+        ["openai/gpt-6-sol", NONE_TO_MAX, "medium"],
+        ["openai/gpt-6-luna", NONE_TO_MAX, "medium"],
+        ["openai/gpt-5.6-terra", NONE_TO_MAX, "medium"],
+        ["openai/gpt-5.5", NONE_TO_XHIGH, "medium"],
+        ["openai/gpt-5.5-pro", ["medium", "high", "xhigh"], "high"],
+        ["openai/gpt-5.4-mini", NONE_TO_XHIGH, "none"],
+        ["openai/gpt-5.4-pro:batch", ["medium", "high", "xhigh"], "medium"],
+      ])("offers %s the efforts its OpenAI page lists", (id, values, defaultValue) => {
+        const config = pickReasoningConfig(id);
+        expect(config?.allowedValues).toEqual(values);
+        expect(config?.defaultValue).toBe(defaultValue);
+        expect(config?.canDisable).toBe(values.includes("none"));
+      });
+
+      /** @scenario "GPT 5.4 and later models offer the reasoning efforts OpenAI documents" */
+      it.each(["openai/gpt-6-astra-pro", "openai/gpt-5.6-sol-pro", "openai/gpt-5.4-image-2"])(
+        "leaves %s, which OpenAI documents no efforts for, without a configuration",
+        (id) => {
+          expect(pickReasoningConfig(id)).toBeUndefined();
+        },
+      );
+    });
+
     it("GPT-4 models don't have reasoning config", () => {
       const config = pickReasoningConfig("openai/gpt-4o");
       expect(config).toBeUndefined();

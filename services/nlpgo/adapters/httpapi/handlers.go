@@ -14,6 +14,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/domain"
@@ -669,7 +670,7 @@ type PlaygroundProxy interface {
 //   - 400 on missing-provider/bad-body input errors.
 //   - 502 when the upstream provider returns an error or the
 //     dispatcher errors mid-stream.
-func proxyPassthroughHandler(proxy PlaygroundProxy) http.HandlerFunc {
+func proxyPassthroughHandler(proxy PlaygroundProxy, catalog litellm.OutputTokensLookup) http.HandlerFunc {
 	if proxy == nil {
 		// Fall back to the original 501 stub when the dispatcher isn't
 		// wired (eg. in tests that don't exercise the playground path).
@@ -680,7 +681,7 @@ func proxyPassthroughHandler(proxy PlaygroundProxy) http.HandlerFunc {
 			}, errors.New("playground proxy not wired")))
 		}
 	}
-	return playgroundProxyDispatch(proxy)
+	return playgroundProxyDispatch(proxy, catalog)
 }
 
 // versionHandler echoes basic identity so callers can verify they're
