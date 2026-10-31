@@ -217,7 +217,10 @@ func (p *Proxy) Remove(service, slug string) {
 	_ = p.run("alias", "--remove", p.naming.RouteName(service, slug))
 }
 
-func (p *Proxy) stateDir() string {
+func (p *Proxy) stateDir() string { return stateDir() }
+
+// stateDir is portless's state directory: PORTLESS_STATE_DIR, else ~/.portless.
+func stateDir() string {
 	if v := os.Getenv("PORTLESS_STATE_DIR"); v != "" {
 		return v
 	}
@@ -232,8 +235,12 @@ func (p *Proxy) stateDir() string {
 // Go, and the browser), the app's and the langy worker's JS runtimes still reject
 // the portless HTTPS hostnames. The orchestrator points NODE_EXTRA_CA_CERTS at
 // this path (see planChildren) to close that gap in dev.
-func (p *Proxy) CACertPath() string {
-	ca := filepath.Join(p.stateDir(), "ca.pem")
+func (p *Proxy) CACertPath() string { return LocalCAPath() }
+
+// LocalCAPath is CACertPath for callers without a Proxy: haven's own CLI, which
+// signs in and calls the API over the portless HTTPS hostnames itself.
+func LocalCAPath() string {
+	ca := filepath.Join(stateDir(), "ca.pem")
 	if !fileExists(ca) {
 		return ""
 	}
