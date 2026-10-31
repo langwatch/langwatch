@@ -22,6 +22,7 @@ import {
   type LivenessThread,
   type UpgradeConsole,
 } from "./lifecycle/liveness-thread.ts";
+import { NOT_HANDLED_DRAINING, NOT_HANDLED_HEADER } from "./lifecycle/not-handled.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
 
@@ -362,10 +363,16 @@ export class Server {
     }
 
     // A draining process still answers its probes — that is why the health
-    // door stops last — but it takes no new work, and says so by name.
+    // door stops last — but it takes no new work, and says so by name. It
+    // closes the connection too: a proxy reuses a pooled one for up to a
+    // minute and would keep sending work here until it did.
     if (this.draining) {
       response
-        .writeHead(503, { "Content-Type": "text/plain", [NOT_HANDLED_HEADER]: "draining" })
+        .writeHead(503, {
+          "Content-Type": "text/plain",
+          Connection: "close",
+          [NOT_HANDLED_HEADER]: NOT_HANDLED_DRAINING,
+        })
         .end(`${this.name} is shutting down`);
       return;
     }
@@ -723,8 +730,6 @@ const BIND_HANDOVER_MS = 10_000;
 /** Above the 60s idle reuse of ALB and nginx, so Node never closes a socket a proxy reuses. */
 const PUBLIC_KEEP_ALIVE_MS = 65_000;
 const BIND_RETRY_MS = 250;
-/** Marks a 503 answered before any handler ran, so a client may resend it (browser wire). */
-const NOT_HANDLED_HEADER = "x-langwatch-not-handled";
 
 function isAddressInUse(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === "EADDRINUSE";

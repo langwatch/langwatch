@@ -350,6 +350,57 @@ describe("Server", () => {
         releaseDrain();
       });
     });
+
+    describe.each([
+      { door: "the main loop", offLoop: false },
+      { door: "the liveness thread", offLoop: true },
+    ])("when the request arrives on a kept-alive connection to $door", ({ offLoop }) => {
+      /** @scenario "A draining refusal closes the connection it came in on" */
+      it("refuses it with 503 and closes the connection", async () => {
+        const server = await startServer();
+        let releaseDrain: () => void = () => undefined;
+        const drainStarted = new Promise<void>((resolve) => {
+          releaseDrain = resolve;
+        });
+        server.with({ name: "slow drain", stop: () => drainStarted, drain: true });
+        if (offLoop) await server.openLiveness();
+        await server.serve({
+          name: "api",
+          start: () => undefined,
+          stop: () => undefined,
+          handler: (_request: http.IncomingMessage, response: http.ServerResponse) => {
+            response.writeHead(200).end("served");
+          },
+        });
+        const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
+        void server.close();
+        const refused = await new Promise<{
+          status?: number;
+          connection?: string;
+          closed: boolean;
+        }>((resolve, reject) => {
+          const request = http.get(
+            { host: "127.0.0.1", port: addressOf(server).port, path: "/api/things", agent },
+            (response) => {
+              response.resume();
+              response.socket.once("close", () =>
+                resolve({
+                  status: response.statusCode,
+                  connection: response.headers.connection,
+                  closed: true,
+                }),
+              );
+            },
+          );
+          request.on("error", reject);
+        });
+        agent.destroy();
+
+        expect(refused).toEqual({ status: 503, connection: "close", closed: true });
+        releaseDrain();
+      });
+    });
   });
 
   describe("given the fluent chain", () => {
