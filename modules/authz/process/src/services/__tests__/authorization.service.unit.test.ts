@@ -197,6 +197,40 @@ describe("authorize", () => {
       expect(proof.grants.map((grant) => grant.projectId)).toEqual([AGGREGATE, "proj_member_1"]);
     });
 
+    /** @scenario "A braid is never honoured before the release that ships its fence" */
+    it("leaves out every braid, with or without a condition, and keeps the trace read", async () => {
+      const from = "2026-10-01T00:00:00.000Z";
+      const { service } = door({
+        rows: [
+          sharedRow({
+            grantId: "grant_braid_open",
+            memberProjectId: "proj_braid_open",
+            condition: { type: "span", from },
+          }),
+          sharedRow({
+            grantId: "grant_braid_where",
+            memberProjectId: "proj_braid_where",
+            condition: {
+              type: "span",
+              where: 'name == "payments_agent"',
+              compiledWhere: { version: 1, tree: { kind: "nameEquals", value: "payments_agent" } },
+              from,
+            },
+          }),
+          sharedRow(),
+        ],
+      });
+      const proof = await service.authorize({
+        actor: ANA,
+        principal: ANA,
+        permission: "traces:view",
+        scope: { projectId: AGGREGATE },
+        purpose: ROUTE,
+      });
+      expect(proof.grants.map((grant) => grant.projectId)).toEqual([AGGREGATE, "proj_member_1"]);
+      expect(proof.grants.some((grant) => grant.condition?.type === "span")).toBe(false);
+    });
+
     it("leaves out a stored window with no start rather than opening it from the epoch", async () => {
       const { service } = door({
         rows: [

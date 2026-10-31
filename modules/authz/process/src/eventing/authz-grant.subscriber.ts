@@ -58,6 +58,7 @@ const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
     "source",
     "legacyRole",
     "condition",
+    "replacesGrantId",
   ],
   [GRANT_ROLE_CHANGED_EVENT_TYPE]: ["grantId", "from", "to"],
   [GRANT_REVOKED_EVENT_TYPE]: ["grantId", "selector", "reason"],
