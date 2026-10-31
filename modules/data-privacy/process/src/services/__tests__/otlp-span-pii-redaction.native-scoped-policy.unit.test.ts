@@ -217,7 +217,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
     /** @scenario An open-weight model id is not mistaken for a key */
     it("keeps the model id whole in the model attributes and in the input", async () => {
       const { service, batchSpy } = makeService(PLATFORM_DEFAULT_DATA_PRIVACY);
-      const model = "doubleword/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4";
+      const model = "doubleword/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4";
       const span = spanWith({
         "gen_ai.request.model": model,
         "gen_ai.response.model": model,

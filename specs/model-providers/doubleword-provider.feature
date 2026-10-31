@@ -1,7 +1,7 @@
 Feature: Doubleword model provider
 
-  Doubleword hosts open-weight models (DeepSeek, Qwen, GLM, Kimi, gpt-oss and
-  others) behind an OpenAI-compatible API at https://api.doubleword.ai/v1. A
+  Doubleword hosts open-weight models (DeepSeek, Qwen, GLM, Kimi and others)
+  behind an OpenAI-compatible API at https://api.doubleword.ai/v1. A
   customer adds it with an API key only, the same way as DeepSeek, and calls
   its models as "doubleword/<model>".
 
