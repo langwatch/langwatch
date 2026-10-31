@@ -1134,6 +1134,16 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And the converge's own statement failure is logged at warn in other words on the check's path, and at error with the alert's message on a deploy's
 
   @integration
+  Scenario: A missing PostgreSQL reader role makes reconvergence grants fail and preserves unrelated access
+    Given a unique PostgreSQL schema has an approved view and an unrelated relation
+    And the reader role is absent before reconvergence grants run
+    When the app executes its generated reader grant statement
+    Then PostgreSQL rejects it with SQLSTATE 42704
+    When the reader role is restored and the same statement executes
+    Then the reader can select the approved view
+    And its unrelated SELECT grant remains
+
+  @integration
   Scenario: A failed converge never removes a working engine table
     Given a rendered install whose PostgreSQL engine tables exist and answer
     When the named collection disappears and a converge runs and fails
