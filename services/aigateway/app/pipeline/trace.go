@@ -37,6 +37,12 @@ func classifyUpstream(err error) (status int, errType string) {
 			return status, "provider_error"
 		case status == 404:
 			return status, "not_found"
+		case status == 401:
+			return status, "unauthorized"
+		case status == 403:
+			return status, "forbidden"
+		case status == 499:
+			return status, "client_closed_request"
 		case status >= 400:
 			return status, "bad_request"
 		default:

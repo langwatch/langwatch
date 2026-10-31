@@ -92,6 +92,10 @@ func TestClassifyUpstream_ForwardedProviderResponseStillWins(t *testing.T) {
 		{"a provider rate limit", &domain.UpstreamError{StatusCode: 429}, 429, "rate_limited"},
 		{"a provider outage", &domain.UpstreamError{StatusCode: 503}, 503, "provider_error"},
 		{"a provider rejecting the caller", &domain.UpstreamError{StatusCode: 402}, 402, "bad_request"},
+		{"a malformed body", &domain.UpstreamError{StatusCode: 400}, 400, "bad_request"},
+		{"an expired credential", &domain.UpstreamError{StatusCode: 401}, 401, "unauthorized"},
+		{"a permission failure", &domain.UpstreamError{StatusCode: 403}, 403, "forbidden"},
+		{"a client disconnect", &domain.UpstreamError{StatusCode: 499}, 499, "client_closed_request"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
