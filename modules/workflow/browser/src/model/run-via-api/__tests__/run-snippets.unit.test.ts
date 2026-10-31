@@ -319,7 +319,14 @@ describe("buildRunSnippet", () => {
   });
 
   describe("given every language and data source", () => {
-    const langs: RunSnippetLang[] = ["python", "typescript", "go", "shell"];
+    const langs: RunSnippetLang[] = [
+      "python",
+      "typescript",
+      "go",
+      "shell",
+      "cli",
+      "github_actions",
+    ];
     const sources = ["attached", "inline", "dataset_id"] as const;
 
     it("produces a non-empty snippet for each combination", () => {
@@ -329,6 +336,99 @@ describe("buildRunSnippet", () => {
           expect(snippet.length).toBeGreaterThan(0);
         }
       }
+    });
+  });
+
+  describe("given an experiment run with a concurrency", () => {
+    const concurrencyIn: Record<RunSnippetLang, string> = {
+      python: "concurrency=4",
+      typescript: "concurrency: 4,",
+      go: '"concurrency": 4,',
+      shell: '"concurrency": 4',
+      cli: "--concurrency 4",
+      github_actions: "--concurrency 4",
+    };
+
+    /** @scenario An experiment snippet carries the run's concurrency in every language */
+    it("starts the run with that concurrency in every language", () => {
+      for (const [lang, expected] of Object.entries(concurrencyIn)) {
+        const snippet = buildRunSnippet({
+          ...baseInput,
+          dataSource: "attached",
+          lang: lang as RunSnippetLang,
+          concurrency: 4,
+        });
+        expect(snippet, lang).toContain(expected);
+      }
+    });
+
+    /** @scenario A sequential experiment snippet starts the run with a concurrency of one */
+    it("passes a concurrency of 1 for a sequential run", () => {
+      const snippet = buildRunSnippet({
+        ...baseInput,
+        dataSource: "attached",
+        lang: "cli",
+        concurrency: 1,
+      });
+      expect(snippet).toContain("--concurrency 1");
+    });
+  });
+
+  describe("given a workflow run with a concurrency", () => {
+    /** @scenario A workflow snippet carries no concurrency */
+    it("names no concurrency, since the workflow endpoint has no such field", () => {
+      for (const lang of ["python", "shell"] as const) {
+        const snippet = buildRunSnippet({
+          ...baseInput,
+          kind: "workflow",
+          identifier: "workflow_abc123",
+          dataSource: "attached",
+          lang,
+          concurrency: 4,
+        });
+        expect(snippet, lang).not.toContain("concurrency");
+      }
+    });
+  });
+
+  describe("given the CLI snippet", () => {
+    /** @scenario The CLI snippet runs the experiment and waits for it to finish */
+    it("runs the experiment with --wait and passes the missing field as a param", () => {
+      const snippet = buildRunSnippet({ ...baseInput, dataSource: "attached", lang: "cli" });
+      expect(snippet).toContain("langwatch experiment run my-experiment");
+      expect(snippet).toContain("--wait");
+      expect(snippet).toMatch(/--param feature_flag=\S+/);
+      expect(snippet).not.toContain("--param question=");
+      expect(snippet).not.toContain("LANGWATCH_ENDPOINT");
+    });
+
+    /** @scenario The CLI snippets say they run the attached dataset when another data source is chosen */
+    it("says it runs the attached dataset and passes no inline rows", () => {
+      for (const lang of ["cli", "github_actions"] as const) {
+        const snippet = buildRunSnippet({ ...baseInput, dataSource: "inline", lang });
+        expect(snippet, lang).toContain("The CLI runs the experiment's attached dataset");
+        expect(snippet, lang).not.toContain("--param");
+        expect(snippet, lang).not.toContain("What is the capital");
+      }
+    });
+  });
+
+  describe("given the GitHub Actions snippet on a self-hosted origin", () => {
+    /** @scenario The GitHub Actions snippet runs the CLI with the API key from a repository secret */
+    it("is a step running the CLI through npx with the key from secrets", () => {
+      const snippet = buildRunSnippet({
+        ...baseInput,
+        baseUrl: "https://langwatch.acme.internal",
+        dataSource: "attached",
+        lang: "github_actions",
+        concurrency: 1,
+      });
+      expect(snippet).toContain("- name: Run the my-experiment experiment");
+      expect(snippet).toContain("LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_API_KEY }}");
+      expect(snippet).toContain("LANGWATCH_ENDPOINT: https://langwatch.acme.internal");
+      expect(snippet).toContain("run: |");
+      expect(snippet).toContain("npx --yes langwatch@latest experiment run my-experiment");
+      expect(snippet).toContain("--concurrency 1");
     });
   });
 });

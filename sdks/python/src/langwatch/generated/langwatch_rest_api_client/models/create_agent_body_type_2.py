@@ -22,6 +22,7 @@ class CreateAgentBodyType2:
         name (str):
         type_ (Literal['workflow']):
         config (CreateAgentBodyType2Config):
+        commit_message (str | Unset): What changed, kept on the version this write creates.
         workflow_id (str | Unset):
         copied_from_agent_id (str | Unset):
     """
@@ -29,6 +30,7 @@ class CreateAgentBodyType2:
     name: str
     type_: Literal["workflow"]
     config: CreateAgentBodyType2Config
+    commit_message: str | Unset = UNSET
     workflow_id: str | Unset = UNSET
     copied_from_agent_id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -39,6 +41,8 @@ class CreateAgentBodyType2:
         type_ = self.type_
 
         config = self.config.to_dict()
+
+        commit_message = self.commit_message
 
         workflow_id = self.workflow_id
 
@@ -53,6 +57,8 @@ class CreateAgentBodyType2:
                 "config": config,
             }
         )
+        if commit_message is not UNSET:
+            field_dict["commitMessage"] = commit_message
         if workflow_id is not UNSET:
             field_dict["workflowId"] = workflow_id
         if copied_from_agent_id is not UNSET:
@@ -73,6 +79,8 @@ class CreateAgentBodyType2:
 
         config = CreateAgentBodyType2Config.from_dict(d.pop("config"))
 
+        commit_message = d.pop("commitMessage", UNSET)
+
         workflow_id = d.pop("workflowId", UNSET)
 
         copied_from_agent_id = d.pop("copiedFromAgentId", UNSET)
@@ -81,6 +89,7 @@ class CreateAgentBodyType2:
             name=name,
             type_=type_,
             config=config,
+            commit_message=commit_message,
             workflow_id=workflow_id,
             copied_from_agent_id=copied_from_agent_id,
         )

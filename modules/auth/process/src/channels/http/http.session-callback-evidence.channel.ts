@@ -16,6 +16,8 @@ const verifiedCallbackClaimsSchema = z.object({
 /** The providers whose ID tokens are verified before a callback writes an account. */
 const VERIFIED_AMR_PROVIDERS = new Set(["auth0", "okta"]);
 
+type SsoAccountKey = Readonly<{ providerId: string; providerAccountId: string; issuer: string }>;
+
 type PendingToken = Readonly<{
   providerId: string;
   providerAccountId: string;
@@ -41,28 +43,47 @@ export class SessionCallbackEvidenceChannel {
   private readonly scope = new AsyncLocalStorage<{
     accepted: AcceptedCallbackAccount[];
     pendingToken: PendingToken | null;
+    ssoAccountKey: SsoAccountKey | null;
   }>();
 
   private constructor() {}
 
   /** Opens the per-request slot; outside one, nothing is recorded or found. */
   runWithScope<T>(run: () => Promise<T>): Promise<T> {
-    return this.scope.run({ accepted: [], pendingToken: null }, run);
+    return this.scope.run({ accepted: [], pendingToken: null, ssoAccountKey: null }, run);
   }
 
   /** The account the SSO plugin's resolveUser seam admitted, before it mints a session. */
   recordAuthenticatedSsoAccount({
     providerId,
     providerAccountId,
+    issuer,
   }: {
     providerId: string;
     providerAccountId: string;
+    issuer: string;
   }): void {
     const slot = this.scope.getStore();
     if (!slot || !providerId || !providerAccountId) return;
     slot.accepted = [
       { providerId, providerAccountId, assertedFactors: [], verifiedTokenClaims: false },
     ];
+    slot.ssoAccountKey = issuer ? { providerId, providerAccountId, issuer } : null;
+  }
+
+  /** The issuer the SSO plugin verified for this request's account: one entry, or none. */
+  findSsoAccountIssuers({
+    providerId,
+    providerAccountId,
+  }: {
+    providerId: string;
+    providerAccountId: string;
+  }): string[] {
+    const key = this.scope.getStore()?.ssoAccountKey;
+    if (!key || key.providerId !== providerId || key.providerAccountId !== providerAccountId) {
+      return [];
+    }
+    return [key.issuer];
   }
 
   /**

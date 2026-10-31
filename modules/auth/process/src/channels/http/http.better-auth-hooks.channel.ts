@@ -899,7 +899,10 @@ export type SessionMintClaims = Readonly<{
   identity: Pick<IdentityApi, "claimsForMint">;
   evidence: Pick<
     SessionCallbackEvidenceChannel,
-    "findAcceptedAccounts" | "recordVerifiedCallbackToken" | "recordAuthenticatedCallbackAccount"
+    | "findAcceptedAccounts"
+    | "recordVerifiedCallbackToken"
+    | "recordAuthenticatedCallbackAccount"
+    | "findSsoAccountIssuers"
   >;
 }>;
 

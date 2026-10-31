@@ -27,6 +27,7 @@ import {
 } from "@langwatch/monitor-contract";
 import { z } from "zod";
 
+import { monitorWriterOf } from "../rules/monitor-actor.rules.ts";
 import { monitorDrawerPath } from "../rules/monitor-auto-pause.rules.ts";
 
 const notFound = documentedResponses({ 404: badRequestSchema });
@@ -71,6 +72,9 @@ function monitorWire(params: {
     updatedAt: monitor.updatedAt.toISOString(),
     autoPausedAt: monitor.autoPausedAt ? monitor.autoPausedAt.toISOString() : null,
     autoPausedReason: monitor.autoPausedReason ?? null,
+    evaluatorLabel: monitor.evaluatorLabel ?? null,
+    createdById: monitor.createdById ?? null,
+    updatedById: monitor.updatedById ?? null,
     platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
       path: monitorDrawerPath(monitor.id),
@@ -141,11 +145,12 @@ export function createMonitorsRest(): Readonly<{
         description: "Create a new online evaluation monitor",
       })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope }, project) =>
+      .handle(async ({ app, input, scope, actor }, project) =>
         monitorWire({
           app,
           projectSlug: project.projectSlug,
           monitor: await app.create({
+            ...monitorWriterOf(actor),
             projectId: scope.id,
             name: input.name,
             checkType: input.checkType,
@@ -159,6 +164,7 @@ export function createMonitorsRest(): Readonly<{
             ...(input.threadIdleTimeout === undefined
               ? {}
               : { threadIdleTimeout: input.threadIdleTimeout }),
+            ...(input.evaluatorLabel === undefined ? {} : { evaluatorLabel: input.evaluatorLabel }),
           }),
         }),
       )
@@ -177,13 +183,13 @@ export function createMonitorsRest(): Readonly<{
         responses: notFound,
       })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope }, project) => {
+      .handle(async ({ app, input, scope, actor }, project) => {
         const { id, ...changes } = input;
 
         return monitorWire({
           app,
           projectSlug: project.projectSlug,
-          monitor: await app.patch({ id, projectId: scope.id, changes }),
+          monitor: await app.patch({ id, projectId: scope.id, changes, ...monitorWriterOf(actor) }),
         });
       })
 

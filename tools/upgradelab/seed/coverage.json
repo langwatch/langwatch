@@ -6,6 +6,11 @@
       "seed": "unplanned",
       "note": "heavy workflows are created with an empty DSL: no HTTP node credentials yet"
     },
+    "agent:backfill-versions": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs Agent rows without AgentVersion rows, as the previous release wrote them"
+    },
     "analytics:fill-lwql-project-keys": {
       "status": "seeded",
       "seed": "tenancy-sql",
@@ -71,6 +76,11 @@
       "seed": "product-seeds:dataset",
       "cells": ["C1", "C3"],
       "note": "heavy creates the dataset by REST with no rows yet; rows in Postgres need a row door (REST rows route)"
+    },
+    "evaluator:backfill-versions": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs Evaluator rows without EvaluatorVersion rows, as the previous release wrote them"
     },
     "identity:connection-grandfather": {
       "status": "pending",

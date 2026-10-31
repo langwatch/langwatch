@@ -4,7 +4,15 @@
  * specs/monitors/replicate-monitor-to-project.feature.
  */
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
+import {
+  assignEvaluatorLabelInputSchema,
+  evaluatorLabelSchema,
+  evaluatorVersionsInputSchema,
+  evaluatorVersionsSchema,
+  removeEvaluatorLabelInputSchema,
+} from "./evaluator-version.ts";
 import {
   evaluatorApiCopyInputSchema,
   evaluatorApiCreateInputSchema,
@@ -106,4 +114,17 @@ export const evaluatorTrpc = defineTrpcContract("evaluators")
   .mutation("toggleSaveAsEvaluator")
   .withInput(evaluatorApiWorkflowToggleInputSchema)
   .withOutput(evaluatorWorkflowSwitchedSchema)
+
+  /** Every version, newest first, with the deploy labels on each. */
+  .query("listVersions")
+  .withInput(evaluatorVersionsInputSchema)
+  .withOutput(evaluatorVersionsSchema)
+
+  .mutation("assignLabel")
+  .withInput(assignEvaluatorLabelInputSchema)
+  .withOutput(evaluatorLabelSchema)
+
+  .mutation("removeLabel")
+  .withInput(removeEvaluatorLabelInputSchema)
+  .withOutput(z.void())
   .build();

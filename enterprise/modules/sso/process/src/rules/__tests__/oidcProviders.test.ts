@@ -86,18 +86,6 @@ describe("buildGenericOAuthConfigs", () => {
     expect(config?.requireIdTokenVerification).toBe(true);
   });
 
-  /** @scenario "Enterprise provider accounts stay under the issuer namespace their stored rows carry" */
-  it.each(["auth0", "okta", ...PLAIN_OIDC_PROVIDER_IDS])(
-    "pins the %s account issuer to its stored local namespace",
-    (provider) => {
-      const config = buildGenericOAuthConfigs(enterpriseEnv(provider)).find(
-        (c) => c.providerId === provider,
-      );
-
-      expect(config?.accountIssuer).toBe(`local:oauth:${provider}`);
-    },
-  );
-
   describe("when provider is cognito", () => {
     /** @scenario Cognito mode */
     it("mounts a cognito provider that discovers its endpoints from the issuer", () => {

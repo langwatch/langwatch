@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { passkey } from "@better-auth/passkey";
 import type {
   SSOOptions,
@@ -39,6 +41,7 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
+import { getAccountIssuer } from "../../rules/provider-account-issuer.rules.ts";
 import {
   ID_TOKEN_MAX_AGE_SECONDS,
   SIGN_IN_CLOCK_TOLERANCE_SECONDS,
@@ -331,14 +334,34 @@ export function answerAuthRefusalByRegisteredCode(ctx: {
   throw handled;
 }
 
+/** The handled refusal a request released, kept until its Better Auth handler returns. */
+const releasedRefusals = new AsyncLocalStorage<{ refusal?: HandledError }>();
+
 /**
  * better-auth's router error hook: a handled refusal leaves its handler for the host's
  * renderer; every other failure keeps better-auth's own answer and is logged here.
  */
 export function releaseHandledRefusal(error: unknown): void {
-  if (HandledError.isHandled(error)) throw error;
+  if (HandledError.isHandled(error)) {
+    // Better Auth 1.7.9+ logs and drops what this hook throws, so the refusal waits for
+    // `answeringReleasedRefusals` to throw it past the router instead.
+    const slot = releasedRefusals.getStore();
+    if (slot === undefined) throw error;
+    slot.refusal = error;
+    return;
+  }
   if (error instanceof APIError && error.status !== "INTERNAL_SERVER_ERROR") return;
   logger.error({ error }, "an auth endpoint failed");
+}
+
+/** Runs a Better Auth handler and throws the handled refusal it released, for the host. */
+export async function answeringReleasedRefusals(
+  handle: () => Promise<Response>,
+): Promise<Response> {
+  const slot: { refusal?: HandledError } = {};
+  const response = await releasedRefusals.run(slot, handle);
+  if (slot.refusal !== undefined) throw slot.refusal;
+  return response;
 }
 
 /**
@@ -422,6 +445,24 @@ function createBeforeRequestHook({
       });
     }
   };
+}
+
+/** The row with the issuer it is stored under: its own, else the one this sign-in proved. */
+function withAccountIssuer<Row extends { providerId?: unknown; accountId?: unknown }>({
+  account,
+  sessionClaims,
+}: {
+  account: Row;
+  sessionClaims: SessionMintClaims;
+}): { account: Row; issuer: string | undefined } {
+  const { providerId, accountId } = account;
+  if (typeof providerId !== "string") return { account, issuer: undefined };
+  const [connectionIssuer] =
+    typeof accountId === "string"
+      ? sessionClaims.evidence.findSsoAccountIssuers({ providerId, providerAccountId: accountId })
+      : [];
+  const issuer = getAccountIssuer({ account: { ...account, providerId }, connectionIssuer });
+  return { account: { ...account, issuer }, issuer };
 }
 
 type CallbackEvidenceArgs = {
@@ -609,6 +650,10 @@ export const createAuthOptions = ({
       idToken: "id_token",
       scope: "scope",
     },
+    // Better Auth no longer writes it; the account create hook below does.
+    additionalFields: {
+      issuer: { type: "string", required: false, input: false },
+    },
     /**
      * Allow an OAuth sign-in to link to an existing User row when the email matches AND that
      * User's `emailVerified` is true.
@@ -715,7 +760,8 @@ export const createAuthOptions = ({
     },
     account: {
       create: {
-        before: async (account, context) => {
+        before: async (unkeyed, context) => {
+          const { account, issuer } = withAccountIssuer({ account: unkeyed, sessionClaims });
           await createBeforeAccountCreateHook({
             repo,
             organizations: hooks.organizations,
@@ -729,7 +775,9 @@ export const createAuthOptions = ({
           // derived id the same id.
           // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
           const pin = await identity.createAccountIdentifier(account);
-          return pin.pinned ? { data: pin.data } : undefined;
+          return {
+            data: { ...(pin.pinned ? pin.data : {}), ...(issuer === undefined ? {} : { issuer }) },
+          };
         },
         after: async (account, context) => {
           recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
@@ -936,6 +984,7 @@ function ssoPlugin({
         evidence.recordAuthenticatedSsoAccount({
           providerId: input.providerId,
           providerAccountId: input.accountKey.accountId,
+          issuer: input.accountKey.issuer,
         });
       }
       return resolution;
@@ -1202,6 +1251,9 @@ export const createBetterAuthTransport = (
   const instance = betterAuth(transportOptions({ ...options, callbackEvidence }));
   return {
     ...instance,
-    handler: (request: Request) => callbackEvidence.runWithScope(() => instance.handler(request)),
+    handler: (request: Request) =>
+      callbackEvidence.runWithScope(() =>
+        answeringReleasedRefusals(() => instance.handler(request)),
+      ),
   };
 };

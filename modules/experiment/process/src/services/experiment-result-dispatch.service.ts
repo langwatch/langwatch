@@ -14,7 +14,11 @@ import type {
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
-import { promptLoadKey, workflowLoadKey } from "../rules/experiment-execution-data.rules.ts";
+import {
+  agentLoadKey,
+  promptLoadKey,
+  workflowLoadKey,
+} from "../rules/experiment-execution-data.rules.ts";
 import type { LoadedEvaluators, LoadedWorkflow } from "./experiment-execution-data.service.ts";
 
 export class ExperimentResultDispatchService {
@@ -126,7 +130,7 @@ export class ExperimentResultDispatchService {
     }
 
     if (t.type === "agent" && t.dbAgentId) {
-      return loadedAgents.get(t.dbAgentId)?.name ?? null;
+      return loadedAgents.get(agentLoadKey(t))?.name ?? null;
     }
 
     if (t.type === "evaluator" && t.targetEvaluatorId) {

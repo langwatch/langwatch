@@ -45,6 +45,14 @@ function unusedRepository(): EvaluatorRepository {
     update: notUsedHere,
     archive: notUsedHere,
     updateNameAndConfig: notUsedHere,
+    findVersions: notUsedHere,
+    findVersion: notUsedHere,
+    latestVersionNumbers: notUsedHere,
+    findLabels: notUsedHere,
+    assignLabel: notUsedHere,
+    removeLabel: notUsedHere,
+    findUnversioned: notUsedHere,
+    backfillFirstVersion: notUsedHere,
   };
 }
 

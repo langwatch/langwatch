@@ -1,8 +1,8 @@
+import type { AvailableSource, FieldType } from "@langwatch/design-system/variable-mapping";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CaretPosition } from "rich-textarea";
 
 import type { SelectedField } from "../../variable-insert-menu.tsx";
-import type { AvailableSource, FieldType } from "../../variable-mapping-input.tsx";
 import type { Variable } from "../../variables-section.tsx";
 import type { PromptTextAreaOnAddMention } from "../prompt-textarea.types.ts";
 import { getCaretCoordinates, setTextareaValueUndoable } from "../prompt-textarea.utils.ts";

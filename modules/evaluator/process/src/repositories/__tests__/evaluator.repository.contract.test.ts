@@ -251,6 +251,11 @@ describe.skipIf(!databaseUrl)("given the Postgres evaluator repository", () => {
 
   const clean = () =>
     cleanupTestRows(database(), [
+      // Copies first: relation emulation refuses to delete a source a copy still names.
+      [
+        "evaluator",
+        { projectId: { in: [projectId, otherProjectId] }, copiedFromEvaluatorId: { not: null } },
+      ],
       ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
     ]);
 

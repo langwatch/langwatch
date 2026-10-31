@@ -606,6 +606,18 @@
     "./column-picker": {
       "types": "./dist/components/layout/column-picker.d.ts",
       "default": "./src/components/layout/column-picker.tsx"
+    },
+    "./deploy-label-select": {
+      "types": "./dist/components/forms/deploy-label-select.d.ts",
+      "default": "./src/components/forms/deploy-label-select.tsx"
+    },
+    "./deploy-labels-dialog": {
+      "types": "./dist/components/overlays/deploy-labels-dialog.d.ts",
+      "default": "./src/components/overlays/deploy-labels-dialog.tsx"
+    },
+    "./version-list": {
+      "types": "./dist/components/display/version-list.d.ts",
+      "default": "./src/components/display/version-list.tsx"
     }
   },
   "scripts": {

@@ -130,6 +130,12 @@ export const mockEvaluators = [
  */
 export const state = {
   mockQuery: {} as Record<string, string>,
+  /** What `evaluators.listVersions` answers for the selected evaluator. */
+  mockVersions: {
+    versions: [] as { version: number }[],
+    labels: [] as { label: string; version: number }[],
+    availableLabels: [] as string[],
+  },
   mockLicenseIsAllowed: true,
   mockMonitor: {
     id: "monitor-1",
@@ -217,6 +223,9 @@ export function createEvaluatorClientMock() {
             data: mockEvaluators.find((e) => e.id === id) ?? null,
             isLoading: false,
           })),
+        },
+        listVersions: {
+          useQuery: vi.fn(() => ({ data: state.mockVersions, isLoading: false })),
         },
       },
     },
@@ -434,6 +443,7 @@ export const Wrapper = ({ children }: { children: React.ReactNode }) => (
  */
 export function resetState() {
   state.mockQuery = {};
+  state.mockVersions = { versions: [], labels: [], availableLabels: [] };
   state.mockLicenseIsAllowed = true;
   state.mockMonitor = {
     id: "monitor-1",

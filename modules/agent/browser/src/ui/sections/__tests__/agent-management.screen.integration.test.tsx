@@ -9,6 +9,8 @@ import type {
   Agent,
   AgentCopy,
   AgentHistoryEntry,
+  AgentLabel,
+  AgentVersions,
   AgentWithFields,
   AgentOverview,
   RelatedAgentEntities,
@@ -75,6 +77,39 @@ const history: AgentHistoryEntry[] = [
     user: { id: "user_1", name: "Ada", email: "ada@example.test" },
   },
 ];
+
+function versionRow(version: number, commitMessage: string | null) {
+  return {
+    id: `version_${version}`,
+    agentId: "agent_1",
+    projectId: "project_1",
+    version,
+    name: "HTTP agent",
+    type: "http" as const,
+    config: {},
+    workflowId: null,
+    commitMessage,
+    authorId: "user_1",
+    authorKind: "user" as const,
+    author: { id: "user_1", name: "Ada", email: "ada@example.test" },
+    createdAt: new Date(`2026-01-0${version}T00:00:00.000Z`),
+    labels: version === 1 ? ["production"] : [],
+  };
+}
+
+const versions: AgentVersions = {
+  versions: [versionRow(2, "Point at the new endpoint"), versionRow(1, null)],
+  labels: [
+    {
+      label: "production",
+      versionId: "version_1",
+      version: 1,
+      updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+      updatedById: "user_1",
+    },
+  ],
+  availableLabels: ["production", "staging"],
+};
 
 const invalidateAgents = vi.fn(async () => undefined);
 const invalidateLimit = vi.fn(async () => undefined);
@@ -188,6 +223,36 @@ class TestAgentBrowser implements AgentClient {
   getHistory(input: unknown): Promise<AgentHistoryEntry[]> {
     this.historyRead.push(input);
     return Promise.resolve(history);
+  }
+
+  readonly labelsAssigned: unknown[] = [];
+  versionsRead = 0;
+  /** A handled error the next label assignment rejects with, once. */
+  assignRefusal: unknown = null;
+
+  listVersions(): Promise<AgentVersions> {
+    this.versionsRead += 1;
+    return Promise.resolve(versions);
+  }
+
+  assignLabel(input: { label: string; version: number }): Promise<AgentLabel> {
+    if (this.assignRefusal) {
+      const refusal = this.assignRefusal;
+      this.assignRefusal = null;
+      return Promise.reject(refusal);
+    }
+    this.labelsAssigned.push(input);
+    return Promise.resolve({
+      label: input.label,
+      version: input.version,
+      versionId: `version_${input.version}`,
+      updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+      updatedById: "user_1",
+    });
+  }
+
+  removeLabel(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -462,6 +527,85 @@ describe("given the agents page", () => {
       await user.click(screen.getByRole("button", { name: /close/i }));
 
       expect(host.setQueryCalls).toEqual([{ history: void 0 }]);
+    });
+  });
+
+  describe("when an agent's history lists its versions", () => {
+    /** @scenario "The history drawer shows versions and opens the deploy dialog" */
+    it("shows each version with its labels and deploys staging to a version", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { browser } = await mountScreen({ history: "agent_1" });
+
+      const list = await screen.findByTestId("agent-versions");
+      expect(within(list).getByText("v2")).toBeInTheDocument();
+      expect(within(list).getByText("Point at the new endpoint")).toBeInTheDocument();
+      expect(within(list).getByText("production")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Deploy" }));
+      const dialog = await screen.findByRole("dialog", { name: /deploy http agent/i });
+      const [, staging] = within(dialog).getAllByRole("combobox");
+      await user.click(staging!);
+      await user.click(await screen.findByRole("option", { name: /v2/ }));
+      await user.click(within(dialog).getByTestId("agent-deploy-save"));
+
+      await waitFor(() => {
+        expect(browser.labelsAssigned).toEqual([
+          { projectId: "project_1", agentId: "agent_1", label: "staging", version: 2 },
+        ]);
+      });
+    });
+
+    /** @scenario "A failed label save shows the registered error and reads the labels again" */
+    it("shows the registered copy for a refused label and reads the labels again", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { browser } = await mountScreen({ history: "agent_1" });
+      browser.assignRefusal = { code: "agent_version_not_found", httpStatus: 404, meta: {} };
+
+      await screen.findByTestId("agent-versions");
+      await user.click(screen.getByRole("button", { name: "Deploy" }));
+      const dialog = await screen.findByRole("dialog", { name: /deploy http agent/i });
+      const readsBefore = browser.versionsRead;
+      const [, staging] = within(dialog).getAllByRole("combobox");
+      await user.click(staging!);
+      await user.click(await screen.findByRole("option", { name: /v2/ }));
+      await user.click(within(dialog).getByTestId("agent-deploy-save"));
+
+      const alert = await within(dialog).findByRole("alert");
+      expect(alert.textContent).toMatch(/^That agent version doesn't exist/);
+      expect(alert.textContent).not.toContain("agent_version_not_found");
+      await waitFor(() => expect(browser.versionsRead).toBeGreaterThan(readsBefore));
+      expect(screen.getByRole("dialog", { name: /deploy http agent/i })).toBeInTheDocument();
+    });
+
+    /** @scenario "The deploy dialog adds a custom label and refuses a reserved one" */
+    it("adds a custom label, refuses a reserved one and cancels with Escape", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { browser } = await mountScreen({ history: "agent_1" });
+
+      await screen.findByTestId("agent-versions");
+      await user.click(screen.getByRole("button", { name: "Deploy" }));
+      const dialog = await screen.findByRole("dialog", { name: /deploy http agent/i });
+
+      await user.click(within(dialog).getByRole("button", { name: "+ Add label" }));
+      await user.type(within(dialog).getByPlaceholderText(/label name/i), "latest");
+      expect(within(dialog).getByText(/always points at the newest version/)).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+      await user.keyboard("{Escape}");
+      expect(within(dialog).queryByPlaceholderText(/label name/i)).not.toBeInTheDocument();
+
+      await user.click(within(dialog).getByRole("button", { name: "+ Add label" }));
+      await user.type(within(dialog).getByPlaceholderText(/label name/i), "canary{Enter}");
+      expect(within(dialog).getByText("canary")).toBeInTheDocument();
+      const canary = within(dialog).getAllByRole("combobox").at(-1);
+      await user.click(canary!);
+      await user.click(await screen.findByRole("option", { name: /v1/ }));
+      await user.click(within(dialog).getByTestId("agent-deploy-save"));
+
+      await waitFor(() => {
+        expect(browser.labelsAssigned).toEqual([
+          { projectId: "project_1", agentId: "agent_1", label: "canary", version: 1 },
+        ]);
+      });
     });
   });
 

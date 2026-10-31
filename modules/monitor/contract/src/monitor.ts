@@ -1,4 +1,4 @@
-import { evaluatorSchema } from "@langwatch/evaluator-contract";
+import { checkEvaluatorLabel, evaluatorSchema } from "@langwatch/evaluator-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -63,6 +63,21 @@ export interface MonitorPreconditionsSchema extends Named<
 export const monitorPreconditionsSchema: MonitorPreconditionsSchema =
   monitorPreconditionsSchemaDefinition;
 
+/**
+ * A deploy label name under the evaluator's label rules. Whether the evaluator holds it is read
+ * at run time: a label that points nowhere runs the latest version.
+ */
+export const monitorEvaluatorLabelSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .superRefine((label, ctx) => {
+    const check = checkEvaluatorLabel(label);
+    if (!check.valid) ctx.addIssue({ code: "custom", message: check.reason });
+  });
+
+const monitorPersonSchema = z.object({ id: z.string(), name: z.string().nullable() }).strict();
+
 const monitorSchemaDefinition = z
   .object({
     id: z.string().min(1),
@@ -86,6 +101,12 @@ const monitorSchemaDefinition = z
     autoPausedAt: z.date().nullish(),
     /** Why it paused itself, in words a person reads. */
     autoPausedReason: z.string().nullish(),
+    evaluatorLabel: z.string().nullish(),
+    /** Null for monitors created before creators were recorded. */
+    createdById: z.string().nullish(),
+    updatedById: z.string().nullish(),
+    createdBy: monitorPersonSchema.nullish(),
+    updatedBy: monitorPersonSchema.nullish(),
   })
   .strict();
 export interface MonitorSchema extends Named<typeof monitorSchemaDefinition> {}
@@ -121,6 +142,8 @@ const enabledGuardrailMonitorSchemaDefinition = z
     evaluatorId: z.string().min(1),
     checkType: z.string().min(1),
     parameters: z.json(),
+    /** The evaluator's deploy label the guardrail runs; null runs the monitor's own settings. */
+    evaluatorLabel: z.string().nullish(),
   })
   .strict();
 export interface EnabledGuardrailMonitorSchema extends Named<
@@ -160,6 +183,10 @@ const monitorCreateInputSchemaDefinition = z
     evaluatorId: z.string().min(1).optional(),
     level: z.enum(["trace", "thread"]).optional(),
     threadIdleTimeout: z.number().int().positive().nullable().optional(),
+    /** The evaluator's deploy label this monitor runs; absent or null runs the latest. */
+    evaluatorLabel: monitorEvaluatorLabelSchema.nullable().optional(),
+    /** The user writing the change, recorded as creator or last updater. */
+    actorId: z.string().min(1).nullable().optional(),
   })
   .strict();
 export interface MonitorCreateInputSchema extends Named<
@@ -184,6 +211,10 @@ const monitorUpdateInputSchemaDefinition = z
     evaluatorId: z.string().min(1).nullable().optional(),
     level: z.enum(["trace", "thread"]).optional(),
     threadIdleTimeout: z.number().int().positive().nullable().optional(),
+    /** The evaluator's deploy label this monitor runs; absent or null runs the latest. */
+    evaluatorLabel: monitorEvaluatorLabelSchema.nullable().optional(),
+    /** The user writing the change, recorded as creator or last updater. */
+    actorId: z.string().min(1).nullable().optional(),
   })
   .strict();
 export interface MonitorUpdateInputSchema extends Named<
@@ -262,6 +293,8 @@ const monitorReplicationInputSchemaDefinition = z
     sourceProjectId: z.string().min(1),
     targetProjectId: z.string().min(1),
     evaluatorId: z.string().min(1).nullable(),
+    /** The user making the copy, recorded as its creator. */
+    actorId: z.string().min(1).nullable().optional(),
   })
   .strict();
 export interface MonitorReplicationInputSchema extends Named<
@@ -309,8 +342,11 @@ const monitorPatchInputSchemaDefinition = z
         evaluatorId: z.string().min(1).nullable().optional(),
         level: z.enum(["trace", "thread"]).optional(),
         threadIdleTimeout: z.number().int().positive().nullable().optional(),
+        evaluatorLabel: monitorEvaluatorLabelSchema.nullable().optional(),
       })
       .strict(),
+    /** The user writing the change, recorded as creator or last updater. */
+    actorId: z.string().min(1).nullable().optional(),
   })
   .strict();
 export interface MonitorPatchInputSchema extends Named<typeof monitorPatchInputSchemaDefinition> {}

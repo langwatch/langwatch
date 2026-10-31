@@ -18,16 +18,22 @@ interface LangTabSpec {
   language: PrismLanguage;
 }
 
-/** Tab order is fixed: Python default, then TypeScript, then Go, then Shell. */
+/** Tab order is fixed: Python default, then TypeScript, Go, Shell, then the CI tabs. */
 const LANG_TABS: LangTabSpec[] = [
   { value: "python", label: "Python", language: "python" },
   { value: "typescript", label: "TypeScript", language: "typescript" },
   { value: "go", label: "Go", language: "go" },
   { value: "shell", label: "Shell", language: "bash" },
+  { value: "cli", label: "CLI", language: "bash" },
+  { value: "github_actions", label: "GitHub Actions", language: "yaml" },
 ];
+
+/** The languages every Run via API dialog offers; an experiment adds the CI tabs. */
+export const API_LANGS: RunSnippetLang[] = ["python", "typescript", "go", "shell"];
 
 export function useRunViaApiTabs(
   buildSnippet: (args: { lang: RunSnippetLang; dataSource: RunSnippetDataSource }) => string,
+  langs: RunSnippetLang[] = API_LANGS,
 ): {
   dataSource: RunSnippetDataSource;
   setDataSource: (dataSource: RunSnippetDataSource) => void;
@@ -37,13 +43,13 @@ export function useRunViaApiTabs(
 
   const tabs = useMemo<ApiSnippetTab[]>(
     () =>
-      LANG_TABS.map((tab) => ({
+      LANG_TABS.filter((tab) => langs.includes(tab.value)).map((tab) => ({
         value: tab.value,
         label: tab.label,
         language: tab.language,
         content: buildSnippet({ lang: tab.value, dataSource }),
       })),
-    [buildSnippet, dataSource],
+    [buildSnippet, dataSource, langs],
   );
 
   return { dataSource, setDataSource, tabs };

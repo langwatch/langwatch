@@ -16,9 +16,13 @@ import {
   type AgentWorkflowConfig,
   type AgentName,
   type AgentReferenceState,
+  type AgentWriteAuthor,
+  AgentVersionNotFoundError,
 } from "@langwatch/agent-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { generate } from "@langwatch/ksuid";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
+import { versionMayCopy } from "../../rules/agent-version-snapshot.rules.ts";
 import type {
   AgentPresenceInput,
   AgentRepository,
@@ -27,15 +31,23 @@ import type {
   UpdateAgentCopyInput,
   UpdatePersistedAgentInput,
   AgentCopyRecord,
+  AgentLabelRecord,
+  AgentVersionLookup,
+  AgentVersionRecord,
 } from "../agent.repository.ts";
 
 export class MemoryAgentRepository implements AgentRepository {
   #agents = new Map<string, Agent>();
+  #versions: AgentVersionRecord[] = [];
+  #labels: (Omit<AgentLabelRecord, "version"> & { projectId: string })[] = [];
 
   private constructor() {}
 
-  static create(): MemoryAgentRepository {
-    return new MemoryAgentRepository();
+  /** `unversioned` seeds rows as an older release wrote them, with no versions and no creator. */
+  static create(input: { unversioned?: Agent[] } = {}): MemoryAgentRepository {
+    const repository = new MemoryAgentRepository();
+    for (const row of input.unversioned ?? []) repository.#seedUnversioned(row);
+    return repository;
   }
 
   async getById(input: GetAgentInput): Promise<Agent> {
@@ -130,26 +142,33 @@ export class MemoryAgentRepository implements AgentRepository {
       hostLabel: input.identity?.hostLabel ?? null,
       identityKey: identityKey ?? null,
       lastSeenAt: input.identity ? now : null,
+      createdById: input.author?.authorId ?? null,
+      updatedById: input.author?.authorId ?? null,
     });
 
     this.#agents.set(agent.id, structuredClone(agent));
+    this.#appendVersion({ agent, author: input.author, commitMessage: input.commitMessage });
 
     return structuredClone(agent);
   }
 
   async update(input: UpdatePersistedAgentInput): Promise<Agent> {
     const agent = this.#get(input);
+    await this.#baselineIfUnversioned(agent);
 
-    return this.#save({
+    const saved = this.#save({
       ...agent,
       name: input.name ?? agent.name,
       type: input.type,
       config: input.config,
       workflowId: input.workflowId ?? agent.workflowId,
+      ...(input.author ? { updatedById: input.author.authorId } : {}),
     });
+    this.#appendVersion({ agent: saved, author: input.author, commitMessage: input.commitMessage });
+    return saved;
   }
 
-  updateConfigIfUnchanged(
+  async updateConfigIfUnchanged(
     input: Parameters<AgentRepository["updateConfigIfUnchanged"]>[0],
   ): Promise<boolean> {
     const agent = this.#agents.get(input.id);
@@ -158,11 +177,13 @@ export class MemoryAgentRepository implements AgentRepository {
       agent.projectId !== input.projectId ||
       agent.updatedAt.getTime() !== input.updatedAt.epochMilliseconds
     ) {
-      return Promise.resolve(false);
+      return false;
     }
-    this.#save({ ...agent, config: input.config });
+    await this.#baselineIfUnversioned(agent);
+    const saved = this.#save({ ...agent, config: input.config });
+    this.#appendVersion({ agent: saved, author: undefined, commitMessage: undefined });
 
-    return Promise.resolve(true);
+    return true;
   }
 
   async archive(input: GetAgentInput): Promise<Agent> {
@@ -187,11 +208,13 @@ export class MemoryAgentRepository implements AgentRepository {
     if (agent.workflowId !== input.workflowId) {
       throw new AgentNotFoundError(input.id, input.projectId);
     }
+    await this.#baselineIfUnversioned(agent);
 
     const updated = agentSchema.parse({ ...agent, config: input.config });
     Object.assign(updated.config, structuredClone(input.config));
     updated.updatedAt = toDate(nowInstant());
     this.#agents.set(agent.id, updated);
+    this.#appendVersion({ agent: updated, author: undefined, commitMessage: undefined });
   }
 
   async findCopies(sourceAgentId: string): Promise<AgentCopyRecord[]> {
@@ -201,7 +224,173 @@ export class MemoryAgentRepository implements AgentRepository {
   }
 
   async updateNameAndConfig(input: UpdateAgentCopyInput): Promise<void> {
-    this.#save({ ...this.#get(input), name: input.name, config: input.config });
+    const agent = this.#get(input);
+    await this.#baselineIfUnversioned(agent);
+    const saved = this.#save({
+      ...agent,
+      name: input.name,
+      config: input.config,
+      ...(input.author ? { updatedById: input.author.authorId } : {}),
+    });
+    this.#appendVersion({ agent: saved, author: input.author, commitMessage: input.commitMessage });
+  }
+
+  async findVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]> {
+    // Instants are immutable and lose their prototype in structuredClone, so only config is copied.
+    return this.#versions
+      .filter((row) => row.projectId === input.projectId && row.agentId === input.agentId)
+      .toSorted((left, right) => right.version - left.version)
+      .map((row) => ({ ...row, config: structuredClone(row.config) }));
+  }
+
+  async findVersion(input: AgentVersionLookup): Promise<AgentVersionRecord | undefined> {
+    const [found] = (await this.findVersions(input)).filter(
+      (row) =>
+        (input.version === void 0 || row.version === input.version) &&
+        (input.versionId === void 0 || row.id === input.versionId),
+    );
+    return found;
+  }
+
+  async latestVersionNumbers(input: AgentIdsInput): Promise<Map<string, number>> {
+    const numbers = new Map<string, number>();
+    for (const row of this.#versions) {
+      if (row.projectId !== input.projectId || !input.ids.includes(row.agentId)) continue;
+      numbers.set(row.agentId, Math.max(numbers.get(row.agentId) ?? 0, row.version));
+    }
+    return numbers;
+  }
+
+  async findLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]> {
+    return this.#labels
+      .filter((row) => row.projectId === input.projectId && input.ids.includes(row.agentId))
+      .flatMap(({ projectId: _projectId, ...row }) => {
+        const version = this.#versions.find((candidate) => candidate.id === row.versionId);
+        return version ? [{ ...row, version: version.version }] : [];
+      })
+      .toSorted((left, right) => left.label.localeCompare(right.label));
+  }
+
+  async assignLabel(input: {
+    projectId: string;
+    agentId: string;
+    label: string;
+    versionId: string;
+    actorId: string | null;
+  }): Promise<AgentLabelRecord> {
+    const version = await this.findVersion({
+      projectId: input.projectId,
+      agentId: input.agentId,
+      versionId: input.versionId,
+    });
+    if (!version) throw new AgentVersionNotFoundError({ agentId: input.agentId });
+    const row = {
+      projectId: input.projectId,
+      agentId: input.agentId,
+      label: input.label,
+      versionId: version.id,
+      updatedAt: nowInstant(),
+      updatedById: input.actorId,
+    };
+    this.#labels = [
+      ...this.#labels.filter(
+        (candidate) => !(candidate.agentId === input.agentId && candidate.label === input.label),
+      ),
+      row,
+    ];
+    const { projectId: _projectId, ...label } = row;
+    return { ...label, version: version.version };
+  }
+
+  async removeLabel(input: {
+    projectId: string;
+    agentId: string;
+    label: string;
+  }): Promise<boolean> {
+    const before = this.#labels.length;
+    this.#labels = this.#labels.filter(
+      (row) =>
+        !(
+          row.projectId === input.projectId &&
+          row.agentId === input.agentId &&
+          row.label === input.label
+        ),
+    );
+    return this.#labels.length < before;
+  }
+
+  async findUnversioned(input: { afterId: string | null; limit: number }): Promise<Agent[]> {
+    return structuredClone(
+      [...this.#agents.values()]
+        .filter((agent) => agent.type !== "connected" && agent.archivedAt === null)
+        .filter((agent) => input.afterId === null || agent.id > input.afterId)
+        .toSorted((left, right) => left.id.localeCompare(right.id))
+        .slice(0, input.limit),
+    );
+  }
+
+  async backfillFirstVersion(input: {
+    agent: Agent;
+    createdById: string | null;
+  }): Promise<boolean> {
+    const { agent } = input;
+    if (this.#versions.some((row) => row.agentId === agent.id)) return false;
+    this.#versions.push({
+      id: generate("agentversion").toString(),
+      agentId: agent.id,
+      projectId: agent.projectId,
+      version: 1,
+      name: agent.name,
+      type: agent.type,
+      config: structuredClone({ ...agent.config }),
+      workflowId: agent.workflowId,
+      commitMessage: null,
+      authorId: input.createdById,
+      authorKind: input.createdById ? "user" : "system",
+      createdAt: fromDate(agent.createdAt),
+    });
+    const stored = this.#agents.get(agent.id);
+    if (stored && input.createdById && !stored.createdById) {
+      this.#agents.set(agent.id, { ...stored, createdById: input.createdById });
+    }
+    return true;
+  }
+
+  #seedUnversioned(agent: Agent): void {
+    this.#agents.set(agent.id, structuredClone(agent));
+  }
+
+  /** An agent saved before versions existed keeps its old config as version 1. */
+  async #baselineIfUnversioned(agent: Agent): Promise<void> {
+    if (this.#versions.some((row) => row.agentId === agent.id)) return;
+    if (!(await versionMayCopy(agent))) return;
+    await this.backfillFirstVersion({ agent, createdById: agent.createdById ?? null });
+  }
+
+  #appendVersion(input: {
+    agent: Agent;
+    author: AgentWriteAuthor | undefined;
+    commitMessage: string | undefined;
+  }): void {
+    const { agent } = input;
+    if (agent.type === "connected") return;
+    const latest = this.#versions
+      .filter((row) => row.agentId === agent.id)
+      .reduce((max, row) => Math.max(max, row.version), 0);
+    this.#versions.push({
+      id: generate("agentversion").toString(),
+      agentId: agent.id,
+      projectId: agent.projectId,
+      version: latest + 1,
+      name: agent.name,
+      type: agent.type,
+      config: structuredClone({ ...agent.config }),
+      workflowId: agent.workflowId,
+      commitMessage: input.commitMessage ?? null,
+      authorId: input.author?.authorId ?? null,
+      authorKind: input.author?.authorKind ?? "system",
+      createdAt: nowInstant(),
+    });
   }
 
   async findConnectedByNameAndEnvironment(

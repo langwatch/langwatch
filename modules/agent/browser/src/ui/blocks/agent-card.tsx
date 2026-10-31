@@ -1,7 +1,7 @@
-import type { Agent, AgentType } from "@langwatch/agent-contract";
+import type { Agent, AgentPersonView, AgentType } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, HStack } from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, HStack } from "@langwatch/design-system/primitives";
 import { ResourceTile } from "@langwatch/design-system/resource-tile";
 import {
   ArrowUp,
@@ -124,7 +124,8 @@ export function AgentCardIcon({ icon: Icon }: { icon: LucideIcon }) {
 }
 
 export type AgentCardProps = {
-  agent: WireOf<Agent>;
+  /** The list rows carry the latest version number and the creator beside the agent. */
+  agent: WireOf<Agent> & { version?: number | null; createdBy?: AgentPersonView | null };
   updatedAtLabel: string;
   onClick?: () => void;
   onEdit?: () => void;
@@ -222,8 +223,25 @@ export function AgentCard({
         )
       }
       title={agent.name}
-      badges={agentHasDevTunnel(agent) && <LocalTunnelBadge />}
-      meta={`${agentTypeLabels[agent.type]} • ${updatedAtLabel}`}
+      badges={
+        (agentHasDevTunnel(agent) || agent.version) && (
+          <>
+            {agent.version ? (
+              <Badge size="xs" variant="subtle" data-testid={`agent-version-${agent.id}`}>
+                v{agent.version}
+              </Badge>
+            ) : null}
+            {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
+          </>
+        )
+      }
+      meta={[
+        agentTypeLabels[agent.type],
+        agent.createdBy?.name ? `Created by ${agent.createdBy.name}` : null,
+        updatedAtLabel,
+      ]
+        .filter(Boolean)
+        .join(" • ")}
     />
   );
 }

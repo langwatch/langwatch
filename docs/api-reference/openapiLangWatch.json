@@ -5625,6 +5625,95 @@
                             ],
                             "description": "Why the agent cannot be run by this credential. Null when it can."
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "label",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                          },
+                          "createdBy": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                          },
+                          "updatedBy": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The user who changed the agent last. Null when an API key changed it."
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -5653,6 +5742,10 @@
                           "instances",
                           "selectable",
                           "notSelectableReason",
+                          "version",
+                          "labels",
+                          "createdBy",
+                          "updatedBy",
                           "createdAt",
                           "updatedAt",
                           "platformUrl"
@@ -5989,6 +6082,95 @@
                       ],
                       "description": "Why the agent cannot be run by this credential. Null when it can."
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the agent last. Null when an API key changed it."
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -6017,6 +6199,10 @@
                     "instances",
                     "selectable",
                     "notSelectableReason",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -6055,6 +6241,11 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
                       },
                       "workflowId": {
                         "type": "string"
@@ -6391,6 +6582,11 @@
                         "minLength": 1,
                         "maxLength": 255
                       },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
+                      },
                       "workflowId": {
                         "type": "string"
                       },
@@ -6707,6 +6903,11 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
                       },
                       "workflowId": {
                         "type": "string"
@@ -7129,6 +7330,11 @@
                         "minLength": 1,
                         "maxLength": 255
                       },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
+                      },
                       "workflowId": {
                         "type": "string"
                       },
@@ -7533,6 +7739,11 @@
                         "minLength": 1,
                         "maxLength": 255
                       },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
+                      },
                       "workflowId": {
                         "type": "string"
                       },
@@ -7564,6 +7775,11 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
                       },
                       "workflowId": {
                         "type": "string"
@@ -7885,6 +8101,95 @@
                       ],
                       "description": "Why the agent cannot be run by this credential. Null when it can."
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the agent last. Null when an API key changed it."
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -7913,6 +8218,10 @@
                     "instances",
                     "selectable",
                     "notSelectableReason",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -7923,6 +8232,7 @@
             }
           }
         },
+        "description": "Reads the latest version unless `label` or `version` is given. The id also takes a suffix: `agent_1:production`, `agent_1:3` or `agent_1:latest`.",
         "summary": "Get an agent in the caller's project",
         "security": [
           {
@@ -7948,6 +8258,26 @@
             },
             "required": true,
             "description": "The agent id."
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "description": "A deploy label, for example production. Omit both to read the latest version."
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "description": "A version number."
           }
         ]
       },
@@ -8199,6 +8529,95 @@
                       ],
                       "description": "Why the agent cannot be run by this credential. Null when it can."
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the agent last. Null when an API key changed it."
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -8227,6 +8646,10 @@
                     "instances",
                     "selectable",
                     "notSelectableReason",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -8273,6 +8696,11 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "commitMessage": {
+                    "description": "What changed, kept on the version this write creates.",
+                    "type": "string",
+                    "maxLength": 500
                   }
                 }
               }
@@ -8554,6 +8982,95 @@
                       ],
                       "description": "Why the agent cannot be run by this credential. Null when it can."
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the agent last. Null when an API key changed it."
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -8582,6 +9099,10 @@
                     "instances",
                     "selectable",
                     "notSelectableReason",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -8628,6 +9149,11 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "commitMessage": {
+                    "description": "What changed, kept on the version this write creates.",
+                    "type": "string",
+                    "maxLength": 500
                   }
                 }
               }
@@ -8737,6 +9263,376 @@
             },
             "required": true,
             "description": "The agent id."
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{agentId}/versions": {
+      "get": {
+        "operationId": "listAgentVersions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "agentId": {
+                            "type": "string"
+                          },
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "signature",
+                              "code",
+                              "workflow",
+                              "http",
+                              "connected",
+                              "voice"
+                            ]
+                          },
+                          "config": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "workflowId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "commitMessage": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "api_key",
+                                  "system"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "author": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "email": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "email"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "agentId",
+                          "projectId",
+                          "version",
+                          "name",
+                          "type",
+                          "config",
+                          "workflowId",
+                          "commitMessage",
+                          "authorId",
+                          "authorKind",
+                          "author",
+                          "createdAt",
+                          "labels"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "labels"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "summary": "List an agent's versions, newest first, with the labels on each",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "project:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{agentId}/labels/{label}": {
+      "put": {
+        "operationId": "assignAgentLabel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "versionId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "version",
+                    "versionId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "summary": "Point a deploy label, such as production, at one of the agent's versions",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "agents:deploy"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "description": "The deploy label, for example production."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The version number the label points at."
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeAgentLabel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "removed": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "removed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove a deploy label from an agent",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "agents:deploy"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "description": "The deploy label, for example production."
           }
         ]
       }
@@ -16183,7 +17079,9 @@
                                           "featureFlags:manageExperiments",
                                           "governanceCost:view",
                                           "sso:view",
-                                          "sso:manage"
+                                          "sso:manage",
+                                          "agents:deploy",
+                                          "evaluators:deploy"
                                         ]
                                       }
                                     ]
@@ -16404,7 +17302,9 @@
                                     "featureFlags:manageExperiments",
                                     "governanceCost:view",
                                     "sso:view",
-                                    "sso:manage"
+                                    "sso:manage",
+                                    "agents:deploy",
+                                    "evaluators:deploy"
                                   ]
                                 }
                               ]
@@ -17025,7 +17925,9 @@
                                                   "featureFlags:manageExperiments",
                                                   "governanceCost:view",
                                                   "sso:view",
-                                                  "sso:manage"
+                                                  "sso:manage",
+                                                  "agents:deploy",
+                                                  "evaluators:deploy"
                                                 ]
                                               }
                                             ]
@@ -17246,7 +18148,9 @@
                                             "featureFlags:manageExperiments",
                                             "governanceCost:view",
                                             "sso:view",
-                                            "sso:manage"
+                                            "sso:manage",
+                                            "agents:deploy",
+                                            "evaluators:deploy"
                                           ]
                                         }
                                       ]
@@ -17688,7 +18592,9 @@
                                         "featureFlags:manageExperiments",
                                         "governanceCost:view",
                                         "sso:view",
-                                        "sso:manage"
+                                        "sso:manage",
+                                        "agents:deploy",
+                                        "evaluators:deploy"
                                       ]
                                     }
                                   ]
@@ -49950,6 +50856,95 @@
                       "workflowIcon": {
                         "type": "string"
                       },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The version this response shows: the latest, unless a label or a version was asked for."
+                      },
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "label",
+                            "version"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "description": "The deploy labels the evaluator carries, such as production, and the version each points at."
+                      },
+                      "createdBy": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded."
+                      },
+                      "updatedBy": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The user who changed the evaluator last. Null when an API key changed it."
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -49968,6 +50963,10 @@
                       "updatedAt",
                       "fields",
                       "outputFields",
+                      "version",
+                      "labels",
+                      "createdBy",
+                      "updatedBy",
                       "platformUrl"
                     ],
                     "additionalProperties": false
@@ -50105,6 +51104,95 @@
                     "workflowIcon": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the evaluator carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the evaluator last. Null when an API key changed it."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -50123,6 +51211,10 @@
                     "updatedAt",
                     "fields",
                     "outputFields",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -50289,6 +51381,95 @@
                     "workflowIcon": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the evaluator carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the evaluator last. Null when an API key changed it."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -50307,6 +51488,10 @@
                     "updatedAt",
                     "fields",
                     "outputFields",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -50337,7 +51522,7 @@
             }
           }
         },
-        "description": "Get a specific evaluator by ID or slug",
+        "description": "Get a specific evaluator by ID or slug, at the latest version unless `label` or `version` is given. The address also takes a suffix: `toxicity:production`, `toxicity:2` or `toxicity:latest`.",
         "security": [
           {
             "project_api_key": []
@@ -50362,6 +51547,26 @@
             },
             "required": true,
             "description": "The evaluator id or its project-unique slug."
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "description": "A deploy label, for example production. Omit both to read the latest version."
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "description": "A version number."
           }
         ]
       }
@@ -50479,6 +51684,95 @@
                     "workflowIcon": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the evaluator carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the evaluator last. Null when an API key changed it."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -50497,6 +51791,10 @@
                     "updatedAt",
                     "fields",
                     "outputFields",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -50568,6 +51866,11 @@
                       "type": "string"
                     },
                     "additionalProperties": {}
+                  },
+                  "commitMessage": {
+                    "description": "A note kept on the version this update appends.",
+                    "type": "string",
+                    "maxLength": 500
                   }
                 }
               }
@@ -50671,6 +51974,461 @@
             },
             "required": true,
             "description": "The evaluator id."
+          }
+        ]
+      }
+    },
+    "/api/v1/evaluators/{evaluatorId}/versions": {
+      "get": {
+        "operationId": "getApiEvaluatorsVersions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "evaluatorId": {
+                            "type": "string"
+                          },
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "evaluator",
+                              "code",
+                              "workflow"
+                            ]
+                          },
+                          "config": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "workflowId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "commitMessage": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "api_key",
+                                  "system"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "author": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "email": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "email"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "evaluatorId",
+                          "projectId",
+                          "version",
+                          "name",
+                          "type",
+                          "config",
+                          "workflowId",
+                          "commitMessage",
+                          "authorId",
+                          "authorKind",
+                          "author",
+                          "createdAt",
+                          "labels"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "labels"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "List an evaluator's versions, newest first, with the labels on each",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "evaluations:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluatorId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The evaluator id."
+          }
+        ]
+      }
+    },
+    "/api/v1/evaluators/{evaluatorId}/labels/{label}": {
+      "put": {
+        "operationId": "putApiEvaluatorsLabel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "versionId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "version",
+                    "versionId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Point a deploy label, such as production, at one of the evaluator's versions",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "evaluators:deploy"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluatorId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The evaluator id."
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "description": "The deploy label, for example production."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The version number the label points at."
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteApiEvaluatorsLabel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "removed": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "removed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Remove a deploy label from an evaluator",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "evaluators:deploy"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluatorId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The evaluator id."
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "description": "The deploy label, for example production."
           }
         ]
       }
@@ -84949,6 +86707,27 @@
                           "null"
                         ]
                       },
+                      "evaluatorLabel": {
+                        "description": "The evaluator deploy label the monitor runs; null runs the latest version.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdById": {
+                        "description": "The user who created the monitor, when recorded.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "updatedById": {
+                        "description": "The user who changed the monitor last.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -84972,6 +86751,9 @@
                       "updatedAt",
                       "autoPausedAt",
                       "autoPausedReason",
+                      "evaluatorLabel",
+                      "createdById",
+                      "updatedById",
                       "platformUrl"
                     ],
                     "additionalProperties": false
@@ -85081,6 +86863,27 @@
                         "null"
                       ]
                     },
+                    "evaluatorLabel": {
+                      "description": "The evaluator deploy label the monitor runs; null runs the latest version.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdById": {
+                      "description": "The user who created the monitor, when recorded.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updatedById": {
+                      "description": "The user who changed the monitor last.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -85104,6 +86907,9 @@
                     "updatedAt",
                     "autoPausedAt",
                     "autoPausedReason",
+                    "evaluatorLabel",
+                    "createdById",
+                    "updatedById",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -85227,6 +87033,19 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "evaluatorLabel": {
+                    "description": "Run the evaluator at this deploy label, such as production; null runs the latest.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -85321,6 +87140,27 @@
                         "null"
                       ]
                     },
+                    "evaluatorLabel": {
+                      "description": "The evaluator deploy label the monitor runs; null runs the latest version.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdById": {
+                      "description": "The user who created the monitor, when recorded.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updatedById": {
+                      "description": "The user who changed the monitor last.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -85344,6 +87184,9 @@
                     "updatedAt",
                     "autoPausedAt",
                     "autoPausedReason",
+                    "evaluatorLabel",
+                    "createdById",
+                    "updatedById",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -85486,6 +87329,27 @@
                         "null"
                       ]
                     },
+                    "evaluatorLabel": {
+                      "description": "The evaluator deploy label the monitor runs; null runs the latest version.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdById": {
+                      "description": "The user who created the monitor, when recorded.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updatedById": {
+                      "description": "The user who changed the monitor last.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -85509,6 +87373,9 @@
                     "updatedAt",
                     "autoPausedAt",
                     "autoPausedReason",
+                    "evaluatorLabel",
+                    "createdById",
+                    "updatedById",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -85639,6 +87506,19 @@
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "evaluatorLabel": {
+                    "description": "Run the evaluator at this deploy label, such as production; null runs the latest.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
                       },
                       {
                         "type": "null"

@@ -1,4 +1,4 @@
-import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { createTrpcRuntime, isAuditLogExempt } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The `monitors.*` procedures over the real runtime and the real application:
@@ -6,7 +6,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  * that reach the wire.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import { type MonitorWithEvaluator, monitorTrpc } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
@@ -198,5 +198,15 @@ describe("the monitors tRPC namespace", () => {
         { workflowId: "workflow-2", projectId: "target" },
       ]);
     });
+  });
+});
+
+describe("auditing monitor changes", () => {
+  /** @scenario "Monitor changes are audited" */
+  it("declares every monitor write as a mutation the tRPC host audits", () => {
+    for (const name of ["create", "update", "toggle", "delete", "copy"] as const) {
+      expect(monitorTrpc.members[name]?.kind).toBe("mutation");
+      expect(isAuditLogExempt(`monitors.${name}`)).toBe(false);
+    }
   });
 });

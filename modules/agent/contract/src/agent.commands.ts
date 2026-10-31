@@ -33,8 +33,15 @@ export const httpAgentTestInputSchema: HttpAgentTestInputSchema =
 
 export type HttpAgentTestInput = z.infer<typeof httpAgentTestInputSchema>;
 
+const commitMessageSchema = z
+  .string()
+  .max(500)
+  .optional()
+  .describe("What changed, kept on the version this write creates.");
+
 const createAgentRequestBaseSchema = z.object({
   name: z.string().min(1).max(255),
+  commitMessage: commitMessageSchema,
   workflowId: z.string().optional(),
   copiedFromAgentId: z.string().optional(),
 });
@@ -123,6 +130,7 @@ const updateAgentRequestSchemaDefinition = z.object({
   type: z.enum(["signature", "code", "workflow", "http", "connected", "voice"]).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
+  commitMessage: commitMessageSchema,
 });
 export interface UpdateAgentRequestSchema extends Named<
   typeof updateAgentRequestSchemaDefinition

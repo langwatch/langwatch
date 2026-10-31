@@ -1390,7 +1390,7 @@ interface Input {
   message: string;
   params?: Record<string, string | number | boolean>;
 }
-// Output: agentTestTurnResultSchema, ../../agent/contract/src/agent.queries.ts:237
+// Output: agentTestTurnResultSchema, ../../agent/contract/src/agent.queries.ts:246
 interface Output {
   output: unknown;
   durationMs: number;
@@ -1406,7 +1406,7 @@ interface Input {
   projectId: string;
   agentId: string;
 }
-// Output: agentTestRunResultSchema, ../../agent/contract/src/agent.queries.ts:249
+// Output: agentTestRunResultSchema, ../../agent/contract/src/agent.queries.ts:258
 interface Output {
   scenarioRunId: string;
   batchRunId: string;
@@ -1415,7 +1415,7 @@ interface Output {
 
 // scenarios.testHttpAgent
 type Input = z.infer<typeof httpAgentTestInputSchema>; // ../../agent/contract/src/agent.commands.ts:32
-type Output = z.infer<typeof httpProxyResultSchema>; // ../../agent/contract/src/agent.queries.ts:271
+type Output = z.infer<typeof httpProxyResultSchema>; // ../../agent/contract/src/agent.queries.ts:280
 ```
 
 ## Sockets

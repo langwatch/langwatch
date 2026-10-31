@@ -6,10 +6,16 @@
 import {
   AgentApi,
   AgentPayloadTooLargeError,
+  agentLabelResponseSchema,
+  agentLabelRestBodySchema,
+  agentLabelRestParamsSchema,
   agentListResponseSchema,
   agentResponseSchema,
+  agentRestGetQuerySchema,
   agentRestParamsSchema,
   agentRestQuerySchema,
+  agentVersionListResponseSchema,
+  agentVersionsRestParamsSchema,
   archiveResultSchema,
   createAgentRequestSchema,
   relayCallBodySchema,
@@ -28,7 +34,11 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
-import { agentConfigWithoutSecrets } from "../rules/agent-secrets.rules.ts";
+import {
+  agentConfigWithoutSecrets,
+  agentVersionsWithoutSecrets,
+} from "../rules/agent-secrets.rules.ts";
+import { agentCallerOf } from "../rules/agent-version-caller.rules.ts";
 
 /** The W3C trace context header a call carries, bound by the process from the request. */
 export const agentTraceparent = defineMiddlewareContext("traceparent", z.string().nullable());
@@ -55,7 +65,13 @@ function response(
   | "notSelectableReason"
   | "createdAt"
   | "updatedAt"
-> & { platformUrl: string } {
+> & {
+  platformUrl: string;
+  version: number | null;
+  labels: { label: string; version: number }[];
+  createdBy: { id: string; name: string | null } | null;
+  updatedBy: { id: string; name: string | null } | null;
+} {
   return {
     id: agent.id,
     name: agent.name,
@@ -71,6 +87,10 @@ function response(
     instances: agent.instances,
     selectable: agent.selectable,
     notSelectableReason: agent.notSelectableReason,
+    version: agent.version ?? null,
+    labels: agent.labels ?? [],
+    createdBy: agent.createdBy ?? null,
+    updatedBy: agent.updatedBy ?? null,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
     platformUrl: app.platformUrl({ projectSlug, agentId: agent.id, agentType: agent.type }),
@@ -125,13 +145,18 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .keepsRecords()
       .withAudit("agents.create")
       .withInput(createAgentRequestSchema)
+      .withCredential("project", { key: true })
       .withPermission("project:update")
       .withOutput(agentResponseSchema)
       .withStatus(201)
       .withDocs({ summary: "Create an authored agent; connected agents register through the SDK" })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope }, context) => {
-        const created = await app.create({ ...input, projectId: scope.id });
+      .handle(async ({ app, input, scope, actor, key }, context) => {
+        const created = await app.create({
+          ...input,
+          projectId: scope.id,
+          caller: agentCallerOf({ actor, key }),
+        });
         const agent = await app.getById({
           id: created.id,
           projectId: scope.id,
@@ -143,9 +168,14 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
 
       .get("/:id", "getAgent")
       .withParams(agentRestParamsSchema)
+      .withQuery(agentRestGetQuerySchema)
       .withPermission("project:view")
       .withOutput(agentResponseSchema)
-      .withDocs({ summary: "Get an agent in the caller's project" })
+      .withDocs({
+        summary: "Get an agent in the caller's project",
+        description:
+          "Reads the latest version unless `label` or `version` is given. The id also takes a suffix: `agent_1:production`, `agent_1:3` or `agent_1:latest`.",
+      })
       .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, context) => {
         const agent = await app.getById({
@@ -162,12 +192,13 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withAudit("agents.update")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
+      .withCredential("project", { key: true })
       .withPermission("project:update")
       .withOutput(agentResponseSchema)
       .withDocs({ summary: "Update an authored agent" })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope }, context) => {
-        await app.update({ ...input, projectId: scope.id });
+      .handle(async ({ app, input, scope, actor, key }, context) => {
+        await app.update({ ...input, projectId: scope.id, caller: agentCallerOf({ actor, key }) });
         const agent = await app.getById({
           id: input.id,
           projectId: scope.id,
@@ -182,12 +213,13 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withAudit("agents.update")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
+      .withCredential("project", { key: true })
       .withPermission("project:update")
       .withOutput(agentResponseSchema)
       .withDocs({ summary: "Update an authored agent; PUT retains partial update semantics" })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope }, context) => {
-        await app.update({ ...input, projectId: scope.id });
+      .handle(async ({ app, input, scope, actor, key }, context) => {
+        await app.update({ ...input, projectId: scope.id, caller: agentCallerOf({ actor, key }) });
         const agent = await app.getById({
           id: input.id,
           projectId: scope.id,
@@ -201,13 +233,75 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withAudit("agents.delete")
       .withoutConfirmation("Langy keys cannot hold project:delete")
       .withParams(agentRestParamsSchema)
+      .withCredential("project", { key: true })
       .withPermission("project:delete")
       .withOutput(archiveResultSchema)
       .withDocs({ summary: "Archive an agent while keeping its runs" })
-      .handle(async ({ app, input, scope }) => {
-        const agent = await app.archive({ ...input, projectId: scope.id });
+      .handle(async ({ app, input, scope, actor, key }) => {
+        const agent = await app.archive({
+          ...input,
+          projectId: scope.id,
+          caller: agentCallerOf({ actor, key }),
+        });
 
         return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
+      })
+
+      .get("/:agentId/versions", "listAgentVersions")
+      .withParams(agentVersionsRestParamsSchema)
+      .withPermission("project:view")
+      .withOutput(agentVersionListResponseSchema)
+      .withDocs({ summary: "List an agent's versions, newest first, with the labels on each" })
+      .handle(async ({ app, input, scope }) => {
+        const versions = agentVersionsWithoutSecrets(
+          await app.listVersions({ projectId: scope.id, agentId: input.agentId }),
+        );
+
+        return {
+          data: versions.versions,
+          labels: versions.labels.map(({ label, version }) => ({ label, version })),
+        };
+      })
+
+      .put("/:agentId/labels/:label", "assignAgentLabel")
+      .keepsRecords()
+      .withAudit("agents.assignLabel")
+      .withParams(agentLabelRestParamsSchema)
+      .withInput(agentLabelRestBodySchema)
+      .withCredential("project", { key: true })
+      .withPermission("agents:deploy")
+      .withOutput(agentLabelResponseSchema)
+      .withDocs({
+        summary: "Point a deploy label, such as production, at one of the agent's versions",
+      })
+      .handle(async ({ app, input, scope, actor, key }) => {
+        const label = await app.assignLabel({
+          projectId: scope.id,
+          agentId: input.agentId,
+          label: input.label,
+          version: input.version,
+          caller: agentCallerOf({ actor, key }),
+        });
+
+        return { label: label.label, version: label.version, versionId: label.versionId };
+      })
+
+      .delete("/:agentId/labels/:label", "removeAgentLabel")
+      .withAudit("agents.removeLabel")
+      .withConfirmation({
+        resource: "agent deploy label",
+        action: "delete",
+        idParam: "label",
+        name: async () => null,
+      })
+      .withParams(agentLabelRestParamsSchema)
+      .withPermission("agents:deploy")
+      .withOutput(z.object({ label: z.string(), removed: z.literal(true) }))
+      .withDocs({ summary: "Remove a deploy label from an agent" })
+      .handle(async ({ app, input, scope }) => {
+        await app.removeLabel({ projectId: scope.id, agentId: input.agentId, label: input.label });
+
+        return { label: input.label, removed: true as const };
       })
 
       .post("/:id/call", "callConnectedAgent")

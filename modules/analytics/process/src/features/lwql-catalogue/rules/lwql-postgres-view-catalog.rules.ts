@@ -94,6 +94,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       identityKey: "omit", // secret
       LastSeenAt: { source: "lastSeenAt" },
       ArchivedAt: { source: "archivedAt" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -551,6 +553,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       WorkflowId: { source: "workflowId" },
       CopiedFromEvaluatorId: { source: "copiedFromEvaluatorId" },
       ArchivedAt: { source: "archivedAt" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -1127,6 +1131,9 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       UpdatedAt: { source: "updatedAt" },
       AutoPausedAt: { source: "autoPausedAt" },
       AutoPausedReason: { source: "autoPausedReason", content: "output" },
+      EvaluatorLabel: { source: "evaluatorLabel" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
     },
   }),
   notifications: defineTableCatalogue({

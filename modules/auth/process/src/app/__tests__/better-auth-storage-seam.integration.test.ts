@@ -111,4 +111,43 @@ describe.skipIf(!DB_URL)("Better Auth's storage on the live tier", () => {
       expect(body?.user.email).toBe(PERSON.email);
     });
   });
+
+  describe.skipIf(!REDIS_URL)("given a user with no password", () => {
+    let redis: RedisConnection;
+    let userId: string;
+
+    beforeAll(async () => {
+      redis = new RedisConnectionService().connect({
+        url: REDIS_URL,
+        clusterEndpoints: undefined,
+        dbIndex: undefined,
+      })!;
+      userId = (
+        await prisma.user.create({
+          data: { email: `${ns}-linked@company.test`, name: "Lin", emailVerified: true },
+        })
+      ).id;
+    });
+    afterAll(async () => {
+      await redis?.quit();
+    });
+
+    /** @scenario "A password linked to an existing user is stored under the local credential issuer" */
+    it("stores the linked password's account under the local credential issuer", async () => {
+      const { transport } = await liveTier(redis);
+      const context = await transport.$context;
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "credential",
+        accountId: userId,
+        password: await hash(PERSON.password, 4),
+      });
+
+      const account = await prisma.account.findFirst({
+        where: { userId, provider: "credential" },
+        select: { issuer: true },
+      });
+      expect(account?.issuer).toBe("local:credential");
+    });
+  });
 });

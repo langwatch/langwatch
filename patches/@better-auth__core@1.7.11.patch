@@ -1,5 +1,5 @@
 diff --git a/dist/oauth2/oauth-provider.d.mts b/dist/oauth2/oauth-provider.d.mts
-index 66ba333..de69d80 100644
+index 2321dde..925fcb8 100644
 --- a/dist/oauth2/oauth-provider.d.mts
 +++ b/dist/oauth2/oauth-provider.d.mts
 @@ -22,6 +22,8 @@ type OAuthIdTokenConfig = {
@@ -12,16 +12,15 @@ index 66ba333..de69d80 100644
     * How the `nonce` claim is compared to the expected nonce.
     * - `"exact"` (default): strict equality.
 diff --git a/dist/oauth2/verify-id-token.mjs b/dist/oauth2/verify-id-token.mjs
-index 7103418..c6fd938 100644
+index 8cb2a95..e6a2e6b 100644
 --- a/dist/oauth2/verify-id-token.mjs
 +++ b/dist/oauth2/verify-id-token.mjs
-@@ -49,7 +49,8 @@ async function verifyProviderIdToken(provider, token, nonce, ctx) {
- 			issuer: config.issuer,
+@@ -49,7 +49,7 @@ async function verifyProviderIdToken(provider, token, nonce, ctx) {
  			audience: config.audience,
  			algorithms: config.algorithms ?? (alg ? [alg] : void 0),
--			maxTokenAge: config.maxTokenAge
-+			maxTokenAge: config.maxTokenAge,
-+			clockTolerance: config.clockTolerance
+ 			maxTokenAge: config.maxTokenAge,
+-			clockTolerance: 30
++			clockTolerance: config.clockTolerance ?? 30
  		});
  		if (nonce && !await nonceMatches(payload.nonce, nonce, config.nonceComparison)) return false;
  		if (config.verifyClaims && !config.verifyClaims(payload)) return false;

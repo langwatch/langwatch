@@ -1,8 +1,11 @@
 import type { AgentHistoryEntry } from "@langwatch/agent-contract";
+import { checkAgentLabel } from "@langwatch/agent-contract";
+import { DeployLabelsDialog } from "@langwatch/design-system/deploy-labels-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { VersionList } from "@langwatch/design-system/version-list";
 import {
   ArrowUp,
   Bot,
@@ -11,11 +14,13 @@ import {
   History,
   type LucideIcon,
   RefreshCw,
+  Rocket,
   Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { useAgentVersions } from "../../behavior/use-agent-versions.ts";
 import type { AgentClient } from "../../model/agent-client.ts";
 
 const ACTION_META = {
@@ -27,6 +32,8 @@ const ACTION_META = {
   "workflow.copyAgent": { label: "Replicated", icon: Copy },
   "agents.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
   "agents.syncFromSource": { label: "Synced from source", icon: RefreshCw },
+  "agents.assignLabel": { label: "Deployed a label", icon: Rocket },
+  "agents.removeLabel": { label: "Removed a label", icon: Rocket },
 } as const satisfies Record<string, { label: string; icon: LucideIcon }>;
 
 const AGENTS_DOCS_HREF = "https://langwatch.ai/docs/agent-testing/targets";
@@ -41,6 +48,12 @@ export type AgentHistoryDrawerProps = {
 };
 
 export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
+  const versions = useAgentVersions({
+    agents: props.agents,
+    projectId: props.projectId,
+    agentId: props.agentId,
+  });
+  const [deployOpen, setDeployOpen] = useState(false);
   const [entries, setEntries] = useState<AgentHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
@@ -63,7 +76,36 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
   }, [props.agentId, props.agents, props.projectId]);
 
   return (
-    <Drawer onClose={() => props.onClose()} title={`${props.agentName} history`}>
+    <Drawer
+      onClose={() => props.onClose()}
+      title={`${props.agentName} history`}
+      {...(versions.versions.length > 0
+        ? { headerAction: { label: "Deploy", onClick: () => setDeployOpen(true) } }
+        : {})}
+    >
+      {versions.versions.length > 0 && (
+        <VersionList
+          data-testid="agent-versions"
+          versions={versions.versions.map((row) => ({
+            ...row,
+            createdAtLabel: props.formatCreatedAt(row.createdAt),
+          }))}
+        />
+      )}
+      <DeployLabelsDialog
+        open={deployOpen}
+        onClose={() => setDeployOpen(false)}
+        entityName={props.agentName}
+        entityNoun="agent"
+        state={versions}
+        checkLabel={checkAgentLabel}
+        testIdPrefix="agent-deploy"
+      />
+      {versions.versions.length > 0 && (
+        <Text fontWeight="semibold" fontSize="sm" paddingTop={4} paddingBottom={2}>
+          Activity
+        </Text>
+      )}
       {isLoading && <SkeletonRows rows={4} />}
       {isError && (
         <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>

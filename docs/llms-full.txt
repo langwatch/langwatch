@@ -73221,6 +73221,15 @@ openapi: "GET /api/v1/agents"
 
 ---
 
+# FILE: ./api-reference/agents/list-an-agent-s-versions-newest-first-wi.mdx
+
+---
+title: "List an agent's versions, newest first, with the labels on each"
+openapi: "GET /api/v1/agents/{agentId}/versions"
+---
+
+---
+
 # FILE: ./api-reference/agents/list-poll.mdx
 
 ---
@@ -73243,11 +73252,29 @@ Manage AI agent configurations. Create, update, and organize agents that are tra
 
 ---
 
+# FILE: ./api-reference/agents/point-a-deploy-label-such-as-production.mdx
+
+---
+title: "Point a deploy label, such as production, at one of the agent's versions"
+openapi: "PUT /api/v1/agents/{agentId}/labels/{label}"
+---
+
+---
+
 # FILE: ./api-reference/agents/put-update-agents.mdx
 
 ---
 title: "Update Agents (PUT)"
 openapi: "PUT /api/v1/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/agents/remove-a-deploy-label-from-an-agent.mdx
+
+---
+title: "Remove a deploy label from an agent"
+openapi: "DELETE /api/v1/agents/{agentId}/labels/{label}"
 ---
 
 ---
@@ -73979,11 +74006,29 @@ openapi: "DELETE /api/v1/evaluators/{id}"
 
 ---
 
+# FILE: ./api-reference/evaluators-config/delete-labels.mdx
+
+---
+title: "Remove a deploy label from an evaluator"
+openapi: "DELETE /api/v1/evaluators/{evaluatorId}/labels/{label}"
+---
+
+---
+
 # FILE: ./api-reference/evaluators-config/get-evaluators.mdx
 
 ---
 title: "Get a specific evaluator by ID or slug"
 openapi: "GET /api/v1/evaluators/{idOrSlug}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/get-versions.mdx
+
+---
+title: "Get Versions"
+openapi: "GET /api/v1/evaluators/{evaluatorId}/versions"
 ---
 
 ---
@@ -74015,6 +74060,15 @@ Manage evaluator configurations for your project. Create, update, and organize e
 ---
 title: "Update an existing evaluator"
 openapi: "PUT /api/v1/evaluators/{id}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/update-labels.mdx
+
+---
+title: "Update Labels"
+openapi: "PUT /api/v1/evaluators/{evaluatorId}/labels/{label}"
 ---
 
 ---

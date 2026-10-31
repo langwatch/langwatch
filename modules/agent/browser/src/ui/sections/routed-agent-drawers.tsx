@@ -26,10 +26,12 @@ import { useRoutedCodeAgent } from "../../behavior/use-routed-code-agent.ts";
 import { useRoutedDrawer } from "../../behavior/use-routed-drawer.ts";
 import { useRoutedHttpAgent } from "../../behavior/use-routed-http-agent.ts";
 import { useRoutedWorkflowAgent } from "../../behavior/use-routed-workflow-agent.ts";
+import { useTargetAgentLabel } from "../../behavior/use-target-agent-label.ts";
 import { useTargetInputMapping } from "../../behavior/use-target-input-mapping.ts";
 import { offeredOutputTypes, outputsFromEditor } from "../../model/code-agent-outputs.ts";
 import { getRandomWorkflowIcon } from "../../model/workflow/random-workflow-icon.ts";
 import { ScenarioMappingSection } from "../blocks/scenario-mapping-section.tsx";
+import { TargetAgentLabelField } from "../elements/target-agent-label-field.tsx";
 import {
   WorkflowCodeEditorModal,
   type WorkflowCodeEditorModalHost,
@@ -132,10 +134,12 @@ export function RoutedAgentHttpEditorDrawer({ agentId, onSave }: AgentEditorDraw
   const { close, goBack } = useRoutedDrawer();
   const http = useRoutedHttpAgent({ agentId, onSave, close, ...(goBack ? { goBack } : {}) });
   const target = useTargetInputMapping("agentHttpEditor");
+  const label = useTargetAgentLabel({ drawer: "agentHttpEditor", agentId });
   const inWorkbench = target.availableSources.length > 0;
   return (
     <AgentHttpEditorDrawer
       {...http.options}
+      {...(label ? { deployLabel: <TargetAgentLabelField target={label} /> } : {})}
       showVariables={inWorkbench}
       inputMappings={target.inputMappings}
       {...(target.onInputMappingsChange
@@ -190,10 +194,12 @@ export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: AgentEditorDraw
   const { close, goBack } = useRoutedDrawer();
   const code = useRoutedCodeAgent({ agentId, onSave, close });
   const target = useTargetInputMapping("agentCodeEditor");
+  const label = useTargetAgentLabel({ drawer: "agentCodeEditor", agentId });
   const inWorkbench = target.availableSources.length > 0;
   return (
     <AgentCodeEditorDrawer
       {...code.options}
+      {...(label ? { deployLabel: <TargetAgentLabelField target={label} /> } : {})}
       {...(target.onInputMappingsChange
         ? { onInputMappingsChange: target.onInputMappingsChange }
         : {})}
@@ -299,9 +305,11 @@ export function RoutedAgentWorkflowTargetEditorDrawer({ agentId }: { agentId?: s
   const { close, goBack } = useRoutedDrawer();
   const workflow = useRoutedWorkflowAgent({ agentId, close });
   const mapping = useTargetInputMapping("agentWorkflowTargetEditor");
+  const label = useTargetAgentLabel({ drawer: "agentWorkflowTargetEditor", agentId });
   return (
     <AgentWorkflowTargetEditorDrawer
       open
+      {...(label ? { deployLabel: <TargetAgentLabelField target={label} /> } : {})}
       isLoading={workflow.options.isLoading}
       hasLookupFailed={workflow.hasLookupFailed}
       {...(workflow.workflow ? { workflowCard: <LinkedWorkflowCard workflow={workflow} /> } : {})}

@@ -1,5 +1,6 @@
 import { Menu } from "@langwatch/design-system/menu";
 import {
+  Badge,
   Box,
   Button,
   Circle,
@@ -29,6 +30,7 @@ import {
   LuArrowLeftRight,
   LuChevronDown,
   LuCircleAlert,
+  LuEraser,
   LuCircleCheck,
   LuCode,
   LuCopy,
@@ -45,6 +47,11 @@ import {
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useLatestPromptVersion } from "../../../../behavior/experiments-v3/use-latest-prompt-version.ts";
 import { usePromptTemplateFields } from "../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
+import {
+  type StaleColumnMapping,
+  staleMappingLine,
+  useStaleColumnMappings,
+} from "../../../../behavior/experiments-v3/use-stale-column-mappings.ts";
 import {
   useTargetName,
   useTargetNames,
@@ -99,6 +106,35 @@ function runButtonTooltip({
   if (isRunning) return "Stop evaluation";
   if (hasMissingMappings) return "Configure missing mappings first";
   return "Run evaluation";
+}
+
+/** The alert's text: the stale mappings by name, else the missing ones; nothing for neither. */
+function missingMappingAlertOf({
+  hasMissingMappings,
+  stale,
+}: {
+  hasMissingMappings: boolean;
+  stale: StaleColumnMapping[];
+}): string | undefined {
+  if (stale.length > 0) return stale.map(staleMappingLine).join(". ");
+  return hasMissingMappings ? TARGET_MISSING_MAPPING_TOOLTIP : undefined;
+}
+
+/** The menu's one-click fix for mappings that read a column the dataset no longer has. */
+function ClearStaleMappingsItem({ count, onClear }: { count: number; onClear: () => void }) {
+  if (count === 0) return null;
+  return (
+    <Menu.Item
+      value="clear-stale-mappings"
+      onClick={onClear}
+      data-testid="clear-stale-mappings-menu-item"
+    >
+      <HStack gap={2}>
+        <LuEraser size={14} />
+        <Text>Remove mappings to missing columns</Text>
+      </HStack>
+    </Menu.Item>
+  );
 }
 
 type TargetHeaderProps = {
@@ -283,10 +319,14 @@ export const TargetHeader = memo(function TargetHeader({
 
   // Check if there are missing mappings for the active dataset
   const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
+  const datasets = useEvaluationsV3Store((state) => state.datasets);
   const promptTemplateFields = usePromptTemplateFields();
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId, {
     promptTemplateFields,
+    datasets,
   });
+  const staleMappings = useStaleColumnMappings(target);
+  const alertTooltip = missingMappingAlertOf({ hasMissingMappings, stale: staleMappings.stale });
 
   // Glows this column's header when a pairwise verdict's variant name was
   // clicked, so users can trace an ambiguous "bot (1)" label back to its
@@ -428,9 +468,21 @@ export const TargetHeader = memo(function TargetHeader({
                 <VersionBadge version={target.promptVersionNumber} />
               </Box>
             )}
-            {hasMissingMappings && (
+            {target.type === "agent" && target.agentLabel && (
+              <Tooltip content={`Runs the agent version deployed as ${target.agentLabel}`}>
+                <Badge
+                  size="xs"
+                  variant="subtle"
+                  flexShrink={0}
+                  data-testid={`target-agent-label-${target.id}`}
+                >
+                  {target.agentLabel}
+                </Badge>
+              </Tooltip>
+            )}
+            {alertTooltip && (
               <Tooltip
-                content={TARGET_MISSING_MAPPING_TOOLTIP}
+                content={alertTooltip}
                 positioning={{ placement: "top" }}
                 openDelay={0}
                 showArrow
@@ -510,6 +562,10 @@ export const TargetHeader = memo(function TargetHeader({
               <Text>{switchLabel}</Text>
             </HStack>
           </Menu.Item>
+          <ClearStaleMappingsItem
+            count={staleMappings.stale.length}
+            onClear={staleMappings.clear}
+          />
           <Menu.Separator />
           <Menu.Item value="remove" onClick={() => onRemove?.(target.id)}>
             <HStack gap={2} color="red.fg">

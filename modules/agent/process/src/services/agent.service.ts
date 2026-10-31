@@ -27,6 +27,8 @@ import {
   type AgentPage,
   type WorkflowAgentConfig,
   httpSecretsKeepingStored,
+  agentWriteAuthorOf,
+  type AgentCaller,
 } from "@langwatch/agent-contract";
 
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
@@ -91,17 +93,21 @@ export class AgentService {
     };
   }
 
-  create(input: CreateAgentCommand): Promise<Agent> {
+  create(input: CreateAgentCommand & { caller?: AgentCaller }): Promise<Agent> {
     if (input.type === "connected") throw new AgentRegisterOnlyError();
 
     const result = createAgentCommandSchema.safeParse(input);
     if (!result.success) throw new InvalidAgentConfigError(input.type, result.error.issues);
 
     const command = result.data;
-    return this.#repository.create({ ...command, id: command.id ?? nextAgentId() });
+    return this.#repository.create({
+      ...command,
+      id: command.id ?? nextAgentId(),
+      author: agentWriteAuthorOf(input.caller),
+    });
   }
 
-  async update(input: UpdateAgentCommand): Promise<Agent> {
+  async update(input: UpdateAgentCommand & { caller?: AgentCaller }): Promise<Agent> {
     if (input.type === "connected") throw new AgentRegisterOnlyError();
 
     const existing = await this.#repository.getByIdIncludingArchived({
@@ -136,7 +142,12 @@ export class AgentService {
       });
     }
 
-    return this.#repository.update({ ...parsed.data, type, config });
+    return this.#repository.update({
+      ...parsed.data,
+      type,
+      config,
+      author: agentWriteAuthorOf(input.caller),
+    });
   }
 
   archive(input: GetAgentInput): Promise<Agent> {

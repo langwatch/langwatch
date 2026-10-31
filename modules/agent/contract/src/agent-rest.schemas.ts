@@ -1,6 +1,7 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { agentPersonViewSchema, agentVersionSchema } from "./agent-version.ts";
 import { connectedParameterDefinitionSchema } from "./config/connected.ts";
 import { agentTypeSchema } from "./config/index.ts";
 import { CONNECTED_AGENT_NOT_SELECTABLE_REASONS } from "./connected-agent.selectable.ts";
@@ -11,6 +12,19 @@ const agentRestParamsSchemaDefinition = z.object({
 });
 export interface AgentRestParamsSchema extends Named<typeof agentRestParamsSchemaDefinition> {}
 export const agentRestParamsSchema: AgentRestParamsSchema = agentRestParamsSchemaDefinition;
+
+/** `?label=` or `?version=` on a single read; the `id:label` address is the shorthand. */
+const agentRestGetQuerySchemaDefinition = z.object({
+  label: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .describe("A deploy label, for example production. Omit both to read the latest version."),
+  version: z.coerce.number().int().positive().optional().describe("A version number."),
+});
+export interface AgentRestGetQuerySchema extends Named<typeof agentRestGetQuerySchemaDefinition> {}
+export const agentRestGetQuerySchema: AgentRestGetQuerySchema = agentRestGetQuerySchemaDefinition;
 
 const agentRestQuerySchemaDefinition = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
@@ -80,6 +94,27 @@ const agentResponseSchemaDefinition = z.object({
     .enum(CONNECTED_AGENT_NOT_SELECTABLE_REASONS)
     .nullable()
     .describe("Why the agent cannot be run by this credential. Null when it can."),
+  version: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .describe(
+      "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code.",
+    ),
+  labels: z
+    .array(z.object({ label: z.string(), version: z.number().int().positive() }))
+    .describe(
+      "The deploy labels the agent carries, such as production, and the version each points at.",
+    ),
+  createdBy: agentPersonViewSchema
+    .nullable()
+    .describe(
+      "The user who created the agent. Null when an API key created it, or it predates creators being recorded.",
+    ),
+  updatedBy: agentPersonViewSchema
+    .nullable()
+    .describe("The user who changed the agent last. Null when an API key changed it."),
   createdAt: z.date(),
   updatedAt: z.date(),
   platformUrl: z.string().url(),
@@ -107,3 +142,25 @@ const archiveResultSchemaDefinition = z.object({
 });
 export interface ArchiveResultSchema extends Named<typeof archiveResultSchemaDefinition> {}
 export const archiveResultSchema: ArchiveResultSchema = archiveResultSchemaDefinition;
+
+/** A version as REST shows it: the config is the one that version holds, secrets withheld. */
+const agentVersionListResponseSchemaDefinition = z.object({
+  data: z.array(agentVersionSchema),
+  labels: z.array(z.object({ label: z.string(), version: z.number().int().positive() })),
+});
+export interface AgentVersionListResponseSchema extends Named<
+  typeof agentVersionListResponseSchemaDefinition
+> {}
+export const agentVersionListResponseSchema: AgentVersionListResponseSchema =
+  agentVersionListResponseSchemaDefinition;
+
+const agentLabelResponseSchemaDefinition = z.object({
+  label: z.string(),
+  version: z.number().int().positive(),
+  versionId: z.string(),
+});
+export interface AgentLabelResponseSchema extends Named<
+  typeof agentLabelResponseSchemaDefinition
+> {}
+export const agentLabelResponseSchema: AgentLabelResponseSchema =
+  agentLabelResponseSchemaDefinition;

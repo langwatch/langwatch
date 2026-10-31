@@ -301,6 +301,8 @@ const targetConfigObjectSchemaDefinition = z.object({
   promptVersionNumber: z.number().optional(),
   localPromptConfig: localPromptConfigSchema.optional(),
   dbAgentId: z.string().optional(),
+  /** The agent deploy label the target runs, such as production; absent runs the latest. */
+  agentLabel: z.string().min(1).max(64).optional(),
   /**
    * The specific agent type (code, signature, workflow, http).
    * Used by DSL adapter to determine which node type to generate.
@@ -583,6 +585,11 @@ export type EvaluationsV3Actions = {
   addColumn: (datasetId: string, column: DatasetColumn) => void;
   removeColumn: (datasetId: string, columnId: string) => void;
   renameColumn: (datasetId: string, columnId: string, newName: string) => void;
+  /**
+   * Drop dataset mappings that read a column the dataset no longer has; with
+   * `targetId`, only that target's own and the evaluators' mappings for it.
+   */
+  removeMappingsToMissingColumns: (args: { datasetId: string; targetId?: string }) => void;
   updateColumnType: (datasetId: string, columnId: string, type: DatasetColumnType) => void;
 
   // Target actions
