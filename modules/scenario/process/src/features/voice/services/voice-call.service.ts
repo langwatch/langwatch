@@ -187,6 +187,13 @@ async function fetchProviderRecord(
 }
 
 /**
+ * Single-flight agent create per conversation on this pod: an optimisation that saves the
+ * second finish a DB round trip. Correctness across pods is `AgentService.createVoiceAgent`'s
+ * identity-key dedupe (#8020); entries clear when the create settles, so failures retry.
+ */
+const inFlightAgentCreates = new Map<string, Promise<{ id: string }>>();
+
+/**
  * Resolve the agent row the run is written under: reuse the one the token
  * carries, else create it from the form values. A create needs a name; without
  * one the panel collects it and retries (throws {@link VoiceNameRequiredError}).
@@ -198,12 +205,16 @@ async function resolveAgentRow(
     projectId,
     transport,
     name,
+    conversationId,
     existingAgentId,
   }: {
     token: VoiceSessionTokenPayload;
     projectId: string;
     transport: VoiceTransport;
     name?: string;
+    /** The claim key for the create: overlapping finishes of the same
+     *  conversation share one `createVoiceAgent` call (#8027). */
+    conversationId: string;
     /** The agent id a half-written run already attached: reused on a re-drive
      *  so a retried drawer finish does not create a second agent (#7973). */
     existingAgentId?: string;
@@ -223,12 +234,24 @@ async function resolveAgentRow(
     };
   }
   if (!trimmedName) throw new VoiceNameRequiredError();
-  const created = await ports.createVoiceAgent({
-    projectId,
-    name: trimmedName,
-    transport,
-    agentId: token.agentExternalId,
-  });
+  const claimKey = `${projectId}:${conversationId}`;
+  let create = inFlightAgentCreates.get(claimKey);
+  if (!create) {
+    create = (async () => {
+      try {
+        return await ports.createVoiceAgent({
+          projectId,
+          name: trimmedName,
+          transport,
+          agentId: token.agentExternalId,
+        });
+      } finally {
+        inFlightAgentCreates.delete(claimKey);
+      }
+    })();
+    inFlightAgentCreates.set(claimKey, create);
+  }
+  const created = await create;
   return { agentRowId: created.id, agentDisplayName: trimmedName };
 }
 
@@ -300,6 +323,7 @@ async function ingestFinishedCall(
     projectId: input.projectId,
     transport,
     name: input.name,
+    conversationId,
     existingAgentId,
   });
 
