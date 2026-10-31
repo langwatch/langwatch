@@ -102,6 +102,19 @@ describe("given a judge that answers", () => {
       expect(judgement.verdicts).toEqual([{ questionId: "annoyed", probability: 0.9 }]);
       expect(judgement.inputTokens).toBe(120);
     });
+
+    /** @scenario "A decision-model leg is billed for its output tokens too" */
+    it("carries the output tokens the judge reports, for a routed leg's output price", async () => {
+      endpoint().intercept({ path: "/v1/systemone", method: "POST" }).reply(200, ANSWER);
+
+      const judgement = await judge().classify({
+        projectId: "project-1",
+        text: "the customer wrote in again",
+        questions: [QUESTION],
+      });
+
+      expect(judgement.outputTokens).toBe(ANSWER.usage.output_tokens);
+    });
   });
 });
 

@@ -14,6 +14,8 @@ export interface InstantEvalDecisionModelRequest {
   readonly text: string;
   readonly questions: readonly InstantEvalQuestion[];
   readonly decisionModel: InstantEvalOwnDecisionModel;
+  /** LangWatch's own key (the router's hosted leg): the provider's input tokens are kept. */
+  readonly isBilledToLangWatch?: boolean;
 }
 
 export interface InstantEvalDecisionModelChannel {

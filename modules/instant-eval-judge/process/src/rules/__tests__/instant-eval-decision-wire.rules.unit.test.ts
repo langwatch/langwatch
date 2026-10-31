@@ -124,9 +124,22 @@ describe("parseDecisionResponse", () => {
     expect(response).toBeDefined();
     expect(readClassifierVerdicts({ questions: QUESTIONS, response: response! })).toEqual([
       { questionId: "polite", probability: 0.9 },
-      { questionId: "quality", score: 3 },
+      { questionId: "quality", score: 3, spread: 0 },
       { questionId: "topic", label: "billing", probabilities: { billing: 0.7, other: 0.3 } },
     ]);
+  });
+
+  /** @scenario "A decision-model leg is billed for its output tokens too" */
+  it("keeps the output tokens OpenAI reports beside the input tokens", () => {
+    const response = parseDecisionResponse({
+      wire: "openai_decisions",
+      body: {
+        answers: [{ type: "predicate", name: "polite", probability: 0.9 }],
+        usage: { input_tokens: 42, output_tokens: 7 },
+      },
+    });
+
+    expect(response?.usage).toEqual({ input_tokens: 42, output_tokens: 7 });
   });
 
   it("drops a refused question and keeps the rest", () => {

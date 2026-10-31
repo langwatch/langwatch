@@ -65,13 +65,14 @@ describe("HttpInstantEvalDecisionModelChannel", () => {
         .intercept({ path: PATH, method: "POST" })
         .reply(200, {
           answers: { annoyed: { type: "noul", noul: 0.8 } },
-          usage: { input_tokens: 99 },
+          usage: { input_tokens: 99, output_tokens: 5 },
         });
 
       const judgement = await classify();
 
       expect(judgement.verdicts).toEqual([{ questionId: "annoyed", probability: 0.8 }]);
       expect(judgement.inputTokens).toBe(0);
+      expect(judgement.outputTokens).toBeUndefined();
       expect(judgement.skippedReason).toBeUndefined();
     });
 

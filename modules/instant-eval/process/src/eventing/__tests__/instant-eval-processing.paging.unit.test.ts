@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   INITIAL_INSTANT_EVAL_STATE,
   INSTANT_EVAL_CANCEL_GRACE_MS,
+  INSTANT_EVAL_LATE_PAGE_HOLD_MS,
   INSTANT_EVAL_STALL_THRESHOLD_MS,
 } from "../instant-eval-processing-data.process.ts";
 import {
@@ -134,6 +135,31 @@ describe("given a run judging its pages", () => {
 
       expect(evolution.state).toMatchObject({ inputTokens: 2_000, requests: 1_000 });
     });
+
+    /** @scenario "A routed judgement is priced from the summed cost of every call" */
+    it("sums the routed tokens beside the routed cost and hands both to the finish", () => {
+      const { ctx, emitted } = context();
+      const routedSoFar = { ...running, costNanoUsd: 300, routedInputTokens: 400 };
+
+      const evolution = handleInstantEvalPageJudged(
+        routedSoFar,
+        view({
+          page: 2,
+          rows: 500,
+          inputTokens: 1_200,
+          costNanoUsd: 0,
+          routedInputTokens: 1_200,
+          cursor: "t1000",
+          hasNextPage: false,
+        }),
+        ctx,
+      );
+
+      expect(evolution.state).toMatchObject({ costNanoUsd: 300, routedInputTokens: 1_600 });
+      expect(emitted[0]).toMatchObject({
+        payload: { inputTokens: 2_000, costNanoUsd: 300, routedInputTokens: 1_600 },
+      });
+    });
   });
 });
 
@@ -247,6 +273,106 @@ describe("given a finished run", () => {
 
       expect(evolution.state.phase).toBe("terminal");
       expect(evolution.nextWakeAt).toBeNull();
+    });
+  });
+});
+
+describe("given a run that ended while a routed page was still judging", () => {
+  const ended = { ...running, phase: "terminal" as const, page: 2 };
+  const latePage = view({ page: 3, rows: 4, inputTokens: 0, requests: 4, costNanoUsd: 5000 });
+  const spent = { page: 3, inputTokens: 0, requests: 4, costNanoUsd: 5000, routedInputTokens: 0 };
+  const billed = { ...spent, runId: RUN_ID, projectId: "project-1" };
+
+  describe("when the page reports before the finish has landed", () => {
+    /** @scenario "A routed page that reports after its run finished is billed on its own" */
+    it("holds the page's spend, and bills it once the finish lands", () => {
+      const { ctx, emitted } = context();
+
+      const held = handleInstantEvalPageJudged(ended, latePage, ctx);
+      expect(emitted).toEqual([]);
+      expect(held.state).toMatchObject({ page: 3, unbilledLatePages: [spent] });
+
+      const finished = handleInstantEvalFinished(held.state, view(), ctx);
+      expect(finished.state).toMatchObject({ isFinishRecorded: true, unbilledLatePages: [] });
+      expect(emitted).toEqual([
+        { messageKey: `late-page:${RUN_ID}:3`, intentType: "billLatePage", payload: billed },
+      ]);
+    });
+  });
+
+  describe("when the page reports after the finish has landed", () => {
+    /** @scenario "A routed page that reports after its run finished is billed on its own" */
+    it("bills the page at once, and a redelivery of it changes nothing", () => {
+      const { ctx, emitted } = context();
+      const recorded = { ...ended, isFinishRecorded: true };
+
+      const first = handleInstantEvalPageJudged(recorded, latePage, ctx);
+      const again = handleInstantEvalPageJudged(first.state, latePage, ctx);
+
+      expect(emitted).toEqual([
+        { messageKey: `late-page:${RUN_ID}:3`, intentType: "billLatePage", payload: billed },
+      ]);
+      expect(again.state).toEqual(first.state);
+      expect(first.nextWakeAt).toBeNull();
+    });
+  });
+
+  describe("when the page is held and the run's finish never lands", () => {
+    /** @scenario "A held late page is billed even when its run's finish never lands" */
+    it("wakes when the hold runs out and bills the page without the finish, once", () => {
+      const { ctx, emitted } = context();
+      const held = handleInstantEvalPageJudged(ended, latePage, ctx);
+      expect(held.nextWakeAt).toBe(NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS);
+
+      const early = instantEvalWake(held.state, context(NOW + 1_000).ctx);
+      expect(early).toMatchObject({ nextWakeAt: NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS });
+
+      const late = context(NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS);
+      const flushed = instantEvalWake(held.state, late.ctx);
+      expect(late.emitted).toEqual([
+        {
+          messageKey: `late-page:${RUN_ID}:3`,
+          intentType: "billLatePage",
+          payload: { ...billed, isFinishMissing: true },
+        },
+      ]);
+      expect(flushed.state).toMatchObject({ unbilledLatePages: [], lateHoldUntilMs: null });
+      expect(flushed.nextWakeAt).toBeNull();
+
+      // A finish that lands after all finds nothing held, so the page is not billed twice.
+      const finished = handleInstantEvalFinished(flushed.state, view(), late.ctx);
+      expect(late.emitted).toHaveLength(1);
+      expect(finished.state).toMatchObject({ isFinishRecorded: true });
+      expect(emitted).toEqual([]);
+    });
+
+    /** @scenario "A held late page is billed even when its run's finish never lands" */
+    it("keeps the hold's wake through a terminal no-op", () => {
+      const { ctx } = context();
+      const held = handleInstantEvalPageJudged(ended, latePage, ctx);
+
+      const redelivered = handleInstantEvalPageJudged(held.state, latePage, ctx);
+      const cancelled = handleInstantEvalCancelRequested(held.state, view(), ctx);
+
+      expect(redelivered.nextWakeAt).toBe(NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS);
+      expect(cancelled.nextWakeAt).toBe(NOW + INSTANT_EVAL_LATE_PAGE_HOLD_MS);
+    });
+  });
+
+  describe("when the late page carries no routed spend", () => {
+    /** @scenario "A routed page that reports after its run finished is billed on its own" */
+    it("changes nothing and asks for nothing, as before the router", () => {
+      const { ctx, emitted } = context();
+      const recorded = { ...ended, isFinishRecorded: true };
+
+      const evolution = handleInstantEvalPageJudged(
+        recorded,
+        view({ page: 3, rows: 4, inputTokens: 900, requests: 4 }),
+        ctx,
+      );
+
+      expect(evolution.state).toEqual(recorded);
+      expect(emitted).toEqual([]);
     });
   });
 });
