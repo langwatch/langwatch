@@ -14,11 +14,14 @@ Feature: Diagnostic logging on auth failure
     Then the door emits a single WARN-level "Authentication failed" log line
     And the log line contains userAgent, traceparent, clientAddress, path, method
     And the log line records hasEmptyAuthToken=false (no header at all)
+    # Sampled per caller (client address and user agent): the first refusal in a minute
+    # warns; that caller's repeats in the window log at debug with the same fingerprint.
+    # specs/observability/client-fault-telemetry.feature
 
   @unit
   Scenario: An empty X-Auth-Token is logged as an empty-token submission
     When the request has X-Auth-Token: "" (empty string)
-    Then the door emits a single WARN-level log line
+    Then the door emits a single WARN-level log line, the first for this caller in its minute
     And the log line records hasEmptyAuthToken=true
     And the message specifically calls out an empty-token submission so the
       caller knows their api_key resolved to an empty string

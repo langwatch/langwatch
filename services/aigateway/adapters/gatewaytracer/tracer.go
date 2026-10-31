@@ -79,9 +79,14 @@ func Middleware(spanNamer func(*http.Request) string) func(http.Handler) http.Ha
 				if rec.hijacked {
 					span.SetAttributes(attribute.Bool("http.connection.hijacked", true))
 				}
-				if rec.status >= 400 {
+				// A 4xx is the caller's request refused (a probe on "/", a bad
+				// key, a 404), not a gateway failure: OTel leaves a server
+				// span UNSET for it, so it does not count against error SLOs.
+				// The status code stays on the span as an attribute.
+				switch {
+				case rec.status >= 500:
 					span.SetStatus(codes.Error, http.StatusText(rec.status))
-				} else {
+				case rec.status < 400:
 					span.SetStatus(codes.Ok, "")
 				}
 				span.SetAttributes(attribute.Int("http.response.status_code", rec.status))
