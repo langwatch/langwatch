@@ -1,7 +1,6 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
-  queryWindowed,
   type TenantScopedReader,
   tenantScope,
   tenantScopeKey,
@@ -213,8 +212,8 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
   /**
    * The trace's last committed slim row plus its applied-event-id watermark
-   * (ADR-066), the CH-fallthrough behind a Redis miss. `fallback: "none"`:
-   * the fold executor owns the miss retry; its own-only proof reads the row it wrote.
+   * (ADR-066), the CH-fallthrough behind a Redis miss. Nothing widens: the
+   * fold executor owns the miss retry; its own-only proof reads the row it wrote.
    */
   async findByTraceId({
     authorization,
@@ -226,33 +225,12 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     window?: { fromMs: number; toMs: number };
   }): Promise<TraceAnalyticsProjectionRead | null> {
     try {
-      // No window: the index's range (once ready) bounds the inner dedup too, since it covers every
-      // version's OccurredAt; flag off, this is today's unbounded read.
-      if (window === undefined) {
-        return await this.queryLatestVersionById({ authorization, traceId });
-      }
-      return await queryWindowed<{
-        row: TraceAnalyticsRow;
-        appliedEventIds: string[];
-      } | null>({
-        table: TABLE_NAME,
-        hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
-        ...(window !== undefined ? { windowMs: (window.toMs - window.fromMs) / 2 } : {}),
-        fallback: "none",
-        isEmpty: (result) => result === null,
-        run: async (fragment) =>
-          this.queryLatestVersion({
-            authorization,
-            traceId,
-            window: fragment ? { fromMs: fragment.fromMs, toMs: fragment.toMs } : undefined,
-          }),
-      });
+      return await this.queryLatestVersion({ authorization, traceId, window });
     } catch (error) {
-      // Logged with its identifiers, like every other read in this file.
-      // `queryWindowed` counts the error and rethrows but knows nothing about
-      // the row, so without this the deploy window ADR-066 documents — workers
-      // rolling ahead of migration 00056, every read throwing
-      // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
+      // Logged with its identifiers, like every other read in this file. Without
+      // this the deploy window ADR-066 documents — workers rolling ahead of
+      // migration 00056, every read throwing UNKNOWN_IDENTIFIER — surfaces as an
+      // untraceable line.
       logger.warn(
         { traceId, scope: tenantScopeKey({ authorization, reads: "traces" }), error },
         "Failed to read back trace analytics row",
@@ -276,23 +254,31 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
           toString(AppliedEventIds) DESC`;
 
   /**
-   * {@link findByTraceId} with no window: the trace_analytics index's range bounds the inner
-   * dedup too, since it covers every version's OccurredAt; before it is ready, today's unbounded
-   * read. The fold executor owns the miss retry, so nothing widens here.
+   * One read for {@link findByTraceId}, IN-tuple dedup, never FINAL. The id index's range covers
+   * every version's OccurredAt, so it bounds both scopes; before it is ready, both read unbounded.
+   * A fold's `window` bounds the outer scope only: the anchor can be re-stamped (ADR-071).
    */
-  private async queryLatestVersionById({
+  private async queryLatestVersion({
     authorization,
     traceId,
+    window,
   }: {
     authorization: Authorization;
     traceId: string;
+    window?: { fromMs: number; toMs: number } | undefined;
   }): Promise<TraceAnalyticsProjectionRead | null> {
+    const foldWindow =
+      window !== undefined
+        ? "AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
+        : "";
+
     const result = await this.reader(authorization).query({
       query: `
         SELECT *
         FROM ${TABLE_NAME}
         WHERE ${tenantScope("OccurredAt")}
           AND TraceId = {traceId:String}
+          ${foldWindow}
           {{idBound:trace_analytics.TraceId:traceId}}
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
@@ -305,58 +291,12 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
         ${TraceAnalyticsClickHouseRepository.LATEST_VERSION_ORDER}
         LIMIT 1
       `,
-      query_params: { traceId },
-      format: "JSONEachRow",
-      idBound: { fallback: "none" },
-    });
-    return TraceAnalyticsClickHouseRepository.latestOf(
-      analyticsRecordRowsSchema.parse(await result.json()),
-    );
-  }
-
-  /**
-   * One ClickHouse attempt for {@link findByTraceId}. Dedups with the IN-tuple pattern, never
-   * FINAL. A caller's `window` bounds the outer read only (ADR-071).
-   */
-  private async queryLatestVersion({
-    authorization,
-    traceId,
-    window,
-  }: {
-    authorization: Authorization;
-    traceId: string;
-    window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
-    const client = this.reader(authorization);
-
-    const partitionFilter =
-      window !== undefined
-        ? "AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
-        : "";
-
-    const result = await client.query({
-      // ID_BOUND_SKIP: a fold read-back's own window, on the outer read only (ADR-071).
-      query: `
-        SELECT *
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("OccurredAt")}
-          AND TraceId = {traceId:String}
-          ${partitionFilter}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${tenantScope("OccurredAt")}
-              AND TraceId = {traceId:String}
-            GROUP BY TenantId, TraceId
-          )
-        ${TraceAnalyticsClickHouseRepository.LATEST_VERSION_ORDER}
-        LIMIT 1
-      `,
       query_params: {
         traceId,
         ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
       },
       format: "JSONEachRow",
+      idBound: { fallback: "none" },
     });
 
     return TraceAnalyticsClickHouseRepository.latestOf(
