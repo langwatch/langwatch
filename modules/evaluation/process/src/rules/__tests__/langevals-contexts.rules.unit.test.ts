@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toLangevalsContexts } from "../langevals-contexts.rules.ts";
+import { toLangevalsContexts, toLangevalsConversation } from "../langevals-contexts.rules.ts";
 
 const chunks = [
   { document_id: "kb-returns-01", chunk_id: "0", content: "Returns: unused items within 30 days." },
@@ -52,5 +52,31 @@ describe("toLangevalsContexts", () => {
       expect(toLangevalsContexts(undefined)).toBeUndefined();
       expect(toLangevalsContexts(null)).toBeUndefined();
     });
+  });
+});
+
+describe("toLangevalsConversation", () => {
+  /** @scenario "A conversation mapping that resolves to nothing reaches langevals as no turns" */
+  it.each(["", "   "])("reads an unmapped %j conversation as no turns", (value) => {
+    expect(toLangevalsConversation(value)).toEqual([]);
+  });
+
+  it("leaves a missing conversation missing", () => {
+    expect(toLangevalsConversation(undefined)).toBeUndefined();
+    expect(toLangevalsConversation(null)).toBeUndefined();
+  });
+
+  it("passes a JSON-encoded conversation through as its turns", () => {
+    const turns = [{ input: "hi", output: "hello" }];
+
+    expect(toLangevalsConversation(JSON.stringify(turns))).toEqual(turns);
+    expect(toLangevalsConversation(turns)).toEqual(turns);
+  });
+
+  /** @scenario "A conversation mapping that resolves to nothing reaches langevals as no turns" */
+  it("drops an empty turn beside real ones", () => {
+    expect(toLangevalsConversation([{ input: "hi", output: "yo" }, ""])).toEqual([
+      { input: "hi", output: "yo" },
+    ]);
   });
 });

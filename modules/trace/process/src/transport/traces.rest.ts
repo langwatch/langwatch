@@ -59,6 +59,15 @@ const logger = createLogger("langwatch:api:traces");
  */
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
 
+/**
+ * The most traces one `includeSpans` search page answers: a page with spans is buffered whole,
+ * and an enterprise-sized one held gigabytes (an api pod OOM). The caller pages on with `scrollId`.
+ */
+export const SEARCH_WITH_SPANS_PAGE_SIZE_MAX = resolveRequestBound(
+  "tracesWithSpansPageSizeMax",
+  "FREE",
+);
+
 /** The credential a route reads: an API key's own id, and the member it acts as. */
 export const tracesRestCredential = defineMiddlewareContext(
   "tracesRestCredential",
@@ -242,7 +251,10 @@ async function searchTraces({
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 
-  const pageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
+  const requestedPageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
+  const pageSize = includeSpans
+    ? Math.min(requestedPageSize, SEARCH_WITH_SPANS_PAGE_SIZE_MAX)
+    : requestedPageSize;
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
     principal: caller.principal,

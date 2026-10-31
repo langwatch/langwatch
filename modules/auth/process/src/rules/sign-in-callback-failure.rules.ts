@@ -97,6 +97,20 @@ function rebuiltLocation({
   return rebuilt.toString();
 }
 
+/** A provider's refusal code as an error a log record carries as its cause. */
+export type SignInRefusal = Error & { readonly code: string };
+
+/**
+ * The cause of a withheld sign-in failure: the provider's own code, so a record reads
+ * "state_not_found" and not "a reason we have not written down". The code is never a secret.
+ */
+export function signInRefusalCause({ code }: { code: string }): SignInRefusal {
+  const cause = Object.assign(new Error(`sign-in refused with "${code}"`), { code });
+  cause.name = "SignInRefusal";
+
+  return cause;
+}
+
 /** The redirect target when it is the sign-in error page itself; a relative Location resolves. */
 function errorPageTargetOf({
   location,

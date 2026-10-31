@@ -198,3 +198,10 @@ Feature: Request log level and where the cause is attached
   Scenario: Credentials in a failed Redis command never reach the summary
     When a failed AUTH command error is logged
     Then the emitted line does not contain the password
+
+  @unit
+  Scenario: A forwarded server failure names its status as the cause, never its body
+    Given a route that passes another service's 5xx answer through
+    When the request is logged
+    Then the record's cause names the forwarded status
+    And the forwarded body is neither read nor quoted

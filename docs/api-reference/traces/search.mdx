@@ -28,3 +28,8 @@ A flat list such as `{"evaluations.passed": ["false"]}` is rejected with 422.
 To find failed evaluations across every evaluator, send
 `"filter": "evaluatorVerdict:fail"`.
 </Note>
+
+<Note>
+With `includeSpans: true`, a page holds at most 100 traces, whatever `pageSize`
+asks for. When a response carries a `scrollId`, send it to fetch the next page.
+</Note>
