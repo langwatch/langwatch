@@ -79,7 +79,7 @@ func Run(ctx context.Context, opts Options) error {
 	)
 
 	httpExec := newHTTPExecutor(cfg.Engine, ssrfOpts)
-	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv, deps.Logger)
 	if err != nil {
 		return err
 	}
@@ -179,8 +179,9 @@ func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
 // standing up the whole service.
 //
 // `getenv` is injected so tests don't need to mutate process env.
-func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
+func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) (*codeblock.Executor, error) {
 	return codeblock.New(codeblock.Options{
+		Logger: logger,
 		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
 		// The instance a code node's LangWatch SDK calls. It is the same URL
 		// the evaluator blocks call back on, and it is injected only next to
