@@ -8,8 +8,6 @@ kind: CronJob
 metadata:
   name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
   labels:
-    app.kubernetes.io/name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
-    app.kubernetes.io/instance: {{ $root.Release.Name }}
     {{- include "langwatch.labels" $root | nindent 4 }}
     {{- if $root.Values.cronjobs.labels }}
     {{- toYaml $root.Values.cronjobs.labels | nindent 4 }}
