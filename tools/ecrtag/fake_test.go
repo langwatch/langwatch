@@ -18,7 +18,8 @@ const (
 var errAccessDenied = errors.New("an error occurred (AccessDeniedException)")
 
 type entry struct {
-	digest, mediaType, body, label string
+	digest, mediaType, body, label, inputs string
+	labelErr                               error
 }
 
 // fakeRegistry is one ECR repository: a tag per entry.
@@ -92,6 +93,15 @@ func (r *fakeRegistry) Label(_ context.Context, ref ecrtag.Ref, key string) (str
 	}
 
 	return r.tags[ref.Tag].label, nil
+}
+
+func (r *fakeRegistry) ImageLabel(_ context.Context, ref ecrtag.Ref, key string) (string, error) {
+	if key != ecrtag.InputsKey {
+		return "", errors.New("unexpected label " + key)
+	}
+	e := r.tags[ref.Tag]
+
+	return e.inputs, e.labelErr
 }
 
 // fakeAncestry walks a first-parent history, nearest commit first.

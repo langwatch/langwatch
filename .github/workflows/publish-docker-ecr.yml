@@ -75,7 +75,7 @@ permissions:
 # Never cancel in flight: a superseded run may already have pushed per-arch layers.
 # Merges that land while one builds wait as one: each newer commit replaces the
 # waiting one, so a burst builds its first and its newest commit. The newest's
-# change set starts at the last published commit, so it covers the replaced ones.
+# plan compares with the image each re-tag would copy, so it covers the replaced ones.
 concurrency:
   group: publish-docker-ecr-${{ github.ref }}
   cancel-in-progress: false
@@ -148,9 +148,13 @@ jobs:
             echo "custom_tag=${CUSTOM_TAG}"
           } >> "$GITHUB_OUTPUT"
 
-  # On push:[main], skip the images a commit cannot have affected so a docs-only
-  # merge does not pay for every image build. A dispatch always builds
-  # everything: that is the run someone is waiting on a complete set from.
+  # On push:[main], build only the images whose inputs changed: the files each
+  # Dockerfile copies, read from the Dockerfile, and of a Go module only the
+  # packages its `go build` compiles (tools/ecrtag/inputs.go). An image whose
+  # inputs hash equals the one recorded on the image its re-tag would copy is
+  # re-tagged, so its digest, and what a release card shows, stays the same. A
+  # dispatch always builds everything: that is the run someone is waiting on a
+  # complete set from.
   changes:
     runs-on: ubuntu-latest
     needs: meta
@@ -169,15 +173,17 @@ jobs:
       lambda-matrix: ${{ steps.select.outputs.lambda-matrix }}
       built: ${{ steps.select.outputs.built }}
     steps:
-      # Full history, without file contents: dorny/paths-filter diffs two
-      # commits out of the object store, and the base step walks the history.
-      # The tree is the publish scripts and the Go workspace cmd/ecrtag needs.
+      # Full history, without old file contents: the select step walks the
+      # history to the image a re-tag would copy, and hashes every input from
+      # git's tree objects. The tree is the publish scripts, the Dockerfiles
+      # and the Go workspace, which cmd/ecrtag builds in and `go list` reads.
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
           sparse-checkout: |
             .github
+            infra/docker
             cmd
             tools
             pkg
@@ -187,8 +193,8 @@ jobs:
           fetch-depth: 0
           filter: blob:none
 
+      # Every run: a dispatch's builds are labelled with their inputs too.
       - name: Set up Go for cmd/ecrtag
-        if: github.event_name == 'push'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
@@ -202,185 +208,19 @@ jobs:
           role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
           role-session-name: publish-docker-ecr-changes-${{ github.run_id }}
 
-      # The change set starts at the oldest commit whose image create-manifest
-      # would re-tag as this commit's (tools/ecrtag.DiffBase), not the previous
-      # push: a replaced run published nothing. `rebuild` is every image whose
-      # re-tag would copy a newer one, which a revert can hide from the diff.
-      # REPOSITORIES is create-manifest's list (ciguard).
-      - name: Find the last published commit
-        id: base
-        if: github.event_name == 'push'
-        env:
-          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
-          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
-          REPOSITORIES: >-
-            langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-langy-agent
-            langwatch-nlp-lambda langwatch-eval-azure langwatch-eval-langevals langwatch-eval-lingua
-            langwatch-eval-openai langwatch-eval-presidio langwatch-eval-ragas langwatch-eval-topic_clustering
-        run: |
-          set -euo pipefail
-          BASE=$(go run ./cmd/ecrtag diffbase -repositories "${REPOSITORIES}" -tag "${IMAGE_TAG}" \
-            -revision "${GITHUB_SHA}" -custom="${CUSTOM_TAG}")
-          TAG=$(printf '%s' "${BASE}" | jq -r '.base')
-          REBUILD=$(printf '%s' "${BASE}" | jq -c '.rebuild')
-          SHA=""
-          if [ -n "${TAG}" ]; then
-            SHA=$(git rev-parse --verify "${TAG#git-}^{commit}")
-            echo "Change set: ${TAG}..${GITHUB_SHA}; rebuilt whatever it says: ${REBUILD}" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "::notice::no image has been published from an ancestor; building every image"
-          fi
-          {
-            echo "sha=${SHA}"
-            echo "rebuild=${REBUILD}"
-          } >> "$GITHUB_OUTPUT"
-
-      # NO NEGATION PATTERNS — dorny ORs a filter's patterns, so a lone `!x`
-      # matches everything. See specs/ci/path-filters.feature.
-      #
-      # Each list mirrors the COPY lines of the corresponding Dockerfile, plus
-      # this workflow itself so a change to the build definition republishes
-      # every image it describes.
-      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        if: steps.base.outputs.sha != ''
-        id: filter
-        with:
-          # Without a base, a push diffs github.event.before, the previous push.
-          base: ${{ steps.base.outputs.sha }}
-          filters: |
-            langwatch-app:
-              - 'infra/docker/Dockerfile'
-              - 'infra/docker/Dockerfile.langyagent'
-              - 'apps/**'
-              - 'packages/**'
-              - 'modules/**'
-              - 'enterprise/**'
-              - 'mcp/typescript/**'
-              - 'sdks/typescript/**'
-              - 'skills/**'
-              - 'services/langevals/ts-integration/evaluators.generated.ts'
-              - 'dev/tests/agentic-e2e/package.json'
-              - 'dev/tests/e2e-stack/package.json'
-              - 'tools/seedgen/runner/package.json'
-              - 'patches/**'
-              - 'dev/scripts/**'
-              - 'vendor/**'
-              - 'go.work'
-              - 'go.work.sum'
-              - 'cmd/go.*'
-              - 'cmd/devscripts/**'
-              - 'pkg/go.*'
-              - 'services/go.*'
-              - 'tools/go.*'
-              - 'tools/devscripts/**'
-              - 'sdks/go/go.*'
-              - 'infra/clickhouse-serverless/go.*'
-              # The Go scenario runner stage: its source and the two modules it imports.
-              - 'services/scenariorunner/**'
-              - 'pkg/**'
-              - 'sdks/go/**'
-              - 'tsconfig.*.json'
-              - '.dockerignore'
-              - 'feature-map.json'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - '.npmrc'
-              - '.github/workflows/publish-docker-ecr.yml'
-            langwatch-nlp-service:
-              - 'infra/docker/Dockerfile.langwatch_nlp'
-              - 'cmd/**'
-              - 'pkg/**'
-              - 'services/**'
-              - 'sdks/go/**'
-              - 'sdks/python/**'
-              - 'packages/ksuid-python/**'
-              - '*/go.mod'
-              - '*/go.sum'
-              - '.dockerignore'
-              - '.github/workflows/publish-docker-ecr.yml'
-            langwatch-nlp-lambda:
-              - 'infra/docker/Dockerfile.langwatch_nlp.lambda'
-              - 'go.work'
-              - 'go.work.sum'
-              - 'cmd/**'
-              - 'pkg/**'
-              - 'services/**'
-              - 'tools/go.*'
-              - 'sdks/go/**'
-              - 'sdks/python/**'
-              - 'packages/ksuid-python/**'
-              - 'infra/clickhouse-serverless/go.*'
-              - '.dockerignore'
-              - '.github/workflows/publish-docker-ecr.yml'
-            langwatch-langy-agent:
-              - 'infra/docker/Dockerfile.langyagent'
-              - 'go.work'
-              - 'go.work.sum'
-              - 'cmd/**'
-              - 'pkg/**'
-              - 'services/**'
-              - 'tools/go.*'
-              - 'sdks/go/**'
-              - 'sdks/typescript/**'
-              - 'infra/clickhouse-serverless/go.*'
-              - 'skills/**'
-              - 'modules/**'
-              - 'packages/**'
-              - 'patches/**'
-              - 'apps/server/package.json'
-              - 'mcp/typescript/package.json'
-              - 'dev/tests/agentic-e2e/package.json'
-              - 'feature-map.json'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - '.npmrc'
-              - '.dockerignore'
-              - '.github/workflows/publish-docker-ecr.yml'
-            # The seven evaluator Lambda images share one Dockerfile and one
-            # source tree, so they rebuild together.
-            langwatch-eval:
-              - 'infra/docker/Dockerfile.langevals.lambda'
-              - 'services/langevals/**'
-              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
-              - '.dockerignore'
-              - '.github/workflows/publish-docker-ecr.yml'
-            langwatch-langevals:
-              - 'infra/docker/Dockerfile.langevals'
-              - 'services/langevals/**'
-              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
-              - '.dockerignore'
-              - '.github/workflows/publish-docker-ecr.yml'
-            langwatch-gateway:
-              - 'infra/docker/Dockerfile.go_service'
-              - 'cmd/**'
-              - 'pkg/**'
-              - 'services/**'
-              - 'sdks/go/**'
-              - '*/go.mod'
-              - '*/go.sum'
-              - '.dockerignore'
-              - '.github/workflows/publish-docker-ecr.yml'
-
       - name: Select the images to build
         id: select
         env:
-          # No base on a dispatch, or before any image is published: build all.
-          FILTERED: ${{ steps.base.outputs.sha != '' }}
-          REBUILD: ${{ steps.base.outputs.rebuild }}
-          LANGWATCH_APP: ${{ steps.filter.outputs.langwatch-app }}
-          LANGWATCH_NLP_SERVICE: ${{ steps.filter.outputs.langwatch-nlp-service }}
-          LANGWATCH_LANGEVALS: ${{ steps.filter.outputs.langwatch-langevals }}
-          LANGWATCH_GATEWAY: ${{ steps.filter.outputs.langwatch-gateway }}
-          LANGWATCH_NLP_LAMBDA: ${{ steps.filter.outputs.langwatch-nlp-lambda }}
-          LANGWATCH_LANGY_AGENT: ${{ steps.filter.outputs.langwatch-langy-agent }}
-          LANGWATCH_EVAL: ${{ steps.filter.outputs.langwatch-eval }}
+          # A push compares each image with the one its re-tag would copy; a
+          # dispatch builds every image.
+          PUSH: ${{ github.event_name == 'push' }}
+          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
         run: |
           set -euo pipefail
 
           # The full build table. `image` doubles as the ECR repository name and
-          # as the key of the path filter above, so the two cannot drift.
+          # as the name cmd/ecrtag select plans, so the two cannot drift.
           #
           # arm64 only — see the header. Docker Hub still ships both arches for
           # the community; this registry serves one all-Graviton consumer.
@@ -392,9 +232,9 @@ jobs:
           ALL=$(cat <<'JSON'
           [
             {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
+            {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.go-services","target":"nlp","cache":"go","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
+            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go-services","target":"gateway","cache":"go","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langy-agent", "dockerfile":"infra/docker/Dockerfile.langyagent",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
           ]
           JSON
@@ -405,7 +245,7 @@ jobs:
           # evaluator Dockerfile installs; empty for the NLP function.
           LAMBDAS=$(cat <<'JSON'
           [
-            {"image":"langwatch-nlp-lambda",          "dockerfile":"infra/docker/Dockerfile.langwatch_nlp.lambda","evaluator":""},
+            {"image":"langwatch-nlp-lambda",          "dockerfile":"infra/docker/Dockerfile.go-services","target":"lambda","cache":"go","evaluator":""},
             {"image":"langwatch-eval-azure",            "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"azure"},
             {"image":"langwatch-eval-langevals",        "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"langevals"},
             {"image":"langwatch-eval-lingua",           "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"lingua"},
@@ -417,37 +257,24 @@ jobs:
           JSON
           )
 
-          if [ "${FILTERED}" = "true" ]; then
-            BUILT=$(jq -cn \
-              --arg app "${LANGWATCH_APP}" \
-              --arg nlp "${LANGWATCH_NLP_SERVICE}" \
-              --arg evals "${LANGWATCH_LANGEVALS}" \
-              --arg gateway "${LANGWATCH_GATEWAY}" \
-              --arg nlplambda "${LANGWATCH_NLP_LAMBDA}" \
-              --arg langy "${LANGWATCH_LANGY_AGENT}" \
-              --arg eval "${LANGWATCH_EVAL}" \
-              --argjson lambdas "${LAMBDAS}" \
-              --argjson rebuild "${REBUILD}" \
-              '[{"langwatch-app": $app,
-                 "langwatch-nlp-service": $nlp,
-                 "langwatch-langevals": $evals,
-                 "langwatch-gateway": $gateway,
-                 "langwatch-langy-agent": $langy,
-                 "langwatch-nlp-lambda": $nlplambda}
-                | to_entries[] | select(.value == "true") | .key]
-               + (if $eval == "true"
-                  then [$lambdas[] | select(.evaluator != "") | .image]
-                  else [] end)
-               + $rebuild | unique')
-          else
-            BUILT=$(jq -cn --argjson all "${ALL}" --argjson lambdas "${LAMBDAS}" \
-              '[$all[].image, $lambdas[].image] | unique')
+          # One plan per image: its inputs hash, and whether to build it. The
+          # whole row is hashed, so a change to what a build is passed rebuilds.
+          IMAGES=$(jq -cn --argjson all "${ALL}" --argjson lambdas "${LAMBDAS}" '$all + $lambdas')
+          SCOPE=(-tag "${IMAGE_TAG}")
+          if [ "${PUSH}" != "true" ]; then
+            SCOPE=(-all)
           fi
+          # The build steps below are inputs too: a new build argument rebuilds.
+          PLANS=$(go run ./cmd/ecrtag select -images "${IMAGES}" -workflow .github/workflows/publish-docker-ecr.yml -revision "${GITHUB_SHA}" \
+            -custom="${CUSTOM_TAG}" "${SCOPE[@]}")
 
-          MATRIX=$(printf '%s' "${ALL}" | jq -c --argjson built "${BUILT}" \
-            '[.[] | select(.image as $i | $built | index($i))]')
-          LAMBDA_MATRIX=$(printf '%s' "${LAMBDAS}" | jq -c --argjson built "${BUILT}" \
-            '[.[] | select(.image as $i | $built | index($i))]')
+          BUILT=$(printf '%s' "${PLANS}" | jq -c '[.[] | select(.build) | .image]')
+          # Each build is labelled with its inputs (tools/ecrtag.InputsKey), which
+          # the next commit's plan compares with.
+          MATRIX=$(printf '%s' "${ALL}" | jq -c --argjson plans "${PLANS}" \
+            '[.[] | . as $row | ($plans[] | select(.image == $row.image and .build)) as $p | $row + {inputs: $p.inputs}]')
+          LAMBDA_MATRIX=$(printf '%s' "${LAMBDAS}" | jq -c --argjson plans "${PLANS}" \
+            '[.[] | . as $row | ($plans[] | select(.image == $row.image and .build)) as $p | $row + {inputs: $p.inputs}]')
 
           {
             echo "built=${BUILT}"
@@ -455,7 +282,11 @@ jobs:
             echo "lambda-matrix=${LAMBDA_MATRIX}"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Images to rebuild: ${BUILT}" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "| Image | Plan | Why |"
+            echo "|---|---|---|"
+            printf '%s' "${PLANS}" | jq -r '.[] | "| `\(.image)` | \(if .build then "build" else "re-tag" end) | \(.reason) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build-and-push:
     needs: [meta, changes]
@@ -543,23 +374,28 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          target: ${{ matrix.target }}
           platforms: ${{ matrix.platform }}
           # Keep each per-arch push a plain manifest. With provenance on, buildx
           # pushes an index carrying an attestation manifest, and the multi-arch
           # index assembled below would then nest indexes — which several ECR
           # consumers (Lambda in particular) refuse to run.
           provenance: false
-          cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
+          # The Go images share one scope: every one of them is a target of
+          # Dockerfile.go-services over the same go-build and sandbox stages.
+          cache-from: type=gha,scope=ecr-${{ matrix.cache || matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.cache || matrix.image }}-${{ matrix.arch }}
           # The Go images stamp this into main.Version, which every log line and
           # the OTel resource report; the other images ignore it.
           build-args: |
             VERSION=${{ needs.meta.outputs.image_tag }}
             SERVICE_VERSION=${{ needs.meta.outputs.image_tag }}
             LANGWATCH_BUILD_COMMIT=${{ github.sha }}
-          # Read back by the existence check above on a re-run.
+          # The revision is read back by the existence check above on a re-run;
+          # the inputs by the next commit's select step.
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
+            org.langwatch.inputs=${{ matrix.inputs }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
 
@@ -723,17 +559,19 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
           push: true
           platforms: linux/arm64
           provenance: false
           sbom: false
-          cache-from: type=gha,scope=ecr-${{ matrix.image }}-arm64
-          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-arm64
+          cache-from: type=gha,scope=ecr-${{ matrix.cache || matrix.image }}-arm64
+          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.cache || matrix.image }}-arm64
           build-args: |
             VERSION=${{ needs.meta.outputs.image_tag }}
             EVALUATOR=${{ matrix.evaluator }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
+            org.langwatch.inputs=${{ matrix.inputs }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}
 
@@ -754,8 +592,8 @@ jobs:
               exit 1 ;;
           esac
 
-  # EVERY image gets this commit's tag, including the ones the path filter
-  # skipped. The point of the whole workflow is that SaaS can pin one `git-<sha>`
+  # EVERY image gets this commit's tag, including the ones whose inputs did not
+  # change. The point of the whole workflow is that SaaS can pin one `git-<sha>`
   # across the whole deployment; if a docs-plus-gateway commit published
   # `langwatch-gateway:git-abc` and nothing else, that pin would fail to resolve
   # for the others. A skipped image is re-tagged from the manifest it
