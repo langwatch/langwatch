@@ -147,14 +147,24 @@ def test_false_positive_table():
 
     found = {reference(text) for _, text in cases() if person_spans(text)}
     assert found <= KNOWN_FALSE_POSITIVES, f"new false PERSON: {found - KNOWN_FALSE_POSITIVES}"
+    assert found == KNOWN_FALSE_POSITIVES, f"fixed, drop from the list: {KNOWN_FALSE_POSITIVES - found}"
 
 
 # @scenario "An ALL-CAPS string that is not a name is not read as a person"
-@pytest.mark.parametrize("index", range(len(cases())))
+@pytest.mark.parametrize(
+    "index",
+    [
+        pytest.param(
+            index,
+            marks=pytest.mark.xfail(strict=True, reason=f"known false positive: {reference(text)}"),
+        )
+        if reference(text) in KNOWN_FALSE_POSITIVES
+        else index
+        for index, (_, text) in enumerate(cases())
+    ],
+)
 def test_no_false_person_on_allcaps_non_name(index: int):
     category, text = cases()[index]
-    if reference(text) in KNOWN_FALSE_POSITIVES:
-        pytest.xfail(f"known false positive: {reference(text)}")
     spans = person_spans(text)
     assert not spans, (
         f"{category}: PERSON span on a non-name. "
