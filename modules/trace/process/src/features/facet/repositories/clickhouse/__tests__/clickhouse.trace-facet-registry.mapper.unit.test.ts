@@ -127,16 +127,23 @@ describe("FACET_REGISTRY shape", () => {
       expect(def?.table).toBe("stored_spans");
     });
 
-    it("emits a query that flattens the per-event attribute maps", () => {
+    it("flattens through the keys subcolumn, never the Map itself", () => {
+      // The inner arrayJoin flattens the events, the outer each event's keys. Reading
+      // the Map to list keys materialises the String values beside them; `.keys` never
+      // opens the values column. Behaviour: trace-facet-event-attribute-keys.integration.
       const def = FACET_REGISTRY.find((d) => d.key === "eventAttributeKeys");
-      // Must double-arrayJoin: outer for events, inner for map keys per event.
-      // Without both, distinct keys would collapse onto the first event only.
       if (def?.kind !== "dynamic_keys") {
         throw new Error("expected eventAttributeKeys to be dynamic_keys");
       }
       const { sql } = def.queryBuilder(baseCtx);
-      expect(sql).toContain("Events.Attributes");
-      expect(sql).toMatch(/arrayJoin\s*\(\s*mapKeys\s*\(\s*arrayJoin/);
+      // Matched as one shape on purpose. Asserting the fragments separately
+      // would pass on a query that flattened the whole Map and only mentioned
+      // `.keys` in the filter, which is the exact bug being pinned out.
+      expect(sql).toMatch(
+        /arrayJoin\(\s*arrayJoin\(\s*`Events\.Attributes`\.keys\s*\)\s*\)\s+AS\s+key/,
+      );
+      expect(sql).not.toContain("mapKeys");
+      expect(sql).not.toContain("mapValues");
     });
   });
 });
@@ -204,6 +211,8 @@ describe("Map-keys discovery facets", () => {
     { key: "metadataKeys", map: "Attributes" },
     // metadata-scoped sibling — same `Attributes` map, `metadata.` prefix.
     { key: "metadata", map: "Attributes" },
+    // One map per event, so the subcolumn is reached through the outer array.
+    { key: "eventAttributeKeys", map: "`Events.Attributes`" },
   ];
 
   it.each(MAP_KEY_FACETS.map((f) => [f.key, f.map]))(
