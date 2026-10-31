@@ -39,6 +39,15 @@ Feature: Redacting personal data from traces
     Then the stored input has the name redacted
     And the analysis service was called
 
+  # Strict stores what the analysis service redacts, and that service reads
+  # capitals as evidence of a name, so a surname written in capitals (forms,
+  # legacy columns, logistics payloads) is held here as a shape of its own.
+  # Detection recall per casing: specs/evaluators/langevals-presidio-allcaps-person-names.feature
+  @unit
+  Scenario: The analysis service redacts a name whose surname is written in capitals
+    When content holding a forename beside a surname written in capitals is sent for strict redaction
+    Then the redacted content holds neither the forename nor the surname
+
   # Strict layers names and locations on top of the essential entities. If the
   # analysis service is unreachable (or simply not configured in development),
   # strict must not leave everything exposed: the native essential pass still

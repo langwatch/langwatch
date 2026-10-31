@@ -28,17 +28,16 @@ Feature: A name written in capitals is still redacted
 
   Titlecasing restores the name cue on WHITFIELD and invents the same cue on
   CEO, so a span the second pass finds is kept only if it has the shape of a
-  name: two or more words, at least one rewritten word of four or more
-  letters, and every other rewritten word either that long or a surname
-  particle (VAN, DER, BIN, DEL and the like). Measured over the recall and
-  precision corpora, these are the only bounds that hold every capitals class
-  at the control's recall with no false positive on single-token surnames.
-  Requiring two long rewritten words looks safer and is not: it throws an
-  ordinary forename beside a capitalised surname back to where it started. A
-  capitalised surname standing alone (OKONKWO) is one word, the same shape as
-  an acronym, and is refused on purpose. Since no span can be kept without a
-  rewritten word of four or more letters, the second pass does not run when
-  the only capitals are short words such as OK, ID or USD.
+  name: two or more words, and either a rewritten word of four or more
+  letters or two rewritten words side by side. The second clause is what
+  keeps AMY LEE, VAN DER BERG and BIN RASHID. A short capitalised word on its
+  own (the CFO, the ROI) is the acronym shape and is refused. Requiring two
+  long rewritten words looks safer and is not: it throws an ordinary forename
+  beside a capitalised surname back to where it started. A capitalised
+  surname standing alone (OKONKWO) is one word, the same shape as an
+  acronym, and is refused on purpose. The second pass does not run when the
+  text holds neither shape, so OK, ID or USD scattered through prose cost
+  nothing.
 
   Precision is held over capitalised strings that are not people (merchants,
   carriers, departments, SKUs, codes, headings, acronym-heavy prose and
@@ -46,19 +45,21 @@ Feature: A name written in capitals is still redacted
   38 were clean. The first build of the second pass dropped that to 33 of 38,
   because ERP, SOW or CFO turned into Erp, Sow or Cfo and were read as
   surnames, and the shape rule above is what brought it back to 37 of 38. The
-  gate is now 44 of 46: the one extra miss is the particle exemption's price,
-  described next. If precision fails again, the second pass is inventing
-  people on a shape nobody has priced. Fix the rule. Do not loosen the corpus
-  or the rate.
+  corpus is now 46 strings with three known false positives, named one by one
+  in the test: one predates the second pass, and two are the price of the
+  side-by-side clause, described next. A fourth fails the build. If it does,
+  the second pass is inventing people on a shape nobody has priced. Fix the
+  rule. Do not loosen the corpus or the list.
 
-  The particle exemption lifted the particle corpus (24 names per class) from
-  45.8% to 87.5% for a capitalised surname and from 8.3% to 87.5% for a
-  wholly capitalised name, both at that corpus's own control ceiling. It costs
-  one false positive, a product line named after its founder read as a
-  person. That one cannot be removed: such a name has the shape of a name
-  because it is one. It is accepted because the alternative redacts
-  single-word surnames and leaks particle surnames, so whether a name is
-  protected would depend on where it comes from.
+  Against a rule that demanded every rewritten word be four letters or more,
+  the side-by-side clause lifted wholly capitalised names with a short word
+  (AMY WHITFIELD, MARCUS LEE, AMY LEE; 24 names) from 5 of 24 to 24 of 24, and
+  the particle corpus (24 names per class) from 8.3% to 87.5%, that corpus's
+  own control ceiling. It costs two false positives: a product line named
+  after its founder, and SEPA ACH in a list of payment rails. The first
+  cannot be removed, since such a name has the shape of a name because it is
+  one. Both are accepted because the alternative leaks short and particle
+  names, so whether a name is protected would depend on how long it is.
 
   A lowercase name is a different defect and is not in scope here. There is
   no cue in a lowercase word that separates a name from any other word, so
@@ -111,7 +112,7 @@ Feature: A name written in capitals is still redacted
 
     @unit
     Scenario: The second pass is skipped when the only capitals are short words
-      Given content whose only wholly capitalised words are shorter than four letters
+      Given content whose only wholly capitalised words are short and stand apart
       When the content is analysed for personal information
       Then the content is analysed once and not twice
 
@@ -126,10 +127,11 @@ Feature: A name written in capitals is still redacted
 
     @unit
     Scenario: Only person spans come out of the second pass
-      Given content holding an email address, a bank account and a card number in capitals
+      Given content holding a name only the second pass finds
+      And an email address, a bank account and a card number in capitals
       When the content is analysed for personal information
-      Then every span that is not a person is reported exactly as it was before
-      And the second pass has added person spans and nothing else
+      Then the name is reported as a person
+      And every span that is not a person is reported exactly as the first pass found it
 
   Rule: A name is not read into a string that is not one
 
@@ -143,7 +145,7 @@ Feature: A name written in capitals is still redacted
     Scenario: A titlecased acronym is not harvested as a name
       Given prose in which a three-letter acronym stands alone in capitals
       When the content is analysed for personal information
-      Then the second pass reports no person span it did not already report
+      Then no person span is reported
 
     @unit
     Scenario: A name with one capitalised word is still harvested
@@ -154,6 +156,12 @@ Feature: A name written in capitals is still redacted
     @unit
     Scenario: A capitalised name with a surname particle is still harvested
       Given a name written wholly in capitals whose surname carries a particle
+      When the content is analysed for personal information
+      Then the whole name is reported as a person
+
+    @unit
+    Scenario: A capitalised name made of short words is still harvested
+      Given a name written wholly in capitals whose forename and surname are under four letters
       When the content is analysed for personal information
       Then the whole name is reported as a person
 

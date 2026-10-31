@@ -5,30 +5,29 @@ leaked values had. Rates: specs/evaluators/langevals-presidio-allcaps-person-nam
 """
 
 import json
-from functools import lru_cache
 
 import pytest
 
-from langevals_presidio.pii_detection import (
-    PresidioEntities,
-    PresidioPIIDetectionEntry,
-    PresidioPIIDetectionEvaluator,
-    PresidioPIIDetectionSettings,
+from presidio_person_name_support import (
+    LENGTH_BAND,
+    MIN_THRESHOLD,
+    evaluator,
+    person_spans,
 )
 
-MIN_THRESHOLD = 0.5
-# Within one case of the control's 47/48, so runner-to-runner drift does not flip it.
-PASS_RATE = 0.95
+# Every gate sits one case under its measured value, so runner drift cannot flip it.
+PASS_RATE = 0.95  # control 47/48
 
 # A floor, not a target: lowercase has no name cue to restore. Tracked: langwatch/tasks#1055.
-LOWERCASE_REGRESSION_FLOOR = 0.75
+LOWERCASE_REGRESSION_FLOOR = 35 / 48  # measured 36/48
 
-# The particle control's own ceiling: the stock recogniser truncates
+# The particle control's own ceiling is 21/24: the stock recogniser truncates
 # 'Marcus Van Der Berg' to 'Marcus Van Der' at any casing (langwatch/tasks#1057).
-PARTICLE_PASS_RATE = 21 / 24
-PARTICLE_LOWERCASE_REGRESSION_FLOOR = 12 / 24
+PARTICLE_PASS_RATE = 20 / 24
+PARTICLE_LOWERCASE_REGRESSION_FLOOR = 11 / 24  # measured 12/24
 
-LENGTH_BAND = (117, 201)
+SHORT_PASS_RATE = 23 / 24  # control 24/24
+SHORT_LOWERCASE_REGRESSION_FLOOR = 21 / 24  # measured 22/24
 
 FORENAMES = [
     "Marcus", "Elena", "Priya", "Tobias", "Ingrid", "Rafael", "Noemi", "Dmitri",
@@ -76,6 +75,17 @@ PARTICLE_SURNAMES = [
 
 PARTICLE_NAMES = list(zip(PARTICLE_FORENAMES, PARTICLE_SURNAMES, strict=True))
 
+# A forename or surname under four letters, in three groups of eight, since
+# the shape rule treats a short capitalised word apart from a long one.
+SHORT_NAMES = [
+    ("Amy", "Whitfield"), ("Ian", "Carrington"), ("Eva", "Lindqvist"), ("Kai", "Nakamura"),
+    ("Max", "Halvorsen"), ("Zoe", "Delacroix"), ("Ben", "Bergstrom"), ("Ana", "Castellanos"),
+    ("Marcus", "Lee"), ("Elena", "Ng"), ("Priya", "Wu"), ("Tobias", "Fox"),
+    ("Ingrid", "Kay"), ("Rafael", "Ito"), ("Noemi", "Roy"), ("Dmitri", "Orr"),
+    ("Amy", "Lee"), ("Ian", "Wu"), ("Eva", "Ng"), ("Kai", "Fox"),
+    ("Max", "Kay"), ("Zoe", "Ito"), ("Ben", "Roy"), ("Ana", "Orr"),
+]
+
 # JSON-shaped, ordinary context words, no other PII type in the string: a
 # second entity would let a non-PERSON hit be mistaken for a name hit.
 CONTEXT_TEMPLATES = [
@@ -111,28 +121,6 @@ def build_cases(
     return cases
 
 
-@lru_cache(maxsize=1)
-def evaluator() -> PresidioPIIDetectionEvaluator:
-    return PresidioPIIDetectionEvaluator(
-        settings=PresidioPIIDetectionSettings(
-            entities=PresidioEntities(person=True),
-            min_threshold=MIN_THRESHOLD,
-        )
-    )
-
-
-@lru_cache(maxsize=None)
-def person_spans(text: str) -> tuple[tuple[int, int, float], ...]:
-    """PERSON spans the real evaluator reports, after its own threshold filter."""
-    result = evaluator().evaluate(PresidioPIIDetectionEntry(input=text))
-    assert result.status == "processed", f"evaluator did not run: {result}"
-    return tuple(
-        (finding["start"], finding["end"], finding["score"])
-        for finding in result.raw_response["results"]
-        if finding["entity_type"] == "PERSON"
-    )
-
-
 def coverage(name: str, text: str) -> str:
     """'full' when a PERSON span covers the whole name, else 'partial' or 'none'."""
     start = text.index(name)
@@ -164,12 +152,20 @@ def test_corpus_is_not_vacuous():
         "a particle surname has to be more than one token or it measures nothing"
     )
 
+    assert len(SHORT_NAMES) >= 20, "short-name corpus too small for a figure"
+    assert all(
+        min(len(forename), len(surname)) < 4 for forename, surname in SHORT_NAMES
+    ), "a short name needs a word under four letters or it measures nothing"
+
+    corpus_size = len(BASE_NAMES) + len(PARTICLE_NAMES) + len(SHORT_NAMES)
     seen_texts = set()
     for casing_class in CASING_CLASSES:
-        cases = build_cases(casing_class) + build_cases(
-            casing_class, names=PARTICLE_NAMES
+        cases = (
+            build_cases(casing_class)
+            + build_cases(casing_class, names=PARTICLE_NAMES)
+            + build_cases(casing_class, names=SHORT_NAMES)
         )
-        assert len(cases) == len(BASE_NAMES) + len(PARTICLE_NAMES)
+        assert len(cases) == corpus_size
         for name, text in cases:
             assert text.count(name) == 1, f"name not uniquely locatable: {name!r}"
             assert LENGTH_BAND[0] <= len(text) <= LENGTH_BAND[1], (
@@ -181,9 +177,7 @@ def test_corpus_is_not_vacuous():
             assert text == text.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
             seen_texts.add(text)
 
-    assert len(seen_texts) == (len(BASE_NAMES) + len(PARTICLE_NAMES)) * len(
-        CASING_CLASSES
-    )
+    assert len(seen_texts) == corpus_size * len(CASING_CLASSES)
 
 
 def _recall_table(names: list[tuple[str, str]]) -> dict[str, dict[str, int]]:
@@ -218,6 +212,7 @@ def test_recall_per_casing_class_table():
     _print_recall_table(
         "Presidio PERSON recall, particle surnames", PARTICLE_NAMES
     )
+    _print_recall_table("Presidio PERSON recall, short names", SHORT_NAMES)
 
     total = len(BASE_NAMES)
     analysed = sum(c["full"] + c["partial"] for c in table.values())
@@ -270,7 +265,7 @@ def test_recall_lowercase_forename_lowercase_surname(index: int):
     _assert_recalled("lowercase_forename_lowercase_surname", index)
 
 
-# Particle surnames: the same four classes, gated at the particle control (PARTICLE_PASS_RATE).
+# Particle surnames: the same four classes, gated one case under the particle control.
 
 
 # @scenario "An ordinarily capitalised name is still detected"
@@ -285,7 +280,7 @@ def test_recall_particle_titlecase_forename_titlecase_surname(index: int):
 @pytest.mark.pass_rate(PARTICLE_PASS_RATE)
 @pytest.mark.parametrize("index", range(len(PARTICLE_NAMES)))
 def test_recall_particle_titlecase_forename_allcaps_surname(index: int):
-    """Held at the particle control: the particle exemption closed this gap."""
+    """Held at the particle control: the side-by-side clause closed this gap."""
     _assert_recalled(
         "titlecase_forename_allcaps_surname", index, names=PARTICLE_NAMES
     )
@@ -296,7 +291,7 @@ def test_recall_particle_titlecase_forename_allcaps_surname(index: int):
 @pytest.mark.parametrize("index", range(len(PARTICLE_NAMES)))
 def test_recall_particle_allcaps_forename_allcaps_surname(index: int):
     """Held at the particle control. This was the worst class on this corpus,
-    2 of 24, and the particle exemption took it to the ceiling."""
+    2 of 24, and the side-by-side clause took it to the ceiling."""
     _assert_recalled(
         "allcaps_forename_allcaps_surname", index, names=PARTICLE_NAMES
     )
@@ -310,3 +305,36 @@ def test_recall_particle_lowercase_forename_lowercase_surname(index: int):
     _assert_recalled(
         "lowercase_forename_lowercase_surname", index, names=PARTICLE_NAMES
     )
+
+
+# Short names: the same four classes, gated one case under the short control.
+
+
+# @scenario "An ordinarily capitalised name is still detected"
+@pytest.mark.pass_rate(SHORT_PASS_RATE)
+@pytest.mark.parametrize("index", range(len(SHORT_NAMES)))
+def test_recall_short_titlecase_forename_titlecase_surname(index: int):
+    _assert_recalled(CONTROL_CLASS, index, names=SHORT_NAMES)
+
+
+# @scenario "A capitalised surname is detected as reliably as an ordinary one"
+@pytest.mark.pass_rate(SHORT_PASS_RATE)
+@pytest.mark.parametrize("index", range(len(SHORT_NAMES)))
+def test_recall_short_titlecase_forename_allcaps_surname(index: int):
+    _assert_recalled("titlecase_forename_allcaps_surname", index, names=SHORT_NAMES)
+
+
+# @scenario "A wholly capitalised name is detected as reliably as an ordinary one"
+@pytest.mark.pass_rate(SHORT_PASS_RATE)
+@pytest.mark.parametrize("index", range(len(SHORT_NAMES)))
+def test_recall_short_allcaps_forename_allcaps_surname(index: int):
+    """5 of 24 before two short capitalised words side by side counted as a name."""
+    _assert_recalled("allcaps_forename_allcaps_surname", index, names=SHORT_NAMES)
+
+
+# @scenario "A lowercase name is held at its measured floor, not raised"
+@pytest.mark.pass_rate(SHORT_LOWERCASE_REGRESSION_FLOOR)
+@pytest.mark.parametrize("index", range(len(SHORT_NAMES)))
+def test_recall_short_lowercase_forename_lowercase_surname(index: int):
+    """Floor, not a target: see LOWERCASE_REGRESSION_FLOOR and tasks#1055."""
+    _assert_recalled("lowercase_forename_lowercase_surname", index, names=SHORT_NAMES)

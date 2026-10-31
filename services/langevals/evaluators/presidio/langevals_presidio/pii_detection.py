@@ -34,14 +34,6 @@ PERSON_ENTITY = "PERSON"
 MIN_SPAN_WORDS = 2
 MIN_NORMALISED_TOKEN_LENGTH = 4
 
-# Exempt from the length bound only, so MARCUS VAN DER BERG is not refused over VAN.
-SURNAME_PARTICLES = frozenset(
-    {
-        "VAN", "VON", "DER", "DEN", "DEL", "DE", "LA", "LOS", "LAS", "DOS",
-        "DAS", "BIN", "IBN", "AL", "MAC", "MC", "ST", "TER", "TEN",
-    }
-)
-
 
 def _is_upper_letter(character: str) -> bool:
     return character.isalpha() and character.isupper()
@@ -107,13 +99,17 @@ def _rewritten_runs(*, original: str, normalised: str) -> list[tuple[int, int]]:
     ]
 
 
-def _has_harvestable_run(*, original: str, normalised: str) -> bool:
-    """Whether any span could pass `_normalisation_justifies_span`; if not, skip the second pass."""
+def _has_name_shaped_rewrite(*, original: str, normalised: str) -> bool:
+    """A rewritten word of 4+ letters, or two rewritten words side by side.
+
+    The second clause is AMY LEE and VAN DER BERG; a lone short one is the CFO.
+    """
+    rewritten = _rewritten_runs(original=original, normalised=normalised)
+    if any(end - start >= MIN_NORMALISED_TOKEN_LENGTH for start, end in rewritten):
+        return True
     return any(
-        run_end - run_start >= MIN_NORMALISED_TOKEN_LENGTH
-        for run_start, run_end in _rewritten_runs(
-            original=original, normalised=normalised
-        )
+        original[left_end:right_start].isspace()
+        for (_, left_end), (right_start, _) in zip(rewritten, rewritten[1:])
     )
 
 
@@ -128,22 +124,7 @@ def _normalisation_justifies_span(
     span = original[start:end]
     if len(span.split()) < MIN_SPAN_WORDS:
         return False
-
-    rewritten = _rewritten_runs(original=span, normalised=normalised[start:end])
-    if not rewritten:
-        return False
-
-    if not any(
-        run_end - run_start >= MIN_NORMALISED_TOKEN_LENGTH
-        for run_start, run_end in rewritten
-    ):
-        return False
-
-    return all(
-        run_end - run_start >= MIN_NORMALISED_TOKEN_LENGTH
-        or span[run_start:run_end].upper() in SURNAME_PARTICLES
-        for run_start, run_end in rewritten
-    )
+    return _has_name_shaped_rewrite(original=span, normalised=normalised[start:end])
 
 
 def _covers(outer: Any, inner: Any) -> bool:
@@ -264,10 +245,10 @@ class PresidioPIIDetectionEvaluator(
         """The PERSON spans only a case-normalised copy of `content` sees.
 
         PERSON only: no other recogniser has a casing problem to fix. Skipped
-        unless a word of 4+ capitals was rewritten, since no span could pass without one.
+        when the text has no name-shaped rewrite, since no span could pass without one.
         """
         normalised = normalise_allcaps_runs(content)
-        if not _has_harvestable_run(original=content, normalised=normalised):
+        if not _has_name_shaped_rewrite(original=content, normalised=normalised):
             return []
 
         placed = {

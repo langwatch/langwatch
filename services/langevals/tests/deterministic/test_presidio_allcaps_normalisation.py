@@ -6,7 +6,6 @@ entry per name. Why each holds: specs/evaluators/langevals-presidio-allcaps-pers
 
 import sys
 import unicodedata
-from functools import lru_cache
 from typing import Any
 
 import pytest
@@ -20,24 +19,12 @@ from langevals_presidio.pii_detection import (
     PresidioPIIDetectionSettings,
     normalise_allcaps_runs,
 )
-
-
-MIN_THRESHOLD = 0.5
+from presidio_person_name_support import MIN_THRESHOLD, evaluator
 
 # U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE. Its lowercase mapping is two
 # characters, 'i' plus U+0307, which is what makes a naive lower() or title()
 # shift every offset after it.
 DOTTED_CAPITAL_I = "İ"
-
-
-@lru_cache(maxsize=1)
-def evaluator() -> PresidioPIIDetectionEvaluator:
-    return PresidioPIIDetectionEvaluator(
-        settings=PresidioPIIDetectionSettings(
-            entities=PresidioEntities(person=True),
-            min_threshold=MIN_THRESHOLD,
-        )
-    )
 
 
 class CountingAnalyzer:
@@ -73,22 +60,18 @@ def analyze_calls(*, entities: PresidioEntities, text: str) -> list[dict[str, An
     return counting.calls
 
 
-def findings(*, text: str, second_pass: bool) -> list[tuple[str, int, int, float]]:
-    """Every finding, with the second pass either live or neutralised."""
-    original = PresidioPIIDetectionEvaluator._person_results_from_normalised_casing
-    if not second_pass:
-        PresidioPIIDetectionEvaluator._person_results_from_normalised_casing = (  # type: ignore[method-assign]
-            lambda self, *, content, already_found: []
-        )
-    try:
-        result = evaluator().evaluate(PresidioPIIDetectionEntry(input=text))
-    finally:
-        PresidioPIIDetectionEvaluator._person_results_from_normalised_casing = original  # type: ignore[method-assign]
+def findings(text: str) -> list[tuple[str, str]]:
+    """(entity type, covered text) for every finding, in the order reported."""
+    result = evaluator().evaluate(PresidioPIIDetectionEntry(input=text))
     assert result.status == "processed", f"evaluator did not run: {result}"
     return [
-        (f["entity_type"], f["start"], f["end"], f["score"])
+        (f["entity_type"], text[f["start"]:f["end"]])
         for f in result.raw_response["results"]
     ]
+
+
+def person_names(text: str) -> list[str]:
+    return [covered for entity, covered in findings(text) if entity == "PERSON"]
 
 
 # ---------------------------------------------------------------------------
@@ -213,41 +196,42 @@ def test_no_second_pass_when_person_is_disabled():
 # 3. PERSON only, union only
 # ---------------------------------------------------------------------------
 
-# Every entity here is in ALL-CAPS context, and none of them is a person.
+# Every other entity is in ALL-CAPS context; only the second pass finds the name.
 MIXED_ENTITY_TEXT = (
-    "CONTACT RECORD: MARCUS WHITFIELD, email MARCUS.WHITFIELD@EXAMPLE.COM, "
+    "CONTACT RECORD: Tobias OKONKWO, email TOBIAS.OKONKWO@EXAMPLE.COM, "
     "IBAN GB33BUKB20201555555555, card 4111 1111 1111 1111, HOST 203.0.113.42."
 )
 
 
 # @scenario "Only person spans come out of the second pass"
-def test_non_person_entities_are_byte_identical_before_and_after():
-    before = findings(text=MIXED_ENTITY_TEXT, second_pass=False)
-    after = findings(text=MIXED_ENTITY_TEXT, second_pass=True)
-
-    other_before = [f for f in before if f[0] != "PERSON"]
-    other_after = [f for f in after if f[0] != "PERSON"]
-
-    assert other_before, "corpus must carry a non-PERSON entity to measure"
-    assert other_after == other_before
+def test_the_second_pass_adds_a_name_and_changes_nothing_else():
+    assert findings(MIXED_ENTITY_TEXT) == [
+        ("EMAIL_ADDRESS", "TOBIAS.OKONKWO@EXAMPLE.COM"),
+        ("IBAN_CODE", "GB33BUKB20201555555555"),
+        ("MEDICAL_LICENSE", "KB2020155"),
+        ("CREDIT_CARD", "4111 1111 1111 1111"),
+        ("IP_ADDRESS", "203.0.113.42"),
+        ("PERSON", "Tobias OKONKWO"),
+    ]
 
 
 # @scenario "Only person spans come out of the second pass"
-def test_the_second_pass_only_ever_adds_person_spans():
-    before = findings(text=MIXED_ENTITY_TEXT, second_pass=False)
-    after = findings(text=MIXED_ENTITY_TEXT, second_pass=True)
-
-    # Every entry the second pass could have touched is a PERSON, so the rest
-    # of the list has to come through in the same order it was built in. The
-    # second pass may drop a first-pass PERSON span in favour of a wider one
-    # covering it, which is why this is not a prefix check over the whole list.
-    assert [f for f in after if f[0] != "PERSON"] == [
-        f for f in before if f[0] != "PERSON"
+def test_non_person_entities_match_the_first_pass_exactly():
+    """Against the analyzer called directly, not a copy with the second pass removed."""
+    entities = [
+        name.upper()
+        for name, enabled in evaluator().settings.entities.model_dump().items()
+        if enabled
     ]
-    assert {f[0] for f in after} <= {f[0] for f in before} | {"PERSON"}
-    assert len([f for f in after if f[0] == "PERSON"]) >= len(
-        [f for f in before if f[0] == "PERSON"]
-    )
+    first_pass = [
+        (result.entity_type, MIXED_ENTITY_TEXT[result.start:result.end])
+        for result in evaluator().analyzer.analyze(
+            text=MIXED_ENTITY_TEXT, entities=entities, language="en"
+        )
+        if result.score >= MIN_THRESHOLD and result.entity_type != "PERSON"
+    ]
+    assert first_pass, "the text must carry a non-PERSON entity to measure"
+    assert [f for f in findings(MIXED_ENTITY_TEXT) if f[0] != "PERSON"] == first_pass
 
 
 # ---------------------------------------------------------------------------
@@ -271,20 +255,19 @@ def test_a_single_rewritten_token_is_enough():
     assert MIN_SPAN_WORDS == 2
     assert MIN_NORMALISED_TOKEN_LENGTH == 4
 
-    person = [
-        f for f in findings(text=ONE_REWRITTEN_WORD_TEXT, second_pass=True)
-        if f[0] == "PERSON"
-    ]
-    covered = [ONE_REWRITTEN_WORD_TEXT[start:end] for _t, start, end, _s in person]
-    assert "Tobias OKONKWO" in covered, covered
+    assert person_names(ONE_REWRITTEN_WORD_TEXT) == ["Tobias OKONKWO"]
 
 
 # @scenario "A capitalised name with a surname particle is still harvested"
 def test_a_particle_surname_in_capitals_is_harvested():
     text = "Please confirm whether MARCUS VAN DER BERG should stay on the plan."
-    person = [f for f in findings(text=text, second_pass=True) if f[0] == "PERSON"]
-    covered = [text[start:end] for _t, start, end, _s in person]
-    assert any("VAN DER BERG" in span for span in covered), covered
+    assert person_names(text) == ["MARCUS VAN DER BERG"]
+
+
+# @scenario "A capitalised name made of short words is still harvested"
+def test_a_capitalised_name_of_short_words_is_harvested():
+    text = "Please confirm whether AMY LEE should stay on the current plan for the renewal."
+    assert person_names(text) == ["AMY LEE"]
 
 
 # @scenario "A titlecased acronym is not harvested as a name"
@@ -312,18 +295,7 @@ def test_a_particle_surname_in_capitals_is_harvested():
     ],
 )
 def test_short_titlecased_tokens_are_not_harvested(text: str, acronym: str):
-    before = {
-        (start, end) for t, start, end, _s in findings(text=text, second_pass=False)
-        if t == "PERSON"
-    }
-    after = {
-        (start, end) for t, start, end, _s in findings(text=text, second_pass=True)
-        if t == "PERSON"
-    }
-    assert after == before, (
-        f"the second pass invented a name around {acronym}: "
-        f"{[text[a:b] for a, b in after - before]}"
-    )
+    assert person_names(text) == [], f"a name was invented around {acronym}"
 
 
 # ---------------------------------------------------------------------------
@@ -334,22 +306,26 @@ def test_short_titlecased_tokens_are_not_harvested(text: str, acronym: str):
 # @scenario "One name is counted once, at its widest span"
 def test_a_wider_span_replaces_the_narrower_one_it_covers():
     """`Tobias` and `Tobias OKONKWO` are one person, so one entry."""
-    before = [
-        (start, end) for t, start, end, _s in findings(
-            text=ONE_REWRITTEN_WORD_TEXT, second_pass=False
-        ) if t == "PERSON"
+    first_pass = [
+        ONE_REWRITTEN_WORD_TEXT[result.start:result.end]
+        for result in evaluator().analyzer.analyze(
+            text=ONE_REWRITTEN_WORD_TEXT, entities=["PERSON"], language="en"
+        )
+        if result.score >= MIN_THRESHOLD
     ]
-    after = [
-        (start, end) for t, start, end, _s in findings(
-            text=ONE_REWRITTEN_WORD_TEXT, second_pass=True
-        ) if t == "PERSON"
-    ]
+    assert first_pass == ["Tobias"], "the first pass must read the forename alone"
+    assert person_names(ONE_REWRITTEN_WORD_TEXT) == ["Tobias OKONKWO"]
 
-    assert before == [(81, 87)], before
-    assert after == [(81, 95)], after
-    assert len(after) == len(before), "one name, so the count may not grow"
-    assert ONE_REWRITTEN_WORD_TEXT[81:87] == "Tobias"
-    assert ONE_REWRITTEN_WORD_TEXT[81:95] == "Tobias OKONKWO"
+
+# @scenario "The analysis service redacts a name whose surname is written in capitals"
+def test_a_capitalised_surname_is_redacted_whole():
+    result = evaluator().evaluate(
+        PresidioPIIDetectionEntry(input=ONE_REWRITTEN_WORD_TEXT)
+    )
+    assert result.status == "processed", f"evaluator did not run: {result}"
+    redacted = result.raw_response["anonymized"]
+    assert "Tobias" not in redacted and "OKONKWO" not in redacted, redacted
+    assert "written by <PERSON> after the call" in redacted, redacted
 
 
 # @scenario "One name is counted once, at its widest span"
