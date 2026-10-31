@@ -393,6 +393,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerSlackConnectionCommands(program);
   registerSecretCommands(program);
   registerMonitorCommands(program);
+  registerTopicCommands(program);
   registerSimulationRunCommands(program);
   registerNavigateCommands(program);
   registerOnboardingCommands(program);
@@ -4555,6 +4556,22 @@ function registerSecretCommands(program: Command): void {
     async (id: string) => {
       const { deleteSecretCommand: impl } = await import("./commands/secrets/delete.js");
       return impl(id);
+    },
+  );
+}
+
+function registerTopicCommands(program: Command): void {
+  const topicCmd = program
+    .command("topic")
+    .description("Manage topic clustering for project traces");
+  emitsResult(
+    topicCmd
+      .command("run-clustering")
+      .description("Start topic clustering unless a run is already in progress")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { runTopicClusteringCommand: impl } = await import("./commands/topics/run-clustering.js");
+      return impl();
     },
   );
 }
