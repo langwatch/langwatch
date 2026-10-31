@@ -45,7 +45,7 @@ const filesUnder = (dir: string): string[] =>
     .readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)))
-    .sort();
+    .toSorted();
 
 const stdout = (): string =>
   stdoutSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("");
@@ -98,7 +98,7 @@ describe("the pi ingestion install", () => {
       const extension = fs.readFileSync(path.join(piExtensionDir, PI_EXTENSION_FILE_NAME), "utf8");
       expect(extension.startsWith(PI_EXTENSION_MARKER)).toBe(true);
       expect(filesUnder(tmpDir)).toEqual(
-        [path.join(".pi", "agent", "extensions", PI_EXTENSION_FILE_NAME), "config.json"].sort(),
+        [path.join(".pi", "agent", "extensions", PI_EXTENSION_FILE_NAME), "config.json"].toSorted(),
       );
       expect(stdout()).toContain("telemetry extension created");
     });

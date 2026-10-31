@@ -216,7 +216,7 @@ describe("the generated pi extension", () => {
       expect(
         exported()
           .map((span) => span.name)
-          .sort(),
+          .toSorted(),
       ).toEqual(["pi.ai.request", "pi.harness.run", "pi.harness.tool", "pi.harness.turn"]);
     });
   });

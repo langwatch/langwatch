@@ -198,26 +198,6 @@ describe("scanTelemetryTargets", () => {
     });
   });
 
-  describe("when `langwatch pi` persisted its telemetry env for bare pi runs", () => {
-    const piBlock = buildOtelEnvBlock("pi", "http://app/api/otel", "ik-lw-pi_secret");
-
-    beforeEach(() => {
-      persistBlockToRc("zsh", buildScopedToolFunction("pi", piBlock, "zsh"), toolMarkers("pi"));
-    });
-
-    /** @scenario "Logout strips pi's injected env names" */
-    it("lists pi among the targets and strips every name pi injected from the rc", () => {
-      expect(presentLabels().some((l) => l.startsWith("pi shell function"))).toBe(true);
-
-      for (const t of scan().filter((t) => t.present)) t.remove();
-
-      const rcFile = path.join(tmpHome, ".zshrc");
-      const rc = fs.existsSync(rcFile) ? fs.readFileSync(rcFile, "utf8") : "";
-      for (const name of Object.keys(piBlock)) expect(rc).not.toContain(name);
-      expect(presentLabels()).toEqual([]);
-    });
-  });
-
   describe("when settings.json carries the langwatch hooks and a user's own", () => {
     const userEntry = {
       hooks: [{ type: "command", command: "./scripts/session-log.sh" }],
@@ -515,5 +495,27 @@ describe("scanTelemetryTargets", () => {
     const keys = telemetryEnvVarNames("claude");
     expect(keys).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
     expect(keys).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
+  });
+});
+
+describe("scanTelemetryTargets for pi", () => {
+  describe("when `langwatch pi` persisted its telemetry env for bare pi runs", () => {
+    const piBlock = buildOtelEnvBlock("pi", "http://app/api/otel", "ik-lw-pi_secret");
+
+    beforeEach(() => {
+      persistBlockToRc("zsh", buildScopedToolFunction("pi", piBlock, "zsh"), toolMarkers("pi"));
+    });
+
+    /** @scenario "Logout strips pi's injected env names" */
+    it("lists pi among the targets and strips every name pi injected from the rc", () => {
+      expect(presentLabels().some((l) => l.startsWith("pi shell function"))).toBe(true);
+
+      for (const t of scan().filter((t) => t.present)) t.remove();
+
+      const rcFile = path.join(tmpHome, ".zshrc");
+      const rc = fs.existsSync(rcFile) ? fs.readFileSync(rcFile, "utf8") : "";
+      for (const name of Object.keys(piBlock)) expect(rc).not.toContain(name);
+      expect(presentLabels()).toEqual([]);
+    });
   });
 });
