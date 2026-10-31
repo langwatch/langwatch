@@ -2,6 +2,7 @@ import {
   analyticsFilterValueSchema,
   type AnalyticsFilterValue as FilterParam,
   type FilterField,
+  parseScoreRange,
 } from "@langwatch/analytics-contract";
 import { tenantSet } from "@langwatch/clickhouse-markers";
 import {
@@ -214,17 +215,10 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
   },
 
   "evaluations.score": ({ values, paramId, key, options }) => {
-    if (!key || values.length < 2) return { sql: "1=0", params: {} };
-    const minScore = parseFloat(values[0] ?? "");
-    const maxScore = parseFloat(values[1] ?? "");
-    // Reject invalid ranges: NaN values or min > max
-    const isFiniteRange = Number.isFinite(minScore) && Number.isFinite(maxScore);
-    if (!isFiniteRange) {
-      return { sql: "1=0", params: {} };
-    }
-    if (minScore > maxScore) {
-      return { sql: "1=0", params: {} };
-    }
+    // Same parser as the trigger matcher (evaluation-filter-matching.service.ts).
+    const range = key ? parseScoreRange(values) : null;
+    if (!key || !range) return { sql: "1=0", params: {} };
+    const { min: minScore, max: maxScore } = range;
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
