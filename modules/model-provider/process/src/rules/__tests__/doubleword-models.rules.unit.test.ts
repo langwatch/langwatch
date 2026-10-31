@@ -57,13 +57,13 @@ const VISION_NO_CACHE: DoublewordModel = {
   tariffs: [
     {
       name: "Realtime",
-      input_price_per_token: "0.00000014",
-      output_price_per_token: "0.00000058",
+      input_price_per_token: "0.00000021",
+      output_price_per_token: "0.0000019",
       api_key_purpose: "realtime",
       is_active: true,
     },
   ],
-  metadata: { context_window: 196608 },
+  metadata: { context_window: 262144 },
 };
 
 const BATCH_ONLY: DoublewordModel = {
@@ -201,7 +201,7 @@ const UNPRICED_REALTIME: DoublewordModel = {
     {
       name: "Realtime",
       input_price_per_token: null,
-      output_price_per_token: "0.00000058",
+      output_price_per_token: "0.0000019",
       api_key_purpose: "realtime",
       is_active: true,
     },
@@ -264,7 +264,7 @@ describe("resolveDoublewordEntries", () => {
         "doubleword/deepseek-ai/DeepSeek-V4.1-Flash",
         "doubleword/Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
       ]);
-      expect(entries[1]!.pricing.inputCostPerToken).toBe(0.00000014);
+      expect(entries[1]!.pricing.inputCostPerToken).toBe(0.00000021);
     });
   });
 
