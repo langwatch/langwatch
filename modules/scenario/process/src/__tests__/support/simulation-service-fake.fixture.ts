@@ -41,6 +41,7 @@ const sentWrites = [
   "deleteRun",
   "recordAgentInstance",
   "recordCutAtLimit",
+  "refreshMetadata",
   "recordHooks",
 ] as const satisfies readonly (keyof SimulationService)[];
 

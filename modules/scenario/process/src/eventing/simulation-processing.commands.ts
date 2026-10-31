@@ -5,6 +5,7 @@ import {
   simulationRunCancelRequestedEventDataSchema,
   simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
+  simulationRunMetadataRefreshedEventDataSchema,
   simulationRunHooksRecordedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
@@ -109,6 +110,20 @@ const RecordCutAtLimitCommand = defineCommand({
   }),
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-cut-at-limit`,
 });
+export const RefreshMetadataCommand = defineCommand({
+  commandType: "lw.simulation_run.refresh_metadata",
+  eventType: "lw.simulation_run.metadata_refreshed",
+  eventVersion: "2026-10-27",
+  aggregateType: "simulation_run",
+  schema: simulationRunMetadataRefreshedEventDataSchema,
+  aggregateId: (d) => d.scenarioRunId,
+  // Keyed on the attempt: run id and occurredAt are identical across re-drives of one call.
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:refreshMetadata:${d.attemptId}`,
+  spanAttributes: (d) => ({
+    "payload.scenarioRun.id": d.scenarioRunId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:refresh-metadata:${d.attemptId}`,
+});
 
 const RecordHooksCommand = defineCommand({
   commandType: "lw.simulation_run.record_hooks",
@@ -187,6 +202,7 @@ export class SimulationProcessingCommandsAdapter {
   readonly deleteRun = DeleteRunCommand;
   readonly recordAgentInstance = RecordAgentInstanceCommand;
   readonly recordCutAtLimit = RecordCutAtLimitCommand;
+  readonly refreshMetadata = RefreshMetadataCommand;
   readonly recordHooks = RecordHooksCommand;
   readonly archiveSet = ArchiveSetCommand;
 

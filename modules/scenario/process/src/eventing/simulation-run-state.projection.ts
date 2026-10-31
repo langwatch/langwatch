@@ -22,6 +22,7 @@ import {
   SimulationRunEvaluatedEventSchema,
   SimulationRunHooksRecordedEventSchema,
   SimulationRunFinishedEventSchema,
+  SimulationRunMetadataRefreshedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
@@ -38,6 +39,7 @@ import {
   type SimulationRunEvaluatedEvent,
   type SimulationRunHooksRecordedEvent,
   type SimulationRunFinishedEvent,
+  type SimulationRunMetadataRefreshedEvent,
   type SimulationRunMetricsComputedEvent,
   type SimulationRunQueuedEvent,
   type SimulationRunStartedEvent,
@@ -304,6 +306,7 @@ const simulationRunEvents = [
   SimulationRunCancelRequestedEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCutAtLimitRecordedEventSchema,
+  SimulationRunMetadataRefreshedEventSchema,
   SimulationRunHooksRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
@@ -364,6 +367,28 @@ export class SimulationRunStateFoldProjection
    */
   static withCutAtLimit(metadata: string | null): string {
     return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
+  }
+
+  /**
+   * Merges a later attempt's metadata over the stored JSON: top-level keys are replaced,
+   * the reserved `langwatch` namespace is deep-merged, and `secretParameters` is stripped.
+   */
+  static withRefreshedMetadata({
+    metadata,
+    refresh,
+  }: {
+    metadata: string | null;
+    refresh: Record<string, unknown>;
+  }): string {
+    const { secretParameters: _secretParameters, ...fields } = refresh;
+    const current = parseMetadataObject(metadata);
+    const merged: Record<string, unknown> = { ...current, ...fields };
+    const currentLangwatch = isRecord(current.langwatch) ? current.langwatch : {};
+    const refreshLangwatch = isRecord(fields.langwatch) ? fields.langwatch : null;
+    if (refreshLangwatch) {
+      merged.langwatch = { ...currentLangwatch, ...refreshLangwatch };
+    }
+    return JSON.stringify(merged);
   }
 
   /**
@@ -808,6 +833,20 @@ export class SimulationRunStateFoldProjection
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Metadata: SimulationRunStateFoldProjection.withCutAtLimit(state.Metadata),
+    };
+  }
+
+  handleSimulationRunMetadataRefreshed(
+    event: SimulationRunMetadataRefreshedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: SimulationRunStateFoldProjection.withRefreshedMetadata({
+        metadata: state.Metadata,
+        refresh: event.data.metadata,
+      }),
     };
   }
 

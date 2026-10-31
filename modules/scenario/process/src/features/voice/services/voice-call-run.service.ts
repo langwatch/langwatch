@@ -4,6 +4,7 @@
  * only per-exchange traces.
  */
 
+import { generate } from "@langwatch/ksuid";
 import {
   VoiceAgentNotFoundError,
   type CallRecord,
@@ -23,7 +24,10 @@ interface VoiceCallRunWriterCollaborators {
   agents: {
     findById(input: { projectId: string; id: string }): Promise<{ id: string } | null>;
   };
-  simulations: Pick<SimulationService, "startRun" | "messageSnapshot" | "finishRun">;
+  simulations: Pick<
+    SimulationService,
+    "startRun" | "messageSnapshot" | "finishRun" | "refreshMetadata"
+  >;
 }
 
 /**
@@ -104,6 +108,7 @@ function createVoiceCallRunWriter(
     record,
     scenario,
     turnTraceIds,
+    isRedrive = false,
   }: {
     projectId: string;
     scenarioRunId: string;
@@ -115,6 +120,11 @@ function createVoiceCallRunWriter(
      *  from {@link recordVoiceCallTraces}. Set on the message and the run's
      *  trace list so the drawer probes the exchange's trace. */
     turnTraceIds: readonly string[];
+    /** True when this write is a retry completing a half-written run (#7973
+     *  AC2). The first attempt's started event already set the metadata and is
+     *  first-wins, so this attempt's `source` / `audioUrl` / cutoff reach the
+     *  run through a refresh event instead (#8032). */
+    isRedrive?: boolean;
   }): Promise<void> {
     // The row id is trusted only as far as the token that carried it; the row
     // itself must exist in this project before a run is written under it.
@@ -152,6 +162,24 @@ function createVoiceCallRunWriter(
       occurredAt: record.endedAt,
     });
 
+    // A re-drive's started event is first-wins, so a refresh carries this attempt's
+    // source, audio and cutoff onto the run. It goes before the finish: a
+    // finished run's retry returns early, so a refresh after it could never be retried.
+    if (isRedrive) {
+      await collaborators.simulations.refreshMetadata({
+        tenantId: projectId,
+        scenarioRunId,
+        // Re-drives share the end time, so only this id keeps their refreshes apart.
+        attemptId: generate("voiceattempt").toString(),
+        metadata: {
+          source: record.source,
+          langwatch: { isCutAtLimit: record.isCutAtLimit },
+          // null, not omitted, so a retry without a recording clears a stale link.
+          audioUrl: record.audioUrl ?? null,
+        },
+        occurredAt: record.endedAt,
+      });
+    }
     // No results envelope: the verdict is not decided here. The run is
     // finished SUCCESS with the scenario id named on the event, so the
     // scenario_evaluations process manager grades the transcript against the
