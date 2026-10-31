@@ -19,6 +19,9 @@ export const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
   // editor surface is separable from the CLI (`copilot_cli`) and app
   // (`copilot_app`) in the API-keys page and analytics. ADR-039 §Extension #2.
   code: "copilot_vscode",
+  // `pi_cli`, not `pi`: the slug is a provenance label, and pi's harness also
+  // runs outside a CLI. ADR-188 Constants.
+  pi: "pi_cli",
 };
 
 /**
@@ -132,6 +135,19 @@ export function buildOtelEnvBlock(
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-chat",
+      };
+    case "pi":
+      // The backend reading this block is our own extension (ADR-188), which
+      // autoconfigures from these names, so logs and metrics are switched off
+      // rather than left unset: unset would start an exporter with nothing to
+      // send. codex omits both names because it ships its own exporter.
+      return {
+        OTEL_TRACES_EXPORTER: "otlp",
+        OTEL_LOGS_EXPORTER: "none",
+        OTEL_METRICS_EXPORTER: "none",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+        ...base,
+        OTEL_RESOURCE_ATTRIBUTES: "service.name=pi",
       };
     default:
       return base;

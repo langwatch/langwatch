@@ -775,3 +775,39 @@ Rule: Copilot reports through one hook file LangWatch owns
     Given the per-agent table that names each agent's tool slug, server agent id, key source types, session id source and hook target
     When the hooks are installed and run for Claude Code, Codex and opencode
     Then their hook files, records and key lookups are the same as before the table
+
+Rule: pi joins this table as a plugin, which is opencode's shape exactly
+  pi exposes no hook directory, so its row's hook target is a plugin: a file of
+  ours in pi's extension directory rather than entries merged into a file the
+  user also edits. The extension then shells out to `langwatch ingest hook pi`,
+  as opencode's plugin shells out to `langwatch ingest hook opencode`, and the
+  command builds and posts the record. The extension causes the record; it
+  never authors one. What the extension is and how it is installed is
+  specs/ai-governance/cli-wrappers/pi-extension-install.feature.
+
+  Neither the row nor its hook target is optional. Without a row the command
+  cannot resolve the agent id at all, so nothing is posted, a pi session folds
+  with no branch and no pull request is ever linked.
+
+  A row's session id variable is a separate thing: it names an environment
+  variable an agent pins its session id to, and a payload's own session id wins
+  wherever it is present. pi's extension always sends one, so pi's row names no
+  variable.
+
+  # becomes @unit
+  @unimplemented
+  Scenario: pi's row carries a plugin hook target, as opencode's does
+    Given the per-agent table that names each agent's tool slug, server agent id, key source types, session id source and hook target
+    When the table is read
+    Then it holds a row for pi whose hook target is a plugin in pi's extension directory
+    And that row names no session id variable
+    And installing the hooks writes no entries into any file pi shares with the user
+
+  # becomes @unit
+  @unimplemented
+  Scenario: The session-context command accepts a record the pi extension asked for
+    Given pi has a row in the table whose hook target is its extension
+    When `langwatch ingest hook pi` is run for session "s-1"
+    Then the record is accepted and declares the agent "pi"
+    And it carries the session id "s-1", the same value pi puts on pi.session.id
+    And it posts with the personal ingest key for pi_cli

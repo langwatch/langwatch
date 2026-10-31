@@ -41,3 +41,7 @@ export const wrapGemini = async (args: string[]): Promise<void> => {
 export const wrapOpencode = async (args: string[]): Promise<void> => {
   await runWrapped("opencode", args);
 };
+
+export const wrapPi = async (args: string[]): Promise<void> => {
+  await runWrapped("pi", args);
+};

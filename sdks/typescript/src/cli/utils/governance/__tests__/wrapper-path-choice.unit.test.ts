@@ -354,6 +354,37 @@ describe("resolveWrapperPath", () => {
     });
   });
 
+  describe("when the tool is pi, which has no gateway path (ADR-188)", () => {
+    /** @scenario "pi resolves to the ingestion path even when a virtual key exists" */
+    it("resolves to ingestion on a terminal without prompting, despite a virtual key", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          default_personal_vk: { id: "vk1", secret: "lw_vk_secret", prefix: "lw_vk_" },
+        }),
+        tool: "pi",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+    });
+
+    /** @scenario "pi resolves to ingestion in a non-interactive shell" */
+    it("resolves to ingestion with no terminal", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "pi",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+    });
+  });
+
   describe("when the tool is copilot (ingestion-first defaults, ADR-039)", () => {
     // Copilot's gateway path switches it into BYOK mode, moving spend off
     // the user's paid Copilot seat onto the org's provider keys -- not

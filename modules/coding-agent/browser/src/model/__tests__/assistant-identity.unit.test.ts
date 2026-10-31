@@ -20,6 +20,11 @@ describe("assistantKindOfAgent", () => {
     it("resolves opencode to its own kind", () => {
       expect(assistantKindOfAgent("opencode")).toBe("opencode");
     });
+
+    /** @scenario "An agent slug resolves to its product name" */
+    it("resolves pi to its own kind", () => {
+      expect(assistantKindOfAgent("pi")).toBe("pi");
+    });
   });
 
   describe("given a slug the registry spells differently", () => {

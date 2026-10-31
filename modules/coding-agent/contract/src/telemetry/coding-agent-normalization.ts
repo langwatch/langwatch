@@ -324,6 +324,37 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "ttft_ms",
   "type",
   "request_id",
+
+  // pi names every attribute under its own prefix and this lookup is exact, so
+  // an unlisted pi key is dropped on arrival (ADR-188). Keys pi declares but
+  // the fold does not read stay out; add one here when a reader needs it.
+  "pi.ai.error.type",
+  "pi.ai.model",
+  "pi.ai.provider",
+  "pi.ai.response.model",
+  "pi.ai.response.stop_reason",
+  "pi.ai.usage.cache_read_tokens",
+  "pi.ai.usage.cache_write_tokens",
+  "pi.ai.usage.cost",
+  "pi.ai.usage.input_tokens",
+  "pi.ai.usage.output_tokens",
+  "pi.ai.usage.reasoning_tokens",
+  "pi.ai.usage.total_tokens",
+  "pi.compaction.reason",
+  "pi.error.code",
+  "pi.error.type",
+  "pi.operation.kind",
+  "pi.operation.outcome",
+  "pi.session.id",
+  "pi.tool.call_id",
+  "pi.tool.is_error",
+  "pi.tool.name",
+  "pi.turn.id",
+
+  // Marks a span whose attributes include stand-in values the agent never
+  // reported, so no reader mistakes a constant for a measurement. Same idiom as
+  // `langwatch.tokens.estimated` on the trace lane.
+  "langwatch.attributes.estimated",
 ];
 
 /**

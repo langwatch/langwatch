@@ -34,6 +34,7 @@ describe("Governance receiver policy", () => {
     "copilot_cli",
     "copilot_app",
     "copilot_vscode",
+    "pi_cli",
   ])("classifies coding source %s", (sourceType) => {
     expect(originForIngestSourceType(sourceType)).toBe("coding_agent");
   });
@@ -213,5 +214,77 @@ describe("Governance receiver policy", () => {
     ).toBe(0);
     expect(request.resourceSpans?.[0]?.scopeSpans?.[0]?.scope?.name).toBe("custom");
     expect(request.resourceLogs?.[0]?.scopeLogs?.[0]?.scope?.name).toBe("custom");
+  });
+
+  /** One pi harness span, as pi's own exporter sends it. */
+  function piHarnessRun(): OtlpReceiverRequest {
+    return {
+      resourceSpans: [
+        {
+          scopeSpans: [
+            {
+              scope: { name: "@earendil-works/pi-agent-core" },
+              spans: [{ attributes: [{ key: "pi.session.id", value: { stringValue: "s-1" } }] }],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  /** @scenario "A pi span ingested under its own key carries the coding-agent origin" */
+  it("stamps a pi span ingested on a pi_cli key as coding-agent activity", () => {
+    const policies = buildIngestKeyReceiverPolicies(
+      { organizationId: "org_1", sourceType: "pi_cli" },
+      false,
+    );
+    const request = piHarnessRun();
+
+    const result = applyOtlpReceiverPolicy({
+      request: request,
+      signal: "traces",
+      apiKeyId: "key_pi",
+      policy: policies.traces,
+    });
+
+    expect(attributes(request, "traces")[0]).toMatchObject({
+      "langwatch.source": "pi_cli",
+      "langwatch.origin": "coding_agent",
+      "langwatch.organization_id": "org_1",
+      "langwatch.api_key.id": "key_pi",
+    });
+    // pi exports only its own spans, so no scope restriction is applied and none is dropped.
+    expect(policies.traces.allowedTraceScopeNames).toBeUndefined();
+    expect(result.droppedScopes).toBe(0);
+  });
+
+  /** @scenario "pi spans sent with another source's key do not pass as pi's" */
+  it("rewrites a forged pi source on an unrelated source's key", () => {
+    const policies = buildIngestKeyReceiverPolicies(
+      { organizationId: "org_1", sourceType: "otel_generic" },
+      false,
+    );
+    const request = piHarnessRun();
+    const group = request.resourceSpans?.[0];
+    if (group) {
+      group.resource = {
+        attributes: [
+          { key: "langwatch.source", value: { stringValue: "pi_cli" } },
+          { key: "langwatch.origin", value: { stringValue: "coding_agent" } },
+        ],
+      };
+    }
+
+    applyOtlpReceiverPolicy({
+      request: request,
+      signal: "traces",
+      apiKeyId: "key_other",
+      policy: policies.traces,
+    });
+
+    expect(attributes(request, "traces")[0]).toMatchObject({
+      "langwatch.source": "otel_generic",
+      "langwatch.origin": "ai_tool",
+    });
   });
 });

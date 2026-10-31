@@ -51,11 +51,20 @@ describe("formatLoginCeremony", () => {
     });
 
     describe("when the org publishes no tools", () => {
-      it("falls back to every built-in wrapper (all seven tools)", () => {
+      it("falls back to every built-in wrapper (all eight tools)", () => {
         const lines = formatLoginCeremony(baseInput);
         const toolLines = lines.filter(isToolCommand);
-        expect(toolLines).toHaveLength(7);
-        for (const slug of ["claude", "codex", "copilot", "code", "cursor", "gemini", "opencode"]) {
+        expect(toolLines).toHaveLength(8);
+        for (const slug of [
+          "claude",
+          "codex",
+          "copilot",
+          "code",
+          "cursor",
+          "gemini",
+          "opencode",
+          "pi",
+        ]) {
           expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(true);
         }
       });
@@ -63,7 +72,7 @@ describe("formatLoginCeremony", () => {
       it("falls back when an empty tools array is supplied", () => {
         const lines = formatLoginCeremony({ ...baseInput, tools: [] });
         const toolLines = lines.filter(isToolCommand);
-        expect(toolLines).toHaveLength(7);
+        expect(toolLines).toHaveLength(8);
       });
     });
   });
