@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.0.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.4.0...python-sdk@v2.0.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk:** client.dashboards and langwatch.dashboards now address the new Dashboards API, not the old Reports; use client.analyticsReports / langwatch.analytics_reports for those. MCP Reports tools are renamed platform_*_analytics_report(s).
+
+### Features
+
+* **automations:** one automation flow: wizard composer, Slack connections, always-on webhooks and API parity ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
+* **coding-agent:** copilot CLI and VS Code sessions become rows ([#8884](https://github.com/langwatch/langwatch/issues/8884)) ([e5c5e8c](https://github.com/langwatch/langwatch/commit/e5c5e8c3eb372ac02eed8ad7e5bd1810fc3c3be1))
+* **dashboard:** add REST create and delete for Dashboards boards ([#8896](https://github.com/langwatch/langwatch/issues/8896)) ([fbc1469](https://github.com/langwatch/langwatch/commit/fbc1469027d6ef59c920243f63e2ebaf2264bcf8))
+* **dashboard:** move dashboards v2 onto its own tables ([#8707](https://github.com/langwatch/langwatch/issues/8707)) ([7f1f527](https://github.com/langwatch/langwatch/commit/7f1f527f85363fe97cdc93d300b7c469de4463eb))
+* **dashboards,insight:** dashboards and insights v1 ([#8545](https://github.com/langwatch/langwatch/issues/8545)) ([7b5e13d](https://github.com/langwatch/langwatch/commit/7b5e13dd84492d526f1442e3360005ff1ed08613))
+* **dashboards:** a per-dashboard Langy traces setting ([#9099](https://github.com/langwatch/langwatch/issues/9099)) ([821b467](https://github.com/langwatch/langwatch/commit/821b467e8a628e599951b42d3c871f0db454efd8))
+* **dashboards:** per-widget "Langy traces" setting in the query editor ([#9137](https://github.com/langwatch/langwatch/issues/9137)) ([5e82c1e](https://github.com/langwatch/langwatch/commit/5e82c1ebc1d2dbfda817cf175f3aba62e485a0d8))
+* **dashboards:** widget queries take sources and projects as params ([#9171](https://github.com/langwatch/langwatch/issues/9171)) ([af5a9c3](https://github.com/langwatch/langwatch/commit/af5a9c342951371a1cf547188cff78f9cd50bcc1))
+* **docs:** add a lightweight static docs app ([#8563](https://github.com/langwatch/langwatch/issues/8563)) ([395ed9c](https://github.com/langwatch/langwatch/commit/395ed9c2ce9de4f25497a3b90092a1e647018ac6))
+* **experiment:** accept a per-run concurrency on the experiment run API ([#9023](https://github.com/langwatch/langwatch/issues/9023)) ([640d0f6](https://github.com/langwatch/langwatch/commit/640d0f6e21afd19e46eaed9312d4c04c121b9a4b))
+* **instant-evals:** meter judgements on the gateway spend spine, a Stripe meter and a 1 USD free budget ([#8220](https://github.com/langwatch/langwatch/issues/8220)) ([e5a2252](https://github.com/langwatch/langwatch/commit/e5a22526eca51e242d9018e3ac24928fe9250131))
+* **instant-evals:** the CLI that waits for the answer, the target shorthand and estimate before spend ([#8216](https://github.com/langwatch/langwatch/issues/8216)) ([c01b277](https://github.com/langwatch/langwatch/commit/c01b277a7631308a2d45dfa5ac97dd3a46ef58ff))
+* **instant-evals:** the Instant Eval run, a judgment job over an LWQL statement with progress and persisted judgments ([#8208](https://github.com/langwatch/langwatch/issues/8208)) ([e337419](https://github.com/langwatch/langwatch/commit/e33741926479c94f6d0b6d2b80d76e886dc1e109))
+* **members:** developer seat, a member who owns a personal project and nothing shared ([#8373](https://github.com/langwatch/langwatch/issues/8373)) ([30ff7ea](https://github.com/langwatch/langwatch/commit/30ff7ea74a4caba95afb76d59ca9a6906b6f613e))
+* **model-provider:** instant evals decision model column with own-key decision models ([#8935](https://github.com/langwatch/langwatch/issues/8935)) ([9b022a5](https://github.com/langwatch/langwatch/commit/9b022a535f304bee38bca86530cc901b03731baa))
+* **monitor:** pause a monitor whose evaluations mostly fail ([#9040](https://github.com/langwatch/langwatch/issues/9040)) ([fcbd9ed](https://github.com/langwatch/langwatch/commit/fcbd9edabbfa2fd9b3a4c142c678298a846e184d))
+* **onboarding:** a Langy-guided onboarding after sign-up, behind a flag for the A/B test ([#7920](https://github.com/langwatch/langwatch/issues/7920)) ([5f5b591](https://github.com/langwatch/langwatch/commit/5f5b591c2dd55beb5991064b7ce55dc6509b0255))
+* **scenarios:** setup and teardown hooks for connected agents ([#8765](https://github.com/langwatch/langwatch/issues/8765)) ([b0949cd](https://github.com/langwatch/langwatch/commit/b0949cdd929d35f030ddeb2fc1c16b1f33328c0f))
+* **sdk:** list the Slack connections a project can use, through GET /api/slack-connections, langwatch slack-connection list, Python list_slack_connections and Go SlackConnections ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
+* **sdk:** one product per dashboards path; dashboards means the new product everywhere ([#9089](https://github.com/langwatch/langwatch/issues/9089)) ([552534d](https://github.com/langwatch/langwatch/commit/552534d24487441ac5395d91c1af69ed072a0c00))
+* **sdks:** send traces as gzipped OTLP/protobuf by default in every SDK ([#8592](https://github.com/langwatch/langwatch/issues/8592)) ([206c830](https://github.com/langwatch/langwatch/commit/206c830dc5653660348004fb10a267cc9d13e7b2))
+* **server:** npx downloads a prebuilt app; evaluations retry while the evaluator is down ([#8845](https://github.com/langwatch/langwatch/issues/8845)) ([6e44487](https://github.com/langwatch/langwatch/commit/6e444878b00756e6d31e3d6cb36611b80920234c))
+
+
+### Bug Fixes
+
+* **annotations:** serialize annotation commands per trace and 404 on unknown delete ([#8400](https://github.com/langwatch/langwatch/issues/8400)) ([7606bf6](https://github.com/langwatch/langwatch/commit/7606bf6a6641e03912b2e16bbafbe0021f681bb8))
+* **deps:** raise authlib, litellm and dnspython for today's advisories ([#9120](https://github.com/langwatch/langwatch/issues/9120)) ([828259f](https://github.com/langwatch/langwatch/commit/828259f92eafec9a0d4e1c5ffecab87e4abd2257))
+* follow-ups that missed the [#7536](https://github.com/langwatch/langwatch/issues/7536) merge (eventing leases, group-queue dead workers, upgrade pacing, upgradelab) ([#8580](https://github.com/langwatch/langwatch/issues/8580)) ([7aca052](https://github.com/langwatch/langwatch/commit/7aca0524747e37193b219add62a00b45b1e55ae7))
+* **image:** install the scenario child's build dependencies before building it ([#8702](https://github.com/langwatch/langwatch/issues/8702)) ([5520bdf](https://github.com/langwatch/langwatch/commit/5520bdffb039d3adce901a019e4ca91bd2476de7))
+* **instant-evals:** end-to-end dogfood on main, five fixes in how numbers and words reach the caller ([#8233](https://github.com/langwatch/langwatch/issues/8233)) ([c5c0030](https://github.com/langwatch/langwatch/commit/c5c00301250d6c8354b126732c56e80e3dda9514))
+* **langevals:** judges reach a verdict on gpt-6 reasoning models ([#9102](https://github.com/langwatch/langwatch/issues/9102)) ([d7b6238](https://github.com/langwatch/langwatch/commit/d7b623874e55e0b6af4d81ce9671114d54dfb2cc))
+* **scenarios:** refuse fields PUT /api/scenarios/{id} does not have instead of dropping them ([#8438](https://github.com/langwatch/langwatch/issues/8438)) ([891c048](https://github.com/langwatch/langwatch/commit/891c048827e57d32c1ff9038daa4a6db913b3f79))
+* **security:** close 148 of 150 alerts across the python locks ([#7634](https://github.com/langwatch/langwatch/issues/7634)) ([c0837d1](https://github.com/langwatch/langwatch/commit/c0837d164d28f15ba179fc6f1c1f0516be32cfa3))
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+* **suites:** refuse fields POST /api/suites does not have instead of dropping them ([#8437](https://github.com/langwatch/langwatch/issues/8437)) ([3afaf50](https://github.com/langwatch/langwatch/commit/3afaf50b85011910f7fedf19ec55b7821027b51b))
+* **trace:** a span's own attributes never break its read on a request-param name ([#9179](https://github.com/langwatch/langwatch/issues/9179)) ([d8adba2](https://github.com/langwatch/langwatch/commit/d8adba263b07692e61b5621527d5ade34d019894))
+* **trace:** render serialised LangChain messages as chat messages ([#8747](https://github.com/langwatch/langwatch/issues/8747)) ([b5f64d7](https://github.com/langwatch/langwatch/commit/b5f64d7a33af4a0f90ceb51ffa2f248d04f329ff))
+* **triggers:** refuse a different customGraphId on PATCH instead of ignoring it ([#8433](https://github.com/langwatch/langwatch/issues/8433)) ([0ad8ad2](https://github.com/langwatch/langwatch/commit/0ad8ad2e1ae6981c130c4c2877bbd5e2722e8dd6))
+* workflow run answers keep the engine's trace, cost, timing and error; profiles use the reported service name ([#8677](https://github.com/langwatch/langwatch/issues/8677)) ([6c601fb](https://github.com/langwatch/langwatch/commit/6c601fb2d8c59abf20657b940276f7989e1040da))
+
 ## [1.4.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.3.1...python-sdk@v1.4.0) (2026-09-06)
 
 ### Features
