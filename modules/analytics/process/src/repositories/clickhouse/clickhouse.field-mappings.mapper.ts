@@ -469,17 +469,22 @@ export function getTableAlias(table: CHTable): string {
  * @param table the table to JOIN.
  * @param requiredColumns optional column subset (defaults to all analytics columns).
  * @param spanTimeFilter `stored_spans` partition bound; omitted, it cold-scans every partition.
+ * @param spanRowFilter `stored_spans` row predicate on a light column, so it reaches PREWHERE
+ *   ahead of the heavy columns in the select list. It prunes no partitions, and may only be a
+ *   predicate the outer query already implies: the subquery feeds an inner JOIN.
  * @param evalTimeFilter `evaluation_runs` partition bound; omitted, it cold-scans every partition.
  */
 export function buildJoinClause({
   table,
   requiredColumns,
   spanTimeFilter,
+  spanRowFilter,
   evalTimeFilter,
 }: {
   table: CHTable;
   requiredColumns?: ReadonlySet<string>;
   spanTimeFilter?: string;
+  spanRowFilter?: string;
   evalTimeFilter?: string;
 }): string {
   const alias = tableAliases[table];
@@ -491,7 +496,8 @@ export function buildJoinClause({
         ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
         : SPAN_ANALYTICS_COLUMNS;
       const timeBound = spanTimeFilter ? ` ${spanTimeFilter}` : "";
-      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE ${tenantSet()}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      const rowFilter = spanRowFilter ? ` ${spanRowFilter}` : "";
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE ${tenantSet()}${timeBound}${rowFilter}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     case "evaluation_runs": {
       const columns = requiredColumns

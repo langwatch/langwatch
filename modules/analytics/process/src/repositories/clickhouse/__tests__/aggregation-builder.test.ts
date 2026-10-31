@@ -1841,6 +1841,45 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY");
     });
 
+    describe.each([
+      ["the feedbacks query", () => buildFeedbacksQuery({ startDate, endDate })],
+      [
+        "the feedbacks page query",
+        () => buildFeedbacksPageQuery({ startDate, endDate, limit: 25 }),
+      ],
+    ])("when %s is built", (_label, build) => {
+      /** @scenario The feedbacks stored_spans source keeps only spans carrying the vote event */
+      it("pushes the event-name predicate into the stored_spans subquery", () => {
+        const { sql } = build();
+
+        // Located rather than merely matched. The predicate is only worth
+        // anything inside the subquery, where it reaches PREWHERE ahead of the
+        // heavy Events.Attributes map; asserting the fragment alone would pass on
+        // a query that had it in the outer WHERE, which is where it already was.
+        const subqueryStart = sql.indexOf("FROM stored_spans WHERE");
+        const subqueryEnd = sql.indexOf(") ss ON", subqueryStart);
+        const predicate = sql.indexOf(`has("Events.Name", 'thumbs_up_down')`);
+        expect(subqueryStart).toBeGreaterThan(-1);
+        expect(subqueryEnd).toBeGreaterThan(subqueryStart);
+        expect(predicate).toBeGreaterThan(subqueryStart);
+        expect(predicate).toBeLessThan(subqueryEnd);
+      });
+
+      /** @scenario The feedbacks stored_spans source keeps only spans carrying the vote event */
+      it("names the same event in the subquery predicate and the outer filter", () => {
+        const { sql } = build();
+
+        // The subquery predicate only preserves the result while it names the
+        // event the outer filter keeps. If someone changes one literal, this
+        // fails rather than silently dropping every feedback row.
+        const pushed = /has\("Events\.Name", ('[^']+')\)/.exec(sql);
+        const outer = /event_name = ('[^']+')/.exec(sql);
+        expect(pushed?.[1]).toBeDefined();
+        expect(outer?.[1]).toBeDefined();
+        expect(pushed?.[1]).toBe(outer?.[1]);
+      });
+    });
+
     it("includes filters when provided with parameterized values", () => {
       const filters = {
         "metadata.user_id": ["user-1"],
