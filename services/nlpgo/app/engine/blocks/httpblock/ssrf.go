@@ -16,9 +16,10 @@ import (
 
 // SSRFOptions tunes the destination policy for the HTTP block.
 type SSRFOptions struct {
-	// AllowedHosts is the comma-separated allow-list (host:port pairs
-	// or bare hosts) that bypasses the private/loopback ban. Mirrors
-	// ALLOWED_PROXY_HOSTS on the Python side.
+	// AllowedHosts are exact hostnames or IP literals that bypass the
+	// private/loopback ban (ALLOWED_PROXY_HOSTS). Matched as packages/egress
+	// matches them: trimmed, case-insensitive, one trailing dot ignored. An
+	// entry carrying a port never matches.
 	AllowedHosts []string
 	// StrictPublicOnly refuses every address that is not globally
 	// routable — CGNAT (100.64.0.0/10), reserved (240.0.0.0/4),
@@ -100,7 +101,10 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	if err != nil {
 		return ErrSSRFBlocked
 	}
-	host := strings.ToLower(u.Hostname())
+	// Policy reads the normalised host; DNS gets the name as written, so a
+	// trailing dot keeps the resolver's search list out of it.
+	written := strings.ToLower(u.Hostname())
+	host := normaliseHost(written)
 	if host == "" {
 		return ErrSSRFBlocked
 	}
@@ -110,7 +114,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	}
 	if allow {
 		// A name that does not resolve is left to fail at dial time, as below.
-		if ips, err := addrsOf(host, opts); err == nil && anyMetadata(ips, opts, host) {
+		if ips, err := addrsOf(host, written, opts); err == nil && anyMetadata(ips, opts, host) {
 			return ErrSSRFBlocked
 		}
 		return nil
@@ -121,7 +125,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 		}
 		return nil
 	}
-	ips, err := resolveHost(host, opts)
+	ips, err := resolveHost(written, opts)
 	if err != nil {
 		// DNS failed — let the actual request fail with a network
 		// error so the customer sees a real upstream message instead
@@ -152,13 +156,14 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 		if err != nil {
 			return nil, err
 		}
-		host = strings.ToLower(host)
+		written := strings.ToLower(host)
+		host = normaliseHost(written)
 		allow, deny := hostPolicy(host, opts)
 		if deny {
 			return nil, ErrSSRFBlocked
 		}
 		if allow {
-			ips, err := addrsOf(host, opts)
+			ips, err := addrsOf(host, written, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -167,7 +172,7 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 			}
 			return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
 		}
-		ips, err := addrsOf(host, opts)
+		ips, err := addrsOf(host, written, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -213,12 +218,13 @@ func (c checkedAddrs) dial(ctx context.Context, base *net.Dialer, network string
 	return nil, lastErr
 }
 
-// addrsOf is the literal address, or what the name resolves to.
-func addrsOf(host string, opts SSRFOptions) ([]net.IP, error) {
-	if ip := net.ParseIP(host); ip != nil {
+// addrsOf is the judged host as a literal address, or what the name resolves
+// to when looked up as written.
+func addrsOf(judged, written string, opts SSRFOptions) ([]net.IP, error) {
+	if ip := net.ParseIP(judged); ip != nil {
 		return []net.IP{ip}, nil
 	}
-	return resolveHost(host, opts)
+	return resolveHost(written, opts)
 }
 
 // anyMetadata reports whether an allow-listed host reaches cloud metadata,
@@ -247,18 +253,26 @@ func anyMetadata(ips []net.IP, opts SSRFOptions, host string) bool {
 // ErrSSRFBlocked is returned when SSRF policy rejects a destination.
 var ErrSSRFBlocked = errors.New("ssrf_blocked")
 
+// normaliseHost is the host as judged: trimmed, lowercased, and without the
+// one trailing dot a fully-qualified name may carry.
+func normaliseHost(host string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+}
+
 // hostPolicy classifies a hostname against the static deny/allow
 // lists. Returns (allow, deny) — both false means "needs IP-level
 // check". Pulled out so CheckURL and SafeDialer apply the same rules.
 func hostPolicy(host string, opts SSRFOptions) (allow, deny bool) {
-	if host == "" {
+	// A name still ending in a dot once one is dropped (`metadata..`) is never
+	// a real host, and would slip past the exact-name lists below.
+	if host == "" || strings.HasSuffix(host, ".") {
 		return false, true
 	}
 	if _, ok := metadataHosts[host]; ok {
 		return false, true
 	}
 	for _, allowed := range opts.AllowedHosts {
-		if strings.EqualFold(host, allowed) {
+		if host == normaliseHost(allowed) {
 			return true, false
 		}
 	}

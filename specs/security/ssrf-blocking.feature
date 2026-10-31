@@ -142,6 +142,36 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
         | TS     |
         | Go     |
 
+    @unit @regression
+    Scenario: The HTTP block matches an allowlist entry whatever its case, spaces or trailing dot
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS names " Agent.Corp.Local. "
+      When the NLP service's HTTP block connects to "agent.corp.local" or "AGENT.corp.local."
+      Then the validation passes
+
+    @unit @regression
+    Scenario: The HTTP block matches no hostname for an allowlist entry carrying a port
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS names "agent.corp.local:8080"
+      And "agent.corp.local" resolves to a private address
+      When the NLP service's HTTP block validates "http://agent.corp.local:8080/"
+      Then the validation fails with an SSRF block error
+
+    @unit @regression
+    Scenario: The HTTP block matches no hostname for a blank or lone-dot allowlist entry
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS names "." and "  "
+      And "agent.corp.local" resolves to a private address
+      When the NLP service's HTTP block validates "http://agent.corp.local/" or "http://./"
+      Then the validation fails with an SSRF block error
+
+    @unit @regression
+    Scenario: The HTTP block resolves a fully-qualified name as written
+      Given ALLOWED_PROXY_HOSTS names "api.example.com"
+      When the NLP service's HTTP block connects to "api.example.com."
+      Then the name looked up is "api.example.com." with its trailing dot
+      And the resolver's search list cannot turn it into another name
+
   # ============================================================================
   # On-premise hosts — blocked by default, allowlistable per host
   # ============================================================================
@@ -215,6 +245,19 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
         | impl   |
         | TS     |
         | Go     |
+
+    @unit @regression
+    Scenario: The HTTP block judges a metadata hostname with a trailing dot as the same name
+      Given BLOCK_LOCAL_HTTP_CALLS is "false"
+      When the NLP service's HTTP block validates "http://metadata.google.internal./computeMetadata/v1/"
+      Then the validation fails with an SSRF block error, whatever the name resolves to
+
+    @unit @regression
+    Scenario: The HTTP block refuses a hostname that still ends in a dot without a lookup
+      Given BLOCK_LOCAL_HTTP_CALLS is "false"
+      When the NLP service's HTTP block validates "http://metadata../"
+      Then the validation fails with an SSRF block error
+      And no DNS lookup was attempted for it
 
   Rule: The metadata refusal reads the address, not the spelling of the host
     A hostname match is not a metadata check: a name an attacker controls can
