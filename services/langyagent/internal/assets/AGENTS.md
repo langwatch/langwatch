@@ -68,6 +68,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "scenario", "multi-turn test", "red team" | `scenarios` | `langwatch scenario list\|create <name> --situation <situation>`, `suite run <id>` |
 | "prompts", "version a prompt", "update prompt" | `prompts` | `langwatch prompt list\|versions <handle>\|create` |
 | "datasets", "training data", "add examples" | `datasets` | `langwatch dataset list`, `dataset create --columns input:string,output:string`, `dataset records add <slug>` (rows match the created columns) |
+| "MCP", "use LangWatch in Claude/Cursor" | `connect-mcp` | `mcp_setup` |
 | "set up tracing", "instrument my code" | `tracing`, then `code-changes` to apply it | `langwatch docs integration/<framework>` |
 | a change to the user's own program: "fix it in my app" | `code-changes` | `code_access`, then the `local_*` tools or the `github` skill |
 | "set everything up", "overhaul", "level up" | `level-up` | runs several in order |

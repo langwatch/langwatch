@@ -63172,6 +63172,19 @@ Langy writes the test or evaluator with `langwatch scenario create`, `langwatch 
 
 Langy reads the trace, writes a failing Scenario test that captures the problem, drafts a fix, and opens a [bot-authored pull request](/langy/pull-requests). A human reviews and merges; Langy never merges.
 
+### Connect LangWatch to your AI client
+
+- "Help me connect the LangWatch MCP."
+- "How do I use LangWatch from Claude Code?"
+- "Set up the LangWatch MCP in Cursor with an API key."
+
+Langy answers with a setup card: pick your client, copy this LangWatch's own MCP address, and follow the steps for signing in with OAuth (recommended) or with an API key. The **Ask Langy** button on **Settings → Integrations** opens the same card. See the [LangWatch MCP guide](/integration/mcp) for every client.
+
+<Frame caption="The MCP setup card: the client picker, the address to paste, and the steps for the sign-in method you choose.">
+  <img src="/images/langy/mcp/mcp-setup-card-light.png" alt="Langy's MCP setup card with a client picker, the MCP server address and OAuth steps" className="block dark:hidden" />
+  <img src="/images/langy/mcp/mcp-setup-card-dark.png" alt="Langy's MCP setup card with a client picker, the MCP server address and OAuth steps" className="hidden dark:block" />
+</Frame>
+
 ## What happens when you ask
 
 <Steps>
