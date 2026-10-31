@@ -23,6 +23,7 @@ import {
   parameterSuggestions,
   valueSuggestions,
 } from "../../../../sections/agent-testing/run-parameters/parameter-suggestions.ts";
+import { undeclaredNamesOnLine } from "../../../../sections/agent-testing/run-parameters/undeclared-parameters.ts";
 
 const MODEL: DeclaredParameter = {
   name: "model",
@@ -100,6 +101,27 @@ describe("unionParameterDefinitions", () => {
       });
 
       expect(declared.map((definition) => definition.name)).toEqual(["model"]);
+    });
+  });
+
+  describe("when a scenario declares a parameter inline in its situation", () => {
+    /** @scenario "The run dialog lists an inline-declared parameter with its default" */
+    it("lists it as declared by the scenario, with its default", () => {
+      const declared = unionParameterDefinitions({
+        scenarioIds: ["case_1"],
+        scenarios: [
+          { id: "case_1", parameters: null, situation: "The customer is { tone: frustrated }" },
+        ],
+      });
+
+      expect(declared).toEqual([
+        expect.objectContaining({
+          name: "tone",
+          defaultValue: "frustrated",
+          source: "scenario",
+        }),
+      ]);
+      expect(undeclaredNamesOnLine({ line: "tone=calm", definitions: declared })).toEqual([]);
     });
   });
 });

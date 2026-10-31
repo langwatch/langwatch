@@ -38420,6 +38420,23 @@ A scenario can declare up to 20 parameters.
 
 The API accepts the same declarations: `POST /api/v1/scenarios` and `PATCH /api/v1/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects.
 
+### Declare a parameter in the situation
+
+You can also declare a parameter where you use it. In the situation, write `{ NAME: default value }` with single braces:
+
+```text title="Situation"
+A customer on the { plan: free } plan in { region: eu-central } asks to cancel their subscription.
+```
+
+This declares `plan` with the default `free` and `region` with the default `eu-central`. The run replaces each declaration with the value it used: with no values set, the simulated user reads "A customer on the free plan in eu-central asks to cancel their subscription". A run that sets `plan=enterprise` reads "the enterprise plan" instead. The run dialog lists these parameters with their defaults, and the criteria can read them as `{{ params.plan }}`.
+
+- The value is text, up to the closing `}` on the same line. Spaces around it are trimmed.
+- Write the declaration once and use `{{ params.NAME }}` elsewhere, or repeat it: every place shows the one value of the run, and the first default wins.
+- A parameter declared in the **Parameters** dialog with the same name keeps that declaration and its default.
+- Other braces stay as text: `{}`, `{ no colon }` and JSON such as `{"order_id": "123"}` are not declarations.
+- Do not put the declaration inside `{{ }}`. `{{ plan: free }}` is not a valid template.
+- A situation written before this feature that has text like `{ word: something }` now declares a parameter `word`. Quote it or reword it if you meant it as text.
+
 ## Parameters declared by the agent
 
 A [connected agent](/agent-testing/connect-your-agent) declares its parameters in the code, from the function that runs it. The platform reads them when the agent connects, so the declaration is the code and no second copy needs to be kept in step by hand.
