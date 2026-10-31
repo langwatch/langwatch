@@ -181,7 +181,7 @@ catalog:
   sharp: ^0.35.5
   shiki: ^4.3.0
   slugify: ^1.6.9
-  stripe: ^15.12.0
+  stripe: ^23.0.0
   ts-pattern: ^5.9.0
   tsrs: 0.18.0-ts7.1.0-dev.20260929
   tsup: ^8.5.0
