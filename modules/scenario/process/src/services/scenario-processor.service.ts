@@ -29,6 +29,37 @@ import type {
 const logger = createLogger("langwatch:scenarios:processor");
 
 export class ScenarioProcessorService implements ScenarioExecutionRunner {
+  /**
+   * Run one best-effort recorder: a throwing recorder is logged at `level` with the run and
+   * project ids and swallowed, so a side-channel write can never fail a finished job (#8029).
+   */
+  static async recordBestEffort({
+    what,
+    jobData,
+    record,
+    jobLogger = logger,
+    level = "warn",
+  }: {
+    what: string;
+    jobData: Pick<ExecutionJobData, "projectId" | "scenarioRunId">;
+    record: () => Promise<unknown>;
+    jobLogger?: Logger;
+    level?: "warn" | "error";
+  }): Promise<void> {
+    try {
+      await record();
+    } catch (err) {
+      jobLogger[level](
+        {
+          err,
+          scenarioRunId: jobData.scenarioRunId,
+          projectId: jobData.projectId,
+        },
+        `Could not record ${what}`,
+      );
+    }
+  }
+
   static create(options: {
     execution: ScenarioExecutionService;
     pool: ScenarioExecutionPoolService;
@@ -394,28 +425,24 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     jobLogger?: Logger;
   }): Promise<void> {
     const { projectId, scenarioRunId } = input.jobData;
-    if (!hasHookResults(input.result.hooks)) return;
-    try {
-      await this.options.execution.recordHooks({
-        projectId,
-        scenarioRunId,
-        hooks: capRunHooks(input.result.hooks),
-      });
-    } catch (error) {
-      const runLogger = input.jobLogger ?? logger;
-      // The run already finished without a verdict, but no reader can tell why without this record.
-      if (isRunNotScored(input.result.hooks)) {
-        runLogger.error(
-          { err: error, scenarioRunId },
-          "Could not record a failed setup: the unscored run reads as an ERROR",
-        );
-        return;
-      }
-      runLogger.warn(
-        { err: error, scenarioRunId },
-        "Could not record the run's setup and teardown results",
-      );
-    }
+    const { hooks } = input.result;
+    if (!hasHookResults(hooks)) return;
+    // An unscored run already finished without a verdict; no reader can tell why without this.
+    const notScored = isRunNotScored(hooks);
+    await ScenarioProcessorService.recordBestEffort({
+      what: notScored
+        ? "a failed setup: the unscored run reads as an ERROR"
+        : "the run's setup and teardown results",
+      jobData: input.jobData,
+      jobLogger: input.jobLogger ?? logger,
+      level: notScored ? "error" : "warn",
+      record: () =>
+        this.options.execution.recordHooks({
+          projectId,
+          scenarioRunId,
+          hooks: capRunHooks(hooks),
+        }),
+    });
   }
 
   /**
@@ -432,29 +459,26 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     const jobLogger = input.jobLogger ?? logger;
     const agentInstance = input.result.agentInstance;
     if (agentInstance) {
-      try {
-        await this.options.execution.recordAgentInstance({
-          projectId,
-          scenarioRunId,
-          agentInstance,
-        });
-      } catch (error) {
-        jobLogger.warn(
-          { err: error, scenarioRunId },
-          "Could not record the agent instance that served the run",
-        );
-      }
+      await ScenarioProcessorService.recordBestEffort({
+        what: "the agent instance that served the run",
+        jobData: input.jobData,
+        jobLogger,
+        record: () =>
+          this.options.execution.recordAgentInstance({
+            projectId,
+            scenarioRunId,
+            agentInstance,
+          }),
+      });
     }
 
     if (input.result.isCutAtLimit) {
-      try {
-        await this.options.execution.recordCutAtLimit({ projectId, scenarioRunId });
-      } catch (error) {
-        jobLogger.warn(
-          { err: error, scenarioRunId },
-          "Could not record that the run was cut at the call limit",
-        );
-      }
+      await ScenarioProcessorService.recordBestEffort({
+        what: "that the run was cut at the call limit",
+        jobData: input.jobData,
+        jobLogger,
+        record: () => this.options.execution.recordCutAtLimit({ projectId, scenarioRunId }),
+      });
     }
   }
 
