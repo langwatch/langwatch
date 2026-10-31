@@ -156,7 +156,7 @@ const SLUG_MAX_RANDOM_SEGMENTS = 1;
 const SLUG_MIN_WORDS = 2;
 
 /**
- * Whether a body is a model-id-like name (`NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4`), not key
+ * Whether a body is a model-id-like name (`NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4`), not key
  * material: four or more short parts, two of them ordinary words, at most one mixing lower, upper
  * and digit (`Qwen3` passes, `x7Kq2-Lm9Tv` does not).
  */

@@ -49,25 +49,25 @@ const FLASH: DoublewordModel = {
 };
 
 const VISION_NO_CACHE: DoublewordModel = {
-  model_name: "tencent/Hy3-FP8",
-  display_name: "Hy3",
+  model_name: "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
+  display_name: "Qwen3 VL 235B",
   model_type: "CHAT",
   capabilities: ["reasoning", "vision"],
   cache_pricing: { enabled: false, read_multiplier: "0.1" },
   tariffs: [
     {
       name: "Realtime",
-      input_price_per_token: "0.00000014",
-      output_price_per_token: "0.00000058",
+      input_price_per_token: "0.00000021",
+      output_price_per_token: "0.0000019",
       api_key_purpose: "realtime",
       is_active: true,
     },
   ],
-  metadata: { context_window: 196608 },
+  metadata: { context_window: 262144 },
 };
 
 const BATCH_ONLY: DoublewordModel = {
-  model_name: "Qwen/Qwen3.5-4B",
+  model_name: "lightonai/LightOnOCR-2-1B-bbox-soup",
   model_type: "CHAT",
   capabilities: ["vision"],
   tariffs: [
@@ -188,7 +188,7 @@ describe("mapDoublewordModels", () => {
   it("skips excluded ids so overlay corrections win", () => {
     const entries = mapDoublewordModels({
       models: [FLASH, VISION_NO_CACHE, BATCH_ONLY],
-      excludeIds: new Set(["doubleword/tencent/Hy3-FP8"]),
+      excludeIds: new Set(["doubleword/Qwen/Qwen3-VL-235B-A22B-Instruct-FP8"]),
       now: NOW,
     });
     expect(entries.map((e) => e.id)).toEqual(["doubleword/deepseek-ai/DeepSeek-V4.1-Flash"]);
@@ -201,7 +201,7 @@ const UNPRICED_REALTIME: DoublewordModel = {
     {
       name: "Realtime",
       input_price_per_token: null,
-      output_price_per_token: "0.00000058",
+      output_price_per_token: "0.0000019",
       api_key_purpose: "realtime",
       is_active: true,
     },
@@ -253,18 +253,18 @@ describe("resolveDoublewordEntries", () => {
 
   describe("when a listed model's realtime tariff has no price", () => {
     it("keeps that model's entry already in the catalog", () => {
-      const previousHy3 = mapDoublewordModel({ model: VISION_NO_CACHE, now: NOW })!;
+      const previousVision = mapDoublewordModel({ model: VISION_NO_CACHE, now: NOW })!;
       const entries = resolveDoublewordEntries({
         fetched: [FLASH, UNPRICED_REALTIME],
-        previousModels: { ...previousModels, [previousHy3.id]: previousHy3 },
+        previousModels: { ...previousModels, [previousVision.id]: previousVision },
         excludeIds: new Set(),
         now: NOW,
       });
       expect(entries.map((e) => e.id)).toEqual([
         "doubleword/deepseek-ai/DeepSeek-V4.1-Flash",
-        "doubleword/tencent/Hy3-FP8",
+        "doubleword/Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
       ]);
-      expect(entries[1]!.pricing.inputCostPerToken).toBe(0.00000014);
+      expect(entries[1]!.pricing.inputCostPerToken).toBe(0.00000021);
     });
   });
 
