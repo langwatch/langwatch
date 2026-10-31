@@ -1,0 +1,63 @@
+{
+  "release": "4.0.0",
+  "previous": "3.21.0",
+  "cutAt": "2026-10-31T21:23:46+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261022120000_user_password_reset_required",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "user",
+      "description": "Postgres schema: user password reset required"
+    },
+    {
+      "id": "prisma:20261022120001_nurturing_organization_coding_signals",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization coding signals"
+    },
+    {
+      "id": "prisma:20261022120001_self_hosted_notices",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "licensing",
+      "description": "Postgres schema: self hosted notices"
+    },
+    {
+      "id": "prisma:20261022130000_project_legacy_api_key_last_used",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "project",
+      "description": "Postgres schema: project legacy api key last used"
+    },
+    {
+      "id": "prisma:20261025120000_monitor_auto_pause",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "monitor",
+      "description": "Postgres schema: monitor auto pause"
+    },
+    {
+      "id": "prisma:20261027120000_dashboards_v2_excluded_origins",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboards v2 excluded origins"
+    },
+    {
+      "id": "prisma:20261027120001_api_key_docs_session_browser_session",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: api key docs session browser session"
+    },
+    {
+      "id": "clickhouse:00123",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "coding-agent",
+      "description": "ClickHouse schema: coding agent session events ai units"
+    }
+  ]
+}
