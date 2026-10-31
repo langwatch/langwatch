@@ -838,11 +838,14 @@ function logInvalid({
   );
 }
 
-/** An evaluator that ran out of time is retried exactly once. */
+/**
+ * Retries a timed-out evaluator once. `details` is typed required but can be
+ * missing at runtime; a missing value counts as "not a timeout" (langwatch#8507).
+ */
 function timedOut(result: SingleEvaluationResult): boolean {
   if (result.status !== "error") return false;
 
-  return result.details.toLowerCase().includes("timed out");
+  return result.details?.toLowerCase().includes("timed out") ?? false;
 }
 
 /** The evaluate doors publish a thrown string as the detail. */
