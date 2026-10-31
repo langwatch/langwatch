@@ -38,7 +38,12 @@ import {
 } from "./cli-api";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import { isIsolatedConfig, type GovernanceConfig } from "./config";
-import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL, telemetryEnvVarNames } from "./otel-env-block";
+import {
+  buildOtelEnvBlock,
+  legacyTelemetryEnvVarNames,
+  SOURCE_TYPE_BY_TOOL,
+  telemetryEnvVarNames,
+} from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { runningCodeRestartNotice } from "./running-code";
 import {
@@ -82,6 +87,16 @@ export function otelWiringLooksLangwatchAuthored(env: Record<string, string>): b
   if (headers && LANGWATCH_BEARER_RE.test(headers)) return true;
   if (endpoint && LANGWATCH_OTLP_ENDPOINT_RE.test(endpoint)) return true;
   return false;
+}
+
+/**
+ * One-time migration (#8284): a block without OTEL_LOG_ASSISTANT_RESPONSES predates it, so its
+ * RAW_API_BODIES is the old default. Once migrated, a RAW_API_BODIES is the user's opt-in.
+ */
+function legacyKeysToStrip(tool: string, current: Record<string, string>): string[] {
+  if (tool !== "claude") return [];
+  if ("OTEL_LOG_ASSISTANT_RESPONSES" in current) return [];
+  return legacyTelemetryEnvVarNames(tool);
 }
 
 export interface IngestionKeyResolution {
@@ -241,6 +256,11 @@ export function refreshClaudeUserTelemetryEnv({
     // The env is the refresh that matters; the seam is best-effort.
     void 0;
   }
+  // installAppEnv only merges, so strip the pre-#8284 default here; see legacyKeysToStrip.
+  const legacyKeys = legacyKeysToStrip("claude", current);
+  if (legacyKeys.length > 0 && appEnvHasAnyVar(target, legacyKeys)) {
+    removeAppEnvVars(target, legacyKeys);
+  }
   if (appEnvHasAllVars(target, vars)) return null;
   installAppEnv(target, vars);
   return `claude telemetry env (${target.displayPath})`;
@@ -324,10 +344,20 @@ export function ensureClaudeProjectTelemetryPin({
 }): ClaudeProjectPinResult {
   const target = claudeProjectSettingsTarget(cwd);
   const base = { path: target.path, displayPath: target.displayPath };
-  if (appEnvHasAllVars(target, vars)) return { action: "unchanged", ...base };
   const current = appEnvValues(target);
   const hasOwnedKey = Object.keys(vars).some((k) => k in current);
-  if (hasOwnedKey && !otelWiringLooksLangwatchAuthored(current)) {
+  const isLangwatchAuthored = !hasOwnedKey || otelWiringLooksLangwatchAuthored(current);
+  // A file with no langwatch key is safe to write but was never our pin, so its
+  // RAW_API_BODIES is not the old default and must not be stripped.
+  const hasLangwatchBlock = hasOwnedKey && otelWiringLooksLangwatchAuthored(current);
+  const legacyKeys = legacyKeysToStrip("claude", current);
+  const shouldStrip =
+    hasLangwatchBlock && legacyKeys.length > 0 && appEnvHasAnyVar(target, legacyKeys);
+  const strippedLegacy = shouldStrip ? removeAppEnvVars(target, legacyKeys) : false;
+  if (appEnvHasAllVars(target, vars)) {
+    return { action: strippedLegacy ? "updated" : "unchanged", ...base };
+  }
+  if (hasOwnedKey && !isLangwatchAuthored) {
     return { action: "skipped", ...base };
   }
   const existedBefore = fs.existsSync(target.path);
@@ -343,7 +373,8 @@ export function ensureClaudeProjectTelemetryPin({
  */
 export function removeClaudeProjectTelemetryPin({ cwd }: { cwd: string }): boolean {
   const target = claudeProjectSettingsTarget(cwd);
-  const keys = telemetryEnvVarNames("claude");
+  // Legacy keys too, so cleanup clears a block a pre-#8284 CLI left.
+  const keys = [...telemetryEnvVarNames("claude"), ...legacyTelemetryEnvVarNames("claude")];
   if (!appEnvHasAnyVar(target, keys)) return false;
   const envValues = appEnvValues(target);
   if (!otelWiringLooksLangwatchAuthored(envValues)) return false;

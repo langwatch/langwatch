@@ -39,6 +39,19 @@ export function telemetryEnvVarNames(tool: string): string[] {
   return Object.keys(buildOtelEnvBlock(tool, "", ""));
 }
 
+/**
+ * Env var names langwatch used to write for `tool`. Install only merges, so a dropped
+ * key would linger in an existing block; refresh and logout strip these (#8284).
+ */
+export function legacyTelemetryEnvVarNames(tool: string): string[] {
+  switch (tool) {
+    case "claude":
+      return ["OTEL_LOG_RAW_API_BODIES"];
+    default:
+      return [];
+  }
+}
+
 export function buildOtelEnvBlock(
   tool: string,
   endpoint: string,
@@ -51,9 +64,8 @@ export function buildOtelEnvBlock(
 
   switch (tool) {
     case "claude":
-      // Four OTel knobs, all ON: TOOL_DETAILS/TOOL_CONTENT lift tool I/O
-      // onto tool events; RAW_API_BODIES is the only surface carrying
-      // response text (capped 60KB, extended-thinking always redacted);
+      // ASSISTANT_RESPONSES carries the reply text; RAW_API_BODIES is opt-in because it
+      // serialises the whole request and response on every call (#8284).
       // ENHANCED_TELEMETRY_BETA unlocks span-tracing into a reconstructable tree.
       return {
         CLAUDE_CODE_ENABLE_TELEMETRY: "1",
@@ -66,7 +78,7 @@ export function buildOtelEnvBlock(
         OTEL_LOG_USER_PROMPTS: "1",
         OTEL_LOG_TOOL_DETAILS: "1",
         OTEL_LOG_TOOL_CONTENT: "1",
-        OTEL_LOG_RAW_API_BODIES: "1",
+        OTEL_LOG_ASSISTANT_RESPONSES: "1",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=claude-code",
       };

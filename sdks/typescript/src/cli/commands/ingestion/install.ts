@@ -254,11 +254,13 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
         // sub-agent. Without it, every sub-agent collapses into one
         // synthesized per-turn trace; content still rides the log events.
         `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
-        // OTel content unlock knobs: log prompts, tool details, tool content, api bodies
+        // The light content knobs; RAW_API_BODIES is opt-in, see #8284.
         `export OTEL_LOG_USER_PROMPTS=1`,
         `export OTEL_LOG_TOOL_DETAILS=1`,
         `export OTEL_LOG_TOOL_CONTENT=1`,
-        `export OTEL_LOG_RAW_API_BODIES=1`,
+        `export OTEL_LOG_ASSISTANT_RESPONSES=1`,
+        // Pasted by hand, so an older raw-bodies line is not replaced; say so, not `unset`.
+        `# Upgrading? Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc unless you intentionally want the full request/response JSON.`,
         `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,

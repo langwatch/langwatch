@@ -41,13 +41,20 @@ describe("buildEnvSnippet", () => {
       expect(snippet).toContain("export OTEL_EXPORTER_OTLP_PROTOCOL=http/json");
     });
 
-    // All four OTEL_LOG_* knobs are load-bearing: dropping any regresses
-    // content visibility in /me/traces.
-    it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", () => {
+    // Each light knob carries a slice of the trace; raw bodies stay opt-in (#8284).
+    it("sets the four light claude OTEL_LOG_* content knobs, not raw bodies", () => {
       expect(snippet).toContain("export OTEL_LOG_USER_PROMPTS=1");
       expect(snippet).toContain("export OTEL_LOG_TOOL_DETAILS=1");
       expect(snippet).toContain("export OTEL_LOG_TOOL_CONTENT=1");
-      expect(snippet).toContain("export OTEL_LOG_RAW_API_BODIES=1");
+      expect(snippet).toContain("export OTEL_LOG_ASSISTANT_RESPONSES=1");
+      // The commented upgrade note may still name the flag.
+      expect(snippet).not.toContain("export OTEL_LOG_RAW_API_BODIES=1");
+    });
+
+    it("tells an upgrading user to drop the old raw-bodies line from their rc", () => {
+      expect(snippet).toContain(
+        "Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc",
+      );
     });
 
     it("interpolates the endpoint and token", () => {

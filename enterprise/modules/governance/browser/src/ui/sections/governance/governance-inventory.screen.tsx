@@ -4449,28 +4449,15 @@ export function buildEditSubmission({
 }
 
 /**
- * Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
- * plus the standard OTEL_*_EXPORTER env vars. We recommend
- * OTEL_TRACES_EXPORTER=otlp so spans claude-code instruments propagate to
- * LangWatch and logs/metrics emitted inside those spans get correlated; the
- * session.id resource attribute is then mapped to gen_ai.conversation.id by
- * the OpenInference extractor so the UI groups the session as one thread.
- * Pre-build the shell export block so admins paste once instead of stitching
- * seven lines off the docs page.
- *
- * Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
- * TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
- * metadata-only, tokens, cost, durations and tool sizes-in-bytes, and user
- * prompt text, assistant response text and tool I/O content are silently
- * absent. With them on, langwatch.input + langwatch.output lift verbatim from
- * claude's api_request + api_response_body events. Payload risk is bounded by
- * claude's 60KB inline cap plus the langwatch receiver content cap.
+ * The claude_code shell export block, pre-built so admins paste once. Claude Code needs
+ * the OTLP exporters plus the four light content knobs or the wire is metadata-only;
+ * RAW_API_BODIES stays opt-in because it serialises every request and response (#8284).
  */
-function buildClaudeCodeEnvBlock({
-  details,
+export function buildClaudeCodeEnvBlock({
+  secret,
   otlpUrl,
 }: {
-  details: SecretDetails;
+  secret: string;
   otlpUrl: string;
 }): string {
   return [
@@ -4482,9 +4469,10 @@ function buildClaudeCodeEnvBlock({
     `export OTEL_LOG_USER_PROMPTS=1`,
     `export OTEL_LOG_TOOL_DETAILS=1`,
     `export OTEL_LOG_TOOL_CONTENT=1`,
-    `export OTEL_LOG_RAW_API_BODIES=1`,
+    `export OTEL_LOG_ASSISTANT_RESPONSES=1`,
+    `# Upgrading? Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc unless you intentionally want the full request/response JSON.`,
     `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
-    `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
+    `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${secret}"`,
   ].join("\n");
 }
 
@@ -4791,7 +4779,7 @@ export function SecretModal({
     secretModalTargets(details);
 
   const claudeCodeEnvBlock =
-    isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : "";
+    isClaudeCode && details ? buildClaudeCodeEnvBlock({ secret: details.secret, otlpUrl }) : "";
 
   const testCurl = details
     ? buildTestCurl({

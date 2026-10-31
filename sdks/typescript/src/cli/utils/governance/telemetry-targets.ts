@@ -47,7 +47,7 @@ import {
   opencodePluginTarget,
   removeOpencodeSessionContextPlugin,
 } from "./opencode-plugin";
-import { telemetryEnvVarNames } from "./otel-env-block";
+import { legacyTelemetryEnvVarNames, telemetryEnvVarNames } from "./otel-env-block";
 import {
   hasSessionContextHooks,
   removeSessionContextHooks,
@@ -108,7 +108,8 @@ export function scanTelemetryTargets({
   // the current VALUES to look langwatch-shaped, not just the key names.
   const claudeTarget = appSettingsTargetFor("claude");
   if (claudeTarget) {
-    const keys = telemetryEnvVarNames("claude");
+    // Legacy keys too, so logout clears a block a pre-#8284 CLI left.
+    const keys = [...telemetryEnvVarNames("claude"), ...legacyTelemetryEnvVarNames("claude")];
     const isClaudeEnvLangwatchOwned = () =>
       otelWiringLooksLangwatchAuthored(appEnvValues(claudeTarget));
     targets.push({
