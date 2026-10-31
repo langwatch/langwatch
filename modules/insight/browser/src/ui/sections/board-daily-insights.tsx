@@ -1,7 +1,7 @@
 /**
  * "Daily insights" in a board's header, lent through analytics' board-header extension point
  * (§10.1). A personal setting: none yet (a quiet switch and the offer), off (the quiet switch),
- * or on (one dropdown). A run the system turned off keeps the dropdown, which says why.
+ * or on (one dropdown, with Run now). A run turned off by the system keeps it, and says why.
  */
 
 import type { BoardHeaderActionProps } from "@langwatch/analytics-client";
@@ -10,7 +10,7 @@ import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-sys
 import { Switch } from "@langwatch/design-system/switch";
 import type { InsightDailyRunSetting, InsightRunSettings } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
-import { ChevronDown, Inbox, Settings2 } from "lucide-react";
+import { ChevronDown, Inbox, MessageCircle, Play, Settings2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useBoardDailyInsights } from "../../behavior/use-board-daily-insights.ts";
@@ -68,10 +68,17 @@ function DailyInsightsControl({
           isEmpty={widgetCount === 0}
           settings={settings}
           lastRun={setting.lastRun}
+          runInFlight={setting.runInFlight}
           turnedOff={isOn ? undefined : turnedOff}
           insightsHref={daily.insightsHref}
+          runNow={
+            isOn && daily.mayRunNow
+              ? { isStarting: daily.isStartingRun, onRun: daily.runNow }
+              : undefined
+          }
           onToggle={isOn ? daily.turnOff : () => daily.turnOn(settings)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenInLangy={daily.openInLangy}
         />
       ) : (
         <Switch
@@ -122,22 +129,29 @@ function DailyInsightsDropdown({
   isEmpty,
   settings,
   lastRun,
+  runInFlight,
   turnedOff,
   insightsHref,
+  runNow,
   onToggle,
   onOpenSettings,
+  onOpenInLangy,
 }: {
   boardId: string;
   /** The board lost its last widget: the run stays on and waits for one. */
   isEmpty: boolean;
   settings: InsightRunSettings;
   lastRun: InsightDailyRunSetting["lastRun"];
+  runInFlight: InsightDailyRunSetting["runInFlight"];
   /** Why the system turned the run off; undefined while it is on. */
   turnedOff: string | undefined;
   insightsHref: string | undefined;
+  /** Undefined where the person may not run the board now. */
+  runNow: { isStarting: boolean; onRun: () => void } | undefined;
   /** Turns the run off while it is on, and on again with what was last chosen while it is off. */
   onToggle: () => void;
   onOpenSettings: () => void;
+  onOpenInLangy: (conversationId: string) => void;
 }) {
   const host = useInsightHost();
   const { inbox } = useInsightInbox();
@@ -209,6 +223,16 @@ function DailyInsightsDropdown({
           <Text textStyle="caption" color="fg.muted">
             {lastRunWords({ lastRun, now, timezone: settings.timezone })}
           </Text>
+          {runInFlight !== null && (
+            <Text textStyle="caption" color="fg.muted">
+              A run is going.
+            </Text>
+          )}
+          {runInFlight === null && runNow?.isStarting === true && (
+            <Text textStyle="caption" color="fg.muted">
+              Starting a run.
+            </Text>
+          )}
         </VStack>
         <VStack align="stretch" gap={0} borderTopWidth="1px" borderColor="border" padding={1.5}>
           {insightsHref !== undefined && (
@@ -217,6 +241,19 @@ function DailyInsightsDropdown({
               onClick={() => leave(() => host.navigate(insightsHref))}
             >
               Open Insights
+            </MenuRow>
+          )}
+          {runInFlight !== null && (
+            <MenuRow
+              icon={<MessageCircle size={13} aria-hidden />}
+              onClick={() => leave(() => onOpenInLangy(runInFlight.conversationId))}
+            >
+              Open in Langy
+            </MenuRow>
+          )}
+          {runInFlight === null && runNow !== undefined && !runNow.isStarting && (
+            <MenuRow icon={<Play size={13} aria-hidden />} onClick={() => leave(runNow.onRun)}>
+              Run now
             </MenuRow>
           )}
           {isOn && (

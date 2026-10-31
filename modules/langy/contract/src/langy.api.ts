@@ -192,6 +192,8 @@ export type LangyStartUnattendedTurnInput = Readonly<{
   idempotencyKey: string;
   text: string;
   title: string;
+  /** True: not counted against `langyUnattendedTurnsPerMinute`. Omitted, the turn is counted. */
+  isExemptFromRateLimit?: boolean;
 }>;
 
 /** One turn a caller holds for; `signal` is the caller's deadline and disconnect. */

@@ -101,6 +101,16 @@ export type InsightRunReason = z.infer<typeof insightRunReasonSchema>;
 /** A schedule whose runs ended `skipped` on this many scheduled days in a row turns itself off. */
 export const INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF = 7;
 
+/** A model call that fails for good is not worth a fourth try. */
+export const INSIGHT_DAILY_RUN_MAX_ATTEMPTS = 3;
+
+/** Longer than a run may wait for Langy, so a slow run is never handed to a second pod. */
+export const INSIGHT_DAILY_RUN_LEASE_MS = 20 * 60_000;
+
+/** A run that recorded no outcome within every attempt's lease is lost, and blocks no more. */
+export const INSIGHT_DAILY_RUN_EXPIRY_MS =
+  INSIGHT_DAILY_RUN_LEASE_MS * INSIGHT_DAILY_RUN_MAX_ATTEMPTS;
+
 /**
  * Why the system turned a schedule off. `board_deleted`: a run found its board gone.
  * `skipped_days`: its runs were skipped too many days in a row. `member_removed` and
@@ -126,6 +136,9 @@ const insightLastRunSchema = z.object({
   renewedCount: z.number().int().nonnegative(),
   conversationId: z.string().nullable(),
 });
+
+/** The last run as its own person reads it, by id: Run now waits for the run its request named. */
+const insightOwnLastRunSchema = z.object({ ...insightLastRunSchema.shape, runId: z.string() });
 
 /** One person's run on one board, as they read it: the board and how the last run ended. */
 const insightDailyRunSchemaDefinition = z.object({
@@ -185,9 +198,16 @@ const insightDailyRunSettingSchemaDefinition = z.object({
   state: insightScheduleStateSchema,
   settings: insightRunSettingsSchema.nullable(),
   /** Null until a run settled. */
-  lastRun: insightLastRunSchema.nullable(),
+  lastRun: insightOwnLastRunSchema.nullable(),
   /** Why the system turned it off; null while it is on, and when the person turned it off. */
   offReason: insightScheduleOffReasonSchema.nullable(),
+  /**
+   * The run that started and has not settled, by id and Langy conversation. Null when none has,
+   * or it started longer ago than a run may take. `startedAt` is epoch milliseconds.
+   */
+  runInFlight: z
+    .object({ runId: z.string(), conversationId: z.string(), startedAt: z.number() })
+    .nullable(),
 });
 export interface InsightDailyRunSettingSchema extends Named<
   typeof insightDailyRunSettingSchemaDefinition
@@ -271,6 +291,32 @@ export interface RequestInsightDailyRunInputSchema extends Named<
 export const requestInsightDailyRunInputSchema: RequestInsightDailyRunInputSchema =
   requestInsightDailyRunInputSchemaDefinition;
 export type RequestInsightDailyRunInput = z.input<typeof requestInsightDailyRunInputSchema>;
+
+/** Run now: the caller asks for one run of their own on a board, the run a schedule asks for. */
+const runInsightDailyRunNowInputSchemaDefinition = requestInsightDailyRunInputSchemaDefinition.omit(
+  { userId: true },
+);
+export interface RunInsightDailyRunNowInputSchema extends Named<
+  typeof runInsightDailyRunNowInputSchemaDefinition
+> {}
+export const runInsightDailyRunNowInputSchema: RunInsightDailyRunNowInputSchema =
+  runInsightDailyRunNowInputSchemaDefinition;
+
+/**
+ * The id of the run to follow: the request's, which the run it starts carries as its `runId`,
+ * or the run already in flight on the board, when Run now requested nothing. `requestedAt` is
+ * epoch milliseconds on the clock that stamps a run's start, to follow a run that held it.
+ */
+const insightDailyRunRequestedSchemaDefinition = z.object({
+  requestId: z.string(),
+  requestedAt: z.number(),
+});
+export interface InsightDailyRunRequestedSchema extends Named<
+  typeof insightDailyRunRequestedSchemaDefinition
+> {}
+export const insightDailyRunRequestedSchema: InsightDailyRunRequestedSchema =
+  insightDailyRunRequestedSchemaDefinition;
+export type InsightDailyRunRequested = z.infer<typeof insightDailyRunRequestedSchema>;
 
 /** The fence tag of the block an answer ended with before the card; read for one release. */
 export const INSIGHT_RUN_FINDINGS_FENCE_TAG = "langwatch-insights";

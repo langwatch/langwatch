@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Each person's own insights in a project. Every operation refuses with `insights_not_enabled` while `release_insights` is off for the project, and an insight another person owns answers `insight_not_found`, exactly as an id no insight has.
 
-Peers call these through the token, declared at `../contract/src/insight.api.ts:22`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/insight.api.ts:23`; nothing else in this package is public.
 
 #### `findInsights`
 
@@ -62,6 +62,14 @@ Asks for one daily insights run now, for a person on a board. The answer names t
 
 ```typescript
 requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }>;
+```
+
+#### `runDailyRunNow`
+
+The reader's own Run now: the same request, refused with `validation_error` unless their daily run on the board is on.
+
+```typescript
+runDailyRunNow(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested>;
 ```
 
 #### `findDailyRuns`
@@ -112,18 +120,19 @@ None: this module declares no REST family.
 
 ### `insights`
 
-Contract `../contract/src/insight.trpc.ts:28`, router `src/transport/insight.trpc.ts:10`.
+Contract `../contract/src/insight.trpc.ts:30`, router `src/transport/insight.trpc.ts:10`.
 
-| Procedure                         | Kind     | Gate                                        | Input                                 | Output                         |
-| --------------------------------- | -------- | ------------------------------------------- | ------------------------------------- | ------------------------------ |
-| `insights.getAll`                 | query    | Permission `analytics:view`                 | `insightProjectScopeSchema`           | inline                         |
-| `insights.file`                   | mutation | Permission `analytics:view`                 | `fileInsightInputSchema`              | `insightEntrySchema`           |
-| `insights.markSeen`               | mutation | Permission `analytics:view`                 | `markInsightsSeenInputSchema`         | inline                         |
-| `insights.archive`                | mutation | Permission `analytics:view`                 | `insightScopeSchema`                  | inline                         |
-| `insights.keep`                   | mutation | Permission `analytics:view`                 | `insightScopeSchema`                  | inline                         |
-| `insights.getBoardDailyRun`       | query    | Permission `analytics:view`                 | `insightBoardDailyRunScopeSchema`     | `insightDailyRunSettingSchema` |
-| `insights.configureBoardDailyRun` | mutation | Permission `analytics:view or langy:create` | `configureInsightDailyRunInputSchema` | inline                         |
-| `insights.turnOffBoardDailyRun`   | mutation | Permission `analytics:view`                 | `turnOffInsightDailyRunInputSchema`   | inline                         |
+| Procedure                         | Kind     | Gate                                        | Input                                 | Output                           |
+| --------------------------------- | -------- | ------------------------------------------- | ------------------------------------- | -------------------------------- |
+| `insights.getAll`                 | query    | Permission `analytics:view`                 | `insightProjectScopeSchema`           | inline                           |
+| `insights.file`                   | mutation | Permission `analytics:view`                 | `fileInsightInputSchema`              | `insightEntrySchema`             |
+| `insights.markSeen`               | mutation | Permission `analytics:view`                 | `markInsightsSeenInputSchema`         | inline                           |
+| `insights.archive`                | mutation | Permission `analytics:view`                 | `insightScopeSchema`                  | inline                           |
+| `insights.keep`                   | mutation | Permission `analytics:view`                 | `insightScopeSchema`                  | inline                           |
+| `insights.getBoardDailyRun`       | query    | Permission `analytics:view`                 | `insightBoardDailyRunScopeSchema`     | `insightDailyRunSettingSchema`   |
+| `insights.configureBoardDailyRun` | mutation | Permission `analytics:view or langy:create` | `configureInsightDailyRunInputSchema` | inline                           |
+| `insights.turnOffBoardDailyRun`   | mutation | Permission `analytics:view`                 | `turnOffInsightDailyRunInputSchema`   | inline                           |
+| `insights.runBoardDailyRunNow`    | mutation | Permission `analytics:view or langy:create` | `runInsightDailyRunNowInputSchema`    | `insightDailyRunRequestedSchema` |
 
 ```typescript
 // insights.getAll
@@ -131,7 +140,7 @@ Contract `../contract/src/insight.trpc.ts:28`, router `src/transport/insight.trp
 interface Input {
   projectId: string;
 }
-// Output: insightEntrySchema.array() (inline, ../contract/src/insight.trpc.ts:31)
+// Output: insightEntrySchema.array() (inline, ../contract/src/insight.trpc.ts:33)
 
 // insights.file
 type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:142
@@ -143,7 +152,7 @@ interface Input {
   projectId: string;
   insightIds: string[];
 }
-// Output: inline, ../contract/src/insight.trpc.ts:39
+// Output: inline, ../contract/src/insight.trpc.ts:41
 type Output = unknown;
 
 // insights.archive
@@ -152,16 +161,16 @@ interface Input {
   projectId: string;
   insightId: string;
 }
-// Output: inline, ../contract/src/insight.trpc.ts:43
+// Output: inline, ../contract/src/insight.trpc.ts:45
 type Output = unknown;
 
 // insights.keep
 type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:150
-// Output: inline, ../contract/src/insight.trpc.ts:47
+// Output: inline, ../contract/src/insight.trpc.ts:49
 type Output = unknown;
 
 // insights.getBoardDailyRun
-// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:234
+// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:254
 interface Input {
   projectId: string;
   board: {
@@ -169,17 +178,25 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:196
+type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:216
 
 // insights.configureBoardDailyRun
-type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:247
-// Output: inline, ../contract/src/insight.trpc.ts:56
+type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:267
+// Output: inline, ../contract/src/insight.trpc.ts:58
 type Output = unknown;
 
 // insights.turnOffBoardDailyRun
-type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:259
-// Output: inline, ../contract/src/insight.trpc.ts:60
+type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:279
+// Output: inline, ../contract/src/insight.trpc.ts:62
 type Output = unknown;
+
+// insights.runBoardDailyRunNow
+type Input = z.infer<typeof runInsightDailyRunNowInputSchema>; // ../contract/src/insight-daily-run.ts:303
+// Output: insightDailyRunRequestedSchema, ../contract/src/insight-daily-run.ts:318
+interface Output {
+  requestId: string;
+  requestedAt: number;
+}
 ```
 
 ## Sockets

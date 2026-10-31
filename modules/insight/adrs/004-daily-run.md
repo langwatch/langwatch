@@ -28,11 +28,11 @@ and a reconcile pass's request to arm (`rearm_requested`).
 
 **The board is a pointer.** `{ kind: "dashboard" | "template", id, name }`. A stored
 board is read through the dashboard module, as the person: every read names the board
-and the viewer, so the dashboard module's own scope rules answer it. An Only me board
-is its author's alone, and to anyone else it reads as a board that was deleted. A From LangWatch board is
-named by its template id, but its widgets are defined in the browser bundle alone, so
-a run on one ends as `skipped` with the reason `template_board`. No second copy of
-the catalogue is kept on the server.
+and the viewer, so the dashboard module's own scope rules answer it. An Only me board is
+its author's alone, and to anyone else it reads as a board that was deleted. A From
+LangWatch board is named by its template id, but its widgets are defined in the browser
+bundle alone, so a run on one ends as `skipped` with the reason `template_board`. No
+second copy of the catalogue is kept on the server.
 
 **The run acts as the person, as they are when it runs.** Nothing about access is
 stored. A gate asks, in this order: the project exists and takes writes, the
@@ -77,21 +77,20 @@ are for a person who saves a finding by hand; a run takes neither. For one relea
 answer that carries no insights card at all may still end with the fenced block tagged
 `langwatch-insights` holding `{ "findings": [...] }`, held to the same checks. The card
 is read first: an answer with a card is never read for a block, and a card that fails a
-check is not rescued by a block beside it.
-A finding's title is at most 120 characters and its body 4,000,
-and a finding that holds a web address refuses the answer with the reason
-`finding_has_url`. What passes is cut to the run's maximum, and a widget id that is not
-on the board is dropped. A finding's query is never Langy's own text. It is kept only when it
-is a stored query of the widget the finding names, compared with white space aside and with
-the run's step read as the step parameter (the brief has Langy write the step into the copy
-it runs), and the board's copy is what is filed: the text the widget itself runs, with its window as the reserved
-`dashboard_context_*` parameters where its author used them
-([ADR-002](./002-pointer-and-fixed-date-evidence.md)). A query Langy wrote may name a database
-or a date, and such an insight replays on one deployment or for one day only. The board's copy
-is kept only when the analytics module's validation door admits it for the person. A query
-that fails either check is dropped and its finding is filed without it. The owner is the run's
-person, the board is the run's board, and the window of a finding's query is the run's own
-window.
+check is not rescued by a block beside it. A finding's title is at most 120 characters
+and its body 4,000, and a finding that holds a web address refuses the answer with the
+reason `finding_has_url`. What passes is cut to the run's maximum, and a widget id that
+is not on the board is dropped. A finding's query is never Langy's own text. It is kept
+only when it is a stored query of the widget the finding names, compared with white
+space aside and with the run's step read as the step parameter (the brief has Langy
+write the step into the copy it runs), and the board's copy is what is filed: the text
+the widget itself runs, with its window as the reserved `dashboard_context_*` parameters
+where its author used them ([ADR-002](./002-pointer-and-fixed-date-evidence.md)). A
+query Langy wrote may name a database or a date, and such an insight replays on one
+deployment or for one day only. The board's copy is kept only when the analytics
+module's validation door admits it for the person. A query that fails either check is
+dropped and its finding is filed without it. The owner is the run's person, the board is
+the run's board, and the window of a finding's query is the run's own window.
 
 **Delivery is at least once.** The outbox may carry a run out twice. Every id and
 instant is derived from the run: the Langy idempotency key is the schedule and run
@@ -127,14 +126,14 @@ expired insight is no match, so finding it again is filed as news, unread. A sec
 finding for the same insight or the same key in one answer is dropped. Renewal changes
 nobody's seen, done or kept state.
 
-**Every run records an outcome.** `filed`, `nothing`, `failed` or `skipped`, each
-with a reason where one applies. The outcome counts what was filed and what was renewed
-apart; a run that only renewed is `nothing`, since seen again is not news. A failure is thrown for the outbox to retry; the
-third attempt records `failed` first. One run is in flight per person and board. A
-run that recorded no outcome within every attempt's lease stops holding the board. A
-request is answered with a request id, never a run id: whether it starts a run is the
-worker's call, made after the answer. An event is taken only on the schedule its own
-project, person and board derive.
+**Every run records an outcome.** `filed`, `nothing`, `failed` or `skipped`, each with a
+reason where one applies. The outcome counts what was filed and what was renewed apart;
+a run that only renewed is `nothing`, since seen again is not news. A failure is thrown
+for the outbox to retry; the third attempt records `failed` first. One run is in flight
+per person and board. A run that recorded no outcome within every attempt's lease stops
+holding the board. A request is answered with a request id, never a run id: whether it
+starts a run is the worker's call, made after the answer. An event is taken only on the
+schedule its own project, person and board derive.
 
 **The run's conversation is the person's own.** It shows in their Langy history
 under a title that names the board and the day, with the origin `run`, and it sends
@@ -196,6 +195,50 @@ operator's run is no scheduled run and takes no date from the schedule. A run th
 `skipped` with `board_deleted` turns the schedule off (`turned_off` by `system`), for a
 schedule that is on and no other; a run on a template keeps ending `skipped` with
 `template_board` and the schedule stays on.
+
+**Run now asks for the same run.** The board's dropdown offers Run now to a person who
+holds `analytics:view` and `langy:create`, on a board that is on with no run in flight.
+`runBoardDailyRunNow` sends the request an operator's task sends, for the caller alone,
+so the run files into the same inbox. The server refuses it with `validation_error`
+unless the caller's run on the board is on, its sentence in `meta.formErrors` for the
+caller to show; an operator's request asks no setting. The request answers its
+`requestId`, and the run it starts takes that id as its `runId`, so the board's read
+names `runId` on both `runInFlight` and `lastRun`. The browser then waits for the run
+with that id to show, with no standing poll: `run_started` and `run_settled` hint the
+board's read, which is read again. A hint is published off the committed event, not after
+the schedule row is folded, so it can outrun the row: a read a hint brought back without
+the run is read again after each of `REQUESTED_RUN_REREAD_DELAYS_MS` in turn (2, 4, 8 and
+16 seconds, about 30 in all), and stops once the run shows or the request ends. The read
+Run now asks once the request is in starts the same re-reads, since a hint that lands
+while it is unanswered merges into it and could not start them itself. In flight, it
+opens Langy on the run's conversation; settled first, it ends the wait.
+
+While a run is in flight, `runNow` requests nothing and answers that run's id, so the
+browser follows it. The read cannot see a run the process holds before `run_started`
+(a scheduled wake that fired, or a second tab that asked first), and the process drops a
+request while it holds one, so that request's id never runs. The server cannot answer
+the held run's id, as the service reads the row and not the process. So the browser also
+follows another run that started at or after the request, or settled after it with a
+conversation: per schedule the process takes events in order, so such a run held the
+request, and the request started nothing. A settled run carries no start time, and a lost
+run is settled as `failed/timeout` with no conversation just before the run that replaces
+it starts, so a settled run without a conversation is never taken for the held one; a held
+run that never reached Langy leaves the wait to its deadline. Run now answers
+`requestedAt`, the time the server recorded the request on the clock that stamps a
+run's start, so the browser's clock never enters the comparison. A scheduled run that
+settled before the request is shown as the last run, and the wait goes on. A run that
+shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser says the
+run could not be started. While a run is in flight the dropdown offers to open it
+instead.
+
+**The row names the run in flight.** `run_started` writes `runInFlightId`,
+`runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run
+clears them. The read names no run in flight once its start is older than
+`INSIGHT_DAILY_RUN_EXPIRY_MS`, a run that is lost.
+
+**Insights runs are exempt from the unattended-turn rate limit.** This is an owner
+decision: what is worth running is not known yet. A run starts its turn with
+`isExemptFromRateLimit`, so it is not counted against `langyUnattendedTurnsPerMinute`.
 
 **A reconcile pass arms what lost its wake.** `dailyInsightsScheduleReconcile` is a
 scheduled singleton on the same pipeline, hourly and once across the fleet, as topic
@@ -351,5 +394,10 @@ contract; insight knows nothing of ops.
 - The clean-up reads a member's rows per project of the organisation. The row has no
   index on the person; a project's rows that are on are few.
 - There is still no cap on how many boards a person turns on.
+- `InsightDailyScheduleProjection` gained `runInFlightId`, `runInFlightConversationId` and
+  `runInFlightStartedAt` (migration `20261015120001`), all nullable. A row folded before the
+  migration names no run in flight until its next run starts.
+- With no rate limit, a person can start Insights runs as fast as they choose Run now; one
+  run in flight per board is the only bound. Revisit once what is worth running is known.
 - The run events and a pass's request are per-run rows and age with the `traces`
   retention class. `configured` and `turned_off` are a person's setting and never expire.

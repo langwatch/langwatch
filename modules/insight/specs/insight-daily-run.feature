@@ -1158,3 +1158,109 @@ Feature: The daily insights run
       When the member turns it on
       Then the control goes back to off
       And the member is told it could not be turned on
+
+  Rule: A person can run their board's insights now
+    Run now asks for the same run the schedule asks for, so it files into the same inbox.
+    Insights runs have no rate limit for now: what is worth running is not known yet.
+
+    @integration
+    Scenario: Run now is in the dropdown of a board that is on
+      Given a member turned a board's daily run on
+      When they open the dropdown in the board's header
+      Then it offers Run now
+
+    @integration
+    Scenario: Run now asks for a run and opens Langy on it
+      Given a board that is on, with no run in flight
+      When the member chooses Run now
+      Then a run is requested for them on that board
+      And once the run has started, the Langy panel opens on the run's conversation
+
+    @integration
+    Scenario: Run now opens Langy when the start's hint arrives before its run is stored
+      Given a board that is on, with no run in flight
+      And the member chose Run now
+      When the hint that the run started reaches the board before the run is stored
+      Then the board reads its run again after 2, 4, 8 and 16 seconds, 4 times at most
+      And it does so also when the hint lands while the read Run now asked is unanswered
+      And it stops reading as soon as the run shows
+      And the Langy panel opens on the run's conversation without waiting for the run to end
+
+    @integration
+    Scenario: Run now waits for the run it asked for, not one that settled before the click
+      Given a board that is on, with no run in flight
+      And a scheduled run settled before the board read it
+      When the member chooses Run now
+      Then the board shows that run as the last run and keeps waiting
+      And the Langy panel opens only once the run that Run now asked for has started
+
+    @integration
+    Scenario: Run now follows a run that started after the click
+      Given a board that is on, with no run in flight
+      And the member chose Run now
+      When another run starts first, from another tab or the schedule, so the request starts none
+      Then the board follows that run instead of waiting for a run that never comes
+      And it compares the run's start with the time the server recorded the request
+      And the Langy panel opens on that run's conversation
+
+    @integration
+    Scenario: Run now waits past a lost run settled before its own starts
+      Given a board that is on, whose run in flight is lost
+      And the member chose Run now
+      When the worker records the lost run as timed out, with no conversation, before it starts theirs
+      Then the board keeps waiting instead of taking the lost run for theirs
+      And the Langy panel opens on their run's conversation once it starts
+
+    @unit
+    Scenario: Run now on a board whose run is already going follows that run
+      Given a board that is on, whose run is in flight before the page shows it
+      When the member chooses Run now
+      Then no run is requested
+      And Run now answers the id of the run in flight, so the board follows that run
+
+    @integration
+    Scenario: A run in flight is opened, not started again
+      Given a board that is on, with a run in flight
+      When the member opens the dropdown
+      Then it says a run is going and offers to open it in Langy, not Run now
+      And opening it opens the Langy panel on the run's conversation
+
+    @integration
+    Scenario: A refused Run now says so
+      Given a board that is on, and a server that refuses the request
+      When the member chooses Run now
+      Then the member is told the run could not be started
+      And the dropdown offers Run now again
+
+    @unit
+    Scenario: A started run names its conversation on the board's row
+      Given a run was requested for a board
+      When the run starts
+      Then the board's row names the run's conversation as the run in flight
+      And once the run settles the row names no run in flight
+
+    @integration
+    Scenario: Run now asks for analytics:view and langy:create
+      Given a member without analytics:view or without langy:create
+      When they ask to run a board now
+      Then the request is refused as forbidden and no run is requested
+
+    @integration
+    Scenario: Run now is refused on an aggregate project, and with the flag off
+      Given an aggregate project, or a project with release_insights off
+      When a member asks to run a board now
+      Then the request is refused and no run is requested
+
+    @unit
+    Scenario: Run now is refused on a board that is not on
+      Given a member whose daily run on a board is off, or never decided
+      When they ask to run that board now
+      Then the request is refused with validation_error and no run is requested
+      And the refusal tells them to turn the board's daily insights on first
+      And an operator's run of the same board is still requested
+
+    @unit
+    Scenario: An Insights run is not held to the unattended window
+      Given a project whose unattended turns reached their window
+      When an Insights run asks Langy for its turn
+      Then the turn starts

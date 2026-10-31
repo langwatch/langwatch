@@ -14,6 +14,7 @@ import type {
   WakeHandler,
 } from "@langwatch/eventing";
 import {
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   insightRunBoardSchema,
   insightRunHourSchema,
   insightRunMaxInsightsSchema,
@@ -32,12 +33,7 @@ import {
   restartSkipStreak,
   scheduledRunId,
 } from "../rules/insight-daily-skip-streak.rules.ts";
-import {
-  INSIGHT_DAILY_RUN_INTENT,
-  INSIGHT_DAILY_RUN_LEASE_MS,
-  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
-  type runBoardIntentSchema,
-} from "./insight-daily-run.intent.ts";
+import { INSIGHT_DAILY_RUN_INTENT, type runBoardIntentSchema } from "./insight-daily-run.intent.ts";
 
 export const INSIGHT_DAILY_RUN_PROCESS_NAME = "dailyInsightsSchedule" as const;
 
@@ -79,9 +75,6 @@ export const INITIAL_INSIGHT_DAILY_RUN_STATE: InsightDailyRunState = {
   skipStreak: NO_SKIP_STREAK,
   turnedOff: false,
 };
-
-/** A run that recorded no outcome within every attempt's lease is lost, and blocks no more. */
-const PENDING_RUN_EXPIRY_MS = INSIGHT_DAILY_RUN_LEASE_MS * INSIGHT_DAILY_RUN_MAX_ATTEMPTS;
 
 type InsightDailyRunIntents = {
   [INSIGHT_DAILY_RUN_INTENT]: IntentSpec<typeof runBoardIntentSchema>;
@@ -129,7 +122,7 @@ type Started = { state: InsightDailyRunState; intents: ProcessIntent[] };
 /** One run at a time per person and board; a run that outlived every lease holds it no more. */
 function isRunInFlight({ pendingRun }: InsightDailyRunState, context: Context): boolean {
   const now = Math.max(context.at, context.now);
-  return pendingRun !== null && now - pendingRun.since < PENDING_RUN_EXPIRY_MS;
+  return pendingRun !== null && now - pendingRun.since < INSIGHT_DAILY_RUN_EXPIRY_MS;
 }
 
 /**

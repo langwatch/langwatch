@@ -37,7 +37,7 @@ and [the daily run](./specs/insight-daily-run.feature). Decisions: [ADRs](./adrs
 | Classification | core (`modules/catalogue.json`)                                                                       |
 | Subjects       | insight                                                                                               |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                              |
-| Api token      | `InsightApi` = `moduleApi<InsightApi>()("insight")`, `contract/src/insight.api.ts:58` (11 operations) |
+| Api token      | `InsightApi` = `moduleApi<InsightApi>()("insight")`, `contract/src/insight.api.ts:64` (12 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                            |
 
 ## What insight owns
