@@ -729,3 +729,41 @@ Feature: Redacting personal data from traces
     When a trace is ingested whose input carries version numbers and counts but
       no run of digits long enough to be a phone number
     Then the stored input is unchanged
+
+  # A number written the national way, with a trunk 0 or local digit groups and
+  # no country code, is not a valid US number, so the default reading misses
+  # it. The floor reads it again in the common regions (Europe, Australia,
+  # India, Brazil). Only a mobile, or a landline written with its area code
+  # and digit groups, counts; a bare run without a leading 0 never does. A
+  # mobile written without a leading 0 or bracketed area code (Spain, Italy,
+  # Portugal, India) also needs a phone word just before it: on real trace text
+  # that shape was mostly product codes, ids and table cells.
+  #
+  # Bindings: packages/redaction/src/__tests__/essentialPii.nationalPhones.unit.test.ts
+
+  @unit
+  Scenario: A phone number written without its country code is redacted
+    When a trace is ingested whose input contains mobile numbers written the
+      national way in the United Kingdom, the Netherlands, Germany, France,
+      Belgium, Spain, Italy, Portugal, Ireland, Austria, Switzerland,
+      Australia, India and Brazil
+    Then every one of them is redacted
+
+  @unit
+  Scenario: A barcode, date, timestamp or order number is not read as a national phone number
+    When a trace is ingested whose input carries barcodes, dates, timestamps,
+      invoice numbers, order numbers and decimals
+    Then the stored input is unchanged
+
+  @unit
+  Scenario: A digit group without a leading zero and no phone word nearby is left alone
+    When a trace is ingested whose input carries a nine or ten digit run in
+      groups, with no leading 0, no area code and no phone word before it
+    Then the stored input is unchanged
+
+  @unit
+  Scenario: A grouped IBAN, a VAT number, a product code or a table cell is not read as a phone number
+    When a trace is ingested whose input carries a grouped IBAN, a VAT number,
+      a code ending in a single check digit, a postal code, a log line and a
+      table of numbers
+    Then the stored input is unchanged
