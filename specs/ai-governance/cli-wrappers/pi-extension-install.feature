@@ -1,6 +1,8 @@
 # The LangWatch pi extension, a first-party file the CLI owns by its marker
 #
 # Implementation:
+#   sdks/typescript/src/cli/utils/governance/pi-plugin.ts         (ownership: install, scan, removal)
+#   sdks/typescript/src/cli/utils/governance/pi-extension-source.ts (the extension text pi loads)
 #   sdks/typescript/src/cli/utils/governance/opencode-plugin.ts   (the marker-and-contents model this follows)
 #   sdks/typescript/src/cli/utils/governance/claude-plugin.ts     (the versioned model this deliberately does not follow)
 #   sdks/typescript/src/cli/utils/governance/otel-env-block.ts    (the env the extension reads)
@@ -46,34 +48,15 @@
 # what it would write: if the file differs, rewrite it; if it carries no marker,
 # it is the user's and we leave it alone.
 #
-# EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
-# or @integration now would report a binding that does not exist. Each scenario
-# names the tag it becomes in a comment above it, and the commit that makes one
-# pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
-# change. A scenario still carrying @unimplemented when ADR-188 is called done
-# is work that was not done.
-#
-# WHAT BLOCKS THESE, AS OF 2026-10-30:
-#   1. THE EXTENSION DOES NOT EXIST. There is no pi-plugin file beside
-#      opencode-plugin.ts and claude-plugin.ts, nothing registers it as a
-#      telemetry target for logout, and `pi` is not a wrapped tool in
-#      otel-env-block.ts, so no run reaches any of this.
-#   2. THE INSTALL COMMAND DOES NOT ACCEPT pi, AND WOULD TAKE THE WRONG ARM
-#      IF IT DID. `pi_cli` is not in SUPPORTED_TOOLS in
-#      sdks/typescript/src/cli/commands/ingestion/install.ts, and the seam
-#      installer branches on a hard-coded id where only `opencode` takes the
-#      plugin path, so a pi row without an arm there writes hook entries into a
-#      file pi never reads. Both edits are hand edits, not generated.
-#   3. pi HAS NO ROW IN SESSION_CONTEXT_AGENTS. Until it does,
-#      isSessionContextAgentId rejects the slug, so `langwatch ingest hook pi`
-#      resolves no agent and posts nothing.
-#   4. THE MINIMUM pi VERSION IS UNVERIFIED. ADR-188's Constants table says so
-#      outright, and one scenario here asserts the refusal below it.
-#
-# The file yields no enforced scenario while that holds, so it is listed in
-# LEGACY_INERT in packages/architecture-enforcer/src/tools/check-feature-parity.ts.
-# The commit that binds the first scenario here deletes that line with it.
+# Three scenarios stay @unimplemented, each for a reason outside this file:
+#   1. The minimum-version refusal: ADR-188's Constants table records the
+#      minimum pi version as UNVERIFIED, and a refusal below an unknown floor
+#      would be a guess.
+#   2. The declared-vocabulary check: pi's schema package is not a dependency
+#      of the SDK, and the extension also emits gen_ai.* mirrors and the
+#      langwatch.attributes.estimated marker, which pi does not declare.
+#   3. The community aliases: they live in pi's definition under
+#      modules/coding-agent/, not in the CLI.
 
 Feature: `langwatch ingest install pi_cli` writes a first-party extension that speaks pi's own telemetry
 
@@ -82,8 +65,7 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
 
   Rule: The extension is the CLI's own file, recognised by its marker
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: The first install writes the extension into pi's extension directory
       Given pi's extension directory holds no LangWatch extension
       When the user runs `langwatch ingest install pi_cli`
@@ -91,39 +73,34 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       And its first line carries LangWatch's own marker
       And it is registered as a telemetry target for logout
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Installing for pi takes the plugin arm, never the hook-entries fallback
       When the user runs `langwatch ingest install pi_cli`
       Then the extension is written into pi's extension directory
       And no hook entries are written into any file pi does not read
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A second install leaves an unchanged extension alone
       Given the file at pi's extension path is byte for byte what this CLI writes
       When the user runs `langwatch ingest install pi_cli`
       Then the extension file is left as it is
       And exactly one set of pi event handlers is registered
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: An extension left by an older CLI is rewritten
       Given the file at pi's extension path carries LangWatch's marker
       And its contents differ from what this CLI writes
       When the user runs `langwatch ingest install pi_cli`
       Then the file is rewritten with this CLI's extension
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A file at that path without our marker is never overwritten
       Given a file at pi's extension path that carries no LangWatch marker
       When the user runs `langwatch ingest install pi_cli`
       Then the file is left exactly as it is
       And nothing of ours is installed over it
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Logout removes the extension by its marker
       Given the LangWatch extension is installed
       When the user runs `langwatch logout`
@@ -140,8 +117,7 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
 
   Rule: The extension emits pi's declared vocabulary, never names of our own
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: An agent run becomes one pi.harness.run span carrying pi's session id
       Given a pi agent start and agent end for session "s-1"
       When the extension handles them
@@ -150,8 +126,7 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
         | pi.session.id | s-1   |
       And its end carries pi's own operation outcome
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Each turn becomes a pi.harness.turn span under the run
       Given a pi run with two turns
       When the extension handles them
@@ -159,16 +134,14 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       And each is a child of the run span
       And each carries pi.turn.id
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Each tool execution becomes a pi.harness.tool span under its turn
       Given a turn that executes the tools "read" and "bash"
       When the extension handles them
       Then two spans named "pi.harness.tool" are emitted under that turn
       And each carries pi.tool.name and pi.tool.call_id
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A failed tool execution ends its span as an error
       Given a tool execution that ends in failure
       When the extension handles it
@@ -177,8 +150,7 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
         | pi.tool.is_error | true  |
       And the span status is error
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: An aborted run is recorded with pi's own outcome, not a status of our invention
       Given a run the user aborts part way through a turn
       When the extension handles the turn end and then the agent end
@@ -194,15 +166,13 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
 
   Rule: A one-shot run exports before pi exits
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A non-interactive run flushes its spans at agent end
       Given a one-shot `pi -p` run whose spans all close inside one batch window
       When the agent ends
       Then the span processor is flushed before pi exits
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: An unreachable endpoint does not hold pi's exit open
       Given the OTLP endpoint does not answer
       When the agent ends
@@ -224,31 +194,27 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
     naming that file. Without the row the command resolves no agent and posts
     nothing, so a pi session folds with no repository and maps no pull request.
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: The extension runs the hook command at agent start
       Given a pi agent start for session "s-1" in a git repository on a branch
       When the extension handles it
       Then it runs `langwatch ingest hook pi` with that session id and working directory
       And the command posts a session-context record carrying that repository and head branch
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: The session id it hands over is the same string pi puts on its spans
       Given a pi agent start for session "s-1"
       When the extension runs the hook command
       Then the session id it passes is byte for byte the pi.session.id on the run span
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A pi run outside a git repository posts no context rather than an empty one
       Given a pi agent start in a directory that is not a git repository
       When the extension runs the hook command
       Then no session-context record is posted
       And the agent run is not interrupted
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A hook command that fails never takes the pi run with it
       Given the session-context endpoint does not answer
       When the extension handles an agent start

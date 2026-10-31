@@ -50,6 +50,7 @@ describe("the coding-assistants help footer", () => {
       "cursor",
       "gemini",
       "opencode",
+      "pi",
       "copilot-app",
       "instrument",
     ]);

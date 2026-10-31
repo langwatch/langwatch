@@ -517,6 +517,103 @@ describe("resolveWrapperMode", () => {
     });
   });
 
+  describe("when pi resolves to ingestion mode", () => {
+    const mintPi = () => {
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "ik-lw-pi-test-token",
+        prefix: "ik-lw-pi",
+        endpoint: "http://app.example.com/api/otel",
+      });
+    };
+
+    /** @scenario "A pinned gateway mode for pi is swapped for ingestion with one notice" */
+    it("swaps a forced gateway mode for ingestion, says so once and forgets the pin", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintPi();
+
+      const cfg = baseCfg({ tool_mode: { pi: "gateway" } });
+      const out = await resolveWrapperMode(cfg, "pi", {}, [], "gateway");
+
+      expect(out.mode).toBe("ingestion");
+      expect(out.notice).toContain("pi supports direct OTLP ingestion only");
+      expect(out.notice?.match(/pi supports direct OTLP ingestion only/g)).toHaveLength(1);
+      expect(cfg.tool_mode?.pi).toBeUndefined();
+      expect(configMod.saveConfig).toHaveBeenCalledWith(expect.objectContaining({ tool_mode: {} }));
+    });
+
+    /** @scenario "Ingestion mode mints a pi_cli ingest key and points pi at LangWatch" */
+    it("mints under pi_cli and injects the endpoint, Bearer, protobuf and service name", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintPi();
+
+      const out = await resolveWrapperMode(baseCfg(), "pi", {});
+
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "pi_cli");
+      expect(out.vars).toMatchObject({
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
+        OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ik-lw-pi-test-token",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+        OTEL_RESOURCE_ATTRIBUTES: "service.name=pi",
+      });
+    });
+
+    /** @scenario "A cached pi_cli ingest key is reused instead of re-minting" */
+    it("reuses a live cached pi_cli key instead of minting again", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.listIngestionKeys as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        { sourceType: "pi_cli", lookupId: "cachedpilookup123" },
+      ]);
+
+      const cfg = baseCfg({
+        default_personal_ingest_keys: {
+          pi_cli: { id: "ik_pi", secret: "ik-lw-cachedpilookup123_secretpart", prefix: "ik-lw-" },
+        },
+      });
+      const out = await resolveWrapperMode(cfg, "pi", {});
+
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-cachedpilookup123_secretpart");
+    });
+
+    /** @scenario "Traces export to LangWatch and the other two signals are pinned off" */
+    it("sets traces to otlp and pins logs and metrics to none rather than leaving them unset", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintPi();
+
+      const out = await resolveWrapperMode(baseCfg(), "pi", {});
+
+      expect(out.vars.OTEL_TRACES_EXPORTER).toBe("otlp");
+      expect(out.vars.OTEL_LOGS_EXPORTER).toBe("none");
+      expect(out.vars.OTEL_METRICS_EXPORTER).toBe("none");
+    });
+
+    /** @scenario "An inherited exporter setting from the parent shell is overridden" */
+    it("overrides a parent shell's exporter switch and collector in the child env", async () => {
+      const saved = {
+        exporter: process.env.OTEL_TRACES_EXPORTER,
+        endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      };
+      process.env.OTEL_TRACES_EXPORTER = "none";
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://another-collector:4318";
+      try {
+        const { resolveWrapperMode } = await import("../wrapper-mode.js");
+        mintPi();
+
+        const out = await resolveWrapperMode(baseCfg(), "pi", {});
+        // The merge runWrapped performs: the parent env, then ours on top.
+        const child = { ...process.env, ...out.vars };
+
+        expect(child.OTEL_TRACES_EXPORTER).toBe("otlp");
+        expect(child.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
+      } finally {
+        if (saved.exporter === undefined) delete process.env.OTEL_TRACES_EXPORTER;
+        else process.env.OTEL_TRACES_EXPORTER = saved.exporter;
+        if (saved.endpoint === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+        else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = saved.endpoint;
+      }
+    });
+  });
+
   describe("when code (VS Code Copilot Chat) resolves to ingestion mode", () => {
     const mintVscode = () => {
       (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({

@@ -11,7 +11,8 @@ export type PlatformToolSlug =
   | "opencode"
   | "cursor"
   | "copilot"
-  | "code";
+  | "code"
+  | "pi";
 
 export interface PlatformToolPolicy {
   allowVk: boolean;
@@ -46,6 +47,9 @@ export const PLATFORM_TOOL_POLICIES: Record<PlatformToolSlug, PlatformToolPolicy
   // native OTel export but no BYOK gateway env, so Path A is not meaningful.
   // Inverse of cursor. ADR-039 §Extension #2.
   code: { allowVk: false, allowOtelDirect: true },
+  // pi is ingestion-only: every model's address is fixed in pi's own build,
+  // so there is no base URL a gateway could swap. ADR-188 Decision 1.
+  pi: { allowVk: false, allowOtelDirect: true },
 };
 
 function hardcodedPolicy(toolSlug: string): PlatformToolPolicy {

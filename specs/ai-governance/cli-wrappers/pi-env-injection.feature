@@ -27,37 +27,19 @@
 #
 # Spans are pi's only signal, so the traces exporter is the only one pointed at
 # LangWatch and the other two are pinned off. Leaving them unset is not the same
-# as switching them off: the backend reading this block is our own extension on
-# the OTel JS SDK, which autoconfigures from these names, so an unset logs or
-# metrics name starts an exporter with nothing to send. codex omits both names
-# safely because codex ships its own exporter and never reads them.
+# as switching them off for any OTel SDK that autoconfigures from these names.
+# Our extension reads only the traces names today (pi loads extensions through
+# jiti with no @opentelemetry/* module reachable, so it hand-encodes OTLP), but
+# the pins keep the block correct for pi's own exporter when pi ships one.
+# codex omits both names safely because codex ships its own exporter.
 #
 # The protocol is pinned to `http/protobuf`, which is what our own extension
 # speaks. `http/json` is set for gemini alone, whose built-in exporter speaks
 # nothing else; pi has no built-in exporter to accommodate.
 #
-# EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds.
-# ADR-188 is proposed; none of what it describes is built. Tagging these @unit
-# or @integration now would report a binding that does not exist. Each scenario
-# names the tag it becomes in a comment above it, and the commit that makes one
-# pass swaps that tag and adds the `@scenario "<title>"` annotation in the same
-# change. A scenario still carrying @unimplemented when ADR-188 is called done
-# is work that was not done.
-#
-# WHAT BLOCKS THESE, AS OF 2026-10-30:
-#   1. `pi` IS NOT A WRAPPED TOOL. otel-env-block.ts
-#      (sdks/typescript/src/cli/utils/governance/) switches on claude_code,
-#      codex, gemini, opencode, copilot and code; there is no pi arm, so
-#      `langwatch pi` injects nothing and resolves no path.
-#   2. THE EXPORTER PINS DEPART FROM THE NEAREST PRECEDENT. ADR-188's Constants
-#      pin OTEL_LOGS_EXPORTER and OTEL_METRICS_EXPORTER to "none" because our
-#      own extension reads them through the OTel JS SDK. codex, the only other
-#      span-only tool here, omits both names instead. Whoever writes the pi arm
-#      follows the record, not codex, and this file says why.
-#
-# The file yields no enforced scenario while that holds, so it is listed in
-# LEGACY_INERT in packages/architecture-enforcer/src/tools/check-feature-parity.ts.
-# The commit that binds the first scenario here deletes that line with it.
+# Every scenario here is bound by a unit test under
+# sdks/typescript/src/cli/utils/governance/__tests__/ (wrapper-mode,
+# wrapper-path-choice and telemetry-targets).
 
 Feature: `langwatch pi` injects the standard OTel env on one path only
 
@@ -66,8 +48,7 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
 
   Rule: pi resolves to ingestion without ever offering a gateway
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: pi resolves to the ingestion path even when a virtual key exists
       Given the user has a personal virtual key
       And no tool_mode is saved for pi
@@ -75,15 +56,13 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
       Then the path is ingestion
       And the user is not prompted to choose a path
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: pi resolves to ingestion in a non-interactive shell
       Given the session has no terminal
       When the wrapper path for "pi" is resolved
       Then the path is ingestion
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A pinned gateway mode for pi is swapped for ingestion with one notice
       Given the user runs `langwatch pi --tool-mode gateway`
       When the wrapper path for "pi" is resolved
@@ -94,8 +73,7 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
 
   Rule: The ingestion env is the standard OTel block, with spans only
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Ingestion mode mints a pi_cli ingest key and points pi at LangWatch
       Given no cached ingest key exists for "pi_cli"
       When the user runs `langwatch pi`
@@ -107,15 +85,13 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
         | OTEL_EXPORTER_OTLP_PROTOCOL  | http/protobuf                         |
         | OTEL_RESOURCE_ATTRIBUTES     | service.name=pi                       |
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: A cached pi_cli ingest key is reused instead of re-minting
       Given a cached ingest key exists for "pi_cli" and is still live on the platform
       When the user runs `langwatch pi`
       Then no new ingest key is minted
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Traces export to LangWatch and the other two signals are pinned off
       When the user runs `langwatch pi`
       Then the injected env carries:
@@ -125,8 +101,7 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
         | OTEL_METRICS_EXPORTER | none  |
       And neither name is left unset for the SDK to default
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: An inherited exporter setting from the parent shell is overridden
       Given the parent shell exports OTEL_TRACES_EXPORTER=none
       And the parent shell exports OTEL_EXPORTER_OTLP_ENDPOINT for another collector
@@ -138,8 +113,7 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
 
   Rule: Nothing pi-shaped survives a logout
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Logout strips pi's injected env names
       Given `langwatch pi` has persisted its telemetry env for bare pi runs
       When the user runs `langwatch logout`
