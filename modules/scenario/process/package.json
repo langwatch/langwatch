@@ -80,6 +80,7 @@
     "liquidjs": "catalog:",
     "nanoid": "catalog:",
     "papaparse": "catalog:",
+    "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -93,6 +94,7 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/papaparse": "catalog:",
+    "@types/ws": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -14337,6 +14337,9 @@ importers:
       papaparse:
         specifier: 'catalog:'
         version: 5.5.4
+      ws:
+        specifier: 'catalog:'
+        version: 8.21.3(bufferutil@4.1.0)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -14368,6 +14371,9 @@ importers:
       '@types/papaparse':
         specifier: 'catalog:'
         version: 5.5.2
+      '@types/ws':
+        specifier: 'catalog:'
+        version: 8.18.1
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
