@@ -103,7 +103,6 @@ const finish = {
   transcript: [],
   startedAt: 1,
   endedAt: 2,
-  isCutAtLimit: false,
   userId: "user_1",
 };
 
@@ -234,7 +233,6 @@ describe("VoiceSessionService", () => {
           transcript: [],
           startedAt: 1,
           endedAt: 2,
-          isCutAtLimit: false,
           userId: "user_1",
         }),
       ).rejects.toMatchObject({ code: "voice_session_invalid" });

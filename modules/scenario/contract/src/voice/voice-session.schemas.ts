@@ -37,9 +37,9 @@ const voiceSessionFinishInputSchemaDefinition = z.object({
   name: z.string().trim().max(200).optional(),
   conversationId: z.string().trim().max(200).optional(),
   transcript: z.array(voiceTranscriptTurnSchema).default([]),
+  /** The call's span; the server derives the cut-at-limit marker from it (#8028). */
   startedAt: z.number(),
   endedAt: z.number(),
-  isCutAtLimit: z.boolean().default(false),
   /** Set for a "Call it myself" run: the scenario the call is scored under (AC23). */
   scenarioId: z.string().trim().min(1).optional(),
 });

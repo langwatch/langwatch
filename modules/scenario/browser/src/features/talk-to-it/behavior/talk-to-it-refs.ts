@@ -9,6 +9,9 @@ export type TalkDispatch = (event: TalkEvent) => void;
 export type TalkRefs = {
   session: { current: VoiceCallSession | null };
   startedAt: { current: number };
+  /** The instant the call ended, frozen once and reused across cleanup and any
+   *  name-save retry, so a slow finish cannot stretch the span the server reads. */
+  endedAt: { current: number };
   conversationId: { current: string | undefined };
   /** The signed session token from mint, carried back verbatim to finish. */
   sessionToken: { current: string | undefined };
@@ -25,6 +28,7 @@ export function createTalkRefs(agentRowId: string | undefined): TalkRefs {
   return {
     session: { current: null },
     startedAt: { current: 0 },
+    endedAt: { current: 0 },
     conversationId: { current: undefined },
     sessionToken: { current: undefined },
     maxSeconds: { current: VOICE_CALL_MAX_SECONDS_DEFAULT },
