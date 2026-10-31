@@ -24,13 +24,11 @@ import {
 } from "@langwatch/scenario-contract";
 import type { z } from "zod";
 
+import type { ScenarioCallRun } from "../rules/scenario-call-run.rules.ts";
 import type { ExecuteSyncTransport } from "./execute-sync.channel.ts";
 import { childExecuteSyncTransport } from "./http/http.execute-sync.channel.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
-import {
-  type ConnectedCallRun,
-  HttpSerializedConnectedAgentChannel,
-} from "./http/http.serialized-connected-agent.channel.ts";
+import { HttpSerializedConnectedAgentChannel } from "./http/http.serialized-connected-agent.channel.ts";
 import {
   HttpSerializedHttpAgentChannel,
   type ScenarioHttp,
@@ -69,8 +67,8 @@ export type AgentAdapterBuildInput = {
   parameters?: RunParameterValues;
   httpPort?: ScenarioHttp;
   logger?: Logger;
-  /** The scenario run a connected agent's calls belong to; absent outside a scenario run. */
-  run?: ConnectedCallRun;
+  /** The scenario run a connected or HTTP agent's calls and hooks name; absent outside one. */
+  run?: ScenarioCallRun;
 };
 
 /**
@@ -146,6 +144,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         parameters: input.parameters,
         httpPort: input.httpPort,
         logger: input.logger,
+        run: input.run,
       }),
   }),
   code: runtime({

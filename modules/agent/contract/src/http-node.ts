@@ -301,11 +301,17 @@ export type SecretReferencer = (input: {
   value: string;
 }) => Promise<string>;
 
+/** The text without leading and trailing `_`, in one linear scan (an anchored regex backtracks). */
+function trimUnderscores(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "_") start += 1;
+  while (end > start && text[end - 1] === "_") end -= 1;
+  return text.slice(start, end);
+}
+
 function upperSnake(text: string): string {
-  return text
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  return trimUnderscores(text.toUpperCase().replace(/[^A-Z0-9]+/g, "_"));
 }
 
 const MAX_NAME_ATTEMPTS = 3;
@@ -357,11 +363,25 @@ export function createSecretReferencer(writer: SecretWriter): SecretReferencer {
   };
 
   return ({ owner, field, value }) =>
-    store({
-      base: ["HTTP", upperSnake(owner), upperSnake(field)].filter(Boolean).join("_"),
-      value,
-      attempt: 1,
-    });
+    store({ base: httpSecretBaseName({ owner, field }), value, attempt: 1 });
+}
+
+/** The field a hooks signing secret is stored under: HTTP_<AGENT>_HOOKS_SIGNING_SECRET. */
+export const HOOKS_SIGNING_SECRET_FIELD = "hooks_signing_secret";
+
+/** HTTP_<OWNER>_<FIELD>: the name a stored credential takes before any numeric suffix. */
+export function httpSecretBaseName(input: { owner: string; field: string }): string {
+  return ["HTTP", upperSnake(input.owner), upperSnake(input.field)].filter(Boolean).join("_");
+}
+
+/** Whether a secret name is one the save made for this owner's field, numbered or not. */
+export function isStoredSecretNameFor(input: {
+  name: string;
+  owner: string;
+  field: string;
+}): boolean {
+  const base = httpSecretBaseName(input);
+  return input.name === base || new RegExp(`^${base}_\\d+$`).test(input.name);
 }
 
 type CredentialStorer = (field: string, value: string) => Promise<string>;
@@ -458,11 +478,13 @@ async function authStoringSecrets(input: {
 
 /** An HTTP agent's config with each literal credential stored as a project secret. */
 export async function httpAgentConfigStoringSecrets<
-  Config extends Pick<HttpAgentConfig, "headers" | "auth">,
+  Config extends Pick<HttpAgentConfig, "headers" | "auth" | "hooksSigningSecret">,
 >(input: { config: Config; owner: string; reference: SecretReferencer }): Promise<Config> {
   const store = credentialStorer(input);
-  const { headers, auth } = input.config;
+  const { headers, auth, hooksSigningSecret } = input.config;
   const storedAuth = auth && (await authStoringSecrets({ auth, store }));
+  const storedSigningSecret =
+    hooksSigningSecret && (await store(HOOKS_SIGNING_SECRET_FIELD, hooksSigningSecret));
   const entries = await entriesStoringSecrets({
     entries: (headers ?? []).map(({ key, value }): [string, unknown] => [key, value]),
     entryField: HEADER_ENTRY_FIELD,
@@ -477,10 +499,11 @@ export async function httpAgentConfigStoringSecrets<
     ...input.config,
     ...(headers ? { headers: storedHeaders } : {}),
     ...(storedAuth ? { auth: storedAuth } : {}),
+    ...(storedSigningSecret ? { hooksSigningSecret: storedSigningSecret } : {}),
   };
 }
 
-type HttpSecrets = Pick<HttpAgentConfig, "headers" | "auth">;
+type HttpSecrets = Pick<HttpAgentConfig, "headers" | "auth" | "hooksSigningSecret">;
 
 function authKeepingStored(input: { stored: HttpAuth | undefined; incoming: HttpAuth }): HttpAuth {
   const { stored, incoming } = input;
@@ -510,11 +533,16 @@ export function httpSecretsKeepingStored<T extends HttpSecrets>(input: {
       : header,
   );
   const auth = incoming.auth && authKeepingStored({ stored: stored.auth, incoming: incoming.auth });
+  const hooksSigningSecret =
+    incoming.hooksSigningSecret === "" || incoming.hooksSigningSecret === undefined
+      ? stored.hooksSigningSecret
+      : incoming.hooksSigningSecret;
 
   return {
     ...incoming,
     ...(headers ? { headers } : {}),
     ...(auth ? { auth } : {}),
+    ...(hooksSigningSecret !== undefined ? { hooksSigningSecret } : {}),
   };
 }
 

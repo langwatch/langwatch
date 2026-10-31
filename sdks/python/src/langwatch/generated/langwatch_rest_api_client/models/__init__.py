@@ -141,6 +141,10 @@ from .create_agent_body_type_3_config_auth_type_2 import CreateAgentBodyType3Con
 from .create_agent_body_type_3_config_auth_type_3 import CreateAgentBodyType3ConfigAuthType3
 from .create_agent_body_type_3_config_dev_tunnel import CreateAgentBodyType3ConfigDevTunnel
 from .create_agent_body_type_3_config_headers_item import CreateAgentBodyType3ConfigHeadersItem
+from .create_agent_body_type_3_config_hooks import CreateAgentBodyType3ConfigHooks
+from .create_agent_body_type_3_config_hooks_previous_signing_secret import (
+    CreateAgentBodyType3ConfigHooksPreviousSigningSecret,
+)
 from .create_agent_body_type_3_config_inputs_item import CreateAgentBodyType3ConfigInputsItem
 from .create_agent_body_type_3_config_inputs_item_json_schema import CreateAgentBodyType3ConfigInputsItemJsonSchema
 from .create_agent_body_type_3_config_inputs_item_type import CreateAgentBodyType3ConfigInputsItemType
@@ -9333,6 +9337,8 @@ __all__ = (
     "CreateAgentBodyType3ConfigAuthType3",
     "CreateAgentBodyType3ConfigDevTunnel",
     "CreateAgentBodyType3ConfigHeadersItem",
+    "CreateAgentBodyType3ConfigHooks",
+    "CreateAgentBodyType3ConfigHooksPreviousSigningSecret",
     "CreateAgentBodyType3ConfigInputsItem",
     "CreateAgentBodyType3ConfigInputsItemJsonSchema",
     "CreateAgentBodyType3ConfigInputsItemType",

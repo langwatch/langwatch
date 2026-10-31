@@ -28,10 +28,15 @@ import {
   type WorkflowAgentConfig,
   httpSecretsKeepingStored,
 } from "@langwatch/agent-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
-import { movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
+import {
+  movesBlankStoredSecrets,
+  withoutHooklessSigningSecret,
+  withPreviousSigningSecret,
+} from "../rules/agent-secrets.rules.ts";
 import { workflowFieldsKeepingStored } from "../rules/agent-view.rules.ts";
 
 export class AgentService {
@@ -98,7 +103,11 @@ export class AgentService {
     if (!result.success) throw new InvalidAgentConfigError(input.type, result.error.issues);
 
     const command = result.data;
-    return this.#repository.create({ ...command, id: command.id ?? nextAgentId() });
+    const id = command.id ?? nextAgentId();
+    if (command.type !== "http") return this.#repository.create({ ...command, id });
+    // A new agent has no rotation behind it: the window is only ever the server's.
+    const { hooksPreviousSigningSecret: _sent, ...config } = command.config;
+    return this.#repository.create({ ...command, id, config });
   }
 
   async update(input: UpdateAgentCommand): Promise<Agent> {
@@ -124,10 +133,18 @@ export class AgentService {
     let config = checked.data.config;
     if (checked.data.type === "http" && existing.type === "http") {
       const stored = existing.config;
-      if (movesStoredSecrets({ stored, incoming: checked.data.config })) {
+      // The as-typed check, references sent back included, ran before any secret was stored
+      // (AgentHttpSecretsService.forUpdate); here a retyped value already reads as its reference.
+      if (movesBlankStoredSecrets({ stored, incoming: checked.data.config })) {
         throw new AgentStoredCredentialsDestinationError();
       }
-      config = httpSecretsKeepingStored({ stored, incoming: checked.data.config });
+      config = withPreviousSigningSecret({
+        stored,
+        saved: withoutHooklessSigningSecret(
+          httpSecretsKeepingStored({ stored, incoming: checked.data.config }),
+        ),
+        now: nowInstant(),
+      });
     }
     if (checked.data.type === "workflow" && existing.type === "workflow") {
       config = workflowFieldsKeepingStored({

@@ -144,5 +144,133 @@ describe("AgentModule HTTP agent credentials", () => {
         auth: { type: "bearer", token: "" },
       });
     });
+
+    describe("when the source's hooks URL is set and the copy holds credentials of its own", () => {
+      const hooks = { setup: true, teardown: true };
+      const blankCredentials = {
+        headers: [
+          { key: "X-Tenant-Key", value: "" },
+          { key: "Accept", value: "application/json" },
+        ],
+        auth: { type: "bearer" as const, token: "" },
+      };
+
+      /** A copy in project_2 that typed its own credentials and rotated its signing secret once. */
+      async function copyHoldingCredentials(sourceHooksUrl: string) {
+        const fixture = await savedHttpAgent({
+          permissions: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+        });
+        const { app, agent } = fixture;
+        const { id } = await app.createCopy({
+          sourceAgentId: agent.id,
+          sourceProjectId: projectId,
+          targetProjectId: "project_2",
+        });
+        const copyConfig = {
+          ...config,
+          headers: [
+            { key: "X-Tenant-Key", value: "copy-tenant" },
+            { key: "Accept", value: "application/json" },
+          ],
+          auth: { type: "bearer" as const, token: "copy-token" },
+          hooksUrl: "https://agent.test/hooks",
+          hooks,
+          hooksSigningSecret: "whsec_copy_0123456789abcdef",
+        };
+        await app.update({ id, projectId: "project_2", config: copyConfig });
+        await app.update({
+          id,
+          projectId: "project_2",
+          config: {
+            ...copyConfig,
+            ...blankCredentials,
+            hooksSigningSecret: "whsec_copy_rotated_0123456789",
+          },
+        });
+        await app.update({
+          id: agent.id,
+          projectId,
+          config: {
+            ...config,
+            hooksUrl: sourceHooksUrl,
+            hooks,
+            hooksSigningSecret: "whsec_source_0123456789abcdef",
+          },
+        });
+
+        return { ...fixture, copyId: id };
+      }
+
+      const expectNoStoredCredential = (copy: { config: unknown }) => {
+        expect(copy.config).toMatchObject({
+          hooksUrl: "https://evil.test/hooks",
+          ...blankCredentials,
+          hooksSigningSecret: "",
+        });
+        expect(copy.config).not.toHaveProperty("hooksPreviousSigningSecret");
+        expect(JSON.stringify(copy.config)).not.toContain("secrets.");
+      };
+
+      /** @scenario A copy updated from its source takes no stored credential to a hooks URL on another origin */
+      it("a push to a hooks URL on another origin carries none of the copy's credentials", async () => {
+        const { app, agent, copyId } = await copyHoldingCredentials("https://evil.test/hooks");
+
+        await app.pushToCopies({ sourceAgentId: agent.id, sourceProjectId: projectId });
+
+        expectNoStoredCredential(await app.getById({ id: copyId, projectId: "project_2" }));
+      });
+
+      /** @scenario A copy updated from its source takes no stored credential to a hooks URL on another origin */
+      it("a sync to a hooks URL on another origin carries none of the copy's credentials", async () => {
+        const { app, copyId } = await copyHoldingCredentials("https://evil.test/hooks");
+
+        await app.syncFromSource({ agentId: copyId, projectId: "project_2" });
+
+        expectNoStoredCredential(await app.getById({ id: copyId, projectId: "project_2" }));
+      });
+
+      it("a push on the copy's hooks origin keeps the copy's credentials and window", async () => {
+        const { app, agent, copyId } = await copyHoldingCredentials("https://agent.test/v2/hooks");
+        const before = await app.getById({ id: copyId, projectId: "project_2" });
+
+        await app.pushToCopies({ sourceAgentId: agent.id, sourceProjectId: projectId });
+
+        const after = await app.getById({ id: copyId, projectId: "project_2" });
+        expect(before.type === "http" && before.config.hooksPreviousSigningSecret).toBeTruthy();
+        expect(after.config).toMatchObject({
+          hooksUrl: "https://agent.test/v2/hooks",
+          headers: before.type === "http" ? before.config.headers : [],
+          auth: before.type === "http" ? before.config.auth : {},
+          hooksSigningSecret: before.type === "http" ? before.config.hooksSigningSecret : "",
+          hooksPreviousSigningSecret:
+            before.type === "http" ? before.config.hooksPreviousSigningSecret : {},
+        });
+      });
+    });
+  });
+
+  it("leaves no new project secret behind when a rotation moves the hooks host and is refused", async () => {
+    const { app, agent, values } = await savedHttpAgent();
+    const before = { ...values };
+
+    await expect(
+      app.update({
+        id: agent.id,
+        projectId,
+        config: {
+          ...config,
+          hooksUrl: "https://elsewhere.test/hooks",
+          hooks: { setup: true, teardown: true },
+          headers: [
+            { key: "X-Tenant-Key", value: "" },
+            { key: "Accept", value: "application/json" },
+          ],
+          auth: { type: "bearer", token: "" },
+          hooksSigningSecret: "whsec_brand_new_0123456789",
+        },
+      }),
+    ).rejects.toMatchObject({ code: "agent_stored_credentials_destination_mismatch" });
+
+    expect(values).toEqual(before);
   });
 });

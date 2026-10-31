@@ -212,14 +212,15 @@ export class AgentModule implements AgentApi {
 
   async update(input: UpdateAgentCommand): Promise<AgentWithFields> {
     // A config-only save of a stored voice agent names no type, so the stored row is asked too.
-    const type =
+    const before =
       input.type === "voice"
-        ? input.type
-        : (await this.#agents.getById({ id: input.id, projectId: input.projectId })).type;
+        ? undefined
+        : await this.#agents.getById({ id: input.id, projectId: input.projectId });
+    const type = before ? before.type : "voice";
     await this.#voiceRelease.assertWritable({ type, projectIds: [input.projectId] });
-    return agentWithResolvedFields(
-      await this.#agents.update(await this.#httpSecrets.forUpdate(input)),
-    );
+    const after = await this.#agents.update(await this.#httpSecrets.forUpdate(input));
+    if (before) await this.#httpSecrets.dropReplacedSigningSecret({ before, after });
+    return agentWithResolvedFields(after);
   }
 
   async archive(input: GetAgentInput): Promise<Agent> {

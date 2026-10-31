@@ -5,12 +5,9 @@
  */
 
 import { zodErrorMessage } from "@langwatch/config";
-import { fetchValidatedDestination } from "@langwatch/egress/ssrf/fenced-fetch";
-import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
 import { configureLogger } from "@langwatch/observability";
 import { processLoggerConfiguration } from "@langwatch/process/observability-owner";
 import {
-  decodeScenarioEgressPolicy,
   SCENARIO_EGRESS_POLICY_ENV,
   ScenarioChildJobSchema,
   type ScenarioChildJob,
@@ -23,16 +20,12 @@ import {
 } from "@langwatch/scenario-process/scenario-child";
 
 import { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
-import type {
-  ScenarioHttp,
-  ScenarioHttpResponse,
-} from "./channels/http/http.serialized-http-agent.channel.ts";
+import { WorkerScenarioChildHttp } from "./channels/http/http.worker-egress.channel.ts";
 import {
   createChildProcessLogger,
   readScenarioChildEnvironment,
   readScenarioChildVoiceEnvironment,
   scenarioChildEnvironmentSource,
-  type ScenarioChildEnvironment,
 } from "./config.ts";
 import { runAgentTestTurn } from "./services/agent-test-turn.service.ts";
 import {
@@ -54,31 +47,6 @@ const { configuration, deprecations } = processLoggerConfiguration({
 configureLogger(configuration);
 const logger = createChildProcessLogger("langwatch:scenarios:child", source);
 for (const deprecation of deprecations) logger.warn(deprecation);
-
-/**
- * The one egress the run makes on its own account. An HTTP target is a URL the customer typed,
- * dialled from inside the cluster, so it goes through the same metadata-and-redirect fence every
- * other outbound request in the product does rather than through native `fetch`.
- */
-class WorkerScenarioChildHttp implements ScenarioHttp {
-  private readonly validate: ReturnType<typeof createSsrfUrlValidator>;
-  private readonly rejectUnauthorized: boolean;
-
-  constructor(environment: Pick<ScenarioChildEnvironment, "egressPolicy" | "rejectUnauthorized">) {
-    this.validate = createSsrfUrlValidator(decodeScenarioEgressPolicy(environment.egressPolicy));
-    this.rejectUnauthorized = environment.rejectUnauthorized;
-  }
-
-  async fetch(input: {
-    url: string;
-    init: { method: string; headers: Record<string, string>; body?: string };
-  }): Promise<ScenarioHttpResponse> {
-    const validated = await this.validate(input.url);
-    return fetchValidatedDestination(validated, input.init, {
-      rejectUnauthorized: this.rejectUnauthorized,
-    });
-  }
-}
 
 function readJobDataFromStdin(): Promise<ScenarioChildJob> {
   return new Promise((resolve, reject) => {

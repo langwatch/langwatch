@@ -12,7 +12,8 @@ import type {
 
 /** Whether a run against this target calls a setup or a teardown hook. */
 export function adapterDeclaresHooks(adapterData: TargetAdapterData): boolean {
-  if (adapterData.type !== "connected") return false;
+  if (adapterData.type === "http" && !adapterData.hooksUrl) return false;
+  if (adapterData.type !== "connected" && adapterData.type !== "http") return false;
   return Boolean(adapterData.hooks?.setup || adapterData.hooks?.teardown);
 }
 

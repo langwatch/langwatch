@@ -76,6 +76,21 @@ export class AgentStoredCredentialsDestinationError extends HandledError {
   }
 }
 
+/** A hooks URL's scheme and host are fixed at save: a template there renders per run, so run
+ * parameters could send a hook call, with the agent's credentials and signature, to any host. */
+export class AgentHooksUrlTemplatedOriginError extends HandledError {
+  declare readonly code: "agent_hooks_url_templated_origin";
+
+  constructor() {
+    super(
+      "agent_hooks_url_templated_origin",
+      "The hooks URL cannot have a template in its scheme or host. Use templates in the path or query only.",
+      { httpStatus: 422, fault: "customer" },
+    );
+    this.name = "AgentHooksUrlTemplatedOriginError";
+  }
+}
+
 /** Only the SDK may change connected-agent registration fields; callers may archive it. */
 export class AgentRegisterOnlyError extends HandledError {
   declare readonly code: "agent_register_only";

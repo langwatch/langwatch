@@ -41664,7 +41664,17 @@ type CreateAgentJSONBody3 struct {
 			Key   string `json:"key"`
 			Value string `json:"value"`
 		} `json:"headers,omitempty"`
-		Inputs *[]struct {
+		Hooks *struct {
+			Setup    bool `json:"setup"`
+			Teardown bool `json:"teardown"`
+		} `json:"hooks,omitempty"`
+		HooksPreviousSigningSecret *struct {
+			ExpiresAt string `json:"expiresAt"`
+			Secret    string `json:"secret"`
+		} `json:"hooksPreviousSigningSecret,omitempty"`
+		HooksSigningSecret *string `json:"hooksSigningSecret,omitempty"`
+		HooksUrl           *string `json:"hooksUrl,omitempty"`
+		Inputs             *[]struct {
 			Desc       *string                              `json:"desc,omitempty"`
 			Hidden     *bool                                `json:"hidden,omitempty"`
 			Identifier string                               `json:"identifier"`

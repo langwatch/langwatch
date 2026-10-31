@@ -7499,6 +7499,42 @@
                               ]
                             }
                           },
+                          "hooksUrl": {
+                            "type": "string"
+                          },
+                          "hooks": {
+                            "type": "object",
+                            "properties": {
+                              "setup": {
+                                "type": "boolean"
+                              },
+                              "teardown": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "setup",
+                              "teardown"
+                            ]
+                          },
+                          "hooksSigningSecret": {
+                            "type": "string"
+                          },
+                          "hooksPreviousSigningSecret": {
+                            "type": "object",
+                            "properties": {
+                              "secret": {
+                                "type": "string"
+                              },
+                              "expiresAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "secret",
+                              "expiresAt"
+                            ]
+                          },
                           "devTunnel": {
                             "type": "object",
                             "properties": {

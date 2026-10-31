@@ -1,3 +1,4 @@
+import { WEBHOOK_SIGNATURE_HEADER } from "@langwatch/webhook-signing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WebhookDispatchRequest } from "../../app/webhook.app.ts";
@@ -7,7 +8,6 @@ import type {
 } from "../../channels/webhook-destination.channel.ts";
 import type { WebhookDispatchCapRepository } from "../../repositories/webhook-dispatch-cap.repository.ts";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
-import { WEBHOOK_SIGNATURE_HEADER } from "../../rules/webhook-signature.rules.ts";
 import {
   SQS_MAX_MESSAGE_BYTES,
   SqsWebhookDestinationService,
