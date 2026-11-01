@@ -79,6 +79,9 @@ func buildMessagesResponsesRequest(
 	if len(anthReq.Messages) == 0 {
 		return nil, fmt.Errorf("anthropic messages body has no messages")
 	}
+	if provider == bfschemas.Bedrock {
+		anthReq.Messages = inlineMidConversationSystem(anthReq.Messages)
+	}
 
 	bfReq := anthReq.ToBifrostResponsesRequest(bfCtx)
 	if bfReq == nil {
