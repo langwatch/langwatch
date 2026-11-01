@@ -25,6 +25,7 @@ vitest.config.ts
 # Build tooling (we ship the prebuilt dist/, no build step at install).
 tsup.config.ts
 build.js
+scripts/
 Dockerfile
 
 # Source maps (large, not needed at runtime).
