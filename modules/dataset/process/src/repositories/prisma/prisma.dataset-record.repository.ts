@@ -108,6 +108,7 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
     datasetId: string;
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
+    skipDuplicates?: boolean;
   }): Promise<DatasetRecord[]> {
     await this.database.datasetRecord.createMany({
       data: input.entries.map(({ id, ...entry }) => ({
@@ -116,6 +117,7 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
         projectId: input.projectId,
         entry: entry as Prisma.InputJsonValue,
       })),
+      skipDuplicates: input.skipDuplicates ?? false,
     });
     const rows = await this.database.$queryRaw<unknown[]>`
       SELECT "id", "datasetId", "projectId", "entry", "createdAt", "updatedAt"

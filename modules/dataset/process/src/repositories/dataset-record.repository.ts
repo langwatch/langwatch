@@ -28,6 +28,8 @@ export interface DatasetRecordRepository {
     datasetId: string;
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
+    /** Leave rows whose id already exists as they are instead of failing (Prisma's skipDuplicates). */
+    skipDuplicates?: boolean;
   }): Promise<DatasetRecord[]>;
   update(input: {
     id: string;

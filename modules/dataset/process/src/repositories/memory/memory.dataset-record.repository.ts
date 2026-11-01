@@ -98,10 +98,14 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     datasetId: string;
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
+    skipDuplicates?: boolean;
   }): Promise<DatasetRecord[]> {
     const now = toDate(this.#database.now());
+    const storedIds = new Set(this.#of(input).map((record) => record.id));
 
     for (const { id, ...entry } of input.entries) {
+      // Mirrors Prisma's skipDuplicates: a repeated deterministic id leaves the stored row.
+      if (input.skipDuplicates && storedIds.has(id)) continue;
       this.#database.putRecord(
         datasetRecordSchema.parse({
           id,

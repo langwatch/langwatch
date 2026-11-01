@@ -160,6 +160,27 @@ describe("DatasetService", () => {
       });
     });
 
+    describe("when a caller writes deterministic ids and may retry a page", () => {
+      /** @scenario "A dataset row that already exists counts as added" */
+      it("asks the store to skip duplicate ids instead of failing the batch", async () => {
+        const { service: subject, createMany } = service();
+
+        await subject.batchCreateRecords({
+          slugOrId: "feedback",
+          projectId: PROJECT_ID,
+          entries: [{ id: "trigger-1-trace-1-0", input: "hi" }],
+          skipDuplicates: true,
+        });
+
+        expect(createMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            entries: [{ id: "trigger-1-trace-1-0", input: "hi", output: null }],
+            skipDuplicates: true,
+          }),
+        );
+      });
+    });
+
     describe("when an entry carries a null byte", () => {
       /** @scenario "Batch create records via REST sanitises null bytes" */
       it("scrubs it before the record reaches the table", async () => {
