@@ -95,7 +95,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
     }
 
     try {
-      await this.peers.datasets.batchCreateRecords({
+      const written = await this.peers.datasets.batchCreateRecords({
         slugOrId: input.datasetId,
         projectId: input.projectId,
         entries,
@@ -103,6 +103,20 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         // re-runs a trace whose rows already landed is already done, not a failure.
         skipDuplicates: true,
       });
+      // DatasetRecord.id is globally unique, but the readback is scoped to this dataset:
+      // an id that already belongs to a different dataset is skipped by skipDuplicates and
+      // never comes back, so the automation would report a row it never added.
+      const requested = new Set(entries.map((entry) => entry.id));
+      const stored = new Set(written.map((record) => record.id));
+      const missing = [...requested].filter((id) => !stored.has(id));
+      if (missing.length > 0) {
+        throw new DispatchError({
+          message:
+            `The dataset write skipped ${missing.length} row(s) whose id already belongs to another ` +
+            `dataset (${missing.slice(0, 3).join(", ")}); retarget this automation's dataset or clear those ids.`,
+          retryable: false,
+        });
+      }
     } catch (error) {
       // A column refusal here means one was removed since the trim: a redelivery re-reads them.
       // It is a customer-fault handled error, which the outbox would retire as dead, so it is
