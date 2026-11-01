@@ -41,7 +41,7 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.js",
     "test:scenario": "vitest run --config vitest.scenario.config.js",
-    "smoke": "node scripts/smoke-pack.mjs"
+    "smoke": "vitest run --config vitest.smoke.config.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
