@@ -21,12 +21,6 @@ resolution-markers = [
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
-[options.exclude-newer-package]
-certifi = "2026-10-21T00:00:00Z"
-pillow = "2026-10-17T00:00:00Z"
-pypdf = "2026-10-18T00:00:00Z"
-streamlit = "2026-10-22T00:00:00Z"
-
 [manifest]
 members = [
     "langwatch",
