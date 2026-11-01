@@ -2,6 +2,7 @@ package providers
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 
 	bfbedrock "github.com/maximhq/bifrost/core/providers/bedrock"
@@ -13,13 +14,16 @@ import (
 
 const hourCacheTTL = "1h"
 
+// claudeVersionPattern captures major and one-digit minor; a date suffix such as
+// claude-sonnet-4-20250514 has no minor.
+var claudeVersionPattern = regexp.MustCompile(`claude-(?:opus|sonnet|haiku)-(\d+)(?:-(\d)(?:\D|$))?`)
+
 // carryBedrockCacheTTL puts an hour-long cache_control TTL on the Converse body.
 // Bifrost v1.5.17 has no ttl on BedrockCachePoint (v1.14 does), so such a request
 // is converted here and sent raw; delete this on upgrade. Other requests stay on
-// Bifrost's conversion. Bedrock answers 400 to an hour-long TTL on non-Anthropic
-// models, so those keep the default lifetime.
+// Bifrost's conversion.
 func carryBedrockCacheTTL(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.BifrostResponsesRequest, anthropicBody []byte) error {
-	if bfReq.Provider != bfschemas.Bedrock || !bfschemas.IsAnthropicModel(bfReq.Model) {
+	if bfReq.Provider != bfschemas.Bedrock || !bedrockModelTakesHourCache(bfReq.Model) {
 		return nil
 	}
 	hourMarkers := countHourCacheMarkers(anthropicBody)
@@ -40,6 +44,22 @@ func carryBedrockCacheTTL(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.Bifr
 	bfReq.RawRequestBody = body
 	bfCtx.SetValue(bfschemas.BifrostContextKeyUseRawRequestBody, true)
 	return nil
+}
+
+// bedrockModelTakesHourCache reports whether Bedrock accepts an hour-long TTL on
+// a model: Claude Opus, Sonnet and Haiku 4.5 and later. A model it refuses would
+// fail the request with a 400, so any other id keeps the default lifetime.
+func bedrockModelTakesHourCache(model string) bool {
+	match := claudeVersionPattern.FindStringSubmatch(model)
+	if match == nil {
+		return false
+	}
+	major, err := strconv.Atoi(match[1])
+	if err != nil {
+		return false
+	}
+	minor, _ := strconv.Atoi(match[2])
+	return major > 4 || (major == 4 && minor >= 5)
 }
 
 // countHourCacheMarkers counts cache_control blocks that ask for an hour.

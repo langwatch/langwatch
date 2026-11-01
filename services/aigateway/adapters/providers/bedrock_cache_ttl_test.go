@@ -83,8 +83,8 @@ func TestCarryBedrockCacheTTL_LeavesOtherRequestsAlone(t *testing.T) {
 		assert.Empty(t, bfReq.RawRequestBody)
 	})
 
-	/** @scenario "A non-Anthropic Bedrock model keeps the default cache lifetime" */
-	t.Run("when a non-Anthropic Bedrock model gets an hour-long breakpoint", func(t *testing.T) {
+	/** @scenario "A Bedrock model that refuses the hour-long lifetime keeps the default one" */
+	t.Run("when a Bedrock model that refuses the lifetime gets an hour-long breakpoint", func(t *testing.T) {
 		bfCtx := bfschemasNewCtx()
 		bfReq, err := buildMessagesResponsesRequest(bfCtx, messagesRequest(hourCacheBody), bfschemas.Bedrock, "eu.amazon.nova-lite-v1:0")
 		require.NoError(t, err)
@@ -112,4 +112,41 @@ func TestExtractResponsesUsage_CountsHourLongWrites(t *testing.T) {
 	}})
 	assert.Equal(t, 800, usage.CacheCreationTokens)
 	assert.Equal(t, 600, usage.CacheCreation1hTokens)
+}
+
+// @scenario "A Bedrock model that refuses the hour-long lifetime keeps the default one"
+func TestBedrockModelTakesHourCache(t *testing.T) {
+	for model, want := range map[string]bool{
+		"eu.anthropic.claude-sonnet-5-5":                                   true,
+		"eu.anthropic.claude-opus-5-5":                                     true,
+		"eu.anthropic.claude-haiku-5-5":                                    true,
+		"eu.anthropic.claude-opus-5":                                       true,
+		"eu.anthropic.claude-haiku-4-5-20251001-v1:0":                      true,
+		"eu.anthropic.claude-sonnet-4-5-20250929-v1:0":                     true,
+		"anthropic.claude-opus-4-8":                                        true,
+		"anthropic.claude-opus-4-1-20250805-v1:0":                          false,
+		"eu.anthropic.claude-sonnet-4-20250514-v1:0":                       false,
+		"eu.anthropic.claude-3-7-sonnet-20250219-v1:0":                     false,
+		"anthropic.claude-3-5-haiku-20241022-v1:0":                         false,
+		"eu.amazon.nova-lite-v1:0":                                         false,
+		"arn:aws:bedrock:eu-central-1:1:application-inference-profile/abc": false,
+	} {
+		assert.Equal(t, want, bedrockModelTakesHourCache(model), model)
+	}
+}
+
+// @scenario "Hour-long cache writes on the translated lane are counted apart"
+func TestTranslatedStream_CountsHourLongWrites(t *testing.T) {
+	iter := &anthropicTranslatedStreamIterator{framer: newAnthropicStreamFramer("", "m")}
+	iter.consume(&bfschemas.BifrostResponsesStreamResponse{Response: &bfschemas.BifrostResponsesResponse{
+		Usage: &bfschemas.ResponsesResponseUsage{
+			InputTokens: 900,
+			InputTokensDetails: &bfschemas.ResponsesResponseInputTokens{
+				CachedWriteTokens:       800,
+				CachedWriteTokenDetails: &bfschemas.ChatCachedWriteTokenDetails{CachedWriteTokens1h: 600},
+			},
+		},
+	}})
+	assert.Equal(t, 800, iter.Usage().CacheCreationTokens)
+	assert.Equal(t, 600, iter.Usage().CacheCreation1hTokens)
 }

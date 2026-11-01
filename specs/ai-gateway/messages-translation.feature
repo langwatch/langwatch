@@ -243,11 +243,11 @@ Feature: Anthropic Messages translation: reaching non-Anthropic providers from a
     Then no raw request body is set
 
   @bdd @messages-translation @unit
-  Scenario: A non-Anthropic Bedrock model keeps the default cache lifetime
-    Given the virtual key resolves to a non-Anthropic model on Bedrock
+  Scenario: A Bedrock model that refuses the hour-long lifetime keeps the default one
+    Given the virtual key resolves to a Bedrock model other than Claude Opus, Sonnet or Haiku 4.5 and later
     And a /v1/messages request carries cache_control with ttl 1h
     When the gateway translates the request
-    Then the cache points carry no ttl, because Bedrock refuses it on those models
+    Then the cache points carry no ttl, so Bedrock does not refuse the request
 
   @bdd @messages-translation @unit
   Scenario: Hour-long cache writes on the translated lane are counted apart
