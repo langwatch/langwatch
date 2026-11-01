@@ -13,12 +13,9 @@ await build({
   // schemas still bundle into the standalone output.
   nodePaths: ["node_modules"],
   banner: {
-    // The bundle inlines CommonJS packages (express, body-parser, debug) that
-    // `require()` Node builtins at load time. An ES module has no `require`,
-    // so esbuild's shim threw `Dynamic require of "tty" is not supported` the
-    // moment `--http` loaded express. Giving the module a real `require`
-    // lets those calls through. The aliased import keeps it clear of any
-    // `createRequire` binding the bundle declares itself.
+    // Inlined CommonJS (express, debug) calls `require()` on Node builtins,
+    // and an ES module has none: `--http` died on `Dynamic require of "tty"`.
+    // The alias keeps clear of any `createRequire` the bundle declares.
     js: [
       "#!/usr/bin/env node",
       'import { createRequire as __langwatchCreateRequire } from "node:module";',

@@ -1,16 +1,7 @@
-// Installs the package the way a user does and starts it.
-//
-// Every other test runs inside the monorepo, where workspace links resolve
-// packages npm has never seen and vitest supplies a `require` the shipped ES
-// module lacks. Two releases broke for exactly those reasons and passed CI:
-// 2.1.0 crashed on `--http` (`Dynamic require of "tty"`), and 2.2.0/3.0.0
-// listed the private `@langwatch/evaluator-contract` as a dependency, so
-// `npx @langwatch/mcp-server` failed with a 404.
-//
-// So: pack as `pnpm publish` would, `npm install` the tarball into an empty
-// folder against the public registry, then start stdio mode, start HTTP mode,
-// and load the library entries through both `import` and `require`.
-//
+// Installs the packed tarball from the public registry into an empty folder,
+// then starts stdio and HTTP mode and loads the library entries. The other
+// tests run inside the monorepo, where workspace links and vitest hide the
+// 404 and the missing `require` that broke 2.1.0, 2.2.0 and 3.0.0.
 // Run after `pnpm run build`: `pnpm run smoke`.
 
 import { execFileSync, spawn } from "node:child_process";
