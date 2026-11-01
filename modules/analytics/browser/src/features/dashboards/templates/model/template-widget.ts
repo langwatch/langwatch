@@ -4,43 +4,46 @@
  * source to set up, and the full-width and half-width places on the chart grid.
  */
 
-import { TRACE_SOURCES, type TraceSource } from "@langwatch/analytics-contract";
+import type { TraceSource } from "@langwatch/analytics-contract";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
-import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
+import { PRESENCE_QUERY, readsSourcesParameter } from "../../model/sources-parameter.ts";
 import type { BoardTemplateWidget } from "./board-template.ts";
 import { PRESENCE_SQL } from "./source-presence-queries.ts";
+import { readSources } from "./stock-query-sources.ts";
 import type { WidgetCode } from "./widget-code-parts.ts";
 
 /**
- * What a catalogue widget's queries count: every origin but Langy's turns, as boards counted
- * before queries named their sources, so a scenario or coding-agent widget keeps its data.
+ * A stock widget's stored definition: each query that reads the sources parameter stores the list
+ * the widget counts; one that never reads it stores none, since the list would say what is not so
+ * (dashboards-v2 AC202, AC202b, AC202f).
  */
-export const CATALOGUE_QUERY_SOURCES: readonly TraceSource[] = TRACE_SOURCES.filter(
-  (source) => source !== LANGY_TRACE_ORIGIN,
-);
-
 export function definition({
   code,
   queries,
+  sources,
 }: {
   code: WidgetCode;
   queries: Readonly<Record<string, string>>;
+  sources: readonly TraceSource[];
 }): DashboardWidgetDefinition {
-  const all = code.source ? { ...queries, present: PRESENCE_SQL[code.source] } : queries;
+  const all = code.source ? { ...queries, [PRESENCE_QUERY]: PRESENCE_SQL[code.source] } : queries;
   return {
     version: DASHBOARD_WIDGET_DEFINITION_VERSION,
     code: code.tsx,
-    queries: Object.entries(all).map(([name, text]) => ({
-      name,
-      sql: text,
-      parameters: [],
-      sources: [...CATALOGUE_QUERY_SOURCES],
-    })),
+    queries: Object.entries(all).map(([name, text]) => {
+      const sql = name === PRESENCE_QUERY ? text : readSources(text);
+      return {
+        name,
+        sql,
+        parameters: [],
+        ...(readsSourcesParameter(sql) ? { sources: [...sources] } : {}),
+      };
+    }),
     description: code.description,
   };
 }

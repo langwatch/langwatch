@@ -45,6 +45,9 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "APP_FUNCTION_UNRESOLVED_KEYS",
   "APP_FUNCTION_RESULT_TRUNCATED",
   "INSTANT_EVAL_SKIPPED",
+  "SHARE_WINDOW_LIMITED",
+  "SOURCES_IGNORED",
+  "GRANULARITY_COARSENED",
 ] as const;
 export const langWatchQLDiagnosticCodeSchema = z.enum(LWQL_DIAGNOSTIC_CODES);
 export type LangWatchQLDiagnosticCode = z.infer<typeof langWatchQLDiagnosticCodeSchema>;
@@ -89,6 +92,19 @@ export const queryCompletenessSchema: QueryCompletenessSchema = queryCompletenes
 export type QueryCompleteness = z.infer<typeof queryCompletenessSchema>;
 export type QueryCompletenessState = QueryCompleteness["state"];
 
+/**
+ * Every placeholder the statement declares, by its SQL name, with the value the run bound, plus
+ * the `period` it followed. A flat map, so the SQL name is the key an agent already knows. Never
+ * holds a protection or a key (permissions stay server-side).
+ */
+const langWatchQLRunParamsSchemaDefinition = z.record(z.string(), z.unknown());
+export interface LangWatchQLRunParamsSchema extends Named<
+  typeof langWatchQLRunParamsSchemaDefinition
+> {}
+export const langWatchQLRunParamsSchema: LangWatchQLRunParamsSchema =
+  langWatchQLRunParamsSchemaDefinition;
+export type LangWatchQLRunParams = z.infer<typeof langWatchQLRunParamsSchema>;
+
 /** The complete result envelope returned by the query transport. */
 const langWatchQLQueryResultSchemaDefinition = z
   .object({
@@ -102,6 +118,8 @@ const langWatchQLQueryResultSchemaDefinition = z
     coarsenedFromSeconds: z.number().optional(),
     /** Absent when the run had no time window or read no catalogued view, and on a failure. */
     completeness: queryCompletenessSchema.optional(),
+    /** What the run was bound to; absent on a pass and on a failure. */
+    params: langWatchQLRunParamsSchema.optional(),
   })
   .strict();
 export interface LangWatchQLQueryResultSchema extends Named<
@@ -280,8 +298,12 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
-  /** A widget query's sources (AC200), `null` for its default; every origin when absent. */
+  /** A widget query's sources (AC200), `null` for its default; the default when absent. */
   sources?: RunSources;
+  /** The projects a card names (AC207); absent, the board's project. */
+  projects?: readonly string[] | "all";
+  /** The member a card's named projects are checked for; absent, none may be named. */
+  userId?: string;
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
   signal?: AbortSignal;
 }>;
@@ -369,7 +391,10 @@ export type LangWatchQLPassInput = Pick<
  * secrets become the tenant-capability set, so the query reads the union of their rows; an
  * empty set is a valid scope that reads zero rows.
  */
-export type LangWatchQLProjectSetExecuteInput = Omit<LangWatchQLExecuteInput, "project"> &
+export type LangWatchQLProjectSetExecuteInput = Omit<
+  LangWatchQLExecuteInput,
+  "project" | "projects"
+> &
   Readonly<{ projects: readonly LangWatchQLCaller[] }>;
 
 /**

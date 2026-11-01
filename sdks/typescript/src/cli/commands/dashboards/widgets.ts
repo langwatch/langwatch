@@ -10,12 +10,18 @@ import { failSpinner } from "../../utils/spinnerError";
 import {
   type DefinitionFlags,
   resolveDefinitionInput,
+  resolveProjects,
   resolveSources,
   WidgetInputError,
 } from "./definitionInput";
 
 /** The flags `widget add` and `update` share beyond the definition. */
-type WidgetFlags = DefinitionFlags & { name?: string; description?: string; sources?: string };
+type WidgetFlags = DefinitionFlags & {
+  name?: string;
+  description?: string;
+  sources?: string;
+  projects?: string;
+};
 
 /** Ends the command on input refused before any request. */
 const refusedLocally = <T>(resolve: () => T): T => {
@@ -30,15 +36,20 @@ const refusedLocally = <T>(resolve: () => T): T => {
   }
 };
 
-/** The definition flags and `--sources`, each parsed once; the sources set on every query given. */
+/**
+ * The definition flags, `--sources` and `--projects`, each parsed once; the lists set on every
+ * query given.
+ */
 const definitionOf = (flags: WidgetFlags) => {
   const parsed = refusedLocally(() => resolveDefinitionInput(flags));
   const sources = refusedLocally(() => resolveSources(flags.sources));
+  const projects = refusedLocally(() => resolveProjects(flags.projects));
+  const listed = { ...(sources ? { sources } : {}), ...(projects ? { projects } : {}) };
   const definition =
-    parsed && sources
-      ? { ...parsed, queries: parsed.queries.map((query) => ({ ...query, sources })) }
+    parsed && (sources || projects)
+      ? { ...parsed, queries: parsed.queries.map((query) => ({ ...query, ...listed })) }
       : parsed;
-  return { definition, sources };
+  return { definition, listed, hasLists: sources !== undefined || projects !== undefined };
 };
 
 /** `langwatch dashboard widget list <dashboardId>`: the widgets on one dashboard. */
@@ -149,12 +160,12 @@ export const updateWidgetOnDashboardCommand = async (
   options: WidgetFlags,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
-  const { definition, sources } = definitionOf(options);
+  const { definition, listed, hasLists } = definitionOf(options);
   const named = options.name !== undefined || options.description !== undefined;
-  if (!named && !definition && !sources) {
+  if (!named && !definition && !hasLists) {
     console.error(
       chalk.red(
-        "Error: nothing to update — pass --name, --description, --sources, or --code / --code-file with --queries-file",
+        "Error: nothing to update — pass --name, --description, --sources, --projects, or --code / --code-file with --queries-file",
       ),
     );
     process.exit(1);
@@ -163,12 +174,12 @@ export const updateWidgetOnDashboardCommand = async (
 
   try {
     const service = new DashboardsApiService();
-    // --sources alone: every stored query, sent back with the new list.
+    // --sources or --projects alone: every stored query, sent back with the new list.
     const resourced =
-      !definition && sources
+      !definition && hasLists
         ? {
             queries: (await service.getWidget({ dashboardId, widgetId })).definition.queries.map(
-              (query) => ({ ...query, sources }),
+              (query) => ({ ...query, ...listed }),
             ),
           }
         : {};

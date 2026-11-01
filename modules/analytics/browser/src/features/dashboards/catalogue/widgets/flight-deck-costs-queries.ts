@@ -21,7 +21,6 @@ export const OUTCOME_JUDGE = "Conversation Outcome Judge";
 type Window = (column: string) => string;
 
 const CONVERSATION = "coalesce(nullIf(ConversationId, ''), TraceId)";
-const PRODUCTION = "Origin IN ('', 'application', 'gateway')";
 
 // An evaluation is dated by its trace: it can run, or be re-run, long after the trace.
 const evaluationsOf = ({ window, from }: { window: Window; from: string }) => `SELECT
@@ -304,8 +303,8 @@ export const SPEND_BY_SOURCE_SQL = `SELECT bucket, source, sum(cost) AS cost, su
 FROM (
   SELECT ${bucketOf("OccurredAt")} AS bucket, TotalCost AS cost, 1 AS traces,
     if(UnpricedSpanCount > 0, 1, 0) AS unpriced,
-    multiIf(${PRODUCTION}, 'production', Origin = 'evaluation', 'evaluations',
-      Origin = 'simulation', 'simulations', Origin IN ('playground', 'workflow'), 'experiments',
+    multiIf(Source IN ('application', 'gateway'), 'production', Source = 'evaluation', 'evaluations',
+      Source = 'simulation', 'simulations', Source IN ('playground', 'workflow'), 'experiments',
       'other') AS source
   FROM trace_metrics
   WHERE ${inPeriod("OccurredAt")}
@@ -326,7 +325,6 @@ const traceWaste = `SELECT ifNull(s.failed, 0) = 1 AS failed, t.cost AS cost,
     SELECT TraceId, TotalCost AS cost
     FROM trace_metrics
     WHERE ${inPeriod("OccurredAt")}
-      AND ${PRODUCTION}
   ) AS t
   LEFT JOIN (
     SELECT TraceId, max(root_failed) AS failed, sum(calls) AS spans, sum(errored_llm) AS retries,
@@ -370,15 +368,13 @@ export const COST_PER_CALL_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS buck
   uniqExact(${CONVERSATION}) AS calls
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
-  AND ${PRODUCTION}
 GROUP BY bucket
 ORDER BY bucket`;
 
 /** Production cost and calls over the whole period. */
 export const COST_PER_CALL_SQL = `SELECT sum(TotalCost) AS cost, uniqExact(${CONVERSATION}) AS calls
 FROM trace_metrics
-WHERE ${inPeriod("OccurredAt")}
-  AND ${PRODUCTION}`;
+WHERE ${inPeriod("OccurredAt")}`;
 
 // One production trace is one document; a trace that used several models is its own line.
 const DOCUMENT_MODEL = "if(length(Models) = 1, Models[1], 'several models')";
@@ -390,7 +386,6 @@ export const DOCUMENT_COST_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS buck
   count() AS documents
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
-  AND ${PRODUCTION}
   AND length(Models) > 0
 GROUP BY bucket, model
 ORDER BY bucket`;
@@ -403,5 +398,4 @@ export const DOCUMENT_COST_HALVES_SQL = `SELECT
   countIf(OccurredAt >= ${MIDPOINT}) AS second_documents
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
-  AND ${PRODUCTION}
   AND length(Models) > 0`;

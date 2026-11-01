@@ -180,6 +180,7 @@ export {
   projectOf,
   type ProjectScopedContext,
   recordBrowserCaller,
+  keyPrincipalOfApiKey,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,

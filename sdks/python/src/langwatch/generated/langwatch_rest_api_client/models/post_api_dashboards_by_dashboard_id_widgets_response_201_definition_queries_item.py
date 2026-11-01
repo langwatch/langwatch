@@ -28,6 +28,7 @@ class PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItem:
         parameters (list[PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItemParametersItem] | Unset):
         sources (list[PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItemSourcesType0Item] | None |
             Unset):
+        projects (list[str] | None | Unset):
     """
 
     name: str
@@ -38,6 +39,7 @@ class PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItem:
     sources: (
         list[PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItemSourcesType0Item] | None | Unset
     ) = UNSET
+    projects: list[str] | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -63,6 +65,15 @@ class PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItem:
         else:
             sources = self.sources
 
+        projects: list[str] | None | Unset
+        if isinstance(self.projects, Unset):
+            projects = UNSET
+        elif isinstance(self.projects, list):
+            projects = self.projects
+
+        else:
+            projects = self.projects
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -75,6 +86,8 @@ class PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItem:
             field_dict["parameters"] = parameters
         if sources is not UNSET:
             field_dict["sources"] = sources
+        if projects is not UNSET:
+            field_dict["projects"] = projects
 
         return field_dict
 
@@ -137,11 +150,29 @@ class PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItem:
 
         sources = _parse_sources(d.pop("sources", UNSET))
 
+        def _parse_projects(data: object) -> list[str] | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                projects_type_0 = cast(list[str], data)
+
+                return projects_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(list[str] | None | Unset, data)
+
+        projects = _parse_projects(d.pop("projects", UNSET))
+
         post_api_dashboards_by_dashboard_id_widgets_response_201_definition_queries_item = cls(
             name=name,
             sql=sql,
             parameters=parameters,
             sources=sources,
+            projects=projects,
         )
 
         return post_api_dashboards_by_dashboard_id_widgets_response_201_definition_queries_item

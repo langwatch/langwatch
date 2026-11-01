@@ -8,7 +8,7 @@ import type { WidgetSource } from "../schemas/widget-sources.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,
-  withSources,
+  withLists,
 } from "./dashboard-widget-queries.js";
 
 export interface AddDashboardWidgetParams {
@@ -18,12 +18,15 @@ export interface AddDashboardWidgetParams {
   queries: DashboardWidgetQueriesInput;
   /** Set on every query; absent, the platform stores application on each. */
   sources?: WidgetSource[] | null;
+  /** Set on every query; absent, the widget reads its board's project. */
+  projects?: string[] | null;
 }
 
 export async function handleAddDashboardWidget(params: AddDashboardWidgetParams): Promise<string> {
-  const queries = withSources({
+  const queries = withLists({
     queries: normalizeDashboardWidgetQueries({ queries: params.queries }),
     sources: params.sources,
+    projects: params.projects,
   });
 
   let widget;
