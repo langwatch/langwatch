@@ -338,9 +338,9 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 /**
- * The one Insights entry, in every product menu's bottom block just above Settings. Hidden
- * until `release_insights` and `release_dashboards` answer on (the page lives in Dashboards),
- * and on an aggregate project, which files no insight; the unread pill is lent by insight.
+ * The one Insights entry, just above Settings in every product menu but Governance (it lists its
+ * own Insights page). Hidden until `release_insights` and `release_dashboards` answer on (the
+ * page lives in Dashboards), and on an aggregate project; the unread pill is lent by insight.
  * @see modules/insight/specs/insight-inbox.feature
  */
 function InsightsMenuLink({ showExpanded }: { showExpanded: boolean }) {
@@ -529,7 +529,9 @@ export function SidebarContent({
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}
           productPinned={
-            isDetour(surface) ? null : <InsightsMenuLink showExpanded={showExpanded} />
+            isDetour(surface) || surface === "governance" ? null : (
+              <InsightsMenuLink showExpanded={showExpanded} />
+            )
           }
         />
       </Box>

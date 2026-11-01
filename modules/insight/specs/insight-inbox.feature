@@ -387,6 +387,9 @@ Feature: The insights inbox
     (above Support for a member who cannot see Settings), with the grey unread pill. The
     Insights page itself lives in the Dashboards product, so the entry shows only while
     release_dashboards is on too. Settings and the Admin console are no product and carry none.
+    Governance carries none either: it lists its own Insights page (the Preview placeholder,
+    specs/governance/governance-platform-placeholders.feature), and two entries named Insights
+    that open different pages would mislead.
 
     @integration
     Scenario: The Dashboards side menu holds the one Insights entry with its unread count
@@ -406,6 +409,13 @@ Feature: The insights inbox
       Given the release_insights and release_dashboards flags are on and a member with analytics:view
       When they look at the Settings or the Admin console side menu
       Then it holds no Insights entry
+
+    @integration
+    Scenario: The Governance side menu holds only its own Insights item
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      When they look at the Governance side menu
+      Then it holds no Insights entry above Settings
+      And the only item named Insights is Governance's own, which opens /governance/insights
 
     @integration
     Scenario: Insights shows nothing while release_dashboards is off

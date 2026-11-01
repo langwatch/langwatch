@@ -85,6 +85,7 @@ function renderSidebar({
   organizationLoading = false,
   kind,
   insightsOn = false,
+  governancePlatformOn = false,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings" | "admin";
   pathname: string;
@@ -94,6 +95,7 @@ function renderSidebar({
   organizationLoading?: boolean;
   kind?: string;
   insightsOn?: boolean;
+  governancePlatformOn?: boolean;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
@@ -106,6 +108,10 @@ function renderSidebar({
         flags: {
           release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading },
           release_insights: { enabled: insightsOn, isLoading: false },
+          release_ui_governance_billed_cost_enabled: {
+            enabled: governancePlatformOn,
+            isLoading: false,
+          },
         },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
@@ -232,6 +238,26 @@ describe("the Insights entry", () => {
 
       await screen.findByRole("button", { name: "Quick Search" });
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
+    });
+  });
+
+  describe("given the Governance sidebar lists its own Insights page", () => {
+    /** @scenario "The Governance side menu holds only its own Insights item" */
+    it("holds no pinned Insights entry, only Governance's own item", async () => {
+      renderSidebar({
+        surface: "governance",
+        pathname: "/governance",
+        insightsOn: true,
+        governancePlatformOn: true,
+        permissions: ["analytics:view", "organization:view"],
+      });
+
+      const entry = await screen.findByRole("link", { name: "Insights" });
+      expect(screen.getAllByRole("link", { name: /Insights/ })).toHaveLength(1);
+      expect(entry).toHaveAttribute("href", "/governance/insights");
+      const bottom = within(screen.getByTestId("sidebar-bottom-block"));
+      expect(bottom.getByRole("link", { name: "Settings" })).toBeInTheDocument();
+      expect(bottom.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
   });
 
