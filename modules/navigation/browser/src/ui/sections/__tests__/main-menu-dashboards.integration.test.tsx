@@ -259,6 +259,24 @@ describe("the Insights entry", () => {
       expect(bottom.getByRole("link", { name: "Settings" })).toBeInTheDocument();
       expect(bottom.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
+
+    /** @scenario "The Governance side menu pins Insights while it has no Insights page of its own" */
+    it("pins the Insights entry while the Governance platform pages are off", async () => {
+      renderSidebar({
+        surface: "governance",
+        pathname: "/governance",
+        insightsOn: true,
+        governancePlatformOn: false,
+        permissions: ["analytics:view", "organization:view"],
+      });
+
+      const bottom = within(screen.getByTestId("sidebar-bottom-block"));
+      expect(await bottom.findByRole("link", { name: /Insights/ })).toHaveAttribute(
+        "href",
+        "/demo/insights",
+      );
+      expect(screen.getAllByRole("link", { name: /Insights/ })).toHaveLength(1);
+    });
   });
 
   describe("given release_insights is off", () => {

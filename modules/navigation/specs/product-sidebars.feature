@@ -7,8 +7,8 @@ Feature: Product sidebars
   the product's own pages, then a pinned bottom block with usage,
   Settings, Support and the theme control. A product may pin its own
   entry there, just above Settings: every product pins Insights
-  (insight-inbox.feature) except Governance, which lists its own
-  Insights page, so a second entry of the same name would mislead.
+  (insight-inbox.feature). Governance skips it while it lists its own
+  Insights page, so two entries of the same name never show.
   The product bodies reuse the same menu components the app has
   always rendered: LLM Ops and Me keep their
   sections minus the Govern group (the product switcher replaces it),

@@ -338,15 +338,27 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 /**
- * The one Insights entry, just above Settings in every product menu but Governance (it lists its
- * own Insights page). Hidden until `release_insights` and `release_dashboards` answer on (the
- * page lives in Dashboards), and on an aggregate project; the unread pill is lent by insight.
+ * The one Insights entry, just above Settings in every product menu; Governance skips it while it
+ * lists its own Insights page. Hidden until `release_insights` and `release_dashboards` answer on
+ * (the page lives in Dashboards), and on an aggregate project; the unread pill is lent by insight.
  * @see modules/insight/specs/insight-inbox.feature
  */
-function InsightsMenuLink({ showExpanded }: { showExpanded: boolean }) {
+function InsightsMenuLink({
+  surface,
+  showExpanded,
+}: {
+  surface: SidebarSurface;
+  showExpanded: boolean;
+}) {
   const host = useNavigationHost();
   const insights = host.featureFlag(FrontendFlags.release_insights);
   const dashboards = host.featureFlag(FrontendFlags.release_dashboards);
+  const governanceInsights = host.featureFlag(
+    FrontendFlags.release_ui_governance_billed_cost_enabled,
+  );
+  if (surface === "governance" && (governanceInsights.isLoading || governanceInsights.enabled)) {
+    return null;
+  }
   if (insights.isLoading || !insights.enabled) return null;
   if (dashboards.isLoading || !dashboards.enabled) return null;
   if (!host.hasPermission("analytics:view")) return null;
@@ -529,8 +541,8 @@ export function SidebarContent({
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}
           productPinned={
-            isDetour(surface) || surface === "governance" ? null : (
-              <InsightsMenuLink showExpanded={showExpanded} />
+            isDetour(surface) ? null : (
+              <InsightsMenuLink surface={surface} showExpanded={showExpanded} />
             )
           }
         />

@@ -332,7 +332,6 @@ type PageMenuLinkProps = {
   path: string;
   project?: NavigationProject;
   badgeNumber?: number;
-  rightElement?: React.ReactNode;
   isActive: boolean;
   showLabel?: boolean;
   beta?: string | boolean;
@@ -347,7 +346,6 @@ const PageMenuLink = ({
   path,
   project,
   badgeNumber,
-  rightElement,
   isActive,
   showLabel = true,
   beta,
@@ -365,7 +363,6 @@ const PageMenuLink = ({
       unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}
-      rightElement={rightElement}
       showLabel={showLabel}
       beta={beta}
       betaLabel={betaLabel}
