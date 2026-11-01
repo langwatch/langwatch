@@ -117,22 +117,26 @@ describe("the published @langwatch/mcp-server", () => {
     };
     child.stdin?.write(JSON.stringify(initialize) + "\n");
     await until(child, async () => child.output.includes('"serverInfo"'));
+    expect(child.output).toContain('"serverInfo"');
   });
 
   /** @scenario "The installed server starts in HTTP mode" */
   it("reports healthy in HTTP mode", async () => {
     const port = await freePort();
     const child = startCli(["--http", "--port", String(port)]);
+    let health: unknown;
     await until(child, async () => {
       try {
         const res = await fetch(`http://127.0.0.1:${port}/health`, {
           signal: AbortSignal.timeout(2_000),
         });
+        if (res.ok) health = await res.json();
         return res.ok;
       } catch {
         return false;
       }
     });
+    expect(health).toEqual({ status: "ok" });
   });
 
   /** @scenario "The library entries load through both doors of the exports map" */
@@ -143,7 +147,7 @@ describe("the published @langwatch/mcp-server", () => {
     ["config", "require"],
   ])("loads %s through %s", (entry, door) => {
     const spec = JSON.stringify(`@langwatch/mcp-server/${entry}`);
-    const [type, code] =
+    const [type, code]: [string, string] =
       door === "import" ? ["module", `await import(${spec})`] : ["commonjs", `require(${spec})`];
     expect(() =>
       execFileSync(process.execPath, [`--input-type=${type}`, "-e", code], {
