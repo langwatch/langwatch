@@ -54,7 +54,7 @@ const storedRecord = (
   input: Pick<DatasetRecord, "id" | "datasetId" | "projectId" | "entry">,
 ): DatasetRecord => ({ ...input, createdAt: new Date(0), updatedAt: new Date(0) });
 
-function service(overrides: { columnTypes?: DatasetColumns } = {}) {
+function service(overrides: { columnTypes?: DatasetColumns; realRecords?: boolean } = {}) {
   const row: Dataset = { ...dataset, columnTypes: overrides.columnTypes ?? dataset.columnTypes };
   const update = vi.fn(async (input: DatasetUpdateInput): Promise<Dataset> => ({
     ...row,
@@ -92,10 +92,10 @@ function service(overrides: { columnTypes?: DatasetColumns } = {}) {
     update,
   });
 
-  const records = Object.assign(MemoryDatasetRecordRepository.create({ database }), {
-    createMany,
-    update: updateRecord,
-  });
+  const memoryRecords = MemoryDatasetRecordRepository.create({ database });
+  const records = overrides.realRecords
+    ? memoryRecords
+    : Object.assign(memoryRecords, { createMany, update: updateRecord });
 
   return {
     service: DatasetService.create({
@@ -109,6 +109,8 @@ function service(overrides: { columnTypes?: DatasetColumns } = {}) {
     update,
     createMany,
     updateRecord,
+    records,
+    database,
   };
 }
 
@@ -161,7 +163,6 @@ describe("DatasetService", () => {
     });
 
     describe("when a caller writes deterministic ids and may retry a page", () => {
-      /** @scenario "A dataset row that already exists counts as added" */
       it("asks the store to skip duplicate ids instead of failing the batch", async () => {
         const { service: subject, createMany } = service();
 
@@ -178,6 +179,51 @@ describe("DatasetService", () => {
             skipDuplicates: true,
           }),
         );
+      });
+
+      /** @scenario "A dataset row that already exists counts as added" */
+      it("leaves one row when the same id is written twice with skipDuplicates", async () => {
+        const { service: subject, records } = service({ realRecords: true });
+        const input = {
+          slugOrId: "feedback",
+          projectId: PROJECT_ID,
+          entries: [{ id: "trigger-1-trace-1-0", input: "hi" }],
+          skipDuplicates: true,
+        };
+
+        await subject.batchCreateRecords(input);
+        await subject.batchCreateRecords(input);
+
+        const page = await records.listAll({
+          datasetId: "dataset-1",
+          projectId: PROJECT_ID,
+          page: 1,
+          limit: 10,
+        });
+        expect(page.total).toBe(1);
+        expect(page.records.map((record) => record.id)).toEqual(["trigger-1-trace-1-0"]);
+      });
+
+      it("still rejects a duplicate id when skipDuplicates is false", async () => {
+        const { service: subject, records } = service({ realRecords: true });
+        const input = {
+          slugOrId: "feedback",
+          projectId: PROJECT_ID,
+          entries: [{ id: "trigger-1-trace-1-0", input: "hi" }],
+        };
+
+        await subject.batchCreateRecords(input);
+        await expect(
+          subject.batchCreateRecords({ ...input, skipDuplicates: false }),
+        ).rejects.toThrow(/Unique constraint failed on the fields: \(id\)/);
+
+        const page = await records.listAll({
+          datasetId: "dataset-1",
+          projectId: PROJECT_ID,
+          page: 1,
+          limit: 10,
+        });
+        expect(page.total).toBe(1);
       });
     });
 
@@ -292,6 +338,77 @@ describe("DatasetService", () => {
         );
         expect(result.record.entry).toEqual({ input: "newvalue" });
       });
+    });
+  });
+});
+
+describe("MemoryDatasetRecordRepository.createMany", () => {
+  const repository = () =>
+    MemoryDatasetRecordRepository.create({ database: MemoryDatasetDatabase.create() });
+  const list = (records: MemoryDatasetRecordRepository, datasetId: string) =>
+    records.listAll({ datasetId, projectId: PROJECT_ID, page: 1, limit: 10 });
+
+  describe("when an id already belongs to another dataset in the same project", () => {
+    it("skips it instead of replacing the row in the other dataset", async () => {
+      const records = repository();
+
+      await records.createMany({
+        datasetId: "dataset-a",
+        projectId: PROJECT_ID,
+        entries: [{ id: "shared-id", input: "first" }],
+      });
+      await records.createMany({
+        datasetId: "dataset-b",
+        projectId: PROJECT_ID,
+        entries: [{ id: "shared-id", input: "second" }],
+        skipDuplicates: true,
+      });
+
+      const first = await list(records, "dataset-a");
+      expect(first.total).toBe(1);
+      expect(first.records[0]?.entry).toEqual({ input: "first" });
+      expect((await list(records, "dataset-b")).records).toEqual([]);
+    });
+
+    it("rejects the write when skipDuplicates is false", async () => {
+      const records = repository();
+
+      await records.createMany({
+        datasetId: "dataset-a",
+        projectId: PROJECT_ID,
+        entries: [{ id: "shared-id", input: "first" }],
+      });
+
+      await expect(
+        records.createMany({
+          datasetId: "dataset-b",
+          projectId: PROJECT_ID,
+          entries: [{ id: "shared-id", input: "second" }],
+          skipDuplicates: false,
+        }),
+      ).rejects.toThrow(/Unique constraint failed on the fields: \(id\)/);
+      expect((await list(records, "dataset-a")).records[0]?.entry).toEqual({ input: "first" });
+      expect((await list(records, "dataset-b")).records).toEqual([]);
+    });
+  });
+
+  describe("when the same id appears twice in one batch", () => {
+    it("keeps the first row, as Prisma does", async () => {
+      const records = repository();
+
+      await records.createMany({
+        datasetId: "dataset-a",
+        projectId: PROJECT_ID,
+        entries: [
+          { id: "twice", input: "first" },
+          { id: "twice", input: "second" },
+        ],
+        skipDuplicates: true,
+      });
+
+      const page = await list(records, "dataset-a");
+      expect(page.total).toBe(1);
+      expect(page.records[0]?.entry).toEqual({ input: "first" });
     });
   });
 });

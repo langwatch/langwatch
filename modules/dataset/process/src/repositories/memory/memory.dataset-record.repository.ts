@@ -101,11 +101,24 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     skipDuplicates?: boolean;
   }): Promise<DatasetRecord[]> {
     const now = toDate(this.#database.now());
-    const storedIds = new Set(this.#of(input).map((record) => record.id));
+    // `DatasetRecord.id` is globally unique (Prisma's `@id`), and putRecord replaces by
+    // projectId+id, so the ids are tracked project-wide: an id stored in another dataset
+    // must be skipped or refused here exactly as Postgres would.
+    const storedIds = new Set(
+      this.#database
+        .records()
+        .filter((record) => record.projectId === input.projectId)
+        .map((record) => record.id),
+    );
 
     for (const { id, ...entry } of input.entries) {
-      // Mirrors Prisma's skipDuplicates: a repeated deterministic id leaves the stored row.
-      if (input.skipDuplicates && storedIds.has(id)) continue;
+      if (storedIds.has(id)) {
+        // Mirrors Prisma's skipDuplicates: a repeated deterministic id leaves the stored row.
+        if (input.skipDuplicates) continue;
+        // Prisma's unique `DatasetRecord.id` fails the insert; never replace the stored row.
+        throw new Error(`Unique constraint failed on the fields: (id) ${id}`);
+      }
+
       this.#database.putRecord(
         datasetRecordSchema.parse({
           id,
@@ -116,6 +129,8 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
           updatedAt: now,
         }),
       );
+      // Same batch, later entry with this id: Prisma keeps the first row and skips the rest.
+      storedIds.add(id);
     }
 
     const created = new Set(input.entries.map((entry) => entry.id));
