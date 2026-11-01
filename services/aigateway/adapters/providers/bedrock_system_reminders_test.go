@@ -118,6 +118,8 @@ func TestBedrockTranslation_ClaudeCodeRequest_KeepsSystemMessagesInPlace(t *test
 func TestBedrockTranslation_PreviousRequestIsAPrefixOfTheNext(t *testing.T) {
 	first := converseFor(t, `{"model": "m", "max_tokens": 10, "system": "sys", "messages": [
 		{"role": "user", "content": "one"},
+		{"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {}}]},
+		{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "hi"}]},
 		{"role": "system", "content": [{
 			"type": "text", "text": "<total_tokens>9 tokens left</total_tokens>",
 			"cache_control": {"type": "ephemeral"}
@@ -125,6 +127,8 @@ func TestBedrockTranslation_PreviousRequestIsAPrefixOfTheNext(t *testing.T) {
 	]}`)
 	second := converseFor(t, `{"model": "m", "max_tokens": 10, "system": "sys", "messages": [
 		{"role": "user", "content": "one"},
+		{"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {}}]},
+		{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "hi"}]},
 		{"role": "system", "content": "<total_tokens>9 tokens left</total_tokens>"},
 		{"role": "assistant", "content": "two"},
 		{"role": "user", "content": "three"},
@@ -135,8 +139,11 @@ func TestBedrockTranslation_PreviousRequestIsAPrefixOfTheNext(t *testing.T) {
 	]}`)
 
 	assert.Equal(t, first.System, second.System)
-	require.Equal(t, "cache_point", first.Messages[0].Content[2].kind())
-	assert.Equal(t, first.Messages[0].Content[:2], second.Messages[0].Content)
+	require.Len(t, first.Messages, 3)
+	require.Len(t, second.Messages, 5)
+	assert.Equal(t, first.Messages[:2], second.Messages[:2])
+	require.Equal(t, "cache_point", first.Messages[2].Content[2].kind())
+	assert.Equal(t, first.Messages[2].Content[:2], second.Messages[2].Content)
 }
 
 // @scenario "A system message between turns on Bedrock stays in place with its cache breakpoint"
