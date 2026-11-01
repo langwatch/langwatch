@@ -9346,9 +9346,9 @@ The gateway calls `https://api.doubleword.ai` as an OpenAI-compatible endpoint.
 
 ## Model names
 
-Write `doubleword/<model>`. Doubleword model ids keep the vendor slash and casing Doubleword uses, for example `doubleword/deepseek-ai/DeepSeek-V4.1-Flash`, `doubleword/Qwen/Qwen3-Embedding-8B` or `doubleword/openai/gpt-oss-120b`. Only the first segment names the provider, and the rest is sent to Doubleword as is.
+Write `doubleword/<model>`. Doubleword model ids keep the vendor slash and casing Doubleword uses, for example `doubleword/deepseek-ai/DeepSeek-V4.1-Flash` or `doubleword/Qwen/Qwen3-Embedding-8B`. Only the first segment names the provider, and the rest is sent to Doubleword as is.
 
-Always keep the `doubleword/` prefix. A bare `openai/gpt-oss-120b` names the OpenAI provider, not Doubleword.
+Always keep the `doubleword/` prefix. Without it the gateway infers the provider from the model name, which may not pick Doubleword.
 
 ## Send a request
 
@@ -64033,7 +64033,7 @@ Langy runs on the model providers your project has enabled. Every provider excep
 | xAI              | API key                                              |                                                                                                                                       |
 | Cerebras         | API key                                              |                                                                                                                                       |
 | Groq             | API key                                              |                                                                                                                                       |
-| Doubleword       | API key                                              | Open-weight models such as DeepSeek, Qwen, GLM and gpt-oss.                                                                           |
+| Doubleword       | API key                                              | Open-weight models such as DeepSeek, Qwen, GLM and Kimi.                                                                           |
 | Voyage           | API key                                              | Embeddings.                                                                                                                           |
 | Custom (LiteLLM) | API key or endpoint                                  | Any provider reachable through LiteLLM.                                                                                               |
 
