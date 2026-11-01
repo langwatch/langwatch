@@ -84,6 +84,22 @@ describe("PersistActionWriterService.addToDataset", () => {
 
       expect(warnings()).toEqual([]);
     });
+
+    /** @scenario "A retry of a page writes the rows that already landed once" */
+    it("asks the dataset to skip ids an earlier attempt already wrote", async () => {
+      const appended: Parameters<DatasetApi["batchCreateRecords"]>[0][] = [];
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        batchCreateRecords: async (input) => {
+          appended.push(input);
+          return [];
+        },
+      });
+
+      await writer.addToDataset(write);
+
+      expect(appended).toEqual([expect.objectContaining({ skipDuplicates: true })]);
+    });
   });
 
   describe("given a mapping whose every column is gone", () => {

@@ -99,6 +99,9 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         slugOrId: input.datasetId,
         projectId: input.projectId,
         entries,
+        // Record ids are deterministic per trigger, trace and row, so a page retry that
+        // re-runs a trace whose rows already landed is already done, not a failure.
+        skipDuplicates: true,
       });
     } catch (error) {
       // A column refusal here means one was removed since the trim: a redelivery re-reads them.

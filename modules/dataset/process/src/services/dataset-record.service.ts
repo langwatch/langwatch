@@ -405,6 +405,7 @@ export class DatasetRecordService {
           id: entry.id ?? this.deps.generateId(),
           ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
         })),
+        skipDuplicates: parsed.skipDuplicates ?? false,
       }),
     );
   }
