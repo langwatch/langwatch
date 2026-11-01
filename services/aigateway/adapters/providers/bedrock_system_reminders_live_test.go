@@ -5,7 +5,7 @@
 //
 //	AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... \
 //	go test -tags live_bedrock_cache ./services/aigateway/adapters/providers/ \
-//	  -run BedrockSystemReminderLive -count=1 -v
+//	  -run Live -count=1 -v
 package providers
 
 import (
@@ -23,7 +23,8 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-func TestBedrockSystemReminderLive_HistoryStaysCached(t *testing.T) {
+func liveBedrockCacheCred(t *testing.T) (domain.Credential, string) {
+	t.Helper()
 	ak, sk := os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY")
 	if ak == "" || sk == "" {
 		t.Skip("AWS creds not set")
@@ -36,10 +37,14 @@ func TestBedrockSystemReminderLive_HistoryStaysCached(t *testing.T) {
 	if region == "" {
 		region = "eu-central-1"
 	}
-	cred := domain.Credential{
+	return domain.Credential{
 		ID: "live-bedrock-cache", ProviderID: domain.ProviderBedrock, APIKey: ak,
 		Extra: map[string]string{"access_key": ak, "secret_key": sk, "region": region},
-	}
+	}, model
+}
+
+func TestBedrockSystemReminderLive_HistoryStaysCached(t *testing.T) {
+	cred, model := liveBedrockCacheCred(t)
 	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop(), InitialPoolSize: 10})
 	require.NoError(t, err)
 	defer router.Close()
@@ -85,4 +90,77 @@ func TestBedrockSystemReminderLive_HistoryStaysCached(t *testing.T) {
 			}}},
 		)
 	}
+}
+
+// TestBedrockCacheTTLLive writes one entry per lifetime, waits past 5 minutes
+// and reads both back. BEDROCK_CACHE_WAIT overrides the wait.
+func TestBedrockCacheTTLLive_HourEntryOutlivesFiveMinutes(t *testing.T) {
+	cred, model := liveBedrockCacheCred(t)
+	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop(), InitialPoolSize: 10})
+	require.NoError(t, err)
+	defer router.Close()
+
+	wait := 6*time.Minute + 30*time.Second
+	if override := os.Getenv("BEDROCK_CACHE_WAIT"); override != "" {
+		wait, err = time.ParseDuration(override)
+		require.NoError(t, err)
+	}
+	marker := func(ttl string) map[string]any {
+		if ttl == "" {
+			return map[string]any{"type": "ephemeral"}
+		}
+		return map[string]any{"type": "ephemeral", "ttl": ttl}
+	}
+	send := func(ttl string, run int64, stream bool) domain.Usage {
+		body, err := json.Marshal(map[string]any{
+			"model": model, "max_tokens": 16, "system": "You answer in one word.",
+			"messages": []map[string]any{{"role": "user", "content": []map[string]any{{
+				"type": "text", "cache_control": marker(ttl),
+				"text": fmt.Sprintf("Run %d. Reply ok. %s", run,
+					strings.Repeat("The quick brown fox jumps over the lazy dog near the river bank. ", 400)),
+			}}}},
+		})
+		require.NoError(t, err)
+		req := &domain.Request{
+			Type: domain.RequestTypeMessages, Model: model, Body: body,
+			Resolved: &domain.ResolvedModel{ModelID: model, ProviderID: domain.ProviderBedrock},
+		}
+		if !stream {
+			resp, err := router.Dispatch(context.Background(), req, cred)
+			require.NoError(t, err)
+			return resp.Usage
+		}
+		iter, err := router.DispatchStream(context.Background(), req, cred)
+		require.NoError(t, err)
+		defer func() { _ = iter.Close() }()
+		for iter.Next(context.Background()) {
+			_ = iter.Chunk()
+		}
+		require.NoError(t, iter.Err())
+		return iter.Usage()
+	}
+
+	now := time.Now().UnixNano()
+	hour := send("1h", now, false)
+	hourStream := send("1h", now+1, true)
+	short := send("", now+2, false)
+	t.Logf("write 1h: %+v", hour)
+	t.Logf("write 1h stream: %+v", hourStream)
+	t.Logf("write default: %+v", short)
+	require.Positive(t, hour.CacheCreation1hTokens)
+	require.Equal(t, hour.CacheCreationTokens, hour.CacheCreation1hTokens)
+	require.Positive(t, hourStream.CacheCreation1hTokens)
+	require.Zero(t, short.CacheCreation1hTokens)
+
+	time.Sleep(wait)
+
+	hourRead := send("1h", now, false)
+	streamRead := send("1h", now+1, true)
+	shortRead := send("", now+2, false)
+	t.Logf("read 1h after %s: %+v", wait, hourRead)
+	t.Logf("read 1h stream after %s: %+v", wait, streamRead)
+	t.Logf("read default after %s: %+v", wait, shortRead)
+	require.Positive(t, hourRead.CacheReadTokens)
+	require.Positive(t, streamRead.CacheReadTokens)
+	require.Zero(t, shortRead.CacheReadTokens)
 }

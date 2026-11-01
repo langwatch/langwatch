@@ -227,6 +227,34 @@ Feature: Anthropic Messages translation: reaching non-Anthropic providers from a
     When the gateway translates the request
     Then those messages keep their system role
 
+  @bdd @messages-translation @unit
+  Scenario: An hour-long cache breakpoint keeps its lifetime on Bedrock
+    Given the virtual key resolves to Bedrock
+    And a /v1/messages request carries cache_control with ttl 1h
+    When the gateway translates the request to Converse
+    Then the matching cache points carry ttl 1h
+    And later cache points without that ttl stay at the default lifetime
+
+  @bdd @messages-translation @unit
+  Scenario: Requests without an hour-long breakpoint keep the vendored Converse conversion
+    Given the virtual key resolves to Bedrock or another translated provider
+    And a /v1/messages request has no cache_control with ttl 1h
+    When the gateway translates the request
+    Then no raw request body is set
+
+  @bdd @messages-translation @unit
+  Scenario: A non-Anthropic Bedrock model keeps the default cache lifetime
+    Given the virtual key resolves to a non-Anthropic model on Bedrock
+    And a /v1/messages request carries cache_control with ttl 1h
+    When the gateway translates the request
+    Then the cache points carry no ttl, because Bedrock refuses it on those models
+
+  @bdd @messages-translation @unit
+  Scenario: Hour-long cache writes on the translated lane are counted apart
+    Given a translated provider reports cache writes split by lifetime
+    When the gateway reads the usage
+    Then the hour-long writes are reported as hour-long writes, within the write total
+
   # ==========================================================================
   # Non-goals: what this deliberately does not change
   # ==========================================================================
