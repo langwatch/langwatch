@@ -47,18 +47,19 @@ describe("fillDeclaredColumns", () => {
     });
   });
 
-  describe("given a JSON column no row has a value in", () => {
-    /** @scenario "A JSON column empty in a row is left out of that row" */
-    it("leaves that column out instead of sending empty text", () => {
+  describe("given columns that are not text with no value in a row", () => {
+    /** @scenario "A column that is not text, empty in a row, is left out of that row" */
+    it("leaves those columns out instead of sending empty text", () => {
       const rows = fillDeclaredColumns({
         rows: [{ input: "hi" }],
         columns: [
           { name: "input", type: "string" },
           { name: "messages", type: "chat_messages" },
+          { name: "score", type: "number" },
         ],
       });
 
-      expect(rows[0]).not.toHaveProperty("messages");
+      expect(rows[0]).toEqual({ input: "hi" });
     });
   });
 

@@ -50,11 +50,11 @@ Feature: An evaluation run accepts inline data, a dataset id, or parameters
     Then no row carries "environment"
 
   @unit
-  Scenario: A JSON column empty in a row is left out of that row
-    Given a dataset with the columns "input" and "messages" of type chat messages
-    And a row has no value in "messages"
+  Scenario: A column that is not text, empty in a row, is left out of that row
+    Given a dataset with a text column "input", a chat messages column "messages" and a number column "score"
+    And a row has no value in "messages" or "score"
     When the run loads the dataset
-    Then that row does not carry "messages"
+    Then that row carries neither "messages" nor "score"
 
   @unit
   Scenario: A parameter overrides a column that is empty in every row

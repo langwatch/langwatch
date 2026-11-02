@@ -102,7 +102,7 @@ export const rowsFromInlineData = (data: Record<string, unknown>[]): LoadedDatas
 /**
  * Every row with a key for each text column the dataset declares: a cell with no
  * value reads as empty text, so a column left empty on purpose still reaches the
- * target. JSON columns and keys the dataset does not declare are never added.
+ * target. Other column types and undeclared keys are never added.
  * @see specs/experiments-v3/execution-inputs.feature
  */
 export const fillDeclaredColumns = ({
@@ -112,9 +112,7 @@ export const fillDeclaredColumns = ({
   rows: Record<string, unknown>[];
   columns: { name: string; type?: string }[];
 }): Record<string, unknown>[] => {
-  const textColumns = columns.filter(
-    (column) => !JSON_COLUMN_TYPES.some((type) => type === column.type),
-  );
+  const textColumns = columns.filter((column) => column.type === "string");
   if (textColumns.length === 0) return rows;
   return rows.map((row) => {
     const missing = textColumns.filter((column) => row[column.name] === undefined);
