@@ -32,8 +32,8 @@ import type { Nav } from "../features/navigation/model.ts";
 import { publishSearchIndex, searchEntry } from "../features/search/compile.ts";
 import { publicSlug, withBasePath } from "../lib/site-path.ts";
 import { appRoot, cacheRoot, docsRoot, readBuildOptions } from "../paths.ts";
-import { writeVersionedPages } from "./build-version.ts";
 import { PAGE_TOKENS } from "./audit/budgets.ts";
+import { writeVersionedPages } from "./build-version.ts";
 import { compressedSearchIndex } from "./compressed-index.ts";
 import { inlinePageStyles } from "./css/page-styles.ts";
 import {

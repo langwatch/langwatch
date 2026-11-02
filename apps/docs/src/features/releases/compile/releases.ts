@@ -8,7 +8,8 @@ import { releaseSchema, type Release } from "../model/release.ts";
 export const RELEASES_SLUG = "changelog";
 const PUBLISHED = 5;
 const WHATS_NEW = 3;
-const LEFT_OUT_NOTE = "Earlier recent releases are left out of this Markdown copy to keep it short.";
+const LEFT_OUT_NOTE =
+  "Earlier recent releases are left out of this Markdown copy to keep it short.";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
 const cache = new Map<string, { modified: number; entries: Release[] }>();
