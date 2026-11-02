@@ -5,18 +5,20 @@ Feature: Useful release updates in the documentation
   Scenario: Read published release notes
     Given the repository changelog has dated releases and an unreleased section
     When the site reads release notes at build time
-    Then the site reads up to the five newest published releases
+    Then it selects the five newest published releases
     And the latest summary comes from its features or fixes
     And version, date and full notes link to the changelog page
     And the changelog page shows those notes and links on to the self-hosting upgrade notes
     And missing or invalid notes produce no announcement
 
   @unit
-  Scenario: Keep the changelog page within the page token budget
+  Scenario: Keep the changelog Markdown export within the page token budget
     Given the newest published releases are together longer than the agent readiness page token budget
-    When the changelog page is built
-    Then it always shows the newest release
-    And it shows each older release only while the page stays within the budget
+    When the changelog's Markdown export is built
+    Then it always keeps the newest release, even when that release alone is over the budget
+    And it keeps each older release only while the built export stays within the budget
+    And a short note under the kept releases says the others are left out
+    But the changelog page still shows every published release
 
   @unit
   Scenario: Show what is new on the home page

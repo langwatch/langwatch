@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { z } from "zod";
 
+import { pageTokensSchema } from "../../lib/page-tokens.ts";
+
 export const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"] as const;
 export const FORM_FACTORS = ["mobile", "desktop"] as const;
 /** Lighthouse's experimental checks for AI agents: reported beside the scores, never gated. */
@@ -41,8 +43,7 @@ export const budgetsSchema = z.strictObject({
     known: z.record(z.string(), z.array(z.string())).default({}),
   }),
   agentReadiness: z.strictObject({
-    /** Approximate tokens (characters / 4) one page's Markdown export may hold. */
-    pageTokens: z.number().int().positive(),
+    pageTokens: pageTokensSchema,
     /** Which docs.json pages are integration pages: whole navigation groups, plus listed slugs. */
     integration: z.strictObject({
       groups: z.array(z.strictObject({ anchor: z.string(), group: z.string() })),

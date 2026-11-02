@@ -3,15 +3,13 @@ import path from "node:path";
 
 import { Temporal } from "@langwatch/time";
 
-import { approximateTokens } from "../../../site/audit/agent-markdown.ts";
-import budgets from "../../../site/audit/budgets.json" with { type: "json" };
 import { releaseSchema, type Release } from "../model/release.ts";
 
 export const RELEASES_SLUG = "changelog";
 const PUBLISHED = 5;
 const WHATS_NEW = 3;
-// Covers what the Markdown export adds around the page (instructions, title, provenance, absolute links).
-const EXPORT_RESERVE_TOKENS = 500;
+const LEFT_OUT_NOTE =
+  "Earlier recent releases are left out of this Markdown copy to keep it short; see the [full changelog on GitHub](https://github.com/langwatch/langwatch/blob/main/CHANGELOG.md).";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
 const cache = new Map<string, { modified: number; entries: Release[] }>();
@@ -107,15 +105,21 @@ export function readReleases({ docsRoot }: { docsRoot: string }) {
   return entries;
 }
 
-/** Fills the changelog's `<ReleaseNotes />` tag (else its top) and any `<WhatsNew />` tag. */
+/**
+ * Fills the changelog's `<ReleaseNotes />` tag (else its top) and any `<WhatsNew />` tag.
+ * `releaseCount` keeps only the newest releases (at least one) and notes that the rest are
+ * left out; the Markdown export passes it to fit the page token budget, the page never does.
+ */
 export function withReleaseNotes({
   source,
   slug,
   docsRoot,
+  releaseCount,
 }: {
   source: string;
   slug: string;
   docsRoot: string;
+  releaseCount?: number;
 }) {
   if (slug !== RELEASES_SLUG) {
     if (!WHATS_NEW_TAG.test(source)) return source;
@@ -123,24 +127,13 @@ export function withReleaseNotes({
   }
   const entries = readReleases({ docsRoot });
   if (!entries.length) return source.replace(NOTES_TAG, "");
-  const sections = entries.map(
+  const kept = entries.slice(0, Math.max(1, releaseCount ?? entries.length));
+  const sections = kept.map(
     ({ version, label, body, compare }) =>
       `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
   );
-  // The newest release always shows; each older one only while the page stays
-  // within the agent readiness token budget. The page links to the full
-  // changelog for the rest.
-  const { pageTokens } = budgets.agentReadiness;
-  let page = placeNotes({ source, notes: sections[0] ?? "" });
-  for (let count = 2; count <= sections.length; count++) {
-    const longer = placeNotes({ source, notes: sections.slice(0, count).join("\n") });
-    if (approximateTokens({ text: longer }) > pageTokens - EXPORT_RESERVE_TOKENS) break;
-    page = longer;
-  }
-  return page;
-}
-
-function placeNotes({ source, notes }: { source: string; notes: string }) {
+  if (kept.length < entries.length) sections.push(`${LEFT_OUT_NOTE}\n`);
+  const notes = sections.join("\n");
   if (NOTES_TAG.test(source)) return source.replace(NOTES_TAG, () => notes);
   const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/)?.[0] ?? "";
   return `${frontmatter}\n${notes}\n${source.slice(frontmatter.length)}`;

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { fitsPageTokens } from "../../../lib/page-tokens.ts";
 import { canonicalUrl, docsUrl } from "../../../lib/site-path.ts";
 import { resolveOperation } from "../../api-reference/compile.ts";
 import {
@@ -11,7 +12,7 @@ import {
 } from "../../api-reference/model.ts";
 import { readFrontmatter, withoutFrontmatter } from "../../content/compile.ts";
 import { readDocsConfig } from "../../navigation/compile.ts";
-import { withReleaseNotes } from "../../releases/compile.ts";
+import { RELEASES_SLUG, readReleases, withReleaseNotes } from "../../releases/compile.ts";
 import { mdxToMarkdown } from "./mdx-markdown.ts";
 import { FENCE, mapProse, markedLines } from "./mdx-text.ts";
 import { pageDescription } from "./page-head.ts";
@@ -258,13 +259,39 @@ export function pageMarkdown({
   docsRoot,
   slug,
   instructions = agentInstructions({ docsRoot }),
+  fitPageTokens = false,
 }: {
   docsRoot: string;
   slug: string;
   /** Pass "" where pages are concatenated, so the block appears once rather than per page. */
   instructions?: string;
+  /** The page's own export: the changelog keeps its newest release, older ones while they fit. */
+  fitPageTokens?: boolean;
 }) {
   const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
+  const exportOf = (releaseCount?: number) =>
+    exportMarkdown({ docsRoot, slug, instructions, source, releaseCount });
+  if (slug !== RELEASES_SLUG || !fitPageTokens) return exportOf();
+  for (let count = readReleases({ docsRoot }).length; count > 1; count--) {
+    const markdown = exportOf(count);
+    if (fitsPageTokens({ markdown })) return markdown;
+  }
+  return exportOf(1);
+}
+
+function exportMarkdown({
+  docsRoot,
+  slug,
+  instructions,
+  source,
+  releaseCount,
+}: {
+  docsRoot: string;
+  slug: string;
+  instructions: string;
+  source: string;
+  releaseCount?: number;
+}) {
   const metadata = readFrontmatter({ source });
   const operation = metadata.openapi
     ? resolveOperation({ docsRoot, openapi: metadata.openapi })
@@ -274,7 +301,9 @@ export function pageMarkdown({
   const fallbackTitle = (slug.split("/").pop() ?? slug).replaceAll("-", " ");
   const title = (metadata.title ?? operation?.summary ?? fallbackTitle) || fallbackTitle;
   const description = pageDescription({ title, description: metadata.description, operation });
-  const authored = withoutFrontmatter({ source: withReleaseNotes({ source, slug, docsRoot }) });
+  const authored = withoutFrontmatter({
+    source: withReleaseNotes({ source, slug, docsRoot, releaseCount }),
+  });
   const markdown = mdxToMarkdown({ source: inlineSnippets({ docsRoot, source: authored }) });
   const body = absoluteLinks({ source: markdown }).trim();
   return (

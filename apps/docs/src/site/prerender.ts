@@ -254,7 +254,7 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
 /** A page's Markdown exports; the home page is also exported at the root. */
 function exportsOf({ slug }: { slug: string }): [string, string][] {
   if (slug === "404") return [];
-  const markdown = pageMarkdown({ docsRoot, slug });
+  const markdown = pageMarkdown({ docsRoot, slug, fitPageTokens: true });
   const names =
     slug === "introduction" ? [slug, "index"] : [...new Set([slug, publicSlug({ slug })])];
   return names.flatMap((name) =>

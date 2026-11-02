@@ -76,7 +76,7 @@ function serveSource({
     const exported = exportSlug({ pathname });
     const slug = Object.hasOwn(nav.pages, exported) ? exported : `${exported}/index`;
     if (!Object.hasOwn(nav.pages, slug)) return void response.writeHead(404).end("Not found");
-    const body = pageMarkdown({ docsRoot, slug });
+    const body = pageMarkdown({ docsRoot, slug, fitPageTokens: true });
     return send({ response, type: "text/markdown; charset=utf-8", body });
   }
   const [, top = ""] = pathname.split("/");

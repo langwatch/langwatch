@@ -182,8 +182,10 @@ than an automatically rotating ticker: it truncates on desktop and retains the
 version/date on phones, with no motion in either preference mode. Existing tiny
 controls remember dismissal by version, so another release is visible again.
 There is no fetch or rendering runtime for the strip. Missing or invalid notes
-omit it. The five newest releases are injected into the changelog page and its
-Markdown output at build time; the changelog links on to the self-hosting
+omit it. The five newest releases are injected into the changelog page at build
+time. Its Markdown export always keeps the newest release and each older one only
+while the export fits the agent readiness page token budget, with a short note
+when some are left out. The changelog links on to the self-hosting
 releases and upgrade pages. The home page's `<WhatsNew />` tag becomes a short
 list of the three newest, each linking to its changelog entry. The docs.json
 announcement and the release line both sit on paper with muted text; each leads
