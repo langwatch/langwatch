@@ -54,6 +54,18 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     Then the page still offers to sign out of the identity provider and try again
     And the guidance falls back to signing in with the method used before
 
+  # The library's own log line for a refused link says only "account_not_linked",
+  # so an alert on it could not tell on-call which customer or which sign-in
+  # method was involved. The door logs that itself, without the full address.
+
+  @unit
+  Scenario: A refused link is logged with the sign-in method and the email domain
+    When the user completes an OAuth sign-in with a different method for the same email
+    Then one warning is logged naming the sign-in method they used
+    And it names the domain of the address the identity provider returned
+    And it names the connection that governs that address, if one does
+    And it never contains the full email address
+
   # A member can be left carrying a stale "you still need to link SSO" flag:
   # it is set at sign-in and only ever cleared by a LATER sign-in that
   # happens to match the organization's required method. The dashboard

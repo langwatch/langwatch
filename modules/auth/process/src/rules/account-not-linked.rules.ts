@@ -43,3 +43,29 @@ function parsedLocation(location: string): { parsed: true; url: URL } | { parsed
     return { parsed: false };
   }
 }
+
+/**
+ * The sign-in method a callback path names: `/callback/<provider>` for a social provider,
+ * `/oauth2/callback/<id>` for a generic OIDC one, `/sso/callback/<id>` for a connection.
+ * `unknown` on any other path, so a refusal log never guesses.
+ */
+export function signInMethodOfPath({ url }: { url: string }): string {
+  const target = parsedLocation(url);
+  if (!target.parsed) return UNKNOWN;
+  const match = /\/callback\/([^/?#]+)/.exec(target.url.pathname);
+  return match?.[1] ? decodeURIComponent(match[1]) : UNKNOWN;
+}
+
+/**
+ * The domain of an address, lower-cased, for logs that must not carry the address itself;
+ * `unknown` when the provider returned none.
+ */
+export function emailDomainOf({ email }: { email: string | undefined }): string {
+  if (email === undefined) return UNKNOWN;
+  const at = email.lastIndexOf("@");
+  if (at < 0 || at === email.length - 1) return UNKNOWN;
+  return email.slice(at + 1).toLowerCase();
+}
+
+/** What a refusal log writes for a field the request did not carry. */
+const UNKNOWN = "unknown";

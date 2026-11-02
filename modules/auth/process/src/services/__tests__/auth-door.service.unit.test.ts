@@ -540,6 +540,38 @@ describe("given an OAuth sign-in Better Auth would not link to the account holdi
     });
   });
 
+  describe("when the refusal is logged", () => {
+    /** @scenario "A refused link is logged with the sign-in method and the email domain" */
+    it("names the sign-in method, the email domain and the governing connection", async () => {
+      loggerSpies.warn.mockClear();
+      const { service } = doorRefusingLink({ governing: { "andrei@acme.com": ["ssoc_acme"] } });
+
+      await service.betterAuthHandshake(callback());
+
+      expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
+      const [fields, message] = loggerSpies.warn.mock.calls[0]!;
+      expect(fields).toEqual({
+        provider: "google",
+        emailDomain: "acme.com",
+        governingConnectionId: "ssoc_acme",
+      });
+      expect(message).toBe(
+        "sign-in refused: the address already has an account under another sign-in method",
+      );
+    });
+
+    /** @scenario "A refused link is logged with the sign-in method and the email domain" */
+    it("never writes the full address", async () => {
+      loggerSpies.warn.mockClear();
+      const { service } = doorRefusingLink({ governing: {} });
+
+      await service.betterAuthHandshake(callback());
+
+      expect(JSON.stringify(loggerSpies.warn.mock.calls)).not.toContain("andrei");
+      expect(loggerSpies.warn.mock.calls[0]![0]).toMatchObject({ governingConnectionId: null });
+    });
+  });
+
   describe("when the redirect is some other refusal", () => {
     it("asks nobody who governs the address", async () => {
       const { service, asked } = doorRefusingLink({
