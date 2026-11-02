@@ -312,6 +312,33 @@ function contractCases(backend: Backend): void {
       expect(await ids(dataset.id)).toEqual(["new-1", "new-2"]);
       expect(await ids(other.id)).toEqual(["other-1"]);
     });
+
+    it("keeps the old entries when a later batch of the replacement fails", async () => {
+      const dataset = await create("replace-failed");
+      const projectId = backend.mine();
+      await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId,
+        entries: [{ id: "kept-1", input: "one" }],
+      });
+      const entries = Array.from({ length: 600 }, (_, index) => ({
+        id: `batch-${index}`,
+        input: `row ${index}`,
+      }));
+      entries.push({ id: "batch-0", input: "a duplicate id in the second batch" });
+
+      await expect(
+        backend.records().replaceAll({ datasetId: dataset.id, projectId, entries }),
+      ).rejects.toBeInstanceOf(Error);
+
+      const remaining = await backend.records().listAll({
+        datasetId: dataset.id,
+        projectId,
+        page: 1,
+        limit: 50,
+      });
+      expect(remaining.records.map((record) => record.id)).toEqual(["kept-1"]);
+    });
   });
 
   describe("when a storage migration pages the project's datasets", () => {
