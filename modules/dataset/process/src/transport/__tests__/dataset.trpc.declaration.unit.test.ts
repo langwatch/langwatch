@@ -99,7 +99,6 @@ describe("the dataset tRPC declaration", () => {
         ["versionPage", "query", "datasets:view"],
         ["compareVersion", "query", "datasets:view"],
         ["restoreVersion", "mutation", "datasets:manage"],
-        ["pinVersion", "mutation", "datasets:update"],
         ["runVersions", "query", "datasets:view"],
       ]);
     });

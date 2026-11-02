@@ -887,7 +887,6 @@ Contract `../contract/src/dataset.trpc.ts:61`, router `src/transport/dataset.trp
 | `dataset.versionPage`            | query    | Permission `datasets:view`   | `datasetVersionPageInputSchema`            | `datasetVersionPageSchema`       |
 | `dataset.compareVersion`         | query    | Permission `datasets:view`   | `compareDatasetVersionInputSchema`         | `datasetVersionComparisonSchema` |
 | `dataset.restoreVersion`         | mutation | Permission `datasets:manage` | `datasetVersionLookupInputSchema`          | `datasetVersionRestoredSchema`   |
-| `dataset.pinVersion`             | mutation | Permission `datasets:update` | `datasetVersionLookupInputSchema`          | `datasetVersionSchema`           |
 | `dataset.runVersions`            | query    | Permission `datasets:view`   | `findRunDatasetVersionsInputSchema`        | inline                           |
 
 ```typescript
@@ -1075,17 +1074,13 @@ interface Input {
 }
 type Output = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:219
 
-// dataset.pinVersion
-type Input = z.infer<typeof datasetVersionLookupInputSchema>; // ../contract/src/dataset-version.ts:115
-type Output = z.infer<typeof datasetVersionSchema>; // ../contract/src/dataset-version.ts:70
-
 // dataset.runVersions
 // Input: findRunDatasetVersionsInputSchema, ../contract/src/dataset-version.ts:244
 interface Input {
   projectId: string;
   runIds: string[];
 }
-// Output: inline, ../contract/src/dataset.trpc.ts:180
+// Output: inline, ../contract/src/dataset.trpc.ts:175
 type Output = {
   runId: string;
   datasetId: string;

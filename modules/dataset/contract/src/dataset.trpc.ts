@@ -169,11 +169,6 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .withInput(datasetVersionLookupInputSchema)
   .withOutput(datasetVersionRestoredSchema)
 
-  /** A version an experiment names, kept out of retention. */
-  .mutation("pinVersion")
-  .withInput(datasetVersionLookupInputSchema)
-  .withOutput(datasetVersionSchema)
-
   /** The dataset versions these experiment runs read. */
   .query("runVersions")
   .withInput(findRunDatasetVersionsInputSchema)

@@ -109,9 +109,6 @@ export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof data
     .handle(({ app, input, actor }) =>
       app.restoreVersion({ ...input, editedBy: datasetAuthorOf({ actor }) }),
     )
-    .procedure("pinVersion")
-    .withPermission("datasets:update")
-    .handle(({ app, input }) => app.pinVersion(input))
     .procedure("runVersions")
     .withPermission("datasets:view")
     .handle(({ app, input }) => app.findRunVersions(input))
