@@ -138,10 +138,10 @@ Rule: Grok's fixed resource is enough to recognise it
 
   @unit
   Scenario: Wrapper resource attributes Grok drops are not relied on
-    Given the wrapper set OTEL_RESOURCE_ATTRIBUTES for the Grok child
-    And Grok exported its records without them
+    Given Grok exported its records under its own fixed resource
+    And no wrapper resource attribute is present on them
     When the records are received under the grok_cli key
-    Then they are attributed and recognised exactly as if the variable were unset
+    Then they are attributed and recognised from the key alone
 
 Rule: Logs-only sessions group under a synthesized trace
 

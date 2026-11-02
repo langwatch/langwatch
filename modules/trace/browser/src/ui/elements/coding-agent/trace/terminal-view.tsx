@@ -1475,15 +1475,16 @@ function ToolResultBody({
 }
 
 /**
- * A tool the human turned down. It never ran, so there is no span and no
- * output — only that it was asked for and refused.
+ * A tool that never ran: the human denied it, or it was aborted (cancelled or
+ * timed out). An abort may not be the user's doing, so only a denial names them.
  */
 function RejectedLine({ name, outcome }: { name: string | null; outcome: "denied" | "aborted" }) {
+  const verdict = outcome === "denied" ? "denied by the user" : "aborted";
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={GLYPH.denied} color={TERMINAL_TOKENS.red} />
       <Text {...CELL} color={TERMINAL_TOKENS.red} flex={1} minWidth={0}>
-        {`${name ?? "A tool call"} — ${outcome} by the user, never ran`}
+        {`${name ?? "A tool call"} — ${verdict}, never ran`}
       </Text>
     </HStack>
   );
