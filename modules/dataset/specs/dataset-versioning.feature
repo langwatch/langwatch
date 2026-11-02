@@ -30,6 +30,24 @@ Feature: Dataset version history
     Then the dataset has version 2 named "Before relabel", authored by that user
 
   @unit
+  Scenario: Edits are recorded for the autosave at most once per window
+    Given a dataset connected to the autosave
+    When a user edits two rows within 30 seconds, then another row after them
+    Then the first two edits are recorded once and the later edit is recorded again
+
+  @unit
+  Scenario: A save that loses its number to a concurrent save takes the next one
+    Given a dataset with version 1 and edited content
+    When another save takes version 2 while this save writes
+    Then this save is version 3
+
+  @unit
+  Scenario: A save that never gets a number removes the rows it wrote
+    Given a dataset with version 1 and edited content
+    When every version number this save tries is taken by a concurrent save
+    Then the save fails and the rows it wrote are removed
+
+  @unit
   Scenario: Saving unchanged content creates no version
     Given a dataset whose latest version holds its current content
     When a version is saved automatically or by an experiment run

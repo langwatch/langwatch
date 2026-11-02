@@ -8,8 +8,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { MigrationStepReport } from "@langwatch/upgrade/step";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DatasetVersionNumberTakenError } from "../../repositories/dataset-version.repository.ts";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
 import { MemoryDatasetVersionRepository } from "../../repositories/memory/memory.dataset-version.repository.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
@@ -183,6 +184,71 @@ describe("given a dataset whose import is still processing", () => {
       app.autosaveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE }),
     ).resolves.toBeUndefined();
     expect(await repositories.versions.findAll({ projectId: PROJECT, datasetId })).toEqual([]);
+  });
+});
+
+describe("given a dataset connected to the autosave", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** @scenario "Edits are recorded for the autosave at most once per window" */
+  it("records edits inside 30 seconds once and an edit after them again", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(clock);
+    const recorded: string[] = [];
+    const ignore = { send: async () => undefined };
+    app.connectVersions({
+      recordContentEdit: { send: async (input) => void recorded.push(input.datasetId) },
+      recordVersionSaved: ignore,
+      recordVersionRestored: ignore,
+    });
+    const datasetId = await createDataset();
+    vi.setSystemTime(clock + 60_000);
+    recorded.length = 0;
+
+    await edit(datasetId, "a", "one");
+    await edit(datasetId, "b", "two");
+    vi.setSystemTime(clock + 91_000);
+    await edit(datasetId, "a", "three");
+
+    expect(recorded).toEqual([datasetId, datasetId]);
+  });
+});
+
+describe("given a save racing another save for its version number", () => {
+  async function editedDataset() {
+    const datasetId = await createDataset();
+    await save(datasetId);
+    await edit(datasetId, "a", "changed");
+    return datasetId;
+  }
+
+  /** @scenario "A save that loses its number to a concurrent save takes the next one" */
+  it("takes the number after the one the other save took", async () => {
+    const datasetId = await editedDataset();
+    const create = repositories.versions.create.bind(repositories.versions);
+    vi.spyOn(repositories.versions, "create").mockImplementationOnce(async (input) => {
+      await create({ ...input, id: "concurrent", contentHash: "another-content" });
+      throw new DatasetVersionNumberTakenError();
+    });
+
+    const saved = await save(datasetId);
+
+    expect(saved.version).toBe(3);
+  });
+
+  /** @scenario "A save that never gets a number removes the rows it wrote" */
+  it("fails after its tries and removes the rows it wrote", async () => {
+    const datasetId = await editedDataset();
+    vi.spyOn(repositories.versions, "create").mockRejectedValue(
+      new DatasetVersionNumberTakenError(),
+    );
+    const deleteChunks = vi.spyOn(repositories.versionContent, "deleteChunks");
+
+    await expect(save(datasetId)).rejects.toThrow(/took no version number/);
+
+    expect(deleteChunks).toHaveBeenCalledWith(expect.objectContaining({ chunkCount: 1 }));
   });
 });
 
