@@ -161,6 +161,14 @@ func TestRedactSecrets_ExtraValuesAreRedactedToo(t *testing.T) {
 	assert.Equal(t, "k=[redacted]", codeblock.RedactSecrets("k=sandbox-key", nil, "sandbox-key"))
 }
 
+func TestRedactSecrets_IsIdempotentWithOneCharSecrets(t *testing.T) {
+	secrets := map[string]string{"a": "e", "b": "d", "c": "r"}
+	text := codeblock.RedactSecrets("x e d r y", secrets)
+	again := codeblock.RedactSecrets(text, secrets)
+	assert.Equal(t, text, again)
+	assert.Equal(t, "x [redacted] [redacted] [redacted] y", text)
+}
+
 func TestWithStderrTail_SandboxKeyStraddlingTheCutIsAbsent(t *testing.T) {
 	key := "SANDBOXKEY12345678"
 	stderr := "boom\n" + strings.Repeat("a", 500) + "\n" + key + strings.Repeat("b", codeblock.MaxStderrInMessage-len(key)/2) + "\n"

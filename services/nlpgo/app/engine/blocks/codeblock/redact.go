@@ -42,7 +42,9 @@ func RedactSecrets(text string, secrets map[string]string, extra ...string) stri
 		}
 		return forms[i] < forms[j]
 	})
-	pairs := make([]string, 0, 2*len(forms))
+	// The marker pair goes first: NewReplacer tries pairs in argument order, so an existing marker is consumed whole and its letters never match a short secret.
+	pairs := make([]string, 0, 2*len(forms)+2)
+	pairs = append(pairs, redactedMarker, redactedMarker)
 	for _, form := range forms {
 		pairs = append(pairs, form, redactedMarker)
 	}
