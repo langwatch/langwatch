@@ -149,9 +149,11 @@ export class HttpAgentTestService {
     if (!input.agentId) return unfilled;
     const stored = await this.#agents.getById({ id: input.agentId, projectId: input.projectId });
     if (stored.type !== "http") return unfilled;
+    // Connector step code is left out: a step reads only the secrets it names.
+    const scanned = { ...stored.config, connector: undefined };
     const values = await this.#secrets.getValuesByName({
       projectId: input.projectId,
-      names: referencedSecretNames([stored.config, input.url]),
+      names: referencedSecretNames([scanned, input.url]),
     });
 
     const saved = { ...stored.config, url: withSecretValues({ text: stored.config.url, values }) };
@@ -165,7 +167,7 @@ export class HttpAgentTestService {
 
     return {
       call: httpSecretsKeepingStored({ stored: stored.config, incoming: input }),
-      secrets: referencedSecretValues({ referencing: stored.config, values }),
+      secrets: referencedSecretValues({ referencing: scanned, values }),
     };
   }
 
