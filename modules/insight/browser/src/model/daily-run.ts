@@ -178,6 +178,9 @@ export function lastRunWords({
   return `Did not run ${when} · ${reason ? SKIP_REASON_WORDS[reason] : "nothing was filed"}`;
 }
 
-/** Said in a From LangWatch board's settings: no run can read one yet. */
+/**
+ * Said in a From LangWatch board's settings, and in the toast when its run is turned on or saved:
+ * no run can read one yet.
+ */
 export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";
