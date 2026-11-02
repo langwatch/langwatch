@@ -6,6 +6,7 @@
 import {
   instantEvalCancelRequestedEventSchema,
   instantEvalFinishedEventSchema,
+  instantEvalLatePageBilledEventSchema,
   instantEvalPageJudgedEventSchema,
   instantEvalPlannedEventSchema,
   instantEvalRequestedEventSchema,
@@ -89,6 +90,21 @@ const finished = (data: Record<string, unknown>, occurredAt = AT): InstantEvalPr
       requests: 0,
       costUsd: 0,
       priceUsd: 0,
+      ...data,
+    },
+  });
+
+const latePageBilled = (data: Record<string, unknown>): InstantEvalProcessingEvent =>
+  instantEvalLatePageBilledEventSchema.parse({
+    ...envelope("lw.obs.instant_eval.late_page_billed", AT),
+    version: "2026-10-30",
+    data: {
+      runId: RUN_ID,
+      page: 3,
+      inputTokens: 0,
+      requests: 4,
+      costNanoUsd: 5000,
+      routedInputTokens: 0,
       ...data,
     },
   });
@@ -233,5 +249,84 @@ describe("given a run's event stream", () => {
 
       expect(fold(events)).toEqual(fold(events));
     });
+  });
+});
+
+describe("given a routed run", () => {
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("carries the routed cost so far on the running row, for the page budget check", () => {
+    const state = fold([
+      requested(),
+      planned(1000),
+      page({ costNanoUsd: 1_500 }),
+      page({ costNanoUsd: 2_500 }),
+    ]);
+    expect(state.costUsd).toBe(0.000004);
+  });
+
+  /** @scenario "A page event without a routed cost still reads and prices from tokens" */
+  it("leaves an unrouted running row's cost at zero until it finishes", () => {
+    expect(fold([requested(), planned(1000), page({})]).costUsd).toBe(0);
+  });
+
+  /** @scenario "A page event without a routed cost still reads and prices from tokens" */
+  it("reads a replayed pre-router page with no routed cost as zero, never NaN", () => {
+    const { costNanoUsd: _dropped, ...preRouter } = page({ inputTokens: 500 }).data as Record<
+      string,
+      unknown
+    >;
+    // wrong-typed input: replay folds unparsed JSON, and a pre-router page has no routed cost.
+    const replayed = { ...page({}), data: preRouter } as unknown as InstantEvalProcessingEvent;
+
+    expect(fold([requested(), planned(1000), replayed]).costUsd).toBe(0);
+  });
+});
+
+describe("given a routed run that finished while a page was still judging", () => {
+  const finishedRun = finished({ outcome: "cancelled", costUsd: 0.000004, priceUsd: 0.0000052 });
+  const late = page({ page: 3, rows: 4, costNanoUsd: 5000 });
+  const bill = latePageBilled({ costUsd: 0.000005, priceUsd: 0.0000065 });
+
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("adds the late page's billed cost and price to the finished row, and nothing else does", () => {
+    const state = fold([requested(), planned(1000), finishedRun, late, bill]);
+
+    expect(state).toMatchObject({ status: "CANCELLED", costUsd: 0.000009, priceUsd: 0.0000117 });
+  });
+
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("keeps the row equal to the bill when the late page lands before the finish", () => {
+    const state = fold([requested(), planned(1000), late, finishedRun, bill]);
+
+    expect(state).toMatchObject({ costUsd: 0.000009, priceUsd: 0.0000117 });
+  });
+
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("leaves the finished row alone for a late page that was never billed", () => {
+    const state = fold([requested(), planned(1000), finishedRun, late]);
+
+    expect(state).toMatchObject({ costUsd: 0.000004, priceUsd: 0.0000052 });
+  });
+
+  /** @scenario "A held late page is billed even when its run's finish never lands" */
+  it("counts a held page billed without its finish once, on top of the running total", () => {
+    const earlier = page({ page: 2, rows: 4, costNanoUsd: 4000 });
+    const state = fold([requested(), planned(1000), earlier, late, bill]);
+
+    expect(state).toMatchObject({ status: "RUNNING", costUsd: 0.000009, priceUsd: 0.0000065 });
+  });
+
+  /** @scenario "A held late page is billed even when its run's finish never lands" */
+  it("keeps a held page billed without its finish when that finish lands after all", () => {
+    const earlier = page({ page: 2, rows: 4, costNanoUsd: 4000 });
+    const delayedFinish = finished({
+      outcome: "finished",
+      costNanoUsd: 4000,
+      costUsd: 0.000004,
+      priceUsd: 0.0000052,
+    });
+    const state = fold([requested(), planned(1000), earlier, late, bill, delayedFinish]);
+
+    expect(state).toMatchObject({ status: "FINISHED", costUsd: 0.000009, priceUsd: 0.0000117 });
   });
 });

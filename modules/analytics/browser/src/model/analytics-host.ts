@@ -4,6 +4,7 @@
  * merging, since a write here often means certain keys are now gone.
  */
 
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { createContext, useContext } from "react";
 
 /** The project every analytics read is scoped to. */
@@ -22,6 +23,11 @@ export type AnalyticsHostProject = {
   /** Whether it is a person's own project, where Langy's conversations are the data. */
   isPersonal?: boolean;
 };
+
+/** A project that never received a trace; an aggregate receives none of its own (ADR-177). */
+export function projectAwaitsFirstTrace(project: AnalyticsHostProject | undefined): boolean {
+  return project !== undefined && !project.hasFirstMessage && !isAggregateProjectKind(project.kind);
+}
 
 /** The path parameters and query string a screen was opened with. */
 export type AnalyticsRouteReading = {

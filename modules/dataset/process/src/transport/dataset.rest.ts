@@ -146,8 +146,7 @@ export function createDatasetRest(): Readonly<{
 
       .get("/", "getApiDataset")
       .withQuery(datasetRestPaginationQuerySchema)
-      .withPermission("datasets:view")
-      .withLegacyKeyScope("legacy_project_key_experiments")
+      .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestListResponseSchema)
       .withDocs({
@@ -396,8 +395,7 @@ export function createDatasetRest(): Readonly<{
 
       .get("/:slugOrId", "getApiDatasetBySlugOrId")
       .withParams(datasetRestSlugOrIdParamsSchema)
-      .withPermission("datasets:view")
-      .withLegacyKeyScope("legacy_project_key_experiments")
+      .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestDetailResponseSchema)
       .withDocs({
@@ -486,8 +484,7 @@ export function createDatasetRest(): Readonly<{
       .get("/:slugOrId/records", "getApiDatasetBySlugOrIdRecords")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
-      .withPermission("datasets:view")
-      .withLegacyKeyScope("legacy_project_key_experiments")
+      .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({
@@ -512,8 +509,7 @@ export function createDatasetRest(): Readonly<{
       .get("/:datasetSlug/entries", "getApiDatasetBySlugEntries")
       .withParams(datasetRestSlugParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
-      .withPermission("datasets:view")
-      .withLegacyKeyScope("legacy_project_key_experiments")
+      .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({

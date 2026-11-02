@@ -13,6 +13,7 @@ import {
   keyCredentialOf,
   routeTemplateOf,
   type RestKeyKind,
+  keyPrincipalOfApiKey,
 } from "@langwatch/api/rest";
 import {
   type AuthzPermission,
@@ -145,7 +146,7 @@ export class ApiRestCredentialsService {
     permissions: readonly AuthzPermission[];
     /** The key kinds the route admits (E7): refused once the key resolves, before permission. */
     keyKinds?: readonly RestKeyKind[];
-    /** The scope flags that open the route to a legacy project key (`withLegacyKeyScope`). */
+    /** The flags that open the route to a legacy project key (`withPermission`'s `legacyKey`). */
     legacyKeyScopes?: readonly string[];
   }): Promise<ApiProjectCredential> {
     const credential = await this.#resolveProjectCredential({
@@ -304,18 +305,12 @@ export class ApiRestCredentialsService {
         markUsed: () => {},
       };
     }
-    if (resolved) {
+    const keyPrincipal = resolved ? keyPrincipalOfApiKey(resolved) : undefined;
+    if (keyPrincipal) {
       return {
-        principal: {
-          kind: "apiKey",
-          apiKeyId: resolved.apiKeyId,
-          userId: resolved.userId,
-          organizationId: resolved.organizationId,
-          resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
-          ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
-        },
-        organizationId: resolved.organizationId,
-        markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
+        principal: keyPrincipal,
+        organizationId: keyPrincipal.organizationId,
+        markUsed: () => this.apiKeys.markUsed({ id: keyPrincipal.apiKeyId }),
       };
     }
 
@@ -324,7 +319,13 @@ export class ApiRestCredentialsService {
     const { apiKeyId, userId, organizationId, isLangySessionKey } = organization.resolved;
 
     return {
-      principal: { kind: "apiKey", apiKeyId, userId, organizationId, isLangySessionKey },
+      principal: {
+        kind: "apiKey",
+        apiKeyId,
+        userId,
+        organizationId,
+        ...(isLangySessionKey ? { isLangySessionKey: true } : {}),
+      },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
     };

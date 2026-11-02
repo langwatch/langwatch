@@ -542,7 +542,7 @@ Answers at `/api/scenario-events`, `/api/v1/scenario-events`; also, undocumented
 
 ```typescript
 type Body = z.infer<typeof scenarioEventSchema>; // ../contract/src/schemas/event-schemas.ts:510
-// Response: inline, src/transport/scenario-event.rest.ts:30
+// Response: inline, src/transport/scenario-event.rest.ts:29
 interface Response {
   success: boolean;
   url?: string | null;
@@ -553,7 +553,7 @@ interface Response {
 
 Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.
 
-Permission `scenarios:create`. Declared at `src/transport/scenario-event.rest.ts:52`.
+Permission `scenarios:create`. Declared at `src/transport/scenario-event.rest.ts:51`.
 
 Answers at `/api/scenario-events/browser-tab`, `/api/v1/scenario-events/browser-tab`; also, undocumented, `/api/scenario-events/2026-08-07/browser-tab`, `/api/v1/scenario-events/2026-08-07/browser-tab`, `/api/scenario-events/latest/browser-tab`, `/api/v1/scenario-events/latest/browser-tab`.
 
@@ -564,7 +564,7 @@ interface Body {
   batchRunId: string;
   scenarioSetId?: string;
 }
-// Response: inline, src/transport/scenario-event.rest.ts:58
+// Response: inline, src/transport/scenario-event.rest.ts:56
 interface Response {
   delivered: boolean;
   url: string;
@@ -575,7 +575,7 @@ interface Response {
 
 Archive simulation runs. Pass exactly one of scenarioSetId (archives every run in the set; scenarioSetId=default targets the implicit default set) or scenarioRunId (archives that one run).
 
-Permission `scenarios:manage`. Declared at `src/transport/scenario-event.rest.ts:73`.
+Permission `scenarios:manage`. Declared at `src/transport/scenario-event.rest.ts:71`.
 
 Answers at `/api/scenario-events`, `/api/v1/scenario-events`; also, undocumented, `/api/scenario-events/2026-08-07`, `/api/v1/scenario-events/2026-08-07`, `/api/scenario-events/latest`, `/api/v1/scenario-events/latest`.
 
@@ -943,7 +943,7 @@ type Response = z.infer<typeof simulationRunListResponseSchema>; // ../contract/
 
 Get a single simulation run by its ID
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:74`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:73`.
 
 Answers at `/api/simulation-runs/:scenarioRunId`, `/api/v1/simulation-runs/:scenarioRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/:scenarioRunId`, `/api/v1/simulation-runs/2026-08-07/:scenarioRunId`, `/api/simulation-runs/latest/:scenarioRunId`, `/api/v1/simulation-runs/latest/:scenarioRunId`.
 
@@ -959,7 +959,7 @@ type Response = z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>; //
 
 List batch summaries for a scenario set (pass/fail counts per batch)
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:94`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:92`.
 
 Answers at `/api/simulation-runs/batches/list`, `/api/v1/simulation-runs/batches/list`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/list`, `/api/v1/simulation-runs/2026-08-07/batches/list`, `/api/simulation-runs/latest/batches/list`, `/api/v1/simulation-runs/latest/batches/list`.
 
@@ -977,7 +977,7 @@ type Response = z.infer<typeof simulationBatchListResponseSchema>; // ../contrac
 
 Get the summary of a single batch run, including its completion flag
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:121`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:118`.
 
 Answers at `/api/simulation-runs/batches/:batchRunId`, `/api/v1/simulation-runs/batches/:batchRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/v1/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/simulation-runs/latest/batches/:batchRunId`, `/api/v1/simulation-runs/latest/batches/:batchRunId`.
 
@@ -1091,7 +1091,7 @@ interface Input {
   projectId: string;
   ids: string[];
 }
-// Output: scenarioBatchArchiveResultSchema, ../contract/src/scenario.responses.ts:89
+// Output: scenarioBatchArchiveResultSchema, ../contract/src/scenario.responses.ts:90
 interface Output {
   archived: string[];
   failed: {
@@ -1108,7 +1108,7 @@ interface Input {
   limit?: number;
   cursor?: number;
 }
-type Output = z.infer<typeof scenarioVersionPageSchema>; // ../contract/src/scenario.responses.ts:34
+type Output = z.infer<typeof scenarioVersionPageSchema>; // ../contract/src/scenario.responses.ts:35
 
 // scenarios.getVersion
 // Input: inline, ../contract/src/scenario.trpc.ts:244
@@ -1130,7 +1130,7 @@ type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
 
 // scenarios.run
 type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:157
-// Output: scenarioRunScheduledSchema, ../contract/src/scenario.responses.ts:75
+// Output: scenarioRunScheduledSchema, ../contract/src/scenario.responses.ts:76
 interface Output {
   scheduled: true;
   setId: string;
@@ -1147,7 +1147,7 @@ interface Input {
   scenarioRunId: string;
   scenarioId: string;
 }
-// Output: scenarioCancelJobResultSchema, ../contract/src/scenario.responses.ts:45
+// Output: scenarioCancelJobResultSchema, ../contract/src/scenario.responses.ts:46
 interface Output {
   cancelled: boolean;
 }
@@ -1159,7 +1159,7 @@ interface Input {
   scenarioSetId: string;
   batchRunId: string;
 }
-// Output: scenarioCancelBatchRunResultSchema, ../contract/src/scenario.responses.ts:59
+// Output: scenarioCancelBatchRunResultSchema, ../contract/src/scenario.responses.ts:60
 interface Output {
   cancelledCount: number;
   skippedCount: number;
@@ -1358,11 +1358,11 @@ interface Input {
   outcome?: "passed" | "failed" | "not_scored" | "pending";
   groupBy: "plan" | "scenario" | "target" | "none";
 }
-type Output = z.infer<typeof resultsOverviewSchema>; // ../contract/src/scenario.responses.ts:179
+type Output = z.infer<typeof resultsOverviewSchema>; // ../contract/src/scenario.responses.ts:194
 
 // scenarios.getResultAtoms
 // Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:466)
-type Output = z.infer<typeof resultAtomsPageSchema>; // ../contract/src/scenario.responses.ts:130
+type Output = z.infer<typeof resultAtomsPageSchema>; // ../contract/src/scenario.responses.ts:145
 
 // scenarios.getRunConfigurations
 // Input: inline, ../contract/src/scenario.trpc.ts:480

@@ -187,8 +187,9 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(evaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
-  .withPermission("evaluations:manage")
-  .withLegacyKeyScope("legacy_project_key_evaluations", "legacy_project_key_experiments")
+  .withPermission("evaluations:manage", {
+    legacyKey: ["legacy_project_key_evaluations", "legacy_project_key_experiments"],
+  })
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -223,8 +224,9 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(namespacedEvaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
-  .withPermission("evaluations:manage")
-  .withLegacyKeyScope("legacy_project_key_evaluations", "legacy_project_key_experiments")
+  .withPermission("evaluations:manage", {
+    legacyKey: ["legacy_project_key_evaluations", "legacy_project_key_experiments"],
+  })
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -255,8 +257,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withoutAudit("run, not a change")
   .withParams(evaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
-  .withPermission("evaluations:manage")
-  .withLegacyKeyScope("legacy_project_key_evaluations")
+  .withPermission("evaluations:manage", { legacyKey: "legacy_project_key_evaluations" })
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,

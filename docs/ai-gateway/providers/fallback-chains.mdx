@@ -50,7 +50,7 @@ For a streaming request the gateway falls back only while opening the stream. On
 
 The response carries `X-LangWatch-Fallback-Count` with the number of failovers that happened, and only when it is at least 1. A request served by the first provider has no header.
 
-```
+```http
 HTTP/1.1 200 OK
 X-LangWatch-Fallback-Count: 1
 X-LangWatch-Gateway-Request-Id: req_3e8385c4e62cbe4e31ca9c410c5891

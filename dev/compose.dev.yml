@@ -113,7 +113,7 @@ services:
           cpus: "0.25"
 
   clickhouse:
-    image: langwatch/clickhouse-serverless:0.2.0
+    image: langwatch/clickhouse-serverless:0.4.0
     environment:
       CLICKHOUSE_PASSWORD: langwatch
     # No host port - accessed via docker network as "clickhouse:8123"

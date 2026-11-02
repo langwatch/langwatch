@@ -1,10 +1,10 @@
 {
-  "name": "B1: finds a Dashboards board by its id",
+  "name": "B1: finds a dashboard by its id",
   "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, ask exactly (with the real value of board.id): 'What's on dashboard <board.id>?' If Langy asks something, answer briefly. Once Langy has answered, reply 'Thanks.'",
   "criteria": [
     "Langy finds the dashboard by its id and names its widgets, 'Traces this period' and 'Error count' (the names in board.widgets).",
     "Langy never says the referenced dashboard is not available, not found, or not accessible.",
-    "Code check: facts_now.board.unchanged is true and facts_now.items_created_this_run is 0, so Langy only read the board."
+    "Code check: facts_now.board.unchanged is true and facts_now.items_created_this_run is 0, so Langy only read the dashboard."
   ],
   "labels": ["jobs", "regression"],
   "parameters": [

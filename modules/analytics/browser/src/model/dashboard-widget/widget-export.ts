@@ -80,6 +80,17 @@ export function widgetExportStatus({
   return answered.some((result) => result.rows.length > 0) ? "ready" : "empty";
 }
 
+/** Whether the card shows none of the widget's data: no traffic, the setup view or no rows. */
+export function widgetShowsNoData({
+  face,
+  status,
+}: {
+  face: WidgetFace["kind"];
+  status: WidgetExportStatus;
+}): boolean {
+  return face === "missing" || status === "empty";
+}
+
 /** Why "Export CSV" cannot be picked yet, in the menu's words. */
 export const EXPORT_UNAVAILABLE_REASON: Readonly<
   Record<Exclude<WidgetExportStatus, "hidden" | "ready">, string>
@@ -173,6 +184,11 @@ export function widgetExportFileName({
 }): string {
   const period = Object.values(results).find((result) => result.period)?.period;
   const days = period ? [utcDay(period.start), utcDay(period.end - 1)] : [];
-  const parts = [slugify(board) || "board", slugify(widget) || "widget", "query-results", ...days];
+  const parts = [
+    slugify(board) || "dashboard",
+    slugify(widget) || "widget",
+    "query-results",
+    ...days,
+  ];
   return `${parts.join("_")}.csv`;
 }

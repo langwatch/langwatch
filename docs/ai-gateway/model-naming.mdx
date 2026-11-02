@@ -8,8 +8,8 @@ The `model` field accepts three forms. Each one tells the gateway a different am
 
 | Form                      | Example                             | Where the request goes                                                           |
 | ------------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
-| Bare model                | `"model": "gpt-5-mini"`             | The provider on the key that serves that model. The gateway infers the provider. |
-| Provider and model        | `"model": "openai/gpt-5-mini"`      | A provider of that kind on the key.                                              |
+| Bare model                | `"model": "gpt-6-luna"`             | The provider on the key that serves that model. The gateway infers the provider. |
+| Provider and model        | `"model": "openai/gpt-6-luna"`      | A provider of that kind on the key.                                              |
 | Instance handle and model | `"model": "europe/claude-sonnet-5"` | The one provider instance that carries the handle `europe`.                      |
 
 A fourth kind of name, an alias, is a name a routing policy maps to one of the forms above. See [Model Aliases](/ai-gateway/model-aliases).
@@ -23,13 +23,13 @@ The gateway reads the `model` string once, in this order. The first step that ma
 3. **Provider family.** If the text before the first `/` is a provider family the gateway knows, the request goes to a provider of that kind. The rest of the string is the model id, including any further `/`.
 4. **Bare model.** Otherwise the whole string is the model id, slashes included, and the gateway infers the provider from it.
 
-The prefix is removed before the request leaves. A provider never receives `openai/gpt-5-mini` as a model name.
+The prefix is removed before the request leaves. A provider never receives `openai/gpt-6-luna` as a model name.
 
 ## Provider families
 
 `openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `xai`, `groq`, `cerebras`, `deepseek`, `doubleword`, `voyage`, `elevenlabs`, `cloudflare`, `custom`, `openai_codex`.
 
-The alternative spellings that SDKs emit are accepted too: `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex`, `google_gemini`. The family is case-insensitive, so `OpenAI/gpt-5-mini` works.
+The alternative spellings that SDKs emit are accepted too: `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex`, `google_gemini`. The family is case-insensitive, so `OpenAI/gpt-6-luna` works.
 
 A family names a kind of provider, not one instance. If the key reaches two Anthropic providers, `anthropic/claude-sonnet-5` matches both and the first one in the key's provider order serves the request. The others stay available for failover. Use an instance handle to choose one.
 
@@ -80,7 +80,7 @@ A handle pins one provider instance. When the key cannot reach that instance, th
 
 ## Declaring the models a provider serves
 
-Hosted providers already declare their models, so `gpt-5-mini` and `claude-sonnet-5` route without setup.
+Hosted providers already declare their models, so `gpt-6-luna` and `claude-sonnet-5` route without setup.
 
 For a **Custom (OpenAI-compatible)** provider, add the models under **Custom models** on the provider. That is what lets a caller send the bare model name instead of `custom/` in front of it, and what puts the model in `GET /v1/models`.
 
@@ -118,7 +118,7 @@ Every refusal is a JSON error with `error.code`, and the HTTP status is fixed pe
 }
 ```
 
-`models_allowed` plays no part in choosing a provider. It judges the model the request resolves to, in both spellings: an entry of `gpt-5-mini` and an entry of `openai/gpt-5-mini` allow the same model.
+`models_allowed` plays no part in choosing a provider. It judges the model the request resolves to, in both spellings: an entry of `gpt-6-luna` and an entry of `openai/gpt-6-luna` allow the same model.
 
 **Also check:** [Troubleshooting](/ai-gateway/troubleshooting) for the full error index.
 

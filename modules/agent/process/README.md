@@ -279,7 +279,7 @@ Answers at `/api/v1/agents/connect/register`.
 
 ```typescript
 type Body = z.infer<typeof agentConnectRegisterInputSchema>; // ../contract/src/connected-agent.connection.ts:72
-// Response: inline, src/transport/agent-connect.rest.ts:124
+// Response: inline, src/transport/agent-connect.rest.ts:123
 type Response = unknown;
 ```
 
@@ -287,7 +287,7 @@ type Response = unknown;
 
 Wait for call and cancel frames while refreshing this instance's presence
 
-Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:150`.
+Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:149`.
 
 Answers at `/api/v1/agents/connect/poll`.
 
@@ -296,7 +296,7 @@ Answers at `/api/v1/agents/connect/poll`.
 interface Query {
   inFlight?: string;
 }
-// Response: inline, src/transport/agent-connect.rest.ts:155
+// Response: inline, src/transport/agent-connect.rest.ts:153
 type Response = unknown;
 ```
 
@@ -304,13 +304,13 @@ type Response = unknown;
 
 Accept this instance's acknowledgements, results and deregistration
 
-Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:177`.
+Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:175`.
 
 Answers at `/api/v1/agents/connect/frames`.
 
 ```typescript
 type Body = z.infer<typeof agentConnectFramesInputSchema>; // ../contract/src/connected-agent.connection.ts:112
-// Response: inline, src/transport/agent-connect.rest.ts:184
+// Response: inline, src/transport/agent-connect.rest.ts:181
 type Response = unknown;
 ```
 

@@ -242,11 +242,14 @@ async function readAnswer({
       error: new Error("the judge answered with a body that is not its published shape"),
     };
   }
+  // Carried for a routed leg's output price; the unrouted price reads input tokens alone.
+  const outputTokens = parsed.data.usage?.output_tokens;
   return {
     kind: "answered",
     judgement: {
       verdicts: readClassifierVerdicts({ questions: request.questions, response: parsed.data }),
       inputTokens: parsed.data.usage?.input_tokens ?? 0,
+      ...(outputTokens === undefined ? {} : { outputTokens }),
       isTextTruncated: isTruncated,
     },
   };

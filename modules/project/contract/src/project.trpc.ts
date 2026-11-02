@@ -9,6 +9,7 @@ import {
   projectAggregateMemberCandidatesInputSchema,
   projectArchiveByIdInputSchema,
   projectCreateInputSchema,
+  projectLegacyKeysInputSchema,
   projectScopeSchema,
   projectUpdateAggregateRuleInputSchema,
   projectUpdateInputSchema,
@@ -20,6 +21,7 @@ import {
   projectApiKeyRevokedSchema,
   projectArchivedSchema,
   projectFirstMessageSchema,
+  projectLegacyKeysSchema,
   projectLegacyKeyStatusSchema,
   projectProvisionedSchema,
   projectSettingsSavedSchema,
@@ -42,6 +44,15 @@ export const projectTrpc = defineTrpcContract("project")
   })
   .withInput(projectScopeSchema)
   .withOutput(projectLegacyKeyStatusSchema)
+
+  // Every project in the organisation the caller can manage that still holds a
+  // live legacy key. The API keys screen is organisation-wide, so its nudge is
+  // too: one project's revoke never speaks for another's.
+  .query("legacyKeys", {
+    invalidatedBy: [{ event: PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE, scope: "organizationId" }],
+  })
+  .withInput(projectLegacyKeysInputSchema)
+  .withOutput(projectLegacyKeysSchema)
 
   // Revokes the legacy project key for good and shows no new key.
   .mutation("revokeProjectApiKey")
