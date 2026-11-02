@@ -57,6 +57,7 @@ import {
   apiKeyPepper,
   credentialsSecret,
   credentialsSecretPrevious,
+  intoKeyPepper,
   sessionSecret,
   type ScopedSecrets,
 } from "@langwatch/secrets";
@@ -150,15 +151,13 @@ function scopeNames(
 async function apiKeyPeppers(
   secrets: ScopedSecrets,
 ): Promise<{ pepper: string; previousPepper: string | undefined }> {
-  const { pepper, pepperFallback, pepperLastFallback, pepperPrevious } = ApiKeyModule.secrets;
-  const answered = await secrets.into(pepper, (primary) =>
-    secrets.into(pepperFallback, (credentials) =>
-      secrets.into(pepperLastFallback, (session) =>
-        secrets.into(pepperPrevious, (previous) => ({
-          pepper: [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
-          previousPepper: primary ? void 0 : previous || void 0,
-        })),
-      ),
+  const { pepper, pepperPrevious } = ApiKeyModule.secrets;
+  const answered = await intoKeyPepper(secrets, (chosen) =>
+    secrets.into(pepper, (primary) =>
+      secrets.into(pepperPrevious, (previous) => ({
+        pepper: chosen,
+        previousPepper: primary ? void 0 : previous || void 0,
+      })),
     ),
   );
   if (answered.pepper === void 0) {

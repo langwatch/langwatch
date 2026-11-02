@@ -67,6 +67,7 @@ import { isAggregateProjectKind, ProjectApi } from "@langwatch/project-contract"
 import {
   apiKeyPepper,
   credentialsSecret,
+  intoKeyPepper,
   Secret,
   sessionSecret,
   type ScopedSecrets,
@@ -379,14 +380,7 @@ type AnalyticsSetup = FeatureSetup<
  * than logging a hash anyone can recompute.
  */
 async function queryHashSecret(secrets: ScopedSecrets): Promise<string> {
-  const { queryHashKey, queryHashKeyFallback, queryHashKeyLastFallback } = AnalyticsModule.secrets;
-  const secret = await secrets.into(queryHashKey, (primary) =>
-    secrets.into(queryHashKeyFallback, (credentials) =>
-      secrets.into(queryHashKeyLastFallback, (session) =>
-        [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
-      ),
-    ),
-  );
+  const secret = await intoKeyPepper(secrets, (pepper) => pepper);
   if (secret === void 0) {
     throw new ConfigParseError([
       "analytics.queryHashKey ← API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET: none is set",

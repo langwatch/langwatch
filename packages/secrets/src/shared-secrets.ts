@@ -2,6 +2,7 @@
  * Secrets more than one owner holds: one handle each, claimed by instance, so a
  * double claim passes only for this very handle (ARCHITECTURE.md §6, layer 3).
  */
+import type { ScopedSecrets } from "./resolver.ts";
 import { Secret } from "./secret.ts";
 
 /** The browser-session key: auth builds sessions from it, automation signs unsubscribe links. */
@@ -15,6 +16,24 @@ export const credentialsSecret = Secret.load("CREDENTIALS_SECRET", { optional: t
  * derives its query-hash key from it.
  */
 export const apiKeyPepper = Secret.load("API_KEY_PEPPER", { optional: true });
+
+/**
+ * Builds from the key pepper: the first of API_KEY_PEPPER, CREDENTIALS_SECRET and NEXTAUTH_SECRET
+ * that is set and not empty, or undefined when none is. api-key hashes keys under it and analytics
+ * derives its query-hash key from it; each owner says itself what none means for it.
+ */
+export function intoKeyPepper<Out>(
+  secrets: ScopedSecrets,
+  build: (pepper: string | undefined) => Out | Promise<Out>,
+): Promise<Out> {
+  return secrets.into(apiKeyPepper, (primary) =>
+    secrets.into(credentialsSecret, (credentials) =>
+      secrets.into(sessionSecret, (session) =>
+        build([primary, credentials, session].find((value) => value !== void 0 && value !== "")),
+      ),
+    ),
+  );
+}
 
 /**
  * The value CREDENTIALS_SECRET held before a rotation. It only reads: stores open old values

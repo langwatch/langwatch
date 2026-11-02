@@ -9,6 +9,7 @@ export {
   credentialsSecretPrevious,
   gatewayInternalSecret,
   internalSlackSignupsWebhook,
+  intoKeyPepper,
   nlpInternalSecret,
   openAiApiKey,
   sessionSecret,

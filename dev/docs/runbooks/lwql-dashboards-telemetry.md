@@ -33,23 +33,24 @@ The Grafana board is `docs/langwatchql-queries-dashboard.json`.
 Sent from the browser through `useUiAnalytics`, after the server accepts the
 change. Each event also carries `projectId`.
 
-| Event                                                          | Sent when                                                                        | Why                                            |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `dashboards.viewed.dashboard`                                  | a board opens (`dashboardKind`, `widgetCount`, `dashboardKey`)                   | are boards opened, and which kinds             |
-| `dashboards.created.dashboard` / `deleted.dashboard`           | the server accepts it                                                            | do people make their own boards, and keep them |
-| `dashboards.added.widget` / `edited.widget` / `deleted.widget` | the server accepts it (`addedFrom`, `widgetSource`)                              | do people build widgets, and from what         |
-| `dashboards.viewed.widget`                                     | half a card first shows on screen, once per card per board view                  | which widgets are looked at, not only loaded   |
-| `dashboards.changed.period`                                    | a new period is picked (`range`, `grain`)                                        | which periods people need                      |
-| `dashboards.exported.widget`                                   | a CSV download finishes                                                          | do people take data out                        |
-| `dashboards.edited.dashboard`                                  | a rename is saved or a drop changes the layout (`change`)                        | do people shape their boards                   |
-| `dashboards.favourited.dashboard`                              | a pin is added or removed (`starred`)                                            | which boards people come back to               |
-| `dashboards.toggled.langy_traces`                              | the Langy traces toggle changes                                                  | do people want Langy's own traces counted      |
-| `lwql.opened.editor`                                           | the widget editor opens (`widgetIs: new or existing`)                            | do people write queries                        |
-| `lwql.ran.query`                                               | a member presses Run in the editor                                               | do they get as far as running one              |
-| `langy.asked.question`                                         | a member sends Langy a question (`surface`: `composer`, `ask_bar`, `add_widget`) | where people ask Langy for help                |
-| `langy.applied.proposal` / `discarded.proposal`                | a member applies or discards what Langy proposed (`kind`, or `other`)            | does Langy's help get used                     |
-| `insights.filed/seen/archived/kept.insight`                    | sent by nurturing from insight's own events, on the person who acted             | are insights read and acted on                 |
-| `automations.opened.alert_link`                                | a signed-in member opens a link marked `lw_from=alert` (`landedOn`)              | do alerts bring people back to the app         |
+| Event                                                | Sent when                                                                        | Why                                            |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `dashboards.viewed.dashboard`                        | a board opens (`dashboardKind`, `widgetCount`, `dashboardKey`)                   | are boards opened, and which kinds             |
+| `dashboards.created.dashboard` / `deleted.dashboard` | the server accepts it                                                            | do people make their own boards, and keep them |
+| `dashboards.added.widget`                            | the server accepts it (`addedFrom`, `widgetCount`)                               | do people build widgets, and from what         |
+| `dashboards.edited.widget` / `deleted.widget`        | the server accepts it                                                            | do people keep their widgets up to date        |
+| `dashboards.viewed.widget`                           | half a card first shows on screen, once per card per board view                  | which widgets are looked at, not only loaded   |
+| `dashboards.changed.period`                          | a new period is picked (`range`, `grain`)                                        | which periods people need                      |
+| `dashboards.exported.widget`                         | a CSV download finishes                                                          | do people take data out                        |
+| `dashboards.edited.dashboard`                        | a rename is saved or a drop changes the layout (`change`)                        | do people shape their boards                   |
+| `dashboards.favourited.dashboard`                    | a pin is added or removed (`starred`)                                            | which boards people come back to               |
+| `dashboards.toggled.langy_traces`                    | a saved widget starts or stops counting Langy's traces (`included`)              | do people want Langy's own traces counted      |
+| `lwql.opened.editor`                                 | the widget editor opens (`widgetIs: new or existing`)                            | do people write queries                        |
+| `lwql.ran.query`                                     | a member presses Run in the editor                                               | do they get as far as running one              |
+| `langy.asked.question`                               | a member sends Langy a question (`surface`: `composer`, `ask_bar`, `add_widget`) | where people ask Langy for help                |
+| `langy.applied.proposal` / `discarded.proposal`      | a member applies or discards what Langy proposed (`kind`, or `other`)            | does Langy's help get used                     |
+| `insights.filed/seen/archived/kept.insight`          | sent by nurturing from insight's own events, on the person who acted             | are insights read and acted on                 |
+| `automations.opened.alert_link`                      | a signed-in member opens a link marked `lw_from=alert` (`landedOn`)              | do alerts bring people back to the app         |
 
 No attribute we set carries a raw board or widget id, SQL, a title or question
 text. `dashboardKey` is 16 hex of SHA-256 of the board id.

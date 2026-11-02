@@ -67,7 +67,12 @@ type StoredQuery = {
   projects?: string[] | null;
 };
 /** A stored widget's definition; its query stores no sources, as one saved before them. */
-const GRAPH: { version: 1; code: string; queries: StoredQuery[] } = {
+const GRAPH: {
+  version: 1;
+  code: string;
+  queries: StoredQuery[];
+  source?: { kind: "catalogue"; catalogueId: string };
+} = {
   version: 1,
   code: "export default function Widget() { return null; }",
   queries: [
@@ -360,6 +365,24 @@ describe("given a widget placed on a board", () => {
     await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
 
     expect(server.runs()[0]?.telemetry).toEqual({ dashboardId: BOARD.id, widgetId: WIDGET.id });
+  });
+
+  describe("when the widget was built from a catalogue widget", () => {
+    /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+    it("also sends the catalogue widget it came from as the template", async () => {
+      const fromCatalogue = {
+        ...WIDGET,
+        graph: { ...GRAPH, source: { kind: "catalogue" as const, catalogueId: "traffic" } },
+      };
+      const server = openBoard({ widgets: [fromCatalogue] });
+      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(server.runs()[0]?.telemetry).toEqual({
+        dashboardId: BOARD.id,
+        widgetId: WIDGET.id,
+        templateId: "traffic",
+      });
+    });
   });
 });
 
