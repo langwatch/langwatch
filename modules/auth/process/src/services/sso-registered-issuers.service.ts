@@ -44,11 +44,6 @@ export class SsoRegisteredIssuersService {
     return connectionId ? this.issuersFor({ connectionId }) : this.issuersForDomainIn(target);
   }
 
-  /** Whether a customer registered this provider id as a connection; unreadable answers no. */
-  async isConnection({ providerId }: { providerId: string }): Promise<boolean> {
-    return (await this.issuersFor({ connectionId: providerId })).length > 0;
-  }
-
   /** The origins these issuers' endpoints live on, when that is not their
    *  own (Google's `*.googleapis.com`). An unreadable answer trusts nothing new. */
   async endpointOriginsFor(issuers: readonly string[]): Promise<string[]> {

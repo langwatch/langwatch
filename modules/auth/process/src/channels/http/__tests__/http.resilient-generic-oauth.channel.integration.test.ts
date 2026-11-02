@@ -171,7 +171,6 @@ const buildAuth = ({
   alongside?: GenericOAuthConfig[];
 }) => {
   const db: MemoryDb = { user: [], session: [], account: [], verification: [] };
-  const betterAuthLog: string[] = [];
   const config: GenericOAuthConfig[] = [
     {
       ...okta({
@@ -188,7 +187,7 @@ const buildAuth = ({
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(db),
     // Collected, not printed: the test harness's console guard fails a test that prints.
-    logger: { log: (level, message) => betterAuthLog.push(`${level}: ${message}`) },
+    logger: { level: "error", log: () => undefined },
     emailAndPassword: { enabled: true },
     account: { accountLinking: { enabled: true } },
     plugins: [resilientGenericOAuth({ config, retryDelaysMs })],

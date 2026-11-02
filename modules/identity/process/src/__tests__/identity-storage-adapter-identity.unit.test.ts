@@ -25,9 +25,8 @@ const EMAIL = "member@acme.com";
 type Stack = IdentityStack;
 
 /**
- * The issuer better-auth 1.7 keys an account by, for a provider with none of
- * its own. Inlined rather than imported since the builder lives only in
- * `@better-auth/core/db`, not worth a dependency for two lines of string construction.
+ * LangWatch's issuer namespace for a provider with none of its own (ADR-189);
+ * better-auth keys the row by `(providerId, accountId)`.
  */
 const oauthIssuer = (providerId: string): string => `local:oauth:${encodeURIComponent(providerId)}`;
 

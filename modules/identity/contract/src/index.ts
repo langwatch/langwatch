@@ -767,6 +767,7 @@ export {
   type SessionCallbackEvidence,
   type SessionClaims,
   type SessionClaimsMintInput,
+  isSsoConnectionProviderId,
   signedInWithFor,
   signInMethodLabelFor,
   signInProviderForPath,

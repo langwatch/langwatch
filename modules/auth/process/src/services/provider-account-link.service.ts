@@ -6,7 +6,8 @@ import type { SsoIssuerDirectory } from "./sso-registered-issuers.service.ts";
 export type ProviderAccountRow = Readonly<{
   userId: string;
   providerId: string;
-  issuer: string;
+  /** Absent for a connection with no registered issuer: the account hook refuses that row. */
+  issuer?: string;
   accountId: string;
 }>;
 
@@ -48,10 +49,11 @@ export class ProviderAccountLinkService {
         ? []
         : await this.deps.issuers.findIssuersForConnection({ connectionId });
 
+    const knowsIssuer = connectionId === null || connectionIssuer !== undefined;
     await this.deps.accounts.createAccount({
       userId,
       providerId: connectionId ?? provider,
-      issuer: providerAccountIssuer({ connectionIssuer, provider }),
+      ...(knowsIssuer ? { issuer: providerAccountIssuer({ connectionIssuer, provider }) } : {}),
       accountId: subject,
     });
   }

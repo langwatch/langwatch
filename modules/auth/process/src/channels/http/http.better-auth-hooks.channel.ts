@@ -19,6 +19,7 @@ import {
   type SsoMigrationCallbackApi,
   identifierProviderFor,
   type IdentityLedgerApi,
+  isSsoConnectionProviderId,
   type LinkProposalReason,
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
@@ -1043,17 +1044,15 @@ function skipOn(code: string): (error: unknown) => undefined {
  * A connection account row with no issuer stated or asserted would be stamped `local:oauth:`
  * and refused at every later sign-in, so it is refused when written instead (ADR-189).
  */
-export async function refuseConnectionAccountWithoutIssuer({
+export function refuseConnectionAccountWithoutIssuer({
   account,
   assertedIssuers,
-  isConnection,
 }: {
-  account: { providerId: string };
+  account: Readonly<{ providerId: string; issuer?: unknown }>;
   assertedIssuers: readonly string[];
-  isConnection: (args: { providerId: string }) => Promise<boolean>;
-}): Promise<void> {
+}): void {
+  if (!isSsoConnectionProviderId(account.providerId)) return;
   if (hasRecordedIssuer({ account, assertedIssuers })) return;
-  if (!(await isConnection({ providerId: account.providerId }))) return;
   logger.warn(
     { providerId: account.providerId },
     "Refused a connection account row with no recorded issuer",

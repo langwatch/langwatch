@@ -70,8 +70,8 @@ async function walk({ auth, db }: Stack): Promise<Transcript> {
   const account: AccountWithIssuer = {
     userId,
     providerId: "google",
-    // better-auth 1.7 keys an account by `(issuer, accountId)`, and
-    // synthesises this issuer for a provider that declares none of its own.
+    // LangWatch's issuer namespace for a provider with none of its own (ADR-189);
+    // better-auth keys the row by `(providerId, accountId)`.
     issuer: "local:oauth:google",
     accountId: "sub-google-1",
   };
@@ -220,8 +220,8 @@ describe("better-auth over the identity storage adapter", () => {
 
     /** @scenario "A connection is found by its own issuer, not refused for it" */
     it("finds a connection account by the real issuer it was linked under", async () => {
-      // The OAuth callback looks an account up by `(issuer, accountId)`; a
-      // connection's issuer is its own URL, not a synthetic one. Answering
+      // A connection's row carries its own issuer URL, not a synthetic one
+      // (ADR-189); the callback finds it by `(providerId, accountId)`. Answering
       // "no rows" for an issuer it could not decode meant every returning
       // connection sign-in failed to find its row and hit the account
       // uniqueness constraint trying to recreate it.

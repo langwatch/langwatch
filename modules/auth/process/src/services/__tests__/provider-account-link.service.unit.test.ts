@@ -53,12 +53,13 @@ describe("given a confirmed link proposal", () => {
   });
 
   describe("when its connection has no issuer on record", () => {
-    it("falls back to the provider's own issuer", async () => {
+    /** @scenario "A connection account row with no recorded issuer is refused when written" */
+    it("states no issuer, so the account hook refuses the row", async () => {
       const { service, accounts } = linker();
 
-      await service.link({ ...proposal, connectionId: "conn_gone", provider: "okta" });
+      await service.link({ ...proposal, connectionId: "ssoc_saml", provider: "saml" });
 
-      expect(accounts.rows[0]?.issuer).toBe("local:oauth:okta");
+      expect(accounts.rows[0]).not.toHaveProperty("issuer");
     });
   });
 

@@ -735,11 +735,7 @@ export const createAuthOptions = ({
             providerId: account.providerId,
             providerAccountId: account.accountId,
           });
-          await refuseConnectionAccountWithoutIssuer({
-            account,
-            assertedIssuers,
-            isConnection: (args) => ssoIssuers.isConnection(args),
-          });
+          refuseConnectionAccountWithoutIssuer({ account, assertedIssuers });
           const issuer = accountIssuerOf({
             account,
             assertedIssuers,
@@ -1036,8 +1032,6 @@ export async function resolveSsoUser({
  */
 interface BetterAuthSsoIssuers {
   issuersForRequest(request: Request | undefined): Promise<string[]>;
-  /** Whether a customer registered this provider id as a connection. */
-  isConnection(args: { providerId: string }): Promise<boolean>;
   /** The public origins those issuers' discovery documents serve endpoints
    *  from. Absent, only the issuers' own origins are trusted. */
   endpointOriginsFor?(issuers: readonly string[]): Promise<string[]>;
