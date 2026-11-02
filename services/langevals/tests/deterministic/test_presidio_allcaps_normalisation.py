@@ -217,7 +217,7 @@ def test_no_second_pass_when_only_short_words_are_capitalised():
     assert len(calls) == 1, f"expected one pass, got {len(calls)}: {calls}"
 
 
-# @scenario "The second pass is skipped when every capitalised word stands alone"
+# @scenario "The second pass is skipped when every capitalised word is its own field"
 @pytest.mark.parametrize(
     "text",
     [
@@ -225,16 +225,19 @@ def test_no_second_pass_when_only_short_words_are_capitalised():
         '{"level": "ERROR", "message": "upstream timed out after 30s"}',
         '{"tool": "search", "args": {"query": "refund policy"}, "status": "SUCCESS"}',
         '{"env": "PROD", "region": "eu-west-1", "service": "checkout"}',
-        'Marcus Whitfield set the field to "NULL" by hand.',
+        '{"first": "Maria", "last": "GONZALEZ"}',
+        '["Maria", "GONZALEZ"]',
     ],
 )
-def test_no_second_pass_when_every_capitalised_word_stands_alone(text: str):
-    """No span can pass without two words, so a lone POST is not worth a pass."""
-    calls = analyze_calls(entities=PresidioEntities(person=True, location=True), text=text)
+def test_no_second_pass_when_every_capitalised_word_is_its_own_field(text: str):
+    """No span crosses a field end, so a quoted POST is not worth a pass."""
+    calls = analyze_calls(
+        entities=PresidioEntities(person=True, location=True), text=text
+    )
     assert len(calls) == 1, f"expected one pass, got {len(calls)}: {calls}"
 
 
-# @scenario "The second pass still runs for a capitalised word beside another word"
+# @scenario "The second pass still runs for a capitalised word that may join another"
 @pytest.mark.parametrize(
     "text,name",
     [
@@ -242,20 +245,30 @@ def test_no_second_pass_when_every_capitalised_word_stands_alone(text: str):
         ("Escalated by Anna Smith-JONES.", "Anna Smith-JONES"),
         ("Note: AMY LEE called twice.", "AMY LEE"),
         ("Signed by J. WHITFIELD on arrival.", "J. WHITFIELD"),
+        ('JOHN "JACK" WHITFIELD', 'JOHN "JACK" WHITFIELD'),
+        ('Customer: Robert "BOB" MILLER', 'Robert "BOB" MILLER'),
+        ("Ann – WHITFIELD", "Ann – WHITFIELD"),
+        ("JAMES' WHITFIELD", "JAMES' WHITFIELD"),
+        ("Contact person: Robert (MILLER), phone unknown", "Robert (MILLER"),
     ],
 )
-def test_second_pass_runs_for_a_capitalised_word_beside_another(text: str, name: str):
-    calls = analyze_calls(entities=PresidioEntities(person=True, location=True), text=text)
+def test_second_pass_runs_for_a_capitalised_word_that_may_join_another(
+    text: str, name: str
+):
+    calls = analyze_calls(
+        entities=PresidioEntities(person=True, location=True), text=text
+    )
     assert len(calls) == 2, f"expected two passes, got {len(calls)}: {calls}"
     assert ("PERSON", name) in names_and_places(text)
 
 
-# @scenario "The second pass still runs for a capitalised word beside another word"
+# @scenario "The second pass still runs for a capitalised word that may join another"
 def test_second_pass_runs_for_a_surname_before_a_comma():
-    """Surname-first lists. Only the forename is redacted today (#9255)."""
+    """Only the comma joins GONZALEZ to a word. Just the forename is redacted
+    today (#9255)."""
     calls = analyze_calls(
         entities=PresidioEntities(person=True, location=True),
-        text="Ticket from GONZALEZ, Maria about the late refund.",
+        text='{"name": "GONZALEZ, Maria"}',
     )
     assert len(calls) == 2, f"expected two passes, got {len(calls)}: {calls}"
 

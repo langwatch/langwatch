@@ -186,7 +186,7 @@ def test_no_false_person_on_allcaps_non_name(index: int):
     )
 
 
-# @scenario "An ALL-CAPS string that is not a place is not read as one"
+# @scenario "The second pass adds no place over an ALL-CAPS string that is not one"
 @pytest.mark.parametrize("index", range(len(cases())))
 def test_no_false_place_from_the_second_pass(index: int):
     """Strict redaction asks for places too, and the second pass looks for them.

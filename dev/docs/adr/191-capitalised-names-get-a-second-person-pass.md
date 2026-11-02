@@ -43,10 +43,12 @@ person spans that copy reveals into the first pass's findings.
    unknown word (ZORBEX ULTRA). This refuses WIDGET PRO, SEPA ACH, API KEY
    and invented brands, which pass the shape rule.
 4. The second pass is skipped when neither person nor location detection is
-   on, or when no rewritten word sits beside another word, joined by a space,
-   a comma or an initial's full stop. Prose with OK, ID or USD and trace data
-   with a lone "POST" or "ERROR" cost one pass, since no span of one word can
-   pass rule 2. With location on and person off it asks for places only.
+   on, or when every rewritten word is cut off from its neighbours by a field
+   end: a colon, or a comma or semicolon beside a quote. Any other gap (a
+   space, comma, quote, bracket or dash) may sit inside a name, as in
+   JOHN "JACK" WHITFIELD. Prose with OK, ID or USD and JSON with a quoted
+   "POST" or "ERROR" cost one pass, since no span of one word can pass rule 2.
+   With location on and person off it asks for places only.
 5. Only PERSON spans, and LOCATION spans when location is redacted, come out
    of the second pass. LOCATION is there because the model reads some
    surnames as places (Costa Pereira), so a person-only pass left them in
@@ -59,7 +61,8 @@ Titlecasing restores the name cue on WHITFIELD and invents the same cue on
 ERP. The shape and name-word rules are what price that: a 54-string corpus
 of capitalised non-names (merchants, carriers, departments, SKUs, codes,
 headings, acronym prose, particle-shaped places, non-places where a place
-would go) keeps two known false people and no false place. One predates the second pass, and the other is a product line
+would go) keeps two known false people and no false place added by the
+second pass. One predates the second pass, and the other is a product line
 named after its founder, which holds a name. The side-by-side clause lifted
 wholly capitalised names with a short word (AMY LEE) from 5 of 24 to 24 of
 24 and particle surnames (VAN DER BERG) from 2 of 24 to 21 of 24, the

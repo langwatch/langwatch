@@ -180,14 +180,16 @@ Feature: A name written in capitals is still redacted
       Then the content is analysed once and not twice
 
     @unit
-    Scenario: The second pass is skipped when every capitalised word stands alone
-      Given trace data whose capitalised words are lone field values such as "method": "POST"
+    Scenario: The second pass is skipped when every capitalised word is its own field
+      Given trace data whose capitalised words are quoted values such as "method": "POST"
+      And each is cut off from its neighbours by a colon, or by a comma or semicolon beside a quote
       When the content is analysed for personal information
       Then the content is analysed once and not twice
 
     @unit
-    Scenario: The second pass still runs for a capitalised word beside another word
-      Given a capitalised name written beside another word of it, after a comma or across a hyphen
+    Scenario: The second pass still runs for a capitalised word that may join another
+      Given a capitalised word of four or more letters, or two capitalised words side by side
+      And a neighbouring word joined to it by a space, a comma, a quote, a bracket, an apostrophe or a dash
       When the content is analysed for personal information
       Then the content is analysed twice
 
@@ -240,8 +242,8 @@ Feature: A name written in capitals is still redacted
       Then no person span is reported over any of them
 
     @unit
-    Scenario: An ALL-CAPS string that is not a place is not read as one
-      Given capitalised non-names, some standing where a place would go
+    Scenario: The second pass adds no place over an ALL-CAPS string that is not one
+      Given capitalised non-names, five of them standing where a place would go
       And person and location detection are both switched on
       When the content is analysed for personal information
       Then the second analysis adds no place span over any of them

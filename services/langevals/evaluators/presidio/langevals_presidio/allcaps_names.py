@@ -18,10 +18,11 @@ from spacy.strings import hash_string
 MIN_SPAN_WORDS = 2
 MIN_NORMALISED_TOKEN_LENGTH = 4
 
-# A word of a name keeps its joins (O'BRIEN, SMITH-JONES). Between two words:
-# J. SMITH, SMITH, Maria, AMY LEE. A quote or colon ends a field ("POST").
+# A word of a name keeps its joins (O'BRIEN, SMITH-JONES). Any other gap may
+# sit inside a name (J. SMITH, JOHN "JACK" WHITFIELD, Ann – WHITFIELD) unless
+# it ends a field: a colon, or a comma or semicolon beside a quote ("POST", ").
 NAME_WORD = re.compile(r"\w+(?:['’-]\w+)*")
-NAME_WORD_GAP = re.compile(r"[.,]?\s+")
+FIELD_END = re.compile(r':|["“”][,;]|[,;]\s*["“”]')
 
 # A word reads as a name when its Titlecase form sits this many times nearer
 # the top of the frequency-sorted vector table than its lowercase and capital
@@ -111,8 +112,8 @@ def has_name_shaped_rewrite(*, original: str, normalised: str) -> bool:
 def could_hold_a_rewritten_name(*, original: str, normalised: str) -> bool:
     """Whether some span of the text could pass `normalisation_justifies_span`.
 
-    That takes a rewritten word beside another word of the same name. A lone
-    capital word (POST, ERROR) never makes one, so it is not worth a second pass.
+    That takes a rewritten word beside another word of the same name. A capital
+    word fenced off as its own field ("POST") never makes one, so it is skipped.
     """
     rewritten = _rewritten_runs(original=original, normalised=normalised)
     if not rewritten:
@@ -126,7 +127,7 @@ def could_hold_a_rewritten_name(*, original: str, normalised: str) -> bool:
         ]
 
     for left, right in pairwise(NAME_WORD.finditer(original)):
-        if not NAME_WORD_GAP.fullmatch(original[left.end() : right.start()]):
+        if FIELD_END.search(original[left.end() : right.start()]):
             continue
         left_lengths, right_lengths = lengths(left), lengths(right)
         if left_lengths and right_lengths:
