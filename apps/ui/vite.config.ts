@@ -437,6 +437,13 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
+        // The docs session frame, served by the API process like the chart frame
+        // (ADR-185): without this entry the docs playground frames the SPA shell.
+        "^/connect/docs/frame(?:\\?.*)?$": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
         // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
         "^/mcp(?:\\?.*)?$": {
           target: API_TARGET,

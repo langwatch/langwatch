@@ -1,10 +1,12 @@
 Feature: Code block — execute user Python with isolated subprocess and structured I/O
   The code block runs arbitrary Python written by the workflow author. nlpgo
-  spawns a Python subprocess (helper script bundled in the container) for each
-  invocation, marshals declared inputs as JSON over stdin, and reads declared
-  outputs as JSON over stdout. Sandboxing matches today's Python NLP behavior
-  (process isolation; no syscall restrictions) so existing customer code keeps
-  working byte-for-byte.
+  spawns a Python subprocess for each invocation — the runner it carries in its
+  own binary, passed to the interpreter as source — hands the interpreter the
+  declared inputs as JSON when it asks for them, and reads declared outputs
+  from a result file. Sandboxing is process isolation with no syscall
+  restrictions, so existing customer code keeps working byte-for-byte; what the
+  four isolation rules below add is that one execution cannot reach another's
+  code, directory, processes or payload.
 
   See _shared/contract.md §7.
 
@@ -99,9 +101,9 @@ Feature: Code block — execute user Python with isolated subprocess and structu
   Rule: Wall-clock timeout terminates the subprocess
 
     # The variable reaching the executor is covered below and by
-    # services/nlpgo/cmd (root_test.go). What is still unbuilt is this whole
-    # path over HTTP: the kill surfacing as a `/go/studio/execute_sync` error
-    # body, and the orphan-process assertion, neither of which any test makes.
+    # services/nlpgo/cmd (root_test.go), and the orphan-process assertion by
+    # the teardown scenario further down. What is still unbuilt is this path
+    # over HTTP: the kill surfacing as a `/go/studio/execute_sync` error body.
     @integration @unimplemented
     Scenario: a code block exceeding NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is killed and reports a timeout
       Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is set to 2
@@ -170,36 +172,157 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When I invoke the workflow 5 times in succession
       Then every invocation returns x=1
 
-  Rule: Every execution runs a freshly materialized runner
+  Rule: No code the interpreter loads comes from a writable location
 
-    # The runner script and its bundled `dspy` stand-in are written from the
-    # engine's own embedded copy into a directory created for that one
-    # execution, and the directory is removed when the execution ends. The
-    # trust anchor is the embedded bytes held in the engine process, which
-    # user code cannot reach, so what a later execution runs never depends on
-    # what an earlier one left on disk.
+    # On the multi-tenant cloud many customers' code blocks run in one nlpgo
+    # container, so an execution is isolated from the other executions and not
+    # only from the engine. The runner script and its bundled `dspy` stand-in
+    # are never written to the filesystem: they travel from the engine's own
+    # embedded copy to the interpreter over argv and in the payload it asks
+    # for, and the runner
+    # drops the working directory from sys.path before any user code runs.
+    # Everything the interpreter loads therefore comes either from the engine's
+    # memory or from the image's read-only library path.
+
+    @unit
+    Scenario: the runner and the dspy stand-in are never written to disk
+      Given a code node whose body reports what it can see of the runner
+      When the engine invokes the node
+      Then the dspy stand-in carries no file path
+      And the execution's working directory holds no Python source
+      And the working directory is not on sys.path
+
+    @unit
+    Scenario: an import is never answered by the execution's working directory
+      Given a code node whose body writes a module into its working directory
+      When the code imports that module
+      Then the import fails
+      And an import of the dspy stand-in still resolves to the shipped one
 
     @unit
     Scenario: user code cannot change what a later execution runs
       Given one executor serving several executions
-      And a first code node whose body rewrites the runner script on disk
+      And a first code node whose body writes a runner script of its own
       When the executor runs that request and then a second ordinary request
       Then the second request returns its declared output
-      And the second request is unaffected by the rewrite
+      And the second request is unaffected by what the first one wrote
 
     @unit
     Scenario: user code cannot change the dspy stand-in a later execution imports
       Given one executor serving several executions
-      And a first code node whose body rewrites the bundled dspy stand-in on disk
+      And a first code node whose body writes a dspy stand-in of its own
       When the executor runs that request and then a second request importing dspy
-      Then the second request sees the shipped stand-in, not the rewritten one
+      Then the second request sees the shipped stand-in, not the written one
+
+  Rule: An execution's working directory is reachable only from that execution
+
+    # Each execution gets a directory with a random name, inside a per-process
+    # root with no read permission: the root cannot be listed, so a directory
+    # cannot be found by walking to it, and it is removed when the execution
+    # ends. Everything in the container runs as one user, so this is a barrier
+    # against discovery rather than one the kernel enforces — the only thing
+    # that would enforce it is a UID per execution, which the container cannot
+    # have (non-root, every capability dropped, no_new_privs).
 
     @unit
-    Scenario: each execution gets its own temporary directory, removed afterwards
-      Given a code node whose body writes a file next to the runner
+    Scenario: each execution gets its own working directory, removed afterwards
+      Given a code node whose body writes a file in its working directory
       When the executor runs the request twice
       Then the second execution does not see the file the first one wrote
       And no execution directory is left behind once the executor is done
+
+    @unit
+    Scenario: an execution cannot reach another execution's working directory
+      Given a code node whose body goes looking for other executions
+      When the executor runs it beside another execution
+      Then listing the root that holds the execution directories is refused
+      And a directory belonging to a finished execution cannot be read or written
+
+  Rule: One execution cannot read another execution's process
+
+    # Everything in the container runs as one user, and /proc hands a process
+    # running as that user another's open descriptors, initial variables and
+    # working directory. A descriptor exec hands the interpreter can be cloned
+    # in the moment before the runner hides itself, so the interpreter is
+    # handed nothing of the run: no payload, no credential, no directory and
+    # no path on its command line. Once non-dumpable it asks nlpgo for its
+    # payload over a socket nlpgo answers by the pid the kernel reports for
+    # the process connecting, and moves into its working directory from it.
+    # The pid is the whole check, so the payload is handed over once and an
+    # ask from anything else is answered with nothing. Where that socket
+    # exists and cannot be bound, the engine refuses to run code blocks at
+    # all rather than put a payload back on a descriptor.
+    #
+    # The limit: a process USER CODE starts is a fresh exec, which the kernel
+    # makes dumpable again, and it inherits the run's credential and directory
+    # from the runner's environment. A concurrent execution can read those out
+    # of such a child for as long as it runs. Closing that needs a uid per
+    # execution, which the container cannot have.
+
+    @unit
+    Scenario: one execution cannot read another's payload, variables or directory through /proc
+      Given a code node whose body reads the /proc entries of another running execution
+      When the executor runs it beside that execution
+      Then reading the other execution's open descriptors is refused
+      And reading its initial variables is refused
+      And reading its working directory is refused
+      And reading its process state still works, because teardown reads it
+
+    @unit
+    Scenario: the interpreter is handed nothing belonging to the run
+      Given a code node whose body reports the descriptors it was started with
+      When the engine invokes the node
+      Then its standard input is empty, because the payload did not arrive on one
+      And the file its errors go to has no name another execution could open
+      And that file is not inside the run's working directory
+
+    @unit
+    Scenario: the payload channel answers only the interpreter it started, once
+      Given a code node whose body asks nlpgo for a payload, from the interpreter and from a process it starts
+      When the engine invokes the node
+      Then the interpreter asking again is told nothing, because its payload was handed over once
+      And the process the code started is told nothing, because it is not an execution the engine started
+
+    @unit
+    Scenario: the run's credential is never in the interpreter's initial variables
+      Given the run carries a sandbox key
+      When the engine invokes a code node
+      Then user code still reads the key as LANGWATCH_API_KEY
+      And the key is not among the variables the interpreter was started with
+      And the command line names no directory belonging to the run
+
+    @unit
+    Scenario: a result file this execution did not write is not read as its output
+      Given a code node whose body writes a result file of its own and exits
+      When the executor runs the request
+      Then the execution reports a runner error
+      And the values in that file are not returned as the node's outputs
+
+  Rule: No process an execution started outlives it
+
+    # The interpreter leads a process group of its own and every exit path
+    # kills the group — success, user-code error and timeout alike. A process
+    # that detached from the group by calling setsid cannot also stop being a
+    # descendant: orphans reparent to the nearest ancestor marked
+    # PR_SET_CHILD_SUBREAPER, which the engine marks itself, so teardown finds
+    # them as its own children, kills them and collects their exit status.
+    # This needs no capability, no cgroup write, no PID namespace and no second
+    # UID, which is what makes it deployable in the shipped container.
+    #
+    # Adoption says an execution started a process, not which one. A process
+    # that also erased the run's marks from its environment and working
+    # directory is swept by the first teardown that can tell it apart from
+    # every execution still running, which is the moment it is older than all
+    # of them: killing a live tenant's helper would be worse than sweeping one
+    # process late.
+
+    @unit
+    Scenario: no process an execution started is left running
+      Given a code node whose body starts a process in a session of its own
+      When the execution returns an output, raises, or runs out of time
+      Then the process it started is gone once the executor returns
+      And a process that detached with a scrubbed environment is gone too
+      And an execution running beside it is left alone
 
   Rule: Container packages a stable Python toolchain for user code
 

@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
   "ipykernel>=7.3.0",
   "langwatch",
-  "litellm>=1.96.2", # security: litellm advisory covering 1.96.0-1.96.1 (#2648)
+  "litellm>=1.100.4", # security: litellm advisories up to GHSA-7hp6-4w63-5g45, fixed in 1.100.4
   "mcp[cli]>=2.2.0", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 2.2.0 (#2823)
   "pandas>=2.3.2",
   "tenacity>=9.1.4",

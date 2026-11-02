@@ -16,6 +16,7 @@ import {
 } from "../../rules/nlp-lambda-config.rules.ts";
 import {
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
+  NLP_LAMBDA_UNPROTECTED_ARN_CACHE_TTL_SECONDS,
   NlpLambdaRuntimeService,
 } from "../nlp-lambda-runtime.service.ts";
 
@@ -48,8 +49,13 @@ class SharedCache implements NlpLambdaArnCache {
   }
 }
 
-function awsResolver(arn: string = ARN) {
-  const resolve = vi.fn(async () => arn);
+/** Answers as the AWS resolver does when it moved the function to the pod's own image. */
+function awsResolver(arn: string = ARN, imageOrder?: number) {
+  const resolve = vi.fn(async (input: { projectId: string; imageUri: string }) => ({
+    arn,
+    imageUri: input.imageUri,
+    imageOrder,
+  }));
   const resolver = new (class implements NlpLambdaArnResolver {
     resolve = resolve;
   })();
@@ -60,12 +66,14 @@ function runtime(options: {
   cache: SharedCache;
   resolver: NlpLambdaArnResolver;
   imageUri?: string;
+  imageOrder?: number;
   configFingerprint?: string;
 }) {
   return NlpLambdaRuntimeService.create({
     cache: options.cache,
     resolver: options.resolver,
     imageUri: options.imageUri ?? IMAGE,
+    imageOrder: options.imageOrder,
     configFingerprint: options.configFingerprint ?? FINGERPRINT,
   });
 }
@@ -192,10 +200,10 @@ describe("the per-project NLP Lambda runtime", () => {
     /** @scenario "Different projects do not share cache slots" */
     it("files each under its own key and never answers one with the other's", async () => {
       const cache = new SharedCache();
-      const resolve = vi.fn(
-        async (input: { projectId: string; imageUri: string }) =>
-          `arn:aws:lambda:eu-central-1:1:function:langwatch_nlp-${input.projectId}`,
-      );
+      const resolve = vi.fn(async (input: { projectId: string; imageUri: string }) => ({
+        arn: `arn:aws:lambda:eu-central-1:1:function:langwatch_nlp-${input.projectId}`,
+        imageUri: input.imageUri,
+      }));
       const resolver = new (class implements NlpLambdaArnResolver {
         resolve = resolve;
       })();
@@ -227,7 +235,7 @@ describe("the per-project NLP Lambda runtime", () => {
       });
       const resolve = vi.fn(async () => {
         await gate;
-        return ARN;
+        return { arn: ARN, imageUri: IMAGE };
       });
       const resolver = new (class implements NlpLambdaArnResolver {
         resolve = resolve;
@@ -387,6 +395,115 @@ describe("the per-project NLP Lambda runtime", () => {
       expect(arn).toBe(ARN);
       expect(account.sent).toEqual([]);
       expect(cache.deleted).toEqual([]);
+    });
+  });
+
+  describe("when pods of two releases share the cache during a rollout", () => {
+    /** @scenario "A cached ARN from a newer release keeps serving an older pod" */
+    it("serves an older pod the newer release's entry without resolving or dropping it", async () => {
+      const cache = new SharedCache();
+      await runtime({
+        cache,
+        resolver: awsResolver(ARN, 200).resolver,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      }).resolveArn(PROJECT);
+      const older = awsResolver(ARN, 100);
+
+      const arn = await runtime({
+        cache,
+        resolver: older.resolver,
+        imageUri: IMAGE,
+        imageOrder: 100,
+      }).resolveArn(PROJECT);
+
+      expect(arn).toBe(ARN);
+      expect(older.resolve).not.toHaveBeenCalled();
+      expect(cache.deleted).toEqual([]);
+      expect(JSON.parse(cache.entries.get("lambda_arn:projectA")!.value)).toMatchObject({
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      });
+    });
+
+    /** @scenario "An image change deletes a stale cached ARN before refresh" */
+    it("has a newer pod drop an older release's entry and resolve again", async () => {
+      const cache = new SharedCache();
+      await runtime({
+        cache,
+        resolver: awsResolver(ARN, 100).resolver,
+        imageUri: IMAGE,
+        imageOrder: 100,
+      }).resolveArn(PROJECT);
+      const newer = awsResolver(ARN, 200);
+
+      await runtime({
+        cache,
+        resolver: newer.resolver,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      }).resolveArn(PROJECT);
+
+      expect(newer.resolve).toHaveBeenCalledTimes(1);
+      expect(cache.deleted).toEqual(["lambda_arn:projectA"]);
+    });
+
+    /** @scenario "A pod that leaves a newer function alone files it under the newer image" */
+    it("files an older pod's resolution under the image the function carries", async () => {
+      const cache = new SharedCache();
+      const leftAlone = vi.fn(async () => ({ arn: ARN, imageUri: NEXT_IMAGE, imageOrder: 200 }));
+      const older = new (class implements NlpLambdaArnResolver {
+        resolve = leftAlone;
+      })();
+      await runtime({ cache, resolver: older, imageUri: IMAGE, imageOrder: 100 }).resolveArn(
+        PROJECT,
+      );
+      const newer = awsResolver(ARN, 200);
+
+      const arn = await runtime({
+        cache,
+        resolver: newer.resolver,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      }).resolveArn(PROJECT);
+
+      expect(arn).toBe(ARN);
+      expect(JSON.parse(cache.entries.get("lambda_arn:projectA")!.value)).toMatchObject({
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      });
+      expect(newer.resolve).not.toHaveBeenCalled();
+      expect(cache.deleted).toEqual([]);
+    });
+
+    /** @scenario "A function left unmoved for want of an order is served briefly from cache" */
+    it("files an unprotected resolution under the pod's own image for a short window", async () => {
+      const cache = new SharedCache();
+      const unmoved = vi.fn(async () => ({
+        arn: ARN,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+        unprotected: true,
+      }));
+      const resolver = new (class implements NlpLambdaArnResolver {
+        resolve = unmoved;
+      })();
+      const engine = runtime({ cache, resolver, imageUri: NEXT_IMAGE, imageOrder: 200 });
+
+      await engine.resolveArn(PROJECT);
+      const again = await runtime({
+        cache,
+        resolver,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      }).resolveArn(PROJECT);
+
+      expect(again).toBe(ARN);
+      expect(unmoved).toHaveBeenCalledTimes(1);
+      expect(cache.deleted).toEqual([]);
+      expect(cache.entries.get("lambda_arn:projectA")?.ttlSeconds).toBe(
+        NLP_LAMBDA_UNPROTECTED_ARN_CACHE_TTL_SECONDS,
+      );
     });
   });
 });

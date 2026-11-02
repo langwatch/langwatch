@@ -25,6 +25,7 @@ export interface ExperimentRunStartRequest {
   dataset_id?: string;
   parameters?: Record<string, string | number | boolean>;
   row_indices?: number[];
+  concurrency?: number;
 }
 
 /**
@@ -35,17 +36,20 @@ export const toRunStartRequest = ({
   datasetId,
   parameters,
   rowIndices,
+  concurrency,
 }: {
   data?: Record<string, unknown>[];
   datasetId?: string;
   parameters?: Record<string, string | number | boolean>;
   rowIndices?: number[];
+  concurrency?: number;
 }): ExperimentRunStartRequest | undefined => {
   const body: ExperimentRunStartRequest = {};
   if (data !== undefined) body.data = data;
   if (datasetId !== undefined) body.dataset_id = datasetId;
   if (parameters !== undefined) body.parameters = parameters;
   if (rowIndices !== undefined) body.row_indices = rowIndices;
+  if (concurrency !== undefined) body.concurrency = concurrency;
   return Object.keys(body).length > 0 ? body : undefined;
 };
 
@@ -423,9 +427,13 @@ export class ExperimentsApiService {
     slug: string,
     options: {
       parameters?: Record<string, string | number | boolean>;
+      concurrency?: number;
     } = {},
   ): Promise<ExperimentRunStartResponse> {
-    const body = toRunStartRequest({ parameters: options.parameters });
+    const body = toRunStartRequest({
+      parameters: options.parameters,
+      concurrency: options.concurrency,
+    });
     const { data, error, response } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
       params: { path: { slug } },
       ...(body !== undefined ? { body } : {}),

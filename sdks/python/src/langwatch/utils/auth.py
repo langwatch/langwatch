@@ -119,6 +119,11 @@ def build_auth_headers(
     return headers
 
 
+# The dated API version every request names (specs/api-reference/client-api-version.feature).
+API_VERSION_HEADER = "X-API-Version"
+LANGWATCH_API_VERSION = "2026-10-26"
+
+
 def build_request_headers(
     api_key: str,
     project_id: str | None = None,
@@ -127,4 +132,5 @@ def build_request_headers(
     return {
         **build_auth_headers(api_key, project_id),
         **build_sdk_identity_headers(str(__version__)),
+        API_VERSION_HEADER: LANGWATCH_API_VERSION,
     }

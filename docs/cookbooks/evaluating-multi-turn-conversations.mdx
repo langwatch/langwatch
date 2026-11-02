@@ -206,7 +206,7 @@ Now we'll define our agents. We'll create both a Planner and an Executor agent. 
 
 ```python
 class PlannerAgent:
-    def __init__(self, model: str = "gpt-5"):
+    def __init__(self, model: str = "gpt-6-luna"):
         self.model = model
         self.client = AsyncOpenAI(api_key=api_key)
 
@@ -217,7 +217,8 @@ class PlannerAgent:
             model=self.model,
             messages=task_history,
             tools=TOOL_SCHEMAS,
-            tool_choice="auto"
+            tool_choice="auto",
+            reasoning_effort="none",  # gpt-6 takes function tools on Chat Completions only with reasoning off
         )
 
         message = response.choices[0].message
@@ -284,7 +285,7 @@ class ExecutorAgent:
         return {"task_history": task_history, "tool_outputs": tool_outputs}
 
 # Generate a response from tool outputs
-async def generate_response(tool_outputs: List[Dict], model: str = "gpt-5") -> str:
+async def generate_response(tool_outputs: List[Dict], model: str = "gpt-6-luna") -> str:
     """Generate a human-readable response based on tool outputs"""
     client = AsyncOpenAI(api_key=api_key)
 
@@ -327,7 +328,7 @@ class Verdict(BaseModel):
 class VerdictList(BaseModel):
     verdicts: list[Verdict]
 
-async def evaluate_conversation(conversation: List[Dict], tools_used: List[str], criteria: List[str], model: str = "gpt-5") -> Dict[str, Any]:
+async def evaluate_conversation(conversation: List[Dict], tools_used: List[str], criteria: List[str], model: str = "gpt-6-luna") -> Dict[str, Any]:
     """Evaluate a conversation against success criteria"""
     client = AsyncOpenAI(api_key=api_key)
 
@@ -383,6 +384,8 @@ async def evaluate_conversation(conversation: List[Dict], tools_used: List[str],
 Below we define a method to simulate conversations between our agent and a user. The outputs will be evaluated by our Evaluator Agent.
 
 ```python
+import langwatch
+
 async def simulate_conversation(ticket: Dict[str, Any], criteria: List[str], max_turns: int = 5):
     """Simulate a conversation with a customer and evaluate against criteria"""
     # Initialize LangWatch evaluation

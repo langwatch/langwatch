@@ -60,6 +60,7 @@ import {
   type ModelProviderPlaygroundRequest,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
+  type BuiltInModel,
   type DecisionModelResolution,
   type ModelProviderResolution,
   type ModelProviderSummary,
@@ -246,6 +247,8 @@ export class ModelProviderModule implements ModelProviderApi {
   /** What the module's own operations spend, never a platform provider credential. */
   static readonly operationalSecrets = {
     openRouter: Secret.load("OPENROUTER_API_KEY", { optional: true }),
+    /** Doubleword's platform key, which reads its model list and prices for the catalog sync. */
+    doublewordCatalog: Secret.load("DOUBLEWORD_API_KEY", { optional: true }),
     /** The engine hop's shared credential: the same handle the process owner holds. */
     nlpInternal: nlpInternalSecret,
   } as const;
@@ -761,8 +764,15 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.resolveModelForFeature(input);
   }
 
-  resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution> {
+  resolveDecisionModel(input: {
+    projectId: string;
+    model?: string;
+  }): Promise<DecisionModelResolution> {
     return this.#modelProviders.resolveDecisionModel(input);
+  }
+
+  listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]> {
+    return this.#modelProviders.listDecisionModelsForProject(input);
   }
 
   findAlternateModel(input: {

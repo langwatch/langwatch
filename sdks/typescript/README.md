@@ -126,8 +126,8 @@ span.end();
   ```ts
   span.setRAGContexts([{ document_id: "doc1", chunk_id: "c1", content: "..." }]);
   span.setMetrics({ promptTokens: 10, completionTokens: 20, cost: 0.002 });
-  span.setRequestModel("gpt-4");
-  span.setResponseModel("gpt-4");
+  span.setRequestModel("gpt-6-luna");
+  span.setResponseModel("gpt-6-luna");
   ```
 
 ### 2. Prompt Management

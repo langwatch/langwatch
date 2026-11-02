@@ -21,7 +21,10 @@ import (
 // Step is one entry in a job's `steps:` list. Only the fields the guards read
 // are modeled; everything else in a workflow is deliberately ignored.
 type Step struct {
+	ID   string            `yaml:"id"`
 	Name string            `yaml:"name"`
+	Run  string            `yaml:"run"`
+	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
 	With map[string]any    `yaml:"with"`
 	Env  map[string]string `yaml:"env"`
@@ -33,6 +36,14 @@ type Step struct {
 	// node, so — unlike a raw text scan — it is immune to a quoted value and to
 	// `uses:` text that appears inside a run: script rather than as a real step.
 	UsesComment string `yaml:"-"`
+
+	// Line and EndLine are the 1-based source lines the step's mapping starts
+	// and ends on, so a guard can attribute raw-text findings to the step that
+	// holds them. EndLine is the last line any of the step's nodes starts on,
+	// which undercounts a trailing multi-line block scalar; a guard reading it
+	// to permit lines therefore errs towards reporting, never towards hiding.
+	Line    int `yaml:"-"`
+	EndLine int `yaml:"-"`
 }
 
 // UnmarshalYAML decodes the modeled step fields, then separately recovers the
@@ -45,8 +56,44 @@ func (s *Step) UnmarshalYAML(node *yaml.Node) error {
 	}
 	*s = Step(plain)
 	s.UsesComment = usesLineComment(node)
+	s.Line = node.Line
+	s.EndLine = lastLine(node)
 
 	return nil
+}
+
+// lastLine returns the greatest start line of node and its descendants.
+func lastLine(node *yaml.Node) int {
+	last := node.Line
+	for _, child := range node.Content {
+		if line := lastLine(child); line > last {
+			last = line
+		}
+	}
+
+	return last
+}
+
+// GrantsWrite reports whether the block grants write on scope, counting the
+// write-all shorthand.
+func (p Permissions) GrantsWrite(scope string) bool {
+	return p.Shorthand == "write-all" || p.Scopes[scope] == "write"
+}
+
+// Declared reports whether a permissions block was written at all.
+func (p Permissions) Declared() bool {
+	return p.Scopes != nil || p.Shorthand != ""
+}
+
+// EffectivePermissions returns the job's own permissions block when it
+// declares one, else the workflow-level block: GitHub replaces, never merges,
+// the workflow block with a job-level one.
+func (w *Workflow) EffectivePermissions(jobName string) Permissions {
+	if job, ok := w.Jobs[jobName]; ok && job.Permissions.Declared() {
+		return job.Permissions
+	}
+
+	return w.Permissions
 }
 
 // usesLineComment returns the trailing comment on the mapping's `uses:` entry,
@@ -267,9 +314,10 @@ type CheckoutStep struct {
 func (w *Workflow) CheckoutSteps() []CheckoutStep {
 	var found []CheckoutStep
 	for _, job := range w.JobNames() {
-		for _, step := range w.Jobs[job].Steps {
-			if strings.HasPrefix(step.Uses, "actions/checkout@") {
-				found = append(found, CheckoutStep{Workflow: w.Path, Job: job, Step: step})
+		steps := w.Jobs[job].Steps
+		for i := range steps {
+			if strings.HasPrefix(steps[i].Uses, "actions/checkout@") {
+				found = append(found, CheckoutStep{Workflow: w.Path, Job: job, Step: steps[i]})
 			}
 		}
 	}

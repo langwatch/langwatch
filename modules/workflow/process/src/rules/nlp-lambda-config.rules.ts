@@ -35,6 +35,8 @@ export type StudioLambdaConfig = Readonly<{
   credentials: NlpLambdaFleetCredentials;
   roleArn: string;
   imageUri: string;
+  /** Where `imageUri` sits in rollout order; absent where the fleet names none. */
+  imageOrder?: number | undefined;
   cacheBucket: string;
   subnetIds: readonly string[];
   securityGroupIds: readonly string[];
@@ -66,6 +68,43 @@ export function clampCodeBlockTimeoutSeconds(rawValue: string | undefined): numb
   }
 
   return Math.min(parsed, maxSeconds);
+}
+
+/** The function tag recording the rollout order of the image a pod last put on it. */
+export const NLP_LAMBDA_IMAGE_ORDER_TAG = "ImageOrder";
+
+/** The order a function's tags record; `none` when they hold no whole number. */
+export type RecordedImageOrder = { kind: "recorded"; order: number } | { kind: "none" };
+
+export function recordedImageOrder(
+  tags: Readonly<Record<string, string>> | undefined,
+): RecordedImageOrder {
+  const raw = tags?.[NLP_LAMBDA_IMAGE_ORDER_TAG];
+
+  return raw !== undefined && /^\d+$/.test(raw)
+    ? { kind: "recorded", order: Number(raw) }
+    : { kind: "none" };
+}
+
+/**
+ * Where a pod's image stands against the one a function was last moved to.
+ * `behind` (a newer release owns it) and `unknown` (its tags could not be read)
+ * leave the function alone; `unordered` (no order named) converges as before.
+ */
+export type StudioLambdaRolloutStanding = "ahead" | "level" | "behind" | "unknown" | "unordered";
+
+export function studioLambdaRolloutStanding(input: {
+  ours: number | undefined;
+  tags: Readonly<Record<string, string>> | undefined;
+  tagsUnreadable: boolean;
+}): StudioLambdaRolloutStanding {
+  if (input.ours === undefined) return "unordered";
+  if (input.tagsUnreadable) return "unknown";
+  const recorded = recordedImageOrder(input.tags);
+  // A function with no usable order predates ordering, so any ordered pod is ahead of it.
+  if (recorded.kind === "none" || input.ours > recorded.order) return "ahead";
+
+  return input.ours === recorded.order ? "level" : "behind";
 }
 
 /**
@@ -121,6 +160,7 @@ export function buildStudioLambdaConfig(input: {
     credentials: fields.credentials,
     roleArn: fields.roleArn,
     imageUri: fields.imageUri,
+    imageOrder: fields.imageOrder,
     cacheBucket: fields.cacheBucket,
     subnetIds: fields.subnetIds,
     securityGroupIds: fields.securityGroupIds,

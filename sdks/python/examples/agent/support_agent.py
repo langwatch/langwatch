@@ -37,7 +37,7 @@ def support_agent(
     messages: list[langwatch.Message],
     thread_id: str,
     session: dict | None,
-    model: Literal["gpt-5-mini", "gpt-5"] = "gpt-5-mini",
+    model: Literal["gpt-6-luna", "gpt-6-sol"] = "gpt-6-luna",
     plan: str = "free",
 ) -> langwatch.AgentReply:
     """One conversation turn.

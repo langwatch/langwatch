@@ -98,7 +98,12 @@ The three levers, in the order they pay:
    cache is one per user, so a new worktree's first run is a rerun too when
    another worktree has run the same files with the same module source,
    environment configuration and lockfile (ADR-193). A change to any of those
-   transforms the module again.
+   transforms the module again. In CI the package-suites job points the cache
+   at `node_modules/.vitest-cache` (`VITEST_FS_MODULE_CACHE_DIR`) and restores
+   it per shard, only for the same lockfile, manifests, tsconfigs and shared
+   config (`specs/ci/package-suites-transform-cache.feature`). A package with
+   no vitest config passes `--fsModuleCache` on its script instead, which
+   `go run ./cmd/ciguard` enforces.
 3. **Import cost itself** - `deps.optimizer` and `server.deps.inline` change how
    a heavy dependency is pre-bundled. Not set by the helper: the optimizer is
    per-dependency tuning, and a wrong entry changes what a test resolves. Reach

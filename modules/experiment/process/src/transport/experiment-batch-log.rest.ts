@@ -73,7 +73,7 @@ export const experimentBatchLogRest = defineRestRouter(ExperimentApi)
   .post("/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults")
   .keepsRecords()
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
-  .withPermission("evaluations:manage")
+  .withPermission("evaluations:manage", { legacyKey: "legacy_project_key_experiments" })
   .withoutAudit("ingestion")
   .withBodyLimit({ maxBytes: BATCH_LOG_MAX_BYTES, onExceeded: batchLogTooLarge })
   .withResponse("protocol", {

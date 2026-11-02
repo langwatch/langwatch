@@ -16,7 +16,7 @@ import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 
 import type { DerivedPostgresView } from "../../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
 import { LWQL_POSTGRES_CATALOG } from "../../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
@@ -1427,28 +1427,35 @@ export async function measureQuery({
 }): Promise<LangWatchQLQueryMeasurement> {
   const queryId = `lwql-measure-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   await selectRows(client, query, { query_id: queryId });
-  await harness.applyAsAdmin(["SYSTEM FLUSH LOGS"]);
 
-  const entries = await selectRows<{
-    read_rows: string;
-    read_bytes: string;
-    result_rows: string;
-    query_duration_ms: string;
-  }>(
-    harness.admin,
-    `SELECT read_rows, read_bytes, result_rows, query_duration_ms ` +
-      `FROM system.query_log WHERE query_id = '${queryId}' AND type = 'QueryFinish'`,
+  // The server queues QueryFinish after the last byte is sent, so one flush can race it.
+  const entry = await vi.waitFor(
+    async () => {
+      await harness.applyAsAdmin(["SYSTEM FLUSH LOGS"]);
+      const [found] = await selectRows<{
+        read_rows: string;
+        read_bytes: string;
+        result_rows: string;
+        query_duration_ms: string;
+      }>(
+        harness.admin,
+        `SELECT read_rows, read_bytes, result_rows, query_duration_ms ` +
+          `FROM system.query_log WHERE query_id = '${queryId}' AND type = 'QueryFinish'`,
+      );
+      if (!found) {
+        throw new Error(
+          "no query_log entry for the measured query — the numbers below would be invented",
+        );
+      }
+      return found;
+    },
+    { timeout: 10_000, interval: 200 },
   );
-  const entry = entries[0];
-  expect(
-    entry,
-    `no query_log entry for the measured query — the numbers below would be invented`,
-  ).toBeDefined();
   return {
-    rowsRead: Number(entry!.read_rows),
-    bytesRead: Number(entry!.read_bytes),
-    resultRows: Number(entry!.result_rows),
-    durationMs: Number(entry!.query_duration_ms),
+    rowsRead: Number(entry.read_rows),
+    bytesRead: Number(entry.read_bytes),
+    resultRows: Number(entry.result_rows),
+    durationMs: Number(entry.query_duration_ms),
   };
 }
 

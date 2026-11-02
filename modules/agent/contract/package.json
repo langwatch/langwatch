@@ -25,7 +25,7 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run"
+    "test": "vitest run --fsModuleCache"
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",

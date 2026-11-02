@@ -334,7 +334,7 @@ langwatch langy --share-control
 
 Ask Langy for a code change in the LangWatch panel first. Its request appears in the terminal:
 
-```
+```text
 ╭─ Langy wants to work in acme-support ───────────────────────────────────────╮
 │                                                                             │
 │   Instrument traces with LangWatch                                          │
@@ -352,7 +352,7 @@ Ask Langy for a code change in the LangWatch panel first. Its request appears in
 
 When two conversations asked for the same folder, you pick one first. After you share it, the command prints what Langy does, one line per call:
 
-```
+```text
 ⏺ Read(app/main.py)
   ⎿  Read 84 lines
 ⏺ Edit(app/main.py)
@@ -363,7 +363,7 @@ When two conversations asked for the same folder, you pick one first. After you 
 
 Reading files, running read-only commands and ordinary git work need no answer. Everything else stops and asks:
 
-```
+```text
 ╭─ Langy wants to run in acme-support ────────────────────────────────────────╮
 │                                                                             │
 │   uv run pytest                                                             │
@@ -417,6 +417,8 @@ langwatch scenario run <scenario-id> --target http:<agent-id>
 ```
 
 A **test suite** groups scenarios: a name and the scenarios you file under it. Every project has a `Default` test suite, so no scenario is loose.
+
+Run `langwatch test-suite list` before `scenario create` and file the scenario in the suite that fits; if none fits, ask the user which suite (or whether to make a new one).
 
 ```bash
 langwatch test-suite list
@@ -477,8 +479,8 @@ A target may also carry the parameter values it alone runs with, written as a qu
 
 ```bash
 langwatch run-plan run --test-suite "Checkout" \
-  --target 'http:agent_abc123?model=gpt-5' \
-  --target 'http:agent_abc123?model=gpt-5-mini' \
+  --target 'http:agent_abc123?model=gpt-6-sol' \
+  --target 'http:agent_abc123?model=gpt-6-luna' \
   --name "Checkout model comparison" --wait
 
 langwatch run-plan run --all \
@@ -493,8 +495,8 @@ A target value wins over the same name given with `--param`, so `--param` carrie
 ```bash
 langwatch test-suite run "Checkout" \
   --param account_tier=platinum \
-  --target 'http:agent_abc123?model=gpt-5' \
-  --target 'http:agent_abc123?model=gpt-5-mini'
+  --target 'http:agent_abc123?model=gpt-6-sol' \
+  --target 'http:agent_abc123?model=gpt-6-luna'
 ```
 
 Both targets run with `account_tier=platinum`, and each one with its own `model`.
@@ -506,7 +508,7 @@ Every run command accepts a repeatable `--param key=value`. A parameter is a con
 ```bash
 langwatch test-suite run <test-suite-id> --target http:<agent-id> --param account_tier=platinum --param region=eu-central
 langwatch scenario run <scenario-id> --target http:<agent-id> --param account_tier=platinum
-langwatch experiment run <experiment-slug> --param model=gpt-5-mini
+langwatch experiment run <experiment-slug> --param model=gpt-6-luna
 langwatch workflow run <workflow-id> --input '{"question":"where is my order?"}' --param region=eu-central
 ```
 
@@ -515,7 +517,7 @@ The value type follows the text you type. `true` and `false` are booleans. A val
 Each command uses the values differently:
 
 - `run-plan run`, `test-suite run` and `scenario run` supply the parameters that the scenarios declare. A name that no scenario in the run declares is rejected before anything is scheduled. See [Scenario run parameters](/agent-testing/run-parameters).
-- `experiment run` merges the values into every dataset row. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
+- `experiment run` merges the values into every dataset row. It also takes `--concurrency <n>`, from 1 to 24, for how many cells (one row against one target) run at once in this run only. Use `--concurrency 1` to run them one at a time, in order. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
 - `workflow run` sends the values as entry inputs. They are merged over `--input`, so a `--param` pair wins when both name the same key.
 
 ### Inspect simulation runs

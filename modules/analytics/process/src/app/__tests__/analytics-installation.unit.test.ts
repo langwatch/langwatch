@@ -67,6 +67,7 @@ function boot(role: "api" | "worker") {
           postgresHost: undefined,
           accessModelMode: undefined,
           sqlSingleNode: undefined,
+          clickhouseCluster: undefined,
         },
         publicBaseUrl: PUBLIC_BASE_URL,
       },
