@@ -178,6 +178,9 @@ type Executor struct {
 	payload *payloadChannel
 	// mode is decided once in New; see hideMode.
 	mode hideMode
+	// refusal is what the platform answered to PR_SET_DUMPABLE, kept so the
+	// disabled error can name it.
+	refusal syscall.Errno
 }
 
 // AllowVisibleProcessSetting is the operator variable that lets code blocks run
@@ -199,7 +202,8 @@ const (
 )
 
 // hideModeFor is the one definition of a refusal: only EPERM, Lambda's, may be
-// overridden by the operator; any other errno disables code blocks.
+// overridden by the operator; any other errno disables code blocks. runner.py
+// mirrors the EPERM rule for its own prctl; both must stay in step.
 func hideModeFor(refusal syscall.Errno, allow bool) hideMode {
 	switch {
 	case refusal == 0:
@@ -217,9 +221,18 @@ func resolveHideMode(allow bool, logger *zap.Logger) hideMode {
 	if mode == hideStrict {
 		logger.Info("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)))
 	} else {
-		logger.Warn("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)), zap.String("refusal", hideRefusal.Error()))
+		logger.Warn("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)), zap.String("refusal", hideRefusal.Error()), zap.Int("errno", int(hideRefusal)))
 	}
 	return mode
+}
+
+// disabledMessage names the refusal, and offers the operator setting only
+// where it can help: a refusal other than EPERM is not overridable.
+func disabledMessage(refusal syscall.Errno) string {
+	if refusal != syscall.EPERM {
+		return "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE) (" + refusal.Error() + "), so the engine cannot hide its process files from user code"
+	}
+	return "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; on AWS Lambda only, " + AllowVisibleProcessSetting + "=true runs them anyway"
 }
 
 // New builds an Executor, reading the runner sources it holds in memory for
@@ -280,6 +293,7 @@ func New(opts Options) (*Executor, error) {
 	}
 	return &Executor{
 		mode:           resolveHideMode(opts.AllowVisibleProcess, opts.logger()),
+		refusal:        hideRefusal,
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
@@ -544,7 +558,7 @@ func runnerEnv(credential map[string]string, runDir, token string) map[string]st
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if e.mode == hideDisabled {
-		return &Result{Error: &Error{Type: RunnerErrorType, Message: "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; on AWS Lambda only, " + AllowVisibleProcessSetting + "=true runs them anyway"}}, nil
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: disabledMessage(e.refusal)}}, nil
 	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape

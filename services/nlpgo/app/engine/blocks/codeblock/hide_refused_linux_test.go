@@ -55,8 +55,8 @@ func seccompNumbers() (seccompNr, prctlNr, auditArch uint32, ok bool) {
 	return 0, 0, 0, false
 }
 
-// refusePrSetDumpable makes every thread of this process answer refusal to
-// prctl(PR_SET_DUMPABLE) and nothing else: the one Lambda refusal the engine
+// refusePrSetDumpable makes every thread of this process answer the given errno
+// to prctl(PR_SET_DUMPABLE) and nothing else: the one Lambda refusal the engine
 // depends on (Lambda also refuses PR_SET_CHILD_SUBREAPER and PR_SET_PDEATHSIG,
 // which the engine tolerates or does not use).
 func refusePrSetDumpable(refusal syscall.Errno) error {
@@ -77,7 +77,7 @@ func refusePrSetDumpable(refusal syscall.Errno) error {
 		{Code: ldAbs, K: 0},                   // 2 syscall number
 		{Code: jeq, Jt: 0, Jf: 2, K: prctlNr}, // 3 not prctl -> 6 allow
 		{Code: ldAbs, K: 16},                  // 4 args[0], the prctl option
-		{Code: jeq, Jt: 1, Jf: 0, K: 4},       // 5 PR_SET_DUMPABLE -> 7 EPERM
+		{Code: jeq, Jt: 1, Jf: 0, K: 4},       // 5 PR_SET_DUMPABLE -> 7 refuse
 		{Code: ret, K: allow},                 // 6
 		{Code: ret, K: errnoRet},              // 7
 	}
@@ -154,28 +154,28 @@ func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
 }
 
 // @scenario "a platform that refuses the hide step with anything but EPERM serves no code blocks"
+// @scenario "the engine reports its hide mode once at start-up"
 func TestHideRefused_DisabledOnAnyOtherRefusal(t *testing.T) {
 	runChild(t, "refused-eacces-allowed")
 }
 
 // @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode"
-// @scenario "a platform that refuses the hide step with anything but EPERM serves no code blocks"
 func TestHideRefused_RunnerFailsWhenStrict(t *testing.T) {
 	t.Run("given prctl is refused and NLPGO_CODE_BLOCK_HIDE is unset", func(t *testing.T) {
 		t.Run("the runner exits 1 with the prctl message", func(t *testing.T) {
 			runChild(t, "runner-strict")
 		})
 	})
-	t.Run("given prctl is refused with EACCES and NLPGO_CODE_BLOCK_HIDE is best-effort", func(t *testing.T) {
-		t.Run("the runner exits 1 with the prctl message", func(t *testing.T) {
-			runChild(t, "runner-best-effort-other-errno", hideModeEnv+"=best-effort")
-		})
-	})
+}
+
+// @scenario "a platform that refuses the hide step with anything but EPERM serves no code blocks"
+func TestHideRefused_RunnerFailsOnOtherErrnoEvenWhenBestEffort(t *testing.T) {
+	runChild(t, "runner-best-effort-other-errno")
 }
 
 // @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed"
 func TestHideRefused_RunnerContinuesWhenBestEffort(t *testing.T) {
-	runChild(t, "runner-best-effort", hideModeEnv+"=best-effort")
+	runChild(t, "runner-best-effort")
 }
 
 // TestHideRefusedChild is the child entry point. It does nothing unless the
@@ -193,21 +193,43 @@ func TestHideRefusedChild(t *testing.T) {
 			os.Exit(skipExitCode)
 		}
 	}
-	switch name {
-	case "runner-strict", "runner-best-effort", "runner-best-effort-other-errno":
-		runRunnerCase(t, name)
-	default:
+	if c := runnerCases[name]; c != nil {
+		runRunnerCase(t, *c)
+	} else {
 		runExecutorCase(t, name)
 	}
 }
 
-// refusalFor names the errno a case's filter answers: EACCES for the cases
-// about any refusal but Lambda's, EPERM otherwise.
+// runnerCase is one run of runner.py alone under a filter answering errno.
+type runnerCase struct {
+	bestEffort  bool
+	wantFailure bool
+}
+
+var runnerCases = map[string]*runnerCase{
+	"runner-strict":                  {bestEffort: false, wantFailure: true},
+	"runner-best-effort":             {bestEffort: true, wantFailure: false},
+	"runner-best-effort-other-errno": {bestEffort: true, wantFailure: true},
+}
+
+// refusals names the errno each case's filter answers; a case not listed is a
+// typo, so refusalFor fails on it.
+var refusals = map[string]syscall.Errno{
+	"refused-allowed":                syscall.EPERM,
+	"refused-unset":                  syscall.EPERM,
+	"refused-eacces-allowed":         syscall.EACCES,
+	"runner-strict":                  syscall.EPERM,
+	"runner-best-effort":             syscall.EPERM,
+	"runner-best-effort-other-errno": syscall.EACCES,
+}
+
 func refusalFor(name string) syscall.Errno {
-	if strings.Contains(name, "eacces") || strings.HasSuffix(name, "other-errno") {
-		return syscall.EACCES
+	errno, ok := refusals[name]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "unknown hide case %q\n", name)
+		os.Exit(2)
 	}
-	return syscall.EPERM
+	return errno
 }
 
 // exitSkippedIfHostRefusesHide ends the child with the skip code when this host
@@ -244,7 +266,8 @@ func runExecutorCase(t *testing.T, name string) {
 		require.NotNil(t, res)
 		require.NotNil(t, res.Error)
 		assert.Contains(t, res.Error.Message, "code blocks are disabled")
-		assert.NotContains(t, res.Error.Message, "prctl(PR_SET_DUMPABLE) failed")
+		assert.Contains(t, res.Error.Message, syscall.EACCES.Error())
+		assert.NotContains(t, res.Error.Message, codeblock.AllowVisibleProcessSetting)
 	case "refused-unset":
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
@@ -358,7 +381,7 @@ func assertHideModeLogged(t *testing.T, logs *observer.ObservedLogs, name string
 	assert.Equal(t, want.mode, entries[0].ContextMap()["mode"])
 }
 
-func runRunnerCase(t *testing.T, name string) {
+func runRunnerCase(t *testing.T, c runnerCase) {
 	t.Helper()
 	source, err := os.ReadFile("runner.py")
 	require.NoError(t, err)
@@ -366,7 +389,7 @@ func runRunnerCase(t *testing.T, name string) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "python3", "-c", string(source)) //nolint:gosec // fixed interpreter running the checked-in runner.py
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
-	if name != "runner-strict" {
+	if c.bestEffort {
 		cmd.Env = append(cmd.Env, hideModeEnv+"=best-effort")
 	}
 	var stderr bytes.Buffer
@@ -374,7 +397,7 @@ func runRunnerCase(t *testing.T, name string) {
 	runErr := cmd.Run()
 
 	const hideFailure = "prctl(PR_SET_DUMPABLE) failed"
-	if name != "runner-best-effort" {
+	if c.wantFailure {
 		exitErr, ok := runErr.(*exec.ExitError)
 		require.True(t, ok, "expected the runner to exit non-zero, got %v", runErr)
 		assert.Equal(t, 1, exitErr.ExitCode())

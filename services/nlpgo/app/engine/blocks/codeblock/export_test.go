@@ -1,5 +1,7 @@
 package codeblock
 
+import "syscall"
+
 // ScratchRoot is the directory this executor creates its per-execution
 // directories in. Exported to the tests only: the root has no read permission
 // precisely so nothing can enumerate it, so a test that needs to look inside
@@ -14,4 +16,9 @@ func RunEnv(env []string, visible bool) []string {
 		mode = hideVisibleProcess
 	}
 	return runEnv(env, mode)
+}
+
+// HideModeFor exposes the refusal rule, as the mode's name.
+func HideModeFor(refusal syscall.Errno, allow bool) string {
+	return string(hideModeFor(refusal, allow))
 }
