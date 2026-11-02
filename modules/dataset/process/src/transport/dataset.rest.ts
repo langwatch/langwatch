@@ -629,6 +629,7 @@ export function createDatasetRest(): Readonly<{
         summary: "Get a dataset version",
         description:
           "Read one version of a dataset: its metadata and a page of the rows it held. A version the dataset does not have is refused with `dataset_version_not_found`.",
+        errors: [{ status: 404, description: "The dataset has no version with that number." }],
       })
       .handle(async ({ app, input, scope }) =>
         app.getVersionPage({
@@ -655,6 +656,7 @@ export function createDatasetRest(): Readonly<{
         summary: "Restore a dataset version",
         description:
           "Restore a version: the dataset's columns and rows become the version's, and the result is saved as a new version. Earlier versions are never changed.",
+        errors: [{ status: 404, description: "The dataset has no version with that number." }],
       })
       .handle(async ({ app, input, scope, actor }) =>
         app.restoreVersion({

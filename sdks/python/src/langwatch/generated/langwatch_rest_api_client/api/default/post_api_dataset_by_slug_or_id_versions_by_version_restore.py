@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -29,11 +29,15 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
+) -> Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
     if response.status_code == 200:
         response_200 = PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 404:
+        response_404 = cast(Any, None)
+        return response_404
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -43,7 +47,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
+) -> Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -60,7 +64,7 @@ def sync_detailed(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> Response[PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
+) -> Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
     """Restore a dataset version
 
      Restore a version: the dataset's columns and rows become the version's, and the result is saved as a
@@ -75,7 +79,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]
+        Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -95,7 +99,7 @@ def sync(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
+) -> Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
     """Restore a dataset version
 
      Restore a version: the dataset's columns and rows become the version's, and the result is saved as a
@@ -110,7 +114,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
+        Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
     """
 
     return sync_detailed(
@@ -125,7 +129,7 @@ async def asyncio_detailed(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> Response[PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
+) -> Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
     """Restore a dataset version
 
      Restore a version: the dataset's columns and rows become the version's, and the result is saved as a
@@ -140,7 +144,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]
+        Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -158,7 +162,7 @@ async def asyncio(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
+) -> Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
     """Restore a dataset version
 
      Restore a version: the dataset's columns and rows become the version's, and the result is saved as a
@@ -173,7 +177,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
+        Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
     """
 
     return (
