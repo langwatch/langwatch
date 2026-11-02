@@ -1,157 +1,117 @@
 # LangWatchQL and Dashboards telemetry
 
-> **Why this exists**: the LangWatchQL Grafana board
-> (`docs/langwatchql-queries-dashboard.json`) and the Dashboards product events
-> answer narrow questions. This page says what they count, what they leave out,
-> and what they cost, so nobody reads more into a number than it holds.
-> Requirements: `modules/dashboard/specs/dashboards-telemetry.feature`.
+What we record about Dashboards, LangWatchQL and Langy: where each signal
+goes, how it gets there, and why we want it. Requirements:
+`modules/dashboard/specs/dashboards-telemetry.feature`.
 
-## What is counted
+## Where things go, and why there
 
-| Signal                          | Kind      | Labels or attributes                           | Written by                            |
-| ------------------------------- | --------- | ---------------------------------------------- | ------------------------------------- |
-| `lwql_queries_total`            | counter   | `caller`, `outcome`                            | `LangWatchQLRunTelemetryService`      |
-| `lwql_query_duration_seconds`   | histogram | `caller`                                       | same                                  |
-| `lwql_rows_read`                | histogram | `caller`                                       | same                                  |
-| one log line per run            | log       | `caller`, `queryHash`, board and widget ids    | same                                  |
-| `dashboards.<action>.<name>`    | PostHog   | attributes we set: no raw ids, SQL or text     | `dashboard-usage-events.ts` (browser) |
-| `langy.asked.question`          | PostHog   | `surface`: `composer`, `ask_bar`, `add_widget` | `langy-ask.ts` (browser)              |
-| `langy.applied.proposal`        | PostHog   | `kind` (or `other`)                            | `langy-ask.ts` (browser)              |
-| `langy.discarded.proposal`      | PostHog   | `kind` (or `other`)                            | `langy-ask.ts` (browser)              |
-| `insights.<act>.insight`        | PostHog   | a filing: `filedVia`, `tone`, `fromBoard`      | nurturing, from insight's events      |
-| `automations.opened.alert_link` | PostHog   | `landedOn`: `trace`, `graph` or `other`        | `use-alert-link-opened.ts` (shell)    |
+| Place                                 | What goes there                                    | Why there                                                                                                      |
+| ------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **PostHog**                           | things a person did on purpose                     | to see whether people use boards and Langy. PostHog bills per event, so it never gets one event per query run. |
+| **Prometheus, shown in Grafana**      | a count, a duration and a row count for every run  | to see volume, speed and errors. A fixed set of series costs the same at any volume.                           |
+| **Our own logs (CloudWatch in prod)** | one line per run, with who ran it and how it ended | to find one slow or failing run. Not billed per line; never sent to PostHog.                                   |
 
-`caller` is one of `dashboard_widget`, `workbench`, `rest_api`, `cli`, `mcp`,
-`langy`, `saved_chart`, `source_presence`, or `unnamed` when a run names none.
+A board left open on Live re-runs every widget every minute with nobody
+watching. Those runs reach Grafana and the logs only, never PostHog.
 
-A query sent with an API key is split by the client that sent it. The server
-reads the identity headers the LangWatch CLI and the MCP servers already send:
-the CLI is `cli`, a local or hosted MCP server is `mcp`, and every other client
-(an SDK, a script, curl) is `rest_api`. A query sent with the session key Langy
-gets for a chat is `langy`, whichever client it came from.
+## Every signal
 
-`outcome` is `ok`, `empty` (no rows), `aborted`, `unhandled`, or the code of the
-handled error that stopped the run. Handled codes are a fixed set in the code,
-so the label stays bounded.
+### Query runs (server, every run)
 
-## Ids that still reach PostHog
+| Signal                                     | Where   | How                                                                                                | Why                                          |
+| ------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `lwql_queries_total{caller,outcome}`       | Grafana | `LangWatchQLRunTelemetryService`, after each run ends                                              | how many runs, from where, and how many fail |
+| `lwql_query_duration_seconds{caller}`      | Grafana | same                                                                                               | which callers are slow                       |
+| `lwql_rows_read{caller}`                   | Grafana | same                                                                                               | which callers read the most data             |
+| "LangWatchQL executed" / "failed" log line | logs    | same; carries `caller`, `outcome`, `queryHash`, board, widget and template ids, and the error code | find the run behind a slow or failing number |
 
-The attributes Dashboards sets carry no raw board or widget id, no SQL and no
-question text. Two ids still reach PostHog:
+The Grafana board is `docs/langwatchql-queries-dashboard.json`.
 
-- the browser host adds the page URL (`context.href`) to every event, and a
-  board's URL holds its id;
-- `projectId` is registered on every event, so events group per project.
+### What people do (PostHog)
 
-Removing them would change every module's events, not only Dashboards'.
+Sent from the browser through `useUiAnalytics`, after the server accepts the
+change. Each event also carries `projectId`.
 
-## A widget seen
+| Event                                                          | Sent when                                                                        | Why                                            |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `dashboards.viewed.dashboard`                                  | a board opens (`dashboardKind`, `widgetCount`, `dashboardKey`)                   | are boards opened, and which kinds             |
+| `dashboards.created.dashboard` / `deleted.dashboard`           | the server accepts it                                                            | do people make their own boards, and keep them |
+| `dashboards.added.widget` / `edited.widget` / `deleted.widget` | the server accepts it (`addedFrom`, `widgetSource`)                              | do people build widgets, and from what         |
+| `dashboards.viewed.widget`                                     | half a card first shows on screen, once per card per board view                  | which widgets are looked at, not only loaded   |
+| `dashboards.changed.period`                                    | a new period is picked (`range`, `grain`)                                        | which periods people need                      |
+| `dashboards.exported.widget`                                   | a CSV download finishes                                                          | do people take data out                        |
+| `dashboards.edited.dashboard`                                  | a rename is saved or a drop changes the layout (`change`)                        | do people shape their boards                   |
+| `dashboards.favourited.dashboard`                              | a pin is added or removed (`starred`)                                            | which boards people come back to               |
+| `dashboards.toggled.langy_traces`                              | the Langy traces toggle changes                                                  | do people want Langy's own traces counted      |
+| `lwql.opened.editor`                                           | the widget editor opens (`widgetIs: new or existing`)                            | do people write queries                        |
+| `lwql.ran.query`                                               | a member presses Run in the editor                                               | do they get as far as running one              |
+| `langy.asked.question`                                         | a member sends Langy a question (`surface`: `composer`, `ask_bar`, `add_widget`) | where people ask Langy for help                |
+| `langy.applied.proposal` / `discarded.proposal`                | a member applies or discards what Langy proposed (`kind`, or `other`)            | does Langy's help get used                     |
+| `insights.filed/seen/archived/kept.insight`                    | sent by nurturing from insight's own events, on the person who acted             | are insights read and acted on                 |
+| `automations.opened.alert_link`                                | a signed-in member opens a link marked `lw_from=alert` (`landedOn`)              | do alerts bring people back to the app         |
 
-`dashboards.viewed.widget` is sent the first time half of a widget's card is on
-screen, once per card per board view. A card that is half visible only while
-the board is still laying out (before a banner pushes it down) also counts.
-On boards that load slowly this can raise the count. If the numbers look
-high, require the card to stay on screen for about 500 ms before sending.
+No attribute we set carries a raw board or widget id, SQL, a title or question
+text. `dashboardKey` is 16 hex of SHA-256 of the board id.
 
-## Aborted runs
+## How a run gets its caller
 
-A run its caller hung up on (a widget unmounted, a request cancelled) is
-`aborted`. It is not an error: the error-rate panel and any alert on it exclude
-it. The outcome panel shows aborts as their own line.
+The server sets `caller` from the door the run came in by; the browser cannot
+choose it.
 
-## What is not counted
+- Board widget or Workbench (tRPC): `dashboard_widget` or `workbench`. A From
+  LangWatch board's widgets count as `dashboard_widget`.
+- Saved chart and source check: `saved_chart` and `source_presence`.
+- `/api/v1/query`: `langy` for Langy's session key; `cli` and `mcp` from the
+  headers the CLI and MCP servers already send; anything else is `rest_api`. A
+  copied header only moves a run between `cli`, `mcp` and `rest_api`, so the
+  split is for usage, not security.
+- `unnamed` when a run names none.
 
-- **Refusals before the app**: a disabled Workbench, `resolveRunCaller` and the
-  tRPC permission check refuse before the instrumented layer runs. The error
-  rate is the share of runs that reached it, not of every attempt.
-- **Instant-eval passes**: `executePass` does not record telemetry.
-- **Clients that do not say who they are**: a script that copies the CLI's or
-  the MCP server's headers is counted as that client. The split is for usage,
-  not for security.
-- **Langy's widgets as widgets**: a widget Langy adds still runs its queries as
-  `dashboard_widget`. Boards and widgets Langy makes send no product event yet:
-  there is no "made by" field on a widget and no Dashboards event pipeline for
-  nurturing to read.
-- **Questions the app sends for a member**: a question from the ask bar or "Add
-  a widget" is counted once, where it was asked. When the Langy panel then
-  sends it, or sends a card's follow-up, it counts nothing more.
-  An empty ask from "Add a widget" counts, because the member pressed ask:
-  Langy gets "Help me build a dashboard".
+`outcome` is `ok`, `empty` (no rows), `aborted` (the caller hung up, not an
+error; excluded from the error rate), `unhandled`, or a handled error code from
+a fixed set.
 
-## The query hash is keyed
+## Alert links
 
-`queryHash` is the first 16 hex characters of an HMAC-SHA256 of the statement
-with its whitespace collapsed. The key is derived from the deployment secret
-(`API_KEY_PEPPER`, else `CREDENTIALS_SECRET`, else `NEXTAUTH_SECRET`) under the
-label `lwql-query-hash`, never the secret itself. The same query groups within
-one deployment. Without the secret, a log line cannot confirm a guessed
-statement or its literals. A deployment with none of the three refuses to boot,
-as api-key already does.
+The digest email and the default Slack message mark links into our own app
+with `lw_from=alert`. Webhook bodies, custom templates and other sites' links
+are sent unchanged. On landing, the app sends `automations.opened.alert_link`
+once and removes the marker from the address, so Back, a reload or a copied
+link does not send it again.
 
-The hash still groups queries, so keep it in internal logs only, never in a
-product event or a customer-facing surface. Rotating the secret starts new
-groups. Whether hashes and ids belong in logs and PostHog at all is still an
-open question with Drew.
+## What is not recorded, and why
 
-## Cardinality
+- **The SQL text.** Logs carry `queryHash`: the first 16 hex of an HMAC-SHA256
+  of the statement, keyed from the deployment secret (`API_KEY_PEPPER`, else
+  `CREDENTIALS_SECRET`, else `NEXTAUTH_SECRET`; the app will not boot without
+  one). It groups the same query without revealing it. Replacing it with the
+  capped text plus the user id, in our logs only, is waiting on Drew's "go".
+- **Runs refused before the app** (a disabled Workbench, the tRPC permission
+  check): they never reach the counted layer, so the error rate is a share of
+  runs that did.
+- **Instant-eval passes**: `executePass` records nothing.
+- **Which boards and widgets Langy made**: no "made by" field is stored yet.
+- **A question the app passes on**: a question from the ask bar or "Add a
+  widget" counts once, where it was asked, not again when the panel sends it.
+- **Alert triggers created, changed, fired or delivered**: triggers have no
+  change events to count from. Needs its own plan.
+- **Report schedules**: their events name no person to count them on. Needs a
+  decision.
+- **Insight renewals**: a renewal names no person.
 
-Per process, before any aggregation:
+## Things to know when reading the numbers
 
-| Metric                        | Series                                                     |
-| ----------------------------- | ---------------------------------------------------------- |
-| `lwql_queries_total`          | 6 callers x outcomes seen (4 fixed plus the handled codes) |
-| `lwql_query_duration_seconds` | 6 callers x 14 (12 buckets, sum, count) = 84               |
-| `lwql_rows_read`              | 6 callers x 11 (9 buckets, sum, count) = 66                |
-
-No label holds an id, a hash or user input. Board, widget and hash values live
-only in the log line, which Prometheus never reads.
-
-## Retention, sampling and cost
-
-- **Sampling**: none. Every run is counted and logged; every product event is
-  sent.
-- **Metrics**: kept as long as the Prometheus that scrapes the api keeps
-  series. This change sets no retention of its own.
-- **Logs**: one line per run. Retention is the log group's setting; the slow
-  query panel needs the production CloudWatch log group to be configured.
-- **PostHog**: one event per board view and one per user action listed in the
-  spec, never per query run. Retention follows the PostHog plan.
-- **Cost**: the metrics add the fixed series above. Log and PostHog volume
-  grow with runs and with board views; measure both after the first production
-  week before adding sampling.
-
-## Insights and alerts
-
-Insight's own events reach PostHog through nurturing, once per event, on the
-person who acted: `filed` (on the owner, else the filer), `seen`, `archived` and `kept`. No
-title, body, query, board name or insight id is sent. `renewed` is not sent: a
-renewal names no person, so there is nobody to count it on.
-
-An alert's default email (the digest mail) and its default Slack message
-mark their links to our own app's traces and charts with
-`lw_from=alert`. Webhook bodies, custom templates and links to other sites are
-sent unchanged. A signed-in member who opens a marked link sends one
-`automations.opened.alert_link`, and the app's router then replaces the
-current history entry without the marker, so Back, a reload, a copied link or
-a later search update does not carry it or send the event again.
-
-Not counted yet:
-
-- **Triggers created, changed, turned on or off, fired or delivered.** Triggers
-  have no change events, and a send is recorded only as a step of the trigger
-  settlement outbox (`notifyDigest`), not as an event nurturing can subscribe
-  to. These need their own plan.
-  `lw.automation.trigger.match_recorded` is one per matched trace, not one per
-  alert sent, so it is not used as "fired".
-- **Report schedules configured, paused, resumed or settled.** Their events
-  name no person: no actor is on the event or its envelope, and `configured` is
-  also sent by the reconcile backfill. Sending them needs a person to send them
-  on first, either the acting person added to the events or the organization's
-  admin, which is a decision still to make.
+- PostHog events still carry two ids: the page URL the browser host adds to
+  every event (a board's URL holds its id) and `projectId`. Removing them would
+  change every module's events.
+- `dashboards.viewed.widget` also counts a card that is half visible only while
+  the board lays out. If it looks high, require 500 ms on screen.
+- No sampling. Metrics add a fixed set of series per process (about 6 callers
+  times their outcomes and buckets). Log and PostHog volume grow with runs and
+  board views; measure after the first production week.
 
 ## Not done yet
 
-The production alert rule, the production CloudWatch log group and a check of
-the production numbers after deploy are tracked in
-https://github.com/langwatch/tasks/issues/1040 and need their own change to
-production monitoring.
+The production alert rule, the CloudWatch log group and a check of the
+production numbers after deploy: https://github.com/langwatch/tasks/issues/1040.
