@@ -43,10 +43,6 @@ function loadVendorTags({ win }: { win: TagWindow }) {
   loadReo({ win });
 }
 
-/**
- * Adds Google Tag Manager and PostHog once, when the reader first interacts or the page is idle,
- * and only after they accepted cookies. Accepting in another tab starts them here too.
- */
 const armed = new WeakSet<TagWindow>();
 
 /** Starts the tag manager here once another tab stores the reader's acceptance. */
@@ -59,6 +55,10 @@ function startOnConsent({ win }: { win: TagWindow }) {
   win.addEventListener("storage", onStorage);
 }
 
+/**
+ * Adds Google Tag Manager and PostHog once, when the reader first interacts or the page is idle,
+ * and only after they accepted cookies. Accepting in another tab starts them here too.
+ */
 export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
   const id = tagManagerId({ doc: win.document, host: win.location.hostname });
   if (!id) return;

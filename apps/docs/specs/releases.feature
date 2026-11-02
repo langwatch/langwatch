@@ -25,7 +25,8 @@ Feature: Useful release updates in the documentation
     Then the update fits one line at desktop and phone widths in both themes
     And it is static with or without reduced motion
     And the release link opens the matching notes on the changelog page
-    And while the docs announcement shows, the release update waits behind it, so one notice line shows at a time
+    And while a docs announcement the reader can dismiss shows, the release update waits behind it, so one notice line shows at a time
+    But an announcement the reader cannot dismiss leaves the release update in view
     And the announcement sits on a tinted ground while the release update stays on paper
     When the reader dismisses the update
     Then it stays dismissed on another page and after reloading

@@ -32,7 +32,7 @@ async function assertDocumentFlow({ page, desktop }) {
       })
       .map((node) => node.className);
     /* Everything the page shows above the footer: article, contents rail, endpoint columns. */
-    const page = [...panel.querySelectorAll("#content, #content > *, .docs-layout > [class]")]
+    const bottoms = [...panel.querySelectorAll("#content, #content > *, .docs-layout > [class]")]
       .filter((node) => node !== footer && !node.matches(".docs-nav-plane"))
       .map((node) => node.getBoundingClientRect().bottom);
     return {
@@ -40,7 +40,7 @@ async function assertDocumentFlow({ page, desktop }) {
       footerTop: bounds(footer).top,
       footerLeft: bounds(footer).left,
       footerBottom: bounds(footer).bottom,
-      mainBottom: Math.max(...page),
+      mainBottom: Math.max(...bottoms),
       panelBottom: bounds(panel).bottom,
       railRight: bounds(rail).right,
       railBottom: bounds(rail).bottom,

@@ -8,11 +8,7 @@ import {
 type ConsentChoice = "accepted" | "declined";
 
 /** The reader's stored choice on either site; none, an unknown value or refused storage is null. */
-export function storedConsent({
-  win,
-}: {
-  win: Pick<Window, "localStorage">;
-}): ConsentChoice | null {
+function storedConsent({ win }: { win: Pick<Window, "localStorage"> }): ConsentChoice | null {
   try {
     const value = win.localStorage.getItem(CONSENT_STORAGE_KEY);
     return value === "accepted" || value === "declined" ? value : null;

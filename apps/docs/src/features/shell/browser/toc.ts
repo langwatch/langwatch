@@ -1,6 +1,6 @@
 import { followSystemTheme } from "../../../lib/theme.ts";
 import { startCookieNotice } from "./cookie-notice.ts";
-import { refreshStars, repaintCachedStars } from "./github-stars.ts";
+import { refreshStars } from "./github-stars.ts";
 import { prepareReadingLayout } from "./reading-layout.ts";
 import { startTagManager } from "./tag-manager.ts";
 
@@ -179,7 +179,7 @@ startCookieNotice();
 
 /* The build's star count goes stale between deploys: refresh it once the page is idle. */
 void refreshStars();
-document.addEventListener("docs:navigated", () => repaintCachedStars());
+document.addEventListener("docs:navigated", () => void refreshStars());
 
 /* A reader on the system theme follows their operating system when it switches. */
 followSystemTheme();

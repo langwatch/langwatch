@@ -547,15 +547,15 @@ figure > .docs-shot {
   grid-area: footer;
   min-width: 0;
 }
-/* One notice line at a time, pinned above the header: the release update waits behind the
-   announcement until the reader dismisses it. */
+/* One notice line at a time, pinned above the header: the release update waits behind an
+   announcement the reader can dismiss, and shows beside one they cannot. */
 .docs-shell {
   --docs-banners-h: 0px;
 }
 .docs-shell:has(.docs-top > [data-docs-banner]) {
   --docs-banners-h: 36px;
 }
-.docs-top > .docs-announcement ~ .docs-release-strip {
+.docs-top > .docs-announcement:has([data-docs-dismiss]) ~ .docs-release-strip {
   display: none;
 }
 .docs-page-header {
@@ -1460,6 +1460,9 @@ figure > .docs-shot {
   .docs-search-dialog[open] {
     animation: none;
   }
+}
+[data-docs-stars][hidden] {
+  display: none;
 }
 .docs-command-bar [hidden] {
   display: none !important;

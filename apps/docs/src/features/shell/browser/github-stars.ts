@@ -1,6 +1,6 @@
+import { GITHUB_ACCEPT, REPOSITORY_API_URL, starCount } from "../../../lib/github-repository.ts";
 import { formatStars, githubLabel } from "../model/github-stars.ts";
 
-const REPOSITORY_URL = "https://api.github.com/repos/langwatch/langwatch";
 const STORAGE_KEY = "lw-docs:github-stars";
 /* GitHub allows 60 anonymous reads an hour per address; one an hour per reader stays inside it. */
 export const STARS_FRESH_MS = 60 * 60 * 1000;
@@ -28,7 +28,7 @@ function writeCache({ win, stars }: { win: StarsWindow; stars: CachedStars }) {
 }
 
 /** Writes a count into every GitHub link on the page: the header's and the mobile menu's. */
-export function paintStars({ win, stars }: { win: Pick<Window, "document">; stars: number }) {
+function paintStars({ win, stars }: { win: Pick<Window, "document">; stars: number }) {
   win.document.querySelectorAll<HTMLElement>("[data-docs-github]").forEach((link) => {
     link.setAttribute("aria-label", githubLabel({ stars }));
     const count = link.querySelector<HTMLElement>("[data-docs-stars-count]");
@@ -47,12 +47,8 @@ function builtCount({ win }: { win: Pick<Window, "document"> }) {
 
 async function fetchStars({ win }: { win: StarsWindow }) {
   try {
-    const response = await win.fetch(REPOSITORY_URL, {
-      headers: { accept: "application/vnd.github+json" },
-    });
-    if (!response.ok) return null;
-    const count = (await response.json()).stargazers_count;
-    return Number.isInteger(count) ? (count as number) : null;
+    const response = await win.fetch(REPOSITORY_API_URL, { headers: { accept: GITHUB_ACCEPT } });
+    return response.ok ? starCount({ body: await response.json() }) : null;
   } catch {
     return null;
   }
@@ -76,10 +72,4 @@ export async function refreshStars({
   const count = await fetchStars({ win });
   writeCache({ win, stars: { count: count ?? fallback, at: now } });
   if (count !== null) paintStars({ win, stars: count });
-}
-
-/** Paints the cached count again after an in-place navigation swaps the mobile menu. */
-export function repaintCachedStars({ win = window }: { win?: StarsWindow } = {}) {
-  const cached = readCache({ win });
-  if (cached?.count != null) paintStars({ win, stars: cached.count });
 }

@@ -27,7 +27,8 @@ export function storedTheme(): ThemeChoice {
   }
 }
 
-export function choiceIsDark({ choice }: { choice: ThemeChoice }) {
+/** Whether a choice paints dark; `system` reads the operating system's colour scheme now. */
+function choiceIsDark({ choice }: { choice: ThemeChoice }) {
   return choice === "dark" || (choice === "system" && matchMedia(DARK_QUERY).matches);
 }
 
