@@ -52,6 +52,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf16"
 
 	_ "embed"
 
@@ -654,14 +655,14 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			Stderr:     stderrText,
 			Error: &Error{
 				Type:    RunnerErrorType,
-				Message: withStderrTail(runErr.Error(), stderrText),
+				Message: withStderrTail(runErr.Error(), stderrText, req.Secrets),
 			},
 		}, nil
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
 		Stderr:     stderrText,
-		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText)},
+		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText, req.Secrets)},
 	}, nil
 }
 
@@ -674,22 +675,65 @@ const maxRunnerStderr = 64 << 10
 // maxStderrInMessage bounds the stderr tail appended to a runner error.
 const maxStderrInMessage = 2 << 10
 
-// withStderrTail appends the end of the interpreter's stderr to a runner
+// withStderrTail appends the end of the kept interpreter stderr to a runner
 // failure, so "exit status 1" says why. That stderr holds the runner's own
-// messages and tracebacks; the runner never writes the payload (secrets
-// included) there. It can also hold what the project's own code wrote
-// straight to file descriptor 2, or a result the runner could not save:
-// that is the same project's data, already shown to it in the run, and the
-// tail is bounded.
-func withStderrTail(message, stderr string) string {
-	tail := strings.TrimSpace(stderr)
+// messages and tracebacks; the runner never writes the payload there. It can
+// also hold what the project's own code wrote straight to file descriptor 2,
+// or a result the runner could not save: that is the same project's data,
+// already shown to it in the run, and the tail is bounded. Secret values are
+// redacted here before the cut (raw and JSON-escaped) and again downstream.
+func withStderrTail(message, stderr string, secrets map[string]string) string {
+	tail := strings.TrimSpace(redactStderrSecrets(stderr, secrets))
+	if len(tail) > maxStderrInMessage {
+		tail = tail[len(tail)-maxStderrInMessage:]
+		if _, rest, found := strings.Cut(tail, "\n"); found {
+			tail = rest
+		}
+	}
+	tail = strings.TrimSpace(strings.ToValidUTF8(tail, ""))
 	if tail == "" {
 		return message
 	}
-	if len(tail) > maxStderrInMessage {
-		tail = strings.ToValidUTF8(tail[len(tail)-maxStderrInMessage:], "")
-	}
 	return message + ": " + tail
+}
+
+// redactStderrSecrets replaces each secret value with "[redacted]" in its raw
+// form and in the escaped forms the runner's JSON fallback writes to stderr.
+func redactStderrSecrets(text string, secrets map[string]string) string {
+	for _, value := range secrets {
+		if value == "" {
+			continue
+		}
+		for _, form := range secretForms(value) {
+			text = strings.ReplaceAll(text, form, "[redacted]")
+		}
+	}
+	return text
+}
+
+// secretForms is the raw value, Go's JSON escaping and Python's
+// ensure_ascii escaping (non-ASCII as \uXXXX, surrogate pairs above the BMP).
+func secretForms(value string) []string {
+	forms := []string{value}
+	marshalled, err := json.Marshal(value)
+	if err != nil {
+		return forms
+	}
+	escaped := string(marshalled[1 : len(marshalled)-1])
+	forms = append(forms, escaped)
+	var ascii strings.Builder
+	for _, r := range escaped {
+		switch {
+		case r <= 0x7f:
+			ascii.WriteRune(r)
+		case r > 0xffff:
+			hi, lo := utf16.EncodeRune(r)
+			fmt.Fprintf(&ascii, "\\u%04x\\u%04x", hi, lo)
+		default:
+			fmt.Fprintf(&ascii, "\\u%04x", r)
+		}
+	}
+	return append(forms, ascii.String())
 }
 
 // newRunnerStderr opens the file the interpreter's own stderr goes to, in the
