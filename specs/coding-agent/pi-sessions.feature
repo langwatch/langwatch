@@ -36,9 +36,10 @@
 # specs/ai-governance/cli-wrappers/session-context-hook.feature.
 #
 # Bound in modules/coding-agent/process/src/eventing/__tests__/pi-session.unit.test.ts
-# and the pull-request usage parity test. Three scenarios stay @unimplemented,
+# and the pull-request usage parity test. Four scenarios stay @unimplemented,
 # each naming the tag it becomes, and each for the one-line reason above it:
 #   - the aborted outcome: the session fold reads no run outcome for any agent;
+#   - the compaction count: compaction folds only on the log lane;
 #   - the terminal banner: its agent list (modules/trace/browser) has no pi;
 #   - the coding-agent origin: a copy of the bound pi-cli-otlp.feature scenario.
 # A scenario still carrying @unimplemented when ADR-188 is called done is work
@@ -111,6 +112,16 @@ Rule: Only pi's own namespace joins a pi session
     When the session span gate decides on each
     Then each is admitted
     And each folds onto that session's one row
+
+  # Parked: compaction folds only on the log lane (coding-agent-session-log.projection.ts), so a
+  # pi compaction is stored and shown in its trace but counts nothing on the session row.
+  # becomes @unit
+  @unimplemented
+  Scenario: A pi compaction counts toward the session's compactions under its reason
+    Given a pi session whose compaction step carries pi.compaction.reason "threshold"
+    When the session is folded
+    Then the session records one compaction
+    And its compaction triggers count "threshold" once
 
   @unit
   Scenario: A harness span pi declares but we do not list is dropped with nothing recorded

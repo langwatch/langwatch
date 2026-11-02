@@ -34,6 +34,7 @@ import {
 } from "../../../../model/coding-agent/assistant-presets.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { AiToolTileType } from "../../model/ai-tool-tile.ts";
+import { lockedToggles, togglesOnKindChange } from "../../model/coding-assistant-toggles.ts";
 import {
   isToolPresetAsset,
   TOOL_KINDS,
@@ -147,11 +148,9 @@ function formFromEntry(entry: AiToolEntry): FormState {
       setupCommand: baseStr("setupCommand"),
       helperText: baseStr("helperText"),
       setupDocsUrl: baseStr("setupDocsUrl"),
-      // pi fixes every model's address in its own build, so a gateway key never applies.
-      allowVk: kind === "pi" ? false : boolOr("allowVk", true),
-      // Cursor is GUI-only - direct OTLP never applies, regardless of a
-      // stored value. Force it off so the toggle reads honestly.
-      allowOtelDirect: kind === "cursor" ? false : boolOr("allowOtelDirect", true),
+      // A locked toggle reads off regardless of a stored value, so it reads honestly.
+      allowVk: lockedToggles(kind).allowVk ?? boolOr("allowVk", true),
+      allowOtelDirect: lockedToggles(kind).allowOtelDirect ?? boolOr("allowOtelDirect", true),
       bundledPlan: boolOr("bundledPlan", true),
     };
   }
@@ -181,10 +180,10 @@ function configFromForm(form: FormState): Record<string, unknown> {
       setupCommand: form.setupCommand.trim(),
       ...(form.helperText.trim() ? { helperText: form.helperText.trim() } : {}),
       ...(form.setupDocsUrl.trim() ? { setupDocsUrl: form.setupDocsUrl.trim() } : {}),
-      // CLI path policy folded into the tile. Cursor is GUI-only, so its
-      // OTLP-direct path is always false regardless of the toggle state.
-      allowVk: form.assistantKind === "pi" ? false : form.allowVk,
-      allowOtelDirect: form.assistantKind === "cursor" ? false : form.allowOtelDirect,
+      // CLI path policy folded into the tile. A locked toggle saves off
+      // regardless of the toggle state.
+      allowVk: lockedToggles(form.assistantKind).allowVk ?? form.allowVk,
+      allowOtelDirect: lockedToggles(form.assistantKind).allowOtelDirect ?? form.allowOtelDirect,
       bundledPlan: form.bundledPlan,
     };
   }
@@ -417,10 +416,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     setForm({
       ...form,
       assistantKind: kind,
-      // Cursor is GUI-only - direct OTLP never applies, so force the
-      // toggle off when the admin picks it.
-      ...(kind === "cursor" ? { allowOtelDirect: false } : {}),
-      ...(kind === "pi" ? { allowVk: false, bundledPlan: false } : {}),
+      ...togglesOnKindChange(kind),
     });
     setIconAsset(iconAfterKindChange({ kind, iconAsset }));
   };

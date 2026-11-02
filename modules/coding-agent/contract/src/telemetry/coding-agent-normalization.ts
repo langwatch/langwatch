@@ -328,28 +328,11 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "request_id",
 
   // pi names every attribute under its own prefix and this lookup is exact, so
-  // an unlisted pi key is dropped on arrival (ADR-188). Keys pi declares but
-  // the fold does not read stay out; add one here when a reader needs it. The
-  // cache and reasoning counts are absent: the pi canonicaliser consumes them.
-  "pi.ai.error.type",
-  "pi.ai.model",
-  "pi.ai.provider",
-  "pi.ai.response.model",
-  "pi.ai.response.stop_reason",
+  // an unlisted pi key is dropped on arrival (ADR-188). The fold reads pi's
+  // model, usage and tool facts through the `gen_ai.*` mirrors above, and the
+  // session key off the raw span, so pi's reported cost is the only pi key
+  // read here. Add one when a reader needs it.
   "pi.ai.usage.cost",
-  "pi.ai.usage.input_tokens",
-  "pi.ai.usage.output_tokens",
-  "pi.ai.usage.total_tokens",
-  "pi.compaction.reason",
-  "pi.error.code",
-  "pi.error.type",
-  "pi.operation.kind",
-  "pi.operation.outcome",
-  "pi.session.id",
-  "pi.tool.call_id",
-  "pi.tool.is_error",
-  "pi.tool.name",
-  "pi.turn.id",
 ];
 
 /**

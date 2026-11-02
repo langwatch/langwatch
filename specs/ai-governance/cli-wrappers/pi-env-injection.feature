@@ -79,6 +79,19 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
       And a pi ingest key is governed by that policy
 
     @unit
+    Scenario: A stored pi tile that allows a virtual key still resolves without one
+      Given the organisation stores a pi tile with the virtual key allowed
+      When the organisation's tool policy for pi is resolved
+      Then pi may not use a virtual key
+
+    @unit
+    Scenario: An admin picking pi in the tile drawer gets the virtual key and bundled plan switched off
+      When an admin picks pi as a coding assistant tile's kind
+      Then the virtual key toggle is off
+      And the bundled plan toggle is off
+      And an opened or saved pi tile keeps the virtual key off, whatever the toggle said
+
+    @unit
     Scenario: pi is offered as an AI tool that sets up with `langwatch pi`
       When the starter AI tools are listed
       Then one coding assistant tile is pi, set up with `langwatch pi`

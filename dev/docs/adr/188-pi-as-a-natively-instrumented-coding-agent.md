@@ -338,7 +338,9 @@ does **not** give away.
    `pi.harness.step` with `pi.step.kind = "compaction"`; its `pi.step.attempt` is a stand-in, listed
    above. Only `pi.harness.checkpoint` has no event to open or close it from, and
    it stays unemitted. Rejects synthesising it from what the shim can infer: that would make us the author
-   of pi's own structure, which this decision exists to prevent.
+   of pi's own structure, which this decision exists to prevent. These spans are stored and read in
+   the trace, but the session row counts nothing from them yet: compaction folds only on the log lane,
+   and the span-lane fold is a parked scenario in `specs/coding-agent/pi-sessions.feature`.
 
 6. **Every model-call attribute is dual-written in GenAI semantic conventions, and the `pi.*` keys we rely
    on are allowlisted by hand.** The shim writes `gen_ai.operation.name`, `gen_ai.request.model`,
@@ -368,7 +370,9 @@ does **not** give away.
    literals, no spreads, and not one of them a `pi.` key). Every `pi.*` attribute this record depends on
    is added to that list or it never reaches the fold, and the failure is quiet: the span is stored, the
    session simply learns nothing from it. One edit covers both lanes, because the log canonicaliser reads
-   the same list (`:403`).
+   the same list (`:403`). In the event only `pi.ai.usage.cost` was added: the fold reads pi's model,
+   tokens and tool name through the `gen_ai.*` mirrors and the session key off the raw span, and a pi
+   key with no reader stays out of the list.
    Two further corrections to the same claim. The noise filter's generic GenAI arm will never see a pi
    span at all: `shouldFilterCodingAgentSpan` returns false for any scope that is not a known noise scope
    before it reaches that arm (`contract/src/telemetry/coding-agent-span-filter.ts:95`, the scope set at

@@ -14,31 +14,12 @@ import { CODING_AGENT_REGISTRY, SPAN_FED_MODEL_CALL_AGENT_IDS } from "../index.t
 import { piAgent } from "../pi.ts";
 
 /**
- * The keys the pi fold reads off a span. The allowlist is an exact-match
- * lookup that drops anything unlisted without erroring, so a removal here has
- * no runtime symptom: this test is the symptom.
+ * The keys the pi fold reads off a span's lifted facts. The allowlist is an
+ * exact-match lookup that drops anything unlisted without erroring, so a
+ * removal here has no runtime symptom: this test is the symptom. Everything
+ * else the fold learns from pi arrives through the `gen_ai.*` mirrors.
  */
-const PI_FOLD_KEYS = [
-  "pi.session.id",
-  "pi.turn.id",
-  "pi.tool.name",
-  "pi.tool.call_id",
-  "pi.tool.is_error",
-  "pi.ai.model",
-  "pi.ai.provider",
-  "pi.ai.response.model",
-  "pi.ai.response.stop_reason",
-  "pi.ai.error.type",
-  "pi.ai.usage.input_tokens",
-  "pi.ai.usage.output_tokens",
-  "pi.ai.usage.total_tokens",
-  "pi.ai.usage.cost",
-  "pi.error.code",
-  "pi.error.type",
-  "pi.operation.kind",
-  "pi.operation.outcome",
-  "pi.compaction.reason",
-];
+const PI_FOLD_KEYS = ["pi.ai.usage.cost"];
 
 describe("the pi coding-agent definition", () => {
   it("is registered, exactly once", () => {
@@ -124,6 +105,12 @@ describe("the pi coding-agent definition", () => {
     it("holds every pi key the fold reads", () => {
       const missing = PI_FOLD_KEYS.filter((key) => !CODING_AGENT_CONTRIBUTION_KEYS.includes(key));
       expect(missing).toEqual([]);
+    });
+
+    it("holds no pi key the fold does not read", () => {
+      expect(CODING_AGENT_CONTRIBUTION_KEYS.filter((key) => key.startsWith("pi."))).toEqual(
+        PI_FOLD_KEYS,
+      );
     });
 
     /** The pi canonicaliser takes these off the span before the allowlist runs. */

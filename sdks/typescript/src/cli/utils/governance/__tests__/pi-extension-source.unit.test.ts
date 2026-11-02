@@ -222,6 +222,74 @@ describe("the generated pi extension", () => {
     });
   });
 
+  describe("when the user navigates the session tree", () => {
+    it("emits one pi.harness.navigation span carrying the session id", async () => {
+      await pi.emit("agent_start", {}, piContext({ sessionId: "s-1" }));
+      await pi.emit("session_before_tree", {});
+      await pi.emit("session_tree", {});
+      await pi.emit("agent_end", { messages: [assistant()] }, piContext({ sessionId: "s-1" }));
+
+      const navigations = named("pi.harness.navigation");
+      expect(navigations).toHaveLength(1);
+      expect(navigations[0]!.attributes).toMatchObject({
+        "pi.session.id": "s-1",
+        "pi.operation.kind": "navigation",
+        "pi.operation.outcome": "completed",
+      });
+    });
+
+    it("emits nothing for a tree event with no opening event before it", async () => {
+      await pi.emit("agent_start", {}, piContext({ sessionId: "s-1" }));
+      await pi.emit("session_tree", {});
+      await pi.emit("agent_end", { messages: [assistant()] }, piContext({ sessionId: "s-1" }));
+
+      expect(named("pi.harness.navigation")).toEqual([]);
+    });
+  });
+
+  describe("when the provider answers a model call", () => {
+    it("puts the response's HTTP status on that call's span", async () => {
+      const ctx = piContext({ sessionId: "s-1" });
+      await pi.emit("agent_start", {}, ctx);
+      await pi.emit("before_provider_request", {}, ctx);
+      await pi.emit("after_provider_response", { status: 429 }, ctx);
+      await pi.emit("message_end", { message: assistant() }, ctx);
+      await pi.emit("before_provider_request", {}, ctx);
+      await pi.emit("message_end", { message: assistant() }, ctx);
+      await pi.emit("agent_end", { messages: [assistant()] }, ctx);
+
+      expect(
+        named("pi.ai.request").map((span) => span.attributes["pi.ai.http.status_code"]),
+      ).toEqual([429, undefined]);
+    });
+  });
+
+  describe("when the run's last assistant message ended in an error", () => {
+    it("records the run as failed with an error status", async () => {
+      const ctx = piContext({ sessionId: "s-1" });
+      await pi.emit("agent_start", {}, ctx);
+      await pi.emit("agent_end", { messages: [assistant({ stopReason: "error" })] }, ctx);
+
+      const runSpan = named("pi.harness.run")[0]!;
+      expect(runSpan.attributes["pi.operation.outcome"]).toBe("failed");
+      expect(runSpan.statusCode).toBe(2);
+    });
+  });
+
+  describe("when spans are recorded outside a finished run", () => {
+    it.each(["agent_settled", "session_shutdown"])("posts them on %s", async (eventName) => {
+      const ctx = piContext({ sessionId: "s-1" });
+      await pi.emit("agent_start", {}, ctx);
+      await pi.emit("turn_start", { turnIndex: 0 }, ctx);
+      await pi.emit("turn_end", { turnIndex: 0 }, ctx);
+      expect(collector.requests).toEqual([]);
+
+      await pi.emit(eventName, {}, ctx);
+
+      expect(exported().map((span) => span.name)).toEqual(["pi.harness.turn"]);
+    });
+  });
+
   describe("when a one-shot run ends", () => {
     /** @scenario "A non-interactive run flushes its spans at agent end" */
     it("has posted every span of the run by the time the agent end handler returns", async () => {
