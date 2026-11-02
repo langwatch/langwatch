@@ -23,6 +23,7 @@ exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
 certifi = "2026-10-21T00:00:00Z"
+langwatch-scenario = "2026-11-02T10:11:00Z"
 pillow = "2026-10-17T00:00:00Z"
 pypdf = "2026-10-18T00:00:00Z"
 streamlit = "2026-10-22T00:00:00Z"
@@ -3391,7 +3392,7 @@ dev = [
 
 [[package]]
 name = "langwatch-scenario"
-version = "1.4.0"
+version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
@@ -3425,9 +3426,9 @@ dependencies = [
     { name = "websockets" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3c/63/4e8d0b854148521ff7e2a0c1e6c0a56c83fd3abf64f5629e9ab2112609da/langwatch_scenario-1.4.0.tar.gz", hash = "sha256:006f167fdf55a79fb5c1e0218521bf74d13848430a5210d321a2aae8dab67e4e", size = 1201340, upload-time = "2026-09-02T02:56:09.956Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/62/b9/8051e27e538e56eab9dc3b706df1d3403297f3ba2ddf6edb163d0520aa9c/langwatch_scenario-1.6.1.tar.gz", hash = "sha256:e95240bed84c43b5b37637c96e09de3280ce87c2749dcda1dad33e4cf02eb020", size = 1257910, upload-time = "2026-11-02T10:10:09.282Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/7c/2f0e9b74ac8e219c7e7b9c38bc45334ff682b1b56505129db8cccf182777/langwatch_scenario-1.4.0-py3-none-any.whl", hash = "sha256:2239e7e4f4f59a358f7340e19466ede77ac5c0cf6a1cd7a84f126dc9927f95f1", size = 1248030, upload-time = "2026-09-02T02:56:08.28Z" },
+    { url = "https://files.pythonhosted.org/packages/25/90/8203fd9ba0d31934d8a1d05d81ab75c1cb7a81e3bae0ce1bab375862d770/langwatch_scenario-1.6.1-py3-none-any.whl", hash = "sha256:cff127b9181d47eb68cb9a1d67732e96a189a1f2a5589d26740b24b61ed5410e", size = 1291570, upload-time = "2026-11-02T10:10:07.816Z" },
 ]
 
 [[package]]

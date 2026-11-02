@@ -16,6 +16,11 @@ the 7-day window has elapsed, add a package-specific exception. Keep the
 exception scoped to the affected package, update the lockfile, and remove the
 exception after the patched release is older than 7 days.
 
+The same scoped, dated exception also covers a first-party release that a
+release of ours needs (for example a `langwatch-scenario` release that allows
+the new SDK major). Say why in the comment beside the entry and remove it once
+the date is more than 7 days old.
+
 Do not set the global delay to `0`, comment out the global setting, or run broad
 updates while the exception is active.
 
