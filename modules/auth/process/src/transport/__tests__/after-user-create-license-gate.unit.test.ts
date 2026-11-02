@@ -114,7 +114,6 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
         federation,
         invites: new StubInvites(),
         announcements: new StubAnnouncements(),
-        authzGrants: {} as never,
         arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
         ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
           record: async () => undefined,

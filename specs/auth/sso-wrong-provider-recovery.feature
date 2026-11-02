@@ -64,8 +64,8 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     Given a person whose email domain belongs to an organization that requires single sign-on
     When they are refused for signing in with a social button
     Then the page tells them to sign in with their company email address
-    And it tells them that, if their company's sign-in turns them away, their company has not given them access yet
-    And it tells them to ask their IT administrator for access
+    And it tells them that, if their company's sign-in turns them away, their company may not have given them access yet
+    And it tells them to ask their IT administrator to check
 
   # A member can be left carrying a stale "you still need to link SSO" flag:
   # it is set at sign-in and only ever cleared by a LATER sign-in that

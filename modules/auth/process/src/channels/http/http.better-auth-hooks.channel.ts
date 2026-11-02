@@ -1,11 +1,5 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
-import {
-  GrantScopeTier,
-  newAuthzGrantId,
-  TeamUserRole,
-  type AuthzGrantsService,
-} from "@langwatch/authz-contract";
 import { isNativeSocialProvider } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -49,8 +43,6 @@ export type BetterAuthHookCollaborators = Readonly<{
   /** The organization an SSO domain names, and the membership an auto-join writes there. */
   organizations: SsoDomainOrganizations;
   announcements: BetterAuthAnnouncements;
-  /** The grant ledger an auto-joined membership is written through. */
-  authzGrants: AuthzGrantsService;
   /** The connection's own arrival door, asked of every federated sign-in. */
   arrivals: SsoArrivalApi;
   /** Where a sign-in through a connection is recorded as having happened. */
@@ -134,41 +126,6 @@ async function refuseRestrictedSignUp({
 export const SIGN_UP_RESTRICTED_CODE = "auth_sign_up_restricted";
 
 /**
- * The organization-scoped grant that comes with a default membership. Idempotent by
- * construction: an identical row already present is skipped, so calling this twice grants
- * nothing twice, and calling it after a membership row turned up on its own is the repair.
- */
-const grantDefaultOrgMembership = ({
-  writer,
-  organizationId,
-  userId,
-  role,
-}: {
-  writer: AuthzGrantsService;
-  organizationId: string;
-  userId: string;
-  role: typeof TeamUserRole.MEMBER | typeof TeamUserRole.VIEWER;
-}) =>
-  writer.attachBindings({
-    organizationId,
-    bindings: [
-      {
-        bindingId: newAuthzGrantId(),
-        principal: { userId },
-        role,
-        customRoleId: null,
-        scopeType: GrantScopeTier.ORGANIZATION,
-        scopeId: organizationId,
-      },
-    ],
-    // The signup is the product acting on a domain rule, not an
-    // administrator granting access.
-    caller: { type: "system" },
-    actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
-    onDuplicate: "skip",
-  });
-
-/**
  * Success-side announcements once the membership landed: the log line, the
  * Slack signup event (fire-and-forget), and the nurturing calls.
  */
@@ -185,9 +142,7 @@ const announceSsoAutoJoin = ({
 }): void => {
   logger.info(
     { userId: user.id, organizationId: org.id, inviteId },
-    inviteId
-      ? "Applied pending invite on SSO signup"
-      : "Auto-added new user to SSO organization",
+    inviteId ? "Applied pending invite on SSO signup" : "Auto-added new user to SSO organization",
   );
 
   announcements.announceSignup({
@@ -206,11 +161,9 @@ const announceSsoAutoJoin = ({
 };
 
 /**
- * Membership + grant for one domain-matched organization. A pending invite wins when one
- * exists (its role and team assignments carry their own grants); otherwise the organization
- * admits them on the seat its licence leaves free, as a connection arrival or a SCIM create is
- * (specs/licensing/seat-limit-at-provisioning.feature): a full member while a full seat is free,
- * else a Lite Member, else held pending with no grant.
+ * Membership + grant for one domain-matched organization. A pending invite wins; otherwise the
+ * organization admits them on the seat its licence leaves free, as every other door does
+ * (specs/licensing/seat-limit-at-provisioning.feature).
  */
 const joinSsoOrganization = async ({
   collaborators,
@@ -221,7 +174,7 @@ const joinSsoOrganization = async ({
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
 }): Promise<void> => {
-  const { announcements, invites, authzGrants: writer } = collaborators;
+  const { announcements, invites } = collaborators;
   const invite = await invites.applyPendingInvite({
     userId: user.id,
     organizationId: org.id,
@@ -244,28 +197,22 @@ const joinSsoOrganization = async ({
     },
   });
   if (admission.outcome === "already-present") {
+    // A concurrent callback wrote the row, and its admission finishes the grant: a second
+    // binding here would leave that admission unconfirmed.
     logger.info(
       { userId: user.id, organizationId: org.id },
       "Auto-add SSO membership was already present (P2002) — treating as success",
     );
-    // The membership row existing says nothing about the grant beside it: the concurrent
-    // callback that created it may have died in between. Re-assert the grant its seat is
-    // worth, which is a no-op when the other attempt finished.
-    if (admission.pending || admission.seat === "DEVELOPER") return;
-    await grantDefaultOrgMembership({
-      writer,
-      organizationId: org.id,
-      userId: user.id,
-      role: admission.seat === "EXTERNAL" ? TeamUserRole.VIEWER : TeamUserRole.MEMBER,
-    });
     return;
   }
 
-  if (admission.seat !== "MEMBER" || admission.pending) {
+  if (admission.pending) {
+    // Held for want of any seat: no access yet, so nobody is told they joined.
     logger.info(
-      { userId: user.id, organizationId: org.id, seat: admission.seat, pending: admission.pending },
-      "Auto-added new user to SSO organization without a full seat: the licence has none free",
+      { userId: user.id, organizationId: org.id },
+      "Held a new user pending at an SSO organization: the licence has no seat free",
     );
+    return;
   }
   announceSsoAutoJoin({ announcements, user, org, inviteId: null });
 };

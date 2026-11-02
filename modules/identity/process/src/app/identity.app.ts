@@ -269,6 +269,7 @@ type IdentityPipelineBuilders = {
 function arrivalMemberships(organizations: OrganizationApi): SsoArrivalMemberships {
   return {
     isMember: (args) => organizations.isMember(args),
+    getMemberSeat: async (args) => (await organizations.getMember(args)).role,
     createMembership: (args) => organizations.createMembership(args),
     applyPendingInvite: (args) => organizations.applyPendingInvite(args),
     /** Absent for an organization deleted between the decision and the join,

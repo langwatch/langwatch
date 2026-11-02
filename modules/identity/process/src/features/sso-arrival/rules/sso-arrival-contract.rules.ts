@@ -19,6 +19,9 @@ export interface JoinedOrganization {
  */
 export interface SsoArrivalMemberships {
   isMember(args: { organizationId: string; userId: string }): Promise<boolean>;
+  /** The role an existing member's row holds, which decides the grant their unfinished
+   *  admission is worth: an EXTERNAL row is a Lite Member seat. */
+  getMemberSeat(args: { organizationId: string; userId: string }): Promise<string>;
   /** Admits them on the seat the licence leaves free: a MEMBER or Lite (EXTERNAL) row carries
    *  the grant intent an unfinished admission resumes from; a DEVELOPER none, and a `pending`
    *  one waits for a seat with none. `"already-present"` is a retry, not a failure. */

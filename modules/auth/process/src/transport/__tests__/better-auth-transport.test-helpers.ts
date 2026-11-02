@@ -95,7 +95,6 @@ export function betterAuthTransportFor(
       route: async () => undefined,
       resolveAuthProvider: async () => "credential",
     } as never,
-    authzGrants: {} as never,
     arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
     linkProposals: createApiFixture<LinkProposals>(),

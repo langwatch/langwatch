@@ -88,9 +88,10 @@ describe("<SignInError/>", () => {
     /** @scenario "A person refused for using a social button is told who to ask if their company turns them away" */
     it("says who to ask when their company's sign-in turns them away", () => {
       renderError("SSO_PROVIDER_NOT_ALLOWED");
+      expect(screen.getByText(/entering your\s+company email address/i)).toBeTruthy();
       expect(
         screen.getByText(
-          "If your company's sign-in turns you away, your company has not given you access to LangWatch yet. Ask your IT administrator to add you.",
+          "If your company's sign-in turns you away, your company may not have given you access to LangWatch yet. Ask your IT administrator to check.",
         ),
       ).toBeTruthy();
     });

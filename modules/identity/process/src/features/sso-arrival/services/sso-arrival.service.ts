@@ -67,8 +67,10 @@ export class SsoArrivalService {
       const { organizationId } = decision;
 
       if (await this.deps.memberships.isMember({ organizationId, userId: user.id })) {
-        // shortcut: a retry does not read the seat, so it resumes as MEMBER; read it for VIEWER.
-        await this.resumeAdmission({ user, organizationId, domain, role: "MEMBER" });
+        // A retry resumes the grant the stored seat is worth: a Lite Member's is a Viewer.
+        const seat = await this.deps.memberships.getMemberSeat({ organizationId, userId: user.id });
+        const role = seat === "EXTERNAL" ? "VIEWER" : "MEMBER";
+        await this.resumeAdmission({ user, organizationId, domain, role });
         await this.adoptIdentity(user.id);
         return;
       }
