@@ -145,11 +145,6 @@ override-dependencies = [
   #
   # NOT fixed here, deliberately:
   #   ragas, diskcache: no patched release exists upstream yet.
-  #   nltk: GHSA-j456-xh4h-cpf2 (high) is fixed in 3.10.4, and 3.10.4 also
-  #   sandboxes the model-artifact paths of GHSA-8mgp-746c-j5xp, which names
-  #   no fix. 3.10.4 (uploaded 2026-10-21) is inside the age gate, neither
-  #   advisory is a 0-day or exploited, and langevals reaches nltk only through
-  #   rouge-score's stemmer. Raise the floor to 3.10.4 from 2026-10-29.
 ]
 
 # Security floors that only need to raise a version. Constraints add to the
