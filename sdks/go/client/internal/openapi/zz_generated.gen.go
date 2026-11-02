@@ -15077,13 +15077,13 @@ func (e PostApiEvaluationsBatchLogResultsJSONBodyTargetsType1) Valid() bool {
 
 // Defines values for PostApiEvaluationsBatchLogResultsJSONBodyTargetsType2.
 const (
-	Evaluator PostApiEvaluationsBatchLogResultsJSONBodyTargetsType2 = "evaluator"
+	PostApiEvaluationsBatchLogResultsJSONBodyTargetsType2Evaluator PostApiEvaluationsBatchLogResultsJSONBodyTargetsType2 = "evaluator"
 )
 
 // Valid indicates whether the value is a known member of the PostApiEvaluationsBatchLogResultsJSONBodyTargetsType2 enum.
 func (e PostApiEvaluationsBatchLogResultsJSONBodyTargetsType2) Valid() bool {
 	switch e {
-	case Evaluator:
+	case PostApiEvaluationsBatchLogResultsJSONBodyTargetsType2Evaluator:
 		return true
 	default:
 		return false
