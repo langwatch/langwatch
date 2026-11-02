@@ -90,12 +90,15 @@ function clickHouseThat({
   failing,
   failingProbe,
   present = [],
+  columns,
   cluster,
   mode = "rendered",
 }: {
   failing?: RegExp;
   failingProbe?: keyof typeof PROBES;
   present?: readonly string[];
+  /** When given, every present relation holds these columns and every app function exists. */
+  columns?: readonly string[];
   cluster?: string;
   mode?: "rendered" | "sql";
 } = {}) {
@@ -141,6 +144,12 @@ function clickHouseThat({
                 );
               }
               return [{ name: "TenantId", type: "String" }];
+            }
+            if (columns && sql.includes("system.functions")) {
+              return lwqlAppFunctionNames().map((name) => ({ name }));
+            }
+            if (columns && sql.includes("system.columns")) {
+              return present.map((table) => ({ table, columns }));
             }
             if (sql.includes("system.tables")) {
               return present.map((name) => ({ name, comment: "" }));
@@ -345,7 +354,7 @@ describe("convergeLwqlAccessModel", () => {
       expect(clickHouse.ran).toEqual([]);
     });
 
-    /** @scenario "An older worker never rewrites a newer view" */
+    /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
     it("creates only the absent approved view, grants SELECT on each gap and never revokes", async () => {
       const [absent, ungranted, untouched] = approvedViews;
       if (!absent || !ungranted || !untouched) throw new Error("the catalog maps too few datasets");
@@ -374,7 +383,7 @@ describe("convergeLwqlAccessModel", () => {
       expect(grants).not.toMatch(/REVOKE|ALTER ROLE|CREATE ROLE/);
     });
 
-    /** @scenario "An older worker never rewrites a newer view" */
+    /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
     it("keeps the revokes and the full grants on a deploy's converge", async () => {
       const postgres = postgresThat({ refuses: false });
 
@@ -590,14 +599,23 @@ describe("when a view a deploy left stale drifts while the collection cannot be 
 
   /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
   it("replaces the view over a fact table, then raises the unconfirmed collection", async () => {
-    const clickHouse = clickHouseThat({ present: [engineTable], failingProbe: "collection" });
+    const database = postgresThat({ refuses: false }).database;
+    const clickHouse = clickHouseThat({
+      present: selfProvisioning.appOwnedRelations({ names: NAMES }),
+      columns: LWQL_VIEW_CATALOG.flatMap((view) => view.columns.map((c) => c.name)).filter(
+        (name) => name !== "Source",
+      ),
+      failingProbe: "collection",
+    });
+    const drift = await findLwqlAppOwnedDrift({ database, plan: clickHouse.plan });
+    expect(drift.clickHouse).toContain("trace_metrics");
 
     await expect(
       convergeLwqlAccessModel({
-        database: postgresThat({ refuses: false }).database,
+        database,
         plan: clickHouse.plan,
         failOnError: true,
-        only: { clickHouse: [engineTable, "trace_metrics"], postgres: [], isKeyMapMissing: false },
+        only: { clickHouse: drift.clickHouse, postgres: [], isKeyMapMissing: false },
       }),
     ).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
 
@@ -667,7 +685,7 @@ describe("findLwqlAppOwnedDrift", () => {
     return findLwqlAppOwnedDrift({ database, plan });
   }
 
-  /** @scenario "An older worker never rewrites a newer view" */
+  /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
   it("finds no drift in objects holding a newer deploy's extra columns", async () => {
     expect(await presentWith({ columns: [...catalogColumns, "AddedByANewerDeploy"] })).toEqual({
       clickHouse: [],

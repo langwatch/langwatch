@@ -1096,7 +1096,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # while both run. So such a deploy ships in two: first add the new column and
   # keep the old one, then drop the old one once no older worker runs.
   @unit
-  Scenario: An older worker never rewrites a newer view
+  Scenario: An older worker never rewrites a newer view for columns it does not declare
     Given a newer deploy has converged views and approved views that added columns this worker's catalog does not declare
     When this worker's reconvergence check runs
     Then it finds no drift and runs no DDL
