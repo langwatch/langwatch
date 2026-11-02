@@ -1,8 +1,8 @@
 // Command slacknotify posts a CI job's failure on main to Slack, unless that job
 // was already red in the previous finished run: `-job typecheck`, or one post per
 // red leg with `-job-prefix "package-suites (" -fallback-job "package-suites (1/1)"`.
-// Inputs: the flags (see -help) and the GITHUB_*, GH_TOKEN, COMMIT_* and Slack env.
-// Spec: specs/ci/package-suite-integration-lane.feature
+// Env: GITHUB_REPOSITORY, _RUN_ID, _RUN_ATTEMPT, _SHA, GH_TOKEN, COMMIT_SUBJECT,
+// COMMIT_AUTHOR, SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL. Spec: specs/ci/package-suite-integration-lane.feature
 package main
 
 import (
@@ -35,7 +35,7 @@ func main() {
 	}
 	legs := slacknotify.Legs{Prefix: *prefix, Fallback: *fallback}
 	if legs.Prefix != "" {
-		// A bad attempt leaves 0: the lookup fails and the fallback leg still posts.
+		// A bad attempt fails the jobs lookup, and the fallback leg still posts.
 		legs.Attempt, _ = strconv.ParseInt(os.Getenv("GITHUB_RUN_ATTEMPT"), 10, 64)
 	}
 	n := slacknotify.Notifier{
@@ -65,7 +65,9 @@ func main() {
 // notify posts for run.Job, or with legs.Prefix set for each red leg.
 func notify(n slacknotify.Notifier, run slacknotify.Run, legs slacknotify.Legs) ([]slacknotify.Result, error) {
 	if legs.Prefix != "" {
-		return n.NotifyRedLegs(context.Background(), run, legs)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		return n.NotifyRedLegs(ctx, run, legs)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

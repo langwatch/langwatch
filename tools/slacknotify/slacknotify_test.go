@@ -275,3 +275,25 @@ func TestAFailedLegLookupStillPostsAndSaysWhy(t *testing.T) {
 		})
 	}
 }
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestAFailedLegLookupPostsTheFallbackEvenIfItWasRedBefore(t *testing.T) {
+	f := &fake{previous: "failure"}
+
+	results, err := f.start(t).NotifyRedLegs(context.Background(), failing, legs)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{job}, f.posted())
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Posted, results[0].Reason)
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestAFailedFallbackPostNamesTheFailedLookup(t *testing.T) {
+	f := &fake{refuse: job}
+
+	_, err := f.start(t).NotifyRedLegs(context.Background(), failing, legs)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "jobs lookup failed")
+}

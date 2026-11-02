@@ -53,6 +53,14 @@ func (n Notifier) Notify(ctx context.Context, run Run) (Result, error) {
 	if repeat {
 		return Result{Job: run.Job, Reason: why}, nil
 	}
+
+	return n.postNow(ctx, run, why)
+}
+
+// postNow posts on a 20s budget of its own, so a slow lookup cannot leave it none.
+func (n Notifier) postNow(ctx context.Context, run Run, why string) (Result, error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
+	defer cancel()
 	if err := n.post(ctx, run); err != nil {
 		return Result{Job: run.Job}, err
 	}
@@ -83,14 +91,21 @@ func (n Notifier) NotifyRedLegs(ctx context.Context, run Run, legs Legs) ([]Resu
 		leg.Job = name
 		// Each leg gets its own minute, so a slow first leg cannot starve the next.
 		legCtx, cancel := context.WithTimeout(ctx, time.Minute)
-		result, err := n.Notify(legCtx, leg)
+		var result Result
+		var err error
+		if lookup != nil && n.Webhook != "" {
+			// The red leg is unknown, so the fallback skips the repeat check.
+			result, err = n.postNow(legCtx, leg, fmt.Sprintf("jobs lookup failed: %v", lookup))
+		} else {
+			result, err = n.Notify(legCtx, leg)
+		}
 		cancel()
+		if err != nil && lookup != nil {
+			err = fmt.Errorf("%w (jobs lookup failed: %v)", err, lookup)
+		}
 		if err != nil {
 			failed = append(failed, fmt.Errorf("%s: %w", name, err))
 			continue
-		}
-		if lookup != nil {
-			result.Reason += fmt.Sprintf("; jobs lookup failed: %v", lookup)
 		}
 		results = append(results, result)
 	}
