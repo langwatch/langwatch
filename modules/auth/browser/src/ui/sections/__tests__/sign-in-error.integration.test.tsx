@@ -84,6 +84,16 @@ describe("<SignInError/>", () => {
       });
       expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
     });
+
+    /** @scenario "A person refused for using a social button is told who to ask if their company turns them away" */
+    it("says who to ask when their company's sign-in turns them away", () => {
+      renderError("SSO_PROVIDER_NOT_ALLOWED");
+      expect(
+        screen.getByText(
+          "If your company's sign-in turns you away, your company has not given you access to LangWatch yet. Ask your IT administrator to add you.",
+        ),
+      ).toBeTruthy();
+    });
   });
 
   describe("when an unsolicited single sign-on response meets a browser signed in as someone else", () => {
