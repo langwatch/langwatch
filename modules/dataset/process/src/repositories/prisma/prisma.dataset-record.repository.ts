@@ -188,7 +188,11 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
             data: input.entries
               .slice(start, start + REPLACE_BATCH_SIZE)
               .map(({ id, ...entry }, offset) => {
-                const createdAt = replacedAt({ writtenAt, position: start + offset });
+                const createdAt = replacedAt({
+                  writtenAt,
+                  position: start + offset,
+                  count: input.entries.length,
+                });
                 return {
                   id,
                   datasetId,
@@ -207,11 +211,19 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
 }
 
 /**
- * Reads order entries by `createdAt`, so a replacement stamps each entry one millisecond after
- * the one before it, keeping the order it was given whatever the ids sort to.
+ * Reads order entries by `createdAt`: a replacement stamps its entries one millisecond apart in
+ * the order given, ending before the write time, so an entry added after it still reads last.
  */
-function replacedAt({ writtenAt, position }: { writtenAt: number; position: number }): Date {
-  return new Date(writtenAt + position);
+function replacedAt({
+  writtenAt,
+  position,
+  count,
+}: {
+  writtenAt: number;
+  position: number;
+  count: number;
+}): Date {
+  return new Date(writtenAt - (count - position));
 }
 
 function toDatasetRecord(row: unknown): DatasetRecord {

@@ -162,7 +162,9 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
       if (new Set(ids).size !== ids.length) throw new Error("Duplicate dataset record id");
       const writtenAt = this.#database.now();
       for (const [position, { id, ...entry }] of input.entries.entries()) {
-        const createdAt = toDate(writtenAt.add({ milliseconds: position }));
+        const createdAt = toDate(
+          writtenAt.subtract({ milliseconds: input.entries.length - position }),
+        );
         this.#database.putRecord(
           datasetRecordSchema.parse({
             id,

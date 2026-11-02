@@ -337,6 +337,31 @@ function contractCases(backend: Backend): void {
       expect(page.records.map((record) => record.id)).toEqual(["row-c", "row-a", "row-b"]);
     });
 
+    it("dates no replaced entry after the write, so an entry added next reads last", async () => {
+      const dataset = await create("replaced-then-added");
+      const projectId = backend.mine();
+      const entries = Array.from({ length: 1500 }, (_, index) => ({
+        id: `restored-${String(index).padStart(4, "0")}`,
+        input: `row ${index}`,
+      }));
+
+      await backend.records().replaceAll({ datasetId: dataset.id, projectId, entries });
+      await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId,
+        entries: [{ id: "added-after", input: "new" }],
+      });
+
+      const page = await backend.records().listAll({
+        datasetId: dataset.id,
+        projectId,
+        page: 1,
+        limit: 1501,
+      });
+      expect(page.records.at(-1)?.id).toBe("added-after");
+      expect(page.records.at(0)?.id).toBe("restored-0000");
+    });
+
     it("keeps the old entries when a later batch of the replacement fails", async () => {
       const dataset = await create("replace-failed");
       const projectId = backend.mine();
