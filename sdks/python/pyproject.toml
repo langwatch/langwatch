@@ -115,7 +115,7 @@ examples = [
   "openai>=1.68.2,<2.55.0", # cap re-verified against openai 2.43.0 (2.8+ historically called model_dump(by_alias=None) which pydantic-core rejected)
   "pydantic>=2.11.0", # chainlit <2.11.1 was broken with pydantic >=2.10.2; fixed in chainlit 2.11.1
   "pytest>=9.1.1,<10.0.0",
-  "python-dotenv==1.2.2",
+  "python-dotenv==1.2.4",
   "streamlit>=1.61.1,<2.0.0",
   "uvicorn>=0.38.0,<0.53.0",
   "json-repair>=0.63.0",
@@ -129,7 +129,7 @@ examples = [
   "pypdf>=6.21.1", # security: pypdf advisories (#543, #2198-#2200, #2807-#2813, #3037)
   "strands-agents[otel]>=1.51.0,<2.0.0",
 ]
-tests = ["factory-boy>=3.3.3", "pytest-asyncio>=1.4.0", "python-dotenv==1.2.2"]
+tests = ["factory-boy>=3.3.3", "pytest-asyncio>=1.4.0", "python-dotenv==1.2.4"]
 
 # The examples group resolves for Python 3.11+ only. Pillow 13 (#2955-#2963,
 # #3038-#3075) dropped 3.10, and the group is never installed on 3.10: CI
