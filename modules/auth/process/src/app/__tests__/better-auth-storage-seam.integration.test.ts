@@ -149,5 +149,22 @@ describe.skipIf(!DB_URL)("Better Auth's storage on the live tier", () => {
       });
       expect(account?.issuer).toBe("local:credential");
     });
+
+    /** @scenario "An enterprise OAuth account linked to an existing user is stored under its local namespace" */
+    it("stores a linked Auth0 account under the local OAuth namespace", async () => {
+      const { transport } = await liveTier(redis);
+      const context = await transport.$context;
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "auth0",
+        accountId: `${ns}-auth0-subject`,
+      });
+
+      const account = await prisma.account.findFirst({
+        where: { userId, provider: "auth0" },
+        select: { issuer: true },
+      });
+      expect(account?.issuer).toBe("local:oauth:auth0");
+    });
   });
 });

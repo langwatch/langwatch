@@ -26,3 +26,9 @@ Feature: Every account row records who asserted its subject
     Given a user with no password
     When auth links a password to them through Better Auth
     Then the new account row's issuer is "local:credential"
+
+  @integration
+  Scenario: An enterprise OAuth account linked to an existing user is stored under its local namespace
+    Given a user with no Auth0 account
+    When auth links an Auth0 account to them through Better Auth
+    Then the new account row's issuer is "local:oauth:auth0"
