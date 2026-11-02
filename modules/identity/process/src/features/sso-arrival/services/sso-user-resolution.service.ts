@@ -26,7 +26,7 @@ import type {
   SsoRegistrantReadRepository,
   SsoResolutionCandidate,
 } from "../../sso-connection/repositories/sso-registrant.repository.ts";
-import { isStoredUnderAnotherIssuer } from "../rules/sso-subject-issuer.rules.ts";
+import { findSubjectIssuerRefusals } from "../rules/sso-subject-issuer.rules.ts";
 
 const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
@@ -65,20 +65,15 @@ export class SsoUserResolutionService {
       connectionId: input.providerId,
     });
     const { providerId, accountKey } = input;
-    // Its row could only be stamped with a `local:` namespace, refused at its next sign-in.
-    if (!accountKey.issuer) {
-      logger.warn({ providerId }, "Refused a single sign-on subject asserted under no issuer");
-      return REFUSE;
-    }
-    const storedIssuers = await this.deps.people.findSubjectIssuers({
-      connectionId: providerId,
-      accountId: accountKey.accountId,
-    });
-    if (isStoredUnderAnotherIssuer({ storedIssuers, issuer: accountKey.issuer })) {
-      logger.warn(
-        { providerId, issuer: accountKey.issuer },
-        "Refused a single sign-on subject stored under another issuer",
-      );
+    const storedIssuers = accountKey.issuer
+      ? await this.deps.people.findSubjectIssuers({
+          connectionId: providerId,
+          accountId: accountKey.accountId,
+        })
+      : [];
+    const [refusal] = findSubjectIssuerRefusals({ storedIssuers, issuer: accountKey.issuer });
+    if (refusal) {
+      logger.warn({ providerId, issuer: accountKey.issuer }, refusal);
       return REFUSE;
     }
     const resolution = await this.chooseResolution({ connection, input });

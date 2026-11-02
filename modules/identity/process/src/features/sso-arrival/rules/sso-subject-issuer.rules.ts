@@ -19,3 +19,17 @@ export function isStoredUnderAnotherIssuer({
     (issuer) => issuer === null || withoutTrailingSlash(issuer) !== asserted,
   );
 }
+
+/** Why a connection subject is refused for its issuer: one reason, or none (ADR-189). */
+export function findSubjectIssuerRefusals({
+  storedIssuers,
+  issuer,
+}: {
+  storedIssuers: readonly (string | null)[];
+  issuer: string | null | undefined;
+}): string[] {
+  if (!issuer) return ["Refused a single sign-on subject asserted under no issuer"];
+  return isStoredUnderAnotherIssuer({ storedIssuers, issuer })
+    ? ["Refused a single sign-on subject stored under another issuer"]
+    : [];
+}
