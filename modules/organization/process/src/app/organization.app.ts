@@ -8,7 +8,7 @@ import {
 } from "@langwatch/authz-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, IntentExecutor, ProcessStore } from "@langwatch/eventing";
+import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
@@ -144,8 +144,6 @@ import {
   buildSeatLimitPipeline,
   type SeatLimitDefinition,
 } from "../eventing/seat-limit.pipeline.ts";
-import type { RecordSeatChangedCommandData } from "../eventing/seat-peak.events.ts";
-import { recordSeatChange, type SeatPeakSender } from "../eventing/seat-peak.intent.ts";
 import { GroupIdentityService } from "../features/group/services/group-identity.service.ts";
 import type { GroupIdentity } from "../features/group/services/group-identity.service.ts";
 import { OrganizationGroupScopeService } from "../features/group/services/organization-group-scope.service.ts";
@@ -1606,20 +1604,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     commands: Readonly<{ recordAudit: EventingCommandSender<RecordAuditCommandData> }>,
   ): void {
     this.#auditSender = commands.recordAudit;
-  }
-
-  /** organization_seat_peak's sender (ADR-002); its changes wait in the outbox until connected. */
-  #seatPeakSender: SeatPeakSender | undefined;
-
-  /** The seat-change intent's executor, for organization_seat_peak's process manager. */
-  seatChangeExecutor(): IntentExecutor<RecordSeatChangedCommandData> {
-    return recordSeatChange(() => this.#seatPeakSender);
-  }
-
-  connectSeatPeak(
-    commands: Readonly<{ recordSeatChanged: EventingCommandSender<RecordSeatChangedCommandData> }>,
-  ): void {
-    this.#seatPeakSender = commands.recordSeatChanged;
   }
 
   connectSeatLimit(

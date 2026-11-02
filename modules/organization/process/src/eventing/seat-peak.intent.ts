@@ -8,13 +8,14 @@ import type { RecordSeatChangedCommandData } from "./seat-peak.events.ts";
 
 export type SeatPeakSender = Pick<EventingCommandSender<RecordSeatChangedCommandData>, "send">;
 
-/** Sends the change under the id its commit minted; an unconnected sender throws, so it retries. */
+/**
+ * Sends the change under the id its commit minted. The getter is the app's
+ * `getSeatChangeSender`, which throws until organization_seat_peak registers, so it retries.
+ */
 export function recordSeatChange(
-  sender: () => SeatPeakSender | undefined,
+  sender: () => SeatPeakSender,
 ): IntentExecutor<RecordSeatChangedCommandData> {
   return async (change) => {
-    const connected = sender();
-    if (!connected) throw new Error("organization_seat_peak is not registered in this process");
-    await connected.send(change);
+    await sender().send(change);
   };
 }
