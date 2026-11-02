@@ -172,19 +172,20 @@ export interface ShardLoad {
   alone: number;
   /** Every light suite, which shares the shard's concurrency slots. */
   shared: number;
-  /** Light integration and browser suites, which run one at a time. */
-  serial: number;
+  /** Light integration and browser suites, each lane one suite at a time. */
+  integration: number;
+  browser: number;
 }
 
-const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, serial: 0 };
+const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, integration: 0, browser: 0 };
 
 /**
- * A shard's wall time, which the split balances. Heavy packages run alone.
- * Light suites share the slots; integration and browser suites run back to back.
- * The light part takes the longer of the two.
+ * A shard's wall time, which the split balances: heavy packages run alone and add
+ * all their weight; light suites share `concurrency` slots, but the integration and
+ * browser lanes run one suite at a time, so the light part takes the longest of them.
  */
 export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency: number }) =>
-  load.alone + Math.max(load.shared / concurrency, load.serial);
+  load.alone + Math.max(load.shared / concurrency, load.integration, load.browser);
 
 /**
  * `load` with one package added. The weights file records a package, not its
@@ -202,7 +203,8 @@ export const withPackage = ({
   if (weight >= HEAVY_SECONDS) return { ...load, alone: load.alone + weight };
   const next = { ...load, shared: load.shared + weight };
   for (const script of scripts) {
-    if (laneOf(script) !== "shared") next.serial += weight / scripts.length;
+    const lane = laneOf(script);
+    if (lane !== "shared") next[lane] += weight / scripts.length;
   }
   return next;
 };
@@ -318,9 +320,9 @@ export interface SuiteJob {
 }
 
 /**
- * Lanes that may not overlap across packages. Integration files share one datastore;
- * browser suites install Chromium under a machine-wide apt lock. Everything else is `shared`.
- * The two lanes may not overlap each other either: see keysOf.
+ * The lanes that may not overlap across packages. Integration files run
+ * serially against one shared datastore; a browser lane installs Chromium
+ * through apt, which holds a machine-wide lock. Everything else is `shared`.
  */
 const LANES: Record<string, "integration" | "browser"> = {
   "test:integration": "integration",
@@ -337,7 +339,7 @@ export const laneOf = (script: string): "integration" | "browser" | "shared" =>
 export const KEEPS_LAUNCHER_WORKERS: ReadonlySet<string> = new Set(["@langwatch/design-system"]);
 
 /**
- * The worker count a job adds to its environment. A heavy unit suite runs alone, so it takes
+ * What a job adds to its environment. A heavy unit suite runs alone, so it takes
  * every core rather than the launcher's two. Integration and browser lanes keep
  * their own counts: their files share a datastore or an apt lock.
  */
@@ -353,20 +355,6 @@ export const workerEnvFor = ({
   heavy && cores > 2 && laneOf(job.script) === "shared" && !KEEPS_LAUNCHER_WORKERS.has(job.pkg.name)
     ? { VITEST_MAX_WORKERS: String(cores) }
     : {};
-
-/**
- * What a job adds to its environment. Ryuk is off: reused ClickHouse containers get no
- * Ryuk label and are never reaped, Redis and Postgres stop in afterAll, and the shared
- * Ryuk container, removed about 10 s after its last client left, aborted Chromium's loads.
- */
-export const suiteEnvFor = (options: {
-  job: SuiteJob;
-  heavy: boolean;
-  cores: number;
-}): Record<string, string> => ({
-  TESTCONTAINERS_RYUK_DISABLED: "true",
-  ...workerEnvFor(options),
-});
 
 /** The scripts nx.json caches. They run through Nx, so an unchanged suite replays its pass. */
 const CACHED_SCRIPTS = new Set(["test", "test:unit"]);
@@ -398,6 +386,67 @@ export const parseConcurrency = (value: string | undefined): number => {
     throw new Error(`PACKAGE_SUITES_CONCURRENCY='${value}' is not a positive whole number.`);
   }
   return parsed;
+};
+
+/**
+ * Which lanes a leg of the job runs. Browser suites get a runner of their own:
+ * a container starting beside one changes the network and Chromium aborts its
+ * module loads with ERR_NETWORK_CHANGED. `all` is a local run's default.
+ */
+export type LaneFilter = "all" | "browser" | "no-browser";
+
+/** Parses `PACKAGE_SUITES_LANES`. Absent means every lane; anything else is an error. */
+export const parseLanes = (value: string | undefined): LaneFilter => {
+  const lanes = value?.trim() ?? "";
+  if (lanes === "") return "all";
+  if (lanes === "browser" || lanes === "no-browser") return lanes;
+  throw new Error(`PACKAGE_SUITES_LANES='${value}' is not 'browser' or 'no-browser'.`);
+};
+
+/** The packages with only the scripts `lanes` admits; a package left with none is dropped. */
+export const withLanes = ({
+  packages,
+  lanes,
+}: {
+  packages: readonly DiscoveredPackage[];
+  lanes: LaneFilter;
+}): DiscoveredPackage[] =>
+  lanes === "all"
+    ? [...packages]
+    : packages.flatMap((pkg) => {
+        const scripts = pkg.scripts.filter(
+          (script) => (laneOf(script) === "browser") === (lanes === "browser"),
+        );
+        return scripts.length === 0 ? [] : [{ ...pkg, scripts }];
+      });
+
+/**
+ * What one shard runs: the lanes this leg admits, split over `shard.total` by wall
+ * time, and this shard's share as jobs, heaviest package first.
+ */
+export const planShard = ({
+  packages,
+  lanes,
+  shard,
+  weightOf,
+  concurrency,
+  excluded,
+}: {
+  packages: readonly DiscoveredPackage[];
+  lanes: LaneFilter;
+  shard: { index: number; total: number };
+  weightOf: (pkg: DiscoveredPackage) => number;
+  concurrency: number;
+  excluded: Map<string, string>;
+}): { assigned: DiscoveredPackage[]; seconds: number; jobs: SuiteJob[] } => {
+  const items = withLanes({ packages, lanes });
+  const split = balanceByWallTime({ items, weightOf, concurrency, total: shard.total });
+  const assigned = split.groups[shard.index - 1] ?? [];
+  return {
+    assigned,
+    seconds: split.walls[shard.index - 1] ?? 0,
+    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
+  };
 };
 
 /** Every script the gate runs, package by package; an excluded package has none. */
@@ -432,7 +481,7 @@ const startReady = ({
 
 /**
  * Runs every job, at most `concurrency` at once, in order where it can. A package
- * runs one script at a time, `integration` and `browser` share one slot, and a
+ * runs one script at a time, `integration` and `browser` hold one slot each, and a
  * heavy job runs alone. Every job runs even after one fails.
  */
 export const runJobs = async ({
@@ -451,7 +500,7 @@ export const runJobs = async ({
   const busy = new Set<string>();
   const running = new Set<Promise<void>>();
   const start = (job: SuiteJob) => {
-    const keys = keysOf({ job, isHeavy });
+    const keys = keysOf(job, isHeavy);
     for (const key of keys) busy.add(key);
     const settled: Promise<void> = run(job)
       .catch(() => 1)
@@ -471,25 +520,15 @@ export const runJobs = async ({
   return statuses;
 };
 
-/**
- * Integration suites may create or remove containers (Redis and Postgres per suite,
- * ClickHouse reused). Each change adds or drops a network interface, and Chromium
- * aborts in-flight requests with ERR_NETWORK_CHANGED and has no switch to ignore it.
- */
-const SERIAL_LANES_KEY = "integration-or-browser";
-
-/** The shard-wide keys a job holds: its package, SERIAL_LANES_KEY if not shared, and heavy. */
-const keysOf = ({
-  job,
-  isHeavy,
-}: {
-  job: SuiteJob;
-  isHeavy: (pkg: DiscoveredPackage) => boolean;
-}): string[] => [
-  `package:${job.pkg.name}`,
-  ...(laneOf(job.script) === "shared" ? [] : [SERIAL_LANES_KEY]),
-  ...(isHeavy(job.pkg) ? ["heavy"] : []),
-];
+/** The shard-wide keys a job holds while it runs: its package, its lane, and heavy. */
+const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => {
+  const lane = laneOf(job.script);
+  return [
+    `package:${job.pkg.name}`,
+    ...(lane === "shared" ? [] : [lane]),
+    ...(isHeavy(job.pkg) ? ["heavy"] : []),
+  ];
+};
 
 /** Only a package's earliest queued script may start, so its lanes keep their order. */
 const isEarliest = (job: SuiteJob, queue: readonly SuiteJob[]) =>
@@ -515,9 +554,7 @@ const canStart = ({
   if (!isEarliest(job, queue)) return false;
   if (isHeavy(job.pkg)) return running === 0;
   const heavyWaiting = queue.some((queued) => isHeavy(queued.pkg) && isEarliest(queued, queue));
-  return (
-    !heavyWaiting && keysOf({ job, isHeavy }).every((key) => !busy.has(key)) && !busy.has("heavy")
-  );
+  return !heavyWaiting && keysOf(job, isHeavy).every((key) => !busy.has(key)) && !busy.has("heavy");
 };
 
 /** A package's single verdict from its scripts' exit codes. */
@@ -791,13 +828,20 @@ if (isEntrypoint()) {
     console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
-  // Every shard reads the same concurrency from the job's env, so they agree.
-  const split = balanceByWallTime({ items: reached, weightOf, concurrency, total: shard.total });
-  const assigned = split.groups[shard.index - 1] ?? [];
-  const expected = split.walls[shard.index - 1] ?? 0;
+  let lanes: LaneFilter;
+  try {
+    lanes = parseLanes(process.env.PACKAGE_SUITES_LANES);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  // Every shard reads the same concurrency and lanes from the job's env, so they agree.
+  const plan = planShard({ packages: reached, lanes, shard, weightOf, concurrency, excluded });
+  const { assigned } = plan;
+  console.log(`Lanes: ${lanes} (PACKAGE_SUITES_LANES).`);
   console.log(
     `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages, ` +
-      `about ${Math.round(expected)}s of suites.`,
+      `about ${Math.round(plan.seconds)}s of suites.`,
   );
   // The nightly flaky-test hunt (.github/workflows/nightly.yml) reruns the suites
   // with vitest's shuffle and seed and a JSON report each; unset, nothing changes.
@@ -834,7 +878,7 @@ if (isEntrypoint()) {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
-          ...suiteEnvFor({ job, heavy: isHeavyPackage({ weightOf, pkg: job.pkg }), cores }),
+          ...workerEnvFor({ job, heavy: isHeavyPackage({ weightOf, pkg: job.pkg }), cores }),
         },
       }),
     log: (line) => console.log(line),
@@ -851,7 +895,7 @@ if (isEntrypoint()) {
   }
 
   const statuses = await runJobs({
-    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
+    jobs: plan.jobs,
     concurrency,
     run: (job) => {
       if (extraArgsFor(job.pkg, job.script) !== undefined) return runner.run(job);

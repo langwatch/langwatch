@@ -16,15 +16,16 @@ import {
   laneOf,
   outcomeOf,
   parseConcurrency,
+  parseLanes,
   parseOnly,
   parseRegister,
   parseShard,
   parseWeights,
+  planShard,
   runJobs,
   workerEnvFor,
   scriptsFor,
   staleEntries,
-  suiteEnvFor,
   summarise,
   wallTimeOf,
   withPackage,
@@ -528,29 +529,6 @@ void describe("given a shard that runs several suites at once", () => {
     });
   });
 
-  void describe("when one package declares a browser suite and another an integration suite", () => {
-    /** @scenario "A browser suite never runs beside an integration suite" */
-    void it("never overlaps them, while the unit suites still run alongside", async () => {
-      const browser = pkg("@fix/a", ["test:browser"]);
-      const integration = pkg("@fix/b", ["test:integration"]);
-      const units = ["c", "d", "e", "f"].map((name) => pkg(`@fix/${name}`, ["test"]));
-      const { overlaps } = await pool(jobsFor([browser, integration, ...units], new Map()), 3);
-      for (const running of overlaps) {
-        const lanes = running.filter((id) => !id.endsWith(" test"));
-        assert.ok(lanes.length <= 1, running.join());
-      }
-      const besideAUnit = (lane: string) =>
-        overlaps.some(
-          (running) => running.includes(lane) && running.some((id) => id.endsWith(" test")),
-        );
-      assert.ok(besideAUnit("@fix/a test:browser"), "no unit suite ran beside the browser suite");
-      assert.ok(
-        besideAUnit("@fix/b test:integration"),
-        "no unit suite ran beside the integration suite",
-      );
-    });
-  });
-
   void describe("when a package has a unit suite and an integration suite", () => {
     /** @scenario "A package's own suites run one after another, in order" */
     void it("starts its integration suite only after its unit suite finished", async () => {
@@ -639,20 +617,6 @@ void describe("given a suite the shard is about to start", () => {
       for (const { job: suite, heavy } of cases) {
         assert.deepEqual(workerEnvFor({ job: suite, heavy, cores: 4 }), {});
       }
-    });
-  });
-
-  void describe("when it may start containers", () => {
-    /** @scenario "Ryuk is off for every suite" */
-    void it("turns testcontainers' Ryuk off for every lane, and keeps the worker count", () => {
-      for (const script of ["test", "test:integration", "test:browser"]) {
-        const env = suiteEnvFor({ job: job("@fix/trace", script), heavy: false, cores: 4 });
-        assert.deepEqual(env, { TESTCONTAINERS_RYUK_DISABLED: "true" });
-      }
-      assert.deepEqual(suiteEnvFor({ job: job("@fix/trace", "test"), heavy: true, cores: 4 }), {
-        TESTCONTAINERS_RYUK_DISABLED: "true",
-        VITEST_MAX_WORKERS: "4",
-      });
     });
   });
 });
@@ -800,13 +764,12 @@ void describe("given the job is split into shards", () => {
     /** @scenario "Shards are balanced by the wall time each package adds" */
     void it("spreads a light package's weight over its scripts' lanes", () => {
       const load = withPackage({
-        load: { alone: 0, shared: 0, serial: 0 },
+        load: { alone: 0, shared: 0, integration: 0, browser: 0 },
         weight: 60,
         scripts: ["test", "test:integration", "test:browser"],
       });
-      // The integration and browser suites run one after the other: 20 + 20, not 60 / 2.
-      assert.deepEqual(load, { alone: 0, shared: 60, serial: 40 });
-      assert.equal(wallTimeOf({ load, concurrency: 2 }), 40);
+      assert.deepEqual(load, { alone: 0, shared: 60, integration: 20, browser: 20 });
+      assert.equal(wallTimeOf({ load, concurrency: 2 }), 30);
     });
 
     /** @scenario "Every shard computes the same split" */
@@ -931,5 +894,66 @@ void describe("given a suite script", () => {
     for (const script of ["test:integration", "test:browser"]) {
       assert.deepEqual(commandFor({ pkg, script }), ["--filter", "@fix/a", "run", script]);
     }
+  });
+});
+
+void describe("given the lanes a leg of the job runs", () => {
+  // A browser suite's Chromium aborts with ERR_NETWORK_CHANGED when a container starts beside it.
+  const workspace = [
+    pkg("@fix/web", ["test", "test:integration", "test:browser"]),
+    pkg("@fix/unit", ["test:unit"]),
+    pkg("@fix/canvas", ["test:browser"]),
+    pkg("@fix/store", ["test:integration"]),
+  ];
+  const scheduled = ({ lanes, index, total }: { lanes: string; index: number; total: number }) =>
+    planShard({
+      packages: workspace,
+      lanes: parseLanes(lanes),
+      shard: { index, total },
+      weightOf: () => DEFAULT_WEIGHT_SECONDS,
+      concurrency: 2,
+      excluded: new Map(),
+    }).jobs.map((job) => `${job.pkg.name} ${job.script}`);
+
+  void describe("when the leg runs the browser lanes", () => {
+    /** @scenario "Browser suites run on their own runner, never beside a suite that starts containers" */
+    void it("schedules every browser suite and nothing else", () => {
+      assert.deepEqual(scheduled({ lanes: "browser", index: 1, total: 1 }).toSorted(), [
+        "@fix/canvas test:browser",
+        "@fix/web test:browser",
+      ]);
+    });
+  });
+
+  void describe("when the leg runs everything but the browser lanes", () => {
+    /** @scenario "Browser suites run on their own runner, never beside a suite that starts containers" */
+    void it("schedules no browser suite on any shard, and every other suite on one", () => {
+      const total = 3;
+      const shards = Array.from({ length: total }, (_, i) =>
+        scheduled({ lanes: "no-browser", index: i + 1, total }),
+      );
+      // Every shard's jobs together: no browser lane, and each other script exactly once.
+      assert.deepEqual(shards.flat().toSorted(), [
+        "@fix/store test:integration",
+        "@fix/unit test:unit",
+        "@fix/web test",
+        "@fix/web test:integration",
+      ]);
+    });
+  });
+
+  void describe("when no lane filter is set", () => {
+    /** @scenario "Without a lane filter every lane runs" */
+    void it("schedules every lane, as a local run always has", () => {
+      assert.equal(parseLanes(undefined), "all");
+      assert.equal(scheduled({ lanes: "", index: 1, total: 1 }).length, 6);
+    });
+  });
+
+  void describe("when the lane filter is malformed", () => {
+    /** @scenario "Without a lane filter every lane runs" */
+    void it("refuses it rather than running every lane on every leg", () => {
+      assert.throws(() => parseLanes("chromium"));
+    });
   });
 });

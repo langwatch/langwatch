@@ -18,10 +18,6 @@ Feature: The real-browser test lane runs, and only where React is
   # by construction, and a lane whose glob matches nothing fails instead of
   # passing.
 
-  # The lane never runs beside an integration suite, whose containers can change the
-  # runner's network and make Chromium abort its page loads: see "A browser suite
-  # never runs beside an integration suite" in package-suite-integration-lane.feature.
-
   Background:
     Given the browser lane runs in a real Chromium through Playwright
     And the jsdom lane remains the default for component tests
@@ -58,6 +54,27 @@ Feature: The real-browser test lane runs, and only where React is
       And the package's browser configuration would not collect it
       When the lane is checked
       Then the check fails naming the uncollected file
+
+  # Bound by .github/scripts/run-package-suites.test.ts (the scheduler) and
+  # tools/ciguard/mainsuites_test.go (the workflow's legs).
+  Rule: browser suites run on a runner of their own
+
+    # A suite that starts a container changes the runner's network, and Chromium
+    # in a browser suite running beside it aborts with ERR_NETWORK_CHANGED.
+
+    @unit
+    Scenario: Browser suites run on their own runner, never beside a suite that starts containers
+      Given the package suites job is split into legs
+      When each leg schedules its suites
+      Then one leg runs every browser suite and no other suite
+      And every other leg runs every suite except the browser suites
+
+    @unit
+    Scenario: Without a lane filter every lane runs
+      Given the package suites run with no lane filter set
+      When the suites are scheduled
+      Then every lane runs, browser suites included, as a local run always has
+      And a lane filter other than browser or no-browser is refused
 
   Rule: React testing dependencies belong only to web packages
 

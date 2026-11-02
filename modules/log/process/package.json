@@ -17,8 +17,7 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run --fsModuleCache --exclude \"**/*.integration.test.ts\"",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test": "vitest run --fsModuleCache"
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",
