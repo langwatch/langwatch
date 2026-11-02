@@ -85,7 +85,8 @@ export const organizationProcessModule: PublishedProcessModule<
       id: "organization:record-seat-peak-opening-snapshots",
       kind: "data",
       mode: "background",
-      needsOldWritersGone: false,
+      // An old pod moves seats without recording the change, so a snapshot then misses it.
+      needsOldWritersGone: true,
       description:
         "Records every organization's seat holders as they stand, to open its seat peak.",
       run: async ({ checkpoint, dryRun, signal }) => {
