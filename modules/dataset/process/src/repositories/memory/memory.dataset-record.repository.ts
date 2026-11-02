@@ -150,6 +150,16 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     return this.#database.removeRecords(input);
   }
 
+  async replaceAll(input: {
+    datasetId: string;
+    projectId: string;
+    entries: (DatasetRecordInput & { id: string })[];
+  }): Promise<void> {
+    const recordIds = this.#of(input).map((record) => record.id);
+    this.#database.removeRecords({ ...input, recordIds });
+    await this.createMany(input);
+  }
+
   #of(input: { datasetId: string; projectId: string }): DatasetRecord[] {
     return this.#database
       .records()

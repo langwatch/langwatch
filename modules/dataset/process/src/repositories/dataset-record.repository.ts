@@ -36,4 +36,10 @@ export interface DatasetRecordRepository {
     entry: Record<string, unknown>;
   }): Promise<DatasetRecord>;
   deleteMany(input: { datasetId: string; projectId: string; recordIds: string[] }): Promise<number>;
+  /** Replaces every entry of the dataset at once: a failure part way keeps the old entries. */
+  replaceAll(input: {
+    datasetId: string;
+    projectId: string;
+    entries: (DatasetRecordInput & { id: string })[];
+  }): Promise<void>;
 }

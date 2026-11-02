@@ -280,6 +280,38 @@ function contractCases(backend: Backend): void {
 
       expect(remaining.records.map((record) => record.id)).toEqual(["delete-2"]);
     });
+
+    it("replaces every entry of the dataset with the ones it is given", async () => {
+      const dataset = await create("replaced");
+      const other = await create("kept");
+      const projectId = backend.mine();
+      await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId,
+        entries: [{ id: "old-1", input: "one" }],
+      });
+      await backend.records().createMany({
+        datasetId: other.id,
+        projectId,
+        entries: [{ id: "other-1", input: "kept" }],
+      });
+
+      await backend.records().replaceAll({
+        datasetId: dataset.id,
+        projectId,
+        entries: [
+          { id: "new-1", input: "uno" },
+          { id: "new-2", input: "dos" },
+        ],
+      });
+
+      const ids = async (datasetId: string) =>
+        (await backend.records().listAll({ datasetId, projectId, page: 1, limit: 50 })).records.map(
+          (record) => record.id,
+        );
+      expect(await ids(dataset.id)).toEqual(["new-1", "new-2"]);
+      expect(await ids(other.id)).toEqual(["other-1"]);
+    });
   });
 
   describe("when a storage migration pages the project's datasets", () => {

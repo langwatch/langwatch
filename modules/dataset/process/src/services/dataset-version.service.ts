@@ -470,23 +470,8 @@ export class DatasetVersionService {
       return;
     }
 
-    let existing: string[];
-    do {
-      const page = await this.deps.records.listAll({ datasetId, projectId, page: 1, limit: 1000 });
-      existing = page.records.map((record) => record.id);
-      if (existing.length > 0) {
-        await this.deps.records.deleteMany({ datasetId, projectId, recordIds: existing });
-      }
-    } while (existing.length > 0);
-    for (let start = 0; start < rows.length; start += RECORD_PAGE_SIZE) {
-      await this.deps.records.createMany({
-        datasetId,
-        projectId,
-        entries: rows
-          .slice(start, start + RECORD_PAGE_SIZE)
-          .map((row) => ({ ...row.entry, id: row.id })),
-      });
-    }
+    const entries = rows.map((row) => ({ ...row.entry, id: row.id }));
+    await this.deps.records.replaceAll({ datasetId, projectId, entries });
     await this.deps.content.update({ id: datasetId, projectId, data: { columnTypes: columns } });
     logger.info({ projectId, datasetId, rows: rows.length }, "Restored a dataset version in place");
   }
