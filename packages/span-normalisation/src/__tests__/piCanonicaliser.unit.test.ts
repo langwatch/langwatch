@@ -93,7 +93,7 @@ describe("the pi canonicaliser", () => {
   });
 
   /** @scenario "Cache-write and reasoning tokens are lifted as their own token types" */
-  it("keeps pi's input count as sent, since it already leaves the cache out", () => {
+  it("keeps pi's input count as sent when pi's total shows it leaves the cache out", () => {
     const { attributes } = canonicaliseWholeChain({
       name: "pi.ai.request",
       spanAttributes: {
@@ -103,14 +103,35 @@ describe("the pi canonicaliser", () => {
         "pi.ai.usage.output_tokens": 30,
         "pi.ai.usage.cache_read_tokens": 400,
         "pi.ai.usage.cache_write_tokens": 90,
+        "pi.ai.usage.total_tokens": 1420,
         "pi.session.id": "s-1",
       },
     });
 
-    // Fresh input exceeds the cache counts, the case where restating would subtract them.
+    expect(attributes[ATTR_KEYS.GEN_AI_USAGE_TOTAL_TOKENS]).toBe(1420);
     expect(attributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(900);
     expect(attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(400);
     expect(attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(90);
+  });
+
+  /** @scenario "Cache-write and reasoning tokens are lifted as their own token types" */
+  it("takes the cache out of pi's input when pi's total shows the input includes it", () => {
+    const { attributes } = canonicaliseWholeChain({
+      name: "pi.ai.request",
+      spanAttributes: {
+        "gen_ai.usage.input_tokens": 900,
+        "gen_ai.usage.output_tokens": 30,
+        "pi.ai.usage.input_tokens": 900,
+        "pi.ai.usage.output_tokens": 30,
+        "pi.ai.usage.cache_read_tokens": 400,
+        "pi.ai.usage.cache_write_tokens": 90,
+        "pi.ai.usage.total_tokens": 930,
+        "pi.session.id": "s-1",
+      },
+    });
+
+    // Charging 900 as fresh would price the 490 cached tokens twice.
+    expect(attributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(410);
   });
 
   /** @scenario "pi's reported cost survives beside the computed cost, never as it" */

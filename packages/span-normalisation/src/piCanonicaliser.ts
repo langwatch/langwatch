@@ -11,11 +11,7 @@ import {
   hasAttributeWithPrefix,
   takeAttribute,
 } from "./canonicalAttributes.ts";
-import {
-  extractModelToBoth,
-  inferSpanTypeIfAbsent,
-  markInputAsFresh,
-} from "./canonicalExtraction.ts";
+import { extractModelToBoth, inferSpanTypeIfAbsent } from "./canonicalExtraction.ts";
 import { asNumber, isNonEmptyString } from "./canonicalGuard.ts";
 
 const PI_ATTR_PREFIX = "pi.";
@@ -30,10 +26,11 @@ const SPAN_NAME_TO_SPAN_TYPE: Record<string, string> = {
 
 /**
  * pi's token spellings → the canonical key for each. Plain input and output are
- * absent: the GenAI adapter takes those from pi's dual-written convention keys,
- * and reading a count twice is how a token total ends up doubled.
+ * absent: the GenAI adapter takes those from pi's dual-written convention keys.
+ * The total lets the fresh-input pass tell whether pi's input already excludes cache.
  */
 const TOKEN_LIFTS: readonly (readonly [string, string])[] = [
+  ["pi.ai.usage.total_tokens", ATTR_KEYS.GEN_AI_USAGE_TOTAL_TOKENS],
   ["pi.ai.usage.cache_read_tokens", ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
   ["pi.ai.usage.cache_write_tokens", ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS],
   ["pi.ai.usage.reasoning_tokens", ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS],
@@ -84,16 +81,6 @@ export class PiCanonicaliserService implements AttributeCanonicaliser {
       takeAttribute(ctx.bag.attrs, sourceKey);
       ctx.setAttr(canonicalKey, tokens);
       ctx.recordRule(`${this.id}:${sourceKey}`);
-    }
-
-    // pi-ai reports input with the cache reads and writes already taken out, so
-    // restating it as the fresh remainder would subtract the cache a second time.
-    const hasInput =
-      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
-      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== void 0 ||
-      ctx.bag.attrs.has("pi.ai.usage.input_tokens");
-    if (hasInput) {
-      markInputAsFresh(ctx, { ruleId: `${this.id}:usage.input_tokens(fresh as sent)` });
     }
   }
 
