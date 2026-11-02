@@ -754,7 +754,7 @@ type Response = z.infer<typeof datasetVersionPageSchema>; // ../contract/src/dat
 
 Restore a dataset version
 
-Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:643`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:644`.
 
 Answers at `/api/dataset/:slugOrId/versions/:version/restore`, `/api/v1/dataset/:slugOrId/versions/:version/restore`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/versions/:version/restore`, `/api/v1/dataset/2026-08-07/:slugOrId/versions/:version/restore`, `/api/dataset/latest/:slugOrId/versions/:version/restore`, `/api/v1/dataset/latest/:slugOrId/versions/:version/restore`.
 
