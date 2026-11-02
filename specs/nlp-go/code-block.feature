@@ -475,3 +475,31 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the engine is asked to execute it
       Then the response status field is "error"
       And the error type is "invalid_workflow"
+
+  Rule: The engine hides its process files, or says plainly that it cannot
+
+    # AWS Lambda's seccomp answers EPERM to prctl(PR_SET_DUMPABLE). The mode is
+    # decided once at start-up; see _shared/contract.md §7.
+
+    @integration
+    Scenario: a platform that lets the engine hide its process files runs code blocks in strict mode
+      Given the platform accepts PR_SET_DUMPABLE
+      When a trivial code block runs
+      Then it returns its value
+      And the runner must hide itself or the run fails
+
+    @integration
+    Scenario: a platform that refuses the hide step runs code blocks when visible-process is allowed
+      Given the platform refuses PR_SET_DUMPABLE
+      And visible-process mode is allowed on AWS Lambda
+      When a trivial code block runs
+      Then it returns its value
+      And the runner continues past its refused hide step
+
+    @integration
+    Scenario: a platform that refuses the hide step serves no code blocks unless visible-process is allowed
+      Given the platform refuses PR_SET_DUMPABLE
+      And visible-process mode is not allowed
+      When a code block runs
+      Then the result carries an error that names NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS
+      And the other block types keep working

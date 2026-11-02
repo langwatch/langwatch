@@ -322,3 +322,27 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS=7)", got, want)
 	}
 }
+
+func TestAllowVisibleProcess_OnlyOnLambda(t *testing.T) {
+	lambda := map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn", "AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}
+	for _, tc := range []struct {
+		name    string
+		setting bool
+		env     map[string]string
+		want    bool
+	}{
+		{"setting off, on Lambda", false, lambda, false},
+		{"setting on, on Lambda", true, lambda, true},
+		{"setting on, no Lambda variables", true, nil, false},
+		{"setting on, function name only", true, map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn"}, false},
+		{"setting on, runtime API only", true, map[string]string{"AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}, false},
+		{"setting off, no Lambda variables", false, nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := allowVisibleProcess(tc.setting, func(k string) string { return tc.env[k] }, zap.NewNop())
+			if got != tc.want {
+				t.Errorf("allowVisibleProcess = %v; want %v", got, tc.want)
+			}
+		})
+	}
+}

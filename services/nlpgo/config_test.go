@@ -124,3 +124,18 @@ func TestBlockTimeoutDefaultsMatchTodaysHardcodedValues(t *testing.T) {
 		}
 	}
 }
+
+func TestCodeBlockAllowVisibleProcessHydrates(t *testing.T) {
+	for value, want := range map[string]bool{"true": true, "1": true, "false": false} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS", value)
+			cfg, err := LoadConfig(t.Context())
+			if err != nil {
+				t.Fatalf("LoadConfig: %v", err)
+			}
+			if cfg.Engine.CodeBlockAllowVisibleProcess != want {
+				t.Errorf("hydrated %q to %v; want %v", value, cfg.Engine.CodeBlockAllowVisibleProcess, want)
+			}
+		})
+	}
+}

@@ -26,13 +26,12 @@ import (
 // installs one; the parent reports the child's verdict.
 
 const (
-	caseEnv         = "NLPGO_TEST_HIDE_CASE"
-	allowSettingEnv = "NLPGO_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
-	lambdaEnv       = "AWS_LAMBDA_FUNCTION_NAME"
-	hideModeEnv     = "NLPGO_CODE_BLOCK_HIDE"
-	skipExitCode    = 77
-	childTimeout    = 90 * time.Second
-	trivialBlock    = "def execute():\n    return {'answer': 42}\n"
+	caseEnv      = "NLPGO_TEST_HIDE_CASE"
+	settingName  = "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
+	hideModeEnv  = "NLPGO_CODE_BLOCK_HIDE"
+	skipExitCode = 77
+	childTimeout = 90 * time.Second
+	trivialBlock = "def execute():\n    return {'answer': 42}\n"
 )
 
 // seccompNumbers returns the syscall numbers of seccomp(2) and prctl(2) and the
@@ -91,7 +90,7 @@ func childEnvFor(name string, extra ...string) []string {
 	env := []string{}
 	for _, kv := range os.Environ() {
 		switch strings.SplitN(kv, "=", 2)[0] {
-		case caseEnv, allowSettingEnv, lambdaEnv, hideModeEnv:
+		case caseEnv, hideModeEnv:
 			continue
 		}
 		env = append(env, kv)
@@ -120,39 +119,19 @@ func runChild(t *testing.T, name string, extra ...string) {
 	require.NoError(t, err, "child case %s failed:\n%s", name, out.String())
 }
 
-// errorText is the message a refused-and-not-allowed run reports, wherever the
-// implementation puts it: the returned error or the result's Error.
-func errorText(res *codeblock.Result, err error) string {
-	if err != nil {
-		return err.Error()
-	}
-	if res != nil && res.Error != nil {
-		return res.Error.Message
-	}
-	return ""
+/** @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode" */
+func TestHideRefused_StrictWhenPlatformAllowsIt(t *testing.T) {
+	runChild(t, "not-refused")
 }
 
-func TestHideRefused_WhenLambdaRefusesPrSetDumpable(t *testing.T) {
-	t.Run("given the setting is unset", func(t *testing.T) {
-		t.Run("the error names the setting and the engine stays alive", func(t *testing.T) {
-			runChild(t, "refused-unset")
-		})
-	})
-	t.Run("given the setting is true on Lambda", func(t *testing.T) {
-		t.Run("a trivial code block returns its value", func(t *testing.T) {
-			runChild(t, "refused-allowed-lambda", allowSettingEnv+"=true", lambdaEnv+"=test")
-		})
-	})
-	t.Run("given the setting is true off Lambda", func(t *testing.T) {
-		t.Run("the setting is ignored and the error names it", func(t *testing.T) {
-			runChild(t, "refused-allowed-off-lambda", allowSettingEnv+"=true")
-		})
-	})
-	t.Run("given the platform allows PR_SET_DUMPABLE", func(t *testing.T) {
-		t.Run("a trivial code block returns its value in strict mode", func(t *testing.T) {
-			runChild(t, "not-refused")
-		})
-	})
+/** @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed" */
+func TestHideRefused_VisibleProcessWhenAllowed(t *testing.T) {
+	runChild(t, "refused-allowed")
+}
+
+/** @scenario "a platform that refuses the hide step serves no code blocks unless visible-process is allowed" */
+func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
+	runChild(t, "refused-unset")
 }
 
 func TestHideRefused_RunnerHideStep(t *testing.T) {
@@ -191,7 +170,8 @@ func TestHideRefusedChild(t *testing.T) {
 
 func runExecutorCase(t *testing.T, name string) {
 	exe, err := codeblock.New(codeblock.Options{
-		AllowVisibleProcess: os.Getenv(allowSettingEnv) == "true",
+		AllowVisibleProcess:        name == "refused-allowed",
+		AllowVisibleProcessSetting: settingName,
 	})
 	require.NoError(t, err, "codeblock.New must never abort the engine over PR_SET_DUMPABLE")
 
@@ -202,8 +182,11 @@ func runExecutorCase(t *testing.T, name string) {
 	})
 
 	switch name {
-	case "refused-unset", "refused-allowed-off-lambda":
-		assert.Contains(t, errorText(res, runErr), allowSettingEnv)
+	case "refused-unset":
+		require.NoError(t, runErr)
+		require.NotNil(t, res)
+		require.NotNil(t, res.Error)
+		assert.Contains(t, res.Error.Message, settingName)
 	default:
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
@@ -235,4 +218,6 @@ func runRunnerCase(t *testing.T, name string) {
 		return
 	}
 	assert.NotContains(t, stderr.String(), hideFailure, "best-effort must continue past the refused prctl")
+	// The next thing the runner does is ask for its payload; this harness has none.
+	assert.Contains(t, stderr.String(), "runner: invalid JSON in the payload")
 }

@@ -106,34 +106,23 @@ from __future__ import annotations
 import os
 import sys
 
-# FIRST, before the payload is asked for: take this process's own /proc
-# files away from everything running as the same user. Every code block
-# in the container runs as that user, so without this one execution
-# reads another's open descriptors, its initial variables and the path
-# of its working directory. State and the command line stay readable,
-# which is what the engine's teardown uses.
-#
-# nlpgo hands this process nothing of the run, so there is nothing to
-# read until this has happened: the payload is asked for below, over a
-# socket the engine answers by the kernel's own idea of who is asking.
-#
-# On Linux this has to work, which is why nothing here is caught: a
-# failure is the one state in which the payload would arrive into a
-# process another execution can read, so the run fails instead. There
-# is nothing to hide anywhere else: no /proc, and no prctl.
+# FIRST, before the payload is asked for: make this process's /proc files
+# unreadable to other executions running as the same user. A failure ends
+# the run, except on AWS Lambda, where seccomp refuses it and the engine
+# sets NLPGO_CODE_BLOCK_HIDE=best-effort. Rationale: specs/nlp-go/_shared/contract.md §7.
 _PR_SET_DUMPABLE = 4
 
 
 def _hide_from_other_executions() -> None:
+    # Popped so user code does not inherit the switch.
+    best_effort = os.environ.pop("NLPGO_CODE_BLOCK_HIDE", "") == "best-effort"
     if not sys.platform.startswith("linux"):
         return
 
     import ctypes
 
     libc = ctypes.CDLL(None, use_errno=True)
-    if libc.prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) != 0:
-        if os.environ.get("NLPGO_CODE_BLOCK_HIDE") == "best-effort":
-            return
+    if libc.prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) != 0 and not best_effort:
         raise OSError(ctypes.get_errno(), "prctl(PR_SET_DUMPABLE) failed")
 
 

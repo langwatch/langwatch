@@ -84,6 +84,7 @@ func enableProcessHardening() {
 		_, _, errno := syscall.Syscall(syscall.SYS_PRCTL, prSetChildSubreaper, 1, 0)
 		subreaperActive = errno == 0
 		_, _, errno = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
+		// A refusal is recorded, not fatal; resolveHideMode turns it into a mode.
 		hideRefused = errno != 0
 	})
 }
