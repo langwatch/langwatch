@@ -242,7 +242,14 @@ describe.skipIf(!DB_URL)("organization's seat changes (Postgres)", () => {
       const organizationId = await organization("domain");
       const userId = await person("domain");
 
-      await members.createSsoDomainMembership({ organizationId, userId });
+      await members.createMembership({
+        organizationId,
+        userId,
+        pendingAdmissionId: `rolebinding_${nanoid(8)}`,
+        via: "domain-join",
+        seat: "MEMBER",
+        pending: false,
+      });
 
       expect(await seatChanges(organizationId)).toEqual([
         expect.objectContaining({

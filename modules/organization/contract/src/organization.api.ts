@@ -454,13 +454,6 @@ export interface OrganizationApi {
   findBySsoDomain(
     input: Readonly<{ domain: string }>,
   ): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
-  /**
-   * Writes the plain MEMBER row an SSO domain auto-join admits (ADR-116); the caller grants
-   * the seat itself. A row already there is `"already-present"`: a concurrent callback.
-   */
-  createSsoDomainMembership(
-    input: Readonly<{ organizationId: string; userId: string }>,
-  ): Promise<"created" | "already-present">;
   /** How many organizations this person has a membership row in, disabled ones included. */
   countMembershipsForUser(input: Readonly<{ userId: string }>): Promise<number>;
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;

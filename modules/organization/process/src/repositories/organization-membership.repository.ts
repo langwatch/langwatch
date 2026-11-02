@@ -392,12 +392,6 @@ export abstract class OrganizationMembershipRepository {
     actorUserId?: string | null;
   }) => Promise<OrganizationAdmission>;
 
-  /** The plain MEMBER row an SSO domain auto-join writes; an existing row is "already-present". */
-  abstract createSsoDomainMembership: (input: {
-    organizationId: string;
-    userId: string;
-  }) => Promise<"created" | "already-present">;
-
   /** Every membership row the person holds, disabled ones included. */
   abstract countMembershipsForUser: (input: { userId: string }) => Promise<number>;
 
