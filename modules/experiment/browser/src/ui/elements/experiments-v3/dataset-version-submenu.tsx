@@ -6,11 +6,11 @@ import type { DatasetVersionOption } from "../../../behavior/experiments-v3/use-
 
 const LATEST = "latest";
 
-export const DATASET_VERSION_PIN_HINT =
+const DATASET_VERSION_PIN_HINT =
   "Runs started from the API, CI or an SDK read this version. Runs started on this page use the rows shown here.";
 
 /** How one version reads in the menu: its number, then its name when it has one. */
-export const datasetVersionLabel = ({ version, name }: DatasetVersionOption): string =>
+const datasetVersionLabel = ({ version, name }: DatasetVersionOption): string =>
   name ? `Version ${version} · ${name}` : `Version ${version}`;
 
 /** The short pin a dataset tab shows: "v3", or nothing for the latest content. */
