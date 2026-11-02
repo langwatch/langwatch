@@ -188,7 +188,7 @@ func TestRedactor_TrimPartialTailKeepsWholeSecretsAndOrdinaryText(t *testing.T) 
 	assert.Equal(t, "ok SECRETVALUE", r.TrimPartialTail("ok SECRETVALUE"))
 	assert.Equal(t, "plain text\n", r.TrimPartialTail("plain text\n"))
 	assert.Equal(t, "ok ", r.TrimPartialTail("ok SECR"))
-	assert.Equal(t, "", r.TrimPartialTail("SECR"))
+	assert.Empty(t, r.TrimPartialTail("SECR"))
 }
 
 func TestRedactor_TrimPartialTailTrimsOnceAndDoesNotEatTheTextBeforeIt(t *testing.T) {
