@@ -130,6 +130,7 @@ export class OrganizationMemberAdmissionService {
       seat: decided.role,
       pending: decided.pending,
       ...(origin === undefined ? {} : { origin }),
+      actorUserId: admittedBy?.actor.type === "user" ? admittedBy.actor.id : null,
     });
     if (
       admission.outcome !== "created" ||
