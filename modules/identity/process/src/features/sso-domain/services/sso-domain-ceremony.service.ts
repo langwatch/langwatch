@@ -279,7 +279,9 @@ export class SsoDomainCeremonyService {
     const fetched = await this.deps.files.fetchVerificationFile({ domain, url });
     if (fetched.outcome === "unreachable") {
       throw new SsoDomainLookupFailedError(
-        `connection ${connectionId}: ${url} could not be fetched (${fetched.reason})`,
+        fetched.reason === "proxy_misconfigured"
+          ? `connection ${connectionId}: the outbound proxy setting is not a valid proxy URL, so ${url} was not fetched`
+          : `connection ${connectionId}: ${url} could not be fetched (${fetched.reason})`,
       );
     }
 

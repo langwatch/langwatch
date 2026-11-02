@@ -63,7 +63,9 @@ export class SsoIdpRegistrationService {
     const answer = await this.deps.discovery.discover({ issuer: registration.issuer });
     if (!answer.reachable) {
       throw new SsoIssuerUnreachableError(
-        `discovery at ${registration.issuer} did not answer: ${answer.reason}`,
+        answer.reason === "proxy_misconfigured"
+          ? `the outbound proxy setting is not a valid proxy URL, so discovery at ${registration.issuer} was not attempted`
+          : `discovery at ${registration.issuer} did not answer: ${answer.reason}`,
       );
     }
     const named = answer.issuer;
