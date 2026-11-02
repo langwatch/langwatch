@@ -103,6 +103,11 @@ export interface RunHookOptions {
    */
   healRevokedKey?: Parameters<typeof hookCommand>[0]["healRevokedKey"];
   /**
+   * The agent's own wiring, as read from its settings file. Defaults to
+   * none, so no test ever reads this machine's real ~/.claude or ~/.codex.
+   */
+  readWiredTarget?: Parameters<typeof hookCommand>[0]["readWiredTarget"];
+  /**
    * Run with no exporter variables at all, the way Claude Code hands its hooks
    * an environment. Every other run seeds `OTEL_EXPORTER_OTLP_ENDPOINT`.
    */
@@ -189,6 +194,7 @@ export const installHookHarness = (): HookHarness => {
       claudeRegistryDir,
       readCliConfig = NO_CLI_CONFIG,
       healRevokedKey = async () => ({ status: "declined" }) as const,
+      readWiredTarget = () => null,
       shouldOmitExporterEnv = false,
     }: RunHookOptions = {}) =>
       hookCommand({
@@ -206,6 +212,7 @@ export const installHookHarness = (): HookHarness => {
         claudeRegistryDir: claudeRegistryDir ?? path.join(stateDir, "claude-sessions"),
         readCliConfig,
         healRevokedKey,
+        readWiredTarget,
       }),
   };
 };
