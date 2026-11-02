@@ -384,6 +384,15 @@ func TestOverlayNeverEmitsLangwatchApiKey(t *testing.T) {
 	}
 }
 
+// TestOverlayGivesTheSeededLegacyKeyFullAccess pins that the seeded local key, a legacy
+// project key, reaches every route on a haven stack, not only ingestion.
+func TestOverlayGivesTheSeededLegacyKeyFullAccess(t *testing.T) {
+	st := Stack{Slug: "portless", APIPort: 1, LocalAPIKey: DefaultLocalAPIKey}
+	if got := valueOf(st.OverlayEnv(), "LEGACY_PROJECT_KEY_FULL_ACCESS"); got != "1" {
+		t.Errorf("LEGACY_PROJECT_KEY_FULL_ACCESS = %q, want 1", got)
+	}
+}
+
 // TestOverlayLeavesNxCacheLocationToNx pins ADR-150's shared cache: Nx 23 already
 // shares one cache and its index across every checkout (~/.nx/<id>), and any of
 // these variables makes it fall back to a per-checkout index over that cache.

@@ -30,6 +30,7 @@ export type MemoryUserRow = {
   joinOfferDismissedDomains: readonly string[];
   /** Topic to choice; a topic that is absent was never answered. */
   notificationPreferences: Readonly<Record<string, UserNotificationChoice>>;
+  passwordResetRequiredAt?: Instant | null;
 };
 
 type MemoryUserAccountRow = {

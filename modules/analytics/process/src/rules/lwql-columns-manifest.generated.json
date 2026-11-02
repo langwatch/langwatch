@@ -343,6 +343,11 @@
           "name": "Branch",
           "type": "String",
           "comment": ""
+        },
+        {
+          "name": "AiUnits",
+          "type": "Float64",
+          "comment": ""
         }
       ]
     },

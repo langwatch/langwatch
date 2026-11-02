@@ -6,6 +6,7 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { Badge, Box, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import {
@@ -26,6 +27,8 @@ export type OnlineEvaluationRow = {
   name: string;
   checkType: string;
   enabled: boolean;
+  /** Why the monitor paused itself, while it stays paused. */
+  autoPausedReason?: string | null;
   executionMode: string;
   performance?: OnlineEvaluationPerformance;
   hasPerformanceError?: boolean;
@@ -89,15 +92,23 @@ export const OnlineEvaluationsTable = ({
               </Badge>
             </ListTable.Cell>
             <ListTable.Cell>
-              <HStack gap={2}>
-                <Box
-                  width="6px"
-                  height="6px"
-                  borderRadius="full"
-                  background={row.enabled ? "green.solid" : "fg.subtle"}
-                />
-                <Text textStyle="sm">{row.enabled ? "Active" : "Paused"}</Text>
-              </HStack>
+              {row.autoPausedReason ? (
+                <Tooltip content={`Paused automatically: ${row.autoPausedReason}`} showArrow>
+                  <Badge colorPalette="orange" variant="subtle" data-testid="monitor-auto-paused">
+                    Paused automatically
+                  </Badge>
+                </Tooltip>
+              ) : (
+                <HStack gap={2}>
+                  <Box
+                    width="6px"
+                    height="6px"
+                    borderRadius="full"
+                    background={row.enabled ? "green.solid" : "fg.subtle"}
+                  />
+                  <Text textStyle="sm">{row.enabled ? "Active" : "Paused"}</Text>
+                </HStack>
+              )}
             </ListTable.Cell>
             <ListTable.Cell>
               {canViewAnalytics ? (

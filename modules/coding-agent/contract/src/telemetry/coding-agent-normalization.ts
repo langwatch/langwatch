@@ -2,6 +2,7 @@
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
 
+import { splitLeadingContextBlocks } from "../leading-context.ts";
 import type {
   CodingAgent,
   CodingAgentEvent,
@@ -9,6 +10,7 @@ import type {
   CodingAgentSignal,
   TokenType,
 } from "./coding-agent-definition.ts";
+import { pickString } from "./coding-agent-span.ts";
 import { CODING_AGENT_REGISTRY } from "./index.ts";
 
 /** Detect agent from record name (reliable signal), not scope (varies by vendor). */
@@ -270,6 +272,8 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "gen_ai.usage.cache_read.input_tokens",
   "gen_ai.usage.cache_creation.input_tokens",
   "codex.turn.token_usage.non_cached_input_tokens",
+  // The GenAI tool span's own name for the tool it ran (Copilot's execute_tool).
+  "gen_ai.tool.name",
   // Codex's tool_result events spell the MCP server as a bare `mcp_server`.
   "mcp_server",
   "mcp_server.name",
@@ -349,16 +353,19 @@ export const SESSION_NAME_FACT_KEY = "langwatch.session.name";
  */
 export const WITHHELD_PROMPT_TEXT = "[REDACTED]";
 
+/** The GenAI semconv operation of a tool run span. */
+const GEN_AI_TOOL_RUN_OPERATION = "execute_tool";
+
 /** The most of a prompt that becomes a session's name. */
 const MAX_PROMPT_TITLE_CHARS = 120;
 
 /**
- * A session name out of a prompt's text, or null when it can't name one: withheld text, an
- * empty string, or a machine-injected turn (agents wrap notifications as user turns, and a
- * session named `<task-notification>` names nothing). Otherwise the first line, capped.
+ * A session name out of a prompt's first line, or null for withheld text, nothing, or a
+ * machine-injected turn (`<task-notification>` names nothing). Complete context blocks put
+ * before the human's words (Copilot's `<current_datetime>`) are peeled first.
  */
 export function deriveSessionTitleFromPrompt(text: string): string | null {
-  const trimmed = text.trim();
+  const trimmed = splitLeadingContextBlocks(text).body.trim();
   if (trimmed === "" || trimmed === WITHHELD_PROMPT_TEXT) return null;
   if (trimmed.startsWith("<")) return null;
   const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? "";
@@ -481,6 +488,11 @@ export function deriveToolName({
 
   const name = spanName ?? "";
   if (name.length === 0) return null;
+  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute.
+  if (name.split(" ", 1)[0] === GEN_AI_TOOL_RUN_OPERATION) {
+    const declared = pickFirstString(attrs, ["gen_ai.tool.name"]);
+    if (declared !== null) return declared;
+  }
   for (const agent of CODING_AGENT_REGISTRY) {
     const tool = agent.extractToolNameFromSpanName?.(name) ?? null;
     if (tool !== null) return tool;
@@ -510,10 +522,11 @@ export function parseMcpToolName(
   return { server, tool };
 }
 
+/** Flat keys at ingest; nested by their dots once the trace read hands a span over. */
 function pickFirstString(attrs: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
-    const value = attrs[key];
-    if (typeof value === "string" && value.length > 0) return value;
+    const value = pickString(attrs, key);
+    if (value !== null) return value;
   }
   return null;
 }

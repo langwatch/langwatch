@@ -114,16 +114,6 @@ export interface BugReportIdInputSchema extends Named<typeof bugReportIdInputSch
 export const bugReportIdInputSchema: BugReportIdInputSchema = bugReportIdInputSchemaDefinition;
 export type BugReportIdInput = z.infer<typeof bugReportIdInputSchema>;
 
-/** The one header the intake reads: the proxy chain its rate-limit bucket comes from. */
-const bugReportIntakeHeadersSchemaDefinition = z.object({
-  "x-forwarded-for": z.string().optional(),
-});
-export interface BugReportIntakeHeadersSchema extends Named<
-  typeof bugReportIntakeHeadersSchemaDefinition
-> {}
-export const bugReportIntakeHeadersSchema: BugReportIntakeHeadersSchema =
-  bugReportIntakeHeadersSchemaDefinition;
-
 /**
  * The report a customer's coding agent posts, parsed by the intake route
  * so a rejection answers the bespoke body released CLI/MCP builds read.

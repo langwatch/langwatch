@@ -77,11 +77,13 @@ describe("buildTimeseriesQuery()", () => {
         });
       }
 
-      it("hoists the attribute into the CTE so the outer aggregation has a column", () => {
+      // The count reads the member-scoped key (a group project's members can share an id), so
+      // the key is hoisted whole and the outer aggregation counts it.
+      it("hoists the member-scoped key into the CTE so the outer aggregation has a column", () => {
         const { sql } = buildGroupedByLabels("metadata.thread_id");
 
-        expect(sql).toContain("AS trace_attr_thread_id");
-        expect(outerQuery(sql)).toContain("trace_attr_thread_id");
+        expect(sql).toContain("AS trace_member_thread_id");
+        expect(outerQuery(sql)).toContain("trace_member_thread_id");
       });
 
       // The hoist is conditional: pushing every attribute read would widen the
@@ -92,7 +94,10 @@ describe("buildTimeseriesQuery()", () => {
       it("hoists only the attribute the requested metric reads", () => {
         const { sql } = buildGroupedByLabels("metadata.thread_id");
 
-        expect(sql).toContain("AS trace_attr_thread_id");
+        expect(sql).toContain("AS trace_member_thread_id");
+        // The bare read sits inside the key, so hoisting it too would only widen the row.
+        expect(sql).not.toContain("AS trace_attr_thread_id");
+        expect(sql).not.toContain("AS trace_member_user_id");
         expect(sql).not.toContain("AS trace_attr_user_id");
         expect(sql).not.toContain("AS trace_attr_customer_id");
       });

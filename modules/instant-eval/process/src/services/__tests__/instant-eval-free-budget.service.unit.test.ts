@@ -19,11 +19,13 @@ function serviceWith({
   isFree = true,
   projects = ["proj_1"],
   isBounded = true,
+  isOwnDecisionModel = false,
 }: {
   spentNanoUsd?: number;
   isFree?: boolean;
   projects?: string[];
   isBounded?: boolean;
+  isOwnDecisionModel?: boolean;
 } = {}) {
   const clock = { now: 0 };
   const sumSpendNanoUsdByRequestType = vi.fn(async () => spentNanoUsd);
@@ -37,6 +39,7 @@ function serviceWith({
       listProjectIds: async () => projects,
       isFreePlan,
       sumSpendNanoUsdByRequestType,
+      isOwnDecisionModel: async () => isOwnDecisionModel,
     },
     reservations,
     isBounded,
@@ -329,6 +332,25 @@ describe("given a deployment that does not bill Instant Evals", () => {
       expect((await service.standing({ projectId: "proj_1" })).remainingUsd).toBeNull();
       expect(sumSpendNanoUsdByRequestType).not.toHaveBeenCalled();
       await expect(reservations.heldNanoUsd({ organizationId: "org_1" })).resolves.toBe(0);
+    });
+  });
+});
+
+describe("given a project on its own decision model", () => {
+  describe("when its free organization has spent the whole budget", () => {
+    /** @scenario "The free budget never binds a project on an own decision model" */
+    it("neither refuses nor holds, and reads no ledger", async () => {
+      const { service, sumSpendNanoUsdByRequestType, reservations } = serviceWith({
+        spentNanoUsd: 5 * NANO,
+        isOwnDecisionModel: true,
+      });
+
+      await expect(service.assertWithinBudget({ projectId: "proj_1" })).resolves.toBeUndefined();
+      await expect(
+        service.reserve({ projectId: "proj_1", reservationId: "run_1", priceUsd: 2 }),
+      ).resolves.toBeUndefined();
+      expect(sumSpendNanoUsdByRequestType).not.toHaveBeenCalled();
+      expect(await reservations.heldNanoUsd({ organizationId: "org_1" })).toBe(0);
     });
   });
 });

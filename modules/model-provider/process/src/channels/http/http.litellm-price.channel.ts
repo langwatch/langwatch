@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   litellmPriceEntrySchema,
   type LitellmPriceEntry,
-} from "../../rules/litellm-audio-prices.rules.ts";
+} from "../../rules/litellm-prices.rules.ts";
 import { LitellmPriceChannel, type LitellmPriceRegistry } from "../litellm-price.channel.ts";
 
 const LITELLM_PRICES_URL =

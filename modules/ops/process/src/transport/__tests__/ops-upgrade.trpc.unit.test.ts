@@ -227,6 +227,7 @@ describe("the ops.upgrade reads", () => {
         deprecations: [],
         version: { kind: "development", containsRelease: null, commit: null },
         latestRelease: null,
+        notices: [],
       });
       expect(await operator.listReleases()).toEqual(await reader.listReleases());
       const { items, cursor } = await reader.listSteps({ release: "3.23.0" });

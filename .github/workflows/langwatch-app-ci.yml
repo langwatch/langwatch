@@ -30,16 +30,11 @@
 name: langwatch-app-ci
 
 on:
+  # Pull requests and the merge queue reach this through pr.yml.
+  workflow_call:
   push:
     branches:
       - main
-  # ready_for_review is NOT a default pull_request activity type. Without it,
-  # taking a PR out of draft fires no event, so the heavy jobs gated on
-  # `draft == false` below would never get their first run.
-  pull_request:
-    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
-    types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
   workflow_dispatch:
 
 env:
@@ -47,10 +42,11 @@ env:
 
 concurrency:
   # A manual run (coverage, duration weights) has its own group, so a push cannot cancel it.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  # A newer commit supersedes an older run, on main too: the newest verdict
-  # covers the commits before it. Image and release builds keep their own rule.
-  cancel-in-progress: true
+  group: langwatch-app-ci-${{ github.event_name }}-${{ github.ref }}
+  # A newer commit supersedes an older run, except a push to main: there
+  # package-suites runs as one long job (see `suites-one-job`), so a run finishes
+  # and the newest commit waits behind it. Guarded by tools/ciguard/mainsuites.go.
+  cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -62,6 +58,9 @@ jobs:
       # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
       # runs the full suite, so nothing lands without it.
       heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
+      # A push to main runs package-suites as one job: nobody waits on it, and one
+      # setup instead of eight saves about a fifth of its Actions minutes (#9146).
+      suites-one-job: ${{ github.event_name == 'push' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -138,8 +137,31 @@ jobs:
               # repo-wide cost decision, not part of this change; tracked
               # separately.
               - '.github/workflows/langwatch-app-ci.yml'
+              # Read by .github/scripts/nightly-workflows.test.ts in ci-scripts-test.
+              - '.github/workflows/nightly.yml'
+              - '.github/workflows/codebase-health.yml'
+              - '.github/workflows/migration-compat.yml'
+              - '.github/workflows/npx-server-smoke.yml'
+              - '.github/workflows/gateway-matrix.yaml'
+              # Read by .github/scripts/release-please-timer.test.ts.
+              - '.github/workflows/release-please-sdks.yml'
+              # Read by .github/scripts/guard-breaking-change-scope.test.ts.
+              - '.github/workflows/pr-conventions.yml'
+              # Read by .github/scripts/pr-workflow-filters.test.ts.
+              - '.github/workflows/e2e-ci.yml'
+              - '.github/workflows/langwatch-nlp-ci.yml'
+              - '.github/workflows/langevals-ci.yml'
+              - '.github/workflows/mcp-javascript-ci.yml'
+              - '.github/workflows/sdk-go-ci.yml'
+              - '.github/workflows/sdk-javascript-ci.yml'
+              - '.github/workflows/docs-ci.yml'
+              - '.github/workflows/codeql.yml'
+              - '.github/workflows/clickhouse-serverless.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
+              # ci-scripts-test reads this workflow's path filters and its
+              # re-tag step, so an edit to the workflow alone must reach it.
+              - '.github/workflows/publish-docker-ecr.yml'
               # Composite actions are covered by ci-scripts-test through the
               # scripts they call, so an edit that only touches an action.yml
               # has to reach the gate too.
@@ -515,12 +537,20 @@ jobs:
         with:
           prefix: ${{ runner.os }}-pkg-dist-
 
+      - name: Set up Go for the Slack notifier
+        if: failure() && github.ref == 'refs/heads/main'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh typecheck
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+        run: go run ./cmd/slacknotify -job typecheck
 
   test-unit:
     needs: [changes, affected]
@@ -677,8 +707,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    name: package-suites (${{ matrix.shard }}/8)
+        shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}
+    name: package-suites (${{ matrix.shard }}/${{ strategy.job-total }})
     #
     # It DOES have services. This job absorbed the datastore lane at the
     # deployment cutover: `test-integration` existed to shard the monolith's
@@ -686,7 +716,7 @@ jobs:
     # package suites, which this job already discovers. Standing the datastores
     # up here is what keeps their integration halves running for real instead
     # of self-skipping into a green job.
-    timeout-minutes: 45
+    timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}
 
     services:
       redis:
@@ -807,21 +837,26 @@ jobs:
 
       # The suites' own Nx cache, apart from the build cache so it holds only test
       # results and stays small. Per shard: a re-push to the same change splits alike.
+      # Main's one job saves under `all`, which a shard falls back to.
       - name: Restore the package suite results
         if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
-          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
+          key: ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-
+            ${{ runner.os }}-nx-suites-all-
 
       - name: Restore the package suite results, saving them at the end of the job
         if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
-          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
+          key: ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-
+            ${{ runner.os }}-nx-suites-all-
 
       - uses: ./.github/actions/prune-pr-caches
         with:
@@ -830,12 +865,50 @@ jobs:
       - name: Adopt the restored suite results index
         run: mkdir -p .nx/suites/data && bash .github/scripts/adopt-nx-cache-index.sh .nx/suites/data
 
+      # Vitest's transformed modules (fsModuleCache), kept between runs so a suite
+      # skips the transform share of its time (specs/ci/package-suites-transform-cache.feature).
+      # Vitest keys each entry by the module's own source, the vitest config and its
+      # plugins, and drops the whole cache when the lockfile changes. It does not key
+      # how an import resolves (package manifests) or what a tsconfig tells the
+      # transform, so a cache is restored only when those are identical too: the
+      # hash is over the blob ids of the lockfile, every package.json and tsconfig,
+      # and packages/vitest-config: the shared config is loaded from the package, so
+      # vitest does not count its source (plugin options, React compiler) as a config file.
+      # Main's one job saves under `all`, which a shard falls back to: entries are keyed by content.
+      - name: Hash what a cached transform depends on besides its source
+        id: transform-inputs
+        run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' packages/vitest-config | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the vitest transforms
+        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vitest-cache
+          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+
+      - name: Restore the vitest transforms, saving them at the end of the job
+        if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vitest-cache
+          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+
+      - uses: ./.github/actions/prune-pr-caches
+        with:
+          prefix: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-
+
       - name: Run every workspace package suite
         env:
           NX_CACHE_DIRECTORY: ${{ github.workspace }}/.nx/suites/cache
           NX_WORKSPACE_DATA_DIRECTORY: ${{ github.workspace }}/.nx/suites/data
           REQUIRE_HELM_TESTS: "1"
-          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
           # at a time left half the cores idle. A heavy suite still runs alone.
           PACKAGE_SUITES_CONCURRENCY: "2"
@@ -857,6 +930,47 @@ jobs:
       - name: Check suites declare what they read outside their package
         if: ${{ !cancelled() }}
         run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
+
+      # Keeps the saved cache bounded. Nothing records which entry a run read: a
+      # restored file keeps the time it was first written, so purging by age would
+      # drop the hottest entries first. A new lockfile, manifest, tsconfig or shared
+      # config already starts a fresh cache (the key above); between those, a cache
+      # past 400 MB is emptied, so the save stores a small one the next run restores.
+      - name: Drop the vitest transforms before saving if they grew past 400 MB
+        if: ${{ !cancelled() }}
+        run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
+
+  # Its own job, so a run that times out (cancelled, no failed step) still posts.
+  package-suites-notify:
+    needs: [changes, package-suites]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.package-suites.result == 'failure' || needs.package-suites.result == 'cancelled')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      # A repeat counts a failed or cancelled (timed-out) job in the previous
+      # finished main run, so a timeout posts once too (tools/slacknotify).
+      - name: Notify Slack on failure
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+        run: go run ./cmd/slacknotify -job "package-suites (1/1)"
 
   lint:
     needs: changes
@@ -1029,7 +1143,9 @@ jobs:
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh lint
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+        run: go run ./cmd/slacknotify -job lint
 
   feature-parity:
     needs: changes
@@ -1061,12 +1177,20 @@ jobs:
       - name: Test dev scripts
         run: TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs dev/nx/__tests__/*.unit.test.mjs
 
+      - name: Set up Go for the Slack notifier
+        if: failure() && github.ref == 'refs/heads/main'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+        run: go run ./cmd/slacknotify -job feature-parity
 
   # The SDK clients and the docs site copy against the OpenAPI document the
   # routes generate.
@@ -1139,12 +1263,20 @@ jobs:
             exit 1
           fi
 
+      - name: Set up Go for the Slack notifier
+        if: failure() && github.ref == 'refs/heads/main'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh openapi-clients
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+        run: go run ./cmd/slacknotify -job openapi-clients
 
   build:
     needs: changes
@@ -1272,12 +1404,20 @@ jobs:
           # (the gate we want); the EXIT trap still stops the preview server.
           node scripts/smoke-boot.mjs
 
+      - name: Set up Go for the Slack notifier
+        if: failure() && github.ref == 'refs/heads/main'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh build
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+        run: go run ./cmd/slacknotify -job build
 
   ci-scripts-test:
     needs: changes
@@ -1318,6 +1458,12 @@ jobs:
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
 
+      - name: Test publish-docker-ecr.yml path filters
+        run: bash .github/scripts/__tests__/publish-ecr-filters.test.sh
+
+      - name: Test nearest-ancestor-tag.sh
+        run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh
+
       - name: Test detect-changes-source.sh
         run: bash .github/scripts/__tests__/detect-changes-source.test.sh
 
@@ -1334,18 +1480,26 @@ jobs:
           export PICOMATCH="$picomatch_dir/node_modules/picomatch"
           bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
 
-      # Lives here rather than in deployment-impact-check.yml because that
-      # workflow filters `on.paths` down to deployment surface, which
-      # .github/** is not — so it would never start for a change to its own
-      # guard. This job's gate already lists `.github/scripts/**`.
-      - name: Test guard-deployment-impact.ts
-        run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+      - name: Test guard-breaking-change-scope.ts
+        run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
 
       - name: Test that every generated file is marked generated
         run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts
 
       - name: Test the PR impact map categories
         run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
+
+      # The nightly suite's reports and its workflow promises (specs/ci/nightly-suite.feature).
+      - name: Test the nightly suite's scripts
+        run: >-
+          node --test --experimental-strip-types
+          .github/scripts/nightly-hygiene.test.ts
+          .github/scripts/nightly-flaky.test.ts
+          .github/scripts/nightly-dashboard.test.ts
+          .github/scripts/nightly-workflows.test.ts
+
+      - name: Test when release pull requests refresh
+        run: node --test --experimental-strip-types .github/scripts/release-please-timer.test.ts
 
   ci-self-test:
     needs: changes

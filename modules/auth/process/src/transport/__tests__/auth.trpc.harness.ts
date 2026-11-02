@@ -8,7 +8,7 @@ import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 /** What a mount reads off the request. Both halves are absent when signed out. */
 export type AuthTrpcTestContext = {
-  actor?: { id: string } | undefined;
+  actor?: { id: string; impersonatorId?: string } | undefined;
   email?: string | null;
   /** The address the process resolved, or none. */
   address?: string | null;
@@ -28,7 +28,13 @@ export function authTrpcTestMembers(): AuthTrpcRuntimeDependencies {
       caller: (ctx) => {
         if (!ctx.actor) throw new Error("this test context carries no caller");
 
-        return { actor: { type: "user", id: ctx.actor.id } };
+        return {
+          actor: {
+            type: "user",
+            id: ctx.actor.id,
+            ...(ctx.actor.impersonatorId ? { impersonatorId: ctx.actor.impersonatorId } : {}),
+          },
+        };
       },
     },
     authorization: {

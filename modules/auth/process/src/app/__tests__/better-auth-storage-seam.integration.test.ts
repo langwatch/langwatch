@@ -51,12 +51,25 @@ describe.skipIf(!DB_URL)("Better Auth's storage on the live tier", () => {
   });
 
   /** @scenario "The live adapter declares native transactions to single sign-on" */
-  it("hands Better Auth a storage that declares native transaction support", async () => {
-    const { transport } = await liveTier(null);
-    const context = await transport.$context;
+  it.skipIf(!REDIS_URL)(
+    "hands Better Auth a storage that declares native transaction support",
+    async () => {
+      // The live tier refuses to build without its Redis member.
+      const redis = new RedisConnectionService().connect({
+        url: REDIS_URL,
+        clusterEndpoints: undefined,
+        dbIndex: undefined,
+      })!;
+      try {
+        const { transport } = await liveTier(redis);
+        const context = await transport.$context;
 
-    expect(typeof context.adapter.options?.adapterConfig.transaction).toBe("function");
-  });
+        expect(typeof context.adapter.options?.adapterConfig.transaction).toBe("function");
+      } finally {
+        await redis.quit();
+      }
+    },
+  );
 
   describe.skipIf(!REDIS_URL)("given a user who has signed in with email and password", () => {
     let redis: RedisConnection;

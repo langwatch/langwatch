@@ -123,3 +123,17 @@ describe("CustomGraphScreen form", () => {
     });
   });
 });
+
+describe("CustomGraphScreen legacy banner", () => {
+  /** @scenario "AC3f The custom graph pages carry the legacy banner too" */
+  it("carries the legacy banner when Dashboards opens for the member", () => {
+    const host = new StubAnalyticsHost({ flags: { release_dashboards: true } });
+    render(
+      <AnalyticsTestHarness host={host}>
+        <CustomGraphScreen mode="new" />
+      </AnalyticsTestHarness>,
+    );
+
+    expect(screen.getByTestId("legacy-analytics-banner")).toBeInTheDocument();
+  });
+});

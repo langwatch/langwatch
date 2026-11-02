@@ -29,6 +29,8 @@ class GetApiMonitorsByIdResponse200:
         thread_idle_timeout (float | None):
         created_at (str):
         updated_at (str):
+        auto_paused_at (None | str): When the monitor paused itself because its evaluations mostly failed.
+        auto_paused_reason (None | str): Why the monitor paused itself.
         platform_url (str):
     """
 
@@ -47,6 +49,8 @@ class GetApiMonitorsByIdResponse200:
     thread_idle_timeout: float | None
     created_at: str
     updated_at: str
+    auto_paused_at: None | str
+    auto_paused_reason: None | str
     platform_url: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -83,6 +87,12 @@ class GetApiMonitorsByIdResponse200:
 
         updated_at = self.updated_at
 
+        auto_paused_at: None | str
+        auto_paused_at = self.auto_paused_at
+
+        auto_paused_reason: None | str
+        auto_paused_reason = self.auto_paused_reason
+
         platform_url = self.platform_url
 
         field_dict: dict[str, Any] = {}
@@ -104,6 +114,8 @@ class GetApiMonitorsByIdResponse200:
                 "threadIdleTimeout": thread_idle_timeout,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
+                "autoPausedAt": auto_paused_at,
+                "autoPausedReason": auto_paused_reason,
                 "platformUrl": platform_url,
             }
         )
@@ -158,6 +170,20 @@ class GetApiMonitorsByIdResponse200:
 
         updated_at = d.pop("updatedAt")
 
+        def _parse_auto_paused_at(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        auto_paused_at = _parse_auto_paused_at(d.pop("autoPausedAt"))
+
+        def _parse_auto_paused_reason(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        auto_paused_reason = _parse_auto_paused_reason(d.pop("autoPausedReason"))
+
         platform_url = d.pop("platformUrl")
 
         get_api_monitors_by_id_response_200 = cls(
@@ -176,6 +202,8 @@ class GetApiMonitorsByIdResponse200:
             thread_idle_timeout=thread_idle_timeout,
             created_at=created_at,
             updated_at=updated_at,
+            auto_paused_at=auto_paused_at,
+            auto_paused_reason=auto_paused_reason,
             platform_url=platform_url,
         )
 

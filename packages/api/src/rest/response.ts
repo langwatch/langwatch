@@ -27,6 +27,9 @@ import { promoteStoreFailure, retryAfterOf } from "../errors.ts";
 /** Context key holding the endpoint a request matched, as `METHOD /path`. */
 export const ENDPOINT_ROUTE = "endpointRoute" as const;
 
+/** Context key holding the full path template a request matched, base path included. */
+export const ROUTE_TEMPLATE = "routeTemplate" as const;
+
 /** Context key holding the complete validated input passed to a handler. */
 export const ENDPOINT_INPUT = "endpointInput" as const;
 

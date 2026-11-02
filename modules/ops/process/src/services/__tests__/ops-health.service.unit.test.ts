@@ -182,6 +182,7 @@ const UPGRADE: OpsUpgradeStatus = {
   deprecations: [],
   version: { kind: "release", release: "3.21.0" },
   latestRelease: null,
+  notices: [],
 };
 
 function health(overrides: Partial<OpsHealthReaders> = {}) {

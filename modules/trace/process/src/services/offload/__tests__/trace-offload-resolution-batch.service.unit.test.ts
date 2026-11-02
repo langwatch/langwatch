@@ -7,10 +7,8 @@ import { TraceCanonicalisationService } from "#features/derivation/services/trac
  * Bulk batch resolver: bounded-concurrency pass over event_log for exports,
  * threads, and annotations. Degrades per-ref without failing the batch.
  */
-import {
-  TraceOffloadResolutionBatchService,
-  EVENT_LOG_RESOLVE_CONCURRENCY,
-} from "../../trace-offload-resolution-batch.service.ts";
+import { OFFLOAD_RECALL_CONCURRENCY } from "../../../repositories/trace-payload-reader.repository.ts";
+import { TraceOffloadResolutionBatchService } from "../../trace-offload-resolution-batch.service.ts";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -35,7 +33,10 @@ import {
   type TraceBlobStoreService,
   BlobNotFoundError,
 } from "../../../features/media/services/trace-blob-store.service.ts";
-import { blobStoreReading } from "../../__tests__/support/trace-blob-store.support.ts";
+import {
+  blobStoreReading,
+  eventLogReads,
+} from "../../__tests__/support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -113,7 +114,7 @@ function createMockLogger() {
 }
 
 /**
- * A TraceBlobStoreService whose getFromEventLog tracks in-flight concurrency so the test can
+ * A TraceBlobStoreService whose event_log read tracks in-flight concurrency so the test can
  * assert the resolver never exceeds the pool size. Each call resolves after a
  * microtask delay so overlapping calls are observable.
  */
@@ -149,7 +150,7 @@ const realIOService = TraceIOExtractionService.create(TraceCanonicalisationServi
 
 describe("TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
   describe("given a large result set where every trace has one offloaded span", () => {
-    const TRACE_COUNT = EVENT_LOG_RESOLVE_CONCURRENCY * 3;
+    const TRACE_COUNT = OFFLOAD_RECALL_CONCURRENCY * 3;
     const fullValue = "X".repeat(100_000);
 
     function buildResultSet(): NormalizedSpan[][] {
@@ -175,10 +176,10 @@ describe("TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatc
         });
 
         expect(peakConcurrency()).toBeGreaterThan(0);
-        expect(peakConcurrency()).toBeLessThanOrEqual(EVENT_LOG_RESOLVE_CONCURRENCY);
+        expect(peakConcurrency()).toBeLessThanOrEqual(OFFLOAD_RECALL_CONCURRENCY);
       });
 
-      it("issues exactly one event_log read per offloaded field (no N×M blow-up)", async () => {
+      it("issues exactly one event_log read per trace event (no N×M blow-up)", async () => {
         const { blobStore, getCalls } = makeConcurrencyTrackingBlobStore(fullValue);
 
         await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
@@ -190,6 +191,46 @@ describe("TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatc
         });
 
         expect(getCalls()).toBe(TRACE_COUNT);
+      });
+
+      it("reads every field of one trace event with a single event read", async () => {
+        const blobStore = blobStoreReading(async ({ field }) => `full ${field}`);
+        const span = makeSpan({
+          traceId: "trace-two-fields",
+          spanAttributes: {
+            "langwatch.input": "input preview",
+            "langwatch.output": "output preview",
+            [`${EVENTREF_ATTR_PREFIX}langwatch.input`]: JSON.stringify({
+              field: "langwatch.input",
+              eventId: "evt-shared",
+            }),
+            [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+              field: "langwatch.output",
+              eventId: "evt-shared",
+            }),
+          },
+        });
+
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: [[span]],
+            blobStore,
+            ioExtractionService: realIOService,
+            logger: createMockLogger(),
+          });
+
+        expect(eventLogReads(blobStore)).toHaveBeenCalledTimes(1);
+        expect(eventLogReads(blobStore).mock.calls[0]![0]).toMatchObject({
+          tenantId: "proj-1",
+          traceId: "trace-two-fields",
+          eventId: "evt-shared",
+          fields: expect.arrayContaining(["langwatch.input", "langwatch.output"]),
+        });
+        expect(results[0]!.resolvedSpans[0]!.spanAttributes).toMatchObject({
+          "langwatch.input": "full langwatch.input",
+          "langwatch.output": "full langwatch.output",
+        });
       });
 
       it("returns one resolution entry per input trace, in order, all resolved", async () => {
@@ -430,6 +471,68 @@ describe("TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatc
         expect(results[1]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
           "bad-preview",
         );
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-trace recall budget — one huge trace must not fill the worker's heap
+// ---------------------------------------------------------------------------
+
+describe("TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch() — per-trace recall budget", () => {
+  describe("given a trace whose offloaded payloads together exceed the trace's recall budget", () => {
+    const MIB = 1024 * 1024;
+    const EVENT_COUNT = 6;
+    const bigValue = "B".repeat(8 * MIB);
+
+    describe("when resolved as a batch, one event read at a time", () => {
+      async function resolveHugeTrace() {
+        const blobStore = blobStoreReading(async () => bigValue);
+        const logger = createMockLogger();
+        const spans = Array.from({ length: EVENT_COUNT }, (_v, i) =>
+          makeSpanWithOutputRef({
+            traceId: "trace-huge",
+            spanId: `span-${i}`,
+            eventId: `evt-${i}`,
+            preview: `preview-${i}`,
+          }),
+        );
+
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: [spans],
+            blobStore,
+            ioExtractionService: realIOService,
+            logger,
+            concurrency: 1,
+          });
+        return { blobStore, logger, results };
+      }
+
+      it("does not throw and keeps the previews of the spans past the budget", async () => {
+        const { results } = await resolveHugeTrace();
+
+        const outputs = results[0]!.resolvedSpans.map(
+          (span) => span.spanAttributes["langwatch.output"],
+        );
+        expect(outputs.filter((output) => output === bigValue).length).toBeGreaterThan(0);
+        expect(outputs.filter((output) => output === bigValue).length).toBeLessThan(EVENT_COUNT);
+        const kept = outputs.filter((output) => output !== bigValue);
+        expect(kept.every((output) => String(output).startsWith("preview-"))).toBe(true);
+      });
+
+      it("stops reading events once the budget is spent", async () => {
+        const { blobStore } = await resolveHugeTrace();
+
+        expect(eventLogReads(blobStore).mock.calls.length).toBeLessThan(EVENT_COUNT);
+      });
+
+      it("does not warn per field for the fields left at their previews", async () => {
+        const { logger } = await resolveHugeTrace();
+
+        expect(logger.warn).not.toHaveBeenCalled();
       });
     });
   });

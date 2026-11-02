@@ -51,6 +51,8 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
   readonly successes: AnalyticsSuccessNotice[] = [];
   readonly failures: AnalyticsFailureNotice[] = [];
   readonly navigations: string[] = [];
+  /** The navigations that left no history entry to come back to. */
+  readonly replacements: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
   readonly alertAuthorings: AnalyticsAlertAuthoring[] = [];
   readonly langyAsks: AnalyticsLangyAskRequest[] = [];
@@ -105,8 +107,9 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
     this.queries.push(next);
   }
 
-  navigate(to: string): void {
+  navigate(to: string, options?: { replace?: boolean }): void {
     this.navigations.push(to);
+    if (options?.replace) this.replacements.push(to);
   }
 
   openAutomationDrawer(request: AnalyticsAlertAuthoring): void {

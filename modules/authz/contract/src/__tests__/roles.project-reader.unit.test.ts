@@ -12,10 +12,12 @@ import {
 
 /**
  * ADR-177, "read grants never escalate": a project-reader grant lets an aggregate project read
- * its members' traces and analytics and nothing else; every other permission is denied.
+ * its members' traces, analytics and cost-gated analytics and nothing else; every other
+ * permission is denied.
  */
 
 const ORG = "org_acme";
+const READER = ["analytics:view", "cost:view", "traces:view"];
 
 function grants(overrides?: Partial<CollectedGrants>): CollectedGrants {
   return {
@@ -31,19 +33,16 @@ function grants(overrides?: Partial<CollectedGrants>): CollectedGrants {
 
 describe("project-reader role", () => {
   describe("when the permission list is read", () => {
-    it("is exactly traces:view and analytics:view", () => {
-      expect([...builtinRolePermissions(PROJECT_READER_ROLE_KEY)].toSorted()).toEqual([
-        "analytics:view",
-        "traces:view",
-      ]);
-      expect([...PROJECT_READER_PERMISSIONS].toSorted()).toEqual(["analytics:view", "traces:view"]);
+    it("is exactly traces:view, analytics:view and cost:view", () => {
+      expect([...builtinRolePermissions(PROJECT_READER_ROLE_KEY)].toSorted()).toEqual(READER);
+      expect([...PROJECT_READER_PERMISSIONS].toSorted()).toEqual(READER);
     });
   });
 
   describe("when a project-reader grant is asked for a permission", () => {
     /** @scenario "A project-reader grant never escalates" */
-    it("allows traces view and analytics view", () => {
-      for (const permission of ["traces:view", "analytics:view"]) {
+    it("allows traces view, analytics view and cost view", () => {
+      for (const permission of READER) {
         expect(builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission })).toBe(true);
       }
     });
@@ -59,7 +58,7 @@ describe("project-reader role", () => {
       const allowed = ALL_PERMISSIONS.filter((permission) =>
         builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission }),
       );
-      expect(allowed.toSorted()).toEqual(["analytics:view", "traces:view"]);
+      expect(allowed.toSorted()).toEqual(READER);
     });
   });
 

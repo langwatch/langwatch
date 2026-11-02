@@ -33,6 +33,8 @@ async function judgeAppWith({
     classifierModel: undefined,
     globalTokensPerSecond: 300_000,
     tenantTokensPerSecond: 150_000,
+    judgeRoutes: undefined,
+    judgeRoutePricing: undefined,
     isSaas: isCloud,
     nodeEnvironment,
   };

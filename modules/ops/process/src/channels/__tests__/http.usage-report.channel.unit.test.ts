@@ -12,6 +12,16 @@ function requestBody(init: RequestInit | undefined): string {
   return body;
 }
 
+const WELL_FORMED_NOTICE = {
+  id: "n1",
+  severity: "security",
+  title: "Vulnerability in prompt sharing",
+  body: "Upgrade to 3.4.2.",
+  url: "https://langwatch.ai/security/n1",
+  fixed_in: "3.4.2",
+  published_at: "2026-10-20T09:00:00.000Z",
+};
+
 describe("HttpUsageReportChannel", () => {
   describe("when a host answers", () => {
     it("posts the report as JSON and resolves with the status, whatever it was", async () => {
@@ -26,7 +36,7 @@ describe("HttpUsageReportChannel", () => {
         body: { event: "daily_usage_stats", instance_id: "4b1c" },
       });
 
-      expect(answer).toEqual({ status: 413, latestRelease: null });
+      expect(answer).toEqual({ status: 413, latestRelease: null, notices: [] });
       const [url, init] = send.mock.calls[0] ?? [];
       expect(url).toBe("https://app.langwatch.ai/api/track_usage");
       expect(init?.method).toBe("POST");
@@ -53,6 +63,43 @@ describe("HttpUsageReportChannel", () => {
       const answer = await channel.post({ endpoint: "https://app.langwatch.ai", body: {} });
 
       expect(answer.latestRelease).toEqual({ release: "3.22.0", commit: "def5678" });
+    });
+  });
+
+  describe("when cloud's reply names a malformed notice beside a well-formed one", () => {
+    /** @scenario "A malformed notice is dropped and the rest are kept" */
+    it("keeps only the well-formed notice and still reads the latest release", async () => {
+      const channel = HttpUsageReportChannel.create({
+        fetch: async () => ({
+          status: 200,
+          json: async () => ({
+            latest_release: { release: "3.22.0", commit: null },
+            notices: [WELL_FORMED_NOTICE, { ...WELL_FORMED_NOTICE, id: "n2", title: undefined }],
+          }),
+        }),
+      });
+
+      const answer = await channel.post({ endpoint: "https://app.langwatch.ai", body: {} });
+
+      expect(answer.notices).toEqual([WELL_FORMED_NOTICE]);
+      expect(answer.latestRelease).toEqual({ release: "3.22.0", commit: null });
+    });
+
+    it("keeps the latest release when the notices are not a list", async () => {
+      const channel = HttpUsageReportChannel.create({
+        fetch: async () => ({
+          status: 200,
+          json: async () => ({ latest_release: { release: "3.22.0" }, notices: "broken" }),
+        }),
+      });
+
+      const answer = await channel.post({ endpoint: "https://app.langwatch.ai", body: {} });
+
+      expect(answer).toEqual({
+        status: 200,
+        latestRelease: { release: "3.22.0", commit: null },
+        notices: [],
+      });
     });
   });
 

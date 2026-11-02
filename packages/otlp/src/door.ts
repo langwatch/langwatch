@@ -77,6 +77,24 @@ export const otlpIngestCredentialSchema: OtlpIngestCredentialSchema =
 /** A refusal is thrown, and the receiver renders it. */
 export type OtlpIngestCredential = Readonly<z.infer<typeof otlpIngestCredentialSchema>>;
 
+/** The key an OTLP bearer is, as a request's access record names it: id and kind only. */
+export type OtlpIngestKey = Readonly<{
+  kind: "legacy_project_key" | "api_key" | "ingestion_key";
+  apiKeyId: string | null;
+  ownerUserId: null;
+}>;
+
+/**
+ * The key behind an OTLP credential. No key id is the legacy project key; a source type is what
+ * makes a key an ingestion key, as the receiver's provenance reads it, with or without a template.
+ */
+export function otlpIngestKeyOf(identity: OtlpIngestCredential["identity"]): OtlpIngestKey {
+  if (!identity.apiKeyId) return { kind: "legacy_project_key", apiKeyId: null, ownerUserId: null };
+  const kind = identity.ingestSourceType ? "ingestion_key" : "api_key";
+
+  return { kind, apiKeyId: identity.apiKeyId, ownerUserId: null };
+}
+
 /** The credential refusals the ingestion doors answer in their own wire, and nothing else. */
 const DOOR_REFUSAL_CODES: ReadonlySet<string> = new Set([
   "missing_credentials",

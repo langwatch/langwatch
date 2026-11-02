@@ -4,6 +4,7 @@
  * a redirect. GET/HEAD follow up to `MAX_FOLLOW_HOPS`; refusal throws.
  */
 import { ConsoleLogger, type Logger } from "../../logger";
+import { API_VERSION_HEADER, LANGWATCH_API_VERSION } from "../constants";
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
@@ -50,6 +51,32 @@ export interface CreateLangWatchFetchOptions {
   /** Receives the one warning per process about an http endpoint. */
   logger?: Logger;
 }
+
+const isPlainHeaders = (headers: HeadersInit): headers is Record<string, string> =>
+  !(headers instanceof Headers) && !Array.isArray(headers);
+
+/**
+ * `init` naming the client's API version, unless the caller already names one. A plain
+ * headers object stays plain, so a caller reading the headers back sees the shape it sent.
+ */
+const withApiVersion = ({
+  input,
+  init,
+}: {
+  input: RequestInfo | URL;
+  init: RequestInit | undefined;
+}): RequestInit => {
+  const sent =
+    init?.headers ??
+    (typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined);
+  if (new Headers(sent).has(API_VERSION_HEADER)) return { ...init };
+  if (sent === undefined || isPlainHeaders(sent)) {
+    return { ...init, headers: { ...sent, [API_VERSION_HEADER]: LANGWATCH_API_VERSION } };
+  }
+  const headers = new Headers(sent);
+  headers.set(API_VERSION_HEADER, LANGWATCH_API_VERSION);
+  return { ...init, headers };
+};
 
 /** Origins that already produced the http-to-https warning in this process. */
 const warnedOrigins = new Set<string>();
@@ -333,7 +360,8 @@ export const createLangWatchFetch = ({
   const send: LangWatchFetch = fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   const log = logger ?? new ConsoleLogger({ level: "warn", prefix: "LangWatch" });
 
-  return async (input, init) => {
+  return async (input, given) => {
+    const init = withApiVersion({ input, init: given });
     const url = requestUrl(input);
     const effective = effectiveRequest({ input, init });
     const method = (effective?.method ?? init?.method ?? "GET").toUpperCase();

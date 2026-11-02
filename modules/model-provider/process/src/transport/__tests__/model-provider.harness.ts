@@ -224,5 +224,7 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     deleteCost: (...args) => app.deleteCost(...args),
     translate: (...args) => app.translate(...args),
     applyCodexCodingDefaults: (...args) => app.applyCodexCodingDefaults(...args),
+    resolveDecisionModel: (...args) => app.resolveDecisionModel(...args),
+    listDecisionModelsForProject: (...args) => app.listDecisionModelsForProject(...args),
   };
 }

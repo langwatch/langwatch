@@ -882,6 +882,7 @@ export class OpsModule implements OpsApi {
         redis: repositories.redisHealth,
         upgradeLedger: repositories.upgradeLedger,
         cloudLatestRelease: repositories.cloudLatestRelease,
+        cloudNotices: repositories.cloudNotices,
       },
       channels: setup.channels,
       // Read only when a report is taken, by which time `app` below exists.
@@ -1892,13 +1893,13 @@ export class OpsModule implements OpsApi {
   /** The intake door's whole answer, in the bodies released CLI and MCP builds read. */
   async receiveBugReport(input: {
     report: SubmitBugReport;
-    forwardedFor: string | null;
+    callerAddress: string | null;
     linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer> {
     try {
       const { id } = await this.submitBugReport({
         report: input.report,
-        callerKey: toCallerKey(input.forwardedFor),
+        callerKey: toCallerKey(input.callerAddress),
         linkedProjectId: input.linkedProjectId,
       });
 

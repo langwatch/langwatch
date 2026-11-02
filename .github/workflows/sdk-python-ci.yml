@@ -243,6 +243,10 @@ jobs:
         env:
           # Pointing a LangWatch process at its own ingest is a feedback loop.
           LANGWATCH_API_KEY: ""
+          # The tag step and the suites call prompts, datasets and evaluations with
+          # the seeded legacy project key, which off the full-access flag may only
+          # ingest (modules/auth/specs/legacy-project-key-scope.feature).
+          LEGACY_PROJECT_KEY_FULL_ACCESS: "1"
         run: |
           API_PORT=5560 NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
           pnpm --filter @langwatch/worker start > /tmp/langwatch-workers.log 2>&1 &

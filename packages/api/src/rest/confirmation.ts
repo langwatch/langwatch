@@ -26,11 +26,17 @@ export type RestConfirmation<Api = unknown> = Readonly<{
   /** Asks only when this holds, as for a toggle that only sometimes disables. */
   when?: (input: Readonly<Record<string, unknown>>) => boolean;
   /**
-   * The record's own name, read from the module that owns it: null when the record has no name,
-   * undefined when there is no such record, so the handler answers for it and no card is shown.
-   * A method, so a route over one module's app still reads as a route of any app.
+   * The record as the handler reads it, for the key's owner and through the route's own `input`
+   * (a parent in the path included): its name, null when it has none, undefined when there is no
+   * such record, so the handler answers for it and no card is shown. A method, for any app.
    */
-  name(args: { app: Api; projectId: string; id: string }): Promise<string | null | undefined>;
+  name(args: {
+    app: Api;
+    projectId: string;
+    id: string;
+    ownerUserId: string | null;
+    input: Readonly<Record<string, unknown>>;
+  }): Promise<string | null | undefined>;
 }>;
 
 /** One request the gate is asked about: which key, which project, which records. */
@@ -198,7 +204,11 @@ export async function confirmMarkedRequest<Api>({
     projectId,
     resource: mark.resource,
     action: mark.action,
-    targets: ids.map((id) => ({ id, name: () => mark.name({ app: app(), projectId, id }) })),
+    targets: ids.map((id) => ({
+      id,
+      name: () =>
+        mark.name({ app: app(), projectId, id, ownerUserId: key.ownerUserId, input: fields }),
+    })),
   });
 }
 

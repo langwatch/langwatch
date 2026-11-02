@@ -44,6 +44,7 @@ let tmpHome: string;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origCodexHome = process.env.CODEX_HOME;
+const origCopilotHome = process.env.COPILOT_HOME;
 const origXdgConfigHome = process.env.XDG_CONFIG_HOME;
 
 // The directory the scan treats as "this directory". A scratch one by
@@ -84,6 +85,8 @@ beforeEach(() => {
   // XDG_CONFIG_HOME the same way, for ~/.config/opencode.
   delete process.env.CODEX_HOME;
   delete process.env.XDG_CONFIG_HOME;
+  // Copilot's hook folder follows COPILOT_HOME the same way.
+  delete process.env.COPILOT_HOME;
 });
 
 afterEach(() => {
@@ -93,6 +96,8 @@ afterEach(() => {
   else process.env.USERPROFILE = origUserprofile;
   if (origCodexHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = origCodexHome;
+  if (origCopilotHome === undefined) delete process.env.COPILOT_HOME;
+  else process.env.COPILOT_HOME = origCopilotHome;
   if (origXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
   else process.env.XDG_CONFIG_HOME = origXdgConfigHome;
   fs.rmSync(tmpHome, { recursive: true, force: true });
@@ -251,6 +256,22 @@ describe("scanTelemetryTargets", () => {
 
       expect(fs.readFileSync(target.path, "utf8")).toBe("export const Mine = async () => ({});\n");
       expect(path.basename(target.path)).toBe(OPENCODE_PLUGIN_FILE_NAME);
+    });
+  });
+
+  describe("when LangWatch's Copilot hook file is installed", () => {
+    it("lists it as the copilot session hooks and removes the file", () => {
+      installSessionContextHooks({ tool: "copilot" });
+
+      expect(presentLabels()).toEqual(["copilot session hooks (~/.copilot/hooks/langwatch.json)"]);
+      expect(
+        scan()
+          .filter((t) => t.present)
+          .map((t) => t.remove()),
+      ).toEqual([true]);
+
+      expect(presentLabels()).toEqual([]);
+      expect(fs.existsSync(path.join(tmpHome, ".copilot", "hooks", "langwatch.json"))).toBe(false);
     });
   });
 

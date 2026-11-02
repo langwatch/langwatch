@@ -46,7 +46,8 @@ export function buildClickHouseAdmin(
           const result = await client.query({
             query: sql,
             format: "JSONEachRow",
-            ...(params ? { query_params: { ...params } } : {}),
+            // In the body: ClickHouse logs a request's URL, query parameters included, at trace.
+            ...(params ? { query_params: { ...params }, use_multipart_params: true } : {}),
           });
           return result.json<Record<string, unknown>>();
         },

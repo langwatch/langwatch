@@ -21,5 +21,5 @@ Feature: The MCP server addresses the canonical /api/v1 API
 
     @unit
     Scenario: A dashboard list goes out at the canonical address
-      When the dashboards tool lists dashboards
-      Then the request path begins with "/api/v1/dashboards"
+      When the dashboards tool lists the Analytics Reports dashboards
+      Then the request path begins with "/api/v1/analytics/reports"

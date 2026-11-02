@@ -56,6 +56,7 @@ The platform sends the same fields on every call. The SDK reads the signature on
 | `new_messages` | `list[dict]` | The messages added since the previous turn |
 | `thread_id` | `str` | The platform's conversation id, the same on every turn of one run |
 | `session` | `Any \| None` | What the function returned as `session` on the previous turn |
+| `state` | `dict \| None` | The scenario's state: what the setup hook returned, as the latest turn updated it |
 | `trace_id` | `str` | The id of the turn's trace |
 
 These names are never run parameters.
@@ -72,7 +73,7 @@ async def support_agent(call: langwatch.AgentCall) -> str:
 
 | Attribute | Value |
 |---|---|
-| `messages`, `new_messages`, `thread_id`, `session`, `trace_id` | The turn fields above |
+| `messages`, `new_messages`, `thread_id`, `session`, `state`, `trace_id` | The turn fields above |
 | `parameters` | A `dict` of the run's values for the declared parameters |
 
 ### Run parameters
@@ -114,7 +115,7 @@ tenant: Annotated[str, langwatch.Param(description="Which tenant to answer for")
 | `str` | The reply text |
 | `dict` | One message |
 | `list[dict]` | Several messages |
-| `langwatch.AgentReply(output, session=...)` | A reply plus the session value for the next turn |
+| `langwatch.AgentReply(output, session=..., state=...)` | A reply, plus the session value for the next turn and an update to the scenario's state |
 
 A generator is refused with a message saying that streaming is not supported.
 
@@ -124,6 +125,30 @@ A generator is refused with a message saying that streaming is not supported.
 |---|---|---|
 | `output` | `str \| dict \| list[dict]` | The reply |
 | `session` | `Any \| None` | An opaque JSON value the platform echoes on the next turn of the same conversation, up to 64 kilobytes |
+| `state` | `dict \| None` | An update to the scenario's state, up to 64 kilobytes |
+
+### `@agent.scenario.setup` and `@agent.scenario.teardown`
+
+The decorated agent has a `scenario` attribute whose two decorators declare the hooks LangWatch calls around a scenario run. See [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks) for when they run and how they fail.
+
+```python
+@my_agent.scenario.setup
+async def setup(run, plan: str = "free") -> dict:
+    return {"customer_id": "cus_123"}  # the state the run starts with
+
+
+@my_agent.scenario.teardown
+async def teardown(run, state, plan: str = "free") -> dict | None:
+    return {"deleted": (state or {}).get("customer_id")}  # shown on the run
+```
+
+| Argument | Type | Value |
+|---|---|---|
+| `run` | `langwatch.agent.ScenarioRun` | `scenario_run_id`, `scenario_name` and `batch_run_id` of the run, each `None` when absent |
+| `state` | `dict \| None` | Teardown only, the second positional argument: the latest state |
+| keyword arguments | | Run parameters, read from the signature as on the agent function |
+
+A hook's keyword arguments join the agent's run parameters. A name declared with a different type or default by the agent and a hook logs a `parameters_invalid` warning, and the agent is not registered. A setup that returns `None` sends an empty state. A sync hook runs in a worker thread, like a sync agent function.
 
 ### `langwatch.agent.serve()`
 
@@ -153,7 +178,7 @@ With the default transport, a proxy that answers the WebSocket upgrade with an H
 
 ### Errors
 
-A failing call answers with a typed code rather than a stack trace. `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_payload_too_large`.
+A failing call answers with a typed code rather than a stack trace. `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_payload_too_large`, `hook_not_declared`.
 
 ## Next steps
 

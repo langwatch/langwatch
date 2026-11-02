@@ -6,6 +6,7 @@ import { defineConfig } from "vitest/config";
 // because the checkout happened to sit above it.
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     environment: "node",
     isolate: false,
     pool: "forks",

@@ -34,6 +34,10 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawerParams: () => ({}),
 }));
 
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 // The picker stub exposes one button that picks the organization scope,
 // so create-mode tests can drive the scope selection without the real
 // multi-select dropdown.

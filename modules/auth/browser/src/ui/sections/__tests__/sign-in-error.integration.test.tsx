@@ -8,8 +8,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { UI_SIGN_OUT_PATH } from "../../../behavior/ui-session-client.ts";
 import { WithTestAuthHost } from "../../../testing.tsx";
-import ErrorScreen, { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx";
+import ErrorScreen, { SignInError } from "../sign-in-error-screen.tsx";
 
 function renderError(error: string, extra: Record<string, string> = {}) {
   return render(
@@ -44,7 +45,7 @@ describe("<SignInError/>", () => {
       const recovery = screen.getByRole("link", {
         name: /sign out.*try again/i,
       });
-      expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+      expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
       // The old behaviour linked straight to /auth/signin, which re-auths the
       // still-live IdP session and re-triggers the same failure (the loop).
       expect(recovery.getAttribute("href")).not.toContain("/auth/signin");
@@ -82,7 +83,7 @@ describe("<SignInError/>", () => {
       const recovery = screen.getByRole("link", {
         name: /sign out.*try again/i,
       });
-      expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+      expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
     });
   });
 
@@ -96,7 +97,7 @@ describe("<SignInError/>", () => {
         ),
       ).toBeTruthy();
       expect(screen.getByRole("link", { name: "Sign out" }).getAttribute("href")).toBe(
-        FEDERATED_LOGOUT_PATH,
+        UI_SIGN_OUT_PATH,
       );
     });
   });
@@ -202,7 +203,7 @@ describe("given a sign-in method refused until an administrator approves the lin
     expect(screen.getByText("This sign-in method needs approval")).toBeTruthy();
     expect(screen.getByText(/administrator in your organization can review/i)).toBeTruthy();
     const recovery = screen.getByRole("link", { name: /sign out.*try again/i });
-    expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+    expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });
@@ -265,6 +266,23 @@ describe("given a sign-in fails for a reason the person has to act on", () => {
     expect(screen.getByText("Account already exists")).toBeTruthy();
     expect(screen.getByRole("link", { name: /sign out.*try again/i })).toBeTruthy();
     expect(document.body.textContent).not.toContain("OAuthAccountNotLinked");
+  });
+});
+
+describe("given an identity provider that refused the person", () => {
+  /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+  it("says it was cancelled or refused, and when to ask their IT administrator", () => {
+    expect(signInErrorMayCross("access_denied")).toBe(true);
+
+    renderError("access_denied");
+
+    expect(screen.getByText("Sign-in was refused")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The sign-in was cancelled, or your identity provider refused it. If you sign in through your company, ask your IT administrator to give you access to the LangWatch app.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });
 

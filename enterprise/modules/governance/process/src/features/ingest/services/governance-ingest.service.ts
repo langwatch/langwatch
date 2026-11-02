@@ -140,8 +140,16 @@ export class GovernanceIngestService {
     return accepted(body);
   }
 
-  #authorize(input: { sourceId: string; headers: GovernanceIngestHeaders }) {
-    return this.#access.authorize({ headers: toHeaders(input.headers), sourceId: input.sourceId });
+  #authorize(input: {
+    sourceId: string;
+    headers: GovernanceIngestHeaders;
+    callerAddress: string | null;
+  }) {
+    return this.#access.authorize({
+      headers: toHeaders(input.headers),
+      sourceId: input.sourceId,
+      callerAddress: input.callerAddress,
+    });
   }
 }
 

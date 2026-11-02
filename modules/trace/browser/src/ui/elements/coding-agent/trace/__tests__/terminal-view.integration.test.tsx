@@ -768,6 +768,20 @@ describe("TerminalView", () => {
       });
     });
 
+    describe("when the loaded window ends on calls after its last line", () => {
+      /** @scenario "The footer at the last line counts the calls after it" */
+      it("counts them, since the reader at the last line is past them", () => {
+        renderView({
+          entries: [...entries, ...ECONOMICS_ONLY_TURN],
+          sessionStartAtMs: 500,
+        });
+
+        // 175 tokens and $0.06 above the last line, 175 tokens and $0.06 after it.
+        expect(screen.getByText("350 tokens")).toBeInTheDocument();
+        expect(screen.getByText("$0.12")).toBeInTheDocument();
+      });
+    });
+
     describe("when the reader may not see cost", () => {
       /** @scenario "A reader who may not see cost still reads the session's tokens" */
       it("counts the session's tokens and states no cost", () => {
@@ -1223,6 +1237,15 @@ describe("the bottom bar's cost stat", () => {
       // the position-scoped number can never pass for the whole session.
       expect(statusLineCostLabel({ costUsd: 12.34, sessionCostUsd: 210 })).toBe(
         "$12.34 of $210.00",
+      );
+    });
+  });
+
+  describe("given a small session whose running figure is short of its total", () => {
+    /** @scenario "The footer at the last line counts the calls after it" */
+    it("states the total beside it, however small the gap", () => {
+      expect(statusLineCostLabel({ costUsd: 0.0023, sessionCostUsd: 0.0032 })).toBe(
+        "$0.0023 of $0.0032",
       );
     });
   });

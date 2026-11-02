@@ -209,6 +209,12 @@ Rule: The agent can declare its working context itself
     And the command says the declaration is queued
     And the exit code is zero
 
+  @unit
+  Scenario: A declaration that cannot be delivered does not hold the agent's shell
+    Given a collector the declare command cannot reach, its connection attempt still open
+    When the declaration has been queued
+    Then the command ends itself with exit code zero after its one line
+
   # Codex's sandbox refuses every write under the home directory, including
   # into a directory that already exists, and allows the temp directory. The
   # queue has to reach wherever the agent is allowed to write, or it is empty
@@ -257,6 +263,33 @@ Rule: The agent can declare its working context itself
     And a collector the session report cannot reach either
     When that session next reports its context
     Then the declaration stays queued for the next turn
+
+  # Each send to a collector that does not answer waits for its deadline, and
+  # the hook has seven seconds of the agent's ten. Once one send in a report
+  # got no answer, the rest would only spend the budget on the same silence.
+  @unit
+  Scenario: A report that cannot reach the collector sends no queued declarations
+    Given declarations queued for several sessions
+    And a collector the session report cannot reach
+    When a session reports its context
+    Then the queued declarations are not sent
+    And they all stay queued for the next turn
+
+  @unit
+  Scenario: A drain stops at the first queued declaration the collector does not answer
+    Given declarations queued for several sessions
+    And a collector that stops answering after the first send
+    When the queue drains
+    Then nothing is sent after the send that got no answer
+    And every declaration not delivered stays queued
+
+  @unit
+  Scenario: The queue drains once the collector answers again
+    Given declarations queued for several sessions while the collector could not be reached
+    And a collector that answers again
+    When a session reports its context
+    Then every queued declaration is posted
+    And nothing is left queued
 
 Rule: The agent is told when to declare
 

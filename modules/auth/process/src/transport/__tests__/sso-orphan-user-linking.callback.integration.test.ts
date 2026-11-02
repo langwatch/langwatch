@@ -125,6 +125,7 @@ function hooksRepositoryOver({ db }: { db: MemoryDb }): BetterAuthHooksRepositor
         deactivatedAt: null,
         pendingSsoSetup: false,
         signupConfirmationPending: false,
+        passwordResetRequiredAt: null,
         lastLoginAt: null,
         emailVerified: row.emailVerified === true,
       };
@@ -139,6 +140,7 @@ function hooksRepositoryOver({ db }: { db: MemoryDb }): BetterAuthHooksRepositor
     flagPendingSsoSetup: unused,
     reconcileSsoAccounts: async () => undefined,
     recordLastLogin: async () => undefined,
+    clearPasswordResetRequirement: async () => undefined,
   };
 }
 

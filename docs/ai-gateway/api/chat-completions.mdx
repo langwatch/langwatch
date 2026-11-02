@@ -6,7 +6,7 @@ sidebarTitle: Chat Completions
 
 ## Endpoint
 
-```
+```http
 POST /v1/chat/completions
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
@@ -23,7 +23,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-5-mini",
+    "model": "gpt-6-luna",
     "messages": [{"role": "user", "content": "Hi"}]
   }'
 ```
@@ -35,7 +35,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   "id": "chatcmpl-abc123",
   "object": "chat.completion",
   "created": 1734567890,
-  "model": "gpt-5-mini",
+  "model": "gpt-6-luna",
   "choices": [
     { "index": 0, "message": { "role": "assistant", "content": "Hello!" }, "finish_reason": "stop" }
   ],
@@ -86,7 +86,7 @@ Non-streaming calls that run long receive a single space character before the JS
 
 Set `"stream": true`. The response is `text/event-stream`, one `data:` frame per chunk, ending with `data: [DONE]`:
 
-```
+```text
 data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"}}]}
 
 data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"!"}}]}

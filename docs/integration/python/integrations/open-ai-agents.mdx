@@ -59,6 +59,12 @@ if __name__ == "__main__":
 
 The `OpenAIAgentsInstrumentor` automatically captures agent activities, LLM calls, and tool usage. Use `@langwatch.trace()` to create a parent trace under which agent operations will be nested.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "OpenAI Agent Run with OpenInference" appears in the traces list within a few seconds. Open it to see the agent run, its LLM calls and tool calls nested inside it.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools

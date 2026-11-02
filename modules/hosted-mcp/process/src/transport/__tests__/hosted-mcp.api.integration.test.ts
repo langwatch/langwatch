@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join, resolve } from "node:path";
 
+import { ClientAddress } from "@langwatch/api/policy";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import {
   afterAll,
@@ -23,12 +24,12 @@ import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
 import { LiveHostedMcpRepositories } from "../../repositories/live/live.hosted-mcp.repositories.ts";
 import type { McpSessionCipher } from "../../repositories/mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
-import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 function stringField(body: unknown, key: string): string {
@@ -353,11 +354,17 @@ beforeAll(async () => {
     projects: new FakeProjectLookup(),
     grants: sessionGrant,
     cliSessions,
-    address: HeaderMcpClientAddressService.create(),
+    address: ResolvedMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   }).createHandler();
 
+  // Stands in for the process's own stamp, behind a trusted local edge that names each caller.
+  const edge = ClientAddress.fromTrustedProxies({
+    addresses: ["127.0.0.1"],
+    trustCloudflare: true,
+  });
   server = createServer((req, res) => {
+    edge.handleIncoming(req);
     handler.handleRequest(req, res);
   });
 

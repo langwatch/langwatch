@@ -6,7 +6,11 @@ import type {
   AnalyticsTopDocumentsResult,
 } from "@langwatch/analytics-contract";
 
-import { AnalyticsRepository, type AnalyticsFeedbackPageRead } from "../analytics.repository.ts";
+import {
+  AnalyticsRepository,
+  type AnalyticsFeedbackPageRead,
+  type AnalyticsTableReadScope,
+} from "../analytics.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
 
 /**
@@ -22,8 +26,8 @@ export class MemoryAnalyticsRepository extends AnalyticsRepository {
     super();
   }
 
-  tableFor(input: AnalyticsTimeseriesInput): AnalyticsTable {
-    return pickAnalyticsTable(input);
+  tableFor(input: AnalyticsTimeseriesInput, scope?: AnalyticsTableReadScope): AnalyticsTable {
+    return pickAnalyticsTable(input, scope);
   }
 
   runTimeseries(): Promise<AnalyticsTimeseriesResult> {

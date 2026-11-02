@@ -32,6 +32,8 @@ type WorkflowLambdaEngine = Readonly<{
   invoke: NlpLambdaInvoke;
   fleet: AwsNlpLambdaFleetChannel;
   imageUri: string;
+  /** Where this deployment's image sits in rollout order; absent where the fleet names none. */
+  imageOrder?: number | undefined;
   configFingerprint: string;
   stagingThresholdBytes: number;
   stagingTtlSeconds: number;

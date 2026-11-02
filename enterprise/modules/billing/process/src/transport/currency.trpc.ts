@@ -4,6 +4,7 @@
  * installation mounts an empty router rather than a surface that guesses.
  */
 import {
+  callerAddressContext,
   defineMiddlewareContext,
   defineTrpcRouter,
   type TrpcRouterDeclaration,
@@ -45,7 +46,9 @@ const PUBLIC_REFERENCE_DATA =
 export const currencyTrpcTransport: TrpcRouterDeclaration<BillingCurrencyApi, typeof currencyTrpc> =
   defineTrpcRouter(BillingCurrencyApi, currencyTrpc)
     .procedure("detectCurrency")
-    .withMiddlewareContext(currencyRequestHeadersContext)
+    .withMiddlewareContext(currencyRequestHeadersContext, callerAddressContext)
     .noPermission({ reason: PUBLIC_REFERENCE_DATA })
-    .handle(({ app }, headers) => app.detectCurrency(headers === null ? {} : { headers }))
+    .handle(({ app }, headers, callerAddress) =>
+      app.detectCurrency(headers === null ? { callerAddress } : { headers, callerAddress }),
+    )
     .build();

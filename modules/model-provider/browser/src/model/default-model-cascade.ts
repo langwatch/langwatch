@@ -9,6 +9,7 @@ import type {
   ModelDefaultConfigSnapshot as StoredModelDefaultConfigSnapshot,
   ModelDefaultEffective,
   ModelProviderScopeType,
+  ModelRole,
 } from "@langwatch/model-provider-contract";
 
 /** A saved default as the browser holds one: its instants are ISO strings. */
@@ -18,15 +19,13 @@ import { toEpochMs } from "@langwatch/time";
 import type { ScopeHierarchy } from "./provider-scope-filter.ts";
 import { scopeBreadthRank } from "./scope-breadth.ts";
 
-/** The four role columns, in the order the table reads them. */
-export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
-export type ModelRoleKey = (typeof MODEL_ROLES)[number];
-
-export const MODEL_ROLE_LABEL: Record<ModelRoleKey, string> = {
+/** Each role column's header; the columns and their order are the contract's `MODEL_ROLES`. */
+export const MODEL_ROLE_LABEL: Record<ModelRole, string> = {
   DEFAULT: "Default",
   FAST: "Fast",
   LANGY: "Langy",
   EMBEDDINGS: "Embeddings",
+  INSTANT_EVALS: "Instant Evals",
 };
 
 /** One tier of the cascade: a scope type and the id of the scope at that tier. */
