@@ -92,6 +92,27 @@ describe("the pi canonicaliser", () => {
     expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]).toBeUndefined();
   });
 
+  /** @scenario "Cache-write and reasoning tokens are lifted as their own token types" */
+  it("keeps pi's input count as sent, since it already leaves the cache out", () => {
+    const { attributes } = canonicaliseWholeChain({
+      name: "pi.ai.request",
+      spanAttributes: {
+        "gen_ai.usage.input_tokens": 900,
+        "gen_ai.usage.output_tokens": 30,
+        "pi.ai.usage.input_tokens": 900,
+        "pi.ai.usage.output_tokens": 30,
+        "pi.ai.usage.cache_read_tokens": 400,
+        "pi.ai.usage.cache_write_tokens": 90,
+        "pi.session.id": "s-1",
+      },
+    });
+
+    // Fresh input exceeds the cache counts, the case where restating would subtract them.
+    expect(attributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(900);
+    expect(attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(400);
+    expect(attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(90);
+  });
+
   /** @scenario "pi's reported cost survives beside the computed cost, never as it" */
   it("leaves pi's reported cost under pi's own key and on no cost key of ours", () => {
     const { attributes } = canonicaliseWholeChain({

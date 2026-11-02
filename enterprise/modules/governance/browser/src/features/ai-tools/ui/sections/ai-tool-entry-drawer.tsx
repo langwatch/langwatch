@@ -416,7 +416,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     setForm({
       ...form,
       assistantKind: kind,
-      ...togglesOnKindChange(kind),
+      ...togglesOnKindChange({ from: form.assistantKind, to: kind }),
     });
     setIconAsset(iconAfterKindChange({ kind, iconAsset }));
   };

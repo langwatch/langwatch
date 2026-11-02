@@ -11,7 +11,11 @@ import {
   hasAttributeWithPrefix,
   takeAttribute,
 } from "./canonicalAttributes.ts";
-import { extractModelToBoth, inferSpanTypeIfAbsent } from "./canonicalExtraction.ts";
+import {
+  extractModelToBoth,
+  inferSpanTypeIfAbsent,
+  markInputAsFresh,
+} from "./canonicalExtraction.ts";
 import { asNumber, isNonEmptyString } from "./canonicalGuard.ts";
 
 const PI_ATTR_PREFIX = "pi.";
@@ -80,6 +84,16 @@ export class PiCanonicaliserService implements AttributeCanonicaliser {
       takeAttribute(ctx.bag.attrs, sourceKey);
       ctx.setAttr(canonicalKey, tokens);
       ctx.recordRule(`${this.id}:${sourceKey}`);
+    }
+
+    // pi-ai reports input with the cache reads and writes already taken out, so
+    // restating it as the fresh remainder would subtract the cache a second time.
+    const hasInput =
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== void 0 ||
+      ctx.bag.attrs.has("pi.ai.usage.input_tokens");
+    if (hasInput) {
+      markInputAsFresh(ctx, { ruleId: `${this.id}:usage.input_tokens(fresh as sent)` });
     }
   }
 
