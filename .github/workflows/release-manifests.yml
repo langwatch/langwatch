@@ -41,9 +41,8 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
-
-      - name: Install the upgrade package
-        run: CI=true pnpm install --frozen-lockfile --filter "@langwatch/upgrade..."
+        with:
+          install: "@langwatch/upgrade..."
 
       - name: Check the manifests against the changelog
         run: pnpm --filter @langwatch/upgrade test src/manifest/__tests__/manifest-loader.unit.test.ts

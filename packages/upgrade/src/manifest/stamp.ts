@@ -1,4 +1,4 @@
-import type { ManifestStep, ReleaseManifest } from "./manifest.ts";
+import { compareReleases, type ManifestStep, type ReleaseManifest } from "./manifest.ts";
 
 /** What one tree (working tree or release tag) holds: SQL file names and declared code steps. */
 export interface ReleaseTreeSteps {
@@ -128,4 +128,43 @@ export function ownerFromTables({
   const owners = new Set([...tables].map((table) => tableOwners.get(table) ?? null));
   if (owners.size !== 1) return null;
   return [...owners][0] ?? null;
+}
+
+/** A shipped release with no manifest, or one following the wrong release, and how to stamp it. */
+export type ReleaseManifestGap = { release: string; previous: string; stamp: string };
+
+/** The commands that stamp `release`; `--tree` reads the tagged tree once the tag exists. */
+function stampCommand({ release, previous }: { release: string; previous: string }): string {
+  return (
+    "pnpm --filter @langwatch/architecture-enforcer print:table-owners --out table-owners.json && " +
+    "node --disable-warning=ExperimentalWarning --experimental-transform-types " +
+    `packages/upgrade/scripts/stamp-release.ts --release ${release} --previous ${previous} ` +
+    `--table-owners table-owners.json (add --tree langwatch@v${release} once that tag exists)`
+  );
+}
+
+/**
+ * Each release after `baseline` that has no manifest, or one that does not follow the release
+ * before it; `released` is every platform release shipped, in any order.
+ */
+export function releaseManifestGaps({
+  released,
+  baseline,
+  manifests,
+}: {
+  released: readonly string[];
+  baseline: string;
+  manifests: readonly Pick<ReleaseManifest, "release" | "previous">[];
+}): ReleaseManifestGap[] {
+  const chain = released
+    .filter((release) => compareReleases({ left: release, right: baseline }) > 0)
+    .toSorted((left, right) => compareReleases({ left, right }));
+
+  return chain.flatMap((release, index) => {
+    const previous = chain[index - 1] ?? baseline;
+    const manifest = manifests.find((each) => each.release === release);
+    if (manifest?.previous === previous) return [];
+
+    return [{ release, previous, stamp: stampCommand({ release, previous }) }];
+  });
 }
