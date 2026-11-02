@@ -391,7 +391,7 @@ function isHookFileInstalled(report: InstallReport): boolean {
 }
 
 /** What each tool's install did beyond the env, told once it is done. */
-const TOOL_INSTALLATION_NOTES: Record<string, (report: InstallReport) => string> = {
+const TOOL_INSTALLATION_NOTES: Partial<Record<SupportedTool, (report: InstallReport) => string>> = {
   codex: (report) =>
     `\nThe [otel] activation block in your codex config.toml has been wired automatically.\n` +
     (report.session_hooks_action

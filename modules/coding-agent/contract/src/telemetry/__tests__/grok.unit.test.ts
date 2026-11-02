@@ -158,6 +158,31 @@ describe("a Grok trace's transcript", () => {
     );
   });
 
+  /** @scenario An allowed Grok tool call is not shown as rejected */
+  it("shows a denied decision as rejected and an allowed one not at all", () => {
+    const transcript = buildCodingAgentTranscript({
+      spans: [],
+      logs: [
+        grokLog({
+          "event.name": "grok_code.tool_decision",
+          tool_name: "read_file",
+          decision: "allow",
+          source: "config",
+        }),
+        grokLog({
+          "event.name": "grok_code.tool_decision",
+          tool_name: "run_terminal_command",
+          decision: "deny",
+          source: "user",
+        }),
+      ],
+    });
+
+    expect(transcript.entries).toEqual([
+      expect.objectContaining({ kind: "tool_rejected", name: "run_terminal_command" }),
+    ]);
+  });
+
   /** @scenario A Grok MCP tool run in the transcript names its server */
   it("names the MCP server Grok reported", () => {
     const transcript = buildCodingAgentTranscript({

@@ -110,7 +110,7 @@ than an API key. Writing the user's model config is out of proportion for v1.
 ## References
 
 - Related ADRs: ADR-039 (wrappers and ingest keys), ADR-056 (session
-  aggregate), ADR-188 (pi, the previous native agent)
+  aggregate)
 - Specs: `specs/ai-governance/ingestion-sources/grok-cli-otlp.feature`,
   `specs/coding-agent/grok-sessions.feature`,
   `specs/coding-agent/grok-model-calls.feature`,

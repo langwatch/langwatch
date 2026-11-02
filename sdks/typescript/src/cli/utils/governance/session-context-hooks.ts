@@ -140,7 +140,8 @@ export function hookFileNotOursNotice({
   displayPath: string;
   command: string;
 }): string {
-  const agent = ownedHookFileToolForCommand(command) === "grok" ? "Grok" : "Copilot";
+  const tool = ownedHookFileToolForCommand(command);
+  const agent = tool ? SESSION_CONTEXT_AGENTS[tool].displayName : "The agent's";
   return (
     `${displayPath} is not a LangWatch file, so it was left alone, and ${agent} ` +
     `sessions will not report their repository or branch. ${agent} loads every .json file ` +
@@ -150,8 +151,8 @@ export function hookFileNotOursNotice({
 
 /**
  * Writes the hook file of the agent `command` launches, when that file is ours
- * alone (Copilot). Null when there is none or the write failed: best-effort,
- * because the exports it rides beside are the wiring that matters.
+ * alone. Null when there is none or the write failed (warned on stderr):
+ * best-effort, because the exports it rides beside are the wiring that matters.
  */
 export function assertOwnedHookFileFor({
   command,
@@ -162,7 +163,12 @@ export function assertOwnedHookFileFor({
   if (!tool) return null;
   try {
     return installSessionContextHooks({ tool });
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(
+      `  ! Could not write ${sessionContextHooksTarget(tool).displayPath} (${reason}): ` +
+        `sessions will not report their repository or branch.`,
+    );
     return null;
   }
 }

@@ -17,6 +17,7 @@ import {
 } from "./telemetry/coding-agent-normalization.ts";
 import { pickString } from "./telemetry/coding-agent-span.ts";
 import { grokAgent } from "./telemetry/grok.ts";
+import { toolDecisionOutcome } from "./telemetry/tool-decision.ts";
 
 export function collectLogEntries(
   logs: TranscriptLogRecord[],
@@ -214,7 +215,8 @@ function buildToolDecisionEntry(
   atMs: number,
 ): TranscriptEntry | null {
   const decision = pickString(attrs, "decision");
-  if (decision === null || decision === "accept") return null;
+  const outcome = toolDecisionOutcome({ decision, source: pickString(attrs, "source") });
+  if (decision === null || outcome === "unknown" || outcome === "allowed") return null;
 
   return {
     kind: "tool_rejected",

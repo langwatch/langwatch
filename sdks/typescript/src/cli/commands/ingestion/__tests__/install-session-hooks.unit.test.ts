@@ -15,10 +15,7 @@ import {
   OPENCODE_HOOK_COMMAND,
   OPENCODE_PLUGIN_FILE_NAME,
 } from "@/cli/utils/governance/opencode-plugin";
-import {
-  COPILOT_HOOK_FILE_NAME,
-  GROK_HOOK_FILE_NAME,
-} from "@/cli/utils/governance/session-context-agents";
+import { OWNED_HOOK_FILE_NAME } from "@/cli/utils/governance/session-context-agents";
 import { sessionContextHookCommand } from "@/cli/utils/governance/session-context-hooks";
 import { scanTelemetryTargets } from "@/cli/utils/governance/telemetry-targets";
 
@@ -330,8 +327,8 @@ describe("the copilot ingestion install", () => {
       await runCopilotInstall();
       await runCopilotInstall();
 
-      expect(fs.readdirSync(copilotHooksDir)).toEqual([COPILOT_HOOK_FILE_NAME]);
-      expect(readJson(path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME))).toEqual({
+      expect(fs.readdirSync(copilotHooksDir)).toEqual([OWNED_HOOK_FILE_NAME]);
+      expect(readJson(path.join(copilotHooksDir, OWNED_HOOK_FILE_NAME))).toEqual({
         version: 1,
         hooks: {
           sessionStart: [copilotHookEntry],
@@ -343,9 +340,7 @@ describe("the copilot ingestion install", () => {
     it("reports the file and says the user's own hook files are untouched", async () => {
       await runCopilotInstall();
 
-      expect(stdout()).toContain(
-        `~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME} session hooks created`,
-      );
+      expect(stdout()).toContain(`~/.copilot/hooks/${OWNED_HOOK_FILE_NAME} session hooks created`);
       expect(stdout()).toContain("own hook files are untouched");
     });
 
@@ -377,7 +372,7 @@ describe("the copilot ingestion install", () => {
 
       await runCopilotInstall();
 
-      expect(fs.readdirSync(path.join(relocated, "hooks"))).toEqual([COPILOT_HOOK_FILE_NAME]);
+      expect(fs.readdirSync(path.join(relocated, "hooks"))).toEqual([OWNED_HOOK_FILE_NAME]);
       expect(fs.existsSync(copilotHooksDir)).toBe(false);
     });
   });
@@ -402,7 +397,7 @@ describe("the copilot ingestion install", () => {
     it("keeps the user's file byte for byte through install and logout, and logout deletes ours", async () => {
       await runCopilotInstall();
       expect(fs.readFileSync(userHookFile(), "utf8")).toBe(userHookBytes);
-      expect(fs.existsSync(path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME))).toBe(true);
+      expect(fs.existsSync(path.join(copilotHooksDir, OWNED_HOOK_FILE_NAME))).toBe(true);
 
       removeTelemetryTargets();
 
@@ -412,7 +407,7 @@ describe("the copilot ingestion install", () => {
   });
 
   describe("given a langwatch.json the user wrote that runs our command beside their own hooks", () => {
-    const langwatchFile = () => path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME);
+    const langwatchFile = () => path.join(copilotHooksDir, OWNED_HOOK_FILE_NAME);
     const userBytes = JSON.stringify({
       hooks: {
         sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
@@ -443,7 +438,7 @@ describe("the copilot ingestion install", () => {
     it("reports the file left alone, never that linking is off or a hook file was added", async () => {
       await runCopilotInstall();
 
-      expect(stdout()).toContain(`~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME}`);
+      expect(stdout()).toContain(`~/.copilot/hooks/${OWNED_HOOK_FILE_NAME}`);
       expect(stdout()).toContain("left alone");
       expect(stdout()).not.toContain("will not report their repository or branch");
       expect(stdout()).not.toContain("A LangWatch hook file was added");
@@ -451,7 +446,7 @@ describe("the copilot ingestion install", () => {
   });
 
   describe("given a langwatch.json the user wrote that runs none of our commands", () => {
-    const langwatchFile = () => path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME);
+    const langwatchFile = () => path.join(copilotHooksDir, OWNED_HOOK_FILE_NAME);
 
     beforeEach(() => {
       fs.mkdirSync(copilotHooksDir, { recursive: true });
@@ -466,7 +461,7 @@ describe("the copilot ingestion install", () => {
       await runCopilotInstall();
 
       expect(stdout()).toContain(
-        `~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME} is not a LangWatch file, so it was left alone`,
+        `~/.copilot/hooks/${OWNED_HOOK_FILE_NAME} is not a LangWatch file, so it was left alone`,
       );
       expect(stdout()).toContain("will not report their repository or branch");
       expect(stdout()).not.toContain("A LangWatch hook file was added");
@@ -479,7 +474,7 @@ describe("the grok ingestion install", () => {
   const grokGroup = {
     hooks: [{ type: "command", command: "langwatch ingest hook grok", timeout: 10 }],
   };
-  const grokFile = () => path.join(grokHooksDir, GROK_HOOK_FILE_NAME);
+  const grokFile = () => path.join(grokHooksDir, OWNED_HOOK_FILE_NAME);
 
   describe("given a Grok hooks folder without the LangWatch file", () => {
     /** @scenario Installing grok writes LangWatch's own hook file */
@@ -487,7 +482,7 @@ describe("the grok ingestion install", () => {
       await runGrokInstall();
       await runGrokInstall();
 
-      expect(fs.readdirSync(grokHooksDir)).toEqual([GROK_HOOK_FILE_NAME]);
+      expect(fs.readdirSync(grokHooksDir)).toEqual([OWNED_HOOK_FILE_NAME]);
       expect(readJson(grokFile())).toEqual({
         hooks: { SessionStart: [grokGroup], Stop: [grokGroup], SubagentStart: [grokGroup] },
       });
@@ -507,7 +502,7 @@ describe("the grok ingestion install", () => {
     it("says Grok runs the hook once the folder is trusted", async () => {
       await runGrokInstall();
 
-      expect(stdout()).toContain(`~/.grok/hooks/${GROK_HOOK_FILE_NAME} session hooks created`);
+      expect(stdout()).toContain(`~/.grok/hooks/${OWNED_HOOK_FILE_NAME} session hooks created`);
       expect(stdout()).toContain("once you trust\nthe folder");
       expect(stdout()).not.toContain("--trust");
     });
@@ -521,7 +516,7 @@ describe("the grok ingestion install", () => {
 
       await runGrokInstall();
 
-      expect(fs.readdirSync(path.join(relocated, "hooks"))).toEqual([GROK_HOOK_FILE_NAME]);
+      expect(fs.readdirSync(path.join(relocated, "hooks"))).toEqual([OWNED_HOOK_FILE_NAME]);
       expect(fs.existsSync(grokHooksDir)).toBe(false);
     });
   });
@@ -570,6 +565,29 @@ describe("the grok ingestion install", () => {
 
       expect(fs.readFileSync(grokFile(), "utf8")).toBe(userBytes);
       expect(stdout()).toContain("Grok sessions will not report their repository or branch");
+    });
+  });
+
+  describe("given the user's langwatch.json runs our hook in a nested handler beside their own", () => {
+    const userBytes = JSON.stringify({
+      hooks: {
+        SessionStart: [{ hooks: [{ type: "command", command: "langwatch ingest hook grok" }] }],
+        PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "./guard.sh" }] }],
+      },
+    });
+
+    beforeEach(() => {
+      fs.mkdirSync(grokHooksDir, { recursive: true });
+      fs.writeFileSync(grokFile(), userBytes);
+    });
+
+    /** @scenario A langwatch.json LangWatch did not write is never rewritten */
+    it("leaves it byte for byte and reports it runs our hook, not that linking is off", async () => {
+      const { installCommand } = await import("../install.js");
+      await installCommand("grok_cli", { json: true });
+
+      expect(fs.readFileSync(grokFile(), "utf8")).toBe(userBytes);
+      expect(JSON.parse(stdout())).toMatchObject({ session_hooks_action: "user_file_runs_hook" });
     });
   });
 });

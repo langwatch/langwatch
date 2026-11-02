@@ -31,6 +31,8 @@ export type HookTarget =
 export interface SessionContextAgent {
   /** The tool argument `langwatch ingest hook` is called with. */
   hookArgument: string;
+  /** The agent's name as a user reads it in a notice. */
+  displayName: string;
   /** What the record declares as `coding_agent.name`: the server's agent id. */
   agent: string;
   /** Every source type a personal key for this agent is cached and minted under. */
@@ -53,42 +55,23 @@ export interface SessionContextAgent {
 /** The single key source type of an agent with one surface. */
 const only = (sourceType: string) => () => sourceType;
 
-/** The name of LangWatch's own file in the Copilot hook folder. */
-export const COPILOT_HOOK_FILE_NAME = "langwatch.json";
+/** The name of LangWatch's own file in every hook folder an agent loads whole. */
+export const OWNED_HOOK_FILE_NAME = "langwatch.json";
 
 /**
- * The Copilot hook folder: `$COPILOT_HOME/hooks` when the user relocated it,
- * `~/.copilot/hooks` otherwise. Both the CLI and VS Code load every `*.json`
+ * Our file in an agent's hook folder: `$<homeVar>/hooks` when the user relocated
+ * the agent's config, `~/<homeDir>/hooks` otherwise. The agent loads every `*.json`
  * there, so this file is ours alone and no user file is ever edited.
  */
-function copilotHookFile(): HooksTarget {
-  const home = process.env.COPILOT_HOME?.trim();
+function ownedHookFileIn({ homeVar, homeDir }: { homeVar: string; homeDir: string }): HooksTarget {
+  const home = process.env[homeVar]?.trim();
   if (home) {
-    const file = path.join(home, "hooks", COPILOT_HOOK_FILE_NAME);
+    const file = path.join(home, "hooks", OWNED_HOOK_FILE_NAME);
     return { path: file, displayPath: file };
   }
   return {
-    path: path.join(os.homedir(), ".copilot", "hooks", COPILOT_HOOK_FILE_NAME),
-    displayPath: `~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME}`,
-  };
-}
-
-/** The name of LangWatch's own file in the Grok hook folder, as Copilot's is. */
-export const GROK_HOOK_FILE_NAME = "langwatch.json";
-
-/**
- * The Grok hook folder: `$GROK_HOME/hooks` when the user relocated Grok's
- * config, `~/.grok/hooks` otherwise. Grok loads every `*.json` there.
- */
-function grokHookFile(): HooksTarget {
-  const home = process.env.GROK_HOME?.trim();
-  if (home) {
-    const file = path.join(home, "hooks", GROK_HOOK_FILE_NAME);
-    return { path: file, displayPath: file };
-  }
-  return {
-    path: path.join(os.homedir(), ".grok", "hooks", GROK_HOOK_FILE_NAME),
-    displayPath: `~/.grok/hooks/${GROK_HOOK_FILE_NAME}`,
+    path: path.join(os.homedir(), homeDir, "hooks", OWNED_HOOK_FILE_NAME),
+    displayPath: `~/${homeDir}/hooks/${OWNED_HOOK_FILE_NAME}`,
   };
 }
 
@@ -98,6 +81,7 @@ export const HOOK_TIMEOUT_SECONDS = 10;
 export const SESSION_CONTEXT_AGENTS = {
   claude_code: {
     hookArgument: "claude-code",
+    displayName: "Claude Code",
     agent: "claude_code",
     keySourceTypes: ["claude_code"],
     keySourceType: only("claude_code"),
@@ -114,6 +98,7 @@ export const SESSION_CONTEXT_AGENTS = {
   },
   codex: {
     hookArgument: "codex",
+    displayName: "Codex",
     agent: "codex",
     keySourceTypes: ["codex"],
     keySourceType: only("codex"),
@@ -135,6 +120,7 @@ export const SESSION_CONTEXT_AGENTS = {
   },
   opencode: {
     hookArgument: "opencode",
+    displayName: "opencode",
     agent: "opencode",
     keySourceTypes: ["opencode"],
     keySourceType: only("opencode"),
@@ -142,6 +128,7 @@ export const SESSION_CONTEXT_AGENTS = {
   },
   copilot: {
     hookArgument: "copilot",
+    displayName: "Copilot",
     agent: "copilot",
     // One agent, two surfaces, two keys: the CLI and VS Code are minted and
     // cached apart so each surface's telemetry stays separable (ADR-039 S4).
@@ -150,16 +137,23 @@ export const SESSION_CONTEXT_AGENTS = {
     keySourceType: (env) => (env.COPILOT_CLI?.trim() ? "copilot_cli" : "copilot_vscode"),
     // The CLI pins this to where it was launched; VS Code sends none.
     projectDirVar: "COPILOT_PROJECT_DIR",
-    hookTarget: { kind: "owned-file", resolve: copilotHookFile },
+    hookTarget: {
+      kind: "owned-file",
+      resolve: () => ownedHookFileIn({ homeVar: "COPILOT_HOME", homeDir: ".copilot" }),
+    },
   },
   grok: {
     hookArgument: "grok",
+    displayName: "Grok",
     agent: "grok",
     keySourceTypes: ["grok_cli"],
     keySourceType: only("grok_cli"),
     sessionIdVar: "GROK_SESSION_ID",
     projectDirVar: "GROK_WORKSPACE_ROOT",
-    hookTarget: { kind: "owned-file", resolve: grokHookFile },
+    hookTarget: {
+      kind: "owned-file",
+      resolve: () => ownedHookFileIn({ homeVar: "GROK_HOME", homeDir: ".grok" }),
+    },
   },
 } as const satisfies Record<string, SessionContextAgent>;
 

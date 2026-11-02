@@ -96,6 +96,13 @@ Rule: One row per Grok session id
     When the session is folded
     Then the row counts one failed tool run
 
+  # Grok decides with allow, deny, followup or cancelled; Claude says accept or reject.
+  @unit
+  Scenario: Grok's tool decisions are counted in its own words
+    Given a Grok session whose tool_decision records say "allow", "deny", "followup" and "cancelled"
+    When the session is folded
+    Then the row counts two denied tool runs and one aborted tool run
+
   # Grok names the server apart, as mcp_server_name, and the tool "<server>__<tool>".
   @unit
   Scenario: A Grok MCP tool run names its server and tool on the row
@@ -184,6 +191,18 @@ Rule: A Grok turn reads back in the Trace Explorer
     Given a Grok tool_result record for "read_file" with tool_input and tool_output
     When the trace's transcript is built
     Then it holds a tool entry "read_file" with that input and output
+
+  @unit
+  Scenario: A Grok tool run's output is withheld behind the output gate
+    Given a Grok tool_result record carrying tool_input and tool_output
+    When the project withholds tool content
+    Then tool_output is withheld as output and tool_input as input
+
+  @unit
+  Scenario: An allowed Grok tool call is not shown as rejected
+    Given Grok tool_decision records for "read_file" saying "allow" and for "run_terminal_command" saying "deny"
+    When the trace's transcript is built
+    Then it holds one rejected entry, for "run_terminal_command"
 
   @unit
   Scenario: A Grok MCP tool run in the transcript names its server

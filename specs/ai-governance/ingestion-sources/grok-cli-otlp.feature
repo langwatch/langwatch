@@ -160,6 +160,7 @@ Rule: Logs-only sessions group under a synthesized trace
     When their correlation is synthesized
     Then all of them share one trace id derived from the session id and prompt id
     And each has a distinct span id
+    And each is marked as synthesized for Grok, not for Claude
 
   @unit
   Scenario: A keyless Grok record is not given a trace of its own

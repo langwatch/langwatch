@@ -14,6 +14,7 @@ import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
+import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
 import { trustLocalDevCa } from "./utils/localDevCa";
 import {
   applyOutputContext,
@@ -6299,7 +6300,7 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
       .option("--session-id <id>", "declare for this session instead of resolving the live one")
       .option(
         "--agent <tool>",
-        "the agent the session belongs to: claude-code, codex, opencode or copilot",
+        `the agent the session belongs to: ${sessionContextHookArguments().join(", ")}`,
       ),
   ).action(async (options: { sessionId?: string; agent?: string }) => {
     try {

@@ -396,6 +396,26 @@ describe("Grok sessions", () => {
       expect(state.failedTools).toBe(1);
     });
 
+    /** @scenario Grok's tool decisions are counted in its own words */
+    it("counts deny and followup as denied, cancelled as aborted, allow as neither", () => {
+      const decision = (value: string) =>
+        grokRecord({
+          eventName: "grok_code.tool_decision",
+          sessionId: PARENT,
+          attributes: { tool_name: "run_terminal_command", decision: value, source: "user" },
+        });
+      const state = foldOne([
+        ...turn(PARENT),
+        decision("allow"),
+        decision("deny"),
+        decision("followup"),
+        decision("cancelled"),
+      ]);
+
+      expect(state.toolsDenied).toBe(2);
+      expect(state.toolsAborted).toBe(1);
+    });
+
     /** @scenario A Grok MCP tool run names its server and tool on the row */
     it("reads the server from mcp_server_name and strips it off the tool name", () => {
       const state = foldOne([

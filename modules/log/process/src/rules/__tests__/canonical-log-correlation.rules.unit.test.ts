@@ -34,7 +34,7 @@ describe("synthesizeCorrelation", () => {
       expect(turn[0]!.traceId).toMatch(/^[a-f0-9]{32}$/);
       expect(new Set(turn.map((record) => record.spanId)).size).toBe(4);
       expect(turn.every((record) => record.providerKind === "grok")).toBe(true);
-      expect(turn.every((record) => record.source === "claude_synthesized")).toBe(true);
+      expect(turn.every((record) => record.source === "grok_synthesized")).toBe(true);
     });
 
     it("gives the next turn a trace id of its own", () => {

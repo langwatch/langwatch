@@ -60,7 +60,7 @@ export function synthesizeCorrelation(args: {
   const sessionId = attributes["session.id"] ?? "";
   // Grok keys a turn on the same session.id and prompt.id as Claude (ADR-192).
   if ((providerKind === "claude_code" || providerKind === "grok") && sessionId) {
-    return claudeSynthesizedCorrelation({
+    return sessionTurnSynthesizedCorrelation({
       providerKind,
       sessionId,
       wireTraceId,
@@ -82,8 +82,8 @@ export function synthesizeCorrelation(args: {
   return { traceId: "", spanId: "", source: "none", providerKind };
 }
 
-function claudeSynthesizedCorrelation(args: {
-  providerKind: LogProviderKind;
+function sessionTurnSynthesizedCorrelation(args: {
+  providerKind: "claude_code" | "grok";
   sessionId: string;
   wireTraceId: string;
   wireSpanId: string;
@@ -108,7 +108,7 @@ function claudeSynthesizedCorrelation(args: {
   return {
     traceId,
     spanId,
-    source: "claude_synthesized",
+    source: providerKind === "grok" ? "grok_synthesized" : "claude_synthesized",
     providerKind,
   };
 }

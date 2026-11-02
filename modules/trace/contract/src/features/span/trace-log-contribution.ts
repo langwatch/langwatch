@@ -6,6 +6,7 @@ const logCorrelationSourceSchema = z.enum([
   "wire",
   "claude_synthesized",
   "codex_synthesized",
+  "grok_synthesized",
 ]);
 
 const logProviderKindSchema = z.enum(["generic", "claude_code", "codex", "grok"]);

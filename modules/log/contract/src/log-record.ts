@@ -6,6 +6,7 @@ export const logCorrelationSourceSchema = z.enum([
   "wire",
   "claude_synthesized",
   "codex_synthesized",
+  "grok_synthesized",
 ]);
 export type LogCorrelationSource = z.infer<typeof logCorrelationSourceSchema>;
 

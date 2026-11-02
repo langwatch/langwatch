@@ -636,14 +636,14 @@ export function assertOwnedSessionHookFile({ tool }: { tool: string }): void {
   const hooks = assertOwnedHookFileFor({ command: tool });
   if (!hooks || hooks.action === "unchanged" || hooks.action === "user_file_runs_hook") return;
   if (hooks.action === "not_ours") {
-    console.log(
+    console.error(
       chalk.yellow(
         `  ! ${hookFileNotOursNotice({ displayPath: hooks.displayPath, command: tool })}`,
       ),
     );
     return;
   }
-  console.log(
+  console.error(
     chalk.green(
       `  ✓ Installed ${hooks.displayPath}, whose hooks report each session's repository and branch`,
     ),
