@@ -466,12 +466,8 @@ func (e *Executor) childEnv() []string {
 	if allow == nil {
 		allow = defaultEnvAllowlist
 	}
-	env := make([]string, 0, len(allow)+1)
+	env := make([]string, 0, len(allow))
 	for _, name := range allow {
-		// Only the engine says whether the runner may skip its hide step.
-		if name == hideModeEnvVar {
-			continue
-		}
 		if v, ok := os.LookupEnv(name); ok {
 			env = append(env, name+"="+v)
 		}

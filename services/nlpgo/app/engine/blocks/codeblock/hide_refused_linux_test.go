@@ -108,6 +108,9 @@ func childEnvFor(name string, extra ...string) []string {
 		case caseEnv, hideModeEnv:
 			continue
 		}
+		if strings.HasPrefix(kv, "NLPGO_") || strings.HasPrefix(kv, "AWS_LAMBDA_") {
+			continue
+		}
 		env = append(env, kv)
 	}
 	env = append(env, caseEnv+"="+name)
@@ -127,7 +130,7 @@ func runChild(t *testing.T, name string, extra ...string) {
 	cmd.Stdout, cmd.Stderr = &out, &out
 	err := cmd.Run()
 	if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == skipExitCode {
-		t.Skipf("cannot install the seccomp filter here, so Lambda's refusal cannot be reproduced: %s", out.String())
+		t.Skipf("cannot run this case on this host: %s", out.String())
 	}
 	require.NoError(t, err, "child case %s failed:\n%s", name, out.String())
 }
@@ -170,7 +173,9 @@ func TestHideRefusedChild(t *testing.T) {
 	if name == "" {
 		t.Skip("entry point for the re-executed child; run through TestHideRefused_*")
 	}
-	if name != "not-refused" {
+	if name == "not-refused" {
+		exitSkippedIfHostRefusesHide()
+	} else {
 		if err := refusePrSetDumpable(); err != nil {
 			fmt.Fprintf(os.Stderr, "seccomp install failed: %v\n", err)
 			os.Exit(skipExitCode)
@@ -181,6 +186,16 @@ func TestHideRefusedChild(t *testing.T) {
 		runRunnerCase(t, name)
 	default:
 		runExecutorCase(t, name)
+	}
+}
+
+// exitSkippedIfHostRefusesHide ends the child with the skip code when this host
+// already refuses PR_SET_DUMPABLE, where strict mode cannot be expected.
+func exitSkippedIfHostRefusesHide() {
+	const prSetDumpable = 4
+	if _, _, errno := syscall.Syscall6(syscall.SYS_PRCTL, prSetDumpable, 1, 0, 0, 0, 0); errno != 0 {
+		fmt.Fprintf(os.Stderr, "this host already refuses PR_SET_DUMPABLE (%v), so strict mode cannot be asserted\n", errno)
+		os.Exit(skipExitCode)
 	}
 }
 
@@ -215,6 +230,35 @@ func runExecutorCase(t *testing.T, name string) {
 		require.Nil(t, res.Error, "expected success, got %+v", res.Error)
 		assert.EqualValues(t, 42, res.Outputs["answer"])
 	}
+	if name == "refused-allowed" {
+		assertRunnerDropsHideFlag(t, exe)
+	}
+}
+
+// assertRunnerDropsHideFlag runs user code in visible-process mode, where the
+// engine does set the flag, and checks neither the code nor a process it
+// starts can see it.
+func assertRunnerDropsHideFlag(t *testing.T, exe *codeblock.Executor) {
+	t.Helper()
+	const code = `import os, subprocess, sys
+
+def execute():
+    sub = subprocess.run(
+        [sys.executable, "-c", "import os; print(os.environ.get('NLPGO_CODE_BLOCK_HIDE'))"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    return {"own": os.environ.get("NLPGO_CODE_BLOCK_HIDE"), "sub": sub}
+`
+	res, err := exe.Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		DeclaredOutputs: []string{"own", "sub"},
+		Timeout:         30 * time.Second,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.Nil(t, res.Error, "expected success, got %+v", res.Error)
+	assert.Nil(t, res.Outputs["own"], "user code must not see the hide flag")
+	assert.Equal(t, "None", res.Outputs["sub"], "a process user code starts must not see the hide flag")
 }
 
 // assertOtherBlocksRunThroughEngine builds an engine around this refused
@@ -259,13 +303,13 @@ func assertOtherBlocksRunThroughEngine(t *testing.T, exe *codeblock.Executor) {
 		return res.Nodes[nodeID]
 	}
 
-	codeState := run("code-1")
-	require.NotNil(t, codeState.Error)
-	assert.Contains(t, codeState.Error.Message, codeblock.AllowVisibleProcessSetting)
-
 	httpState := run("http-1")
-	require.Nil(t, httpState.Error, "the HTTP node must not be touched by the disabled code executor")
-	assert.Equal(t, "yes", httpState.Outputs["value"])
+	require.Nil(t, httpState.Error, "node http-1 must not be touched by the disabled code executor")
+	assert.Equal(t, "yes", httpState.Outputs["value"], "node http-1 output")
+
+	codeState := run("code-1")
+	require.NotNil(t, codeState.Error, "node code-1 must carry the error")
+	assert.Contains(t, codeState.Error.Message, codeblock.AllowVisibleProcessSetting, "node code-1 error")
 }
 
 // assertHideModeLogged checks the one operator-facing record of the mode:
