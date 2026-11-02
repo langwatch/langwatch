@@ -16,16 +16,18 @@ import (
 )
 
 // PRCall is one check pr.yml calls: its job key there and its file. An
-// Always check runs on every change, so its filter is every path.
+// Always check runs on every change, so its filter is every path. An
+// OnMainPush check still runs on a merge to main; the rest run nightly.
 type PRCall struct {
-	Key    string
-	File   string
-	Always bool
+	Key        string
+	File       string
+	Always     bool
+	OnMainPush bool
 }
 
 // PRCalls are the product checks pr.yml starts, in the order it lists them.
 var PRCalls = []PRCall{
-	{Key: "app", File: "langwatch-app-ci.yml"},
+	{Key: "app", File: "langwatch-app-ci.yml", OnMainPush: true},
 	{Key: "e2e", File: "e2e-ci.yml"},
 	{Key: "nlp", File: "langwatch-nlp-ci.yml"},
 	{Key: "langevals", File: "langevals-ci.yml"},
@@ -290,7 +292,10 @@ func settleProblems(pr *prFile) []string {
 // calls, and the nightly suite runs pr.yml for the rest.
 func mainProblems(repoRoot string) ([]string, error) {
 	var problems []string
-	for _, call := range PRCalls[1:] {
+	for _, call := range PRCalls {
+		if call.OnMainPush {
+			continue
+		}
 		rel := filepath.ToSlash(filepath.Join(ciscan.WorkflowDir, call.File))
 		called, err := loadPRFile(repoRoot, rel)
 		if err != nil {

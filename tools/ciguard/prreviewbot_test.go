@@ -330,16 +330,41 @@ func TestPRReviewBotAcceptsALocalCompositeAction(t *testing.T) {
 	assert.Empty(t, problems)
 }
 
-func TestPRReviewBotReportsMissingTriggerTypes(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow,
-		"\n    types: [opened, synchronize, reopened, ready_for_review]", "", 1)
-	root := writePRReviewBotWorkflow(t, broken)
+// calledPRReviewBot is the bot as pr.yml calls it: no pull_request trigger of its own.
+func calledPRReviewBot(t *testing.T, prTypes string) string {
+	t.Helper()
+	bot := strings.Replace(goodPRReviewBotWorkflow,
+		"  pull_request:\n    types: [opened, synchronize, reopened, ready_for_review]", "  workflow_call:", 1)
+	root := writePRReviewBotWorkflow(t, bot)
+	pr := "name: pr\non:\n  pull_request:\n" + prTypes + "jobs: {}\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, ciguard.PRWorkflowFile), []byte(pr), 0o600))
 
-	problems, err := ciguard.PRReviewBot(root)
+	return root
+}
+
+func TestPRReviewBotReportsMissingTriggerTypes(t *testing.T) {
+	problems, err := ciguard.PRReviewBot(calledPRReviewBot(t, ""))
 
 	require.NoError(t, err)
-	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "declares no pull_request")
+	assert.Contains(t, strings.Join(problems, "\n"), ciguard.PRWorkflowFile+" declares no pull_request")
+}
+
+func TestPRReviewBotReadsTheTriggerTypesOfPRWorkflowWhenCalled(t *testing.T) {
+	problems, err := ciguard.PRReviewBot(calledPRReviewBot(t, "    types: [opened, synchronize, reopened, ready_for_review]\n"))
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+
+	problems, err = ciguard.PRReviewBot(calledPRReviewBot(t, "    types: [opened, synchronize]\n"))
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), ciguard.PRWorkflowFile+" pull_request types are")
+}
+
+func TestPRReviewBotRefusesWhenCalledAndPRWorkflowIsMissing(t *testing.T) {
+	root := calledPRReviewBot(t, "")
+	require.NoError(t, os.Remove(filepath.Join(root, ciguard.PRWorkflowFile)))
+
+	_, err := ciguard.PRReviewBot(root)
+	require.Error(t, err)
 }
 
 func TestPRReviewBotReportsAnExtraTriggerType(t *testing.T) {
