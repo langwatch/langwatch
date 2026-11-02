@@ -82,6 +82,10 @@ const monitorSchemaDefinition = z
     threadIdleTimeout: z.number().int().positive().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
+    /** When the monitor paused itself because its evaluations mostly errored; cleared on enable. */
+    autoPausedAt: z.date().nullish(),
+    /** Why it paused itself, in words a person reads. */
+    autoPausedReason: z.string().nullish(),
   })
   .strict();
 export interface MonitorSchema extends Named<typeof monitorSchemaDefinition> {}

@@ -64,10 +64,37 @@ describe("the monitors REST family", () => {
           threadIdleTimeout: null,
           createdAt: "2026-08-24T00:00:00.000Z",
           updatedAt: "2026-08-24T00:00:00.000Z",
+          autoPausedAt: null,
+          autoPausedReason: null,
           platformUrl:
             "https://app.langwatch.test/project-one/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=monitor-1",
         },
       ]);
+    });
+
+    /** @scenario "The REST API shows why a monitor paused itself" */
+    it("answers when and why a monitor paused itself", async () => {
+      const reason = "95% of evaluations failed in the last hour (114 of 120)";
+      const api = mountMonitorRest({
+        seed: [
+          {
+            ...seeded,
+            enabled: false,
+            autoPausedAt: new Date("2026-08-24T01:00:00.000Z"),
+            autoPausedReason: reason,
+          },
+        ],
+      });
+
+      const response = await api.get("/api/monitors/monitor-1");
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        id: "monitor-1",
+        enabled: false,
+        autoPausedAt: "2026-08-24T01:00:00.000Z",
+        autoPausedReason: reason,
+      });
     });
 
     it("answers at the dated namespace, at latest, and under /api/v1", async () => {

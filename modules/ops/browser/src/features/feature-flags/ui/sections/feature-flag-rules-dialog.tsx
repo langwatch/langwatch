@@ -63,7 +63,7 @@ const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string 
 const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
   EVERYONE: "Applies to every context",
   ORGANIZATION: "Organization id",
-  PROJECT: "Project id",
+  PROJECT: "Project ids",
   NEW_USERS: "Organization created on or after",
   PERCENTAGE: "Percentage of users",
   EMAIL_DOMAIN: "Email domains",
@@ -72,7 +72,7 @@ const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
 const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
   EVERYONE: "",
   ORGANIZATION: "organization_xxxx",
-  PROJECT: "project_xxxx",
+  PROJECT: "project_xxxx, project_yyyy",
   NEW_USERS: "",
   PERCENTAGE: "50",
   EMAIL_DOMAIN: "acme.com, acme.io",
@@ -81,7 +81,7 @@ const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
 const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
   EVERYONE: "",
   ORGANIZATION: "Every organization rule needs an organization id.",
-  PROJECT: "Every project rule needs a project id.",
+  PROJECT: "Every project rule needs one or more project ids.",
   NEW_USERS: "Every new users rule needs a date.",
   PERCENTAGE: "Every percentage rule needs a number between 0 and 100.",
   EMAIL_DOMAIN: "Every email domain rule needs one or more domains, without the @.",

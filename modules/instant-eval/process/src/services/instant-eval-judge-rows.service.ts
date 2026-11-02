@@ -7,6 +7,8 @@
 
 import {
   InstantEvalClassifierUnavailableError,
+  InstantEvalJudgeStoppedError,
+  pickInstantEvalJudgementRoutedSpend,
   type InstantEvalJudgement,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
@@ -34,6 +36,9 @@ export interface InstantEvalJudgeUsage {
   inputTokens: number;
   skipped: Record<string, number>;
   limiterWaitMs: number;
+  /** The summed cost of routed judgements, and the input tokens that cost covers. */
+  costNanoUsd: number;
+  routedInputTokens: number;
 }
 
 /** The rows as they are written, and what judging them sent. */
@@ -90,6 +95,8 @@ export class InstantEvalJudgeRowsService {
       inputTokens: 0,
       skipped: {},
       limiterWaitMs: 0,
+      costNanoUsd: 0,
+      routedInputTokens: 0,
     };
     const cells = new Map<number, Map<string, InstantEvalVerdict | null>>();
     let failures = 0;
@@ -98,7 +105,7 @@ export class InstantEvalJudgeRowsService {
       limit: this.concurrency,
       signal,
       run: async (unit) => {
-        const judgement = await this.#classify({ projectId, unit, signal });
+        const judgement = await this.#classify({ projectId, unit, signal, usage });
         if (judgement === null) failures += 1;
         record({ unit, judgement: judgement ?? LOST_JUDGEMENT, cells, usage });
       },
@@ -127,10 +134,12 @@ export class InstantEvalJudgeRowsService {
     projectId,
     unit,
     signal,
+    usage,
   }: {
     projectId: string;
     unit: InstantEvalJudgementUnit;
     signal: AbortSignal | null;
+    usage: InstantEvalJudgeUsage;
   }): Promise<InstantEvalJudgement | null> {
     try {
       return await this.judge.classify(
@@ -142,6 +151,12 @@ export class InstantEvalJudgeRowsService {
         signal ?? undefined,
       );
     } catch (error) {
+      // A routed call stopped after paid legs: what they spent is billed with the batch.
+      if (error instanceof InstantEvalJudgeStoppedError) {
+        usage.requests += 1;
+        usage.inputTokens += error.inputTokens;
+        recordRoutedCost({ judgement: error, usage });
+      }
       if (signal?.aborted || isAbortError(error)) throw error;
 
       return null;
@@ -176,6 +191,7 @@ function record({
   usage.requests += 1;
   usage.inputTokens += judgement.inputTokens;
   usage.limiterWaitMs += judgement.limiterWaitMs ?? 0;
+  recordRoutedCost({ judgement, usage });
   if (judgement.skippedReason) {
     usage.skipped[judgement.skippedReason] = (usage.skipped[judgement.skippedReason] ?? 0) + 1;
   }
@@ -186,6 +202,20 @@ function record({
     row.set(question.id, byQuestion.get(question.id) ?? null);
   }
   cells.set(unit.rowIndex, row);
+}
+
+/** A routed judgement's or stopped call's cost, and the tokens it covers, summed into the usage. */
+function recordRoutedCost({
+  judgement,
+  usage,
+}: {
+  judgement: Pick<InstantEvalJudgement, "inputTokens" | "costNanoUsd">;
+  usage: InstantEvalJudgeUsage;
+}): void {
+  const routed = pickInstantEvalJudgementRoutedSpend(judgement);
+  if (!routed) return;
+  usage.costNanoUsd += routed.costNanoUsd;
+  usage.routedInputTokens += routed.routedInputTokens;
 }
 
 /** Whether a thrown value is a stop rather than a failure. */

@@ -8,7 +8,7 @@ import fastq from "fastq";
 import { describe, expect, it, vi } from "vitest";
 
 import { GroupQueueDispatcher } from "../dispatcher.ts";
-import type { DispatchResult } from "../scripts.ts";
+import type { ClaimedBatch, DispatchResult } from "../scripts.ts";
 
 /** Stands in for the staging Lua: each claim waits until the test answers it. */
 class StagingScriptsDouble {
@@ -26,8 +26,10 @@ class StagingScriptsDouble {
     return null;
   }
 
-  dispatchBatch(): Promise<DispatchResult[]> {
-    return new Promise((resolve) => this.claims.push(resolve));
+  claimBatch(): Promise<ClaimedBatch> {
+    return new Promise((resolve) =>
+      this.claims.push((claims) => resolve({ claims, passedOverUntilMs: null })),
+    );
   }
 }
 

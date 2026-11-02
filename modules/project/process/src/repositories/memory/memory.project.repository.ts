@@ -2,6 +2,7 @@ import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
   NEVER_LANDED_ON_PROJECT_KINDS,
   NON_DESTINATION_PROJECT_KINDS,
+  UNMANAGED_PROJECT_KEY_KINDS,
   aggregateRuleSchema,
   type AggregateMemberCandidate,
   type AggregateRule,
@@ -38,7 +39,9 @@ import {
 } from "@langwatch/project-contract";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
+import { isLegacyKeyRevoked } from "../../rules/legacy-project-key.rules.ts";
 import type {
+  LiveLegacyKey,
   ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
@@ -651,6 +654,34 @@ export class MemoryProjectRepository implements ProjectRepository {
       .find((row) => row.apiKey === input.token && row.archivedAt === null);
 
     return project?.id ?? null;
+  }
+
+  async markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void> {
+    this.#database.putLegacyKeyUse(input.projectId, input.at);
+  }
+
+  async findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
+    return this.#database.findLegacyKeyUse(input.projectId) ?? null;
+  }
+
+  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          !UNMANAGED_PROJECT_KEY_KINDS.includes(project.kind) &&
+          this.#database.isInOrganization(project, input.organizationId) &&
+          !isLegacyKeyRevoked(project.apiKey),
+      )
+      .toSorted((left, right) => left.name.localeCompare(right.name))
+      .map((project) => ({
+        projectId: project.id,
+        teamId: project.teamId,
+        projectName: project.name,
+        projectSlug: project.slug,
+        lastUsedAt: this.#database.findLegacyKeyUse(project.id) ?? null,
+      }));
   }
 
   /** Answers false for a project this memory holds no live row for, as the fenced UPDATE does. */

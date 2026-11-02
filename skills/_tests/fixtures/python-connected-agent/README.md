@@ -5,7 +5,7 @@ to LangWatch Agent Testing with `langwatch.connect_agent`. When it runs, the
 agent shows as Online in the project and every simulation turn reaches this
 process.
 
-The function declares two run parameters: `model` (`gpt-5-mini` or `gpt-5`)
+The function declares two run parameters: `model` (`gpt-6-luna` or `gpt-6-sol`)
 and `plan` (`free` or `pro`). The system prompt changes with the plan, so the
 agent answers a pro customer differently from a free one.
 

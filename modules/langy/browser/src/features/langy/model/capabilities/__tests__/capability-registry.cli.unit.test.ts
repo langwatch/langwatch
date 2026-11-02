@@ -10,6 +10,7 @@ import {
   buildSurfaceHref,
   resolveCapability,
   SURFACE_BY_FEATURE,
+  SURFACE_LABEL,
   withDecidedCard,
 } from "../../../../../model/langy-capability-registry.ts";
 import { FEATURES } from "../../../../../model/shared/langy/feature-map.ts";
@@ -259,6 +260,42 @@ describe("buildResourceHref, given a row-level deep link", () => {
           resourceId: "scenario_1",
         }),
       ).toBe("/acme/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1");
+    });
+  });
+
+  describe("when the resource is a dashboard or an Analytics Report", () => {
+    const linkFor = (tool: string) => {
+      const descriptor = resolveCapability(tool);
+      if (!descriptor) return null;
+      return {
+        label: SURFACE_LABEL[descriptor.surface],
+        href: buildResourceHref({
+          surface: descriptor.surface,
+          projectSlug: "acme",
+          resourceId: "dashboard_1",
+        }),
+      };
+    };
+
+    /** @scenario "AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports" */
+    it("opens a Dashboards dashboard at its own page", () => {
+      expect(linkFor("langwatch.dashboard.get")).toEqual({
+        label: "Dashboards",
+        href: "/acme/dashboards/dashboard_1",
+      });
+    });
+
+    /** @scenario "AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports" */
+    it("opens a report, a graph or a saved chart in the Analytics Reports viewer", () => {
+      const reports = {
+        label: "Analytics Reports",
+        href: "/acme/analytics/reports?dashboard=dashboard_1",
+      };
+      expect(
+        ["analytics-report", "graph", "chart"].map((resource) =>
+          linkFor(`langwatch.${resource}.get`),
+        ),
+      ).toEqual([reports, reports, reports]);
     });
   });
 

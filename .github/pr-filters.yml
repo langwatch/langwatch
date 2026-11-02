@@ -17,6 +17,7 @@ app:
   - ".github/workflows/npx-server-smoke.yml"
   - ".github/workflows/gateway-matrix.yaml"
   - ".github/workflows/release-please-sdks.yml"
+  - ".github/workflows/pr-conventions.yml"
   - ".github/workflows/e2e-ci.yml"
   - ".github/workflows/langwatch-nlp-ci.yml"
   - ".github/workflows/langevals-ci.yml"
