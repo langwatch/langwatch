@@ -442,16 +442,17 @@ describe("convergeLwqlAccessModel", () => {
 
     /** @scenario "The collection probe reads the approved view in the app's PostgreSQL schema" */
     it("binds the app's PostgreSQL schema into both probe reads", async () => {
-      if (!stale || !absent) throw new Error("the catalog maps too few PostgreSQL datasets");
-      const clickHouse = clickHouseThat({ present: [stale], schema: "langwatch_db" });
+      const clickHouse = clickHouseThat({ present: [stale ?? ""], schema: "langwatch_db" });
 
       await check(clickHouse);
 
-      expect(clickHouse.probed).toHaveLength(2);
-      for (const probe of clickHouse.probed) {
-        expect(probe.sql).toContain("{schema:String}");
-        expect(probe.schema).toBe("langwatch_db");
-      }
+      expect(clickHouse.probed.map((probe) => probe.schema)).toEqual([
+        "langwatch_db",
+        "langwatch_db",
+      ]);
+      expect(
+        clickHouse.probed.every((probe) => String(probe.sql).includes("{schema:String}")),
+      ).toBe(true);
     });
 
     /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */

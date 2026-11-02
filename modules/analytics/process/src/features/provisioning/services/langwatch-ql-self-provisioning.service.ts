@@ -112,7 +112,10 @@ export interface LwqlCollectionProbe {
   /** An approved view the engine tables read; reading its structure authenticates. */
   readonly relation: string;
   readonly connection: Omit<PostgresNamedCollection, "collection">;
-  /** The PostgreSQL schema holding the approved view: the table function does not use the role's search_path. */
+  /**
+   * The PostgreSQL schema holding the approved view: the table function does not use the role's
+   * search_path.
+   */
   readonly schema: string;
 }
 
