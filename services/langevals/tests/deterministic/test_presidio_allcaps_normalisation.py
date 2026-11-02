@@ -193,6 +193,7 @@ def test_no_second_pass_when_only_short_words_are_capitalised(text: str):
         "{'method': 'POST', 'url': '/v1', 'level': 'ERROR'}",
         '"method"; "POST"; "status"; "SUCCESS"',
         "{“method”: “POST”, “level”: “ERROR”}",
+        "{‘method’: ‘POST’, ‘level’: ‘ERROR’}",
         '{method: "POST", level: "ERROR"}',
     ],
 )
