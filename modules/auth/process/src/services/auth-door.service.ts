@@ -24,11 +24,18 @@ import {
   isSignInCallbackPath,
   signInErrorRedirectOf,
   signInFailureLocation,
-  signInRefusalCause,
 } from "../rules/sign-in-callback-failure.rules.ts";
 import { findConnectionIdsInPath } from "../rules/sso-request-target.rules.ts";
 
 const logger = createLogger("langwatch:auth");
+
+/** A provider's refusal code as a log record's cause; a class, so the record's type names it. */
+class SignInRefusal extends Error {
+  constructor(readonly code: string) {
+    super(`sign-in refused with "${code}"`);
+    this.name = "SignInRefusal";
+  }
+}
 
 /** What the sign-in door reads through: the one Better Auth instance and the session reads. */
 export interface AuthDoorDeps {
@@ -261,7 +268,7 @@ function withholdInternalSignInError({
   } else {
     logger.error(
       {
-        error: signInRefusalCause({ code: redirect.code }),
+        error: new SignInRefusal(redirect.code),
         code: redirect.code,
         description: redirect.description,
         traceId: traceId ?? null,
