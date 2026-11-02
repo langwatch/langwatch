@@ -420,7 +420,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
       // Cursor is GUI-only - direct OTLP never applies, so force the
       // toggle off when the admin picks it.
       ...(kind === "cursor" ? { allowOtelDirect: false } : {}),
-      ...(kind === "pi" ? { allowVk: false } : {}),
+      ...(kind === "pi" ? { allowVk: false, bundledPlan: false } : {}),
     });
     setIconAsset(iconAfterKindChange({ kind, iconAsset }));
   };

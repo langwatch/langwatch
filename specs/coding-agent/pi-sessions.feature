@@ -252,3 +252,12 @@ Rule: A pi session bills against a real source
     When its usage is prepared for billing
     Then the source the billable decision is made against is "pi"
     And the decision is made against that source, not a missing one
+
+  # The trace side reads the billed fact by the ingest key's source type, so a
+  # fact recorded only under the kind "pi" would leave pi's traces unbilled.
+  @unit
+  Scenario: A pi tile off a bundled plan bills the traces pi's ingest key sends
+    Given organization "acme" has an enabled pi tile that is not on a bundled plan
+    When governance records the organization's billing facts
+    Then source "pi" is billed
+    And source "pi_cli" is billed

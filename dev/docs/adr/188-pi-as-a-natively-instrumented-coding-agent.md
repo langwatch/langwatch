@@ -551,13 +551,18 @@ does **not** give away.
     sources for one fact.
 
 11. **Community extensions are accepted as compatibility, never as a dependency.** pi's definition
-    carries `eventAliases` and `metricAliases` entries for the signal names the two maintained community
+    is to carry `eventAliases` and `metricAliases` entries for the signal names the two maintained community
     extensions emit, so a customer already running one still lands in the trace explorer. Nothing is
     installed, nothing is audited, and the aliases are data in the definition, not a code path. Rejects
     ignoring those signal names: a customer who already runs one of those extensions would see their pi
     traffic land as untracked spans, and the first thing they would do is install ours alongside it, which
     is the double trace. Rejects normalising them in the canonicaliser instead, which would put
     third-party vocabulary into code rather than into one data field.
+
+    Aliases are matched on the raw signal name, before normalisation: pi's `matches()` admits a name
+    that starts with `pi.` **or** is an alias key, so a community name that does not start with `pi.`
+    still reaches pi's definition. Not shipped yet: no alias names are recorded until they are read from
+    each extension's own source, so the scenario stays `@unimplemented` and today only `pi.` names match.
 
 12. **The shim has a death date.** When pi wires its native `TelemetryContext` into the CLI, or ships
     `OTEL_*` support, `buildOtelEnvBlock("pi")` keeps its standard variables, `pi-plugin.ts` is deleted,
