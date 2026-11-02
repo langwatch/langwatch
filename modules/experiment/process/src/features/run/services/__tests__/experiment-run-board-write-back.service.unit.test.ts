@@ -1,6 +1,7 @@
 import type {
   ExperimentRunPlan,
   WorkbenchActor,
+  PersistedResults,
   WorkbenchStateView,
 } from "@langwatch/experiment-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -61,12 +62,12 @@ const progress: ExperimentRunProgressState = {
 };
 
 /** The board as the workbench keeps it: each write bumps the version and says who wrote it. */
-function board() {
+function board({ results }: { results?: PersistedResults } = {}) {
   let view: WorkbenchStateView = {
     experimentId: "experiment_1",
     slug: "exp-one",
     name: "Experiment one",
-    state: createBlankWorkbenchState(),
+    state: { ...createBlankWorkbenchState(), ...(results ? { results } : {}) },
     version: 1,
     updatedAt: new Date("2026-09-28T10:00:00.000Z"),
   };
@@ -273,6 +274,29 @@ describe("ExperimentRunBoardWriteBackService.writeBack", () => {
       await service.writeBack({ ...run, finishedCells: 3, lastAttempt: false });
 
       expect(results()?.targetOutputs).toEqual({ target_a: ["c", "a"] });
+    });
+
+    /** @scenario "A pinned run keeps the results of board rows the version does not hold" */
+    it("keeps the saved cells of a board row added after the version", async () => {
+      const { experiments, results } = board({
+        results: {
+          targetOutputs: { target_a: ["old a", "old b", "added later"] },
+          targetMetadata: {},
+          evaluatorResults: {},
+          errors: {},
+        },
+      });
+      const service = ExperimentRunBoardWriteBackService.create({
+        folds: await foldsWith({
+          planned: { ...plan, boardRowIndices: [1, null, 0] },
+          folded: pinnedProgress,
+        }),
+        experiments,
+      });
+
+      await service.writeBack({ ...run, finishedCells: 3, lastAttempt: false });
+
+      expect(results()?.targetOutputs).toEqual({ target_a: ["c", "a", "added later"] });
     });
   });
 });
