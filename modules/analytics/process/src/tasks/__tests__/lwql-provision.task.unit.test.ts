@@ -585,7 +585,8 @@ describe("convergeLwqlAccessModel", () => {
 });
 
 describe("when a view a deploy left stale drifts while the collection cannot be confirmed", () => {
-  const [engineTable = ""] = selfProvisioning.engineTablesIn({ only: undefined });
+  const [engineTable] = selfProvisioning.engineTablesIn({ only: undefined });
+  if (!engineTable) throw new Error("the catalog maps no PostgreSQL engine table");
 
   /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
   it("replaces the view over a fact table, then raises the unconfirmed collection", async () => {

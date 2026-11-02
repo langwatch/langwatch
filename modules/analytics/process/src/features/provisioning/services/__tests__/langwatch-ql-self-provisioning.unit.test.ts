@@ -5,6 +5,7 @@ import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-
 import { canProvisionAppFunctions } from "../../../app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import { LangWatchQLPostgresMappingService } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLSelfProvisioningService } from "../langwatch-ql-self-provisioning.service.ts";
+import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts";
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
@@ -255,6 +256,11 @@ describe("given the rendered-mode statements a converge runs", () => {
   });
 });
 
+/** Every catalog view holding exactly the columns its catalog entry declares. */
+const CATALOG_COLUMNS = Object.fromEntries(
+  LWQL_VIEW_CATALOG.map((view) => [view.name, view.columns.map((column) => column.name)]),
+);
+
 describe("given what the reconvergence check finds in ClickHouse", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
   const fingerprint = selfProvisioning.credentialFingerprint({ names: NAMES, postgres: POSTGRES });
@@ -268,7 +274,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
       names: NAMES,
       relations,
       functions: ["lwql_trace"],
-      found: { relations: found, functions, comments },
+      found: { relations: found, functions, comments, columns: CATALOG_COLUMNS },
       credentialFingerprint: fingerprint,
     });
 

@@ -421,8 +421,8 @@ export class LangWatchQLSelfProvisioningService {
       functions: readonly string[];
       /** Each present relation's `system.tables` comment. */
       comments: Readonly<Record<string, string>>;
-      /** Each present relation's column names; a relation not listed is not compared. */
-      columns?: Readonly<Record<string, readonly string[]>>;
+      /** Each present relation's column names. */
+      columns: Readonly<Record<string, readonly string[]>>;
     };
     credentialFingerprint: string;
   }): LwqlClickHouseDrift {
@@ -431,13 +431,18 @@ export class LangWatchQLSelfProvisioningService {
     const isStale = (name: string) =>
       engineTables.includes(name) && found.comments[name] !== current;
     // Only a missing column is drift, never an extra one, so a rolling deploy
-    // that adds or removes a column settles on the union. A column rename must
-    // ship as add-then-drop across two deploys, or old and new workers would
-    // replace each other's view at every check (specs/lwql/api.feature).
+    // that only adds or only removes columns settles on the union. A deploy that
+    // removes one column and adds another (a rename included) must ship as
+    // add-then-drop across two deploys, or old and new workers would replace
+    // each other's view at every check (specs/lwql/api.feature).
     const lacksColumns = (name: string) => {
-      const held = found.columns?.[name];
+      const held = found.columns[name] ?? [];
       const view = LWQL_VIEW_CATALOG.find((entry) => entry.name === name);
-      return !!held && !!view && view.columns.some((column) => !held.includes(column.name));
+      return (
+        found.relations.includes(name) &&
+        !!view &&
+        view.columns.some((column) => !held.includes(column.name))
+      );
     };
     const objects = [
       ...relations.filter(
