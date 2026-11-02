@@ -32,7 +32,7 @@ import {
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
 import { boardTrpcTransport } from "../board.trpc.ts";
 import {
-  dashboardWidgetCallerSource,
+  dashboardWidgetCaller,
   dashboardWidgetRest,
   dashboardWidgetUrl,
 } from "../dashboard-widget.rest.ts";
@@ -172,7 +172,7 @@ function credentialDoors(app: DashboardApi, projectId: string, actor: Actor | nu
 
 const WIDGET_CONTEXT = [
   bindMiddlewareContext(dashboardWidgetUrl, () => PLATFORM_URL),
-  bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+  bindMiddlewareContext(dashboardWidgetCaller, () => ({ source: { kind: "api" as const } })),
 ];
 const CHART_CONTEXT = [
   bindMiddlewareContext(langWatchQLCallerProtections, () => FULLY_PERMITTED),

@@ -6,7 +6,7 @@ sidebarTitle: Chat Completions
 
 ## Endpoint
 
-```
+```http
 POST /v1/chat/completions
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
@@ -86,7 +86,7 @@ Non-streaming calls that run long receive a single space character before the JS
 
 Set `"stream": true`. The response is `text/event-stream`, one `data:` frame per chunk, ending with `data: [DONE]`:
 
-```
+```text
 data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"}}]}
 
 data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"!"}}]}

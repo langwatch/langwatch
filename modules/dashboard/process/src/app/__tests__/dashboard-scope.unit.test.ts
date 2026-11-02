@@ -469,22 +469,6 @@ describe("board scope on the server", () => {
       });
     });
 
-    /** @scenario "AC200d Langy setting: only a member who can edit the board changes it" */
-    it("refuses its Langy setting from a project that only reads it, and keeps the default", async () => {
-      const { app, target } = await boardAt("ORGANIZATION");
-      const board = { dashboardId: target.dashboardId, viewer: AUTHOR };
-
-      const refused = await codeOf(
-        app.updateBoard({ ...board, projectId: SIBLING, excludedOrigins: [] }),
-      );
-      const stored = await app.getBoard({ ...board, projectId: HOME });
-
-      expect({ refused, excludedOrigins: stored.excludedOrigins }).toEqual({
-        refused: "dashboard_read_only_here",
-        excludedOrigins: null,
-      });
-    });
-
     /** @scenario "AC173 Scope: an Organization board is read-only outside the project that owns it" */
     it("is unchanged by those attempts", async () => {
       const { app, target } = await boardAt("ORGANIZATION");

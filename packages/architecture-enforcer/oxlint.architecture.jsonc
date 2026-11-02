@@ -26,6 +26,7 @@
     "langwatch/banned-verb-prefix": "error",
     "langwatch/module-classes": "error",
     "langwatch/module-layers": "error",
+    "langwatch/app-feature-layout": "error",
     "langwatch/pass-through-class": "error",
     "langwatch/rest-route": "error",
     "langwatch/store-containment": "error",

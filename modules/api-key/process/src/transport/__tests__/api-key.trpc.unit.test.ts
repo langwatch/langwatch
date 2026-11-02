@@ -66,6 +66,7 @@ describe("the apiKey tRPC transport", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "apiKey.create",
         "apiKey.list",
+        "apiKey.mintDocsSessionKey",
         "apiKey.myBindings",
         "apiKey.nameById",
         "apiKey.orgMembers",
@@ -446,6 +447,43 @@ describe("the apiKey tRPC transport", () => {
       await expect(caller.revoke({ organizationId: ORG_ID, apiKeyId: "ak_1" })).rejects.toThrow(
         "ECONNREFUSED 10.0.0.5:5432",
       );
+    });
+  });
+
+  describe("when a signed-in member allows the docs to connect", () => {
+    it("hands the member and the browser session they asked on to the application", async () => {
+      const mintDocsSessionKey = vi.fn(async () => ({
+        token: "sk-lw-docs",
+        expiresAt: "2026-10-26T12:05:00.000Z",
+        expiresIn: 300,
+        project: { id: "project_1", name: "Checkout" },
+      }));
+      const { caller } = harness({ mintDocsSessionKey });
+
+      await expect(
+        caller.mintDocsSessionKey({ projectId: "project_1", docsOrigin: "https://langwatch.ai" }),
+      ).resolves.toMatchObject({ token: "sk-lw-docs" });
+      expect(mintDocsSessionKey).toHaveBeenCalledWith({
+        userId: USER_ID,
+        impersonatorId: undefined,
+        browserSession: { id: "session-1", startedAt: null, expiresAt: null },
+        projectId: "project_1",
+        docsOrigin: "https://langwatch.ai",
+      });
+    });
+
+    it("refuses an operator acting as the member before the application runs", async () => {
+      const mintDocsSessionKey = vi.fn();
+      const { caller } = apiKeyTrpcCaller({
+        declaration: apiKeyTrpcTransport,
+        app: stubApiKeyApi({ mintDocsSessionKey }),
+        actor: { type: "user", id: USER_ID, impersonatorId: "operator_1" },
+      });
+
+      await expect(
+        caller.mintDocsSessionKey({ projectId: "project_1", docsOrigin: "https://langwatch.ai" }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      expect(mintDocsSessionKey).not.toHaveBeenCalled();
     });
   });
 });

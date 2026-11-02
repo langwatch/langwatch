@@ -1,3 +1,5 @@
+import type { WidgetSource } from "./schemas/widget-sources.js";
+
 /**
  * One named LangWatchQL statement a widget may run, as the REST endpoint validates it
  * (`modules/dashboard/contract/src/dashboard-widget-rest.schemas.ts`).
@@ -10,6 +12,9 @@ export interface DashboardWidgetQueryInput {
     type: "string" | "number" | "boolean";
     default?: string | number | boolean;
   }[];
+  /** The trace origins the query counts; `null` makes it unset, counting application. */
+  sources?: WidgetSource[] | null;
+  projects?: string[] | null;
 }
 
 /** Where a widget came from, as the platform records it. */

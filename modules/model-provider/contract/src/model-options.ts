@@ -8,6 +8,8 @@ export type ModelOption = {
   isDisabled: boolean;
   mode?: "chat" | "embedding" | undefined;
   isCustom?: boolean;
+  /** Served by LangWatch's own offer, so no provider row of the project's has to carry it. */
+  isBuiltIn?: boolean;
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(allLitellmModels).map(
