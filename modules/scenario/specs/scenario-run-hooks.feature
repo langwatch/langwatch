@@ -1,5 +1,5 @@
 Feature: Scenario run hooks: setup and teardown
-  As a person who tests a connected agent with scenarios
+  As a person who tests a connected or HTTP agent with scenarios
   I want the platform to run the agent's setup before the turns and its teardown after
   So that a scenario starts from known test data and leaves none behind.
 
@@ -7,7 +7,8 @@ Feature: Scenario run hooks: setup and teardown
     The order is setup, turns, teardown. Hooks run for scenario runs only.
     Parameters come from the run parameters, one value per name per run.
     The child sends each hook's result on its result line; the parent records
-    it as a platform event folded into the run. Decided in ADR-180.
+    it as a platform event folded into the run. Decided in ADR-180; an HTTP
+    agent's setup and teardown are Connector steps LangWatch runs, decided in ADR-194.
 
   Rule: Order and state
 
@@ -219,8 +220,8 @@ Feature: Scenario run hooks: setup and teardown
       And the run shows "No hooks"
 
     @unit
-    Scenario: HTTP and code agents never call hooks
-      Given an HTTP agent
+    Scenario: An HTTP agent without a Connector and a code agent never call hooks
+      Given an HTTP agent without a Connector
       When a scenario runs against it
       Then the run shows "No hooks"
 
@@ -319,3 +320,130 @@ Feature: Scenario run hooks: setup and teardown
       Given a scenario child that writes a result line naming a setup and a teardown result
       When the processor runs the job and the child exits
       Then the run records both hooks
+
+  # Decided in ADR-194: setup and teardown of an HTTP agent are code LangWatch stores and runs.
+  Rule: Connector steps on an HTTP agent
+
+    @integration
+    Scenario: An HTTP agent with a Connector runs setup, then the turns, then teardown
+      Given an HTTP agent whose Connector has a setup step and a teardown step
+      When a scenario runs against it
+      Then the code runner gets the setup step, the agent URL gets the turns, and the code runner gets the teardown step
+      And the teardown step receives the state setup returned
+
+    @unit
+    Scenario: A Connector step runs only in the code runner
+      Given a Connector step
+      When it is called
+      Then its code is posted to the code runner as the one code node of a workflow
+      And the scenario child never evaluates the code itself
+
+    @integration
+    Scenario: A turn template reads the state and the run-scoped secrets setup returned
+      Given a setup step that returns the state accountId "acc_1" and the run-scoped secret ACCOUNT_TOKEN
+      When the turns are called
+      Then each turn URL carries "acc_1"
+      And each turn sends the ACCOUNT_TOKEN value in its header
+
+    @unit
+    Scenario: An HTTP turn template reads the state setup returned
+      Given a run whose setup returned a state
+      When an HTTP turn template renders {{ state }} and {{ state.NAME }}
+      Then it renders the whole state as JSON and the named key as its value
+
+    @unit
+    Scenario: A Connector step receives only the secrets it names
+      Given a project with the secrets API_KEY and OTHER_KEY
+      And a setup step that names API_KEY
+      When the run is prepared
+      Then the step carries API_KEY and not OTHER_KEY
+
+    @unit
+    Scenario: A Connector step receives the run, its idempotency key and the run parameters
+      Given a run with the parameter persona "gold"
+      When the setup step and the teardown step are called
+      Then each receives its kind, the run ids, the parameters and the key "<scenarioRunId>:<attemptId>:<kind>"
+      And only the teardown step receives the state
+
+    @unit
+    Scenario: A Connector step bound to a dataset receives its rows
+      Given a setup step bound to a dataset of two rows
+      When the run is prepared and the step is called
+      Then the step receives both rows
+
+    @unit
+    Scenario: Run-scoped secrets stay out of the record, the simulated user, the judge and every error
+      Given a setup step that returns a run-scoped secret and puts the same value in its state
+      When the run records setup and a turn fails echoing the value
+      Then the recorded state holds "[redacted]" in its place
+      And the turn error holds "[redacted]" in its place
+
+    @integration
+    Scenario: A Connector setup that raises leaves the run not scored and still runs teardown
+      Given a setup step that raises an error
+      When a scenario runs against the agent
+      Then no turn is called
+      And setup records "failed" with the traceback as its error
+      And the teardown step was called once
+
+    @integration
+    Scenario: A Connector setup that does not answer in time records a timeout
+      Given a setup step that runs past its budget
+      When a scenario runs against the agent
+      Then setup records "timed_out"
+      And the teardown step was called once
+
+    @unit
+    Scenario: A Connector setup state over 64 KiB fails setup
+      Given a setup step that returns a state over 64 KiB
+      Then setup records "failed" naming the cap
+
+    @unit
+    Scenario: A Connector step that names a missing secret fails before it runs
+      Given a setup step that names a secret the project does not have
+      When setup is called
+      Then the code runner is not called
+      And setup records "failed" naming the secret
+
+    @unit
+    Scenario: A Connector step whose dataset is over 64 KiB fails before it runs
+      Given a setup step bound to a dataset over 64 KiB
+      When setup is called
+      Then the code runner is not called
+      And setup records "failed" naming the cap
+
+    @unit
+    Scenario: A secret in a Connector step's error is scrubbed
+      Given a teardown step whose traceback prints a secret it was given
+      Then the teardown error holds "[redacted]" in its place
+
+    @unit
+    Scenario: A failed Connector teardown leaves the verdict unchanged
+      Given a passing run whose teardown step raises
+      Then the run verdict is still success
+      And teardown records "failed"
+
+    @unit
+    Scenario: Rerun and keep data skips a Connector teardown
+      Given a run started with "Rerun and keep data" against an HTTP agent with a Connector
+      Then the teardown step is not called
+      And teardown records "skipped"
+
+    @unit
+    Scenario: A run of an HTTP agent with a Connector goes to the Node child
+      Given an HTTP agent whose Connector has a setup step
+      When the run is prepared
+      Then the run calls hooks and is routed to the Node child
+
+    @unit
+    Scenario: The Connector config is checked when it is read
+      Given a Connector step in a language the code runner does not offer, or code over 64 KiB, or a secret name that is not an identifier
+      When the agent config is parsed
+      Then it is refused
+
+    # The Python code runner on main has no egress fence; ADR-194 waits on the WebAssembly runner for it.
+    @integration @unimplemented
+    Scenario: A Connector step's outbound calls pass the deployment's egress policy
+      Given a deployment that refuses private and metadata addresses
+      When a Connector step calls a metadata address
+      Then the call is refused
