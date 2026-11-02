@@ -427,6 +427,10 @@ export class LangWatchQLSelfProvisioningService {
     const current = postgresMapping.credentialComment({ fingerprint: credentialFingerprint });
     const isStale = (name: string) =>
       engineTables.includes(name) && found.comments[name] !== current;
+    // Only a missing column is drift, never an extra one, so a rolling deploy
+    // that adds or removes a column settles on the union. A column rename must
+    // ship as add-then-drop across two deploys, or old and new workers would
+    // replace each other's view at every check (specs/lwql/api.feature).
     const lacksColumns = (name: string) => {
       const held = found.columns?.[name];
       const view = LWQL_VIEW_CATALOG.find((entry) => entry.name === name);

@@ -1090,6 +1090,10 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # SELECT. A newer deploy that only removed a column is put back to the older
   # view by an older worker, and the newer worker accepts the extra column: the
   # view settles on the union both need, never flapping, until the next deploy.
+  # A rename is not additive: a worker that needs the old name and one that needs
+  # the new name would each replace the other's view at every check while both
+  # run. So a catalog column rename ships in two deploys: first add the new name
+  # and keep the old one, then drop the old one once no older worker runs.
   @unit
   Scenario: An older worker never rewrites a newer view
     Given a newer deploy has converged views and approved views that added columns this worker's catalog does not declare
