@@ -61,12 +61,11 @@ export class ScenarioTargetPrefetchService {
     langwatchEndpoint: string;
     voiceTargets: VoiceTargetReader | null;
   }): ScenarioTargetPrefetchService {
-    return new ScenarioTargetPrefetchService(
-      options,
-      ScenarioWorkflowMappingService.create(),
-      ScenarioWorkflowAgentSecretsService.create(options.agents),
-      ConnectorStepPrefetchService.create(options),
-    );
+    return new ScenarioTargetPrefetchService(options, {
+      workflowMappings: ScenarioWorkflowMappingService.create(),
+      workflowAgentSecrets: ScenarioWorkflowAgentSecretsService.create(options.agents),
+      connectorSteps: ConnectorStepPrefetchService.create(options),
+    });
   }
 
   private constructor(
@@ -82,9 +81,11 @@ export class ScenarioTargetPrefetchService {
       langwatchEndpoint: string;
       voiceTargets: VoiceTargetReader | null;
     },
-    private readonly workflowMappings: ScenarioWorkflowMappingService,
-    private readonly workflowAgentSecrets: ScenarioWorkflowAgentSecretsService,
-    private readonly connectorSteps: ConnectorStepPrefetchService,
+    private readonly collaborators: {
+      workflowMappings: ScenarioWorkflowMappingService;
+      workflowAgentSecrets: ScenarioWorkflowAgentSecretsService;
+      connectorSteps: ConnectorStepPrefetchService;
+    },
   ) {}
 
   async getTargetAdapter(input: {
@@ -277,7 +278,7 @@ export class ScenarioTargetPrefetchService {
       sessionPath: config.sessionPath,
       scenarioMappings: config.scenarioMappings,
       secrets: secretValues,
-      ...(await this.connectorSteps.connectorData({
+      ...(await this.collaborators.connectorSteps.connectorData({
         projectId,
         connector: config.connector,
         runSecretValues,
@@ -384,7 +385,10 @@ export class ScenarioTargetPrefetchService {
       };
     }
 
-    const dsl = await this.workflowAgentSecrets.fill({ dsl: hydrateResult.dsl, projectId });
+    const dsl = await this.collaborators.workflowAgentSecrets.fill({
+      dsl: hydrateResult.dsl,
+      projectId,
+    });
     const { inputs, outputs } = this.options.workflowHydrator.extractWorkflowIO(dsl);
 
     const secretValues = await this.executionSecrets({ projectId, runSecretValues });
@@ -401,7 +405,7 @@ export class ScenarioTargetPrefetchService {
       secrets: secretValues,
     };
 
-    this.workflowMappings.validate(data);
+    this.collaborators.workflowMappings.validate(data);
 
     return data;
   }
