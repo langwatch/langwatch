@@ -155,7 +155,11 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
     /** @scenario "The guide's error messages and error codes are the ones the code returns" */
     it("lists only registered error codes", () => {
       const table = section("limits-and-cost.mdx", "lwql-error-codes");
-      const codes = [...table.matchAll(/`([a-z_]+)`/g)].map((m) => m[1]);
+      const codes = table
+        .split("\n")
+        .filter((line) => /^\| \d{3} \|/.test(line))
+        .flatMap((line) => [...(line.split("|")[2] ?? "").matchAll(/`([a-z_]+)`/g)])
+        .map((m) => m[1]);
       const registered = new Set<string>(APP_ERROR_CODES);
 
       expect(codes.length).toBeGreaterThan(10);
