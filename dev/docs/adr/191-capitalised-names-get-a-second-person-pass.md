@@ -32,12 +32,17 @@ person spans that copy reveals into the first pass's findings.
    or more words, and either a rewritten word of four or more letters or two
    rewritten words side by side. A short capitalised word on its own (CFO,
    ROI) is the acronym shape and is refused.
-3. The span must also hold one name word: a word the model's frequency table
-   holds in ordinary case at least 1.5 times as often as in lowercase or in
-   capitals, or does not hold at all. This refuses WIDGET PRO, SEPA ACH and
-   API KEY, which pass the shape rule.
-4. The second pass is skipped when person detection is off or when the text
-   holds no such shape, so prose with OK, ID or USD costs one pass.
+3. The span must also hold one name word: a word on a bundled list of common
+   surnames and given-name syllables from the naming traditions the English
+   corpus misreads (NGO, SEO, HUNG, TAN), or a word the model's frequency
+   table holds in ordinary case at least 1.5 times as often as in lowercase
+   or in capitals. A span of words the table does not hold at all is a rare
+   name and is kept; one unknown word beside a known ordinary word
+   (ZORBEX ULTRA) is not. This refuses WIDGET PRO, SEPA ACH, API KEY and
+   invented brands beside an ordinary word, which pass the shape rule.
+4. The second pass is skipped when neither person nor location detection is
+   on, or when the text holds no such shape, so prose with OK, ID or USD costs
+   one pass. With location on and person off it asks for places only.
 5. Only PERSON spans, and LOCATION spans when location is redacted, come out
    of the second pass. LOCATION is there because the model reads some
    surnames as places (Costa Pereira), so a person-only pass left them in
@@ -57,12 +62,20 @@ wholly capitalised names with a short word (AMY LEE) from 5 of 24 to 24 of
 control's own ceiling. Without it, whether a name is protected would depend
 on how long it is.
 
-The name-word rule has its own price. Of 51,072 pairings of common forenames
-and surnames in capitals, 1.3% hold only everyday words (ROSE WHITE, WILL
-YOUNG) and are refused, which leaves them as they were before the second
-pass. In return, false hits on a fresh set of capitalised non-names in eight
-trace shapes fell from 7 of 96 to 1 of 96, the rate before the second pass,
-with no loss of recall on any corpus.
+The name-word rule has its own price, and frequency alone set it by naming
+tradition: it refused up to one capitalised Vietnamese name in eleven, and
+Korean and Turkish names at 5 to 7%, because the corpus is English. The
+bundled list is the answer to that, measured on names it was not built from:
+over 480 capitalised names from twelve traditions in three trace sentences,
+the rule refuses none, and the 144 of 1,440 cases still in clear are ones
+neither analysis finds (main leaves 1,238). Of 51,072 pairings of common
+English forenames and surnames, 1.2% hold only everyday words (ROSE WHITE,
+GRACE BROWN) and are refused, which leaves them as they were before the
+second pass. On 80 capitalised non-names in two trace sentences the branch
+reports 10 of 160 as people or places against 8 on main; the extra two are
+VELTRIX MAX, a brand word that is also a name. The list is a maintained
+artefact: a tradition it does not cover pays the frequency price again, and
+the fix is to add to the list, measured on held-out names.
 
 Alternatives rejected:
 

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import unicodedata
 from typing import Any, Literal, Optional
 from langevals_core.base_evaluator import (
     BaseEvaluator,
@@ -13,10 +14,13 @@ from langevals_core.base_evaluator import (
 from pydantic import BaseModel, Field
 import spacy
 import spacy.cli
+from spacy.lang.en.stop_words import STOP_WORDS
 from spacy.strings import hash_string
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 from presidio_analyzer.nlp_engine import SpacyNlpEngine
+
+from langevals_presidio.name_words import NAME_WORDS
 
 # Presidio's analyzer emits a WARNING for every requested entity that has
 # no recognizer in the active language. Our entity list intentionally
@@ -134,20 +138,34 @@ def _frequency_rank(vectors: Any, form: str) -> float:
     return float("inf") if row < 0 else float(row)
 
 
-def _reads_as_name(word: str, vectors: Any) -> bool:
-    """Whether the model's corpus writes `word` mostly in Titlecase.
+def _folded(word: str) -> str:
+    """Lowercase ASCII, so NGÔ and NGO both read as ngo."""
+    decomposed = unicodedata.normalize("NFKD", word.lower())
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
+def _is_known_word(word: str, vectors: Any) -> bool:
+    return any(
+        _frequency_rank(vectors, form) != float("inf")
+        for form in (word, word.lower(), word.upper(), word[:1].upper() + word[1:].lower())
+    )
+
+
+def _is_name_word(word: str, vectors: Any) -> bool:
+    """Whether `word` is a listed name, or one the model's corpus writes mostly in Titlecase.
 
     Names are; product words (WIDGET), acronyms (SEPA, API) and everyday
-    words (KEY) are not. A word in no form at all is rare, so most likely a
-    name, and is kept.
+    words (KEY) are not. The list catches names the corpus writes mostly as
+    something else (NGO, Hung); English stop words never count from it.
     """
+    folded = _folded(word)
+    if folded in NAME_WORDS and folded not in STOP_WORDS:
+        return True
     title = _frequency_rank(vectors, word[:1].upper() + word[1:].lower())
     other = min(
         _frequency_rank(vectors, word.lower()),
         _frequency_rank(vectors, word.upper()),
     )
-    if title == other == float("inf"):
-        return True
     return title * NAME_FORM_DOMINANCE < other
 
 
@@ -157,18 +175,23 @@ def _normalisation_justifies_span(
     """Whether a span found only after normalisation is shaped and worded like a name.
 
     Titlecasing restores the cue on WHITFIELD and invents one on CEO and on
-    WIDGET PRO. Measured bounds: specs/evaluators/langevals-presidio-allcaps-person-names.feature
+    WIDGET PRO. A span of words the model has never seen (a rare name) is
+    kept; one unseen word beside an everyday word (ZORBEX ULTRA) is not.
+    Measured bounds: specs/evaluators/langevals-presidio-allcaps-person-names.feature
     """
     span = original[start:end]
     if len(span.split()) < MIN_SPAN_WORDS:
         return False
     if not _has_name_shaped_rewrite(original=span, normalised=normalised[start:end]):
         return False
-    return any(
-        _reads_as_name(span[word_start:word_end], vectors)
+    words = [
+        span[word_start:word_end]
         for word_start, word_end in _word_runs(span)
         if span[word_start:word_end].isalpha()
-    )
+    ]
+    if any(_is_name_word(word, vectors) for word in words):
+        return True
+    return bool(words) and not any(_is_known_word(word, vectors) for word in words)
 
 
 def _covers(outer: Any, inner: Any) -> bool:
@@ -306,6 +329,7 @@ class PresidioPIIDetectionEvaluator(
                 text=normalised, entities=entities, language="en"
             )
             if result.score >= self.settings.min_threshold
+            and result.entity_type in entities
             and (result.entity_type, result.start, result.end) not in placed
             and _normalisation_justifies_span(
                 original=content,

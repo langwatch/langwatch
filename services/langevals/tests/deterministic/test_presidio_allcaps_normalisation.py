@@ -11,6 +11,7 @@ from functools import lru_cache
 from typing import Any
 
 import pytest
+from presidio_analyzer import RecognizerResult
 
 from langevals_presidio.pii_detection import (
     MIN_NORMALISED_TOKEN_LENGTH,
@@ -215,14 +216,25 @@ def test_no_second_pass_when_only_short_words_are_capitalised():
     assert len(calls) == 1, f"expected one pass, got {len(calls)}: {calls}"
 
 
-# @scenario "The second pass is skipped when person detection is off"
-def test_no_second_pass_when_person_is_disabled():
+# @scenario "The second pass is skipped when neither names nor places are redacted"
+def test_no_second_pass_when_person_and_location_are_disabled():
     calls = analyze_calls(
-        entities=PresidioEntities(person=False),
+        entities=PresidioEntities(person=False, location=False),
         text="MARCUS WHITFIELD asked about the renewal of his annual plan.",
     )
     assert len(calls) == 1, f"expected one pass, got {len(calls)}: {calls}"
     assert "PERSON" not in calls[0]["entities"]
+    assert "LOCATION" not in calls[0]["entities"]
+
+
+# @scenario "The second pass asks only for places when only places are redacted"
+def test_second_pass_asks_only_for_places_when_person_is_off():
+    calls = analyze_calls(
+        entities=PresidioEntities(person=False, location=True),
+        text="MARCUS WHITFIELD asked about the renewal of his annual plan.",
+    )
+    assert len(calls) == 2, f"expected two passes, got {len(calls)}: {calls}"
+    assert calls[1]["entities"] == ["LOCATION"]
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +277,41 @@ def test_other_entities_match_the_first_pass_exactly():
         for f in findings(MIXED_ENTITY_TEXT, subject)
         if f[0] not in ("PERSON", "LOCATION")
     ] == first_pass
+
+
+class AnalyzerThatAddsAnEmail:
+    """Passes calls through, and on the normalised copy also calls the name an email."""
+
+    def __init__(self, inner: Any, original: str, span: tuple[int, int]):
+        self._inner = inner
+        self._original = original
+        self._span = span
+
+    def analyze(self, **kwargs: Any) -> Any:
+        results = list(self._inner.analyze(**kwargs))
+        if kwargs["text"] != self._original:
+            start, end = self._span
+            results.append(RecognizerResult("EMAIL_ADDRESS", start, end, 1.0))
+        return results
+
+
+# @scenario "Only name and place spans come out of the second pass"
+def test_a_non_name_span_from_the_second_pass_is_dropped():
+    """Whatever the analyzer returns on the normalised copy, only names and
+    places are taken from it, even on a span shaped and worded like a name."""
+    start = MIXED_ENTITY_TEXT.index("Tobias OKONKWO")
+    span = (start, start + len("Tobias OKONKWO"))
+    subject = name_and_place_evaluator()
+    inner = PresidioPIIDetectionEvaluator.analyzer
+    PresidioPIIDetectionEvaluator.analyzer = AnalyzerThatAddsAnEmail(  # type: ignore[assignment]
+        inner, MIXED_ENTITY_TEXT, span
+    )
+    try:
+        found = findings(MIXED_ENTITY_TEXT, subject)
+    finally:
+        PresidioPIIDetectionEvaluator.analyzer = inner  # type: ignore[assignment]
+    assert ("EMAIL_ADDRESS", "Tobias OKONKWO") not in found
+    assert ("PERSON", "Tobias OKONKWO") in found
 
 
 # @scenario "A surname the model reads as a place is still redacted in capitals"
@@ -365,19 +412,59 @@ def test_capitalised_non_name_words_are_not_harvested(template: str, phrase: str
     assert names_and_places(text) == [], f"a name or place was invented in {phrase}"
 
 
+PLAN_TEMPLATE = "Please confirm whether {name} should stay on the current plan."
+
+
 # @scenario "A name made only of everyday words is not harvested in capitals"
-@pytest.mark.parametrize("name", ["ROSE WHITE", "WILL YOUNG"])
+@pytest.mark.parametrize("name", ["ROSE WHITE", "GRACE BROWN", "HOPE STONE"])
 def test_a_name_of_everyday_words_is_the_accepted_price(name: str):
     """The measured cost of the name-word rule, pinned so a change shows.
 
     The model's corpus writes both words more often in lowercase, so nothing
-    tells them from WIDGET PRO. One name word is enough: Marcus GREEN is kept.
+    tells them from WIDGET PRO.
     """
-    text = f"Please confirm whether {name} should stay on the current plan."
-    assert person_names(text) == []
-    assert person_names("Please confirm whether Marcus GREEN should stay on the plan.") == [
-        "Marcus GREEN"
-    ]
+    assert person_names(PLAN_TEMPLATE.format(name=name)) == []
+
+
+# @scenario "A name made only of everyday words is not harvested in capitals"
+def test_one_name_word_beside_an_everyday_word_is_enough():
+    """GRACE alone is everyday; NWOSU makes it a name. The first pass misses it,
+    so this is the second pass and the rule at work."""
+    text = PLAN_TEMPLATE.format(name="GRACE NWOSU")
+    analyzer = PresidioPIIDetectionEvaluator.analyzer
+    assert not [
+        r
+        for r in analyzer.analyze(text=text, entities=["PERSON"], language="en")
+        if r.score >= MIN_THRESHOLD
+    ], "the first pass must miss it for this to test the second"
+    assert person_names(text) == ["GRACE NWOSU"]
+
+
+# @scenario "A short name the corpus mostly writes as another word is still harvested"
+@pytest.mark.parametrize("name", ["HUNG NGO", "WOO SEO", "MIN SONG", "CEM TAN"])
+def test_a_short_name_read_as_an_acronym_or_word_is_harvested(name: str):
+    """NGO and SEO are acronyms in the corpus, Hung and Song everyday words.
+    The name list keeps them; without it all four stay in clear."""
+    assert person_names(PLAN_TEMPLATE.format(name=name)) == [name]
+
+
+# @scenario "An unknown word beside an everyday word is not harvested"
+@pytest.mark.parametrize(
+    "text,phrase",
+    [
+        ("Customer ZORBEX ULTRA called about the refund.", "ZORBEX ULTRA"),
+        ("Shipped with KORVATH EXPRESS this morning.", "KORVATH EXPRESS"),
+        ("Product FROSTWYN HOODIE out of stock.", "FROSTWYN HOODIE"),
+    ],
+)
+def test_an_invented_brand_beside_an_everyday_word_is_not_harvested(text: str, phrase: str):
+    assert names_and_places(text) == [], f"a name or place was invented in {phrase}"
+
+
+# @scenario "A name of words the model has never seen is still harvested"
+@pytest.mark.parametrize("name", ["TAVRIK ZOLNEY", "ZELIMIR VRAKHOV"])
+def test_a_name_of_unknown_words_is_harvested(name: str):
+    assert person_names(PLAN_TEMPLATE.format(name=name)) == [name]
 
 
 # ---------------------------------------------------------------------------

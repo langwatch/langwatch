@@ -21,14 +21,16 @@ Feature: A name written in capitals is still redacted
 
   Three things bound it. The copy may never change length, because the
   offsets are used against the original. The second analysis may not run when
-  it has nothing to normalise or when person detection is off, because it
-  costs a second pass on a service that already throttles. And it may harvest
+  it has nothing to normalise or when neither names nor places are being
+  redacted, because it costs a second pass on a service that already
+  throttles. A level that redacts places but not names still gets the second
+  pass, asking for places only. And it may harvest
   person and place spans only: capitals mean something to the code, currency
   and identifier recognisers, and none of them has a casing problem to fix.
   Places are in because the model splits some names across both. In ordinary
   case it reads Maria Fernanda as a person and Costa Pereira as a place, so a
   person-only pass left COSTA PEREIRA in clear. A place is asked for only
-  when places are being redacted at all.
+  when places are being redacted, and a name only when names are.
 
   Titlecasing restores the name cue on WHITFIELD and invents the same cue on
   CEO, so a span the second pass finds is kept only if it has the shape of a
@@ -49,21 +51,41 @@ Feature: A name written in capitals is still redacted
   word the model's own corpus writes in ordinary case at least one and a half
   times as often as in lowercase or in capitals. Lee, Whitfield and Okonkwo
   are name words. Widget and Key are written mostly in lowercase, SEPA and API
-  mostly in capitals, and Pro only slightly more often in ordinary case. A
-  word the corpus does not hold in any form is rare, so most likely a name,
-  and counts as one. The lookup reads the model's frequency table and adds
-  nothing to it.
+  mostly in capitals, and Pro only slightly more often in ordinary case. The
+  lookup reads the model's frequency table and adds nothing to it.
 
-  The name-word rule has a measured price. Over 51,072 pairings of common
-  forenames and surnames written wholly in capitals, 1.3% hold no name word,
-  because both words are everyday words as well (ROSE WHITE, WILL YOUNG). The
-  second pass refuses those, which leaves them where they were before it
-  existed. One name word is enough, so Marcus GREEN is still found. A
-  stricter margin of two refuses 1.7% and buys only WIDGET PRO MAX, which
-  stays redacted at any margin because Max is a name. On the trace-shaped
-  recall corpora below the rule changes nothing, and on a fresh set of twelve
-  capitalised non-names in eight trace shapes it takes the false hits from 7
-  of 96 back to 1 of 96, the same as before the second pass.
+  The corpus is English, and short names from other traditions are written
+  there mostly as something else: Ngo and Seo as acronyms (NGO, SEO), Hung,
+  Song and Tan as everyday words. On frequency alone HUNG NGO, WOO SEO and
+  CEM TAN stayed in clear while Hung Ngo was redacted, and the rule refused
+  up to one capitalised Vietnamese name in eleven. So a bundled list of
+  common surnames and given-name syllables from the traditions the corpus
+  misreads (Chinese, Korean, Vietnamese, Japanese, Turkish, Arabic, West
+  African and South Asian) also counts as name words. English stop words
+  never count from it, so AN and DO stay ordinary words.
+
+  A span of words the corpus holds in no form at all is a rare name, and is
+  kept (TAVRIK ZOLNEY). A single unknown word is not enough when the span
+  also holds a known word that is not a name word: ZORBEX ULTRA,
+  KORVATH EXPRESS and FROSTWYN HOODIE are an invented brand beside an
+  ordinary word, and were redacted as people when any unknown word counted.
+
+  The name-word rule has a measured price, and it depends on the naming
+  tradition, so it is measured on names the list was not built from. Over 480
+  capitalised names from twelve traditions (Vietnamese, Korean, mainland and
+  overseas Chinese, Japanese, Turkish, Arabic, Nigerian, Indian, Polish,
+  Spanish, Filipino) in three trace sentences, the rule refuses none: every
+  one of the 144 of 1,440 cases still in clear is one neither analysis finds,
+  and main leaves 1,238 in clear. Over 51,072 pairings of common English
+  forenames and surnames, 1.2% hold no name word, because both words are
+  everyday words as well (ROSE WHITE, GRACE BROWN). The second pass refuses
+  those, which leaves them where they were before it existed. One name word
+  is enough, so GRACE NWOSU is still found. A stricter margin of two refuses
+  1.5% and buys nothing: WIDGET PRO MAX stays redacted at any margin because
+  Max is a name. Over 80 capitalised non-names in two trace sentences, main
+  reports 8 of 160 as people or places and the second pass adds 2, both
+  VELTRIX MAX. A brand word that is a name word in its own right (NOVA, MAX,
+  PHOENIX) is the shape this rule cannot tell from a name.
 
   Precision is held over capitalised strings that are not people (merchants,
   carriers, departments, SKUs, codes, headings, acronym-heavy prose and
@@ -148,11 +170,18 @@ Feature: A name written in capitals is still redacted
       Then the second analysis asks for persons and places
 
     @unit
-    Scenario: The second pass is skipped when person detection is off
+    Scenario: The second pass is skipped when neither names nor places are redacted
       Given content carrying a wholly capitalised word
-      And person detection is switched off
+      And person and location detection are both switched off
       When the content is analysed for personal information
       Then the content is analysed once and not twice
+
+    @unit
+    Scenario: The second pass asks only for places when only places are redacted
+      Given content carrying a wholly capitalised name
+      And location detection is on and person detection is off
+      When the content is analysed for personal information
+      Then the second analysis asks for places and not for persons
 
   Rule: The second pass changes nothing but name and place spans
 
@@ -163,11 +192,13 @@ Feature: A name written in capitals is still redacted
       When the content is analysed for personal information
       Then the name is reported as a person
       And every span that is not a person or a place is reported exactly as the first pass found it
+      And a span of another kind the second analysis returns is not reported
 
     @unit
     Scenario: A surname the model reads as a place is still redacted in capitals
       Given a name whose two-word surname the model reads as a place in ordinary case
       And the surname is written wholly in capitals
+      And person and location detection are both switched on
       When the content is analysed for personal information
       Then the surname is reported as it is in ordinary case
 
@@ -196,7 +227,25 @@ Feature: A name written in capitals is still redacted
       Given a name written wholly in capitals whose every word is also an everyday word
       When the content is analysed for personal information
       Then no person span is reported, as before the second pass existed
-      And a name with one name word beside a capitalised everyday word is still reported
+      And a name the first pass misses, with one name word beside an everyday word, is still reported
+
+    @unit
+    Scenario: A short name the corpus mostly writes as another word is still harvested
+      Given a short name written wholly in capitals whose words the corpus writes mostly as acronyms or everyday words
+      When the content is analysed for personal information
+      Then the whole name is reported as a person
+
+    @unit
+    Scenario: An unknown word beside an everyday word is not harvested
+      Given an invented brand name beside an everyday word, in capitals
+      When the content is analysed for personal information
+      Then no person or place span is reported over it
+
+    @unit
+    Scenario: A name of words the model has never seen is still harvested
+      Given a name written wholly in capitals whose every word is unknown to the model
+      When the content is analysed for personal information
+      Then the whole name is reported as a person
 
     @unit
     Scenario: A name with one capitalised word is still harvested
