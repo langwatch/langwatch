@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"unicode/utf16"
@@ -29,7 +30,7 @@ type span struct{ start, end int }
 func New(secrets map[string]string, extra ...string) *Redactor {
 	values := make([]string, 0, len(extra)+len(secrets))
 	values = append(values, extra...)
-	values = append(values, mapValues(secrets)...)
+	values = append(values, slices.Collect(maps.Values(secrets))...)
 	seen := map[string]struct{}{}
 	for _, value := range values {
 		if value == "" {
@@ -118,12 +119,11 @@ func endOfSpanContaining(spans []span, pos int) int {
 	return pos
 }
 
-// TrimPartialTail removes the longest suffix of raw that is a proper prefix of
-// a secret form, once: a secret cut off at the end of a stream is not matched
-// whole, so its first characters would otherwise show. A suffix inside a whole
-// match is kept (it is redacted anyway); one that cuts a whole match in two
-// takes the match with it. An ordinary tail that looks like a prefix goes too:
-// a leak is worse than losing up to MaxFormLen-1 bytes.
+// TrimPartialTail removes, once, the longest suffix of raw that is a proper
+// prefix of a secret form: a secret cut off at the end is not matched whole.
+// A suffix inside a whole match stays (it is redacted); one that cuts a match
+// in two takes the match with it. An ordinary tail that looks like a prefix
+// goes too: a leak is worse than losing up to MaxFormLen-1 bytes.
 func (r *Redactor) TrimPartialTail(raw string) string {
 	k := r.partialTailLen(raw)
 	if k == 0 {
@@ -235,14 +235,6 @@ func mergeRuns(runs []span) []span {
 		}
 	}
 	return merged
-}
-
-func mapValues(m map[string]string) []string {
-	values := make([]string, 0, len(m))
-	for _, v := range m {
-		values = append(values, v)
-	}
-	return values
 }
 
 // secretForms is the raw value, Go's JSON escaping and Python's

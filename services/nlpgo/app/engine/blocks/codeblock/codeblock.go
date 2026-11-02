@@ -757,8 +757,8 @@ func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
 	}
 	// Invalid bytes go before any matching: dropped later they would join the
 	// bytes around them into a secret the redactor never saw.
+	capStart := max(0, len(buf)-maxRunnerStderr)
 	raw := strings.ToValidUTF8(string(dropCutRune(buf)), "\uFFFD")
-	capStart := max(0, len(raw)-maxRunnerStderr)
 	raw = redactor.TrimPartialTail(raw)
 	if offset == 0 && capStart == 0 {
 		return redactor.Redact(raw)

@@ -387,15 +387,10 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: What the interpreter wrote to stderr explains a runner failure, without leaking a secret
 
-    # The runner captures the user's own stderr into the result file; this
-    # stream holds interpreter-level diagnostics, read back only when no
-    # result was produced. It keeps the last 64 KiB; the cut is chosen on the
-    # raw bytes so it falls inside no secret, a secret cut off at the end is
-    # dropped, and only the kept part is redacted. Invalid UTF-8 is replaced
-    # before any matching so a dropped byte never joins a secret. Trimming a
-    # partial at the end may drop up to MaxFormLen-1 trailing bytes on
-    # purpose, even an ordinary tail such as "1000" for a secret "0000":
-    # a leak is worse than a lost byte. A partial inside a whole match stays.
+    # Only the last 64 KiB of interpreter stderr is read, and only when no result
+    # exists. The cut falls inside no secret, invalid UTF-8 is replaced before
+    # matching, and a secret cut off at the end is dropped, even an ordinary
+    # tail such as "1000" for a secret "0000"; a partial inside a match stays.
     @unit
     Scenario: A runner error carries the end of the interpreter stderr
       Given a runner that exits without writing a result and wrote to stderr

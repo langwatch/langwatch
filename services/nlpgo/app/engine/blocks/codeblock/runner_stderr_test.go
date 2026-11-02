@@ -456,3 +456,21 @@ func TestWithStderrTail_ASecretLargerThanTheTailAtTheEndLeavesNoFragment(t *test
 	assert.NotContains(t, msg, "S3cr3")
 	assert.Contains(t, msg, "Boom")
 }
+
+// @scenario "A secret is scrubbed from stderr in its JSON-escaped forms"
+func TestReadRunnerStderr_CutRuneAtTheEndKeepsTheFullSecretLookback(t *testing.T) {
+	secret := "ABCDEFGHIJKLMNOPQRST"
+	total := codeblock.MaxRunnerStderr + 5000
+	readOffset := total - codeblock.MaxRunnerStderr - len(secret)
+	stderr := strings.Repeat("x", readOffset-1) + secret
+	stderr += strings.Repeat("x", total-3-len(stderr)) + "\xf0\x9f\x98"
+
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), stderr, map[string]string{"K": secret})
+	require.NoError(t, err)
+	tail := codeblock.WithStderrTail("exit status 1", got)
+
+	for i := 0; i+2 <= len(secret); i++ {
+		assert.False(t, strings.Contains(got, secret[i:i+2]), "fragment %q in output", secret[i:i+2])
+		assert.False(t, strings.Contains(tail, secret[i:i+2]), "fragment %q in tail", secret[i:i+2])
+	}
+}
