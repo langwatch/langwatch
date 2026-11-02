@@ -46,30 +46,20 @@ export function movesAnInvitationExpiry({
   return before.holder.expiresAt !== after.holder.expiresAt;
 }
 
-/** One member's seat as the fold last recorded it and as it stands now. */
-export type MemberSeatReading = Readonly<{ userId: string; recorded: SeatKind; live: SeatKind }>;
-
-/** A seat a write outside organization moved, as the change that corrects the fold. */
-export type MemberSeatCorrection = Readonly<{ userId: string; from: SeatKind; to: SeatKind }>;
+/** One holder's seat as the fold last recorded it and as it stands now. */
+export type SeatReading = Readonly<{ holder: SeatHolder; recorded: SeatKind; live: SeatKind }>;
 
 /**
- * The members whose live seat differs from the seat the fold recorded (ADR-002 §6). Across the
- * view-only line only a swap between a Lite Member and a full seat counts: a seat taken or given
- * back is its writer's own change, which may still be on its way to the fold.
+ * The holders an organization-wide re-read corrects (ADR-002 §6): those it finds in a metered
+ * seat the fold has not recorded. A seat given back is left to its writer's own change, so the
+ * correction, dated at its source, never outranks a late admission and cannot lose a seat.
  */
-export function memberSeatCorrections({
+export function organizationSeatCorrections({
   readings,
-  acrossViewOnlyLineOnly,
 }: {
-  readings: readonly MemberSeatReading[];
-  acrossViewOnlyLineOnly: boolean;
-}): MemberSeatCorrection[] {
-  return readings
-    .filter(({ recorded, live }) => movesASeat({ from: recorded, to: live }))
-    .filter(
-      ({ recorded, live }) => !acrossViewOnlyLineOnly || (isMetered(recorded) && isMetered(live)),
-    )
-    .map(({ userId, recorded, live }) => ({ userId, from: recorded, to: live }));
+  readings: readonly SeatReading[];
+}): SeatReading[] {
+  return readings.filter(({ recorded, live }) => isMetered(live) && live !== recorded);
 }
 
 function isMetered(seat: SeatKind): boolean {

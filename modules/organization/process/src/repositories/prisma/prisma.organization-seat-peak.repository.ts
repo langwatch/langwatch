@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/eventing";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { emptySeatPeak, type SeatPeakState } from "../../rules/seat-peak.rules.ts";
 import {
   OrganizationSeatPeakRepository,
   type SeatPeakFoldState,
@@ -15,10 +16,14 @@ type PrismaSeatPeakDatabase = PrismaClient | Prisma.TransactionClient;
 
 type Row = Prisma.OrganizationSeatPeakProjectionGetPayload<object>;
 
-/** An unreadable row reads as empty, so the fold starts it again. */
-function readRow(row: Row): StoredProjectionRead<SeatPeakFoldState> {
+/** An unreadable row throws: read as empty, the fold would silently stop counting (ADR-002). */
+function readRow(row: Row): Extract<StoredProjectionRead<SeatPeakFoldState>, { kind: "folded" }> {
   const state = seatPeakFoldStateSchema.safeParse(row.folded);
-  if (!state.success) return { kind: "empty" };
+  if (!state.success) {
+    throw new Error(
+      `organization ${row.organizationId}'s seat-peak state does not match its schema; rebuild the projection`,
+    );
+  }
   return {
     kind: "folded",
     projection: {
@@ -73,11 +78,10 @@ export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
     });
   }
 
-  async findState(organizationId: string): Promise<SeatPeakFoldState | null> {
+  async getState(organizationId: string): Promise<SeatPeakState> {
     const row = await this.prisma.organizationSeatPeakProjection.findUnique({
       where: { organizationId },
     });
-    const read = row ? readRow(row) : null;
-    return read?.kind === "folded" ? read.projection.state : null;
+    return row ? readRow(row).projection.state : emptySeatPeak();
   }
 }

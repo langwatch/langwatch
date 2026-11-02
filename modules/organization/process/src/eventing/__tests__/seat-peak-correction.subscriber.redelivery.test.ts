@@ -11,7 +11,6 @@ import {
 } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import type { SeatPeakFoldState } from "../../repositories/organization-seat-peak.repository.ts";
 import {
   emptySeatPeak,
   foldSeatPeak,
@@ -45,11 +44,8 @@ function setup({ foldLags }: { foldLags: boolean }) {
     state = foldSeatPeak({ state, fact });
   };
   const corrections = SeatPeakCorrectionService.create({
-    seats: { findSeatHolders: async () => [] },
-    peaks: {
-      findState: async () =>
-        ({ ...state, CreatedAt: 0, UpdatedAt: 0, LastEventOccurredAt: 0 }) as SeatPeakFoldState,
-    },
+    seats: { findSeatHolders: async () => [], findMemberSeat: async () => null },
+    peaks: { getState: async () => state },
     organizationIdsForMember: async () => [ORG],
     changes: () => ({
       send: async (change) => {
@@ -61,6 +57,8 @@ function setup({ foldLags }: { foldLags: boolean }) {
   const pipeline = buildSeatPeakPipeline({
     store: createApiFixture(),
     opener: { open: async () => undefined },
+    sender: () => ({ send: async () => undefined }),
+    retention: { deleteDispatchedBefore: async () => 0 },
     corrections,
   });
   const lanes = new Map<string, EventSubscriberDefinition>();
@@ -90,13 +88,14 @@ const context = { tenantId: "leaver", aggregateId: "leaver" };
 
 describe("organization's account deactivated seat correction", () => {
   describe("when user's deactivation fact is delivered twice", () => {
-    it("records one seat change once the first has been folded", async () => {
+    it("sends the same change again once the first has been folded, and it counts once", async () => {
       const { lane, sent, counts } = setup({ foldLags: false });
 
       await lane.handle(deactivated, context);
       await lane.handle(deactivated, context);
 
-      expect(sent).toHaveLength(1);
+      expect(new Set(sent.map(({ changeId }) => changeId)).size).toBe(1);
+      expect(sent[0]).toMatchObject({ from: "full", to: "none", occurredAt: DEACTIVATED_AT });
       expect(counts().full).toBe(0);
     });
 

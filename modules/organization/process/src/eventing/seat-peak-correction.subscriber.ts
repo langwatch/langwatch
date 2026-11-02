@@ -34,7 +34,7 @@ import type { SeatPeakCorrectionService } from "../services/seat-peak-correction
 
 export type SeatPeakCorrections = Pick<
   SeatPeakCorrectionService,
-  "correctMembers" | "correctInvitations" | "correctAccount" | "countDirectoryCreate"
+  "correctMember" | "correctOrganization" | "correctInvitations" | "correctAccount"
 >;
 
 type PeerSubscribing = {
@@ -57,7 +57,10 @@ const organizationWide = {
   },
 };
 
-/** Adds the corrections to organization_seat_peak; every handler is idempotent by event id. */
+/**
+ * Adds the corrections to organization_seat_peak; every handler is idempotent by event id, reads
+ * the live seat and dates its change at the source event (ADR-002 §6).
+ */
 export function withSeatCorrections<Pipeline extends PeerSubscribing>({
   pipeline,
   corrections,
@@ -69,9 +72,8 @@ export function withSeatCorrections<Pipeline extends PeerSubscribing>({
     organizationId: string,
     { eventId, occurredAt }: { eventId: string; occurredAt: number },
   ) =>
-    corrections.correctMembers({
+    corrections.correctOrganization({
       organizationId,
-      acrossViewOnlyLineOnly: true,
       source: { eventId, occurredAt, cause: "custom_role_changed" },
     });
 
@@ -84,10 +86,9 @@ export function withSeatCorrections<Pipeline extends PeerSubscribing>({
     },
     handle: (grant, { tenantId, eventId, occurredAt }) =>
       isTeamGrantToAPerson(grant) && grant.principal.id !== null
-        ? corrections.correctMembers({
+        ? corrections.correctMember({
             organizationId: tenantId,
-            userIds: [grant.principal.id],
-            acrossViewOnlyLineOnly: true,
+            userId: grant.principal.id,
             source: { eventId, occurredAt, cause: "custom_role_changed" },
           })
         : Promise.resolve(),
@@ -152,9 +153,9 @@ export function withSeatCorrections<Pipeline extends PeerSubscribing>({
     eventType: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
     data: authzMemberOffboardedEventDataSchema,
     handle: async ({ organizationId, userId }, { eventId, occurredAt }) => {
-      await corrections.correctMembers({
+      await corrections.correctMember({
         organizationId,
-        userIds: [userId],
+        userId,
         source: { eventId, occurredAt, cause: "removed" },
       });
       await corrections.correctInvitations({
@@ -163,20 +164,16 @@ export function withSeatCorrections<Pipeline extends PeerSubscribing>({
       });
     },
   });
-  // SCIM wrote the membership; its fact names the seat the admission gave (a held create, none).
+  // SCIM wrote the membership; the seat is classified here by organization's own rule.
   pipeline.withPeerSubscriber("seatPeakDirectoryMemberCreated", {
     eventType: SCIM_MEMBER_CREATED_EVENT_TYPE,
     data: scimMemberCreatedEventDataSchema,
-    options: { enqueue: { filter: (created) => created.seat !== "none" } },
-    handle: ({ organizationId, userId, seat, createId }, { occurredAt }) =>
-      seat === "none"
-        ? Promise.resolve()
-        : corrections.countDirectoryCreate({
-            organizationId,
-            userId,
-            seat,
-            source: { eventId: createId, occurredAt, cause: "directory_created" },
-          }),
+    handle: ({ organizationId, userId, createId }, { occurredAt }) =>
+      corrections.correctMember({
+        organizationId,
+        userId,
+        source: { eventId: createId, occurredAt, cause: "directory_created" },
+      }),
   });
   return pipeline;
 }

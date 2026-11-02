@@ -489,7 +489,10 @@ export const SCIM_MEMBER_CREATED_EVENT_VERSION = "2026-11-02" as const;
 export const scimMemberSeatSchema = z.enum(["full", "lite", "none"]);
 export type ScimMemberSeat = z.infer<typeof scimMemberSeatSchema>;
 
-/** `createId` is minted with the membership row, so a redelivered fact records nothing new. */
+/**
+ * `createId` is minted with the membership row, so a redelivered fact records nothing new.
+ * `seat` is informational: organization classifies the member's seat by its own rule.
+ */
 const scimMemberCreatedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),

@@ -4,6 +4,7 @@ import type {
   StoredProjectionRead,
 } from "@langwatch/eventing";
 
+import { emptySeatPeak, type SeatPeakState } from "../../rules/seat-peak.rules.ts";
 import {
   OrganizationSeatPeakRepository,
   type SeatPeakFoldState,
@@ -36,7 +37,7 @@ export class MemoryOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
     this.rows.set(context.aggregateId, projection);
   }
 
-  async findState(organizationId: string): Promise<SeatPeakFoldState | null> {
-    return this.rows.get(organizationId)?.state ?? null;
+  async getState(organizationId: string): Promise<SeatPeakState> {
+    return this.rows.get(organizationId)?.state ?? emptySeatPeak();
   }
 }

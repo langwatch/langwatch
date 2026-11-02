@@ -1,3 +1,4 @@
+import type { MemberType } from "@langwatch/entitlement-contract";
 import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
 
 import type { SeatHolder, SeatKind } from "../rules/seat-holder.rules.ts";
@@ -21,4 +22,9 @@ export abstract class OrganizationSeatRepository {
   abstract countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats>;
   /** Every seat holder and its seat, live invitations included: the seat peak's opening count. */
   abstract findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]>;
+  /** One member's seat by the rule the counts use; null when they hold none. */
+  abstract findMemberSeat(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberType | null>;
 }

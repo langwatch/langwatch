@@ -9,11 +9,11 @@ import {
   SCIM_MEMBERSHIP_AGGREGATE_TYPE,
   type ScimMemberSeat,
 } from "@langwatch/enterprise-scim-contract";
+import type { MemberType } from "@langwatch/entitlement-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { SeatPeakFoldState } from "../../repositories/organization-seat-peak.repository.ts";
 import {
   emptySeatPeak,
   foldSeatPeak,
@@ -33,7 +33,10 @@ const TEN_FULL_SEATS = Array.from({ length: 10 }, (_, index) => ({
   seat: "full" as const,
 }));
 
-function setup({ countingStarted = true }: { countingStarted?: boolean } = {}) {
+function setup({
+  countingStarted = true,
+  live = "FullMember",
+}: { countingStarted?: boolean; live?: MemberType | null } = {}) {
   let state: SeatPeakState = countingStarted
     ? foldSeatPeak({
         state: emptySeatPeak(),
@@ -55,15 +58,11 @@ function setup({ countingStarted = true }: { countingStarted?: boolean } = {}) {
   const corrections = SeatPeakCorrectionService.create({
     seats: {
       findSeatHolders: async () => {
-        throw new Error("a directory create is counted from SCIM's fact, not the members table");
+        throw new Error("a directory create reads the one member, not the whole organization");
       },
+      findMemberSeat: async () => live,
     },
-    peaks: {
-      findState: async () =>
-        countingStarted
-          ? ({ ...state, CreatedAt: 0, UpdatedAt: 0, LastEventOccurredAt: 0 } as SeatPeakFoldState)
-          : null,
-    },
+    peaks: { getState: async () => state },
     organizationIdsForMember: async () => [ORG],
     changes: () => ({
       send: async (change) => {
@@ -143,12 +142,22 @@ describe("organization's count of a seat SCIM's directory create took", () => {
       expect(Object.values(peaks())[0]?.fullPeak).toBe(11);
     });
 
-    it("records nothing for a create held until a seat frees", async () => {
-      const { lane, sent } = setup();
+    it("counts no seat for a create held until a seat frees", async () => {
+      const { lane, sent, peaks } = setup({ live: null });
 
       await lane.handle(memberCreated("none"), context);
 
-      expect(sent).toEqual([]);
+      expect(sent).toMatchObject([{ from: "none", to: "none", cause: "directory_created" }]);
+      expect(Object.values(peaks())[0]?.fullPeak).toBe(10);
+    });
+
+    it("counts the seat organization's own rule gives, not the one the fact names", async () => {
+      const { lane, sent, peaks } = setup({ live: "LiteMember" });
+
+      await lane.handle(memberCreated("full"), context);
+
+      expect(sent).toMatchObject([{ from: "none", to: "lite" }]);
+      expect(Object.values(peaks())[0]).toMatchObject({ fullPeak: 10, litePeak: 1 });
     });
   });
 

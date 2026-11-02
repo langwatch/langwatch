@@ -16,7 +16,10 @@ export const SCIM_MEMBERSHIP_PRUNE_INTENT = "pruneMemberCreated" as const;
 /** The tenant's one member-created outbox instance. */
 const SCIM_MEMBERSHIP_PROCESS_KEY = "members";
 
-/** The seat an admitted row takes: a held row none, a Lite Member row lite, any other full. */
+/**
+ * The seat SCIM's admission gave the row, informational on the fact: organization counts the
+ * seat by its own rule, read when the fact arrives (ADR-002 §6).
+ */
 export function directorySeatOf({
   role,
   pending,

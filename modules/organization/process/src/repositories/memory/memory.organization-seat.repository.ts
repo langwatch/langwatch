@@ -143,6 +143,25 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     ];
   }
 
+  async findMemberSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberType | null> {
+    const member = this.memory.organizationUsers.find(
+      (candidate) =>
+        candidate.organizationId === organizationId &&
+        candidate.userId === userId &&
+        candidate.disabledAt === null &&
+        (this.memory.users.get(userId)?.deactivatedAt ?? null) === null,
+    );
+    if (!member) return null;
+    const permissionsOf = this.#permissionsOf(organizationId);
+    return classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf));
+  }
+
   #permissionsOf(organizationId: string): PermissionsOf {
     return (customRoleId) => {
       const role = customRoleId ? this.memory.customRoles.get(customRoleId) : undefined;

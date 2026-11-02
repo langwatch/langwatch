@@ -20,7 +20,7 @@ export type SeatPeakSenders = Readonly<{
 
 type SeatPeakDependencies = Readonly<{
   seats: Pick<OrganizationSeatRepository, "findSeatHolders">;
-  peaks: Pick<OrganizationSeatPeakRepository, "findState">;
+  peaks: Pick<OrganizationSeatPeakRepository, "getState">;
   organizations: Pick<OrganizationRepository, "listAllIds">;
   plans: Pick<EntitlementApi, "getActivePlan">;
 }>;
@@ -84,8 +84,8 @@ export class SeatPeakService {
     });
     const unopened: string[] = [];
     for (const organizationId of page.ids) {
-      const state = await this.dependencies.peaks.findState(organizationId);
-      if (state?.openedAt == null) unopened.push(organizationId);
+      const state = await this.dependencies.peaks.getState(organizationId);
+      if (state.openedAt === null) unopened.push(organizationId);
     }
     if (!dryRun && unopened.length > 0) {
       const snapshots: RecordSeatSnapshotCommandData[] = [];
@@ -110,11 +110,11 @@ export class SeatPeakService {
     now: number;
   }): Promise<OrganizationSeatPeak> {
     const [state, plan] = await Promise.all([
-      this.dependencies.peaks.findState(organizationId),
+      this.dependencies.peaks.getState(organizationId),
       this.dependencies.plans.getActivePlan({ organizationId }),
     ]);
     const caps = { fullSeats: plan.maxMembers, liteSeats: plan.maxMembersLite };
-    if (state?.openedAt == null) return { counted: false, caps };
+    if (state.openedAt === null) return { counted: false, caps };
     const asOf = seatPeakAsOf({ state, now });
     return {
       counted: true,
