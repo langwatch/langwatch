@@ -98,7 +98,7 @@ describe("who created and last changed a monitor", () => {
     const { app } = harness();
     const created = await app.create({ ...createInput, actorId: "user_ada" });
 
-    const read = await app.getById({ id: created.id, projectId });
+    const read = (await app.list({ projectId })).find((row) => row.id === created.id)!;
     expect([read.createdById, read.updatedById]).toEqual(["user_ada", "user_ada"]);
     expect(read.createdBy).toEqual({ id: "user_ada", name: "Ada" });
   });
@@ -109,7 +109,7 @@ describe("who created and last changed a monitor", () => {
     const created = await app.create({ ...createInput, actorId: "user_ada" });
     await app.patch({ id: created.id, projectId, changes: { sample: 0.5 }, actorId: "user_grace" });
 
-    const read = await app.getById({ id: created.id, projectId });
+    const read = (await app.list({ projectId })).find((row) => row.id === created.id)!;
     expect(read.createdBy).toEqual({ id: "user_ada", name: "Ada" });
     expect(read.updatedBy).toEqual({ id: "user_grace", name: "Grace" });
   });

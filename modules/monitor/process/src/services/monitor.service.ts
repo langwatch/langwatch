@@ -147,15 +147,14 @@ export class MonitorService {
     return Promise.all(monitors.map((monitor) => this.readable(monitor)));
   }
 
-  /** The monitor as it runs: its evaluator at the pinned label, and who wrote it. */
+  /** The monitor as it runs: its evaluator at the pinned label. Only list reads name people. */
   private async readable(monitor: MonitorWithEvaluator): Promise<MonitorWithEvaluator> {
-    const [named = monitor] = await this.withPeople([monitor]);
-    if (!named.evaluator || !named.evaluatorLabel) return named;
+    if (!monitor.evaluator || !monitor.evaluatorLabel) return monitor;
     const evaluator = await this.options.evaluators.atLabelOrLatest({
-      evaluator: named.evaluator,
-      label: named.evaluatorLabel,
+      evaluator: monitor.evaluator,
+      label: monitor.evaluatorLabel,
     });
-    return { ...named, evaluator };
+    return { ...monitor, evaluator };
   }
 
   /** Fills `createdBy` and `updatedBy`; a monitor with no recorded creator keeps null. */
