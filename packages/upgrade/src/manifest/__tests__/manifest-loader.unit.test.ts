@@ -136,6 +136,7 @@ describe("releaseManifestGaps()", () => {
         { release: "3.21.0", previous: "3.20.1" },
       ]);
       const stamp =
+        "git fetch -q origin 'refs/tags/langwatch@v*:refs/tags/langwatch@v*' && " +
         'pnpm --filter @langwatch/architecture-enforcer print:table-owners --out "$PWD/table-owners.json"' +
         " && node --disable-warning=ExperimentalWarning --experimental-transform-types" +
         " packages/upgrade/scripts/stamp-release.ts --release 3.21.0 --previous 3.20.1" +
