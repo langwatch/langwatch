@@ -180,7 +180,13 @@ func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
 //
 // `getenv` is injected so tests don't need to mutate process env.
 func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) (*codeblock.Executor, error) {
-	return codeblock.New(codeblock.Options{
+	return codeblock.New(codeExecutorOptions(engineCfg, getenv, logger))
+}
+
+// codeExecutorOptions is the knob-to-option mapping on its own, so a test can
+// read what the executor is handed without a new accessor on the executor.
+func codeExecutorOptions(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) codeblock.Options {
+	return codeblock.Options{
 		Logger: logger,
 		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
 		// The instance a code node's LangWatch SDK calls. It is the same URL
@@ -192,7 +198,7 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, l
 		),
 		DefaultTimeout:      resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
 		AllowVisibleProcess: allowVisibleProcess(engineCfg.CodeBlockAllowVisibleProcess, getenv, logger),
-	})
+	}
 }
 
 // allowVisibleProcess honors the setting only on AWS Lambda, the one platform

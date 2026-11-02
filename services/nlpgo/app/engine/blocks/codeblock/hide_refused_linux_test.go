@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"runtime"
@@ -22,6 +24,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
 // Lambda's seccomp answers EPERM to prctl(PR_SET_DUMPABLE). A filter cannot be
@@ -202,12 +205,29 @@ func runExecutorCase(t *testing.T, name string) {
 		require.NotNil(t, res)
 		require.NotNil(t, res.Error)
 		assert.Contains(t, res.Error.Message, codeblock.AllowVisibleProcessSetting)
+		assertHTTPBlockStillRuns(t)
 	default:
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
 		require.Nil(t, res.Error, "expected success, got %+v", res.Error)
 		assert.EqualValues(t, 42, res.Outputs["answer"])
 	}
+}
+
+// assertHTTPBlockStillRuns proves a block type other than code keeps serving in
+// this same refused process.
+func assertHTTPBlockStillRuns(t *testing.T) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":"yes"}`))
+	}))
+	defer srv.Close()
+	exe := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}},
+	})
+	res, err := exe.Execute(context.Background(), httpblock.Request{URL: srv.URL, Method: "GET", OutputPath: "$.ok"})
+	require.NoError(t, err)
+	assert.Equal(t, "yes", res.Output)
 }
 
 // assertHideModeLogged checks the one operator-facing record of the mode:

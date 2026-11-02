@@ -327,6 +327,22 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 	}
 }
 
+// The helper test below proves the rule; this proves the executor is built
+// from it, so passing the raw setting through would turn this red.
+// @scenario "the engine warns when the visible-process setting is ignored off Lambda"
+func TestCodeExecutorOptions_IgnoreVisibleProcessSettingOffLambda(t *testing.T) {
+	t.Setenv("NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS", "true")
+	cfg, err := nlpgo.LoadConfig(t.Context())
+	require.NoError(t, err)
+	require.True(t, cfg.Engine.CodeBlockAllowVisibleProcess, "the variable must reach the config")
+	core, logs := observer.New(zapcore.DebugLevel)
+
+	opts := codeExecutorOptions(cfg.Engine, func(string) string { return "" }, zap.New(core))
+
+	assert.False(t, opts.AllowVisibleProcess)
+	assert.Len(t, logs.FilterMessage("nlpgo_code_block_allow_visible_process_ignored").All(), 1)
+}
+
 // @scenario "the engine warns when the visible-process setting is ignored off Lambda"
 func TestAllowVisibleProcess_HonoredOnlyOnLambdaAndWarnsWhenIgnored(t *testing.T) {
 	lambdaEnv := map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn", "AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}
