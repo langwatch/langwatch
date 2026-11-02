@@ -41,9 +41,17 @@ import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards
 const LEGACY_PROCEDURES = [analyticsTrpc, graphTrpc, dashboardTrpc, savedViewTrpc].flatMap(
   ({ namespace, members }) => Object.keys(members).map((name) => `${namespace}.${name}`),
 );
-/** The board's own reads: its list, its stars and its widgets, none of them data. */
-// The card also reads the projects the member may name, to show a query's project names.
-const BOARD_PROCEDURES = /^(boards|dashboardWidgets|analytics\.lwql\.readableProjects)\.?/;
+/**
+ * The board's own reads: its list, its stars, its widgets, and the projects a card may name.
+ * Named one by one, so a write such as `dashboardWidgets.update` is never among them.
+ */
+const BOARD_READS = [
+  "boards.getAll",
+  "boards.listStarred",
+  "dashboardWidgets.list",
+  "analytics.lwql.readableProjects",
+];
+const notABoardRead = (path: string) => !BOARD_READS.includes(path);
 
 const FLAGS = { release_dashboards: true };
 const BOARD = {
@@ -177,7 +185,7 @@ describe("given a member opens a stored board with widgets", () => {
 
     /** @scenario "AC19 Every dashboard data request goes to LWQL and none to legacy analytics" */
     it("sends every data request to the LWQL query procedure, one per widget", () => {
-      expect(calls.map(({ path }) => path).filter((path) => !BOARD_PROCEDURES.test(path))).toEqual([
+      expect(calls.map(({ path }) => path).filter(notABoardRead)).toEqual([
         "analytics.lwql.query",
         "analytics.lwql.query",
       ]);
@@ -204,9 +212,9 @@ describe("given a member opens a From LangWatch board", () => {
       });
       const queried = widgets.filter(({ definition }) => definition.queries.length > 0);
 
-      expect(
-        server.calls.map(({ path }) => path).filter((path) => !BOARD_PROCEDURES.test(path)),
-      ).toEqual(queried.map(() => "analytics.lwql.query"));
+      expect(server.calls.map(({ path }) => path).filter(notABoardRead)).toEqual(
+        queried.map(() => "analytics.lwql.query"),
+      );
     });
   });
 });
@@ -257,7 +265,11 @@ describe("given a board where one widget's LWQL query fails", () => {
 });
 
 describe("given a board saved before the v2 templates, with its own widget code", () => {
-  /** As stored then: no description, prompt or source, and a number format of its own. */
+  /**
+   * As stored then. The stored definition has one version, so what marks an older widget is what
+   * it lacks: no description, prompt or source, which later widgets carry (see
+   * `dashboard-widget-definition.ts`). Its number format is its own, written in its code.
+   */
   const SAVED = {
     ...TRACES,
     name: "Requests (old label)",
@@ -281,34 +293,40 @@ describe("given a board saved before the v2 templates, with its own widget code"
 
   describe("when the member opens it", () => {
     /** @scenario "AC11 Existing boards are unaffected" */
-    it("hands the widget frame its stored code, number format included, unchanged", () => {
+    // The frame's runtime cannot run under jsdom, so this checks the code it is handed; the
+    // drawn number is checked in the running app (see the PR's use-proof).
+    it("hands the widget frame its stored code unchanged, its own number format with it", () => {
       const [frame] = screen.getAllByTestId("sandboxed-frame");
       expect(frames.get(frame as Element)?.code).toBe(SAVED.graph.code);
     });
 
     /** @scenario "AC11 Existing boards are unaffected" */
-    it("shows the widget under its stored label", () => {
-      expect(screen.getByText(SAVED.name)).toBeInTheDocument();
+    it("titles the widget's card with its stored label", () => {
+      const [frame] = screen.getAllByTestId("sandboxed-frame");
+      let card = frame?.parentElement ?? null;
+      while (card && !within(card).queryByTestId("widget-card-footer")) card = card.parentElement;
+      if (!card) throw new Error("the frame is in no widget card");
+      expect(within(card).getAllByText(SAVED.name)[0]).toBeVisible();
     });
 
     /** @scenario "AC11 Existing boards are unaffected" */
-    it("runs the widget's stored query", () => {
+    // The test asks for the query by its stored name, as the widget's code would; the door must
+    // answer with the stored SQL.
+    it("runs the stored SQL when the widget asks for its stored query", () => {
       expect(
         calls.filter(({ path }) => path === "analytics.lwql.query").map(({ input }) => input),
       ).toEqual([expect.objectContaining({ sql: SAVED.graph.queries[0]?.sql })]);
     });
 
     /** @scenario "AC11 Existing boards are unaffected" */
-    it("writes nothing back to the board or its widgets", () => {
-      // Reads only, named one by one: a pattern like `boards.*` would let a write through.
-      const reads = [
-        "boards.getAll",
-        "boards.listStarred",
-        "dashboardWidgets.list",
-        "analytics.lwql.readableProjects",
-        "analytics.lwql.query",
-      ];
-      expect(calls.map(({ path }) => path).filter((path) => !reads.includes(path))).toEqual([]);
+    it("writes nothing back to the board or its widgets, even after it settles", async () => {
+      // A save from a timer or a late effect would land after the first pass.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 1_000)));
+      expect(
+        calls
+          .map(({ path }) => path)
+          .filter((path) => notABoardRead(path) && path !== "analytics.lwql.query"),
+      ).toEqual([]);
     });
   });
 });
