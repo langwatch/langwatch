@@ -3,10 +3,6 @@
 ## [3.22.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.21.0...langwatch@v3.22.0) (2026-11-02)
 
 
-### ⚠ BREAKING CHANGES
-
-* **sdk:** client.dashboards and langwatch.dashboards now address the new Dashboards API, not the old Reports; use client.analyticsReports / langwatch.analytics_reports for those. MCP Reports tools are renamed platform_*_analytics_report(s).
-
 ### Features
 
 * **aigateway:** serve OpenAI Decisions API on /v1/decisions ([#9200](https://github.com/langwatch/langwatch/issues/9200)) ([aa27b1f](https://github.com/langwatch/langwatch/commit/aa27b1ffaa92860abe40548cbbb5009369472bdd))
@@ -17,7 +13,7 @@
 * **auth:** force a password reset for a set of users ([#8959](https://github.com/langwatch/langwatch/issues/8959)) ([e408de0](https://github.com/langwatch/langwatch/commit/e408de0fa03840c6683b932c5009454cf55dd52b))
 * **auth:** legacy key scope flag for annotation reads ([#9024](https://github.com/langwatch/langwatch/issues/9024)) ([2cd1992](https://github.com/langwatch/langwatch/commit/2cd1992b34bae1925760c7d3994471730397f1a1))
 * **auth:** log which credential and client each API request used ([#9003](https://github.com/langwatch/langwatch/issues/9003)) ([c55dc6e](https://github.com/langwatch/langwatch/commit/c55dc6e6e22aa2a6563b4be7d3e93d7f40c7f23b))
-* **auth:** record each request's credential type and make legacy project keys ingestion-only ([#8962](https://github.com/langwatch/langwatch/issues/8962)) ([ec41367](https://github.com/langwatch/langwatch/commit/ec41367384ebda1e5cbe3d0ed16b1797b9769575))
+* **auth:** record each request's credential type and log legacy project key requests beyond ingestion; they are refused only on projects in `legacy_project_key_scope_enforced` ([#8962](https://github.com/langwatch/langwatch/issues/8962)) ([ec41367](https://github.com/langwatch/langwatch/commit/ec41367384ebda1e5cbe3d0ed16b1797b9769575))
 * **chart:** let the operator turn the heap ceiling off ([#9127](https://github.com/langwatch/langwatch/issues/9127)) ([6899309](https://github.com/langwatch/langwatch/commit/6899309e2a1ca62362603b7b17d2a4221408a5e7))
 * **charts:** let the langyagent chart take over existing agent objects ([#8965](https://github.com/langwatch/langwatch/issues/8965)) ([fa657fa](https://github.com/langwatch/langwatch/commit/fa657fa456f2bce14acfe9e12ad51e751894b62e))
 * **ci:** assume AWS roles by OIDC for embeds publish and the gateway matrix ([#8961](https://github.com/langwatch/langwatch/issues/8961)) ([d8f12d2](https://github.com/langwatch/langwatch/commit/d8f12d2ea2c7da57ebf372320760474a1690127f))
