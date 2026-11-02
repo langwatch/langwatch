@@ -34,8 +34,8 @@ export class ExperimentBoardRowsService {
     const boardRowIds: string[] = [];
     let limit = DATASET_PAGE_LIMIT_MAX;
     let page = 1;
-    let totalPages = 1;
-    while (page <= totalPages) {
+    let total: number | null = null;
+    while (total === null || boardRowIds.length < total) {
       let read;
       try {
         read = await this.datasets.listRecords({ projectId, slugOrId: datasetId, page, limit });
@@ -44,12 +44,13 @@ export class ExperimentBoardRowsService {
         if (!(error instanceof DatasetPageTooLargeError)) throw error;
         const suggestedLimit = Number(error.meta.suggestedLimit);
         if (!(suggestedLimit >= 1 && suggestedLimit < limit)) throw error;
-        page = ((page - 1) * limit) / suggestedLimit + 1;
+        page = Number(error.meta.suggestedPage);
         limit = suggestedLimit;
         continue;
       }
+      if (read.data.length === 0) break;
       boardRowIds.push(...read.data.map((record) => record.id));
-      totalPages = read.data.length === 0 ? 0 : read.pagination.totalPages;
+      total = read.pagination.total;
       page += 1;
     }
     return boardRowIndicesOf({ runRowIds, boardRowIds });
