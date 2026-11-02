@@ -12,6 +12,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import {
   MonitorApi,
   monitorConfig,
@@ -37,15 +38,23 @@ import {
   type EnabledGuardrailMonitor,
   type MonitorSummary,
 } from "@langwatch/monitor-contract";
+import { NotificationService } from "@langwatch/notification-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
+import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  buildMonitorAutoPausePipeline,
+  type MonitorAutoPausePipeline,
+} from "../eventing/monitor-auto-pause.pipeline.ts";
 import {
   buildMonitorEvaluatorCleanupPipeline,
   type MonitorEvaluatorCleanupPipeline,
 } from "../eventing/monitor-evaluator-cleanup.pipeline.ts";
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
 import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
+import { MonitorAutoPauseService } from "../services/monitor-auto-pause.service.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
 import { MonitorReplicationService } from "../services/monitor-replication.service.ts";
 import { MonitorService } from "../services/monitor.service.ts";
@@ -69,6 +78,12 @@ export class MonitorModule implements MonitorApi {
     featureFlags: FeatureFlagApi,
     /** Removes the workflow a monitor copy replicated when the replica is refused. */
     workflows: WorkflowApi,
+    /** The project's name, slug and organization, for the paused-monitor email. */
+    projects: ProjectApi,
+    /** The admins' addresses the paused-monitor email goes to. */
+    users: UserApi,
+    /** Sends the paused-monitor email through this install's gateway. */
+    notifications: NotificationService,
   };
   /** The shared deployment origin, absent where the deployment named no `BASE_HOST`. */
   static readonly config = monitorConfig;
@@ -78,6 +93,7 @@ export class MonitorModule implements MonitorApi {
   #catalogue: MonitorCatalogService;
   #permissions: AuthzApi;
   #replication: MonitorReplicationService;
+  #autoPause: MonitorAutoPauseService;
   readonly #publicBaseUrl: string | undefined;
 
   private constructor(
@@ -99,6 +115,20 @@ export class MonitorModule implements MonitorApi {
       workflows: dependencies.workflows,
     });
     this.#publicBaseUrl = publicBaseUrl;
+    this.#autoPause = MonitorAutoPauseService.create({
+      repository: repositories.monitors,
+      projects: dependencies.projects,
+      administrators: dependencies.permissions,
+      users: dependencies.users,
+      mail: dependencies.notifications,
+      renderer: ReactEmailMailRenderer.create(),
+      ...(publicBaseUrl === undefined
+        ? {}
+        : {
+            platformUrl: (input: { projectSlug: string; path: string }) =>
+              monitorPlatformUrl({ publicBaseUrl, ...input }),
+          }),
+    });
   }
 
   static create(setup: MonitorSetup): MonitorModule {
@@ -108,6 +138,11 @@ export class MonitorModule implements MonitorApi {
   /** Removes the monitors that ran an evaluator once evaluator records it deleted. */
   evaluatorCleanupPipeline(): MonitorEvaluatorCleanupPipeline {
     return buildMonitorEvaluatorCleanupPipeline({ monitors: this.#monitors });
+  }
+
+  /** Pauses a monitor whose evaluations mostly errored, from evaluation's fact. */
+  autoPausePipeline(): MonitorAutoPausePipeline {
+    return buildMonitorAutoPausePipeline({ autoPause: this.#autoPause });
   }
 
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {

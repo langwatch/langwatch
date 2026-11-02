@@ -69,6 +69,10 @@ RUN set -eux; \
 # readable by a non-root user.
 # https://docs.aws.amazon.com/lambda/latest/dg/images-create.html#images-reqs
 FROM gcr.io/distroless/python3-debian12:nonroot
+# The nonroot base sets WORKDIR /home/nonroot, which is mode 0700 for uid 65532.
+# Lambda's own user cannot enter it, so every start fails with
+# Runtime.InvalidEntrypoint. Start from / instead.
+WORKDIR /
 COPY --from=lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
 COPY --from=go-build /out/service /usr/local/bin/service

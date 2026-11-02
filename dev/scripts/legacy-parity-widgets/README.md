@@ -32,7 +32,7 @@ executor fills from the page's own time window automatically (see
 ## Files
 
 - `legacy-*.json` — the 8 widget definitions (`{ name, code, queries }`),
-  one file per widget, ready to hand to `seed.mjs` or `langwatch dashboard-widget create`.
+  one file per widget, ready to hand to `seed.mjs` or `langwatch dashboard widget add <dashboardId>`.
 - `seed.mjs` — creates all 8 widgets in a project via the REST API
   (`POST /api/v1/projects/{projectId}/analytics/dashboard-widgets`, see
   `platform/app/src/app/api/analytics-sql/[[...route]]/app.dashboard-widgets.v1.ts`).

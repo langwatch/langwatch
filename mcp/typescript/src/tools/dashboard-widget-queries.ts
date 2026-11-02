@@ -1,4 +1,26 @@
 import type { DashboardWidgetQueryInput } from "../langwatch-api-dashboard-widgets.js";
+import type { WidgetSource } from "../schemas/widget-sources.js";
+
+/**
+ * Every query with `sources` and `projects` set to the lists given; a list not named is left as
+ * the query has it.
+ */
+export function withLists({
+  queries,
+  sources,
+  projects,
+}: {
+  queries: readonly DashboardWidgetQueryInput[];
+  sources: WidgetSource[] | null | undefined;
+  projects?: string[] | null | undefined;
+}): DashboardWidgetQueryInput[] {
+  if (sources === undefined && projects === undefined) return [...queries];
+  return queries.map((query) => ({
+    ...query,
+    ...(sources === undefined ? {} : { sources }),
+    ...(projects === undefined ? {} : { projects }),
+  }));
+}
 
 /** A widget file rarely needs more than a couple of named queries (server bound). */
 export const MAX_DASHBOARD_WIDGET_QUERIES = 8;

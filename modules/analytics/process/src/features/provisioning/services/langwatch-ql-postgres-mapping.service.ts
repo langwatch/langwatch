@@ -4,6 +4,8 @@
  * @see specs/lwql/api.feature
  */
 
+import { scryptSync } from "node:crypto";
+
 import {
   clickHouseLiteral,
   postgresLiteral,
@@ -42,6 +44,12 @@ interface LangWatchQLColumn {
  * PostgreSQL-engine storage, so a catalog of six datasets asks for six pools.
  */
 export const DEFAULT_POSTGRES_ENGINE_POOL_SIZE = 2;
+
+/** Starts the engine-table comment that names the collection values the table was built on. */
+const CREDENTIAL_COMMENT_PREFIX = "lwql-credentials=";
+
+/** Fixed, so the fingerprint is stable across processes; scrypt makes a guess costly. */
+const CREDENTIAL_FINGERPRINT_SALT = "lwql-postgres-named-collection";
 
 /**
  * Alias the approved view's body gives the base relation. Fixed rather than
@@ -187,6 +195,26 @@ export class LangWatchQLPostgresMappingService {
   }
 
   /**
+   * A short, one-way digest of every value the named collection holds, never the password itself.
+   * An engine table's pool keeps the values it was built with, so a changed digest means rebuild.
+   */
+  credentialFingerprint({
+    connection,
+  }: {
+    connection: Omit<PostgresNamedCollection, "collection">;
+  }): string {
+    const { host, port, database, user, password } = connection;
+    const material = JSON.stringify([host, port, database, user, password]);
+
+    return scryptSync(material, CREDENTIAL_FINGERPRINT_SALT, 8).toString("hex");
+  }
+
+  /** The comment an engine table built on these collection values carries. */
+  credentialComment({ fingerprint }: { fingerprint: string }): string {
+    return `${CREDENTIAL_COMMENT_PREFIX}${fingerprint}`;
+  }
+
+  /**
    * Maps one approved PostgreSQL view into the LangWatchQL database as a PostgreSQL-engine
    * table. `OR REPLACE` swaps atomically on an Atomic or Replicated database, so a run that fails
    * (a missing named collection) leaves the working table in place (issue #8726).
@@ -198,6 +226,7 @@ export class LangWatchQLPostgresMappingService {
     collection,
     postgresRelation,
     connectionPoolSize = DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+    credentialFingerprint,
   }: {
     names: LangWatchQLNames;
     table: string;
@@ -206,6 +235,8 @@ export class LangWatchQLPostgresMappingService {
     postgresRelation: string;
     /** Connections this one mapped table may hold open. See the constant. */
     connectionPoolSize?: number;
+    /** Stamped once ClickHouse is shown to hold these values; absent reads as stale (#8858). */
+    credentialFingerprint?: string;
   }): string {
     accessModel.assertNames(names);
     sqlText.assertIdentifier(collection, "named collection");
@@ -225,11 +256,16 @@ export class LangWatchQLPostgresMappingService {
     const columnList = columns
       .map((column) => `${sqlText.assertIdentifier(column.name, "column")} ${column.type}`)
       .join(", ");
+    const comment =
+      credentialFingerprint === undefined
+        ? ""
+        : ` COMMENT ${clickHouseLiteral(this.credentialComment({ fingerprint: credentialFingerprint }))}`;
 
     return (
       `CREATE OR REPLACE TABLE ${accessModel.qualified(names, table)} (${columnList}) ` +
       `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}) ` +
-      `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}`
+      `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}` +
+      comment
     );
   }
 

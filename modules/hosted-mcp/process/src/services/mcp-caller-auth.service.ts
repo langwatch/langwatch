@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { LegacyProjectKeyIngestionOnlyError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   McpAuthorizationRequiredError,
@@ -187,6 +188,10 @@ export class McpCallerAuthService {
     if (lookup.kind === "unknown") {
       this.#authFailures.track(this.clientIpOf(req));
       await http.sendHandled(res, new McpInvalidApiKeyError());
+      return { kind: "answered" };
+    }
+    if (lookup.kind === "ingestion_only") {
+      await http.sendHandled(res, new LegacyProjectKeyIngestionOnlyError());
       return { kind: "answered" };
     }
     const projectId = lookup.project.id;

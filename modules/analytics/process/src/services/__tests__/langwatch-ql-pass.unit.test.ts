@@ -17,11 +17,15 @@ import {
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../../rules/langwatch-ql-pass-sql.rules.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCapabilityService } from "../langwatch-ql-capability.service.ts";
+import { LangWatchQLCatalogShapesService } from "../langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 const PROJECT = { id: "project-1", lwqlKey: "key-1" };
+const [POSTGRES_VIEW] = LangWatchQLCatalogShapesService.create().postgresViews(LWQL_VIEW_CATALOG);
+if (!POSTGRES_VIEW) throw new Error("the catalogue has no PostgreSQL-resident view");
 const STATEMENT =
   "SELECT TraceId, eval(TraceName, 'Is the name a greeting?') AS named FROM analytics.traces";
 const CAPABILITY = LangWatchQLCapabilityService.create().tenantCapability({
@@ -124,6 +128,42 @@ describe("LangWatchQLService.executePass", () => {
   });
 
   describe("given a statement the policy refuses", () => {
+    /** @scenario "A pass over a PostgreSQL-resident view with FINAL is refused too" */
+    it("refuses FINAL on a PostgreSQL-resident view, reaching no database", async () => {
+      const executor = new RecordingExecutor();
+
+      const refusal = await refusalOf(
+        serviceOver(executor).executePass({
+          project: PROJECT,
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+          sql: `SELECT count() FROM analytics.${POSTGRES_VIEW.name} FINAL`,
+          pass: { kind: "count", limit: 10 },
+          isInstantEvalsEnabled: true,
+        }),
+      );
+
+      expect(codeOf(refusal)).toBe("lwql_table_modifier_unsupported");
+      expect(executor.requests).toEqual([]);
+    });
+
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it("refuses FINAL on a subquery, reaching no database", async () => {
+      const executor = new RecordingExecutor();
+
+      const refusal = await refusalOf(
+        serviceOver(executor).executePass({
+          project: PROJECT,
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+          sql: "SELECT count() FROM (SELECT TraceId FROM analytics.traces) FINAL",
+          pass: { kind: "count", limit: 10 },
+          isInstantEvalsEnabled: true,
+        }),
+      );
+
+      expect(codeOf(refusal)).toBe("lwql_table_modifier_unsupported");
+      expect(executor.requests).toEqual([]);
+    });
+
     /** @scenario "A pass re-validates its statement with the full policy" */
     it("refuses a caller's own wrapper holding eval in a subquery, reaching no database", async () => {
       const executor = new RecordingExecutor();

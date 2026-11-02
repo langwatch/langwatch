@@ -1,5 +1,5 @@
 {
-  "name": "D1: chart on the attached board",
+  "name": "D1: chart on the attached dashboard",
   "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the names it gives you (board.name, trace_name), never mention ids, facts or anything else from it. Write short, plain messages. In your first message, ask exactly (with the real values): 'Add a chart of trace volume per day over the last 2 full UTC days for my traces named <trace_name> to my \"<board.name>\" dashboard.' If Langy asks something, answer briefly. Once Langy says the chart is added, stop.",
   "criteria": [
     "Code check, from the test state after Langy's last reply: facts_now.board.added holds exactly one item (one new chart or widget on the dashboard named in board.name).",

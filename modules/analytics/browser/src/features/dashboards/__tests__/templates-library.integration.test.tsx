@@ -100,10 +100,28 @@ afterEach(cleanup);
 describe("the templates finder", () => {
   describe("given the release_dashboards flag is off", () => {
     /** @scenario "AC100b Templates library: the library is behind the dashboards gate" */
+    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
     it("shows the not-found page", () => {
       openLibrary({ flags: { release_dashboards: false } });
 
       expect(screen.getByRole("heading", { name: "This page is not here" })).toBeInTheDocument();
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
+    });
+  });
+
+  describe("given the flag is on", () => {
+    /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
+    it("points back to the old Analytics", () => {
+      openLibrary();
+
+      expect(screen.getByTestId("old-analytics-banner")).toBeInTheDocument();
+    });
+
+    /** @scenario "AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view" */
+    it("shows no banner to a member without analytics:view", () => {
+      openLibrary({ permissions: [] });
+
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 
@@ -290,7 +308,7 @@ describe("the templates finder", () => {
       const card = screen.getByRole("article", { name: READY.name });
 
       const added = await within(card).findByRole("link", {
-        name: `${READY.name} is added: open its board`,
+        name: `${READY.name} is added: open its dashboard`,
       });
       expect(added).toHaveAttribute("href", "/test-project/dashboards/board-9");
       expect(added).toHaveTextContent("Added");

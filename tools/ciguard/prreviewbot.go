@@ -144,7 +144,7 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 // replaces the workflow-level one when present, so the effective set is the
 // job's block if it declares one, else the workflow's.
 func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
-	perms := effectivePRReviewBotPermissions(workflow)
+	perms := workflow.EffectivePermissions(prReviewBotReviewJob)
 
 	if perms.Shorthand != "" {
 		return []string{fmt.Sprintf(
@@ -200,18 +200,6 @@ func comparePRReviewBotPermissionScopes(scopes map[string]string) []string {
 	return problems
 }
 
-// effectivePRReviewBotPermissions returns the review job's own permissions
-// block when it declares one, else the workflow-level block — mirroring
-// GitHub's replace-not-merge semantics for job-level permissions.
-func effectivePRReviewBotPermissions(workflow *ciscan.Workflow) ciscan.Permissions {
-	job, ok := workflow.Jobs[prReviewBotReviewJob]
-	if ok && (job.Permissions.Scopes != nil || job.Permissions.Shorthand != "") {
-		return job.Permissions
-	}
-
-	return workflow.Permissions
-}
-
 // prReviewBotPinning enforces the pinning invariant every `uses:` step in this
 // workflow must meet: a full 40-character commit SHA, never a floating tag or
 // branch, with a trailing comment recording what it means. Both the ref and
@@ -225,8 +213,8 @@ func prReviewBotPinning(workflow *ciscan.Workflow) []string {
 	}
 
 	var problems []string
-	for _, step := range steps {
-		if problem, bad := pinProblem(step); bad {
+	for i := range steps {
+		if problem, bad := pinProblem(steps[i]); bad {
 			problems = append(problems, problem)
 		}
 	}
@@ -239,9 +227,10 @@ func prReviewBotPinning(workflow *ciscan.Workflow) []string {
 func usesSteps(workflow *ciscan.Workflow) []ciscan.Step {
 	var steps []ciscan.Step
 	for _, job := range workflow.JobNames() {
-		for _, step := range workflow.Jobs[job].Steps {
-			if step.Uses != "" {
-				steps = append(steps, step)
+		jobSteps := workflow.Jobs[job].Steps
+		for i := range jobSteps {
+			if jobSteps[i].Uses != "" {
+				steps = append(steps, jobSteps[i])
 			}
 		}
 	}

@@ -45,23 +45,6 @@ export async function getProject(id: string): Promise<ProjectSummary> {
   ) as Promise<ProjectSummary>;
 }
 
-/** Identity of the project the calling API key belongs to. */
-export interface CurrentProjectIdentity {
-  id: string;
-  name: string;
-  slug: string;
-  isPersonal: boolean;
-}
-
-/**
- * Resolves the project behind the configured API key. Needed for the
- * `/api/v1/projects/:projectId/...` route family, whose path must name the
- * caller's own project — there is no "current project" shorthand there.
- */
-export async function getCurrentProject(): Promise<CurrentProjectIdentity> {
-  return makeRequest("GET", "/api/v1/me/project") as Promise<CurrentProjectIdentity>;
-}
-
 export async function createProject(data: {
   name: string;
   language: string;

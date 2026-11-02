@@ -309,8 +309,9 @@ describe.skipIf(databaseUrl === null)("the scenario-run state read window", () =
 
       expect(windowed?.data.ScenarioRunId).toBe(scenarioRunId);
       expect(unbounded?.data.ScenarioRunId).toBe(scenarioRunId);
-      // Weeks 3 to 8 back lie outside both bounds: six parts, counted by both scopes.
-      expect(unboundedParts).toBeGreaterThanOrEqual(windowedParts + 12);
+      // Weeks 3 to 8 back are six weekly partitions only the unbounded read opens, at least one
+      // mark each. Background merges in the shared database change marks per part, never that.
+      expect(unboundedParts).toBeGreaterThanOrEqual(windowedParts + 6);
     });
   });
 });

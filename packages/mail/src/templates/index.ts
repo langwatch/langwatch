@@ -18,6 +18,7 @@ import {
   joinRequestReminderTemplate,
 } from "./join-request-emails.tsx";
 import { licenseEmailTemplate } from "./license-email.tsx";
+import { monitorAutoPausedEmailTemplate } from "./monitor-auto-paused-email.tsx";
 import { organizationMfaRequirementEmailTemplate } from "./organization-mfa-requirement-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
@@ -55,6 +56,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   budgetIncreaseRequestEmailTemplate,
   usageLimitEmailTemplate,
   automationLimitEmailTemplate,
+  monitorAutoPausedEmailTemplate,
   triggerDigestEmailTemplate,
   digestPlanPressureTemplate,
   digestScenariosTrendTemplate,

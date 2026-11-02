@@ -5,12 +5,12 @@ import type { ReactNode } from "react";
 import { findInboxProvider, type InboxProviderId } from "../../model/inbox-providers.ts";
 import { AuthCard } from "./auth-card.tsx";
 import { Google } from "./google-icon.tsx";
-import { Microsoft } from "./sign-in-method-icon.tsx";
+import { BRAND_MARK_SIZE, Microsoft } from "./sign-in-method-icon.tsx";
 
 /** The mark on the inbox door; a provider we hold no mark for wears a plain envelope. */
 const INBOX_MARKS: Record<InboxProviderId, ReactNode> = {
-  gmail: <Google />,
-  outlook: <Microsoft />,
+  gmail: <Google size={BRAND_MARK_SIZE} />,
+  outlook: <Microsoft size={BRAND_MARK_SIZE} />,
   yahoo: <Mail size={18} />,
   icloud: <Mail size={18} />,
   proton: <Mail size={18} />,
@@ -55,7 +55,7 @@ export function CheckYourEmail({
                 as="span"
                 display="inline-flex"
                 alignItems="center"
-                boxSize="18px"
+                boxSize={`${BRAND_MARK_SIZE}px`}
                 css={{ "& svg": { width: "100%", height: "100%" } }}
                 aria-hidden="true"
                 data-testid="inbox-mark"

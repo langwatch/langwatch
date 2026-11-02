@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  *
  * @see specs/evaluations/experiments-online-evaluations-separation.feature
+ * @see modules/monitor/specs/monitor-auto-pause.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -180,6 +181,29 @@ describe("<OnlineEvaluationsTable />", () => {
     expect(
       screen.queryByRole("button", { name: "Actions for Answer quality" }),
     ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The monitor list shows that a monitor paused itself" */
+  it("badges a monitor that paused itself, with the reason in its tooltip", async () => {
+    const user = userEvent.setup();
+    const reason = "95% of evaluations failed in the last hour (114 of 120)";
+    render(
+      <OnlineEvaluationsTable
+        {...defaultProps}
+        rows={[{ ...rows[2]!, autoPausedReason: reason }, rows[1]!]}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    const badge = screen.getByTestId("monitor-auto-paused");
+    expect(badge).toHaveTextContent("Paused automatically");
+    expect(screen.getByText("Active")).toBeInTheDocument();
+
+    await user.hover(badge);
+
+    expect(
+      await screen.findByText(`Paused automatically: ${reason}`, undefined, { timeout: 2_000 }),
+    ).toBeInTheDocument();
   });
 
   it("shows an explicit state when performance analytics cannot load", () => {

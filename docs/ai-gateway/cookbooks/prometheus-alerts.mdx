@@ -208,9 +208,9 @@ tests:
   # Every request errors, so the 5xx ratio pins at 1.0.
   - interval: 1m
     input_series:
-      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="500", provider="openai", model="gpt-5-mini"}'
+      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="500", provider="openai", model="gpt-6-luna"}'
         values: "0+1x15"
-      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="200", provider="openai", model="gpt-5-mini"}'
+      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="200", provider="openai", model="gpt-6-luna"}'
         values: "0+0x15"
     alert_rule_test:
       - eval_time: 10m
