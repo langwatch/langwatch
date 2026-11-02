@@ -1037,8 +1037,6 @@ type BetterAuthTransportOptions = Readonly<{
   organizations: BetterAuthHookCollaborators["organizations"];
   announcements: BetterAuthAnnouncements;
   shadow: SignInRouterShadow;
-  /** The grant ledger an SSO auto-join writes its membership through. */
-  authzGrants: BetterAuthHookCollaborators["authzGrants"];
   /** The connection's arrival door every federated sign-in is asked of. */
   arrivals: BetterAuthHookCollaborators["arrivals"];
   /** Whether a customer's identity provider may assert this address at all. */
@@ -1090,7 +1088,6 @@ const transportOptions = ({
   announcements,
   arrivals,
   auth,
-  authzGrants,
   credentialGuard,
   database,
   deployment,
@@ -1141,7 +1138,6 @@ const transportOptions = ({
       invites,
       organizations,
       announcements,
-      authzGrants,
       arrivals,
       ssoActivity,
       ssoMigration,
