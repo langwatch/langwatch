@@ -275,8 +275,8 @@ export class ExperimentExecutionDataService {
       services.entitlements.requestBound({ key: "datasetRowsMax", organizationId }),
       services.entitlements.requestBound({ key: "datasetWholeReadBytes", organizationId }),
     ]);
-    // The current content is counted before it is saved as a version, so an oversized
-    // dataset is refused without being copied.
+    // The current content's row count is checked before it is saved as a version; its byte
+    // size is known only once the version is written, so that refusal comes after the copy.
     if (pinned === undefined) {
       const head = await services.datasets.getDatasetHead({ slugOrId, projectId });
       if (head.total > maxRows) {
