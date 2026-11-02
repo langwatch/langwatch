@@ -135,12 +135,13 @@ describe("releaseManifestGaps()", () => {
       expect(gaps.map(({ release, previous }) => ({ release, previous }))).toEqual([
         { release: "3.21.0", previous: "3.20.1" },
       ]);
-      expect(gaps[0]?.stamp).toContain(
-        "print:table-owners --out table-owners.json && node --disable-warning=ExperimentalWarning",
-      );
-      expect(gaps[0]?.stamp).toContain(
-        "stamp-release.ts --release 3.21.0 --previous 3.20.1 --table-owners table-owners.json",
-      );
+      const stamp =
+        'pnpm --filter @langwatch/architecture-enforcer print:table-owners --out "$PWD/table-owners.json"' +
+        " && node --disable-warning=ExperimentalWarning --experimental-transform-types" +
+        " packages/upgrade/scripts/stamp-release.ts --release 3.21.0 --previous 3.20.1" +
+        " --table-owners table-owners.json";
+      expect(gaps[0]?.stamp).toBe(stamp);
+      expect(gaps[0]?.stampShipped).toBe(`${stamp} --tree langwatch@v3.21.0`);
     });
   });
 

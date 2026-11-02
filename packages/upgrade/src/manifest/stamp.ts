@@ -131,15 +131,30 @@ export function ownerFromTables({
 }
 
 /** A shipped release with no manifest, or one following the wrong release, and how to stamp it. */
-export type ReleaseManifestGap = { release: string; previous: string; stamp: string };
+export type ReleaseManifestGap = {
+  release: string;
+  previous: string;
+  /** Stamps from the working tree: a release PR, before its tag exists. */
+  stamp: string;
+  /** Stamps from the release tag: a release that already shipped. */
+  stampShipped: string;
+};
 
-/** The commands that stamp `release`; `--tree` reads the tagged tree once the tag exists. */
-function stampCommand({ release, previous }: { release: string; previous: string }): string {
+/** The shell commands that stamp `release`, reading `tree` when it names a tag. */
+function stampCommand({
+  release,
+  previous,
+  tree,
+}: {
+  release: string;
+  previous: string;
+  tree?: string;
+}): string {
   return (
-    "pnpm --filter @langwatch/architecture-enforcer print:table-owners --out table-owners.json && " +
+    'pnpm --filter @langwatch/architecture-enforcer print:table-owners --out "$PWD/table-owners.json" && ' +
     "node --disable-warning=ExperimentalWarning --experimental-transform-types " +
     `packages/upgrade/scripts/stamp-release.ts --release ${release} --previous ${previous} ` +
-    `--table-owners table-owners.json (add --tree langwatch@v${release} once that tag exists)`
+    `--table-owners table-owners.json${tree ? ` --tree ${tree}` : ""}`
   );
 }
 
@@ -165,6 +180,13 @@ export function releaseManifestGaps({
     const manifest = manifests.find((each) => each.release === release);
     if (manifest?.previous === previous) return [];
 
-    return [{ release, previous, stamp: stampCommand({ release, previous }) }];
+    return [
+      {
+        release,
+        previous,
+        stamp: stampCommand({ release, previous }),
+        stampShipped: stampCommand({ release, previous, tree: `langwatch@v${release}` }),
+      },
+    ];
   });
 }
