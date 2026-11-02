@@ -140,6 +140,7 @@ It is reversible: the branches stay, and a hooks URL can come back later as a se
      - a second run whose setup throws shows Not scored, and its teardown still runs.
 
    No customer code.
+
 2. **Form.** The Connector tab, the "Defined in LangWatch" hint, and the docs page section, which replaces https://github.com/langwatch/langwatch/pull/9195.
 3. **Langy.**
    - Langy reads the agent's API docs and recent traces, then proposes Connector steps and scenarios through the propose-and-accept flow, applied only when accepted.
