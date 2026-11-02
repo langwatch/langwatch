@@ -108,7 +108,7 @@ func runChild(t *testing.T, name string, extra ...string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), childTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHideRefusedChild$", "-test.v", "-test.timeout=80s")
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHideRefusedChild$", "-test.v", "-test.timeout=80s") //nolint:gosec // re-executes this test binary, no external input
 	cmd.Env = childEnvFor(name, extra...)
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
@@ -169,6 +169,7 @@ func TestHideRefusedChild(t *testing.T) {
 }
 
 func runExecutorCase(t *testing.T, name string) {
+	t.Helper()
 	exe, err := codeblock.New(codeblock.Options{
 		AllowVisibleProcess:        name == "refused-allowed",
 		AllowVisibleProcessSetting: settingName,
@@ -196,11 +197,12 @@ func runExecutorCase(t *testing.T, name string) {
 }
 
 func runRunnerCase(t *testing.T, name string) {
+	t.Helper()
 	source, err := os.ReadFile("runner.py")
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "python3", "-c", string(source))
+	cmd := exec.CommandContext(ctx, "python3", "-c", string(source)) //nolint:gosec // fixed interpreter running the checked-in runner.py
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
 	if name == "runner-best-effort" {
 		cmd.Env = append(cmd.Env, hideModeEnv+"=best-effort")

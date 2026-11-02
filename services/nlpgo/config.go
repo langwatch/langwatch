@@ -99,7 +99,7 @@ type EngineConfig struct {
 	// accepts as a fallback.
 	SandboxPython string `env:"SANDBOX_PYTHON"`
 	// CodeBlockAllowVisibleProcess — run code blocks where the platform refuses
-	// to hide the engine's /proc files. Honoured only on AWS Lambda (cmd/root.go).
+	// to hide the engine's /proc files. Honored only on AWS Lambda (cmd/root.go).
 	CodeBlockAllowVisibleProcess bool `env:"CODE_BLOCK_ALLOW_VISIBLE_PROCESS"`
 	// LangWatchBaseURL — base URL for evaluator + agent-workflow callbacks.
 	// In production this is the public LangWatch app URL (eg.
