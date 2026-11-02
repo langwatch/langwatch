@@ -675,9 +675,12 @@ const maxRunnerStderr = 64 << 10
 const maxStderrInMessage = 2 << 10
 
 // withStderrTail appends the end of the interpreter's stderr to a runner
-// failure, so "exit status 1" says why. Safe to surface: this is the
-// interpreter's own stderr (user stderr goes to the result file) and the
-// payload, secrets included, never reaches it. The tail is bounded.
+// failure, so "exit status 1" says why. That stderr holds the runner's own
+// messages and tracebacks; the runner never writes the payload (secrets
+// included) there. It can also hold what the project's own code wrote
+// straight to file descriptor 2, or a result the runner could not save:
+// that is the same project's data, already shown to it in the run, and the
+// tail is bounded.
 func withStderrTail(message, stderr string) string {
 	tail := strings.TrimSpace(stderr)
 	if tail == "" {
