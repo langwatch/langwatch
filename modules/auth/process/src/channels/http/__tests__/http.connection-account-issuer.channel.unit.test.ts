@@ -11,10 +11,10 @@ const CONNECTION = "ssoc_acme";
 describe("refuseConnectionAccountWithoutIssuer", () => {
   describe("when a connection row has no recorded issuer", () => {
     /** @scenario "A connection account row with no recorded issuer is refused when written" */
-    it("refuses it as not linked", () => {
+    it.each([CONNECTION, "local_ssoc_acme"])("refuses %s as not linked", (providerId) => {
       expect(() =>
         refuseConnectionAccountWithoutIssuer({
-          account: { providerId: CONNECTION },
+          account: { providerId },
           assertedIssuers: [],
         }),
       ).toThrow(
@@ -50,7 +50,7 @@ describe("refuseConnectionAccountWithoutIssuer", () => {
 
   describe("when the provider is not a connection", () => {
     /** @scenario "A connection account row with no recorded issuer is refused when written" */
-    it.each(["google", "credential", "okta", "microsoft"])(
+    it.each(["google", "credential", "okta", "microsoft", "ssocmd_acme"])(
       "writes a %s row as before",
       (providerId) => {
         expect(() =>

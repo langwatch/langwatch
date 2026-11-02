@@ -30,11 +30,6 @@ export type SignInPathReading =
 
 const UNRECOGNIZED_PATH: SignInPathReading = { recognized: false };
 
-/** A customer's SSO connection signs in under its own id (`ssoc_…`), never a vendor name. */
-export function isSsoConnectionProviderId(providerId: string): boolean {
-  return providerId.startsWith("ssoc_");
-}
-
 /**
  * The provider a path signs in through, in the vocabulary `Account.provider`
  * and `Identifier.provider` use. A federated callback names its own provider

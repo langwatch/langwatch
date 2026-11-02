@@ -19,7 +19,7 @@ import {
   type SsoMigrationCallbackApi,
   identifierProviderFor,
   type IdentityLedgerApi,
-  isSsoConnectionProviderId,
+  looksLikeSsoConnectionId,
   type LinkProposalReason,
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
@@ -1051,7 +1051,7 @@ export function refuseConnectionAccountWithoutIssuer({
   account: Readonly<{ providerId: string; issuer?: unknown }>;
   assertedIssuers: readonly string[];
 }): void {
-  if (!isSsoConnectionProviderId(account.providerId)) return;
+  if (!looksLikeSsoConnectionId(account.providerId)) return;
   if (hasRecordedIssuer({ account, assertedIssuers })) return;
   logger.warn(
     { providerId: account.providerId },
