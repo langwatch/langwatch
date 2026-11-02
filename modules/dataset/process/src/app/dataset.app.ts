@@ -125,6 +125,7 @@ const logger = createLogger("langwatch:dataset:app");
  * and the snapshot reads the content as it is then.
  */
 const EDIT_NOTE_WINDOW_MS = 30_000;
+/** How many datasets each per-process memory holds before it starts over. */
 const EDIT_NOTE_MEMORY = 10_000;
 
 /** The command senders the versions pipeline hands the app once it is registered. */
@@ -681,7 +682,7 @@ export class DatasetModule implements DatasetApi {
       by: input.editedBy ?? SYSTEM_DATASET_VERSION_AUTHOR,
       ...(input.name !== undefined ? { name: input.name } : {}),
     });
-    this.#versioned.add(saved.version.datasetId);
+    this.#markVersioned(saved.version.datasetId);
     return saved.version;
   }
 
@@ -754,7 +755,7 @@ export class DatasetModule implements DatasetApi {
       trigger: "experiment_run",
       by: input.by,
     });
-    this.#versioned.add(saved.version.datasetId);
+    this.#markVersioned(saved.version.datasetId);
     return saved.version;
   }
 
@@ -876,13 +877,18 @@ export class DatasetModule implements DatasetApi {
           by: SYSTEM_DATASET_VERSION_AUTHOR,
         });
       }
-      this.#versioned.add(dataset.id);
+      this.#markVersioned(dataset.id);
     } catch (error) {
       logger.warn(
         { error, projectId: dataset.projectId, datasetId: dataset.id },
         "Could not save a dataset's first version before an edit; the edit goes ahead",
       );
     }
+  }
+
+  #markVersioned(datasetId: string): void {
+    if (this.#versioned.size >= EDIT_NOTE_MEMORY) this.#versioned.clear();
+    this.#versioned.add(datasetId);
   }
 
   async #noteEdit({ dataset, editedBy }: { dataset: Dataset } & EditedBy): Promise<void> {
