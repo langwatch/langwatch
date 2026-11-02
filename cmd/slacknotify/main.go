@@ -1,20 +1,7 @@
-// Command slacknotify posts a CI job's failure on main to Slack, unless the
-// same job was already red in the previous finished run.
-//
-// Usage:
-//
-//	go run ./cmd/slacknotify -job typecheck
-//	go run ./cmd/slacknotify -job-prefix "package-suites (" -fallback-job "package-suites (1/1)"
-//
-// -job-prefix posts once per job of this run attempt (GITHUB_RUN_ATTEMPT) that
-// carries the prefix and failed or was cancelled; with none, or a failed
-// lookup, it posts as -fallback-job.
-// -workflow defaults to the running workflow's file, from GITHUB_WORKFLOW_REF.
-// COMMIT_SUBJECT and COMMIT_AUTHOR come from a push event; any other event
-// falls back to the checked-out commit.
-// It reads GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_SHA, GH_TOKEN,
-// SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL, COMMIT_SUBJECT and COMMIT_AUTHOR.
-//
+// Command slacknotify posts a CI job's failure on main to Slack, unless that job
+// was already red in the previous finished run: `-job typecheck`, or one post per
+// red leg with `-job-prefix "package-suites (" -fallback-job "package-suites (1/1)"`.
+// Inputs: the flags (see -help) and the GITHUB_*, GH_TOKEN, COMMIT_* and Slack env.
 // Spec: specs/ci/package-suite-integration-lane.feature
 package main
 
