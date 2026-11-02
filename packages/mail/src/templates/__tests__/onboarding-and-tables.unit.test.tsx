@@ -320,6 +320,23 @@ describe("given the trigger digest", () => {
     });
   });
 
+  describe("when a row links a trace with a start time and another a chart", () => {
+    /** @scenario "Digest email links carry the marker" */
+    it("marks both links as an alert's, after the partition hint", async () => {
+      const rendered = await html(triggerDigestEmailTemplate, {
+        ...base,
+        entries: [{ traceId: "trace_1", occurredAtMs: 1_700_000_000_000 }, { graphId: "graph_1" }],
+      });
+
+      expect(rendered).toContain(
+        "https://app.langwatch.ai/support-agent/traces/trace_1?t=1700000000000&amp;lw_from=alert",
+      );
+      expect(rendered).toContain(
+        "https://app.langwatch.ai/support-agent/analytics/custom/graph_1?lw_from=alert",
+      );
+    });
+  });
+
   describe("when more matched than are listed", () => {
     /** @scenario "The digest counts what matched, what is listed and what is not" */
     it("shows the three counts over the table", async () => {
