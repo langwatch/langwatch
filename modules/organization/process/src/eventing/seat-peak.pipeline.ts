@@ -3,6 +3,7 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type ProcessStore,
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import {
@@ -13,13 +14,32 @@ import {
 import type { OrganizationModule } from "../app/organization.app.ts";
 import type { SeatPeakFoldState } from "../repositories/organization-seat-peak.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
+import {
+  SEAT_PEAK_PROCESS_NAME,
+  SEAT_PEAK_PRUNE_INTENT,
+  SEAT_PEAK_RECORD_INTENT,
+} from "../rules/seat-change.rules.ts";
 import { RecordSeatChangedCommand, RecordSeatSnapshotCommand } from "./seat-peak.commands.ts";
 import {
   SEAT_PEAK_AGGREGATE_TYPE,
   SEAT_PEAK_PIPELINE_NAME,
+  recordSeatChangedCommandDataSchema,
   seatChangedEventSchema,
   seatSnapshotTakenEventSchema,
 } from "./seat-peak.events.ts";
+import {
+  pruneSeatChangeIntents,
+  recordSeatChange,
+  type SeatPeakSender,
+} from "./seat-peak.intent.ts";
+import {
+  SEAT_PEAK_MAX_ATTEMPTS,
+  SEAT_PEAK_PROCESS_INITIAL_STATE,
+  SEAT_PEAK_PRUNE_INTERVAL_MS,
+  seatPeakProcessStateSchema,
+  seatPeakPruneSchema,
+  seatPeakPruneWake,
+} from "./seat-peak.process.ts";
 import { SeatPeakFoldProjection } from "./seat-peak.projection.ts";
 
 /** Opens an organization's count from every holder's seat as it stands. */
@@ -30,9 +50,16 @@ export type SeatPeakOpener = Readonly<{
 type SeatPeakPipelineDependencies = Readonly<{
   store: StateProjectionStore<SeatPeakFoldState>;
   opener: SeatPeakOpener;
+  /** The seat-change sender; it throws until this pipeline registers, so a delivery retries. */
+  sender: () => SeatPeakSender;
+  retention: Pick<ProcessStore, "deleteDispatchedBefore">;
 }>;
 
-function seatPeakCommands({ store }: Pick<SeatPeakPipelineDependencies, "store">) {
+function seatPeakCommands({
+  store,
+  sender,
+  retention,
+}: Pick<SeatPeakPipelineDependencies, "store" | "sender" | "retention">) {
   return definePipeline({
     name: SEAT_PEAK_PIPELINE_NAME,
     aggregate: defineAggregate({ type: SEAT_PEAK_AGGREGATE_TYPE }),
@@ -40,7 +67,20 @@ function seatPeakCommands({ store }: Pick<SeatPeakPipelineDependencies, "store">
     .withEvents([seatChangedEventSchema, seatSnapshotTakenEventSchema])
     .withCommand("recordSeatChanged", RecordSeatChangedCommand)
     .withCommand("recordSeatSnapshot", RecordSeatSnapshotCommand)
-    .withPostgresProjection(SeatPeakFoldProjection.create({ store }));
+    .withPostgresProjection(SeatPeakFoldProjection.create({ store }))
+    .withProcessManager(SEAT_PEAK_PROCESS_NAME, (pm) =>
+      pm
+        .state(seatPeakProcessStateSchema, SEAT_PEAK_PROCESS_INITIAL_STATE)
+        .intent(
+          SEAT_PEAK_RECORD_INTENT,
+          recordSeatChangedCommandDataSchema,
+          recordSeatChange(sender),
+        )
+        .intent(SEAT_PEAK_PRUNE_INTENT, seatPeakPruneSchema, pruneSeatChangeIntents(retention))
+        .schedule({ everyMs: SEAT_PEAK_PRUNE_INTERVAL_MS })
+        .onWake(seatPeakPruneWake)
+        .outbox({ maxAttempts: SEAT_PEAK_MAX_ATTEMPTS }),
+    );
 }
 
 export type SeatPeakDefinition = ReturnType<ReturnType<typeof seatPeakCommands>["build"]>;
@@ -48,12 +88,15 @@ export type SeatPeakDefinition = ReturnType<ReturnType<typeof seatPeakCommands>[
 /**
  * organization_seat_peak: every seat change and the opening count, folded per organization. A new
  * organization opens from its holders as they stand once it exists, keyed by its creation moment.
+ * The outbox delivers the changes writes commit (ADR-002 §1).
  */
 export function buildSeatPeakPipeline({
   store,
   opener,
+  sender,
+  retention,
 }: SeatPeakPipelineDependencies): SeatPeakDefinition {
-  return seatPeakCommands({ store })
+  return seatPeakCommands({ store, sender, retention })
     .withPeerSubscriber("seatPeakOrganizationCreated", {
       eventType: ORGANIZATION_CREATED_EVENT_TYPE,
       data: organizationCreatedEventDataSchema.pick({ organizationId: true, occurredAt: true }),
@@ -64,7 +107,7 @@ export function buildSeatPeakPipeline({
 
 export const seatPeakEventing = defineEventingModule({
   pipeline: SEAT_PEAK_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
-    app.seatPeakPipeline(),
+  build: ({ app, processStore }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
+    app.seatPeakPipeline({ processStore }),
   connect: ({ app, commands }) => app.connectSeatPeak(commands),
 });

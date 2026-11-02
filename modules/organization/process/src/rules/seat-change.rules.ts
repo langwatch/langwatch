@@ -6,10 +6,15 @@
 import type { MemberType } from "@langwatch/entitlement-contract";
 import type { ProcessStore } from "@langwatch/eventing";
 
-import type { RecordSeatChangedCommandData, SeatKind } from "../eventing/seat-peak.events.ts";
+import type {
+  RecordSeatChangedCommandData,
+  SeatHolder,
+  SeatKind,
+} from "../eventing/seat-peak.events.ts";
 
 export const SEAT_PEAK_PROCESS_NAME = "organizationSeatPeak" as const;
 export const SEAT_PEAK_RECORD_INTENT = "recordSeatChange" as const;
+export const SEAT_PEAK_PRUNE_INTENT = "pruneSeatChanges" as const;
 /** The tenant's one seat-change outbox instance. */
 const SEAT_PEAK_PROCESS_KEY = "seats";
 
@@ -27,6 +32,21 @@ export function seatKindOf(memberType: MemberType | null): SeatKind {
 /** A change that moves no seat records nothing (an admin made from a member). */
 export function movesASeat({ from, to }: { from: SeatKind; to: SeatKind }): boolean {
   return from !== to;
+}
+
+type HeldSeat = Readonly<{ holder: SeatHolder; seat: SeatKind }>;
+
+/** A live invitation whose expiry moved keeps its seat, but the fold must learn the new expiry. */
+export function movesAnInvitationExpiry({
+  before,
+  after,
+}: {
+  before: HeldSeat;
+  after: HeldSeat;
+}): boolean {
+  if (before.holder.kind !== "invitation" || after.holder.kind !== "invitation") return false;
+  if (before.seat !== after.seat || after.seat === "none") return false;
+  return before.holder.expiresAt !== after.holder.expiresAt;
 }
 
 type SeatChangeAppend = Omit<Parameters<ProcessStore["appendIntents"]>[0], "transaction">;

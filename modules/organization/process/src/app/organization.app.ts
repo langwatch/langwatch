@@ -1634,8 +1634,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   // --- organization_seat_peak (ADR-002) ---
 
   /** organization_seat_peak: seat changes and the opening count, folded per organization. */
-  seatPeakPipeline(): SeatPeakDefinition {
-    return buildSeatPeakPipeline({ store: this.#seatPeakStore, opener: this.#seatPeak });
+  seatPeakPipeline({ processStore }: { processStore: ProcessStore }): SeatPeakDefinition {
+    return buildSeatPeakPipeline({
+      store: this.#seatPeakStore,
+      opener: this.#seatPeak,
+      sender: () => this.getSeatChangeSender(),
+      retention: processStore,
+    });
   }
 
   connectSeatPeak(
