@@ -119,6 +119,16 @@ func TestWithStderrTail_JSONEscapedSecretIsRedacted(t *testing.T) {
 	assert.Contains(t, got, "[redacted]")
 }
 
+func TestWithStderrTail_PythonJSONEscapedSecretWithHTMLCharsIsRedacted(t *testing.T) {
+	secret := "a&b<c>\nd"
+	stderr := "x \"a&b<c>\\nd\" y"
+
+	got := codeblock.WithStderrTail("exit status 1", stderr, map[string]string{"K": secret})
+
+	assert.NotContains(t, got, "a&b")
+	assert.Contains(t, got, "[redacted]")
+}
+
 func TestWithStderrTail_BlankStderrLeavesTheMessageUnchanged(t *testing.T) {
 	assert.Equal(t, "exit status 1", codeblock.WithStderrTail("exit status 1", " \n\t ", map[string]string{"K": "v"}))
 }

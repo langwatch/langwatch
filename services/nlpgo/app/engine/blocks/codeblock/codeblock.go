@@ -37,6 +37,7 @@
 package codeblock
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -715,10 +716,13 @@ func redactStderrSecrets(text string, secrets map[string]string) string {
 // ensure_ascii escaping (non-ASCII as \uXXXX, surrogate pairs above the BMP).
 func secretForms(value string) []string {
 	forms := []string{value}
-	marshalled, err := json.Marshal(value)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false) // match Python's json.dumps, which leaves <, > and & as they are
+	if err := enc.Encode(value); err != nil {
 		return forms
 	}
+	marshalled := bytes.TrimSpace(buf.Bytes())
 	escaped := string(marshalled[1 : len(marshalled)-1])
 	forms = append(forms, escaped)
 	var ascii strings.Builder
