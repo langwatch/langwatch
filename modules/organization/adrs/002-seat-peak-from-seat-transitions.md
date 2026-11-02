@@ -34,8 +34,10 @@ counts, because the cap counts it.
    disagree about what a seat is. The change is committed with the write through the outbox the
    audit intents use, never sent after it: a lost change would skew every later count.
    A directory (SCIM) create is the one path organization does not write: SCIM records its
-   `lw.scim.member_created` fact with the membership write, and organization subscribes to it and
-   records the seat change.
+   `lw.scim.member_created` fact with the membership write, and organization subscribes to it,
+   reads the member's seat by its own rule and records the seat change (§6). A change is stamped
+   in milliseconds, strictly later than the last one the process stamped, so two changes to one
+   holder in one write keep their order.
 2. **A projection folds them.** `organization_seat_peak` runs in the worker, per organization, in
    the order the changes arrive (§7). It keeps the running count of each kind of seat and, per
    calendar month (UTC), the highest count and when it was first reached. It adds the seat a change
@@ -48,11 +50,18 @@ counts, because the cap counts it.
    count the month began with.
 5. **The fold opens from a snapshot.** Seat changes are recorded from this decision on, so there is
    no history to replay before it. A one-off system migration records `seat_snapshot_taken` per
-   organization with every holder's seat as it stands. Until an organization has one, its changes are
+   organization with every holder's seat as it stands. It waits until no pod of the previous
+   release serves, since those move seats without recording the change. Until an organization has one, its changes are
    not folded and the ops console says counting has not started. A new organization opens at zero.
 6. **A custom role flips a seat across modules.** Whether a Lite Member holds a full seat depends on
    their custom role, which authz owns. Organization subscribes to authz's grant events, classifies
-   the member again and records a seat change when the seat moved.
+   the member again and records a seat change when the seat moved. Every such subscriber (authz,
+   user, SCIM) reads the live seat and records it as a change dated at the source event, keyed by
+   that event and the holder; it never trusts the fold's state, which may lag. For a named person
+   the change is always sent, so a change of theirs dated earlier and still on its way is
+   outranked. An event naming only a role or a grant re-reads every member and pending invitation
+   and sends a change for each found in a metered seat the fold has not recorded; a seat given
+   back is left to its writer's change, so a correction never outranks a late admission.
 7. **Changes are folded in the order they arrive** (accepted by the user, 2026-11-02). The outbox
    does not deliver in time order: a retried delivery can be overtaken by the next one, and two
    transactions on one organization can commit out of the order of their stamps. The fold applies
@@ -60,12 +69,16 @@ counts, because the cap counts it.
    in time order. Each change still lands in the month of its own time and expires invitations by
    its own time. Each holder is last-write-wins by the change's own time: the fold keeps the time of
    the last change applied to a holder (a snapshot counts as one), drops a change dated at or
-   before it, and otherwise moves the count from the seat it holds to the change's `to`. An
+   before it (ordered by time, then change id, so only the same change ties), and otherwise moves
+   the count from the seat it holds to the change's `to`. A change dated in an earlier month than
+   one already folded moves that month and every later one: their closing counts exactly, their
+   peaks only upward. An
    invitation's expiry is inferred, not recorded, so it never outranks a real change: a late
    extension restores the seat with its new expiry, which is expired again by event time if it
    too is already past. So the running count is exact in any order, and only a momentary peak can be one
    seat out when two changes cross. A holder who leaves is kept with no seat, so a late change
-   cannot bring them back.
+   cannot bring them back; an invitation holding no seat is dropped 30 days after its last change
+   or expiry, once no change to it can still be on its way.
 
 ## Rationale / Trade-offs
 
@@ -86,6 +99,8 @@ ordered before its event is counted twice or not at all. That is one seat, once,
   pass through the fold.
 - The ops console shows the month's peak beside the licence's cap. The customer does not see it.
 - Changing the seat rule means rebuilding the projection from the events, which the fold allows.
+- Changing the shape of the folded state also means a rebuild: a stored row that no longer
+  matches the schema fails loudly rather than reading as empty, which would silently stop counting.
 
 ## References
 
