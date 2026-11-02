@@ -12,6 +12,7 @@ import {
   INSTANT_EVAL_EVENT_VERSIONS,
   instantEvalCancelRequestedEventDataSchema,
   instantEvalFinishedEventDataSchema,
+  instantEvalLatePageBilledEventDataSchema,
   instantEvalPageJudgedEventDataSchema,
   instantEvalPlannedEventDataSchema,
   instantEvalRequestedEventDataSchema,
@@ -126,13 +127,31 @@ const RecordInstantEvalFinishedCommand = defineCommand({
   makeJobId: (data) => runKey({ ...data, phase: "finished" }),
 });
 
-/** The five, named as the pipeline registers them and the app sends them. */
+/** One per late page: a redelivered bill collapses rather than adding the page twice. */
+const RecordInstantEvalLatePageBilledCommand = defineCommand({
+  commandType: INSTANT_EVAL_COMMAND_TYPES.RECORD_LATE_PAGE_BILLED,
+  eventType: INSTANT_EVAL_EVENT_TYPES.LATE_PAGE_BILLED,
+  eventVersion: INSTANT_EVAL_EVENT_VERSIONS.LATE_PAGE_BILLED,
+  aggregateType: INSTANT_EVAL_AGGREGATE_TYPE,
+  schema: instantEvalLatePageBilledEventDataSchema,
+  aggregateId: (data) => data.runId,
+  groupKey: groupByTenant,
+  idempotencyKey: (data) => runKey({ ...data, phase: `late-page-${data.page}` }),
+  spanAttributes: (data) => ({
+    "payload.page": data.page,
+    "payload.input_tokens": data.inputTokens,
+  }),
+  makeJobId: (data) => runKey({ ...data, phase: `late-page-${data.page}` }),
+});
+
+/** The six, named as the pipeline registers them and the app sends them. */
 export class InstantEvalProcessingCommandsAdapter {
   readonly requestRun = RequestInstantEvalRunCommand;
   readonly recordPlanned = RecordInstantEvalPlannedCommand;
   readonly recordPageJudged = RecordInstantEvalPageJudgedCommand;
   readonly requestCancel = RequestInstantEvalCancelCommand;
   readonly recordFinished = RecordInstantEvalFinishedCommand;
+  readonly recordLatePageBilled = RecordInstantEvalLatePageBilledCommand;
 
   private constructor() {}
 

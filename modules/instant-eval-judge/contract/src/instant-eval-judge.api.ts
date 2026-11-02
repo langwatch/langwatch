@@ -8,6 +8,11 @@
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
+import type {
+  InstantEvalJudgeRouteRequest,
+  InstantEvalJudgeRouting,
+} from "./instant-eval-judge-route.ts";
+
 /**
  * The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no
  * peer: what it checks before each call comes from its own copies of its peers' facts.
@@ -36,6 +41,12 @@ export interface InstantEvalJudgeApi {
    * fact cannot be stored, so a run's finish retries onto the same request id.
    */
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
+  /**
+   * The rates a judged query's budget hold is priced at: the dearest base input rate a routed call
+   * could reach, never below the classifier's. A best-effort hold, not a hard cap: a routed query
+   * re-sends text and pays output and long-context rates, so it can spend past it (ADR-190 d7).
+   */
+  queryHoldPricing(): Promise<InstantEvalPricing>;
   /**
    * Copies one confirmed Instant Evals row of the gateway ledger into the judge's own spend, for
    * the spend catch-up (ADR-174 decision 17). A request the judge already holds is kept as it is.
@@ -97,6 +108,8 @@ export interface InstantEvalClassification {
   readonly signal?: AbortSignal;
   /** Present when the project runs on its own decision model instead of LangWatch's. */
   readonly decisionModel?: InstantEvalOwnDecisionModel;
+  /** Present when the call is routed; absent, the hosted classifier answers alone, as before. */
+  readonly route?: InstantEvalJudgeRouteRequest;
 }
 
 /** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
@@ -117,6 +130,10 @@ export interface InstantEvalJudgeSpendRecord {
   readonly requestId: string;
   /** Input tokens the classifier billed for. Zero records nothing. */
   readonly inputTokens: number;
+  /** The summed cost of routed calls, priced for the routed tokens instead of the rate. */
+  readonly costNanoUsd?: number;
+  /** The input tokens `costNanoUsd` covers; absent or zero, the spend is unrouted. */
+  readonly routedInputTokens?: number;
   /** Classifications made, one per judged text. */
   readonly requests: number;
   /** The run the spend belongs to, when it belongs to one. */
@@ -231,6 +248,11 @@ export interface InstantEvalVerdict {
   readonly probability?: number;
   /** The probability-weighted mean inside the declared range, for a score. */
   readonly score?: number;
+  /**
+   * The probability-weighted standard deviation of the levels, for a score read from a
+   * distribution: how unsure the score is. Absent when the judge gave no distribution.
+   */
+  readonly spread?: number;
   /** The most likely option name, for a category. */
   readonly label?: string;
   /** Every option's probability, for a category. Sums to one. */
@@ -244,6 +266,11 @@ export interface InstantEvalJudgement {
   readonly skippedReason?: InstantEvalSkipReason;
   /** Input tokens the classifier billed for. Zero for a skip. */
   readonly inputTokens: number;
+  /**
+   * Output tokens the backend reported, when it reports them. A routed leg prices them at its
+   * backend's output rate; an unrouted judgement is priced from input alone (ADR-174).
+   */
+  readonly outputTokens?: number;
   readonly isTextTruncated: boolean;
   /**
    * Time this classification waited for rate-limit capacity. A run whose wall
@@ -251,6 +278,10 @@ export interface InstantEvalJudgement {
    * opposite fixes, and elapsed time alone cannot tell them apart.
    */
   readonly limiterWaitMs?: number;
+  /** What every call of a routed judgement cost us, summed; absent when the call was not routed. */
+  readonly costNanoUsd?: number;
+  /** How a routed judgement was answered; absent when the call was not routed. */
+  readonly routing?: InstantEvalJudgeRouting;
 }
 
 /** What the classifier charges, and what the customer is charged. */

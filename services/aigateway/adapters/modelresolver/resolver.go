@@ -25,6 +25,7 @@ var missingModelMessages = map[domain.RequestType]string{
 	domain.RequestTypeMessages:        jsonBodyMessage("POST /v1/messages"),
 	domain.RequestTypeResponses:       jsonBodyMessage("POST /v1/responses"),
 	domain.RequestTypeEmbeddings:      jsonBodyMessage("POST /v1/embeddings"),
+	domain.RequestTypeDecisions:       jsonBodyMessage("POST /v1/decisions"),
 	domain.RequestTypeSpeech:          jsonBodyMessage("POST /v1/audio/speech"),
 	domain.RequestTypeImageGeneration: jsonBodyMessage("POST /v1/images/generations"),
 	domain.RequestTypeImageEdit: `POST /v1/images/edits sends a multipart/form-data body and takes ` +

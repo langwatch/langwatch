@@ -97,6 +97,15 @@ export const projectUpdateAggregateRuleInputSchema: ProjectUpdateAggregateRuleIn
   projectUpdateAggregateRuleInputSchemaDefinition;
 export type ProjectUpdateAggregateRuleInput = z.infer<typeof projectUpdateAggregateRuleInputSchema>;
 
+/** The organisation whose live legacy project keys are being asked about. */
+const projectLegacyKeysInputSchemaDefinition = z.object({ organizationId: z.string() });
+export interface ProjectLegacyKeysInputSchema extends Named<
+  typeof projectLegacyKeysInputSchemaDefinition
+> {}
+export const projectLegacyKeysInputSchema: ProjectLegacyKeysInputSchema =
+  projectLegacyKeysInputSchemaDefinition;
+export type ProjectLegacyKeysInput = z.infer<typeof projectLegacyKeysInputSchema>;
+
 /** The organisation whose projects an aggregate's explicit rule may name. */
 const projectAggregateMemberCandidatesInputSchemaDefinition = z.object({
   organizationId: z.string(),

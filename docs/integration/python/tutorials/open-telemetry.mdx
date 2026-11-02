@@ -364,6 +364,8 @@ This warning exists because replacing a globally configured provider can sometim
 If you are intentionally running LangWatch alongside an existing global OpenTelemetry setup and want LangWatch to add its exporter to that setup, you can silence this warning by setting:
 
 ```python
+import langwatch
+
 langwatch.setup(
     # ... other options
     ignore_global_tracer_provider_override_warning=True

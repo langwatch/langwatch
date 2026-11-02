@@ -180,6 +180,7 @@ export {
   projectOf,
   type ProjectScopedContext,
   recordBrowserCaller,
+  keyPrincipalOfApiKey,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
@@ -337,6 +338,7 @@ export {
 export {
   assertKeyKind,
   keyCredentialOf,
+  keyCredentialOfDoor,
   REST_KEY_KINDS,
   type RestKeyCredential,
   type RestKeyDoor,

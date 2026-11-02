@@ -89,7 +89,7 @@ In RAG, precision was less important since we relied on the model's ability to f
 
 For example, let's say the model calls the following tools: get calendar events, create reminder, and send email about the event. If all we really cared about is that the model tells us what time an event is, we don't care about the reminder nor the email.
 
-As opposed to RAG, the model won't filter these tools out for us (technically you could chain it with another LLM to do this for you, but this is not a standard practice). It will call them, leading to increased latency and cost.
+Unlike RAG, the model won't filter these tools out for us (technically you could chain it with another LLM to do this for you, but this is not a standard practice). It will call them, leading to increased latency and cost.
 
 Recall is, just like standard RAG, important. If we're not calling the right tools, we might miss out on potential tools that the user needs.
 
@@ -202,6 +202,8 @@ Note that you don't need a lot of examples to begin with. The first few tests ar
 ## Run the Tests
 
 ```python
+import langwatch
+
 def extract_tool_calls(response):
     """Extract tool calls from the new response format"""
     tool_calls = []

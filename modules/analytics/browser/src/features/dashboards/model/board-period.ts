@@ -8,7 +8,6 @@ import {
   LWQL_GRANULARITY_MAX_BUCKETS,
   type LangWatchQLAcceptedGranularityStep,
 } from "@langwatch/analytics-contract";
-import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 /** "live" is the last hour, rolling, refreshed every minute (dashboards-v2 AC19c). */
 export const BOARD_PERIOD_RANGES = ["live", "1h", "24h", "7d", "30d", "90d", "1y"] as const;
@@ -22,54 +21,6 @@ export interface BoardPeriod {
   readonly periodStart: number;
   readonly periodEnd: number;
   readonly granularitySeconds: LangWatchQLAcceptedGranularityStep;
-}
-
-/**
- * What every query on a board is run with: its period, and the trace origins it leaves out.
- * A list rather than a switch, so a board parameter can set it later without a new shape.
- */
-export interface BoardQueryContext extends BoardPeriod {
-  readonly excludeOrigins: readonly string[];
-}
-
-/**
- * The origins a board leaves out by default: Langy's turns, since a board shows the member's
- * agent (ADR-061); none in a personal project, where Langy's conversations are the data.
- */
-export function defaultBoardExcludedOrigins({
-  isPersonalProject,
-}: {
-  isPersonalProject: boolean;
-}): readonly string[] {
-  return isPersonalProject ? [] : [LANGY_TRACE_ORIGIN];
-}
-
-/** The origins a board leaves out: what it stores, or its default while it stores none (AC200). */
-export function boardExcludedOrigins({
-  stored,
-  isPersonalProject,
-}: {
-  stored: readonly string[] | null;
-  isPersonalProject: boolean;
-}): readonly string[] {
-  return stored ?? defaultBoardExcludedOrigins({ isPersonalProject });
-}
-
-/** Whether a board's widgets count Langy's conversations. */
-export function boardIncludesLangy({ excluded }: { excluded: readonly string[] }): boolean {
-  return !excluded.includes(LANGY_TRACE_ORIGIN);
-}
-
-/** The list to store when the member includes or leaves out Langy; other origins stay. */
-export function boardOriginsWithLangy({
-  excluded,
-  includeLangy,
-}: {
-  excluded: readonly string[];
-  includeLangy: boolean;
-}): readonly string[] {
-  const others = excluded.filter((origin) => origin !== LANGY_TRACE_ORIGIN);
-  return includeLangy ? others : [...others, LANGY_TRACE_ORIGIN];
 }
 
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";

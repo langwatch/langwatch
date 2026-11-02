@@ -60,6 +60,20 @@ func (a *App) HandleEmbeddings(ctx context.Context, bundle *domain.Bundle, body 
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeEmbeddings, Model: model, BodyReader: body})
 }
 
+// HandleDecisions dispatches POST /v1/decisions (OpenAI Decisions API). The
+// route pins OpenAI credentials through its surface, and the body reaches the
+// provider as the caller sent it apart from the resolved model.
+//
+//nolint:revive // argument-limit: the same four values every Handle method beside it takes.
+func (a *App) HandleDecisions(ctx context.Context, bundle *domain.Bundle, body []byte, model string) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:    domain.RequestTypeDecisions,
+		Model:   model,
+		Body:    body,
+		Surface: domain.DecisionsSurface(),
+	})
+}
+
 // HandleSpeechStream dispatches POST /v1/audio/speech (OpenAI-wire TTS). The
 // iterator yields the provider's body as it arrives: audio bytes, or the
 // provider's SSE when the caller asked for stream_format "sse".

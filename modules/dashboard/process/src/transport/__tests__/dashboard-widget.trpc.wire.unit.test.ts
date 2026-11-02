@@ -120,9 +120,34 @@ describe("the dashboard widgets tRPC namespace", () => {
       expect(rows).toEqual([
         expect.objectContaining({
           name: "Usage",
-          graph: { version: 1, code: WIDGET.code, queries: WIDGET.queries },
+          graph: {
+            version: 1,
+            code: WIDGET.code,
+            queries: WIDGET.queries.map((query) => ({ ...query, sources: ["application"] })),
+          },
         }),
       ]);
+    });
+  });
+
+  describe("when a write names a query's sources", () => {
+    /** @scenario "AC200n Sources: an unknown source is refused at every door" */
+    it("refuses an unknown source on create and update at the door, and takes a known one", () => {
+      const { requests } = mounted(createDashboardTestApp());
+      const input = (name: string) => {
+        const request = requests.find(({ procedure }) => procedure.endsWith(`.${name}`));
+        if (!request) throw new Error(`no procedure ${name}`);
+        return request.member.input;
+      };
+      const queries = (sources: unknown) => [{ name: "usage", sql: "SELECT 1", sources }];
+      const accepts = (name: string, body: object) => input(name).validate(body);
+
+      expect(accepts("create", { ...WIDGET, queries: queries(["nope"]) })).toBe(false);
+      expect(
+        accepts("update", { ...WIDGET, id: "w", queries: queries(["langy", "Gateway"]) }),
+      ).toBe(false);
+      expect(accepts("create", { ...WIDGET, queries: queries(["langy"]) })).toBe(true);
+      expect(accepts("update", { ...WIDGET, id: "w", queries: queries(null) })).toBe(true);
     });
   });
 

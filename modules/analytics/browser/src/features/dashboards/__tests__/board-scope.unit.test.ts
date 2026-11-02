@@ -88,7 +88,7 @@ describe("what a change of scope says", () => {
     expect(words).toEqual({
       title: 'Make "Weekly review" visible only to you?',
       message:
-        "It leaves the Dashboards list of everyone else in Checkout. Anyone who has it open is told it is not available the next time it loads. 2 other people starred it. Their stars are kept, and come back if you widen the scope again.",
+        "It leaves the Dashboards list of everyone else in Checkout. Anyone who has it open is told it is not available the next time it loads. 2 other people pinned it. Their pins are kept, and come back if you widen the scope again.",
       confirmLabel: "Set to Only me",
     });
   });
@@ -121,7 +121,7 @@ describe("what a change of scope says", () => {
       otherStars: 1,
     });
 
-    expect(message).toContain("1 other person starred it.");
+    expect(message).toContain("1 other person pinned it.");
   });
 
   /** @scenario "AC180 Scope change: any other change is made at once and offers Undo" */

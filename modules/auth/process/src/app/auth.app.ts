@@ -531,6 +531,7 @@ export class AuthModule implements AuthApiContract {
         now,
       }),
       operators: dependencies.authz,
+      docsKeys: dependencies.apiKeys,
       now,
     });
 
