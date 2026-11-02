@@ -422,6 +422,23 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       expect(adapter).not.toHaveProperty("connector.setup.rows");
     });
 
+    it("reads no project secret a step's code references, which only its named ones reach", async () => {
+      const secretReads: string[][] = [];
+      const service = serviceAnswering({
+        agent: withConnector({
+          setup: { ...step, secretNames: [], code: "key = '{{ secrets.HIDDEN_KEY }}'" },
+        }),
+        projectSecrets: { HIDDEN_KEY: "hidden-value" },
+        secretReads,
+        connectorsReleased: false,
+      });
+
+      const adapter = await fetchFor(service, "http");
+
+      expect(secretReads.flat()).not.toContain("HIDDEN_KEY");
+      expect(JSON.stringify(adapter)).not.toContain("hidden-value");
+    });
+
     /** @scenario "A hosted project with the Connector release flag runs Connector steps" */
     it("packs no refusal while the release is on", async () => {
       const service = serviceAnswering({

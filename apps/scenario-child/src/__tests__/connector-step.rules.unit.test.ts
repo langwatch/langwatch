@@ -202,7 +202,7 @@ describe("scrubbedJson()", () => {
     expect(
       scrubbedJson({
         value: { token: "tok-123456", nested: ["Bearer tok-123456"], n: 1 },
-        secrets: { ACCOUNT_TOKEN: "tok-123456" },
+        values: ["tok-123456"],
       }),
     ).toEqual({ token: "[redacted]", nested: ["Bearer [redacted]"], n: 1 });
   });

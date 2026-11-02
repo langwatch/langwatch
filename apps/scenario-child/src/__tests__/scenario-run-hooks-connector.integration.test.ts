@@ -10,13 +10,14 @@ import type { ConnectorData, ConnectorStepData, HttpAgentData } from "@langwatch
 import { describe, expect, it } from "vitest";
 
 import type { ExecuteSyncTransport } from "../channels/execute-sync.channel.ts";
-import { ConnectorHookCaller } from "../channels/http/http.connector-hook.channel.ts";
+import { HttpConnectorHookChannel } from "../channels/http/http.connector-hook.channel.ts";
 import {
   HttpSerializedHttpAgentChannel,
   type ScenarioHttp,
 } from "../channels/http/http.serialized-http-agent.channel.ts";
 import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
 import { CONNECTOR_STEP_NODE_ID } from "../rules/connector-step.rules.ts";
+import { ScenarioConnectorHooksService } from "../services/scenario-connector-hooks.service.ts";
 import {
   ScenarioRunHooksError,
   ScenarioRunHooksService,
@@ -95,15 +96,15 @@ function fakeCodeRunner(replies: Partial<Record<"setup" | "teardown", StepReply>
 
 type TurnCall = { url: string; headers: Record<string, string> };
 
-/** The customer's agent: answers each turn, or fails echoing what it was sent. */
-function fakeAgent({ fails = false }: { fails?: boolean } = {}) {
+/** The customer's agent: answers each turn, or echoes what it was sent in a failure or a reply. */
+function fakeAgent({ fails = false, echoes = false }: { fails?: boolean; echoes?: boolean } = {}) {
   const calls: TurnCall[] = [];
   const http: ScenarioHttp = {
     fetch: async ({ url, init }) => {
       calls.push({ url, headers: init.headers });
       const text = fails
         ? `bad token ${init.headers.Authorization}`
-        : JSON.stringify({ output: "hi" });
+        : JSON.stringify({ output: echoes ? `you sent ${init.headers.Authorization}` : "hi" });
       return {
         ok: !fails,
         status: fails ? 500 : 200,
@@ -140,10 +141,10 @@ function runWith({
   keepData?: boolean;
   timeoutMs?: number;
 }) {
-  const hooks = ConnectorHookCaller.create({
+  const hooks = ScenarioConnectorHooksService.create({
     agentId: "agent_shop",
     connector,
-    transport: runner.transport,
+    channel: HttpConnectorHookChannel.create({ transport: runner.transport }),
     projectApiKey: "sk-lw-run-key-value",
     parameters: { persona: "gold" },
     run: { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" },
@@ -168,7 +169,7 @@ function runWith({
       await channel.call(turnInput("second"));
       return { success };
     };
-  return { hooks, service, turns, agent };
+  return { hooks, service, turns, agent, channel };
 }
 
 function turnInput(text: string) {
@@ -297,6 +298,22 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
       expect(hooks.runState).toEqual({ accountId: "acc_1", leaked: "[redacted]" });
       expect(message).toContain("[redacted]");
       expect(message).not.toContain(ACCOUNT_TOKEN);
+    });
+  });
+
+  describe("when setup returns a run-scoped secret and a turn's reply echoes it", () => {
+    /** @scenario "Run-scoped secrets stay out of the record, the simulated user, the judge and every error" */
+    it("answers the reply with the value redacted", async () => {
+      const runner = fakeCodeRunner({ setup: setupReturningAccount });
+      const { service, channel } = runWith({
+        connector: { setup: step() },
+        runner,
+        agent: fakeAgent({ echoes: true }),
+      });
+
+      const { value } = await service.around(() => channel.call(turnInput("first")));
+
+      expect(value).toBe("you sent Bearer [redacted]");
     });
   });
 

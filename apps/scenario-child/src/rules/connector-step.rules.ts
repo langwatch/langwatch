@@ -269,22 +269,16 @@ export function connectorStepAnswer({
 }
 
 /** A JSON value with every known secret value in its strings replaced by the placeholder. */
-export function scrubbedJson<T>({
-  value,
-  secrets,
-}: {
-  value: T;
-  secrets: Record<string, string>;
-}): T {
+export function scrubbedJson<T>({ value, values }: { value: T; values: readonly string[] }): T {
   if (typeof value === "string") {
-    return ScenarioSecretReferenceAdapter.redact({ message: value, secrets }) as T;
+    return ScenarioSecretReferenceAdapter.redactValues({ message: value, values }) as T;
   }
   if (Array.isArray(value)) {
-    return value.map((item: unknown) => scrubbedJson({ value: item, secrets })) as T;
+    return value.map((item: unknown) => scrubbedJson({ value: item, values })) as T;
   }
   if (isObject(value)) {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, scrubbedJson({ value: item, secrets })]),
+      Object.entries(value).map(([key, item]) => [key, scrubbedJson({ value: item, values })]),
     ) as T;
   }
   return value;

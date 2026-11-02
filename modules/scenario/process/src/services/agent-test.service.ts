@@ -69,7 +69,6 @@ type AgentTestServiceOptions = {
   prompts: PromptApi;
   secrets: SecretApi;
   datasets: Pick<DatasetApi, "findDatasetPage">;
-  connectorSteps: ConnectorStepsGate;
   modelProviders: ModelProviderApi;
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;
@@ -94,6 +93,9 @@ function usableTimeouts({
 
 const NOT_TESTABLE_REASON = "Only HTTP, code, workflow and connected agents can be tested this way";
 
+/** An agent test calls no Connector step (ADR-194), so its prefetch reads no step secret or row. */
+const AGENT_TEST_CALLS_NO_STEP: ConnectorStepsGate = { isEnabled: async () => false };
+
 const connectedCallConfigSchema = z.looseObject({
   timeoutMs: z.number().int().positive().optional(),
   sticky: z.boolean().optional(),
@@ -117,7 +119,7 @@ export class AgentTestService {
       workflows: options.workflows,
       secrets: options.secrets,
       datasets: options.datasets,
-      connectorSteps: options.connectorSteps,
+      connectorSteps: AGENT_TEST_CALLS_NO_STEP,
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,

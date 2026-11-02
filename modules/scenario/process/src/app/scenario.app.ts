@@ -369,7 +369,6 @@ export class ScenarioModule implements ScenarioApi {
         prompts: peers.prompts,
         secrets: peers.secrets,
         datasets: peers.datasets,
-        connectorSteps,
         modelProviders: peers.modelProviders,
         simulations,
         config: prefetchConfig,

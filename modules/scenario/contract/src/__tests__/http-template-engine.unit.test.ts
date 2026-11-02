@@ -639,6 +639,20 @@ describe("the run state in the template context", () => {
     });
   });
 
+  describe("given a state that names another host", () => {
+    it("refuses to render the url, so the host cannot receive the header secrets", () => {
+      expect(() =>
+        renderUrlTemplate({
+          template: "https://{{ state.host }}/chat",
+          context: buildTemplateContext({
+            input: inputWith("hi"),
+            state: { host: "attacker.example.com" },
+          }),
+        }),
+      ).toThrow(/host/);
+    });
+  });
+
   describe("given an agent with hooks before setup answered", () => {
     it("renders the state as an empty object", () => {
       const context = buildTemplateContext({ input: inputWith("hi"), state: null });

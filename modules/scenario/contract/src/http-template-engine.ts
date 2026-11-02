@@ -233,10 +233,11 @@ function parseOrigin(url: string): string | null {
 }
 
 /**
- * Refuses a URL whose host the held session decided. The session is the agent's own answer
- * handed back on the next turn, so it is the one value in the context the agent fully controls.
+ * Refuses a URL whose host the held session or the run state decided. The session is the agent's
+ * own answer and the state is what setup returned; either choosing the host would send it the
+ * header secrets.
  */
-function assertSessionDidNotChooseTheHost({
+function assertSessionAndStateDidNotChooseTheHost({
   template,
   context,
   rendered,
@@ -246,12 +247,14 @@ function assertSessionDidNotChooseTheHost({
   rendered: string;
 }): void {
   const aliases = sessionDerivedKeysByContext.get(context) ?? [];
-  if (!("session" in context) && aliases.length === 0) return;
-  const blanked: Record<string, unknown> = { ...context, session: "" };
-  for (const alias of aliases) blanked[alias] = "";
-  const withoutSession = urlLiquid.parseAndRenderSync(template, blanked);
-  if (parseOrigin(rendered) !== parseOrigin(withoutSession)) {
-    throw new Error("the session of the agent cannot decide the host the turn is sent to");
+  const decided = ["session", "state", ...aliases].filter((key) => key in context);
+  if (decided.length === 0) return;
+  const blanked = { ...context, ...Object.fromEntries(decided.map((key) => [key, ""])) };
+  const withoutThem = urlLiquid.parseAndRenderSync(template, blanked);
+  if (parseOrigin(rendered) !== parseOrigin(withoutThem)) {
+    throw new Error(
+      "neither the session nor the run state can decide the host the turn is sent to",
+    );
   }
 }
 
@@ -275,7 +278,7 @@ export function renderUrlTemplate({
 }): string {
   try {
     const rendered = urlLiquid.parseAndRenderSync(template, context);
-    assertSessionDidNotChooseTheHost({ template, context, rendered });
+    assertSessionAndStateDidNotChooseTheHost({ template, context, rendered });
     return rendered;
   } catch (cause) {
     throw new TemplateRenderError({ field: "url", cause });

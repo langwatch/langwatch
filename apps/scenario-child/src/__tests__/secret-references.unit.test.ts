@@ -199,4 +199,21 @@ describe("secret references", () => {
       ).toBe("anything at all");
     });
   });
+
+  describe("given a list of secret values rather than named secrets", () => {
+    it("replaces each value, the longer one first when one contains another", () => {
+      expect(
+        ScenarioSecretReferenceAdapter.redactValues({
+          message: "sent tok-live-123-extended and tok-live-123",
+          values: ["tok-live-123", "tok-live-123-extended"],
+        }),
+      ).toBe("sent [redacted] and [redacted]");
+    });
+
+    it("ignores an empty value rather than replacing everything", () => {
+      expect(
+        ScenarioSecretReferenceAdapter.redactValues({ message: "anything at all", values: [""] }),
+      ).toBe("anything at all");
+    });
+  });
 });

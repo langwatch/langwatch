@@ -26,8 +26,9 @@ import {
 import type { z } from "zod";
 
 import type { ScenarioCallRun } from "../rules/scenario-call-run.rules.ts";
+import { ScenarioConnectorHooksService } from "../services/scenario-connector-hooks.service.ts";
 import type { ExecuteSyncTransport } from "./execute-sync.channel.ts";
-import { ConnectorHookCaller } from "./http/http.connector-hook.channel.ts";
+import { HttpConnectorHookChannel } from "./http/http.connector-hook.channel.ts";
 import { childExecuteSyncTransport } from "./http/http.execute-sync.channel.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
 import { HttpSerializedConnectedAgentChannel } from "./http/http.serialized-connected-agent.channel.ts";
@@ -63,15 +64,16 @@ function connectorHooksOf({
 }: {
   data: HttpAgentData;
   input: AgentAdapterBuildInput;
-}): { connectorHooks?: ConnectorHookCaller } {
+}): { connectorHooks?: ScenarioConnectorHooksService } {
   const { connector } = data;
   if (!connector?.setup && !connector?.teardown) return {};
   if (!input.projectApiKey) throw new Error("Connector steps require projectApiKey");
+  const transport = executeSyncTransportOf({ input, projectApiKey: input.projectApiKey });
   return {
-    connectorHooks: ConnectorHookCaller.create({
+    connectorHooks: ScenarioConnectorHooksService.create({
       agentId: data.agentId,
       connector,
-      transport: executeSyncTransportOf({ input, projectApiKey: input.projectApiKey }),
+      channel: HttpConnectorHookChannel.create({ transport }),
       projectApiKey: input.projectApiKey,
       parameters: input.parameters,
       run: input.run,

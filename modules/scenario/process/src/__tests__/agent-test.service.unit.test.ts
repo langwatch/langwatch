@@ -4,7 +4,9 @@
  * @see specs/agents/agent-test-run.feature
  */
 import { type AgentApi, type AgentOverview, type AgentWithFields } from "@langwatch/agent-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -94,6 +96,8 @@ function serviceFor(options: {
   queueRun?: ReturnType<typeof vi.fn>;
   namesById?: Record<string, string>;
   connected?: AgentOverview;
+  secrets?: SecretApi;
+  datasets?: Pick<DatasetApi, "findDatasetPage">;
 }) {
   const queueRun = options.queueRun ?? vi.fn().mockResolvedValue(undefined);
   const { agents, callConnected } = fakeAgents(options.namesById, options.connected);
@@ -103,9 +107,8 @@ function serviceFor(options: {
     apiKeys: { mintRunKey: vi.fn(), mintAgentSandboxKey: vi.fn() },
     workflows: {} as never,
     prompts: {} as never,
-    secrets: {} as never,
-    datasets: {} as never,
-    connectorSteps: { isEnabled: async () => true },
+    secrets: options.secrets ?? ({} as never),
+    datasets: options.datasets ?? ({} as never),
     modelProviders: {} as never,
     turns: { run: runTurn },
     nlpTimeouts: { engineCodeBlockTimeoutSeconds: Number.NaN, maxTimeoutMs: 90_000 },
@@ -293,6 +296,44 @@ describe("AgentTestService.sendTurn", () => {
         },
         logContext: { projectId: "proj_1", scenarioId: AGENT_TEST_SCENARIO_ID },
       });
+    });
+  });
+
+  describe("given an HTTP agent with a Connector", () => {
+    it("packs its steps without reading their secrets or rows, since a test calls no step", async () => {
+      runTurn.mockResolvedValue({ success: true, output: "pong", durationMs: 12 });
+      const getValuesByName = vi.fn<SecretApi["getValuesByName"]>().mockResolvedValue({});
+      const findDatasetPage = vi.fn<DatasetApi["findDatasetPage"]>().mockResolvedValue(null);
+      const base = httpAgent();
+      const agent = {
+        ...base,
+        config: {
+          ...base.config,
+          connector: {
+            setup: {
+              language: "python",
+              code: "def execute(input):\n    return {}\n",
+              secretNames: ["SHOP_ADMIN_KEY"],
+              datasetId: "dataset_personas",
+            },
+          },
+        },
+      } as AgentWithFields;
+      const { service } = serviceFor({
+        connected: overviewOf(agent, "offline"),
+        secrets: createApiFixture<SecretApi>({ getValuesByName }),
+        datasets: { findDatasetPage },
+      });
+
+      await service.sendTurn({ projectId: "proj_1", agent, message: "ping", actor });
+      const [{ reads }] = prefetchAgentTestData.mock.calls[0] as [
+        { reads: { adapter: () => Promise<unknown> } },
+      ];
+      const adapter = await reads.adapter();
+
+      expect(adapter).toMatchObject({ connector: { setup: { secretNames: [], secrets: {} } } });
+      expect(getValuesByName).not.toHaveBeenCalled();
+      expect(findDatasetPage).not.toHaveBeenCalled();
     });
   });
 

@@ -257,13 +257,13 @@ export class ScenarioTargetPrefetchService {
 
     const config = parseResult.data;
 
-    // Loaded once for the whole run, the same way the code and workflow paths
-    // load them: the child process has no database access, so a secret the url,
-    // a header or an auth field references has to travel with the job.
+    // Loaded once for the whole run: the child has no database access, so a secret the url, a
+    // header or an auth field references travels with the job. Connector steps are left out: a
+    // step receives only the secrets it names, and only while the release is on.
     const secretValues = await this.executionSecrets({
       projectId,
       runSecretValues,
-      names: referencedSecretNames(config),
+      names: referencedSecretNames({ ...config, connector: undefined }),
     });
 
     return {
