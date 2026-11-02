@@ -4,12 +4,14 @@ import path from "node:path";
 import { Temporal } from "@langwatch/time";
 
 import { approximateTokens } from "../../../site/audit/agent-markdown.ts";
-import { readBudgets } from "../../../site/audit/budgets.ts";
+import budgets from "../../../site/audit/budgets.json" with { type: "json" };
 import { releaseSchema, type Release } from "../model/release.ts";
 
 export const RELEASES_SLUG = "changelog";
 const PUBLISHED = 5;
 const WHATS_NEW = 3;
+// Covers what the Markdown export adds around the page (instructions, title, provenance, absolute links).
+const EXPORT_RESERVE_TOKENS = 500;
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
 const cache = new Map<string, { modified: number; entries: Release[] }>();
@@ -128,11 +130,11 @@ export function withReleaseNotes({
   // The newest release always shows; each older one only while the page stays
   // within the agent readiness token budget. The page links to the full
   // changelog for the rest.
-  const { pageTokens } = readBudgets().agentReadiness;
+  const { pageTokens } = budgets.agentReadiness;
   let page = placeNotes({ source, notes: sections[0] ?? "" });
   for (let count = 2; count <= sections.length; count++) {
     const longer = placeNotes({ source, notes: sections.slice(0, count).join("\n") });
-    if (approximateTokens({ text: longer }) > pageTokens) break;
+    if (approximateTokens({ text: longer }) > pageTokens - EXPORT_RESERVE_TOKENS) break;
     page = longer;
   }
   return page;

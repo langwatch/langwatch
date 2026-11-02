@@ -105,7 +105,8 @@ describe("when the newest releases are longer than the page token budget", () =>
     try {
       const { pageTokens } = readBudgets().agentReadiness;
       // Each long release fills about two thirds of the budget on its own.
-      const long = "* **traces:** a long note\n".repeat(Math.ceil((pageTokens * 4 * 2) / 3 / 26));
+      const note = "* **traces:** a long note\n";
+      const long = note.repeat(Math.ceil((pageTokens * 4 * 2) / 3 / note.length));
       writeFileSync(
         path.join(project, "CHANGELOG.md"),
         `## [3.0.0](${compare}) (2026-11-02)\n### Features\n${long}` +

@@ -5,7 +5,7 @@ Feature: Useful release updates in the documentation
   Scenario: Read published release notes
     Given the repository changelog has dated releases and an unreleased section
     When the site reads release notes at build time
-    Then it selects the five newest published releases
+    Then the site reads up to the five newest published releases
     And the latest summary comes from its features or fixes
     And version, date and full notes link to the changelog page
     And the changelog page shows those notes and links on to the self-hosting upgrade notes
