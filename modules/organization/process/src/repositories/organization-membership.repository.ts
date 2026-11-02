@@ -156,6 +156,8 @@ export interface SetMemberDisabledInput {
   organizationId: string;
   userId: string;
   disabled: boolean;
+  /** Who disabled or re-enabled them; null for a service credential. */
+  actorUserId?: string | null;
 }
 
 /**
@@ -386,6 +388,8 @@ export abstract class OrganizationMembershipRepository {
     pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
+    /** The person who admitted them, when one did (an approved join request). */
+    actorUserId?: string | null;
   }) => Promise<OrganizationAdmission>;
 
   /** The plain MEMBER row an SSO domain auto-join writes; an existing row is "already-present". */

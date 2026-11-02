@@ -143,7 +143,12 @@ export class OrganizationMemberRoleService {
       }
     }
 
-    await this.repo.setMemberDisabled({ organizationId, userId, disabled });
+    await this.repo.setMemberDisabled({
+      organizationId,
+      userId,
+      disabled,
+      actorUserId: actingUser?.id ?? null,
+    });
 
     if (disabled) {
       // The seat is gone and the authz snapshot retired below, so the next request is refused
