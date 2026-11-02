@@ -97,6 +97,22 @@ Rule: grok_cli is a personal source type an org can govern
     When pull-request usage asks whether the session's source is billable
     Then it asks for the catalogue slug "grok", not the key's source type
 
+Rule: The receiver keeps the event name Grok sends in its own field
+
+  # Grok 1.0.70 names events only in LogRecord field 12, with no body and no
+  # event.name attribute; the pinned decoder predates that field.
+  @unit
+  Scenario: A protobuf log record named only in its event_name field keeps that name
+    Given a protobuf logs export whose records carry "grok_code.user_prompt" only in event_name
+    When the receiver parses it
+    Then each record's eventName is the name it carried, in wire order
+
+  @unit
+  Scenario: A JSON log record keeps the eventName it carries
+    Given a JSON logs export whose record has eventName "grok_code.session_start"
+    When the receiver parses it
+    Then the record's eventName is "grok_code.session_start"
+
 Rule: Grok's fixed resource is enough to recognise it
 
   @unit
