@@ -385,6 +385,41 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the stored stderr shows the secret value as "[redacted]"
       And the stored stdout still contains "eu-central", because a run parameter is not a credential
 
+  Rule: What the interpreter wrote to stderr explains a runner failure, without leaking a secret
+
+    # The runner captures the user's own stderr into the result file; this
+    # stream holds interpreter-level diagnostics, read back only when no
+    # result was produced. It is capped, and secrets are redacted on the
+    # raw bytes before the cut so none is left half-shown.
+    @unit
+    Scenario: A runner error carries the end of the interpreter stderr
+      Given a runner that exits without writing a result and wrote to stderr
+      When the code node runs
+      Then the error message is the exit reason followed by the end of that stderr
+      And the stderr part of the message is bounded
+
+    @unit
+    Scenario: A cut interpreter stderr ends with a truncation marker
+      Given a runner that wrote more stderr than the cap
+      When the code node runs
+      Then the stored stderr ends with "[stderr truncated]"
+      And the text kept before the marker is not dropped when it has no newline
+
+    @unit
+    Scenario: A secret is scrubbed from stderr in its JSON-escaped forms
+      Given the workflow carries a secret with quotes, newlines and non-ASCII characters
+      And the runner wrote that secret to stderr raw, as Go JSON and as Python JSON
+      When the code node runs
+      Then none of the three forms is shown and each reads "[redacted]"
+
+    @unit
+    Scenario: A secret that crosses the stderr cap is never partly shown
+      Given the workflow carries secrets of different lengths, one of them one character long
+      And the runner wrote a stderr in which a long secret starts before the cap and ends after it
+      When the code node runs
+      Then the stored stderr and the error message show no fragment of that secret
+      And the stored stderr ends with "[stderr truncated]"
+
   Rule: A run's own LangWatch credential reaches user code through the environment
 
     # Project secrets never travel in the environment. The one exception is

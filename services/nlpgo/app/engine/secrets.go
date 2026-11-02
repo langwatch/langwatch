@@ -62,6 +62,9 @@ func resolveSecretsInMap(m map[string]string, secrets map[string]string) map[str
 // stored stdout and stderr travel that same route, so a secret a code node
 // prints would otherwise land in all the same places.
 func redactSecrets(s string, secrets map[string]string) string {
+	if s == "" || len(secrets) == 0 {
+		return s
+	}
 	return redact.New(secrets).Redact(s)
 }
 

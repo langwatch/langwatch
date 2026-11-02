@@ -12,9 +12,11 @@ import (
 const redactedMarker = "[redacted]"
 
 // Redactor replaces secret values with "[redacted]" in one pass over a text.
-// Build it once per run and reuse it.
+// Building one sorts the forms and compiles a replacer, so reuse it across
+// the texts of one run.
 type Redactor struct {
 	replacer   *strings.Replacer
+	forms      []string
 	maxFormLen int
 }
 
@@ -56,7 +58,7 @@ func New(secrets map[string]string, extra ...string) *Redactor {
 	for _, form := range forms {
 		pairs = append(pairs, form, redactedMarker)
 	}
-	return &Redactor{replacer: strings.NewReplacer(pairs...), maxFormLen: len(forms[0])}
+	return &Redactor{replacer: strings.NewReplacer(pairs...), forms: forms, maxFormLen: len(forms[0])}
 }
 
 // Redact replaces every secret form in text with "[redacted]".
@@ -71,6 +73,34 @@ func (r *Redactor) Redact(text string) string {
 // that starts inside a window and is at most this long ends inside the
 // window extended by it.
 func (r *Redactor) MaxFormLen() int { return r.maxFormLen }
+
+// CutBefore returns the largest cut point at or below limit that falls inside
+// no secret form in raw, so raw[:cut] holds whole secrets or none. It works on
+// the raw text: Redact changes lengths, so an offset taken from redacted text
+// does not point at the same place in raw.
+func (r *Redactor) CutBefore(raw string, limit int) int {
+	cut := min(limit, len(raw))
+	for moved := true; moved; {
+		moved = false
+		for _, form := range r.forms {
+			for from := 0; ; {
+				i := strings.Index(raw[from:], form)
+				if i < 0 {
+					break
+				}
+				start := from + i
+				if start >= cut {
+					break
+				}
+				if start+len(form) > cut {
+					cut, moved = start, true
+				}
+				from = start + 1
+			}
+		}
+	}
+	return cut
+}
 
 func mapValues(m map[string]string) []string {
 	values := make([]string, 0, len(m))

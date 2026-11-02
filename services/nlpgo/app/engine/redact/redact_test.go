@@ -50,15 +50,26 @@ func TestRedactor_IsIdempotentWithOneCharSecrets(t *testing.T) {
 	assert.Equal(t, "x [redacted] [redacted] [redacted] y", text)
 }
 
+// @scenario "A secret is scrubbed from stderr in its JSON-escaped forms"
 func TestRedactor_MatchesPythonJSONDumpsForAwkwardCharacters(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 not available")
 	}
-	secret := "a\nb\"c\\d&e<f>g\x7fh\x01i\U0001F600é"
+	secret := "a\nb\"c\\d&e<f>g\x7fh\x01i\U0001F600é\b\f"
 	out, err := exec.Command("python3", "-I", "-c", "import json,sys; sys.stdout.write(json.dumps(sys.argv[1]))", secret).Output()
 	require.NoError(t, err)
 
 	got := redactAll("stderr: "+string(out)+" end", map[string]string{"K": secret})
 
 	assert.Equal(t, "stderr: [redacted] end", strings.Replace(got, "\"[redacted]\"", "[redacted]", 1))
+}
+
+func TestRedactor_CutBeforeMovesOffASecretThatCrossesTheLimitAndNothingElse(t *testing.T) {
+	r := redact.New(map[string]string{"L": "LONGSECRET", "S": "x"})
+	raw := "xx.LONGSECRET.xx"
+	assert.Equal(t, 3, r.CutBefore(raw, 7))
+	assert.Equal(t, 3, r.CutBefore(raw, 4))
+	assert.Equal(t, 13, r.CutBefore(raw, 13))
+	assert.Equal(t, 2, r.CutBefore(raw, 2))
+	assert.Equal(t, len(raw), r.CutBefore(raw, 99))
 }

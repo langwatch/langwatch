@@ -17,6 +17,7 @@ import (
 
 // A runner that dies before writing a result must say why in the error that
 // reaches spans and logs, not only "exit status 1".
+// @scenario "A runner error carries the end of the interpreter stderr"
 func TestCodeBlock_RunnerDeathCarriesBoundedStderrInError(t *testing.T) {
 	requirePython(t)
 
@@ -41,6 +42,7 @@ func TestCodeBlock_RunnerDeathCarriesBoundedStderrInError(t *testing.T) {
 	assert.Less(t, len(res.Error.Message), 3<<10)
 }
 
+// @scenario "A runner error carries the end of the interpreter stderr"
 func TestCodeBlock_RunnerExitingZeroWithoutResultCarriesStderrInError(t *testing.T) {
 	requirePython(t)
 
@@ -104,6 +106,7 @@ func TestWithStderrTail_SecretStraddlingTheCutIsNotPresentEvenPartially(t *testi
 	assert.NotContains(t, got, "boom")
 }
 
+// @scenario "A secret is scrubbed from stderr in its JSON-escaped forms"
 func TestWithStderrTail_JSONEscapedSecretIsRedacted(t *testing.T) {
 	secret := "pa\"ss\nwo\\rd\u00e9\U0001F600"
 	encoded, err := json.Marshal(map[string]string{"stderr": secret})
@@ -119,6 +122,7 @@ func TestWithStderrTail_JSONEscapedSecretIsRedacted(t *testing.T) {
 	assert.Contains(t, got, "[redacted]")
 }
 
+// @scenario "A secret is scrubbed from stderr in its JSON-escaped forms"
 func TestWithStderrTail_PythonJSONEscapedSecretWithHTMLCharsIsRedacted(t *testing.T) {
 	secret := "a&b<c>\nd"
 	stderr := "x \"a&b<c>\\nd\" y"
@@ -143,6 +147,7 @@ func TestWithStderrTail_SandboxKeyStraddlingTheCutIsAbsent(t *testing.T) {
 	assert.NotContains(t, got, "5678")
 }
 
+// @scenario "A secret that crosses the stderr cap is never partly shown"
 func TestCodeBlock_SecretStraddlingTheStderrCapIsAbsentAndResultSaysTruncated(t *testing.T) {
 	requirePython(t)
 	const secret = "CAPSECRET-0123456789"
@@ -167,6 +172,7 @@ func TestCodeBlock_SecretStraddlingTheStderrCapIsAbsentAndResultSaysTruncated(t 
 	assert.NotContains(t, res.Error.Message, "CAPSEC")
 }
 
+// @scenario "A secret that crosses the stderr cap is never partly shown"
 func TestCodeBlock_MultiLineSecretStartingBeforeTheStderrCapIsAbsent(t *testing.T) {
 	requirePython(t)
 	const secret = "-----BEGIN KEY-----\nLEAKEDLINEAAAA\nBBBB\n-----END KEY-----"
@@ -190,4 +196,71 @@ func TestCodeBlock_MultiLineSecretStartingBeforeTheStderrCapIsAbsent(t *testing.
 	assert.True(t, strings.HasSuffix(res.Stderr, "[stderr truncated]"), res.Stderr)
 	assert.NotContains(t, res.Stderr, "LEAKEDLINE")
 	assert.NotContains(t, res.Error.Message, "LEAKEDLINE")
+}
+
+// @scenario "A secret that crosses the stderr cap is never partly shown"
+func TestReadRunnerStderr_ShortSecretsInTheWindowDoNotMoveACutThroughALongSecret(t *testing.T) {
+	const long = "LONGSECRET-ABCDEFGHIJ"
+	raw := strings.Repeat("xx\n", 40) + strings.Repeat(".", codeblock.MaxRunnerStderr-80-len(long)/2) + long + strings.Repeat(".", 200)
+
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), raw, map[string]string{"S": "x", "L": long})
+	require.NoError(t, err)
+
+	assertNoFragments(t, got, long, 4)
+	assert.True(t, strings.HasSuffix(got, "[stderr truncated]"), got[len(got)-40:])
+}
+
+// @scenario "A secret that crosses the stderr cap is never partly shown"
+func TestReadRunnerStderr_NoFragmentOfASecretSurvivesAnyOffsetAroundTheCap(t *testing.T) {
+	const long = "LONGSECRET-ABCDEFGHIJ"
+	const mid = "MIDVAL99"
+	secrets := map[string]string{"A": "ab", "B": "Q", "M": mid, "L": long}
+	for _, secret := range []string{long, mid} {
+		for offset := -len(secret) - 3; offset <= 3; offset++ {
+			pad := codeblock.MaxRunnerStderr + offset
+			raw := strings.Repeat("ab.", 30) + strings.Repeat("Q", 5) + strings.Repeat(".", pad-95) + secret + strings.Repeat(".", 300)
+
+			got, err := codeblock.ReadRunnerStderr(t.TempDir(), raw, secrets)
+			require.NoError(t, err)
+
+			assertNoFragments(t, got, long, 4)
+			assertNoFragments(t, got, mid, 4)
+		}
+	}
+}
+
+// @scenario "A cut interpreter stderr ends with a truncation marker"
+// @scenario "A cut interpreter stderr ends with a truncation marker"
+func TestReadRunnerStderr_CutTextWithoutANewlineIsKeptAndMarked(t *testing.T) {
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), strings.Repeat("z", codeblock.MaxRunnerStderr+500), nil)
+	require.NoError(t, err)
+
+	assert.True(t, strings.HasSuffix(got, "z\n[stderr truncated]"))
+	assert.Len(t, got, codeblock.MaxRunnerStderr+len("\n[stderr truncated]"))
+}
+
+// @scenario "A secret that crosses the stderr cap is never partly shown"
+func TestReadRunnerStderr_RedactionThatShrinksTheTextStillCutsOnTheRawCap(t *testing.T) {
+	const long = "LONGSECRET-ABCDEFGHIJ"
+	for offset := -len(long); offset <= 3; offset++ {
+		head := strings.Repeat(long+"\n", 300)
+		raw := head + strings.Repeat(".", codeblock.MaxRunnerStderr+offset-len(head)) + long + strings.Repeat(".", 300)
+
+		got, err := codeblock.ReadRunnerStderr(t.TempDir(), raw, map[string]string{"L": long})
+		require.NoError(t, err)
+
+		assertNoFragments(t, got, long, 4)
+		assert.True(t, strings.HasSuffix(got, "[stderr truncated]"), "offset %d", offset)
+	}
+}
+
+func assertNoFragments(t *testing.T, text, secret string, minLen int) {
+	t.Helper()
+	for i := 0; i+minLen <= len(secret); i++ {
+		for j := i + minLen; j <= len(secret); j++ {
+			if strings.Contains(text, secret[i:j]) {
+				t.Fatalf("fragment %q of a secret is shown", secret[i:j])
+			}
+		}
+	}
 }

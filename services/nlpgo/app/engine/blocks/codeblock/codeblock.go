@@ -657,14 +657,14 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			Stderr:     stderrText,
 			Error: &Error{
 				Type:    RunnerErrorType,
-				Message: withStderrTail(runErr.Error(), stderrText, redactor),
+				Message: withStderrTail(runErr.Error(), stderrText),
 			},
 		}, nil
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
 		Stderr:     stderrText,
-		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText, redactor)},
+		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText)},
 	}, nil
 }
 
@@ -672,7 +672,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 // runner captures the user's own stderr into the result file, so this stream
 // carries interpreter-level diagnostics and a cap costs nothing — except to
 // code that writes gigabytes to its descriptor, which is why there is one.
-// readRunnerStderr redacts before it cuts, so no secret is left half-kept.
+// readRunnerStderr cuts on a raw offset that is inside no secret.
 const maxRunnerStderr = 64 << 10
 
 // maxStderrInMessage bounds the stderr tail appended to a runner error.
@@ -680,11 +680,10 @@ const maxStderrInMessage = 2 << 10
 
 // withStderrTail appends the end of the kept interpreter stderr to a runner
 // failure, so "exit status 1" says why. That stderr is the project's own
-// output, already shown to it in the run, and the tail is bounded. Secrets
-// are redacted again here: readRunnerStderr already redacted before its cut,
-// so a secret is never cut first.
-func withStderrTail(message, stderr string, redactor *redact.Redactor) string {
-	tail := strings.TrimSpace(redactor.Redact(stderr))
+// output, already shown to it in the run, and the tail is bounded. The
+// stderr must already be redacted, as readRunnerStderr returns it.
+func withStderrTail(message, stderr string) string {
+	tail := strings.TrimSpace(stderr)
 	if len(tail) > maxStderrInMessage {
 		tail = tail[len(tail)-maxStderrInMessage:]
 		if _, rest, found := strings.Cut(tail, "\n"); found {
@@ -722,30 +721,23 @@ func newRunnerStderr(scratchRoot string) (*os.File, error) {
 // paths where the runner never produced a result file and that text is the
 // only account of why. The file has no name, so it is read back through the
 // descriptor the executor still holds. It reads past the cap by the longest
-// secret form and redacts that window first, so a secret that starts before
-// the cap is whole when matched; only then does it cut, on a line boundary.
+// secret form, so a secret that crosses the cap is seen whole; the cut is
+// chosen on the raw bytes, off any secret, and only the kept part is redacted.
 func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return ""
 	}
-	limit := maxRunnerStderr + redactor.MaxFormLen() + 1
-	data, err := io.ReadAll(io.LimitReader(file, int64(limit)))
+	data, err := io.ReadAll(io.LimitReader(file, int64(maxRunnerStderr+redactor.MaxFormLen()+1)))
 	if err != nil {
 		return ""
 	}
-	text := redactor.Redact(string(data))
-	if len(data) == limit {
-		// The window may end inside a secret that starts past the cap.
-		text = text[:max(0, len(text)-redactor.MaxFormLen())]
+	raw := string(data)
+	if len(raw) <= maxRunnerStderr {
+		return redactor.Redact(raw)
 	}
-	if len(text) <= maxRunnerStderr && len(data) < limit {
-		return text
-	}
-	text = text[:min(len(text), maxRunnerStderr)]
+	text := redactor.Redact(raw[:redactor.CutBefore(raw, maxRunnerStderr)])
 	if i := strings.LastIndexByte(text, '\n'); i >= 0 {
 		text = text[:i]
-	} else {
-		text = ""
 	}
 	return text + "\n[stderr truncated]"
 }
