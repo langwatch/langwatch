@@ -44,7 +44,9 @@ func tokenServer(t *testing.T, pub *rsa.PublicKey, status int) *httptest.Server 
 	return srv
 }
 
-func serviceAccountJSON(t *testing.T, tokenURI string) (string, *rsa.PublicKey) {
+// vertexKey starts a token server answering with status and returns a
+// service-account key whose token_uri points at it.
+func vertexKey(t *testing.T, status int) (string, *httptest.Server) {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -54,19 +56,18 @@ func serviceAccountJSON(t *testing.T, tokenURI string) (string, *rsa.PublicKey) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	pemKey := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+	ts := tokenServer(t, &key.PublicKey, status)
 	raw, _ := json.Marshal(map[string]string{
 		"type": "service_account", "client_email": "matrix@example.iam.gserviceaccount.com",
-		"private_key": pemKey, "token_uri": tokenURI,
+		"private_key": string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})),
+		"token_uri":   ts.URL,
 	})
-	return string(raw), &key.PublicKey
+	return string(raw), ts
 }
 
 /** @scenario "The Vertex cache cell gets a token minted from the service-account key" */
 func TestMintVertexTokenExchangesASignedAssertion(t *testing.T) {
-	keyJSON, pub := serviceAccountJSON(t, "")
-	ts := tokenServer(t, pub, http.StatusOK)
-	keyJSON = strings.Replace(keyJSON, `"token_uri":""`, `"token_uri":"`+ts.URL+`"`, 1)
+	keyJSON, ts := vertexKey(t, http.StatusOK)
 	got, err := mintVertexToken(context.Background(), ts.Client(), keyJSON)
 	if err != nil || got != "ya29.minted" {
 		t.Fatalf("token=%q err=%v", got, err)
@@ -75,9 +76,7 @@ func TestMintVertexTokenExchangesASignedAssertion(t *testing.T) {
 
 /** @scenario "The Vertex cache cell gets a token minted from the service-account key" */
 func TestMintVertexTokenRefusalIsAnErrorNotAToken(t *testing.T) {
-	keyJSON, pub := serviceAccountJSON(t, "")
-	ts := tokenServer(t, pub, http.StatusForbidden)
-	keyJSON = strings.Replace(keyJSON, `"token_uri":""`, `"token_uri":"`+ts.URL+`"`, 1)
+	keyJSON, ts := vertexKey(t, http.StatusForbidden)
 	if got, err := mintVertexToken(context.Background(), ts.Client(), keyJSON); err == nil || got != "" {
 		t.Fatalf("a refused grant must yield no token: token=%q err=%v", got, err)
 	}
@@ -92,9 +91,7 @@ func vertexEnv(keyJSON string) map[string]string {
 
 /** @scenario "The Vertex cache cell gets a token minted from the service-account key" */
 func TestRunExportsTheMintedVertexToken(t *testing.T) {
-	keyJSON, pub := serviceAccountJSON(t, "")
-	ts := tokenServer(t, pub, http.StatusOK)
-	keyJSON = strings.Replace(keyJSON, `"token_uri":""`, `"token_uri":"`+ts.URL+`"`, 1)
+	keyJSON, _ := vertexKey(t, http.StatusOK)
 	_, server := newStub(t, nil)
 	result := run(t, server.URL, vertexEnv(keyJSON))
 	if got := exported(result)["VERTEX_ACCESS_TOKEN"]; got != "ya29.minted" {
@@ -107,9 +104,7 @@ func TestRunExportsTheMintedVertexToken(t *testing.T) {
 
 /** @scenario "The Vertex cache cell gets a token minted from the service-account key" */
 func TestRunWarnsAndExportsNoTokenWhenTheExchangeIsRefused(t *testing.T) {
-	keyJSON, pub := serviceAccountJSON(t, "")
-	ts := tokenServer(t, pub, http.StatusForbidden)
-	keyJSON = strings.Replace(keyJSON, `"token_uri":""`, `"token_uri":"`+ts.URL+`"`, 1)
+	keyJSON, _ := vertexKey(t, http.StatusForbidden)
 	_, server := newStub(t, nil)
 	result := run(t, server.URL, vertexEnv(keyJSON))
 	if _, ok := exported(result)["VERTEX_ACCESS_TOKEN"]; ok {

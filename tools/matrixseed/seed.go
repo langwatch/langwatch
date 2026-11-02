@@ -49,8 +49,9 @@ func (r Result) Err() error {
 }
 
 // Run provisions the organization and project, then seeds each provider in
-// turn. A bootstrap failure returns an error and no exports; a provider failure
-// is recorded and the remaining providers are still seeded.
+// turn, then mints and exports VERTEX_ACCESS_TOKEN when a service-account key is
+// set. A bootstrap failure returns an error and no exports; a provider failure
+// is recorded and the rest still seed; a refused token only warns.
 func Run(ctx context.Context, opts Options) (Result, error) {
 	if opts.InstanceAdminKey == "" {
 		return Result{}, errors.New("no instance administrator key: set LANGWATCH_INSTANCE_ADMIN_API_KEY on the api and the seed")
