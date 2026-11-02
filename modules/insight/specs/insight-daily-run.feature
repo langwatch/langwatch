@@ -729,9 +729,9 @@ Feature: The daily insights run
       Then the run's row names the board Costs
 
     @integration
-    Scenario: No thanks from the offer stores off
+    Scenario: Turning off a board never decided on stores off
       Given a board a member never decided on
-      When they say no thanks to the offer
+      When they turn its daily run off
       Then they read off with nothing chosen
       And they can still turn it on
 
