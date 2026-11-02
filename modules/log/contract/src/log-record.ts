@@ -9,7 +9,7 @@ export const logCorrelationSourceSchema = z.enum([
 ]);
 export type LogCorrelationSource = z.infer<typeof logCorrelationSourceSchema>;
 
-export const logProviderKindSchema = z.enum(["generic", "claude_code", "codex"]);
+export const logProviderKindSchema = z.enum(["generic", "claude_code", "codex", "grok"]);
 export type LogProviderKind = z.infer<typeof logProviderKindSchema>;
 
 const canonicalLogRecordSchemaDefinition = z.object({

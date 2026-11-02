@@ -45,6 +45,7 @@ export const TOOL_WRAPPER_COMMANDS = [
   "cursor",
   "gemini",
   "opencode",
+  "grok",
 ] as const;
 
 /**
@@ -351,6 +352,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerCursorCommands(program);
   registerGeminiCommands(program);
   registerOpencodeCommands(program);
+  registerGrokCommands(program);
   registerCodingAssistantHelp(program);
   registerReportCommands(program);
   registerLogoutCommands(program);
@@ -779,6 +781,27 @@ function registerOpencodeCommands(program: Command): void {
     });
 }
 
+function registerGrokCommands(program: Command): void {
+  program
+    .command("grok", { hidden: true })
+    .description(
+      "Run `grok` (Grok CLI) with LangWatch telemetry (ingestion only: grok sets its model endpoints in config.toml, not the environment).",
+    )
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapGrok } = await import("./commands/wrap.js");
+        await wrapGrok(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+}
+
 function registerCodingAssistantHelp(program: Command): void {
   // A wrapper renders no result of its own, in any format: it hands the
   // terminal to the tool it runs. Registered as such so the auto-detected
@@ -803,6 +826,7 @@ function registerCodingAssistantHelp(program: Command): void {
       "  cursor          Run `cursor` routed through the gateway",
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
+      "  grok            Run `grok` (Grok CLI) with LangWatch telemetry",
       "  copilot-app     Set up capture for the standalone GitHub Copilot app",
       "  instrument      Write persistent telemetry wiring for a tool without launching it",
       "",

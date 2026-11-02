@@ -974,6 +974,11 @@ const AGENT_BANNERS: Record<SessionBanner["agent"], { name: string; mark: MarkSp
     name: "GitHub Copilot",
     mark: flatMark(["▗▛▀▀▀▜▖", "▐ ▐▌▐▌▌", "▝▙▄▄▄▟▘"], TERMINAL_TOKENS.blue),
   },
+  // A plain mark, not Grok's own startup art, which no capture has recorded.
+  grok: {
+    name: "Grok",
+    mark: flatMark(["▗▄▄▄▖", "▐ ▞ ▌", "▝▀▀▀▘"], TERMINAL_TOKENS.screenFg),
+  },
   unknown: {
     name: "Coding agent",
     mark: flatMark(["▛███▜", "█████", "▘▘ ▝▝"], TERMINAL_TOKENS.faint),

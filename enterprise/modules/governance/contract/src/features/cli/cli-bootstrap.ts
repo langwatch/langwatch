@@ -12,6 +12,7 @@ const cliToolPolicyMapSchema = z
     cursor: platformToolPolicySchema,
     copilot: platformToolPolicySchema,
     code: platformToolPolicySchema,
+    grok: platformToolPolicySchema,
   })
   .strict();
 

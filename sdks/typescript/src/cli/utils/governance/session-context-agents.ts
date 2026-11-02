@@ -73,6 +73,25 @@ function copilotHookFile(): HooksTarget {
   };
 }
 
+/** The name of LangWatch's own file in the Grok hook folder, as Copilot's is. */
+export const GROK_HOOK_FILE_NAME = "langwatch.json";
+
+/**
+ * The Grok hook folder: `$GROK_HOME/hooks` when the user relocated Grok's
+ * config, `~/.grok/hooks` otherwise. Grok loads every `*.json` there.
+ */
+function grokHookFile(): HooksTarget {
+  const home = process.env.GROK_HOME?.trim();
+  if (home) {
+    const file = path.join(home, "hooks", GROK_HOOK_FILE_NAME);
+    return { path: file, displayPath: file };
+  }
+  return {
+    path: path.join(os.homedir(), ".grok", "hooks", GROK_HOOK_FILE_NAME),
+    displayPath: `~/.grok/hooks/${GROK_HOOK_FILE_NAME}`,
+  };
+}
+
 /** Seconds every hook file we write gives the hook before the agent kills it. */
 export const HOOK_TIMEOUT_SECONDS = 10;
 
@@ -132,6 +151,15 @@ export const SESSION_CONTEXT_AGENTS = {
     // The CLI pins this to where it was launched; VS Code sends none.
     projectDirVar: "COPILOT_PROJECT_DIR",
     hookTarget: { kind: "owned-file", resolve: copilotHookFile },
+  },
+  grok: {
+    hookArgument: "grok",
+    agent: "grok",
+    keySourceTypes: ["grok_cli"],
+    keySourceType: only("grok_cli"),
+    sessionIdVar: "GROK_SESSION_ID",
+    projectDirVar: "GROK_WORKSPACE_ROOT",
+    hookTarget: { kind: "owned-file", resolve: grokHookFile },
   },
 } as const satisfies Record<string, SessionContextAgent>;
 

@@ -328,7 +328,7 @@ export class CodingAgentSessionLogProjection {
       toolInputBytes:
         base.toolInputBytes + this.stateProjection.number(attrs.tool_input_size_bytes),
       errorTypes:
-        errorType !== null && this.stateProjection.coerceScalarString(attrs.success) === "false"
+        errorType !== null && this.stateProjection.isFalse(attrs.success)
           ? this.stateProjection.incrementCounter(base.errorTypes, errorType)
           : base.errorTypes,
     };
@@ -348,7 +348,7 @@ export class CodingAgentSessionLogProjection {
     return !wrapped && agent !== undefined && EVENTS_FOLD_TOOL_RUNS_AGENT_IDS.has(agent)
       ? this.stateProjection.foldToolInvocation(withBytes, {
           attrs,
-          failed: this.stateProjection.coerceScalarString(attrs.success) === "false",
+          failed: this.stateProjection.isFalse(attrs.success),
           toolMs: this.stateProjection.number(attrs.duration_ms),
           startedAtMs: occurredAtMs ?? 0,
         })

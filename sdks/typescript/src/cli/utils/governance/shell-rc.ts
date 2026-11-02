@@ -48,6 +48,9 @@ export const SHELL_FUNCTION_TOOLS: readonly string[] = [
   // config-file env target for the auth header, so it uses the same
   // scoped-function tier. ADR-039 §Extension #2.
   "code",
+  // grok reads its exporter only from the environment, so a bare `grok` run
+  // reports only while the scoped function re-injects it. ADR-192.
+  "grok",
 ] as const;
 
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
