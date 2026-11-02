@@ -26,6 +26,13 @@ describe("DatasetContentHasherService", () => {
     );
   });
 
+  /** @scenario "A version larger than one whole read is refused before it is read" */
+  it("sizes the rows by their values alone, as a run measures them", () => {
+    const hasher = DatasetContentHasherService.create({ columns: COLUMNS });
+    for (const row of rows) hasher.push(row);
+    expect(hasher.digest().sizeBytes).toBe(Buffer.byteLength(JSON.stringify(rows[0]!.entry)));
+  });
+
   /** @scenario "Saving unchanged content creates no version" */
   it("hashes a column change as different content", () => {
     expect(datasetContentHashOf({ columns: COLUMNS, rows })).not.toBe(

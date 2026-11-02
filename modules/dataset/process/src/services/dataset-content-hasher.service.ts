@@ -2,9 +2,13 @@ import { createHash, type Hash } from "node:crypto";
 
 import type { DatasetColumns, DatasetVersionRow } from "@langwatch/dataset-contract";
 
+import { entryBytesOf } from "../rules/dataset-row-limits.rules.ts";
 import { stableStringify } from "../rules/dataset-version.rules.ts";
 
-/** The streaming SHA-256 over a dataset's columns, then its rows in order. */
+/**
+ * The streaming SHA-256 over a dataset's columns, then its rows in order. The size is the
+ * rows' values alone, the measure every whole-read and run bound compares with.
+ */
 export class DatasetContentHasherService {
   readonly #hash: Hash = createHash("sha256");
   #rows = 0;
@@ -22,7 +26,7 @@ export class DatasetContentHasherService {
     const line = stableStringify({ id: row.id, entry: row.entry });
     this.#hash.update(`${line}\n`);
     this.#rows += 1;
-    this.#bytes += Buffer.byteLength(line, "utf8") + 1;
+    this.#bytes += entryBytesOf(row.entry);
   }
 
   digest(): { contentHash: string; rowCount: number; sizeBytes: number } {
