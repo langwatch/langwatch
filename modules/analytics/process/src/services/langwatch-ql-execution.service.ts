@@ -80,7 +80,10 @@ export class LangWatchQLExecutionService {
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
     const { database, views } = this.deps;
     const { validation, granularity, memberWindows } = run;
-    const execution = await this.runRestricted(run);
+    const execution = await this.runRestricted({
+      ...run,
+      tenantIds: projects.map((project) => project.id),
+    });
     const hydrationStartedMs = this.deps.stopwatch();
     const answer = await this.deps.extraction.hydrate({
       projects: hydratableProjects({ projects, memberWindows }),
@@ -146,12 +149,12 @@ export class LangWatchQLExecutionService {
     validation,
     granularity,
     tenantCapability,
+    tenantIds,
     memberWindows,
     timeWindow,
-  }: Omit<
-    LangWatchQLExecutionInput,
-    "projects" | "protections" | "signal"
-  >): Promise<LangWatchQLExecutionResult> {
+  }: Omit<LangWatchQLExecutionInput, "projects" | "protections" | "signal"> & {
+    readonly tenantIds: readonly string[];
+  }): Promise<LangWatchQLExecutionResult> {
     const { database, views, limits } = this.deps;
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when
@@ -174,6 +177,7 @@ export class LangWatchQLExecutionService {
       // granularity merge, so passing it drops `period_granularity_seconds`.
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability,
+      tenantIds,
     });
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.

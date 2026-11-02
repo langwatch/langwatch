@@ -744,6 +744,40 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query is rejected rather than executed with weaker guarantees
 
   # ---------------------------------------------------------------------------
+  # Organizations with a private ClickHouse (issue #9248). Provisioning the
+  # LangWatchQL objects on a private ClickHouse lands in a later PR.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity
+    Given an organization whose projects are routed to its own ClickHouse by a URL carrying the server's own user and password
+    When a LangWatchQL query reads that organization's projects
+    Then it runs on the route's server and database
+    And it connects as the LangWatchQL restricted identity, never with the user or password in the route URL
+    And a query for an organization without a private ClickHouse still runs on the shared ClickHouse
+
+  @unit
+  Scenario: A LangWatchQL query for an organization whose private route is missing is refused, never answered from the shared ClickHouse
+    Given an organization recorded as keeping its data on its own ClickHouse
+    And this deployment has no route to that ClickHouse
+    When a LangWatchQL query reads that organization's projects
+    Then it is refused with error code lwql_unavailable, saying LangWatchQL is not available for this organization's ClickHouse
+    And no statement runs on the shared ClickHouse
+
+  @unit
+  Scenario: A LangWatchQL query spanning organizations is refused
+    Given projects that belong to two organizations
+    When one LangWatchQL query reads them together
+    Then it is refused with error code lwql_unavailable before any statement runs
+
+  @unit
+  Scenario: A LangWatchQL query on a private ClickHouse without LangWatchQL set up is refused
+    Given an organization whose private ClickHouse does not know the LangWatchQL identity or has no LangWatchQL views
+    When a LangWatchQL query reads that organization's projects
+    Then it is refused with error code lwql_unavailable, saying LangWatchQL is not set up on this organization's ClickHouse yet
+    And the refusal names no URL, user or password
+
+  # ---------------------------------------------------------------------------
   # Resource safety (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
 

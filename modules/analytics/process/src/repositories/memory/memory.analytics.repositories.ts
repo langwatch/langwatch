@@ -52,6 +52,7 @@ export class MemoryAnalyticsRepositories {
           throw new Error("Memory stores provide no PostgreSQL for LangWatchQL provisioning.");
         },
         unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
+        routeTenantSet: () => Promise.resolve({ kind: "shared" }),
       },
     };
   }

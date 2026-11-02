@@ -3,6 +3,7 @@ import {
   createTenantRouter,
   type PrivateRouteRefusalFactory,
   type TenantDirectory,
+  type TenantRoute,
   type TenantRouter,
 } from "./tenancy.ts";
 import { TenantScopeError } from "./tenantGuard.ts";
@@ -107,10 +108,11 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
   }
 
   /**
-   * The one server a declared tenant set is answered on: its organisation's. A set spanning
-   * organisations is refused, since no single server holds every tenant's rows.
+   * Where a declared tenant set is answered: its organisation's route. A set spanning
+   * organisations is refused, since no single server holds every tenant's rows, and so is a
+   * recorded private organisation whose route is missing: never the shared server.
    */
-  async resolveTenantSet({
+  async routeTenantSet({
     tenantId,
     tenantIds,
     organizationId: routed,
@@ -118,7 +120,7 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
     tenantId: string;
     tenantIds: readonly string[];
     organizationId?: string | undefined;
-  }): Promise<Client> {
+  }): Promise<TenantRoute> {
     this.assertOpen();
     const resolved = await Promise.all(tenantIds.map((each) => this.router.organizationOf(each)));
     const organizations = [...new Set(routed === undefined ? resolved : [routed, ...resolved])];
@@ -129,12 +131,21 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
         tenantId,
       );
     }
-    if (this.configuration.privateRoutes.has(organizationId)) {
-      return this.resolveOrganization(organizationId);
-    }
+    const configured = this.configuration.privateRoutes.get(organizationId);
+    if (configured !== undefined) return { kind: "private", organizationId, url: configured.url };
     const route = await this.router.routeOrganization(organizationId);
     this.assertOpen();
-    return route.kind === "shared" ? this.shared() : this.resolveOrganization(organizationId);
+    return route;
+  }
+
+  /** The one server a declared tenant set is answered on, by {@link routeTenantSet}'s rules. */
+  async resolveTenantSet(input: {
+    tenantId: string;
+    tenantIds: readonly string[];
+    organizationId?: string | undefined;
+  }): Promise<Client> {
+    const route = await this.routeTenantSet(input);
+    return route.kind === "shared" ? this.shared() : this.resolveOrganization(route.organizationId);
   }
 
   /** Resolves a known organisation without a directory lookup. */
