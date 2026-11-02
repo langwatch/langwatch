@@ -18,11 +18,10 @@ from spacy.strings import hash_string
 MIN_SPAN_WORDS = 2
 MIN_NORMALISED_TOKEN_LENGTH = 4
 
-# A word of a name keeps its joins (O'BRIEN, SMITH-JONES). Any other gap may
-# sit inside a name (J. SMITH, JOHN "JACK" WHITFIELD, Ann – WHITFIELD) unless
-# it ends a field: a colon, or a comma or semicolon beside a quote ("POST", ").
-NAME_WORD = re.compile(r"\w+(?:['’-]\w+)*")
-FIELD_END = re.compile(r':|["“”][,;]|[,;]\s*["“”]')
+# Any gap may sit inside a name (J. SMITH, JOHN "JACK" WHITFIELD, Robert:
+# MILLER) unless it ends a quoted field: a quote beside a colon, comma or
+# semicolon, as in "method": "POST", "url" or 'POST', 'url'.
+FIELD_END = re.compile(r"[\"'“”‘’]\s*[:,;]|[:,;]\s*[\"'“”‘’]")
 
 # A word reads as a name when its Titlecase form sits this many times nearer
 # the top of the frequency-sorted vector table than its lowercase and capital
@@ -115,24 +114,20 @@ def could_hold_a_rewritten_name(*, original: str, normalised: str) -> bool:
     That takes a rewritten word beside another word of the same name. A capital
     word fenced off as its own field ("POST") never makes one, so it is skipped.
     """
-    rewritten = _rewritten_runs(original=original, normalised=normalised)
+    rewritten = set(_rewritten_runs(original=original, normalised=normalised))
     if not rewritten:
         return False
 
-    def lengths(word: re.Match[str]) -> list[int]:
-        return [
-            end - start
-            for start, end in rewritten
-            if word.start() <= start and end <= word.end()
-        ]
+    def rewritten_length(run: tuple[int, int]) -> int:
+        return run[1] - run[0] if run in rewritten else 0
 
-    for left, right in pairwise(NAME_WORD.finditer(original)):
-        if FIELD_END.search(original[left.end() : right.start()]):
+    for left, right in pairwise(_word_runs(original)):
+        if FIELD_END.search(original[left[1] : right[0]]):
             continue
-        left_lengths, right_lengths = lengths(left), lengths(right)
-        if left_lengths and right_lengths:
+        left_length, right_length = rewritten_length(left), rewritten_length(right)
+        if left_length and right_length:
             return True
-        if max(left_lengths + right_lengths, default=0) >= MIN_NORMALISED_TOKEN_LENGTH:
+        if max(left_length, right_length) >= MIN_NORMALISED_TOKEN_LENGTH:
             return True
     return False
 

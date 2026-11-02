@@ -1,6 +1,7 @@
 """The evaluator, span helper and corpus bounds the Presidio name tests share."""
 
 from functools import cache, lru_cache
+from typing import Any
 
 from langevals_presidio.pii_detection import (
     PresidioEntities,
@@ -55,6 +56,26 @@ def second_pass_places(text: str) -> tuple[str, ...]:
         if finding["entity_type"] == "LOCATION"
         and (finding["start"], finding["end"]) not in first_pass
     )
+
+
+def analysis_count(text: str) -> int:
+    """How many analyze() calls one evaluate() of `text` makes, person and place on."""
+    subject = name_and_place_evaluator()
+    inner = PresidioPIIDetectionEvaluator.analyzer
+    calls = 0
+
+    class Counting:
+        def analyze(self, **kwargs: Any) -> Any:
+            nonlocal calls
+            calls += 1
+            return inner.analyze(**kwargs)
+
+    PresidioPIIDetectionEvaluator.analyzer = Counting()  # type: ignore[assignment]
+    try:
+        subject.evaluate(PresidioPIIDetectionEntry(input=text))
+    finally:
+        PresidioPIIDetectionEvaluator.analyzer = inner  # type: ignore[assignment]
+    return calls
 
 
 @cache

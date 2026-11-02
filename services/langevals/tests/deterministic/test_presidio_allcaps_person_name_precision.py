@@ -11,6 +11,7 @@ from langevals_presidio.allcaps_names import normalise_allcaps_runs
 from presidio_person_name_support import (
     LENGTH_BAND,
     MIN_THRESHOLD,
+    analysis_count,
     person_spans,
     second_pass_places,
 )
@@ -195,3 +196,10 @@ def test_no_false_place_from_the_second_pass(index: int):
     """
     category, text = cases()[index]
     assert second_pass_places(text) == (), f"{category}: LOCATION on a non-place in {text!r}"
+
+
+# @scenario "The second pass adds no place over an ALL-CAPS string that is not one"
+@pytest.mark.parametrize("text", PRECISION_CORPUS["place_context_non_names"])
+def test_place_context_strings_reach_the_second_pass(text: str):
+    """Without a second pass the no-place check above has nothing to judge."""
+    assert analysis_count(text) == 2, f"no second pass over {text!r}"

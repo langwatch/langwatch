@@ -44,9 +44,9 @@ person spans that copy reveals into the first pass's findings.
    and invented brands, which pass the shape rule.
 4. The second pass is skipped when neither person nor location detection is
    on, or when every rewritten word is cut off from its neighbours by a field
-   end: a colon, or a comma or semicolon beside a quote. Any other gap (a
-   space, comma, quote, bracket or dash) may sit inside a name, as in
-   JOHN "JACK" WHITFIELD. Prose with OK, ID or USD and JSON with a quoted
+   end: a quote beside a colon, comma or semicolon, as in "method": "POST".
+   Any other gap (a space, comma, colon, quote, bracket or dash) may sit
+   inside a name, as in JOHN "JACK" WHITFIELD or Robert: MILLER. Prose with OK, ID or USD and JSON with a quoted
    "POST" or "ERROR" cost one pass, since no span of one word can pass rule 2.
    With location on and person off it asks for places only.
 5. Only PERSON spans, and LOCATION spans when location is redacted, come out

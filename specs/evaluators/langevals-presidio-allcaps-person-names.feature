@@ -182,14 +182,15 @@ Feature: A name written in capitals is still redacted
     @unit
     Scenario: The second pass is skipped when every capitalised word is its own field
       Given trace data whose capitalised words are quoted values such as "method": "POST"
-      And each is cut off from its neighbours by a colon, or by a comma or semicolon beside a quote
+      And each is cut off from its neighbours by a quote beside a colon, comma or semicolon
       When the content is analysed for personal information
       Then the content is analysed once and not twice
 
     @unit
     Scenario: The second pass still runs for a capitalised word that may join another
       Given a capitalised word of four or more letters, or two capitalised words side by side
-      And a neighbouring word joined to it by a space, a comma, a quote, a bracket, an apostrophe or a dash
+      And a neighbouring word joined to it by a space, comma, colon, quote, bracket, apostrophe or dash
+      And no quote beside a colon, comma or semicolon between them
       When the content is analysed for personal information
       Then the content is analysed twice
 
@@ -246,7 +247,8 @@ Feature: A name written in capitals is still redacted
       Given capitalised non-names, five of them standing where a place would go
       And person and location detection are both switched on
       When the content is analysed for personal information
-      Then the second analysis adds no place span over any of them
+      Then each of those five is analysed a second time
+      And the second analysis adds no place span over any of them
 
     @unit
     Scenario: A titlecased acronym is not harvested as a name

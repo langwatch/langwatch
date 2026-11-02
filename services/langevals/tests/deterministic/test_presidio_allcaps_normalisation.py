@@ -227,10 +227,14 @@ def test_no_second_pass_when_only_short_words_are_capitalised():
         '{"env": "PROD", "region": "eu-west-1", "service": "checkout"}',
         '{"first": "Maria", "last": "GONZALEZ"}',
         '["Maria", "GONZALEZ"]',
+        "{'method': 'POST', 'url': '/v1', 'level': 'ERROR'}",
+        '"method"; "POST"; "status"; "SUCCESS"',
+        "{“method”: “POST”, “level”: “ERROR”}",
     ],
 )
 def test_no_second_pass_when_every_capitalised_word_is_its_own_field(text: str):
-    """No span crosses a field end, so a quoted POST is not worth a pass."""
+    """A quote beside a colon, comma or semicolon ends a field, so a quoted POST
+    is not worth a pass."""
     calls = analyze_calls(
         entities=PresidioEntities(person=True, location=True), text=text
     )
@@ -248,6 +252,8 @@ def test_no_second_pass_when_every_capitalised_word_is_its_own_field(text: str):
         ('JOHN "JACK" WHITFIELD', 'JOHN "JACK" WHITFIELD'),
         ('Customer: Robert "BOB" MILLER', 'Robert "BOB" MILLER'),
         ("Ann – WHITFIELD", "Ann – WHITFIELD"),
+        ("Ann - WHITFIELD", "Ann - WHITFIELD"),
+        ("Contact Robert: MILLER", "Robert: MILLER"),
         ("JAMES' WHITFIELD", "JAMES' WHITFIELD"),
         ("Contact person: Robert (MILLER), phone unknown", "Robert (MILLER"),
     ],
