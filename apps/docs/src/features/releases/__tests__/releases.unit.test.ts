@@ -194,7 +194,13 @@ describe("when only some of the older releases fit the page token budget", () =>
 
   /** @scenario "Keep the changelog Markdown export within the page token budget" */
   it("keeps the newest releases that fit and notes the rest are left out", () => {
-    const twoFit = tokens(exportOf({ changelog: newestTwo, pageTokens: Infinity })) + 50;
+    // The note's real cost: a one-token budget keeps the newest release plus the left-out section.
+    const noteCost =
+      tokens(exportOf({ changelog: all, pageTokens: 1 })) -
+      tokens(
+        exportOf({ changelog: release({ version: "3.0.0", day: "21" }), pageTokens: Infinity }),
+      );
+    const twoFit = tokens(exportOf({ changelog: newestTwo, pageTokens: Infinity })) + noteCost + 1;
     expect(tokens(exportOf({ changelog: all, pageTokens: Infinity }))).toBeGreaterThan(twoFit);
     const markdown = exportOf({ changelog: all, pageTokens: twoFit });
     expect(markdown).toContain("## Release v3.0.0");

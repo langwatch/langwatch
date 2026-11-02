@@ -11,8 +11,9 @@ const WHATS_NEW = 3;
 const LEFT_OUT_HEADING = "## Releases left out of this copy";
 const LEFT_OUT_NOTE =
   "Earlier recent releases are left out of this Markdown copy to keep it short. " +
-  "All published releases are on the [changelog page](/changelog) and in the " +
-  "[repository CHANGELOG](https://github.com/langwatch/langwatch/blob/main/CHANGELOG.md).";
+  "The [changelog page](/changelog) shows the newest releases, and the " +
+  "[repository CHANGELOG](https://github.com/langwatch/langwatch/blob/main/CHANGELOG.md) " +
+  "holds every release.";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
 const cache = new Map<string, { modified: number; entries: Release[] }>();

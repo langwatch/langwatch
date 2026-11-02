@@ -73,9 +73,9 @@ export function readBudgets({ file = DEFAULT_BUDGETS_FILE }: { file?: URL | stri
  * budgets.json beside its own module. Only this field is parsed, so an unrelated bad budget
  * cannot break the build.
  */
-export const PAGE_TOKENS = z
-  .object({ agentReadiness: z.object({ pageTokens: z.number().int().positive() }) })
-  .parse(budgetsFile).agentReadiness.pageTokens;
+export const PAGE_TOKENS = budgetsSchema.shape.agentReadiness.shape.pageTokens.parse(
+  budgetsFile.agentReadiness.pageTokens,
+);
 
 const failingAudit = z.object({ id: z.string(), category, title: z.string(), score: z.number() });
 
