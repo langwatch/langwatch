@@ -29,6 +29,36 @@ export function movesASeat({ from, to }: { from: SeatKind; to: SeatKind }): bool
   return from !== to;
 }
 
+/** One member's seat as the fold last recorded it and as it stands now. */
+export type MemberSeatReading = Readonly<{ userId: string; recorded: SeatKind; live: SeatKind }>;
+
+/** A seat a write outside organization moved, as the change that corrects the fold. */
+export type MemberSeatCorrection = Readonly<{ userId: string; from: SeatKind; to: SeatKind }>;
+
+/**
+ * The members whose live seat differs from the seat the fold recorded (ADR-002 §6). Across the
+ * view-only line only a swap between a Lite Member and a full seat counts: a seat taken or given
+ * back is its writer's own change, which may still be on its way to the fold.
+ */
+export function memberSeatCorrections({
+  readings,
+  acrossViewOnlyLineOnly,
+}: {
+  readings: readonly MemberSeatReading[];
+  acrossViewOnlyLineOnly: boolean;
+}): MemberSeatCorrection[] {
+  return readings
+    .filter(({ recorded, live }) => movesASeat({ from: recorded, to: live }))
+    .filter(
+      ({ recorded, live }) => !acrossViewOnlyLineOnly || (isMetered(recorded) && isMetered(live)),
+    )
+    .map(({ userId, recorded, live }) => ({ userId, from: recorded, to: live }));
+}
+
+function isMetered(seat: SeatKind): boolean {
+  return seat === "full" || seat === "lite";
+}
+
 type SeatChangeAppend = Omit<Parameters<ProcessStore["appendIntents"]>[0], "transaction">;
 
 /** The outbox append that carries one seat change, keyed by the change's own id. */

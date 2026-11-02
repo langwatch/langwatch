@@ -13,6 +13,10 @@ import {
 import type { OrganizationModule } from "../app/organization.app.ts";
 import type { SeatPeakFoldState } from "../repositories/organization-seat-peak.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
+import {
+  type SeatPeakCorrections,
+  withSeatCorrections,
+} from "./seat-peak-correction.subscriber.ts";
 import { RecordSeatChangedCommand, RecordSeatSnapshotCommand } from "./seat-peak.commands.ts";
 import {
   SEAT_PEAK_AGGREGATE_TYPE,
@@ -30,6 +34,7 @@ export type SeatPeakOpener = Readonly<{
 type SeatPeakPipelineDependencies = Readonly<{
   store: StateProjectionStore<SeatPeakFoldState>;
   opener: SeatPeakOpener;
+  corrections: SeatPeakCorrections;
 }>;
 
 function seatPeakCommands({ store }: Pick<SeatPeakPipelineDependencies, "store">) {
@@ -52,14 +57,15 @@ export type SeatPeakDefinition = ReturnType<ReturnType<typeof seatPeakCommands>[
 export function buildSeatPeakPipeline({
   store,
   opener,
+  corrections,
 }: SeatPeakPipelineDependencies): SeatPeakDefinition {
-  return seatPeakCommands({ store })
-    .withPeerSubscriber("seatPeakOrganizationCreated", {
-      eventType: ORGANIZATION_CREATED_EVENT_TYPE,
-      data: organizationCreatedEventDataSchema.pick({ organizationId: true, occurredAt: true }),
-      handle: ({ organizationId, occurredAt }) => opener.open({ organizationId, occurredAt }),
-    })
-    .build();
+  const pipeline = seatPeakCommands({ store }).withPeerSubscriber("seatPeakOrganizationCreated", {
+    eventType: ORGANIZATION_CREATED_EVENT_TYPE,
+    data: organizationCreatedEventDataSchema.pick({ organizationId: true, occurredAt: true }),
+    handle: ({ organizationId, occurredAt }) => opener.open({ organizationId, occurredAt }),
+  });
+  // Seats moved by writes organization does not make (ADR-002 §6).
+  return withSeatCorrections({ pipeline, corrections }).build();
 }
 
 export const seatPeakEventing = defineEventingModule({
