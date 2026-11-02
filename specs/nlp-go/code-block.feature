@@ -390,7 +390,8 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # Only the last 64 KiB of interpreter stderr is read, and only when no result
     # exists. The cut falls inside no secret, invalid UTF-8 is replaced before
     # matching, and a secret cut off at the end is dropped, even an ordinary
-    # tail such as "1000" for a secret "0000"; a partial inside a match stays.
+    # tail such as "1000" for a secret "0000", on purpose: a leak is worse than
+    # a lost byte; a partial inside a match stays.
     @unit
     Scenario: A runner error carries the end of the interpreter stderr
       Given a runner that exits without writing a result and wrote to stderr
