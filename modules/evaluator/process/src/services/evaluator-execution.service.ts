@@ -3,7 +3,6 @@ import {
   codeEvaluatorConfigSchema,
   evaluatorExecutionConfigSchema,
   EvaluatorInvalidConfigError,
-  EvaluatorNotFoundError,
   EvaluatorWorkflowNotFoundError,
   parseEvaluatorAddress,
   resolvedEvaluatorExecutionSchema,
@@ -25,7 +24,7 @@ export class EvaluatorExecutionService {
   static create(options: {
     repository: EvaluatorRepository;
     workflows: WorkflowApi;
-    versions?: EvaluatorVersionService;
+    versions: EvaluatorVersionService;
   }): EvaluatorExecutionService {
     return new EvaluatorExecutionService(options);
   }
@@ -34,16 +33,14 @@ export class EvaluatorExecutionService {
     private readonly options: {
       repository: EvaluatorRepository;
       workflows: WorkflowApi;
-      versions?: EvaluatorVersionService;
+      versions: EvaluatorVersionService;
     },
   ) {}
 
   /** `toxicity`, `toxicity:production` or `toxicity:2`: the suffix picks the version run. */
   async resolve(addressed: EvaluatorIdOrSlugInput): Promise<ResolvedEvaluatorExecution> {
     const evaluator = await this.#evaluatorAt(addressed);
-    const input = this.options.versions
-      ? { ...addressed, idOrSlug: parseEvaluatorAddress(addressed.idOrSlug).idOrSlug }
-      : addressed;
+    const input = { ...addressed, idOrSlug: parseEvaluatorAddress(addressed.idOrSlug).idOrSlug };
 
     const config = evaluatorExecutionConfigSchema.safeParse(evaluator.config);
     const settings = config.success ? config.data.settings : void 0;
@@ -84,16 +81,11 @@ export class EvaluatorExecutionService {
   }
 
   async #evaluatorAt(input: EvaluatorIdOrSlugInput): Promise<Evaluator> {
-    if (this.options.versions) {
-      const { evaluator } = await this.options.versions.resolve({
-        projectId: input.projectId,
-        address: input.idOrSlug,
-        bySlug: true,
-      });
-      return evaluator;
-    }
-    const evaluator = await this.options.repository.findByIdOrSlug(input);
-    if (!evaluator) throw new EvaluatorNotFoundError(input.idOrSlug);
+    const { evaluator } = await this.options.versions.resolve({
+      projectId: input.projectId,
+      address: input.idOrSlug,
+      bySlug: true,
+    });
     return evaluator;
   }
 

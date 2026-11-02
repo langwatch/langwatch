@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EvaluatorInvalidConfigError,
   EvaluatorNotFoundError,
@@ -14,6 +15,7 @@ import { ZodError } from "zod";
 import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../evaluator-history.service.ts";
+import { EvaluatorVersionService } from "../evaluator-version.service.ts";
 import { EvaluatorService } from "../evaluator.service.ts";
 
 const baseEvaluator: Evaluator = {
@@ -47,6 +49,7 @@ function repository(overrides: Partial<EvaluatorRepository> = {}): EvaluatorRepo
     archive: vi.fn().mockResolvedValue(baseEvaluator),
     findCopies: vi.fn().mockResolvedValue([]),
     updateNameAndConfig: vi.fn().mockResolvedValue(undefined),
+    latestVersionNumbers: vi.fn().mockResolvedValue(new Map()),
     ...overrides,
   } as EvaluatorRepository;
 }
@@ -71,8 +74,15 @@ function service(
     codeExecution?: EvaluatorCodeExecution;
   } = {},
 ): EvaluatorService {
+  const evaluatorRepository = options.repository ?? repository();
   return EvaluatorService.create({
-    repository: options.repository ?? repository(),
+    repository: evaluatorRepository,
+    versions: EvaluatorVersionService.create({
+      repository: evaluatorRepository,
+      users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      permissions: createApiFixture<AuthzApi>({}),
+      auditLog: { listEntityHistory: async () => [] },
+    }),
     workflows: options.workflows ?? workflows(),
     history: EvaluatorHistoryService.create({
       auditLog: {

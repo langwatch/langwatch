@@ -46,8 +46,8 @@ type EvaluatorServiceOptions = {
   fallbackModels?: { defaultModel: string; embeddingsModel: string };
   codeExecution: EvaluatorCodeExecution;
   generateId: (kind: string) => string;
-  /** Resolves `slug:label` addresses for execution; without it the address is read bare. */
-  versions?: EvaluatorVersionService;
+  /** Resolves `slug:label` addresses for execution. */
+  versions: EvaluatorVersionService;
 };
 
 function evaluatorResultFieldType(identifier: string): string {
