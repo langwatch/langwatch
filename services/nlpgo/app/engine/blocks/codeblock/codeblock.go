@@ -48,6 +48,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -653,14 +654,14 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			Stderr:     stderrText,
 			Error: &Error{
 				Type:    RunnerErrorType,
-				Message: runErr.Error(),
+				Message: withStderrTail(runErr.Error(), stderrText),
 			},
 		}, nil
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
 		Stderr:     stderrText,
-		Error:      &Error{Type: RunnerErrorType, Message: "empty_result"},
+		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText)},
 	}, nil
 }
 
@@ -669,6 +670,24 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 // carries interpreter-level diagnostics and a cap costs nothing — except to
 // code that writes gigabytes to its descriptor, which is why there is one.
 const maxRunnerStderr = 64 << 10
+
+// maxStderrInMessage bounds the stderr tail appended to a runner error.
+const maxStderrInMessage = 2 << 10
+
+// withStderrTail appends the end of the interpreter's stderr to a runner
+// failure, so "exit status 1" says why. Safe to surface: this is the
+// interpreter's own stderr (user stderr goes to the result file) and the
+// payload, secrets included, never reaches it. The tail is bounded.
+func withStderrTail(message, stderr string) string {
+	tail := strings.TrimSpace(stderr)
+	if tail == "" {
+		return message
+	}
+	if len(tail) > maxStderrInMessage {
+		tail = strings.ToValidUTF8(tail[len(tail)-maxStderrInMessage:], "")
+	}
+	return message + ": " + tail
+}
 
 // newRunnerStderr opens the file the interpreter's own stderr goes to, in the
 // engine's scratch root and unlinked at once.
