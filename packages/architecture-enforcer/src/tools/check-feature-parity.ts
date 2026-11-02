@@ -316,7 +316,12 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
  * langevals scorers would have no way to satisfy parity short of a
  * misleading TS stub.
  */
-const DEFAULT_PYTHON_TEST_ROOTS: string[] = ["services/langevals", "sdks/python"];
+const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
+  "services/langevals",
+  "sdks/python",
+  // PII detector levels (specs/pii-detector/pii-detector-levels.feature).
+  "services/piidetector",
+];
 
 /**
  * Feature files whose unbound `@unit` / `@integration` scenarios are tolerated (non-fatal)
