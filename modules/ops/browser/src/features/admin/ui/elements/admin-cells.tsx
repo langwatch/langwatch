@@ -56,6 +56,14 @@ export function formatDate(value: TimeInput | null | undefined): string {
   return toDate(moment).toLocaleDateString();
 }
 
+/** Calendar date in UTC, for instants that are UTC by definition (seat peak months). */
+export function formatDateUtc(value: TimeInput | null | undefined): string {
+  if (!value) return "—";
+  const moment = readableMoment(value);
+  if (moment === null) return "—";
+  return toDate(moment).toLocaleDateString(undefined, { timeZone: "UTC" });
+}
+
 export function formatDateTime(value: TimeInput | null | undefined): string {
   if (!value) return "—";
   const moment = readableMoment(value);

@@ -33,7 +33,7 @@ import {
 } from "./seat-peak.events.ts";
 import {
   pruneSeatChangeIntents,
-  recordSeatChange,
+  recordSeatChanged,
   type SeatPeakSender,
 } from "./seat-peak.intent.ts";
 import {
@@ -79,7 +79,7 @@ function seatPeakCommands({
         .intent(
           SEAT_PEAK_RECORD_INTENT,
           recordSeatChangedCommandDataSchema,
-          recordSeatChange(sender),
+          recordSeatChanged(sender),
         )
         .intent(SEAT_PEAK_PRUNE_INTENT, seatPeakPruneSchema, pruneSeatChangeIntents(retention))
         .schedule({ everyMs: SEAT_PEAK_PRUNE_INTERVAL_MS })

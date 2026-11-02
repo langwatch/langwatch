@@ -2,13 +2,24 @@
  * Our team's view of the most seats an organization held at once each month, beside what its
  * licence sells (ADR-002). Renewal reads it here; the customer's own pages never show it.
  */
-import { Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Heading, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import type { OrganizationSeatPeakMonth } from "@langwatch/organization-contract";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { formatDate } from "../elements/admin-cells.tsx";
+import { formatDateUtc } from "../elements/admin-cells.tsx";
 
 export function SeatPeakSummary({ organizationId }: { organizationId: string }) {
+  return (
+    <VStack align="stretch" gap={2}>
+      <Heading as="h3" size="xs" color="fg.muted" textTransform="none" letterSpacing="wider" pt={2}>
+        Seats
+      </Heading>
+      <SeatPeakBody organizationId={organizationId} />
+    </VStack>
+  );
+}
+
+function SeatPeakBody({ organizationId }: { organizationId: string }) {
   const peak = api.organizationSeatPeak.get.useQuery({ organizationId });
 
   if (peak.isLoading) {
@@ -40,16 +51,21 @@ export function SeatPeakSummary({ organizationId }: { organizationId: string }) 
       <Text fontSize="sm">
         Full seats: {seats.full} of {caps.fullSeats} in use
         {thisMonth
-          ? `, peak this month ${thisMonth.fullPeak} (${formatDate(thisMonth.fullPeakAt)})`
+          ? `, peak this month ${thisMonth.fullPeak} (${formatDateUtc(thisMonth.fullPeakAt)})`
           : ""}
       </Text>
       <Text fontSize="sm">
         Lite Member seats: {seats.lite} of {caps.liteSeats} in use
         {thisMonth
-          ? `, peak this month ${thisMonth.litePeak} (${formatDate(thisMonth.litePeakAt)})`
+          ? `, peak this month ${thisMonth.litePeak} (${formatDateUtc(thisMonth.litePeakAt)})`
           : ""}
       </Text>
       {earlier.length > 0 && <EarlierMonths months={earlier} />}
+      {peak.data.mismatches > 0 && (
+        <Text fontSize="sm" color="fg.muted" data-testid="ops-seat-peak-mismatches">
+          {peak.data.mismatches} seat changes disagreed with the count
+        </Text>
+      )}
     </VStack>
   );
 }
@@ -69,10 +85,10 @@ function EarlierMonths({ months }: { months: readonly OrganizationSeatPeakMonth[
           <Table.Row key={month.month}>
             <Table.Cell>{month.month}</Table.Cell>
             <Table.Cell>
-              {month.fullPeak} ({formatDate(month.fullPeakAt)})
+              {month.fullPeak} ({formatDateUtc(month.fullPeakAt)})
             </Table.Cell>
             <Table.Cell>
-              {month.litePeak} ({formatDate(month.litePeakAt)})
+              {month.litePeak} ({formatDateUtc(month.litePeakAt)})
             </Table.Cell>
           </Table.Row>
         ))}

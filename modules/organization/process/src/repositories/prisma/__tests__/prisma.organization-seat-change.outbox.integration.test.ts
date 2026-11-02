@@ -119,7 +119,7 @@ describe.skipIf(!DB_URL)("organization's seat changes (Postgres)", () => {
 
       expect(await seatChanges(organizationId)).toEqual([
         expect.objectContaining({
-          intentType: "recordSeatChange",
+          intentType: "recordSeatChanged",
           tenantId: organizationId,
           organizationId,
           holder: {

@@ -378,7 +378,6 @@ export function OrganizationEditDrawer({
           <IdentityFields form={form} setField={setField} />
           <BillingFields form={form} setField={setField} />
           <LimitFields form={form} setField={setField} error={fieldErrors.datasetAttachmentMaxMb} />
-          <SectionHeading>Seats</SectionHeading>
           <SeatPeakSummary organizationId={organization.id} />
           <AuthenticationSection organization={organization} />
           <LicenseFields form={form} setField={setField} />

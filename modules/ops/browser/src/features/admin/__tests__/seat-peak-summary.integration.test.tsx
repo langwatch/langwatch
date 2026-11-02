@@ -10,7 +10,7 @@ import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeOpsHost, renderWithOpsHost } from "../../../testing.tsx";
-import { formatDate } from "../ui/elements/admin-cells.tsx";
+import { formatDateUtc } from "../ui/elements/admin-cells.tsx";
 import { OrganizationEditDrawer } from "../ui/sections/organizations-view.tsx";
 
 const peakState = vi.hoisted(() => ({
@@ -115,13 +115,31 @@ describe("Feature: our team sees the seat peak at renewal", () => {
       const summary = screen.getByTestId("ops-seat-peak");
       expect(peakState.askedFor).toContainEqual({ organizationId: "org-acme" });
       expect(summary).toHaveTextContent(
-        `Full seats: 48 of 50 in use, peak this month 57 (${formatDate(PEAK_REACHED)})`,
+        `Full seats: 48 of 50 in use, peak this month 57 (${formatDateUtc(PEAK_REACHED)})`,
       );
       expect(summary).toHaveTextContent(/Lite Member seats: 3 of 10 in use, peak this month 4/);
       const earlier = within(screen.getByRole("table", { name: "Seat peaks of earlier months" }));
       expect(earlier.getByRole("row", { name: /2026-10/ })).toHaveTextContent(/51/);
       expect(earlier.getByRole("row", { name: /2026-09/ })).toHaveTextContent(/51/);
       expect(earlier.queryByRole("row", { name: /2026-11/ })).toBeNull();
+    });
+  });
+
+  describe("given some seat changes disagreed with the count", () => {
+    it("shows the mismatch count only when it is above zero", () => {
+      peakState.answer = { ...counted, mismatches: 3 };
+      const { unmount } = renderWithOpsHost(
+        <OrganizationEditDrawer organization={organization} onClose={vi.fn()} />,
+        { host: fakeOpsHost({ isOpsAdmin: true, cloudOps: true }) },
+      );
+      expect(screen.getByTestId("ops-seat-peak-mismatches")).toHaveTextContent(
+        "3 seat changes disagreed with the count",
+      );
+      unmount();
+
+      peakState.answer = counted;
+      openOrganization();
+      expect(screen.queryByTestId("ops-seat-peak-mismatches")).toBeNull();
     });
   });
 

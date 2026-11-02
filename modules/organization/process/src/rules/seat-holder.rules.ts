@@ -11,7 +11,7 @@ export const seatHolderSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("invitation"),
     inviteId: z.string().min(1),
-    /** Epoch milliseconds; absent for an invitation that never expires. */
+    /** Epoch milliseconds; null for an invitation that never expires. */
     expiresAt: z.number().int().nonnegative().nullable(),
   }),
 ]);

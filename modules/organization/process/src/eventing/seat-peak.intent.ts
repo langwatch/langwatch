@@ -15,7 +15,7 @@ export type SeatPeakSender = Pick<EventingCommandSender<RecordSeatChangedCommand
  * Sends the change under the id its commit minted. The getter is the app's
  * `getSeatChangeSender`, which throws until organization_seat_peak registers, so it retries.
  */
-export function recordSeatChange(
+export function recordSeatChanged(
   sender: () => SeatPeakSender,
 ): IntentExecutor<RecordSeatChangedCommandData> {
   return async (change) => {

@@ -158,6 +158,9 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       select: { userId: true, role: true },
     });
     if (user === null) return null;
+    if (user.role !== OrganizationUserRole.EXTERNAL) {
+      return classifyMemberType(user.role, undefined);
+    }
     const permissions = await this.getUserPermissionsMap(
       organizationId,
       [user],
@@ -180,6 +183,9 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     });
     if (invite === null) return null;
     const teamAssignments = teamAssignmentsSchema.safeParse(invite.teamAssignments).data ?? null;
+    if (teamAssignments === null || teamAssignments.length === 0) {
+      return classifyMemberType(invite.role, undefined);
+    }
     return classifyMemberType(
       invite.role,
       this.getInvitePermissions(teamAssignments, await this.getCustomRoleMap(organizationId)),

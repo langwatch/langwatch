@@ -136,7 +136,7 @@ export function foldSeatPeak({
       ? applied
       : expireInvitations({ state: applied, until: latestChangeOf(applied) });
   return {
-    ...forgetSettledInvitations({ state: moved, at: fact.data.occurredAt }),
+    ...forgetSettledHolders({ state: moved, at: fact.data.occurredAt }),
     recentChangeIds: [...moved.recentChangeIds, fact.data.changeId].slice(
       -SEAT_PEAK_RECENT_CHANGE_IDS,
     ),
@@ -158,17 +158,11 @@ function isStale({
 }
 
 /**
- * Drops an invitation with no seat once it gave its seat back (last change, or inferred expiry)
- * longer ago than the settled window (ADR-002 §7): a revoked or accepted one cannot move again,
- * and a lapsed one refreshed later is a later change, which takes the seat with or without it.
+ * Drops a member or invitation with no seat once it gave its seat back (last change, or
+ * inferred expiry) longer ago than the settled window (ADR-002 §7): a revoked or accepted one
+ * cannot move again, and a later change finds no stored seat and moves from none.
  */
-function forgetSettledInvitations({
-  state,
-  at,
-}: {
-  state: SeatPeakState;
-  at: number;
-}): SeatPeakState {
+function forgetSettledHolders({ state, at }: { state: SeatPeakState; at: number }): SeatPeakState {
   const horizon = at - SEAT_PEAK_SETTLED_INVITATION_MS;
   const entries = Object.entries(state.invitations);
   const kept = entries.filter(([, invitation]) => {
@@ -176,8 +170,16 @@ function forgetSettledInvitations({
     const expired = invitation.expiredByFold === true ? invitation.expiresAt : null;
     return Math.max(invitation.lastChangedAt, expired ?? Number.NEGATIVE_INFINITY) >= horizon;
   });
-  if (kept.length === entries.length) return state;
-  return { ...state, invitations: Object.fromEntries(kept) };
+  const members = Object.entries(state.members);
+  const keptMembers = members.filter(
+    ([, member]) => member.seat !== "none" || member.lastChangedAt >= horizon,
+  );
+  if (kept.length === entries.length && keptMembers.length === members.length) return state;
+  return {
+    ...state,
+    invitations: Object.fromEntries(kept),
+    members: Object.fromEntries(keptMembers),
+  };
 }
 
 /** Gives back the seats of invitations that expired strictly before `until`, in expiry order. */

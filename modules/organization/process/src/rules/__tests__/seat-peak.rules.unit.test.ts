@@ -718,6 +718,47 @@ describe("foldSeatPeak", () => {
   });
 });
 
+describe("foldSeatPeak's settled members", () => {
+  it("drops a removed member after the window and counts them again when re-added", () => {
+    const removed = change({
+      holder: member("leaver"),
+      from: "full",
+      to: "none",
+      occurredAt: NOV_3,
+    });
+    const unrelated = change({
+      holder: member("joiner"),
+      from: "none",
+      to: "lite",
+      occurredAt: NOV_3 + SEAT_PEAK_SETTLED_INVITATION_MS + 1,
+    });
+    const readded = change({
+      holder: member("leaver"),
+      from: "none",
+      to: "full",
+      occurredAt: NOV_3 + SEAT_PEAK_SETTLED_INVITATION_MS + 2,
+    });
+    const settled = foldAll([
+      snapshot({ occurredAt: NOV_1, extra: [{ holder: member("leaver"), seat: "full" }] }),
+      removed,
+      unrelated,
+    ]);
+
+    expect(settled.members.leaver).toBeUndefined();
+    expect(settled.counts).toEqual({ full: 0, lite: 1, developer: 0 });
+
+    const state = foldAll([
+      snapshot({ occurredAt: NOV_1, extra: [{ holder: member("leaver"), seat: "full" }] }),
+      removed,
+      unrelated,
+      readded,
+    ]);
+    expect(state.members.leaver).toMatchObject({ seat: "full" });
+    expect(state.counts).toEqual({ full: 1, lite: 1, developer: 0 });
+    expect(state.mismatches).toBe(0);
+  });
+});
+
 describe("foldSeatPeak's settled invitations", () => {
   const NOV_25 = at("2026-11-25T09:00:00Z");
   const created = change({

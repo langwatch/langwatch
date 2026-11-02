@@ -10,7 +10,7 @@ import type { RecordSeatChangedCommandData } from "../eventing/seat-peak.events.
 import type { SeatHolder, SeatKind } from "./seat-holder.rules.ts";
 
 export const SEAT_PEAK_PROCESS_NAME = "organizationSeatPeak" as const;
-export const SEAT_PEAK_RECORD_INTENT = "recordSeatChange" as const;
+export const SEAT_PEAK_RECORD_INTENT = "recordSeatChanged" as const;
 export const SEAT_PEAK_PRUNE_INTENT = "pruneSeatChanges" as const;
 /** The tenant's one seat-change outbox instance. */
 const SEAT_PEAK_PROCESS_KEY = "seats";
