@@ -68,8 +68,8 @@ const teardownDeadline = 2 * time.Second
 //
 // In strict mode, PR_SET_DUMPABLE 0 takes the engine's own /proc files away
 // from every other process running as that same user, and a code block is one
-// of those. In visible-process mode (Lambda refused it) they stay readable.
-// Without the step, the engine's own process environment is readable by any code block that
+// of those. In visible-process mode (Lambda refused it) they stay readable:
+// the engine's own process environment is then readable by any code block that
 // looks — the whole pod environment this executor's allowlist exists to
 // withhold, including the database and ClickHouse credentials and the
 // instance's own LangWatch key — and the engine's memory and open descriptors

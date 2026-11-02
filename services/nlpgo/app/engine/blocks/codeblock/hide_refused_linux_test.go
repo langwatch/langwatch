@@ -132,7 +132,7 @@ func runChild(t *testing.T, name string, extra ...string) {
 	if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == skipExitCode {
 		// CI logs are not verbose: a skip there would pass unseen.
 		if os.Getenv("CI") != "" {
-			t.Fatalf("seccomp filter could not be installed or arch unsupported (exit %d); CI must run this case: %s", skipExitCode, out.String())
+			t.Fatalf("child exited %d (cannot run this case here); CI must run it: %s", skipExitCode, out.String())
 		}
 		t.Skipf("cannot run this case on this host: %s", out.String())
 	}
