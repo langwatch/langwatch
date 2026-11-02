@@ -38,6 +38,8 @@ const seatPeakMemberSchema = z.object({ seat: seatKindSchema, lastChangedAt: z.n
 const seatPeakInvitationSchema = z.object({
   ...seatPeakMemberSchema.shape,
   expiresAt: z.number().nullable(),
+  /** The fold gave its seat back at `expiresAt`: inferred, so it never outranks a real change. */
+  expiredByFold: z.boolean().optional(),
 });
 type SeatPeakInvitation = z.infer<typeof seatPeakInvitationSchema>;
 
@@ -115,7 +117,12 @@ export function foldSeatPeak({
   const stale =
     fact.data.occurredAt <= holdingOf({ state, holder: fact.data.holder }).lastChangedAt;
   const expired = stale ? state : expireInvitations({ state, until: fact.data.occurredAt });
-  const moved = stale ? state : moveHolder({ state: expired, change: fact.data });
+  const applied = stale ? state : moveHolder({ state: expired, change: fact.data });
+  // A late invitation change may carry an expiry already past what the fold has seen.
+  const moved =
+    stale || fact.data.holder.kind === "member"
+      ? applied
+      : expireInvitations({ state: applied, until: latestChangeOf(applied) });
   return {
     ...moved,
     recentChangeIds: [...moved.recentChangeIds, fact.data.changeId].slice(
@@ -143,7 +150,7 @@ export function expireInvitations({
     const at = invitation.expiresAt ?? until;
     const invitations = {
       ...next.invitations,
-      [inviteId]: { ...invitation, seat: "none" as const, lastChangedAt: at },
+      [inviteId]: { ...invitation, seat: "none" as const, expiredByFold: true },
     };
     next = record({
       state: { ...next, invitations },
@@ -199,7 +206,8 @@ function moveHolder({
     // An extended invitation keeps its seat; only its expiry moves.
     return withHolder({ state, change });
   }
-  const mismatches = held === change.from ? state.mismatches : state.mismatches + 1;
+  const agrees = held === change.from || inferredExpiry({ state, holder: change.holder });
+  const mismatches = agrees ? state.mismatches : state.mismatches + 1;
   const counts = adjust({
     counts: adjust({ counts: state.counts, seat: held, by: -1 }),
     seat: change.to,
@@ -221,6 +229,19 @@ function holdingOf({ state, holder }: { state: SeatPeakState; holder: SeatHolder
 } {
   if (holder.kind === "member") return state.members[holder.userId] ?? UNSEEN;
   return state.invitations[holder.inviteId] ?? UNSEEN;
+}
+
+function inferredExpiry({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): boolean {
+  return holder.kind === "invitation" && state.invitations[holder.inviteId]?.expiredByFold === true;
+}
+
+/** The time of the latest change the fold applied to any holder. */
+function latestChangeOf(state: SeatPeakState): number {
+  const holdings = [...Object.values(state.members), ...Object.values(state.invitations)];
+  return holdings.reduce(
+    (latest, holding) => Math.max(latest, holding.lastChangedAt),
+    Number.NEGATIVE_INFINITY,
+  );
 }
 
 function heldSeat({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): SeatKind {

@@ -160,7 +160,7 @@ describe("foldSeatPeak", () => {
       ]);
 
       expect(state.invitations).toEqual({
-        "inv-1": { seat: "none", expiresAt: NOV_2, lastChangedAt: NOV_2 },
+        "inv-1": { seat: "none", expiresAt: NOV_2, lastChangedAt: NOV_1, expiredByFold: true },
       });
       expect(state.counts.full).toBe(11);
       expect(novemberOf(state).fullPeak).toBe(11);
@@ -201,6 +201,59 @@ describe("foldSeatPeak", () => {
       });
       expect(state.counts.full).toBe(12);
       expect(novemberOf(state).fullPeak).toBe(12);
+      expect(state.mismatches).toBe(0);
+    });
+
+    it("keeps an extension that arrives after a change dated past the old expiry", () => {
+      const state = foldAll([
+        snapshot({
+          occurredAt: NOV_1,
+          full: 10,
+          extra: [{ holder: invitation("inv-1", NOV_2), seat: "full" }],
+        }),
+        change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_2 + 1 }),
+        change({
+          holder: invitation("inv-1", NOV_3),
+          from: "full",
+          to: "full",
+          occurredAt: NOV_1 + 1,
+        }),
+      ]);
+
+      expect(state.invitations).toEqual({
+        "inv-1": { seat: "full", expiresAt: NOV_3, lastChangedAt: NOV_1 + 1 },
+      });
+      expect(state.counts.full).toBe(12);
+      expect(state.mismatches).toBe(0);
+    });
+
+    it("expires a late extension again when its new expiry is already past", () => {
+      const extendedTo = NOV_2 + 60_000;
+      const facts = (late: boolean): SeatPeakFact[] => {
+        const extension = change({
+          holder: invitation("inv-1", extendedTo),
+          from: "full",
+          to: "full",
+          occurredAt: NOV_1 + 1,
+        });
+        const joiner = change({
+          holder: member("joiner"),
+          from: "none",
+          to: "full",
+          occurredAt: NOV_3,
+        });
+        const opening = snapshot({
+          occurredAt: NOV_1,
+          full: 10,
+          extra: [{ holder: invitation("inv-1", NOV_2), seat: "full" }],
+        });
+        return late ? [opening, joiner, extension] : [opening, extension, joiner];
+      };
+      const state = foldAll(facts(true));
+
+      expect(state.invitations["inv-1"]).toMatchObject({ seat: "none", expiresAt: extendedTo });
+      expect(state.counts).toEqual(foldAll(facts(false)).counts);
+      expect(state.counts.full).toBe(11);
       expect(state.mismatches).toBe(0);
     });
 

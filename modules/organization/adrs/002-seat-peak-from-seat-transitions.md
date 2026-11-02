@@ -59,12 +59,13 @@ counts, because the cap counts it.
    each change on top of the stored state as it comes and does not hold changes back to replay them
    in time order. Each change still lands in the month of its own time and expires invitations by
    its own time. Each holder is last-write-wins by the change's own time: the fold keeps the time of
-   the last change applied to a holder (a snapshot or an invitation's expiry counts as one), drops
-   a change dated at or before it, and otherwise moves the count from the seat it holds to the
-   change's `to`. So the running count is exact in any order, and only a momentary peak can be one
+   the last change applied to a holder (a snapshot counts as one), drops a change dated at or
+   before it, and otherwise moves the count from the seat it holds to the change's `to`. An
+   invitation's expiry is inferred, not recorded, so it never outranks a real change: a late
+   extension restores the seat with its new expiry, which is expired again by event time if it
+   too is already past. So the running count is exact in any order, and only a momentary peak can be one
    seat out when two changes cross. A holder who leaves is kept with no seat, so a late change
-   cannot bring them back. One exception: an invitation's extension that arrives after a change
-   dated past its old expiry is dropped, so its seat is missing until its next change.
+   cannot bring them back.
 
 ## Rationale / Trade-offs
 
