@@ -7,6 +7,7 @@ import { MemoryGroupRepository } from "./memory.group.repository.ts";
 import { MemoryOrganizationInviteRateLimitRepository } from "./memory.organization-invite-rate-limit.repository.ts";
 import { MemoryOrganizationInviteRepository } from "./memory.organization-invite.repository.ts";
 import { MemoryOrganizationMembershipRepository } from "./memory.organization-membership.repository.ts";
+import { MemoryOrganizationSeatPeakRepository } from "./memory.organization-seat-peak.repository.ts";
 import { MemoryOrganizationSeatRepository } from "./memory.organization-seat.repository.ts";
 import { MemoryOrganizationUserDirectoryRepository } from "./memory.organization-user-directory.repository.ts";
 import { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
@@ -44,6 +45,7 @@ export function memoryOrganizationRepositories({
     inviteRateLimit: MemoryOrganizationInviteRateLimitRepository.create(),
     invite: MemoryOrganizationInviteRepository.create({ memory }),
     seats: MemoryOrganizationSeatRepository.create({ memory }),
+    seatPeak: MemoryOrganizationSeatPeakRepository.create(),
     userDirectory: MemoryOrganizationUserDirectoryRepository.create({ memory }),
     privateClickHouseRoutes: new MemoryPrivateClickHouseRoutesRepository(),
     privateS3Accounts: new MemoryPrivateS3AccountsRepository(),

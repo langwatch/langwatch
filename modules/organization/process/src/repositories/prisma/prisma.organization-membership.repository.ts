@@ -59,6 +59,7 @@ import {
 } from "../../rules/organization-membership.rules.ts";
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
+import { PrismaOrganizationSeatChangeStore } from "./prisma.organization-seat-change.store.ts";
 import {
   customRoleFromRecord,
   organizationFromRecord,
@@ -101,6 +102,24 @@ import type {
 import type { OrganizationSettingsCipher } from "../organization.repository.ts";
 
 const logger = createLogger("langwatch:organization:membership-repository");
+
+/** An admission's row: a held (pending) one is created disabled, so it takes no seat yet. */
+function admissionRow(input: {
+  organizationId: string;
+  userId: string;
+  pendingAdmissionId: string;
+  seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+  pending: boolean;
+}): Prisma.OrganizationUserUncheckedCreateInput {
+  const { organizationId, userId, seat, pending } = input;
+  return {
+    userId,
+    organizationId,
+    role: seat,
+    disabledAt: pending ? new Date() : null,
+    pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : input.pendingAdmissionId,
+  };
+}
 
 /**
  * The team's name for a refusal or a report, both of which are read by somebody
@@ -924,6 +943,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return this.#audit;
   }
 
+  #seatChanges: PrismaOrganizationSeatChangeStore | undefined;
+
+  /** Organization's seat changes (ADR-002), committed with the write that moved the seat. */
+  private get seatChanges(): PrismaOrganizationSeatChangeStore {
+    this.#seatChanges ??= PrismaOrganizationSeatChangeStore.create({ database: this.prisma });
+    return this.#seatChanges;
+  }
+
   findPersonalTeamsInScopes(params: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string }[]> {
@@ -1051,15 +1078,26 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         );
       }
 
-      await this.prisma.organizationUser.update({
-        where: {
-          userId_organizationId: {
-            userId: input.userId,
-            organizationId: created.organization.id,
-          },
-        },
-        data: { disabledAt: null },
-      });
+      // The founder's seat is the new organization's first (ADR-002), taken with the enable.
+      await this.prisma.$transaction((transaction) =>
+        this.seatChanges.movingMember({
+          transaction,
+          organizationId: created.organization.id,
+          userId: input.userId,
+          cause: "organization_created",
+          actorUserId: input.userId,
+          write: () =>
+            transaction.organizationUser.update({
+              where: {
+                userId_organizationId: {
+                  userId: input.userId,
+                  organizationId: created.organization.id,
+                },
+              },
+              data: { disabledAt: null },
+            }),
+        }),
+      );
     } catch (error) {
       // A queued append may outlive this request: deleting the committed rows
       // leaves any late projection pointing at an organization never reused.
@@ -1791,18 +1829,19 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
+    /** The person who admitted them, when one did (an approved join request). */
+    actorUserId?: string | null;
   }): Promise<OrganizationAdmission> {
     const { organizationId, userId, seat, pending } = input;
     try {
       await this.prisma.$transaction(async (tx) => {
-        await tx.organizationUser.create({
-          data: {
-            userId,
-            organizationId,
-            role: seat,
-            disabledAt: pending ? new Date() : null,
-            pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : input.pendingAdmissionId,
-          },
+        await this.seatChanges.movingMember({
+          transaction: tx,
+          organizationId,
+          userId,
+          cause: "admitted",
+          actorUserId: input.actorUserId ?? null,
+          write: () => tx.organizationUser.create({ data: admissionRow(input) }),
         });
         // A Developer gets no grant, so its admission is audited here (ADR-171).
         if (seat === "DEVELOPER") {
@@ -1879,7 +1918,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // crash between the two leaves orphaned grants, which the no-member branch
     // above revokes on retry; a refusal inside the transaction revokes nothing.
     const archivedTeamIds = await this.prisma.$transaction(async (tx) => {
-      await this.deleteMembershipRow({ tx, organizationId, userId });
+      await this.seatChanges.movingMember({
+        transaction: tx,
+        organizationId,
+        userId,
+        cause: "removed",
+        actorUserId: actingUserId ?? null,
+        write: () => this.deleteMembershipRow({ tx, organizationId, userId }),
+      });
       // As main's offboard: a kept group or team row would hand the access back on a rejoin.
       await tx.groupMembership.deleteMany({ where: { userId, group: { organizationId } } });
       await tx.teamUser.deleteMany({ where: { userId, team: { organizationId } } });
@@ -2018,9 +2064,18 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         }
       }
 
-      await tx.organizationUser.update({
-        where: { userId_organizationId: { userId, organizationId } },
-        data: { disabledAt: disabled ? new Date() : null },
+      // Disabling gives the seat back; re-enabling, a held admission's release included, takes it.
+      await this.seatChanges.movingMember({
+        transaction: tx,
+        organizationId,
+        userId,
+        cause: disabled ? "disabled" : "enabled",
+        actorUserId: input.actorUserId ?? null,
+        write: () =>
+          tx.organizationUser.update({
+            where: { userId_organizationId: { userId, organizationId } },
+            data: { disabledAt: disabled ? new Date() : null },
+          }),
       });
     });
   }
@@ -2060,14 +2115,22 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         currentRole: currentMember.role,
       });
 
-      await tx.organizationUser.update({
-        where: {
-          userId_organizationId: {
-            userId,
-            organizationId,
-          },
-        },
-        data: { role },
+      await this.seatChanges.movingMember({
+        transaction: tx,
+        organizationId,
+        userId,
+        cause: "role_changed",
+        actorUserId: input.currentUserId ?? null,
+        write: () =>
+          tx.organizationUser.update({
+            where: {
+              userId_organizationId: {
+                userId,
+                organizationId,
+              },
+            },
+            data: { role },
+          }),
       });
 
       plans.push(await planOrganizationSeatBinding({ tx, organizationId, userId, role }));
@@ -2163,10 +2226,21 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       });
     } catch (error) {
       if (previousRole !== role) {
-        await this.prisma.organizationUser.updateMany({
-          where: { organizationId, userId, role },
-          data: { role: previousRole },
-        });
+        // The seat goes back with the role, so the change recorded above is undone too.
+        await this.prisma.$transaction((transaction) =>
+          this.seatChanges.movingMember({
+            transaction,
+            organizationId,
+            userId,
+            cause: "role_changed",
+            actorUserId: input.currentUserId ?? null,
+            write: () =>
+              transaction.organizationUser.updateMany({
+                where: { organizationId, userId, role },
+                data: { role: previousRole },
+              }),
+          }),
+        );
       }
       throw error;
     }

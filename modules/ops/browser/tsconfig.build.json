@@ -48,6 +48,9 @@
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {

@@ -5,6 +5,7 @@ import type { OrganizationSettingsCipher } from "../organization.repository.ts";
 import { PrismaGroupRepository } from "./prisma.group.repository.ts";
 import { PrismaOrganizationInviteRepository } from "./prisma.organization-invite.repository.ts";
 import { PrismaOrganizationMembershipRepository } from "./prisma.organization-membership.repository.ts";
+import { PrismaOrganizationSeatPeakRepository } from "./prisma.organization-seat-peak.repository.ts";
 import { PrismaOrganizationSeatRepository } from "./prisma.organization-seat.repository.ts";
 import { PrismaOrganizationUserDirectoryRepository } from "./prisma.organization-user-directory.repository.ts";
 import { PrismaOrganizationRepository } from "./prisma.organization.repository.ts";
@@ -40,6 +41,7 @@ export const PostgresOrganizationRepositories = {
     signUpPolicy: PrismaSignUpPolicyRepository.create(prisma),
     invite: PrismaOrganizationInviteRepository.create({ database: prisma }),
     seats: PrismaOrganizationSeatRepository.create(prisma),
+    seatPeak: PrismaOrganizationSeatPeakRepository.create(prisma),
     userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),
   }),
 };
