@@ -30,27 +30,37 @@ func main() {
 		os.Exit(2)
 	}
 
-	result, err := matrixseed.Run(context.Background(), matrixseed.Options{
+	os.Exit(seed(context.Background(), matrixseed.Options{
 		BaseURL:          *baseURL,
 		InstanceAdminKey: os.Getenv("LANGWATCH_INSTANCE_ADMIN_API_KEY"),
 		Env:              os.Getenv,
-	})
+	}, files{env: *envFile, output: *outputFile}))
+}
+
+// files are the runner files the seed appends to: GITHUB_ENV and GITHUB_OUTPUT.
+type files struct{ env, output string }
+
+// seed runs the seed and writes its files, returning the exit code. The
+// bootstrapped output is written only after the project key is exported.
+func seed(ctx context.Context, opts matrixseed.Options, out files) int {
+	result, err := matrixseed.Run(ctx, opts)
 	if err != nil {
 		fmt.Printf("::error::the gateway-matrix seed could not provision its project: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
-	if err := writeExports(*envFile, result.Exports); err != nil {
+	if err := writeExports(out.env, result.Exports); err != nil {
 		fmt.Printf("::error::could not export the seeded keys: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
-	if err := writeBootstrapped(*outputFile); err != nil {
+	if err := writeBootstrapped(out.output); err != nil {
 		fmt.Printf("::error::could not set the bootstrapped step output: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	matrixseed.Report(os.Stdout, result)
 	if result.Err() != nil {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func writeExports(path string, exports []matrixseed.Export) error {

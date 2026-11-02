@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/langwatch/langwatch/tools/matrixseed"
 )
 
+// TestWriteExportsAppendsToTheEnvFile keeps what the env file already held.
 func TestWriteExportsAppendsToTheEnvFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "github_env")
 	if err := os.WriteFile(path, []byte("EARLIER=1\n"), 0o600); err != nil {
@@ -25,6 +30,7 @@ func TestWriteExportsAppendsToTheEnvFile(t *testing.T) {
 	}
 }
 
+// TestWriteExportsRefusesAValueWithALineBreak stops a value injecting a variable.
 func TestWriteExportsRefusesAValueWithALineBreak(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "github_env")
 	if err := writeExports(path, []matrixseed.Export{{Name: "TEST_VK_OPENAI", Value: "a\nINJECTED=1"}}); err == nil {
@@ -32,6 +38,7 @@ func TestWriteExportsRefusesAValueWithALineBreak(t *testing.T) {
 	}
 }
 
+// TestEnvOrFallsBackOnlyWhenUnset reads a set variable over the fallback.
 func TestEnvOrFallsBackOnlyWhenUnset(t *testing.T) {
 	t.Setenv("MATRIXSEED_TEST_VALUE", "")
 	if got := envOr("MATRIXSEED_TEST_VALUE", "fallback"); got != "fallback" {
@@ -43,6 +50,7 @@ func TestEnvOrFallsBackOnlyWhenUnset(t *testing.T) {
 	}
 }
 
+// TestWriteBootstrappedAppendsTheStepOutput appends bootstrapped=true to the output file.
 /** @scenario "The gateway and matrix run only once the seed has bootstrapped" */
 func TestWriteBootstrappedAppendsTheStepOutput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "github_output")
@@ -61,8 +69,29 @@ func TestWriteBootstrappedAppendsTheStepOutput(t *testing.T) {
 	}
 }
 
+// TestWriteBootstrappedWithNoPathWritesNothing treats no path as no output.
 func TestWriteBootstrappedWithNoPathWritesNothing(t *testing.T) {
 	if err := writeBootstrapped(""); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRefusedBootstrapWritesNoBootstrappedOutput leaves the gateway and matrix
+// steps gated off when the control plane refuses the organization.
+/** @scenario "The gateway and matrix run only once the seed has bootstrapped" */
+func TestRefusedBootstrapWritesNoBootstrappedOutput(t *testing.T) {
+	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "no", http.StatusForbidden)
+	}))
+	t.Cleanup(refusing.Close)
+	dir := t.TempDir()
+	envFile, outputFile := filepath.Join(dir, "github_env"), filepath.Join(dir, "github_output")
+	opts := matrixseed.Options{BaseURL: refusing.URL, InstanceAdminKey: "admin", Env: func(string) string { return "" }}
+	if code := seed(context.Background(), opts, files{env: envFile, output: outputFile}); code != 1 {
+		t.Fatalf("a refused bootstrap must fail the step, got exit %d", code)
+	}
+	got, _ := os.ReadFile(outputFile)
+	if strings.Contains(string(got), "bootstrapped") {
+		t.Fatalf("a refused bootstrap wrote %q to the step output", got)
 	}
 }

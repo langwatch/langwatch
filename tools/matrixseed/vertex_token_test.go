@@ -26,9 +26,13 @@ func tokenServer(t *testing.T, pub *rsa.PublicKey, status int) *httptest.Server 
 			return
 		}
 		parts := strings.Split(r.Form.Get("assertion"), ".")
-		sig, _ := base64.RawURLEncoding.DecodeString(parts[len(parts)-1])
+		if len(parts) != 3 {
+			http.Error(w, "not a JWT", http.StatusBadRequest)
+			return
+		}
+		sig, _ := base64.RawURLEncoding.DecodeString(parts[2])
 		sum := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
-		if len(parts) != 3 || rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig) != nil {
+		if rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig) != nil {
 			http.Error(w, "bad signature", http.StatusUnauthorized)
 			return
 		}
@@ -112,6 +116,9 @@ func TestRunWarnsAndExportsNoTokenWhenTheExchangeIsRefused(t *testing.T) {
 	}
 	if len(result.Warnings) != 1 || !strings.Contains(result.Warnings[0], "Vertex cache cell skips") {
 		t.Fatalf("want one warning that the cell skips, got %v", result.Warnings)
+	}
+	if strings.Contains(result.Warnings[0], "ya29.minted") || !strings.Contains(result.Warnings[0], "HTTP 403") {
+		t.Fatalf("the warning must keep the status and drop the endpoint's body: %s", result.Warnings[0])
 	}
 	if result.Err() != nil {
 		t.Fatalf("a refused exchange only skips a cell, it does not fail the seed: %v", result.Err())

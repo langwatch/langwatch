@@ -42,6 +42,7 @@ func TestRefusedModelProviderPutNeverPrintsTheBody(t *testing.T) {
 	}
 }
 
+/** @scenario "A refused request never prints a submitted secret" */
 func TestRefusedOtherCallRedactsSubmittedSecrets(t *testing.T) {
 	c := &client{base: echoServer(t).URL, http: http.DefaultClient, token: "instance-admin-token"}
 	name := "name-" + multiLineKey
@@ -60,6 +61,7 @@ func TestRefusedOtherCallRedactsSubmittedSecrets(t *testing.T) {
 	}
 }
 
+/** @scenario "A refused request never prints a submitted secret" */
 func TestSnippetRemovesJSONEscapedForms(t *testing.T) {
 	got := snippet([]byte(`{"k":"-----BEGIN\nMIIE\"x\""}`), []string{"-----BEGIN\nMIIE\"x\""})
 	if strings.Contains(got, "MIIE") {
