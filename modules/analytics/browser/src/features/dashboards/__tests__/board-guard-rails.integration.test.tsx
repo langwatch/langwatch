@@ -277,7 +277,7 @@ describe("given a board saved before the v2 templates, with its own widget code"
       version: 1 as const,
       code: [
         "export default function Widget() {",
-        '  const n = LW.useQuery("main").data?.[0]?.n ?? 0;',
+        '  const n = LW.useChartQuery("main", {}).data?.[0]?.n ?? 0;',
         '  return <span>{"$" + Number(n).toFixed(0)}</span>;',
         "}",
       ].join("\n"),
