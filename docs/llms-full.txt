@@ -35865,7 +35865,7 @@ LangWatch does not schedule runs itself: a run plan has no schedule or cron sett
 
 A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards.
 
-You declare them on the connected agent in the SDK. In Python, decorate the functions with `@support_agent.scenario.setup` and `@support_agent.scenario.teardown`, where `support_agent` is the agent function you decorated with `@langwatch.connect_agent`. In TypeScript, call `supportAgent.scenario.setup(...)` and `supportAgent.scenario.teardown(...)`, where `supportAgent` is what `connectAgent(...)` returns. A setup hook receives the run and the run parameters, and returns the scenario state as a dictionary. A teardown hook receives the run, that state and the run parameters, and removes the data. See [Connect your agent](/agent-testing/connect-your-agent).
+You declare them on the connected agent in the SDK. For the arguments, what happens when a hook fails and the limits, see [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks).
 
 Give each run its own names for the data it makes, such as a trace name or an order reference with the run id in it. Runs of one plan share a project, so counting "every trace named `checkout`" includes what other runs left behind. Traces have no delete route, so teardown cannot remove them; give each run its own trace name so counts stay exact.
 
@@ -36078,7 +36078,7 @@ def refund_total(thread_id: str) -> float:
 
 Call it after the turn, next to `state_of_world`. Then attach an Exact Match evaluator to the [test suite](/agent-testing/evaluators):
 
-1. Run the scenario once first. The tool calls picker lists every span name the project has seen, not only tool spans. A span name shows only after a run has produced it, so `refund_total` is not there before that.
+1. Run the scenario once first. The tool calls picker lists every span name the project has seen, not only tool spans. Only a span reported with `type="tool"` answers a tool call mapping, so a name from any other span never resolves. A span name shows only after a run has produced it, so `refund_total` is not there before that.
 2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
 3. Set `expected_output` to the literal `49.95`. Type `49.95`, then click **Use "49.95" as value**.
 
@@ -36111,7 +36111,7 @@ Compare one fact, not the whole `state_of_world` object, because a whole-object 
 ## Caveats
 
 - **Keep the facts short and flat.** The judge reads a digest of the trace. A large trace becomes a structure-only tree that the judge has to expand, and a repeated long string is shown once. A few scalar facts read the same at any trace size.
-- **Clean up after the run.** Declare a teardown hook to remove the data a run made, as [Build a scenario suite](/agent-testing/build-a-scenario-suite#isolate-scenarios-with-setup-and-teardown-hooks) shows. The hook gets the scenario state, not the session or thread id, so return the seeded ids as state with `AgentReply(..., state={...})`, or seed in a setup hook. A teardown does not run if the agent process dies, so also delete test data older than a few hours on a schedule, found by the test flag.
+- **Clean up after the run.** Declare a teardown hook to remove the data a run made, as [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks) shows. The hook gets the scenario state, not the session or thread id, so return the seeded ids as state with `AgentReply(..., state={...})`, or seed in a setup hook. A teardown does not run if the agent process dies, so also delete test data older than a few hours on a schedule, found by the test flag.
 - **Seed in development or staging only.** Never seed test data in production.
 - **Self-hosted: run langevals.** Exact Match runs in langevals. If langevals is not running, the evaluator errors, and a required one fails the run.
 - **Background work is not covered.** The span reports the state when the function returns. Work that continues after the call, such as a queued job, is not in it.
