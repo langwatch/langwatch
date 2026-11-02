@@ -48,6 +48,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -475,10 +476,23 @@ func (e *Executor) childEnv() []string {
 			env = append(env, name+"="+v)
 		}
 	}
-	if e.mode == hideVisibleProcess {
-		env = append(env, hideModeEnvVar+"=best-effort")
-	}
 	return env
+}
+
+// runEnv is the final environment of the interpreter. The hide flag is
+// stripped from everything else and added last, so only the engine's own
+// mode can ever tell the runner to skip its hide step.
+func runEnv(env []string, mode hideMode) []string {
+	out := make([]string, 0, len(env)+1)
+	for _, kv := range env {
+		if !strings.HasPrefix(kv, hideModeEnvVar+"=") {
+			out = append(out, kv)
+		}
+	}
+	if mode == hideVisibleProcess {
+		out = append(out, hideModeEnvVar+"=best-effort")
+	}
+	return out
 }
 
 // sandboxCredential names the LangWatch variables user code reads, or nothing.
@@ -528,7 +542,7 @@ func runnerEnv(credential map[string]string, runDir, token string) map[string]st
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if e.mode == hideDisabled {
-		return &Result{Error: &Error{Type: RunnerErrorType, Message: "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; set " + AllowVisibleProcessSetting + "=true to run them anyway (AWS Lambda only)"}}, nil
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; on AWS Lambda only, " + AllowVisibleProcessSetting + "=true runs them anyway"}}, nil
 	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape
@@ -602,7 +616,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// see childEnv. What the run itself carries — secrets, its credential, its
 	// token, its directory — travels in the payload and is put into the
 	// environment by the runner, where another execution cannot read it.
-	cmd.Env = append(e.childEnv(), e.payload.channelEnv()...)
+	cmd.Env = runEnv(append(e.childEnv(), e.payload.channelEnv()...), e.mode)
 	// Started outside the run's directory, and the runner moves into it from
 	// the payload before any user code runs. A working directory is readable
 	// from /proc in the moment before the runner is hidden, so starting in the

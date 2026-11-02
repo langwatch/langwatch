@@ -327,8 +327,8 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 	}
 }
 
-// The helper test below proves the rule; this proves the executor is built
-// from it, so passing the raw setting through would turn this red.
+// The table test below owns the rule and its warning; this proves the options
+// are built from it, so passing the raw setting through would turn this red.
 // @scenario "the engine warns when the visible-process setting is ignored off Lambda"
 func TestCodeExecutorOptions_IgnoreVisibleProcessSettingOffLambda(t *testing.T) {
 	t.Setenv("NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS", "true")
@@ -340,7 +340,7 @@ func TestCodeExecutorOptions_IgnoreVisibleProcessSettingOffLambda(t *testing.T) 
 	opts := codeExecutorOptions(cfg.Engine, func(string) string { return "" }, zap.New(core))
 
 	assert.False(t, opts.AllowVisibleProcess)
-	assert.Len(t, logs.FilterMessage("nlpgo_code_block_allow_visible_process_ignored").All(), 1)
+	assert.NotEmpty(t, logs.FilterMessage("nlpgo_code_block_allow_visible_process_ignored").All())
 }
 
 // @scenario "the engine warns when the visible-process setting is ignored off Lambda"

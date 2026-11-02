@@ -183,8 +183,7 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, l
 	return codeblock.New(codeExecutorOptions(engineCfg, getenv, logger))
 }
 
-// codeExecutorOptions is the knob-to-option mapping on its own, so a test can
-// read what the executor is handed without a new accessor on the executor.
+// codeExecutorOptions maps the operator's engine config to executor options.
 func codeExecutorOptions(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) codeblock.Options {
 	return codeblock.Options{
 		Logger: logger,

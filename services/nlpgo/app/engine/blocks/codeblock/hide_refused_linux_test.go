@@ -5,6 +5,7 @@ package codeblock_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -23,8 +24,10 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 // Lambda's seccomp answers EPERM to prctl(PR_SET_DUMPABLE). A filter cannot be
@@ -205,7 +208,7 @@ func runExecutorCase(t *testing.T, name string) {
 		require.NotNil(t, res)
 		require.NotNil(t, res.Error)
 		assert.Contains(t, res.Error.Message, codeblock.AllowVisibleProcessSetting)
-		assertHTTPBlockStillRuns(t)
+		assertOtherBlocksRunThroughEngine(t, exe)
 	default:
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
@@ -214,20 +217,55 @@ func runExecutorCase(t *testing.T, name string) {
 	}
 }
 
-// assertHTTPBlockStillRuns proves a block type other than code keeps serving in
-// this same refused process.
-func assertHTTPBlockStillRuns(t *testing.T) {
+// assertOtherBlocksRunThroughEngine builds an engine around this refused
+// executor and runs a code node and an HTTP node as Studio component runs: the
+// code node carries the error that names the setting while the HTTP node
+// still answers.
+func assertOtherBlocksRunThroughEngine(t *testing.T, exe *codeblock.Executor) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"ok":"yes"}`))
 	}))
 	defer srv.Close()
-	exe := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}},
+	eng := engine.New(engine.Options{
+		Code: exe,
+		HTTP: httpblock.New(httpblock.Options{SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}}}),
 	})
-	res, err := exe.Execute(context.Background(), httpblock.Request{URL: srv.URL, Method: "GET", OutputPath: "$.ok"})
-	require.NoError(t, err)
-	assert.Equal(t, "yes", res.Output)
+	field := func(id, typ string, value any) dsl.Field {
+		raw, err := json.Marshal(value)
+		require.NoError(t, err)
+		return dsl.Field{Identifier: id, Type: dsl.FieldType(typ), Value: raw}
+	}
+	wf := &dsl.Workflow{
+		WorkflowID: "hide-refused",
+		Nodes: []dsl.Node{
+			{ID: "code-1", Type: dsl.ComponentCode, Data: dsl.Component{
+				Parameters: []dsl.Field{field("code", "code", trivialBlock)},
+				Outputs:    []dsl.Field{{Identifier: "answer", Type: dsl.FieldTypeStr}},
+			}},
+			{ID: "http-1", Type: dsl.ComponentHTTP, Data: dsl.Component{
+				Parameters: []dsl.Field{
+					field("url", "str", srv.URL),
+					field("method", "str", "GET"),
+					field("output_path", "str", "$.ok"),
+				},
+			}},
+		},
+	}
+	run := func(nodeID string) *engine.NodeState {
+		res, err := eng.Execute(context.Background(), engine.ExecuteRequest{Workflow: wf, NodeID: nodeID, Inputs: map[string]any{}})
+		require.NoError(t, err)
+		require.Contains(t, res.Nodes, nodeID)
+		return res.Nodes[nodeID]
+	}
+
+	codeState := run("code-1")
+	require.NotNil(t, codeState.Error)
+	assert.Contains(t, codeState.Error.Message, codeblock.AllowVisibleProcessSetting)
+
+	httpState := run("http-1")
+	require.Nil(t, httpState.Error, "the HTTP node must not be touched by the disabled code executor")
+	assert.Equal(t, "yes", httpState.Outputs["value"])
 }
 
 // assertHideModeLogged checks the one operator-facing record of the mode:
