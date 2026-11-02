@@ -428,7 +428,8 @@ await it("shows the launcher only on tracing pages, and its wheel stays put", as
           "api-reference/coding-agents/overview",
           "self-hosting/overview",
         ]) {
-          await page.goto(base + slug);
+          const response = await page.goto(base + slug);
+          assert.equal(response?.status(), 200, `${slug} must be a real page`);
           assert.equal(await page.locator(".docs-left-rail .docs-agent-launcher").count(), 0, slug);
         }
         await page.goto(base + "integration/quick-start");

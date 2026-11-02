@@ -45,6 +45,20 @@ function loadVendorTags({ win }: { win: TagWindow }) {
 
 const armed = new WeakSet<TagWindow>();
 
+function loadTags({ win, id }: { win: TagWindow; id: string }) {
+  win.dataLayer = win.dataLayer ?? [];
+  win.dataLayer.push(TAG_RESTRICTIONS);
+  // The performance clock gives epoch milliseconds without pulling Temporal into this island.
+  const epochMilliseconds = Math.round(performance.timeOrigin + performance.now());
+  win.dataLayer.push({ "gtm.start": epochMilliseconds, event: "gtm.js" });
+  const script = win.document.createElement("script");
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(id)}`;
+  win.document.head.append(script);
+  loadPostHog({ win });
+  loadVendorTags({ win });
+}
+
 /** Starts the tag manager here once another tab stores the reader's acceptance. */
 function startOnConsent({ win }: { win: TagWindow }) {
   const onStorage = (event: StorageEvent) => {
@@ -70,17 +84,10 @@ export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
     if (started) return;
     started = true;
     for (const name of INTERACTIONS) win.removeEventListener(name, start);
-    win.dataLayer = win.dataLayer ?? [];
-    win.dataLayer.push(TAG_RESTRICTIONS);
-    // The performance clock gives epoch milliseconds without pulling Temporal into this island.
-    const epochMilliseconds = Math.round(performance.timeOrigin + performance.now());
-    win.dataLayer.push({ "gtm.start": epochMilliseconds, event: "gtm.js" });
-    const script = win.document.createElement("script");
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(id)}`;
-    win.document.head.append(script);
-    loadPostHog({ win });
-    loadVendorTags({ win });
+    /* The reader may have declined in another tab while the load waited: wait for consent again. */
+    if (analyticsConsented({ win })) return loadTags({ win, id });
+    armed.delete(win);
+    startOnConsent({ win });
   };
   for (const name of INTERACTIONS) win.addEventListener(name, start, { once: true, passive: true });
   const idle = () =>
