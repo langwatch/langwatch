@@ -68,6 +68,31 @@ describe("given a member opens Insights", () => {
   });
 });
 
+describe("given an insight in the owner's inbox", () => {
+  describe("when the owner selects and pastes its text", () => {
+    /** @scenario "An owner can share an insight by selecting and pasting its text" */
+    it("keeps the insight text available on the card", async () => {
+      renderWithInsightHost({
+        element: <InsightsScreen />,
+        answer: project({
+          entries: [
+            insightEntry({
+              title: "Checkout errors doubled",
+              body: "Checkout errors doubled overnight: 240 failed against 118 the day before.",
+              seenAt: NOW,
+            }),
+          ],
+        }).answer,
+      });
+
+      expect(await screen.findByText("Checkout errors doubled")).toBeInTheDocument();
+      expect(
+        screen.getByText("Checkout errors doubled overnight: 240 failed against 118 the day before."),
+      ).toBeInTheDocument();
+    });
+  });
+});
+
 describe("given 2 unseen insights in the inbox", () => {
   describe("when the reader opens the Inbox folder, leaves it and comes back", () => {
     /** @scenario "Opening a folder marks what it shows as seen, once" */

@@ -422,3 +422,9 @@ Feature: The insights inbox
 
   Rule: Sharing an insight
     Until a share action exists, an owner shares an insight by selecting and pasting its text.
+
+    @integration
+    Scenario: An owner can share an insight by selecting and pasting its text
+      Given an insight in the owner's inbox
+      When the owner selects and pastes its text
+      Then the insight text is available to select and paste
