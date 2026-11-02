@@ -351,6 +351,7 @@ func TestAllowVisibleProcess_OnlyOnLambda(t *testing.T) {
 	}
 }
 
+/** @scenario "the engine warns when the visible-process setting is ignored off Lambda" */
 func TestAllowVisibleProcess_WarnsWhenTheSettingIsIgnoredOffLambda(t *testing.T) {
 	lambdaEnv := map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn", "AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}
 	cases := []struct {
@@ -367,12 +368,9 @@ func TestAllowVisibleProcess_WarnsWhenTheSettingIsIgnoredOffLambda(t *testing.T)
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, key := range []string{"AWS_LAMBDA_FUNCTION_NAME", "AWS_LAMBDA_RUNTIME_API"} {
-				t.Setenv(key, tc.env[key])
-			}
 			core, logs := observer.New(zapcore.DebugLevel)
 
-			got := allowVisibleProcess(tc.setting, os.Getenv, zap.New(core))
+			got := allowVisibleProcess(tc.setting, func(k string) string { return tc.env[k] }, zap.New(core))
 
 			assert.Equal(t, tc.honored, got)
 			entries := logs.FilterMessage("nlpgo_code_block_allow_visible_process_ignored").All()
@@ -382,7 +380,7 @@ func TestAllowVisibleProcess_WarnsWhenTheSettingIsIgnoredOffLambda(t *testing.T)
 			}
 			require.Len(t, entries, 1)
 			assert.Equal(t, zapcore.WarnLevel, entries[0].Level)
-			assert.Equal(t, "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS", entries[0].ContextMap()["setting"])
+			assert.Equal(t, codeblock.DefaultAllowVisibleProcessSetting, entries[0].ContextMap()["setting"])
 		})
 	}
 }

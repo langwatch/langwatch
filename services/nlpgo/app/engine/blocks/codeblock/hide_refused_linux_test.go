@@ -30,7 +30,7 @@ import (
 
 const (
 	caseEnv      = "NLPGO_TEST_HIDE_CASE"
-	settingName  = "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
+	settingName  = codeblock.DefaultAllowVisibleProcessSetting
 	hideModeEnv  = "NLPGO_CODE_BLOCK_HIDE"
 	skipExitCode = 77
 	childTimeout = 90 * time.Second
@@ -127,26 +127,28 @@ func runChild(t *testing.T, name string, extra ...string) {
 	require.NoError(t, err, "child case %s failed:\n%s", name, out.String())
 }
 
-/** @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode" */
+/**
+ * @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode"
+ * @scenario "the engine reports its hide mode once at start-up"
+ */
 func TestHideRefused_StrictWhenPlatformAllowsIt(t *testing.T) {
 	runChild(t, "not-refused")
 }
 
-/** @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed" */
+/**
+ * @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed"
+ * @scenario "the engine reports its hide mode once at start-up"
+ */
 func TestHideRefused_VisibleProcessWhenAllowed(t *testing.T) {
 	runChild(t, "refused-allowed")
 }
 
-/** @scenario "a platform that refuses the hide step serves no code blocks unless visible-process is allowed" */
+/**
+ * @scenario "a platform that refuses the hide step serves no code blocks unless visible-process is allowed"
+ * @scenario "the engine reports its hide mode once at start-up"
+ */
 func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
 	runChild(t, "refused-unset")
-}
-
-/** @scenario "the engine reports its hide mode once at start-up" */
-func TestHideRefused_LogsTheModeItChose(t *testing.T) {
-	for _, name := range []string{"not-refused", "refused-allowed", "refused-unset"} {
-		t.Run(name, func(t *testing.T) { runChild(t, name) })
-	}
 }
 
 func TestHideRefused_DisabledMessageNamesTheVariableWhenTheOptionIsOmitted(t *testing.T) {
@@ -214,7 +216,7 @@ func runExecutorCase(t *testing.T, name string) {
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Error)
-		assert.Contains(t, res.Error.Message, settingName)
+		assert.Contains(t, res.Error.Message, codeblock.DefaultAllowVisibleProcessSetting)
 	default:
 		require.NoError(t, runErr)
 		require.NotNil(t, res)

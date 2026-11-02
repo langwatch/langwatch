@@ -190,14 +190,10 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, l
 			engineCfg.LangWatchBaseURL,
 			getenv,
 		),
-		DefaultTimeout:             resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
-		AllowVisibleProcess:        allowVisibleProcess(engineCfg.CodeBlockAllowVisibleProcess, getenv, logger),
-		AllowVisibleProcessSetting: allowVisibleProcessSetting,
+		DefaultTimeout:      resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
+		AllowVisibleProcess: allowVisibleProcess(engineCfg.CodeBlockAllowVisibleProcess, getenv, logger),
 	})
 }
-
-// allowVisibleProcessSetting is the full name of EngineConfig.CodeBlockAllowVisibleProcess.
-const allowVisibleProcessSetting = codeblock.DefaultAllowVisibleProcessSetting
 
 // allowVisibleProcess honors the setting only on AWS Lambda, the one platform
 // whose seccomp refuses the hide step; elsewhere it is ignored with a warning.
@@ -205,7 +201,7 @@ func allowVisibleProcess(setting bool, getenv func(string) string, logger *zap.L
 	onLambda := getenv("AWS_LAMBDA_FUNCTION_NAME") != "" && getenv("AWS_LAMBDA_RUNTIME_API") != ""
 	if setting && !onLambda {
 		logger.Warn("nlpgo_code_block_allow_visible_process_ignored",
-			zap.String("setting", allowVisibleProcessSetting),
+			zap.String("setting", codeblock.DefaultAllowVisibleProcessSetting),
 			zap.String("hint", "only honored on AWS Lambda; elsewhere the hide step stays required"))
 	}
 	return setting && onLambda

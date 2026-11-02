@@ -503,3 +503,18 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When a code block runs
       Then the result carries an error that names NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS
       And the other block types keep working
+
+    @unit
+    Scenario: the engine reports its hide mode once at start-up
+      Given a platform that accepts, refuses with visible-process allowed, or refuses without it
+      When the code block executor is built
+      Then exactly one nlpgo_code_block_hide_mode record carries the mode
+      And the record is at info when the mode is strict and at warn otherwise
+
+    @unit
+    Scenario: the engine warns when the visible-process setting is ignored off Lambda
+      Given visible-process mode is allowed by the setting
+      And the process is not running on AWS Lambda
+      When the code block executor is built
+      Then the setting is ignored and the hide step stays required
+      And one warning names NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS
