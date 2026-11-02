@@ -201,7 +201,7 @@ func runExecutorCase(t *testing.T, name string) {
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Error)
-		assert.Contains(t, res.Error.Message, codeblock.DefaultAllowVisibleProcessSetting)
+		assert.Contains(t, res.Error.Message, codeblock.AllowVisibleProcessSetting)
 	default:
 		require.NoError(t, runErr)
 		require.NotNil(t, res)

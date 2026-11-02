@@ -201,7 +201,7 @@ func allowVisibleProcess(setting bool, getenv func(string) string, logger *zap.L
 	onLambda := getenv("AWS_LAMBDA_FUNCTION_NAME") != "" && getenv("AWS_LAMBDA_RUNTIME_API") != ""
 	if setting && !onLambda {
 		logger.Warn("nlpgo_code_block_allow_visible_process_ignored",
-			zap.String("setting", codeblock.DefaultAllowVisibleProcessSetting),
+			zap.String("setting", codeblock.AllowVisibleProcessSetting),
 			zap.String("hint", "only honored on AWS Lambda; elsewhere the hide step stays required"))
 	}
 	return setting && onLambda

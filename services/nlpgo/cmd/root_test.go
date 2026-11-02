@@ -380,7 +380,7 @@ func TestAllowVisibleProcess_WarnsWhenTheSettingIsIgnoredOffLambda(t *testing.T)
 			}
 			require.Len(t, entries, 1)
 			assert.Equal(t, zapcore.WarnLevel, entries[0].Level)
-			assert.Equal(t, codeblock.DefaultAllowVisibleProcessSetting, entries[0].ContextMap()["setting"])
+			assert.Equal(t, codeblock.AllowVisibleProcessSetting, entries[0].ContextMap()["setting"])
 		})
 	}
 }

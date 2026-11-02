@@ -179,9 +179,9 @@ type Executor struct {
 	mode hideMode
 }
 
-// DefaultAllowVisibleProcessSetting is the operator variable the disabled-mode
-// error names when the caller does not say which one it read.
-const DefaultAllowVisibleProcessSetting = "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
+// AllowVisibleProcessSetting is the operator variable that lets code blocks run
+// when the hide step is refused (AWS Lambda only).
+const AllowVisibleProcessSetting = "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
 
 // hideMode says how the engine's own /proc files are protected.
 type hideMode string
@@ -528,7 +528,7 @@ func runnerEnv(credential map[string]string, runDir, token string) map[string]st
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if e.mode == hideDisabled {
-		return &Result{Error: &Error{Type: RunnerErrorType, Message: "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; set " + DefaultAllowVisibleProcessSetting + "=true to run them anyway (AWS Lambda only)"}}, nil
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; set " + AllowVisibleProcessSetting + "=true to run them anyway (AWS Lambda only)"}}, nil
 	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape
