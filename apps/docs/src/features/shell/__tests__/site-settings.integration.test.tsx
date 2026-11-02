@@ -44,7 +44,7 @@ describe("when docs.json has a banner", () => {
     expect(html).toContain('aria-label="Announcement"');
     expect(html).toContain('data-docs-banner="announcement:abc"');
     expect(html).toMatch(/<strong><a[^>]+href="\/skills\/directory"[^>]*>Skills<\/a>:<\/strong>/);
-    expect(html).toContain("data-docs-dismiss");
+    expect(html).toContain('data-docs-dismiss=""');
     expect(html).toContain("data-docs-dismissible");
   });
 
@@ -53,7 +53,8 @@ describe("when docs.json has a banner", () => {
     const html = render(
       <SiteAnnouncement announcement={{ id: "announcement:abc", content, dismissible: false }} />,
     );
-    expect(html).not.toContain("data-docs-dismiss");
+    expect(html).not.toContain('data-docs-dismiss=""');
+    expect(html).not.toContain("data-docs-dismissible");
     expect(render(<SiteAnnouncement announcement={null} />)).toBe("");
   });
 });
