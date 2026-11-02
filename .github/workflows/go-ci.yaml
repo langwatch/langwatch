@@ -341,9 +341,8 @@ jobs:
       - name: Generated READMEs are current
         run: pnpm check:readmes
 
-  # The single required status check. Every job above is `if:`-gated and so
-  # cannot be required directly — a skipped job never reports, and branch
-  # protection would wait forever. This one always runs and consolidates them.
+  # Consolidates every `if:`-gated job above into one result for pr.yml's
+  # ci-complete, which is the required verdict.
   go-ci-complete:
     needs: [changes, build, test, lint, vet, generated, ci-guards]
     if: always()

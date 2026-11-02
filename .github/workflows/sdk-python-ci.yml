@@ -373,7 +373,7 @@ jobs:
         working-directory: sdks/python
         run: uv run python -m build
 
-  # One required check for the whole workflow. Reports success if every
+  # One result for pr.yml's ci-complete, the required verdict. Reports success if every
   # upstream job either passed or was legitimately skipped (paths didn't
   # match). Reports failure if any upstream job failed. Uses `alls-green`
   # because GitHub's default `needs:` semantics treat skipped needs as

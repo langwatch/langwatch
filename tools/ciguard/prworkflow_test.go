@@ -44,7 +44,11 @@ func prTree(t *testing.T, edit func(name, content string) string) string {
 	skips := strings.Builder{}
 	skips.WriteString("settle, checks, ")
 	for _, call := range PRCalls {
-		write(filepath.Join(ciscan.WorkflowDir, call.File), fmt.Sprintf(calledWorkflow, call.Key))
+		called := fmt.Sprintf(calledWorkflow, call.Key)
+		if call.OnMainPush {
+			called = strings.Replace(called, "  workflow_dispatch:\n", "  push:\n    branches: [main]\n  workflow_dispatch:\n", 1)
+		}
+		write(filepath.Join(ciscan.WorkflowDir, call.File), called)
 		fmt.Fprintf(&outputs, "      %[1]s: ${{ steps.filter.outputs.%[1]s || steps.force.outputs.all }}\n", call.Key)
 		fmt.Fprintf(&calls, "  %[1]s:\n    needs: [changes, settle]\n    if: ${{ !cancelled() && needs.changes.outputs.%[1]s == 'true' && needs.settle.result != 'failure' }}\n    uses: ./.github/workflows/%[2]s\n", call.Key, call.File)
 		fmt.Fprintf(&skips, "%s, ", call.Key)
@@ -56,7 +60,9 @@ func prTree(t *testing.T, edit func(name, content string) string) string {
 	write(PRWorkflowFile, "name: pr\non:\n  pull_request:\njobs:\n  changes:\n    outputs:\n"+outputs.String()+
 		"    steps:\n      - run: gh api labels | grep -qx 'ci:now'\n"+
 		"  settle:\n    needs: changes\n    if: needs.changes.outputs.wait == 'true'\n    environment: settle\n"+
-		"  checks:\n    runs-on: ubuntu-latest\n"+calls.String()+
+		"  checks:\n    runs-on: ubuntu-latest\n    steps:\n"+
+		"      - run: ./.github/scripts/check-added-images.sh\n      - run: go run ./cmd/linkcheck README.md\n"+
+		"      - run: node .github/scripts/pr-token-usage.ts\n"+calls.String()+
 		"  ci-complete:\n    steps:\n      - env:\n          RESULTS: >-\n"+results.String()+
 		"          CHANGES: ${{ needs.changes.result }}\n"+
 		"        run: case \"$result\" in success | skipped) state=success ;; esac; [ \"$CHANGES\" = success ] || state=failure\n"+
@@ -240,4 +246,30 @@ func TestPRWorkflowReportsACheckStillOnMain(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, problems, ".github/workflows/e2e-ci.yml: runs on a push to main; the nightly suite runs it")
 	require.Contains(t, problems, NightlyWorkflowFile+": no main-checks job calls "+PRWorkflowFile)
+}
+
+// @scenario "A merge to main runs only the app checks"
+func TestPRWorkflowReportsAppChecksOffMain(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if strings.HasSuffix(name, "langwatch-app-ci.yml") {
+			return strings.Replace(content, "  push:\n    branches: [main]\n", "", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, ".github/workflows/langwatch-app-ci.yml: does not run on a push to main")
+}
+
+// @scenario "The cheap checks run at once"
+func TestPRWorkflowReportsACheapCheckDropped(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "      - run: go run ./cmd/linkcheck README.md\n", "", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": the checks job does not run cmd/linkcheck")
 }

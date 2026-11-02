@@ -22,6 +22,7 @@ const ABSORBED: Record<string, string[]> = {
   "migration-compat.yml": ["pull_request", "workflow_dispatch"],
   "npx-server-smoke.yml": ["workflow_dispatch", "push"],
   "gateway-matrix.yaml": ["workflow_dispatch", "pull_request"],
+  "pr.yml": ["pull_request", "merge_group"],
 };
 
 void describe("given the nightly workflow", () => {

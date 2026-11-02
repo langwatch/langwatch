@@ -285,8 +285,27 @@ func settleProblems(pr *prFile) []string {
 	if !readsLabel {
 		problems = append(problems, PRWorkflowFile+": the changes job does not read the ci:now label")
 	}
-	if slices.Contains(pr.Jobs[checksJob].Needs, settleJob) {
+
+	return append(problems, cheapChecksProblems(pr)...)
+}
+
+// cheapChecks are what the checks job runs, each once its own workflow.
+var cheapChecks = []string{"check-added-images.sh", "cmd/linkcheck", "pr-token-usage.ts"}
+
+// cheapChecksProblems: the checks job exists, runs each cheap check and does not wait.
+func cheapChecksProblems(pr *prFile) []string {
+	job, ok := pr.Jobs[checksJob]
+	if !ok {
+		return []string{PRWorkflowFile + ": no checks job runs the cheap checks"}
+	}
+	var problems []string
+	if slices.Contains(job.Needs, settleJob) {
 		problems = append(problems, PRWorkflowFile+": the cheap checks wait for a quiet branch")
+	}
+	for _, check := range cheapChecks {
+		if !slices.ContainsFunc(job.Steps, func(step prStep) bool { return strings.Contains(step.Run, check) }) {
+			problems = append(problems, PRWorkflowFile+": the checks job does not run "+check)
+		}
 	}
 
 	return problems
@@ -297,16 +316,17 @@ func settleProblems(pr *prFile) []string {
 func mainProblems(repoRoot string) ([]string, error) {
 	var problems []string
 	for _, call := range PRCalls {
-		if call.OnMainPush {
-			continue
-		}
 		rel := filepath.ToSlash(filepath.Join(ciscan.WorkflowDir, call.File))
 		called, err := loadPRFile(repoRoot, rel)
 		if err != nil {
 			return nil, err
 		}
-		if _, ok := called.On["push"]; ok {
+		_, onPush := called.On["push"]
+		switch {
+		case onPush && !call.OnMainPush:
 			problems = append(problems, rel+": runs on a push to main; the nightly suite runs it")
+		case !onPush && call.OnMainPush:
+			problems = append(problems, rel+": does not run on a push to main")
 		}
 	}
 	nightly, err := loadPRFile(repoRoot, NightlyWorkflowFile)
