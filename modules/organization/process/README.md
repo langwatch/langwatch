@@ -6,7 +6,7 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, seatPeakTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(seatPeakEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:32`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, seatPeakTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(seatPeakEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:31`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -2134,7 +2134,7 @@ type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/persona
 
 ### `organizationSeatPeak`
 
-Contract `../contract/src/seat-peak.ts:60`, router `src/transport/seat-peak.trpc.ts:14`.
+Contract `../contract/src/seat-peak.ts:58`, router `src/transport/seat-peak.trpc.ts:14`.
 
 | Procedure                  | Kind  | Gate                             | Input  | Output                       |
 | -------------------------- | ----- | -------------------------------- | ------ | ---------------------------- |
@@ -2142,11 +2142,11 @@ Contract `../contract/src/seat-peak.ts:60`, router `src/transport/seat-peak.trpc
 
 ```typescript
 // organizationSeatPeak.get
-// Input: inline, ../contract/src/seat-peak.ts:62
+// Input: inline, ../contract/src/seat-peak.ts:60
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof organizationSeatPeakSchema>; // ../contract/src/seat-peak.ts:56
+type Output = z.infer<typeof organizationSeatPeakSchema>; // ../contract/src/seat-peak.ts:54
 ```
 
 ### `team`
