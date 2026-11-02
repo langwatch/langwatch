@@ -18,13 +18,23 @@ export const CONNECTOR_ROWS_MAX_BYTES = 64 * 1024;
 /** The name grammar the secrets UI and the engine use. */
 const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/** UTF-8 size without TextEncoder, which this isomorphic package's lib does not declare. */
+function utf8ByteLength(text: string): number {
+  let bytes = 0;
+  for (const char of text) {
+    const point = char.codePointAt(0) ?? 0;
+    bytes += 1 + Number(point >= 0x80) + Number(point >= 0x800) + Number(point >= 0x10000);
+  }
+  return bytes;
+}
+
 const connectorStepSchemaDefinition = z.object({
   language: z.enum(CONNECTOR_STEP_LANGUAGES),
   code: z
     .string()
     .min(1, "A Connector step needs code.")
     .refine(
-      (code) => new TextEncoder().encode(code).byteLength <= CONNECTOR_CODE_MAX_BYTES,
+      (code) => utf8ByteLength(code) <= CONNECTOR_CODE_MAX_BYTES,
       `A Connector step's code is at most ${CONNECTOR_CODE_MAX_BYTES / 1024} KiB.`,
     ),
   /** The project secrets this step may read; nothing else travels to it. */
