@@ -55,11 +55,11 @@ func seccompNumbers() (seccompNr, prctlNr, auditArch uint32, ok bool) {
 	return 0, 0, 0, false
 }
 
-// refusePrSetDumpable makes every thread of this process answer EPERM to
+// refusePrSetDumpable makes every thread of this process answer refusal to
 // prctl(PR_SET_DUMPABLE) and nothing else: the one Lambda refusal the engine
 // depends on (Lambda also refuses PR_SET_CHILD_SUBREAPER and PR_SET_PDEATHSIG,
 // which the engine tolerates or does not use).
-func refusePrSetDumpable() error {
+func refusePrSetDumpable(refusal syscall.Errno) error {
 	seccompNr, prctlNr, arch, ok := seccompNumbers()
 	if !ok {
 		return fmt.Errorf("unsupported architecture %s", runtime.GOARCH)
@@ -69,8 +69,8 @@ func refusePrSetDumpable() error {
 		jeq   = 0x15 // BPF_JMP | BPF_JEQ | BPF_K
 		ret   = 0x06 // BPF_RET | BPF_K
 		allow = 0x7fff0000
-		eperm = 0x00050000 | 1 // SECCOMP_RET_ERRNO | EPERM
 	)
+	errnoRet := uint32(0x00050000) | uint32(refusal) // SECCOMP_RET_ERRNO | errno
 	prog := []syscall.SockFilter{
 		{Code: ldAbs, K: 4},                   // 0 arch
 		{Code: jeq, Jt: 0, Jf: 4, K: arch},    // 1 other arch -> 6 allow
@@ -79,7 +79,7 @@ func refusePrSetDumpable() error {
 		{Code: ldAbs, K: 16},                  // 4 args[0], the prctl option
 		{Code: jeq, Jt: 1, Jf: 0, K: 4},       // 5 PR_SET_DUMPABLE -> 7 EPERM
 		{Code: ret, K: allow},                 // 6
-		{Code: ret, K: eperm},                 // 7
+		{Code: ret, K: errnoRet},              // 7
 	}
 	fprog := syscall.SockFprog{Len: uint16(len(prog)), Filter: &prog[0]}
 
@@ -153,18 +153,29 @@ func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
 	runChild(t, "refused-unset")
 }
 
+// @scenario "a platform that refuses the hide step with anything but EPERM serves no code blocks"
+func TestHideRefused_DisabledOnAnyOtherRefusal(t *testing.T) {
+	runChild(t, "refused-eacces-allowed")
+}
+
 // @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode"
-func TestHideRefused_RunnerHideStep(t *testing.T) {
+// @scenario "a platform that refuses the hide step with anything but EPERM serves no code blocks"
+func TestHideRefused_RunnerFailsWhenStrict(t *testing.T) {
 	t.Run("given prctl is refused and NLPGO_CODE_BLOCK_HIDE is unset", func(t *testing.T) {
 		t.Run("the runner exits 1 with the prctl message", func(t *testing.T) {
 			runChild(t, "runner-strict")
 		})
 	})
-	t.Run("given prctl is refused and NLPGO_CODE_BLOCK_HIDE is best-effort", func(t *testing.T) {
-		t.Run("the runner gets past the hide step", func(t *testing.T) {
-			runChild(t, "runner-best-effort", hideModeEnv+"=best-effort")
+	t.Run("given prctl is refused with EACCES and NLPGO_CODE_BLOCK_HIDE is best-effort", func(t *testing.T) {
+		t.Run("the runner exits 1 with the prctl message", func(t *testing.T) {
+			runChild(t, "runner-best-effort-other-errno", hideModeEnv+"=best-effort")
 		})
 	})
+}
+
+// @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed"
+func TestHideRefused_RunnerContinuesWhenBestEffort(t *testing.T) {
+	runChild(t, "runner-best-effort", hideModeEnv+"=best-effort")
 }
 
 // TestHideRefusedChild is the child entry point. It does nothing unless the
@@ -177,17 +188,26 @@ func TestHideRefusedChild(t *testing.T) {
 	if name == "not-refused" {
 		exitSkippedIfHostRefusesHide()
 	} else {
-		if err := refusePrSetDumpable(); err != nil {
+		if err := refusePrSetDumpable(refusalFor(name)); err != nil {
 			fmt.Fprintf(os.Stderr, "seccomp install failed: %v\n", err)
 			os.Exit(skipExitCode)
 		}
 	}
 	switch name {
-	case "runner-strict", "runner-best-effort":
+	case "runner-strict", "runner-best-effort", "runner-best-effort-other-errno":
 		runRunnerCase(t, name)
 	default:
 		runExecutorCase(t, name)
 	}
+}
+
+// refusalFor names the errno a case's filter answers: EACCES for the cases
+// about any refusal but Lambda's, EPERM otherwise.
+func refusalFor(name string) syscall.Errno {
+	if strings.Contains(name, "eacces") || strings.HasSuffix(name, "other-errno") {
+		return syscall.EACCES
+	}
+	return syscall.EPERM
 }
 
 // exitSkippedIfHostRefusesHide ends the child with the skip code when this host
@@ -204,7 +224,7 @@ func runExecutorCase(t *testing.T, name string) {
 	t.Helper()
 	core, logs := observer.New(zapcore.DebugLevel)
 	opts := codeblock.Options{
-		AllowVisibleProcess: name == "refused-allowed",
+		AllowVisibleProcess: name == "refused-allowed" || name == "refused-eacces-allowed",
 		Logger:              zap.New(core),
 	}
 	exe, err := codeblock.New(opts)
@@ -219,6 +239,12 @@ func runExecutorCase(t *testing.T, name string) {
 	})
 
 	switch name {
+	case "refused-eacces-allowed":
+		require.NoError(t, runErr)
+		require.NotNil(t, res)
+		require.NotNil(t, res.Error)
+		assert.Contains(t, res.Error.Message, "code blocks are disabled")
+		assert.NotContains(t, res.Error.Message, "prctl(PR_SET_DUMPABLE) failed")
 	case "refused-unset":
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
@@ -321,9 +347,10 @@ func assertHideModeLogged(t *testing.T, logs *observer.ObservedLogs, name string
 		mode  string
 		level zapcore.Level
 	}{
-		"not-refused":     {"strict", zapcore.InfoLevel},
-		"refused-allowed": {"visible-process", zapcore.WarnLevel},
-		"refused-unset":   {"disabled", zapcore.WarnLevel},
+		"not-refused":            {"strict", zapcore.InfoLevel},
+		"refused-allowed":        {"visible-process", zapcore.WarnLevel},
+		"refused-unset":          {"disabled", zapcore.WarnLevel},
+		"refused-eacces-allowed": {"disabled", zapcore.WarnLevel},
 	}[name]
 	entries := logs.FilterMessage("nlpgo_code_block_hide_mode").All()
 	require.Len(t, entries, 1, "the mode is logged exactly once")
@@ -339,7 +366,7 @@ func runRunnerCase(t *testing.T, name string) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "python3", "-c", string(source)) //nolint:gosec // fixed interpreter running the checked-in runner.py
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
-	if name == "runner-best-effort" {
+	if name != "runner-strict" {
 		cmd.Env = append(cmd.Env, hideModeEnv+"=best-effort")
 	}
 	var stderr bytes.Buffer
@@ -347,7 +374,7 @@ func runRunnerCase(t *testing.T, name string) {
 	runErr := cmd.Run()
 
 	const hideFailure = "prctl(PR_SET_DUMPABLE) failed"
-	if name == "runner-strict" {
+	if name != "runner-best-effort" {
 		exitErr, ok := runErr.(*exec.ExitError)
 		require.True(t, ok, "expected the runner to exit non-zero, got %v", runErr)
 		assert.Equal(t, 1, exitErr.ExitCode())

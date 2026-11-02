@@ -505,6 +505,14 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the other block types keep working
 
     @integration
+    Scenario: a platform that refuses the hide step with anything but EPERM serves no code blocks
+      Given the platform refuses PR_SET_DUMPABLE with EACCES
+      And visible-process mode is allowed on AWS Lambda
+      When a code block runs
+      Then the result carries the disabled error and not a raw prctl error
+      And the runner still fails its hide step even in best-effort mode
+
+    @integration
     Scenario: the engine reports its hide mode once at start-up
       Given a platform that accepts, refuses with visible-process allowed, or refuses without it
       When the code block executor is built

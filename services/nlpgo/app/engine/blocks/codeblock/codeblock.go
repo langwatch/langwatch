@@ -198,20 +198,26 @@ const (
 	hideModeEnvVar = "NLPGO_CODE_BLOCK_HIDE"
 )
 
+// hideModeFor is the one definition of a refusal: only EPERM, Lambda's, may be
+// overridden by the operator; any other errno disables code blocks.
+func hideModeFor(refusal syscall.Errno, allow bool) hideMode {
+	switch {
+	case refusal == 0:
+		return hideStrict
+	case refusal == syscall.EPERM && allow:
+		return hideVisibleProcess
+	}
+	return hideDisabled
+}
+
 // resolveHideMode decides the mode and logs it once. A refusal never fails New:
 // the other block types must keep working.
 func resolveHideMode(allow bool, logger *zap.Logger) hideMode {
-	mode := hideStrict
-	if hideRefused {
-		mode = hideDisabled
-		if allow {
-			mode = hideVisibleProcess
-		}
-	}
+	mode := hideModeFor(hideRefusal, allow)
 	if mode == hideStrict {
 		logger.Info("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)))
 	} else {
-		logger.Warn("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)))
+		logger.Warn("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)), zap.String("refusal", hideRefusal.Error()))
 	}
 	return mode
 }

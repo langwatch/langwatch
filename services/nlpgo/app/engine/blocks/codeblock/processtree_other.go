@@ -18,8 +18,8 @@ import (
 
 func enableProcessHardening() {}
 
-// hideRefused is always false off Linux: nothing is hidden there to refuse.
-const hideRefused = false
+// hideRefusal is always 0 off Linux: nothing is hidden there to refuse.
+const hideRefusal syscall.Errno = 0
 
 func runStartMarker(int) uint64 { return 0 }
 

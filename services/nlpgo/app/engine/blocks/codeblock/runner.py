@@ -109,8 +109,8 @@ import sys
 
 # FIRST, before the payload is asked for: make this process's /proc files
 # unreadable to other executions running as the same user. A failure ends
-# the run, except on AWS Lambda, where seccomp refuses it and the engine
-# sets NLPGO_CODE_BLOCK_HIDE=best-effort. Rationale: specs/nlp-go/_shared/contract.md §7.
+# the run, except on AWS Lambda, where seccomp refuses it with EPERM and the
+# engine sets NLPGO_CODE_BLOCK_HIDE=best-effort (best effort covers EPERM only). Rationale: specs/nlp-go/_shared/contract.md §7.
 _PR_SET_DUMPABLE = 4
 
 
