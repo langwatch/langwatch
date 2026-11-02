@@ -52,9 +52,7 @@ describe("the Connector on an HTTP agent config", () => {
       ["no code", { ...setup, code: "" }],
       ["a secret name that is not an identifier", { ...setup, secretNames: ["NOT-A-NAME"] }],
     ])("refuses %s", (_case, step) => {
-      expect(httpAgentConfigSchema.safeParse({ url, connector: { setup: step } }).success).toBe(
-        false,
-      );
+      expect(httpAgentConfigSchema.validate({ url, connector: { setup: step } })).toBe(false);
     });
   });
 });

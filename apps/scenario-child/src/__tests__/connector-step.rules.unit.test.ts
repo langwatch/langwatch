@@ -181,10 +181,12 @@ describe("connectorStepAnswer()", () => {
   });
 
   it("fails a setup whose state is not an object or whose secrets are not strings", () => {
-    expect(() => connectorStepAnswer({ kind: "setup", outputs: { state: [1] } })).toThrow();
+    expect(() => connectorStepAnswer({ kind: "setup", outputs: { state: [1] } })).toThrow(
+      /JSON object/,
+    );
     expect(() =>
       connectorStepAnswer({ kind: "setup", outputs: { secrets: { TOKEN: 1 } } }),
-    ).toThrow();
+    ).toThrow(/map each name to a string/);
   });
 
   it("returns teardown's whole object, without any secrets it returned", () => {

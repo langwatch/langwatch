@@ -326,7 +326,7 @@ export class ScenarioTargetPrefetchService {
     };
   }
 
-  /** The bound dataset's entries, or why the step cannot have them; it then fails before running. */
+  /** The bound dataset's entries, or why the step cannot have them (it then fails unrun). */
   private async connectorRows({
     projectId,
     datasetId,

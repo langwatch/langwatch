@@ -58,6 +58,16 @@ type StepEvent = {
   };
 };
 
+/** The code runner's answer body for a scripted reply. */
+function engineBody(reply: Exclude<StepReply, "hang">) {
+  if (reply === "code_block_timeout")
+    return { status: "error", error: { type: "code_block_timeout" } };
+  if ("raises" in reply) {
+    return { status: "error", error: { type: "code_runner_error", traceback: reply.raises } };
+  }
+  return { status: "success", nodes: { [CONNECTOR_STEP_NODE_ID]: { outputs: reply.outputs } } };
+}
+
 /** A code runner that answers each step by kind and records what it was sent. */
 function fakeCodeRunner(replies: Partial<Record<"setup" | "teardown", StepReply>>) {
   const calls: StepCall[] = [];
@@ -76,15 +86,7 @@ function fakeCodeRunner(replies: Partial<Record<"setup" | "teardown", StepReply>
           signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
         });
       }
-      const body =
-        reply === "code_block_timeout"
-          ? { status: "error", error: { type: "code_block_timeout" } }
-          : "raises" in reply
-            ? { status: "error", error: { type: "code_runner_error", traceback: reply.raises } }
-            : {
-                status: "success",
-                nodes: { [CONNECTOR_STEP_NODE_ID]: { outputs: reply.outputs } },
-              };
+      const body = engineBody(reply);
       return { ok: true, status: 200, text: async () => JSON.stringify(body) };
     },
   };
