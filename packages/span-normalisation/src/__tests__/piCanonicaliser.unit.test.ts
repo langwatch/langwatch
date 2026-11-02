@@ -127,12 +127,13 @@ describe("the pi canonicaliser", () => {
   });
 
   /** @scenario "Session, turn and tool identifiers are lifted from pi's harness spans" */
-  it("names the thread from pi.session.id and keeps pi's turn and tool-call ids", () => {
+  it("names the conversation from pi.session.id and keeps pi's turn and tool-call ids", () => {
     const run = canonicaliseWholeChain({
       name: "pi.harness.run",
       spanAttributes: { "pi.session.id": "s-1" },
     });
-    expect(run.attributes[ATTR_KEYS.LANGWATCH_THREAD_ID]).toBe("s-1");
+    // The key a trace's conversation is read from, which the session replay looks traces up by.
+    expect(run.attributes[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe("s-1");
 
     const turn = canonicaliseWholeChain({
       name: "pi.harness.turn",

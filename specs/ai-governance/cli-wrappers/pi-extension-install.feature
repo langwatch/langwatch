@@ -35,12 +35,12 @@
 # extension are met with signal aliases in pi's definition instead, which is
 # data, not an install.
 #
-# `langwatch ingest install pi_cli` is what writes the file, not the `langwatch pi`
-# wrapper: the wrapper installs no session-context seam for any agent, and the
-# install command is where every other agent's seam is written. pi therefore
-# has to be an accepted tool of that command and take the plugin arm of it,
-# or the install writes hook entries into a file pi never reads and says
-# nothing.
+# Both `langwatch ingest install pi_cli` and the `langwatch pi` wrapper write
+# the file. The install command is where every other agent's seam is written,
+# so pi takes the plugin arm of it, or it writes hook entries into a file pi
+# never reads. The wrapper writes it too because pi ships no exporter: a live
+# run proved `langwatch pi` alone sent nothing, as most users never run the
+# install command (ADR-188 Decision 4).
 #
 # Ownership is by a first-line marker and a contents comparison, as for the
 # opencode plugin, not by a version stamp. A single file written into a
@@ -101,6 +101,21 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       And nothing of ours is installed over it
 
     @unit
+    Scenario: Launching pi through the wrapper keeps the extension in place
+      Given pi's extension directory holds no LangWatch extension
+      When the user runs `langwatch pi`
+      Then the LangWatch extension is written into pi's extension directory
+      And one line names where it was written
+      And a later launch with the same extension says nothing about it
+
+    @unit
+    Scenario: A failed extension write is reported and pi still starts
+      Given pi's extension directory cannot be written
+      When the user runs `langwatch pi`
+      Then one line says this session sends no telemetry
+      And the launch carries on
+
+    @unit
     Scenario: Logout removes the extension by its marker
       Given the LangWatch extension is installed
       When the user runs `langwatch logout`
@@ -125,6 +140,14 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
         | attribute     | value |
         | pi.session.id | s-1   |
       And its end carries pi's own operation outcome
+
+    # The server keys a span to its session from that span alone, so a turn,
+    # tool or model-call span without the id is dropped (ADR-188 Decision 8).
+    @unit
+    Scenario: Every span the extension emits carries pi's session id
+      Given a pi run for session "s-1" with one turn that calls a model and runs one tool
+      When the extension handles it
+      Then the run, turn, tool and model-call spans each carry pi.session.id "s-1"
 
     @unit
     Scenario: Each turn becomes a pi.harness.turn span under the run

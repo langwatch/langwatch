@@ -70,6 +70,30 @@ export function installPiTelemetryExtension({
   return { action: existing === null ? "created" : "updated", ...target };
 }
 
+/**
+ * `langwatch pi` keeps the extension in place on every launch: pi ships no
+ * exporter, so without it the injected env reaches nothing (ADR-188 Decision 4).
+ * Never throws; a failed write is reported, and pi still starts.
+ */
+export function ensurePiTelemetryExtension({
+  dirPath,
+  notify,
+}: {
+  dirPath?: string;
+  notify: (line: string) => void;
+}): void {
+  try {
+    const result = installPiTelemetryExtension({ dirPath });
+    if (result.action !== "unchanged") {
+      notify(`${result.action} the pi telemetry extension at ${result.displayPath}.`);
+    }
+  } catch (err) {
+    notify(
+      `could not write the pi telemetry extension, so this session sends no telemetry: ${(err as Error).message}`,
+    );
+  }
+}
+
 /** Whether our extension is currently on disk, for the logout scan. */
 export function hasPiTelemetryExtension({ dirPath }: { dirPath?: string } = {}): boolean {
   const contents = readFileOrNull(piExtensionTarget(dirPath).path);

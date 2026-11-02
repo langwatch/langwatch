@@ -11,10 +11,9 @@ import { describe, expect, it } from "vitest";
 const SRC_ROOT = resolve(__dirname, "..", "..", "..");
 
 /**
- * Files that call another server, and how many raw calls each is allowed: a
- * tunnel probe, a user's own HTTP agent, the cloudflared release download from
- * GitHub, and pi's extension source, which runs inside pi where this transport
- * does not exist. A file is not exempt as a whole, so an added call fails even here.
+ * Raw calls each file may make: a tunnel probe, a user's own HTTP agent, the
+ * cloudflared download, and pi's extension (runs inside pi, without this transport).
+ * A file is not exempt as a whole, so an added call fails even here.
  */
 const NOT_LANGWATCH = new Map([
   ["cli/commands/agents/tunnel.ts", 1],

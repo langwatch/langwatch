@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { PI_EXTENSION_MARKER, piExtensionSource } from "../pi-extension-source";
 import {
+  ensurePiTelemetryExtension,
   hasPiTelemetryExtension,
   installPiTelemetryExtension,
   PI_EXTENSION_FILE_NAME,
@@ -112,6 +113,39 @@ describe("installPiTelemetryExtension", () => {
       expect(fs.readFileSync(extensionPath, "utf8")).toBe(theirs);
       expect(hasPiTelemetryExtension()).toBe(false);
     });
+  });
+});
+
+describe("ensurePiTelemetryExtension", () => {
+  /** @scenario "Launching pi through the wrapper keeps the extension in place" */
+  it("writes the extension on the first launch and stays quiet on the next", () => {
+    const lines: string[] = [];
+    const notify = (line: string) => lines.push(line);
+
+    ensurePiTelemetryExtension({ notify });
+    ensurePiTelemetryExtension({ notify });
+
+    expect(fs.readFileSync(extensionPath, "utf8")).toBe(piExtensionSource());
+    expect(lines).toEqual([
+      "created the pi telemetry extension at ~/.pi/agent/extensions/pi-plugin.ts.",
+    ]);
+  });
+
+  /** @scenario "A failed extension write is reported and pi still starts" */
+  it("reports a failed write instead of throwing", () => {
+    const blocker = path.join(tmpHome, "not-a-dir");
+    fs.writeFileSync(blocker, "");
+    const lines: string[] = [];
+
+    ensurePiTelemetryExtension({
+      dirPath: path.join(blocker, "extensions"),
+      notify: (l) => lines.push(l),
+    });
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(
+      /^could not write the pi telemetry extension, so this session sends no telemetry: /,
+    );
   });
 });
 

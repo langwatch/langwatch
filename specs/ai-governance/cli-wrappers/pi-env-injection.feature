@@ -71,6 +71,18 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
       And the saved gateway pin for pi is forgotten
       And pi still runs
 
+    @unit
+    Scenario: The server's tool policy lets pi send telemetry but never use a gateway key
+      When the organisation's tool policy is resolved with no override for pi
+      Then pi may send telemetry directly
+      And pi may not use a virtual key
+      And a pi ingest key is governed by that policy
+
+    @unit
+    Scenario: pi is offered as an AI tool that sets up with `langwatch pi`
+      When the starter AI tools are listed
+      Then one coding assistant tile is pi, set up with `langwatch pi`
+
   Rule: The ingestion env is the standard OTel block, with spans only
 
     @unit

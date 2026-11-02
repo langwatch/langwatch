@@ -303,6 +303,7 @@ const aiAttributes = (message, ctx) => {
   const model = message?.model ?? ctx?.model?.id;
   const provider = message?.provider ?? ctx?.model?.provider;
   return {
+    "pi.session.id": sessionId,
     "pi.ai.operation": AI_OPERATION,
     "pi.ai.provider": provider,
     "pi.ai.model": model,
@@ -356,6 +357,7 @@ export default (pi) => {
       startNano: turn.startNano,
       endNano: nowNano(),
       attributes: {
+        "pi.session.id": sessionId,
         "pi.lane.name": LANE_NAME,
         "pi.operation.id": operationId,
         "pi.turn.id": turn.turnId,
@@ -390,6 +392,7 @@ export default (pi) => {
       endNano: nowNano(),
       isError,
       attributes: {
+        "pi.session.id": sessionId,
         "pi.lane.name": LANE_NAME,
         "pi.operation.id": operationId,
         "pi.turn.id": pending.turnId,
@@ -446,6 +449,7 @@ export default (pi) => {
       startNano: compaction.startNano,
       endNano,
       attributes: {
+        "pi.session.id": sessionId,
         "pi.lane.name": LANE_NAME,
         "pi.operation.id": compaction.operationId,
         "pi.step.kind": "compaction",

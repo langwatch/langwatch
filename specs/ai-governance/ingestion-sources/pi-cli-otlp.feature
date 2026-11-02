@@ -100,14 +100,16 @@ Feature: pi CLI OTLP spans canonicalise on the unified substrate
       When the canonicalisation chain runs
       Then the canonical span carries both as pi reported them
 
+    # The trace's conversation is read from gen_ai.conversation.id, and the
+    # sessions screen opens a session's replay by looking its traces up by it.
     @unit
     Scenario: Session, turn and tool identifiers are lifted from pi's harness spans
       Given the run, turn and tool spans of one pi session
       And the run carries attribute "pi.session.id" "s-1"
       When the canonicalisation chain runs
       Then the recorded span attributes contain:
-        | attribute           | value |
-        | langwatch.thread.id | s-1   |
+        | attribute              | value |
+        | gen_ai.conversation.id | s-1   |
       And the turn and tool spans keep pi's turn and tool-call identifiers
 
     @unit

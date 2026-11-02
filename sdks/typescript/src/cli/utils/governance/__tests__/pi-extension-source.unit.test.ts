@@ -137,6 +137,16 @@ describe("the generated pi extension", () => {
         expect(span.attributes["langwatch.attributes.estimated"]).toBe(true);
       }
     });
+
+    /** @scenario "Every span the extension emits carries pi's session id" */
+    it("writes pi's session id on the run, turn, tool and model-call spans", async () => {
+      await runSession({ sessionId: "s-1", turns: [[{ name: "read" }]] });
+
+      const names = ["pi.harness.run", "pi.harness.turn", "pi.harness.tool", "pi.ai.request"];
+      for (const name of names) {
+        expect(named(name).map((span) => span.attributes["pi.session.id"])).toEqual(["s-1"]);
+      }
+    });
   });
 
   describe("when a run has two turns", () => {

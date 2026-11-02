@@ -107,10 +107,11 @@ export class PiCanonicaliserService implements AttributeCanonicaliser {
    * consuming one here would lose it the session it belongs to.
    */
   private liftIdentifiers(ctx: ExtractorContext): void {
+    // The trace's conversation is read from this key, and the session replay finds traces by it.
     const sessionId = ctx.bag.attrs.get("pi.session.id");
-    if (isNonEmptyString(sessionId) && ctx.out[ATTR_KEYS.LANGWATCH_THREAD_ID] === void 0) {
-      ctx.setAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId);
-      ctx.recordRule(`${this.id}:thread.id`);
+    if (isNonEmptyString(sessionId) && ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID] === void 0) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId);
+      ctx.recordRule(`${this.id}:conversation.id`);
     }
 
     const toolName = ctx.bag.attrs.get("pi.tool.name");

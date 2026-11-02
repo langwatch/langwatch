@@ -147,7 +147,8 @@ function formFromEntry(entry: AiToolEntry): FormState {
       setupCommand: baseStr("setupCommand"),
       helperText: baseStr("helperText"),
       setupDocsUrl: baseStr("setupDocsUrl"),
-      allowVk: boolOr("allowVk", true),
+      // pi fixes every model's address in its own build, so a gateway key never applies.
+      allowVk: kind === "pi" ? false : boolOr("allowVk", true),
       // Cursor is GUI-only - direct OTLP never applies, regardless of a
       // stored value. Force it off so the toggle reads honestly.
       allowOtelDirect: kind === "cursor" ? false : boolOr("allowOtelDirect", true),
@@ -182,7 +183,7 @@ function configFromForm(form: FormState): Record<string, unknown> {
       ...(form.setupDocsUrl.trim() ? { setupDocsUrl: form.setupDocsUrl.trim() } : {}),
       // CLI path policy folded into the tile. Cursor is GUI-only, so its
       // OTLP-direct path is always false regardless of the toggle state.
-      allowVk: form.allowVk,
+      allowVk: form.assistantKind === "pi" ? false : form.allowVk,
       allowOtelDirect: form.assistantKind === "cursor" ? false : form.allowOtelDirect,
       bundledPlan: form.bundledPlan,
     };
@@ -419,6 +420,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
       // Cursor is GUI-only - direct OTLP never applies, so force the
       // toggle off when the admin picks it.
       ...(kind === "cursor" ? { allowOtelDirect: false } : {}),
+      ...(kind === "pi" ? { allowVk: false } : {}),
     });
     setIconAsset(iconAfterKindChange({ kind, iconAsset }));
   };
@@ -830,6 +832,7 @@ function CliPathsSection({
   setForm: (f: FormState) => void;
 }) {
   const cursorOnly = form.assistantKind === "cursor";
+  const noGateway = form.assistantKind === "pi";
   return (
     <FormSection
       label="CLI paths"
@@ -840,12 +843,15 @@ function CliPathsSection({
           <VStack align="start" gap={0}>
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
-              Route through the LangWatch gateway with a personal virtual key.
+              {noGateway
+                ? "pi sets each model's address in its own build, so the gateway never applies."
+                : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>
           <Switch
             colorPalette="accent"
-            checked={form.allowVk}
+            checked={noGateway ? false : form.allowVk}
+            disabled={noGateway}
             onCheckedChange={({ checked }) => setForm({ ...form, allowVk: checked })}
           />
         </HStack>
