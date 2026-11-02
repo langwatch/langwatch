@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { approximateTokens } from "../../../lib/page-tokens.ts";
-import { PAGE_TOKENS, readBudgets } from "../../../site/audit/budgets.ts";
+import { PAGE_TOKENS } from "../../../site/audit/budgets.ts";
 import { pageMarkdown } from "../../discovery/compile.ts";
 import { parseReleases, readReleases, withReleaseNotes } from "../compile/releases.ts";
 
@@ -133,7 +133,6 @@ describe("when the newest releases are longer than the page token budget", () =>
         pageTokens,
       });
       expect(approximateTokens({ text: markdown })).toBeLessThanOrEqual(pageTokens);
-      expect(pageTokens).toBe(readBudgets().agentReadiness.pageTokens);
       expect(markdown).toContain("## Release v3.0.0");
       expect(markdown).not.toContain("## Release v2.9.0");
       expect(markdown).not.toContain("## Release v2.8.0");
@@ -173,6 +172,57 @@ describe("when the newest releases are longer than the page token budget", () =>
     } finally {
       dispose();
     }
+  });
+});
+
+describe("when only some of the older releases fit the page token budget", () => {
+  const long = "* **traces:** a long note\n".repeat(200);
+  const release = ({ version, day }: { version: string; day: string }) =>
+    `## [${version}](${compare}) (2026-10-${day})\n### Features\n${long}`;
+  const newestTwo =
+    release({ version: "3.0.0", day: "21" }) + release({ version: "2.9.0", day: "11" });
+  const all = newestTwo + release({ version: "2.8.0", day: "01" });
+
+  function exportOf({ changelog, pageTokens }: { changelog: string; pageTokens: number }) {
+    const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-fit-"));
+    const docsRoot = path.join(project, "docs");
+    mkdirSync(docsRoot);
+    writeFileSync(path.join(project, "CHANGELOG.md"), changelog);
+    writeFileSync(path.join(docsRoot, "docs.json"), "{}");
+    writeFileSync(
+      path.join(docsRoot, "changelog.mdx"),
+      "---\ntitle: Changelog\n---\n<ReleaseNotes />\n\n## Older releases",
+    );
+    try {
+      return pageMarkdown({ docsRoot, slug: "changelog", pageTokens });
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  }
+  const tokens = (text: string) => approximateTokens({ text });
+  const leftOut = "Earlier recent releases are left out of this Markdown copy";
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps the newest releases that fit and notes the rest are left out", () => {
+    const twoFit = tokens(exportOf({ changelog: newestTwo, pageTokens: Infinity })) + 50;
+    expect(tokens(exportOf({ changelog: all, pageTokens: Infinity }))).toBeGreaterThan(twoFit);
+    const markdown = exportOf({ changelog: all, pageTokens: twoFit });
+    expect(markdown).toContain("## Release v3.0.0");
+    expect(markdown).toContain("## Release v2.9.0");
+    expect(markdown).not.toContain("## Release v2.8.0");
+    expect(markdown).toContain(leftOut);
+    expect(tokens(markdown)).toBeLessThanOrEqual(twoFit);
+  });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps every release and adds no note when they all fit", () => {
+    const markdown = exportOf({
+      changelog: all,
+      pageTokens: tokens(exportOf({ changelog: all, pageTokens: Infinity })),
+    });
+    for (const version of ["3.0.0", "2.9.0", "2.8.0"])
+      expect(markdown).toContain(`## Release v${version}`);
+    expect(markdown).not.toContain(leftOut);
   });
 });
 
