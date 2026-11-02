@@ -12,7 +12,8 @@ import (
 	"github.com/langwatch/langwatch/tools/matrixseed"
 )
 
-// TestWriteExportsAppendsToTheEnvFile keeps what the env file already held.
+// TestWriteExportsAppendsToTheEnvFile: earlier steps' variables live in the same
+// GITHUB_ENV, so truncating it would unset them for the rest of the job.
 func TestWriteExportsAppendsToTheEnvFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "github_env")
 	if err := os.WriteFile(path, []byte("EARLIER=1\n"), 0o600); err != nil {
@@ -38,7 +39,8 @@ func TestWriteExportsRefusesAValueWithALineBreak(t *testing.T) {
 	}
 }
 
-// TestEnvOrFallsBackOnlyWhenUnset reads a set variable over the fallback.
+// TestEnvOrFallsBackOnlyWhenUnset: the job's LW_BASE_URL must win, or the seed
+// would talk to the default port while the api listens elsewhere.
 func TestEnvOrFallsBackOnlyWhenUnset(t *testing.T) {
 	t.Setenv("MATRIXSEED_TEST_VALUE", "")
 	if got := envOr("MATRIXSEED_TEST_VALUE", "fallback"); got != "fallback" {
@@ -50,7 +52,8 @@ func TestEnvOrFallsBackOnlyWhenUnset(t *testing.T) {
 	}
 }
 
-// TestWriteBootstrappedAppendsTheStepOutput appends bootstrapped=true to the output file.
+// TestWriteBootstrappedAppendsTheStepOutput: the gateway and matrix steps run
+// only on this line, and other outputs share the file.
 /** @scenario "The gateway and matrix run only once the seed has bootstrapped" */
 func TestWriteBootstrappedAppendsTheStepOutput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "github_output")
@@ -69,7 +72,8 @@ func TestWriteBootstrappedAppendsTheStepOutput(t *testing.T) {
 	}
 }
 
-// TestWriteBootstrappedWithNoPathWritesNothing treats no path as no output.
+// TestWriteBootstrappedWithNoPathWritesNothing: run by hand there is no
+// GITHUB_OUTPUT, and that must not fail a seed that worked.
 func TestWriteBootstrappedWithNoPathWritesNothing(t *testing.T) {
 	if err := writeBootstrapped(""); err != nil {
 		t.Fatal(err)
