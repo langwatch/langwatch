@@ -185,6 +185,13 @@ Feature: Evaluator versions and deploy labels
     And the evaluator's labels are read again so a retry starts from what was saved
 
   @integration
+  Scenario: The evaluator drawer says when its versions fail to load
+    Given an evaluator whose versions cannot be read
+    When the user opens its version history
+    Then the drawer says the versions failed to load
+    And no Deploy action is offered
+
+  @integration
   Scenario: The deploy dialog adds a custom label and refuses a reserved one
     Given the deploy dialog is open for an evaluator with versions 1 and 2
     When the user adds a label named "latest" or a number

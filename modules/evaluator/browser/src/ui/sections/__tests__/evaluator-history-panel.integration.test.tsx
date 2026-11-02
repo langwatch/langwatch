@@ -11,6 +11,7 @@ import { EvaluatorHistoryPanel } from "../evaluator-history-panel.tsx";
 import { renderWithEvaluatorHost } from "./testing.tsx";
 
 const calls = vi.hoisted(() => ({
+  versionsFailed: false,
   assignLabel: vi.fn(async (input: unknown) => input),
   removeLabel: vi.fn(async () => undefined),
   invalidateVersions: vi.fn(async () => undefined),
@@ -65,7 +66,10 @@ vi.mock("@langwatch/evaluator-client", () => {
       evaluators: {
         getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
         listVersions: {
-          useQuery: () => ({ data: versions, isLoading: false, isError: false }),
+          useQuery: () =>
+            calls.versionsFailed
+              ? { data: undefined, isLoading: false, isError: true }
+              : { data: versions, isLoading: false, isError: false },
         },
         assignLabel: mutation(calls.assignLabel),
         removeLabel: mutation(calls.removeLabel),
@@ -74,7 +78,10 @@ vi.mock("@langwatch/evaluator-client", () => {
   };
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  calls.versionsFailed = false;
+});
 
 describe("the evaluator history drawer", () => {
   /** @scenario "The evaluator drawer shows versions and opens the deploy dialog" */
@@ -172,5 +179,17 @@ describe("the evaluator history drawer", () => {
     expect(alert.textContent).not.toContain("evaluator_version_not_found");
     expect(calls.invalidateVersions).toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  /** @scenario "The evaluator drawer says when its versions fail to load" */
+  it("says the versions failed to load and offers no Deploy action", async () => {
+    calls.versionsFailed = true;
+    renderWithEvaluatorHost(
+      <EvaluatorHistoryPanel evaluatorId="eval_1" evaluatorName="Answer relevancy" />,
+    );
+
+    expect(await screen.findByText("Failed to load versions.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deploy" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("evaluator-versions")).not.toBeInTheDocument();
   });
 });

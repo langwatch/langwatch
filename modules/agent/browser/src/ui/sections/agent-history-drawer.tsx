@@ -92,6 +92,11 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
           }))}
         />
       )}
+      {versions.isError && (
+        <Text role="alert" color="red.fg" fontSize="sm" paddingY={2}>
+          Failed to load versions.
+        </Text>
+      )}
       <DeployLabelsDialog
         open={deployOpen}
         onClose={() => setDeployOpen(false)}

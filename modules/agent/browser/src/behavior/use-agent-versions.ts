@@ -21,7 +21,6 @@ export function useAgentVersions(input: {
 }) {
   const { agents, projectId, agentId } = input;
   const [data, setData] = useState<AgentVersions>(EMPTY);
-  const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -29,7 +28,6 @@ export function useAgentVersions(input: {
   const [extraLabels, setExtraLabels] = useState<string[]>([]);
 
   const reload = useCallback(async () => {
-    setIsLoading(true);
     setIsError(false);
     try {
       const loaded = await agents.listVersions({ projectId, agentId });
@@ -38,8 +36,6 @@ export function useAgentVersions(input: {
       setExtraLabels([]);
     } catch {
       setIsError(true);
-    } finally {
-      setIsLoading(false);
     }
   }, [agents, projectId, agentId]);
 
@@ -78,7 +74,6 @@ export function useAgentVersions(input: {
     latestVersion: data.versions[0]?.version ?? null,
     labels,
     selections,
-    isLoading,
     isError,
     isSaving,
     saveError,

@@ -63,7 +63,6 @@ export function useEvaluatorVersions(input: { projectId: string; evaluatorId: st
     latestVersion: versions[0]?.version ?? null,
     labels,
     selections,
-    isLoading: query.isLoading,
     isError: query.isError,
     isSaving,
     saveError,
