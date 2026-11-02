@@ -73,6 +73,11 @@ func refusePrSetDumpable() error {
 	}
 	fprog := syscall.SockFprog{Len: uint16(len(prog)), Filter: &prog[0]}
 
+	// no_new_privs is per thread: pin this goroutine so seccomp(2) runs on the
+	// thread that set it. The child process exits after its case, so the thread
+	// is never unlocked.
+	runtime.LockOSThread()
+
 	const prSetNoNewPrivs = 38
 	if _, _, errno := syscall.Syscall6(syscall.SYS_PRCTL, prSetNoNewPrivs, 1, 0, 0, 0, 0); errno != 0 {
 		return fmt.Errorf("PR_SET_NO_NEW_PRIVS: %w", errno)
