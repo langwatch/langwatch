@@ -471,7 +471,7 @@ describe("board scope at the doors", () => {
 
   describe("when a key makes a board over REST", () => {
     /** @scenario "AC197 Scope: a key that names no person stands where a project credential does" */
-    /** @scenario "AC199i Split: a board made in Analytics Reports is not starred and not Only me" */
+    /** @scenario "AC199i Split: a board made in Analytics Reports is not pinned and not Only me" */
     it.each([
       { key: "its author's own key", actor: keyOf(AUTHOR) },
       { key: "a key that names nobody", actor: NOBODY },
@@ -717,7 +717,7 @@ describe("the Dashboards and Analytics Reports boards at the doors", () => {
     });
   });
 
-  /** @scenario "AC199i Split: a board made in Analytics Reports is not starred and not Only me" */
+  /** @scenario "AC199i Split: a board made in Analytics Reports is not pinned and not Only me" */
   it("makes My dashboard in Reports at Project with no star, and in Dashboards Only me and starred", async () => {
     const { call } = appWith();
     const made = (procedure: string) =>

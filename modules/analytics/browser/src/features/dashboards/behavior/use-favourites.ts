@@ -61,7 +61,7 @@ export function useFavourites() {
           analytics.track(dashboardFavourited({ starred }));
           void refresh();
         },
-        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change your stars" }),
+        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change your pins" }),
       },
     );
   };
