@@ -112,6 +112,8 @@ export interface LwqlCollectionProbe {
   /** An approved view the engine tables read; reading its structure authenticates. */
   readonly relation: string;
   readonly connection: Omit<PostgresNamedCollection, "collection">;
+  /** The PostgreSQL schema holding the approved view: the table function does not use the role's search_path. */
+  readonly schema: string;
 }
 
 /** The endpoint must be reachable from the ClickHouse server; the chart's cluster DNS is. */
@@ -217,15 +219,17 @@ export class LangWatchQLSelfProvisioningService {
   collectionProbe({
     names,
     postgres,
+    schema,
   }: {
     names: LangWatchQLNames;
     postgres: LwqlPostgresSettings;
+    schema: string;
   }): LwqlCollectionProbe {
     const { collection, ...connection } = this.namedCollectionValues({ names, postgres });
     const [first] = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
     if (!first) throw new Error("lwql self-provisioning: the catalog maps no PostgreSQL dataset");
     sqlText.assertIdentifier(collection, "named collection");
-    return { collection, relation: first.postgres.approvedView, connection };
+    return { collection, relation: first.postgres.approvedView, connection, schema };
   }
 
   /** The engine tables a converge creates: every one, or those among the check's drift. */

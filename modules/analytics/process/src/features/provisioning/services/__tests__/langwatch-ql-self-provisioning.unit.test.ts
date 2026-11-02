@@ -471,7 +471,7 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
 
 describe("given the collection probe", () => {
   it("names the collection it reads through", () => {
-    expect(selfProvisioning.collectionProbe({ names: NAMES, postgres: POSTGRES }).collection).toBe(
+    expect(selfProvisioning.collectionProbe({ names: NAMES, postgres: POSTGRES, schema: "public" }).collection).toBe(
       `lwql_postgres_${NAMES.database}`,
     );
   });
@@ -481,6 +481,7 @@ describe("given the collection probe", () => {
       selfProvisioning.collectionProbe({
         names: { ...NAMES, database: "lwql'; DROP" },
         postgres: POSTGRES,
+        schema: "public",
       }),
     ).toThrow(/named collection must match/);
   });

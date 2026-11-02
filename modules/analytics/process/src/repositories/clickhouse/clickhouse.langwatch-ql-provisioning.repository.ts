@@ -263,16 +263,18 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   probePostgresCollection({
     collection,
     relation,
+    schema,
     cluster,
   }: {
     collection: string;
     relation: string;
+    schema: string;
     cluster: string | undefined;
   }): Promise<void> {
     return readThroughPostgres({
       client: this.client,
-      source: `${collection}, table = {relation:String}`,
-      params: { relation },
+      source: `${collection}, table = {relation:String}, schema = {schema:String}`,
+      params: { relation, schema },
       cluster,
     });
   }
@@ -280,23 +282,26 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   probePostgresCredentials({
     credentials,
     relation,
+    schema,
     cluster,
   }: {
     credentials: LwqlPostgresCredentials;
     relation: string;
+    schema: string;
     cluster: string | undefined;
   }): Promise<void> {
     return readThroughPostgres({
       client: this.client,
       cluster,
       source:
-        "{address:String}, {database:String}, {relation:String}, {user:String}, {password:String}",
+        "{address:String}, {database:String}, {relation:String}, {user:String}, {password:String}, {schema:String}",
       params: {
         address: `${credentials.host}:${credentials.port}`,
         database: credentials.database,
         relation,
         user: credentials.user,
         password: credentials.password,
+        schema,
       },
     });
   }

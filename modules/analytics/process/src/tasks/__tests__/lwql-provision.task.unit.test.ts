@@ -92,12 +92,14 @@ function clickHouseThat({
   present = [],
   cluster,
   mode = "rendered",
+  schema = "public",
 }: {
   failing?: RegExp;
   failingProbe?: keyof typeof PROBES;
   present?: readonly string[];
   cluster?: string;
   mode?: "rendered" | "sql";
+  schema?: string;
 } = {}) {
   const ran: string[] = [];
   const probed: Record<string, unknown>[] = [];
@@ -117,7 +119,7 @@ function clickHouseThat({
     },
     names: NAMES,
     sourceDatabase: () => NAMES.database,
-    schema: "public",
+    schema,
     settings: { LWQL_ACCESS_MODEL_MODE: mode, CLICKHOUSE_CLUSTER: cluster },
     openRepository: () =>
       ClickHouseLangWatchQLProvisioningRepository.create({
@@ -437,6 +439,20 @@ describe("convergeLwqlAccessModel", () => {
       });
     const rebuilt = (clickHouse: ReturnType<typeof clickHouseThat>, table: string) =>
       clickHouse.ran.filter((s) => s.includes(`.${table} (`) && s.includes("ENGINE = PostgreSQL"));
+
+    /** @scenario "The collection probe reads the approved view in the app's PostgreSQL schema" */
+    it("binds the app's PostgreSQL schema into both probe reads", async () => {
+      if (!stale || !absent) throw new Error("the catalog maps too few PostgreSQL datasets");
+      const clickHouse = clickHouseThat({ present: [stale], schema: "langwatch_db" });
+
+      await check(clickHouse);
+
+      expect(clickHouse.probed).toHaveLength(2);
+      for (const probe of clickHouse.probed) {
+        expect(probe.sql).toContain("{schema:String}");
+        expect(probe.schema).toBe("langwatch_db");
+      }
+    });
 
     /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
     it("reads through the collection and with the app's own values, then rebuilds each stamped", async () => {
