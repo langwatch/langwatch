@@ -4,8 +4,11 @@
 /
 /agent-testing
 /agent-testing/authenticated-agents
+/agent-testing/build-a-scenario-suite
+/agent-testing/check-the-world
 /agent-testing/compare-agents
 /agent-testing/connect-your-agent
+/agent-testing/designing-a-suite
 /agent-testing/environments
 /agent-testing/evaluators
 /agent-testing/linking-your-traces
