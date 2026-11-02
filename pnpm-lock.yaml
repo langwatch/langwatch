@@ -12685,6 +12685,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
+      '@langwatch/enterprise-scim-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/scim/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract

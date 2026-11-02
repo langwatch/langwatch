@@ -106,6 +106,32 @@ export class SeatPeakCorrectionService {
     }
   }
 
+  /**
+   * Counts the seat a directory create gave, as SCIM's fact names it: the members table is not
+   * read again. The create's id keys the change, so a redelivered fact records once.
+   */
+  async countDirectoryCreate({
+    organizationId,
+    userId,
+    seat,
+    source,
+  }: {
+    organizationId: string;
+    userId: string;
+    seat: SeatKind;
+    source: CorrectionSource;
+  }): Promise<void> {
+    const state = await this.dependencies.peaks.findState(organizationId);
+    if (state?.openedAt == null) return;
+    await this.#record({
+      organizationId,
+      holder: { kind: "member", userId },
+      from: "none",
+      to: seat,
+      source,
+    });
+  }
+
   /** Corrects one person in every organization they hold a membership in, or in those named. */
   async correctAccount({
     userId,

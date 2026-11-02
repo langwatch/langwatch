@@ -1,6 +1,6 @@
 /**
- * Organization's peer subscribers for seats moved outside its own writes (ADR-002 §6): authz's
- * custom role bindings, user's account deactivation and erasure, and authz's offboarding.
+ * Organization's peer subscribers for seats moved outside its own writes (ADR-002 §6): authz,
+ * user and SCIM's directory creates.
  * Spec: modules/organization/specs/seat-peak.feature
  */
 import {
@@ -17,6 +17,10 @@ import {
   roleDeletedPayloadSchema,
   rolePermissionsChangedPayloadSchema,
 } from "@langwatch/authz-contract";
+import {
+  SCIM_MEMBER_CREATED_EVENT_TYPE,
+  scimMemberCreatedEventDataSchema,
+} from "@langwatch/enterprise-scim-contract";
 import type { ParsingSchema, PeerSubscriberDefinition } from "@langwatch/eventing";
 import {
   USER_DEACTIVATED_EVENT_TYPE,
@@ -30,7 +34,7 @@ import type { SeatPeakCorrectionService } from "../services/seat-peak-correction
 
 export type SeatPeakCorrections = Pick<
   SeatPeakCorrectionService,
-  "correctMembers" | "correctInvitations" | "correctAccount"
+  "correctMembers" | "correctInvitations" | "correctAccount" | "countDirectoryCreate"
 >;
 
 type PeerSubscribing = {
@@ -158,6 +162,21 @@ export function withSeatCorrections<Pipeline extends PeerSubscribing>({
         source: { eventId, occurredAt, cause: "invitation_revoked" },
       });
     },
+  });
+  // SCIM wrote the membership; its fact names the seat the admission gave (a held create, none).
+  pipeline.withPeerSubscriber("seatPeakDirectoryMemberCreated", {
+    eventType: SCIM_MEMBER_CREATED_EVENT_TYPE,
+    data: scimMemberCreatedEventDataSchema,
+    options: { enqueue: { filter: (created) => created.seat !== "none" } },
+    handle: ({ organizationId, userId, seat, createId }, { occurredAt }) =>
+      seat === "none"
+        ? Promise.resolve()
+        : corrections.countDirectoryCreate({
+            organizationId,
+            userId,
+            seat,
+            source: { eventId: createId, occurredAt, cause: "directory_created" },
+          }),
   });
   return pipeline;
 }
