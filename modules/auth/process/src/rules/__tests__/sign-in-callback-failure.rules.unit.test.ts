@@ -147,6 +147,7 @@ describe("signInErrorRedirectOf", () => {
 });
 
 describe("signInRefusalCause", () => {
+  /** @scenario "The logged cause names the provider's code" */
   it("names the provider's code so a log record reads the real cause", () => {
     const cause = signInRefusalCause({ code: "state_not_found" });
 
