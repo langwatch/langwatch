@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -15,7 +14,6 @@ import (
 const redactedMarker = "[redacted]"
 
 // Redactor replaces secret values with "[redacted]" in a text.
-// Building one sorts the forms; reuse it across the texts of one run.
 type Redactor struct {
 	forms      []string
 	maxFormLen int
@@ -41,21 +39,19 @@ func New(secrets map[string]string, extra ...string) *Redactor {
 	if len(seen) == 0 {
 		return &Redactor{}
 	}
-	forms := make([]string, 0, len(seen))
+	forms := make([]string, 0, len(seen)+1)
+	maxLen := 0
 	for form := range seen {
 		forms = append(forms, form)
-	}
-	sort.Strings(forms)
-	maxLen := 0
-	for _, form := range forms {
 		maxLen = max(maxLen, len(form))
 	}
-	return &Redactor{forms: forms, maxFormLen: maxLen}
+	// The marker is matched like a form so a short secret never splits it.
+	return &Redactor{forms: append(forms, redactedMarker), maxFormLen: maxLen}
 }
 
 // Redact replaces every secret form in text with "[redacted]". Forms that
-// overlap are replaced as one span, so no part of either is left showing, and
-// an existing marker is kept whole so a short secret never matches inside it.
+// overlap or touch are replaced as one span, so no part of either is left
+// showing, and an existing marker is kept whole.
 func (r *Redactor) Redact(text string) string {
 	if len(r.forms) == 0 || text == "" {
 		return text
@@ -87,43 +83,78 @@ func (r *Redactor) MaxFormLen() int { return r.maxFormLen }
 // redacted text does not point at the same place in raw.
 func (r *Redactor) SafeCut(raw string, limit int) int {
 	cut := min(limit, len(raw))
-	if len(r.forms) > 0 {
-		for _, s := range r.mergedSpans(raw) {
-			if s.start < cut && cut < s.end {
-				cut = s.start
-				break
-			}
-		}
+	if len(r.forms) == 0 {
+		return alignToRune(raw, cut)
 	}
+	spans := r.mergedSpans(raw)
+	// Leaving a span can land mid-rune and stepping back can land in the
+	// span again, so the two moves repeat until neither changes the cut.
+	for {
+		moved := alignToRune(raw, startOutsideSpans(spans, cut))
+		if moved == cut {
+			return cut
+		}
+		cut = moved
+	}
+}
+
+func alignToRune(raw string, cut int) int {
 	for cut > 0 && cut < len(raw) && !utf8.RuneStart(raw[cut]) {
 		cut--
 	}
 	return cut
 }
 
-// mergedSpans finds every occurrence of every form (and of the marker),
-// overlapping ones included, and merges the overlapping ones. Cost is
-// O(len(text) * forms): each search resumes one byte past the last start.
-func (r *Redactor) mergedSpans(text string) []span {
-	var spans []span
-	for _, form := range append([]string{redactedMarker}, r.forms...) {
-		for from := 0; from < len(text); {
-			i := strings.Index(text[from:], form)
-			if i < 0 {
-				break
-			}
-			start := from + i
-			spans = append(spans, span{start, start + len(form)})
-			from = start + 1
+// startOutsideSpans moves cut to the start of the span that strictly contains it.
+func startOutsideSpans(spans []span, cut int) int {
+	for _, s := range spans {
+		if s.start < cut && cut < s.end {
+			return s.start
 		}
 	}
-	if len(spans) == 0 {
+	return cut
+}
+
+// mergedSpans is the sorted, disjoint spans every form (and the marker)
+// occupies in text. The search is O(forms * len(text)) and, for a form that
+// overlaps itself, up to its length times that; memory is one entry per run,
+// never one per occurrence.
+func (r *Redactor) mergedSpans(text string) []span {
+	var runs []span
+	for _, form := range r.forms {
+		runs = append(runs, formRuns(text, form)...)
+	}
+	return mergeRuns(runs)
+}
+
+// formRuns finds the occurrences of one form, joining those that overlap or
+// touch into one run as it goes, so a text of one repeated byte is one run.
+func formRuns(text, form string) []span {
+	var runs []span
+	for from := 0; from < len(text); {
+		i := strings.Index(text[from:], form)
+		if i < 0 {
+			break
+		}
+		start := from + i
+		if n := len(runs); n > 0 && start <= runs[n-1].end {
+			runs[n-1].end = max(runs[n-1].end, start+len(form))
+		} else {
+			runs = append(runs, span{start, start + len(form)})
+		}
+		from = start + 1
+	}
+	return runs
+}
+
+func mergeRuns(runs []span) []span {
+	if len(runs) == 0 {
 		return nil
 	}
-	slices.SortFunc(spans, func(a, b span) int { return cmp.Or(cmp.Compare(a.start, b.start), cmp.Compare(b.end, a.end)) })
-	merged := spans[:1]
-	for _, s := range spans[1:] {
-		if last := &merged[len(merged)-1]; s.start < last.end {
+	slices.SortFunc(runs, func(a, b span) int { return cmp.Compare(a.start, b.start) })
+	merged := runs[:1]
+	for _, s := range runs[1:] {
+		if last := &merged[len(merged)-1]; s.start <= last.end {
 			last.end = max(last.end, s.end)
 		} else {
 			merged = append(merged, s)

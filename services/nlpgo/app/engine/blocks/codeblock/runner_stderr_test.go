@@ -146,7 +146,7 @@ func TestCodeBlock_SecretStraddlingTheStderrCapIsAbsentAndResultSaysTruncated(t 
 	require.NoError(t, err)
 	require.NotNil(t, res.Error)
 
-	assert.True(t, strings.HasSuffix(res.Stderr, "[stderr truncated]"), res.Stderr)
+	assert.True(t, strings.HasSuffix(res.Stderr, codeblock.TruncatedMarker), res.Stderr)
 	assert.NotContains(t, res.Stderr, "CAPSEC")
 	assert.NotContains(t, res.Error.Message, "CAPSEC")
 }
@@ -172,7 +172,7 @@ func TestCodeBlock_MultiLineSecretStartingBeforeTheStderrCapIsAbsent(t *testing.
 	require.NoError(t, err)
 	require.NotNil(t, res.Error)
 
-	assert.True(t, strings.HasSuffix(res.Stderr, "[stderr truncated]"), res.Stderr)
+	assert.True(t, strings.HasSuffix(res.Stderr, codeblock.TruncatedMarker), res.Stderr)
 	assert.NotContains(t, res.Stderr, "LEAKEDLINE")
 	assert.NotContains(t, res.Error.Message, "LEAKEDLINE")
 }
@@ -186,7 +186,7 @@ func TestReadRunnerStderr_LongSecretCrossingTheCapIsAbsentWhenShortSecretsAreNea
 	require.NoError(t, err)
 
 	assertNoFragments(t, got, long, 4)
-	assert.True(t, strings.HasSuffix(got, "[stderr truncated]"), got)
+	assert.True(t, strings.HasSuffix(got, codeblock.TruncatedMarker), got)
 }
 
 // @scenario "A secret that crosses the stderr cap is never partly shown"
@@ -214,7 +214,7 @@ func TestReadRunnerStderr_CutTextWithoutANewlineIsKeptAndMarked(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, strings.HasSuffix(got, "z\n[stderr truncated]"))
-	assert.Len(t, got, codeblock.MaxRunnerStderr+len("\n[stderr truncated]"))
+	assert.Len(t, got, codeblock.MaxRunnerStderr+len(codeblock.TruncatedMarker))
 }
 
 // @scenario "A secret that crosses the stderr cap is never partly shown"
@@ -228,7 +228,7 @@ func TestReadRunnerStderr_RedactionThatShrinksTheTextStillCutsOnTheRawCap(t *tes
 		require.NoError(t, err)
 
 		assertNoFragments(t, got, long, 4)
-		assert.True(t, strings.HasSuffix(got, "[stderr truncated]"), "offset %d", offset)
+		assert.True(t, strings.HasSuffix(got, codeblock.TruncatedMarker), "offset %d", offset)
 	}
 }
 
@@ -245,14 +245,14 @@ func assertNoFragments(t *testing.T, text, secret string, minLen int) {
 
 // @scenario "A runner error carries the end of the interpreter stderr"
 func TestWithStderrTail_SingleLongLineKeepsTheByteTail(t *testing.T) {
-	stderr := strings.Repeat("é", codeblock.MaxRunnerStderr) + "\n[stderr truncated]"
+	stderr := strings.Repeat("é", codeblock.MaxRunnerStderr) + codeblock.TruncatedMarker
 
 	got := codeblock.WithStderrTail("exit status 1", stderr)
 
 	assert.True(t, utf8.ValidString(got))
 	assert.Contains(t, tailOf(got), "éééé")
-	assert.True(t, strings.HasSuffix(got, "[stderr truncated]"), got)
-	assert.LessOrEqual(t, len(tailOf(got)), codeblock.MaxStderrInMessage+len("\n[stderr truncated]"))
+	assert.True(t, strings.HasSuffix(got, codeblock.TruncatedMarker), got)
+	assert.LessOrEqual(t, len(tailOf(got)), codeblock.MaxStderrInMessage+len(codeblock.TruncatedMarker))
 }
 
 // @scenario "A cut interpreter stderr ends with a truncation marker"
@@ -263,5 +263,20 @@ func TestReadRunnerStderr_CutInsideAMultiByteRuneWithoutANewlineStaysValidUTF8(t
 
 		assert.True(t, utf8.ValidString(got), "prefix %q", prefix)
 		assert.True(t, strings.HasSuffix(got, "é\n[stderr truncated]"), "prefix %q", prefix)
+	}
+}
+
+// @scenario "A secret that crosses the stderr cap is never partly shown"
+func TestReadRunnerStderr_SecretEndingAtTheCapBeforeAStrayByteIsNotPartlyShown(t *testing.T) {
+	const secret = "SECRET12"
+	head := strings.Repeat(".", codeblock.MaxRunnerStderr-len(secret))
+	for _, stray := range []string{"\x80", "\xa9"} {
+		raw := head + secret + stray + strings.Repeat(".", 100)
+
+		got, err := codeblock.ReadRunnerStderr(t.TempDir(), raw, map[string]string{"K": secret})
+		require.NoError(t, err)
+
+		assertNoFragments(t, got, secret, 4)
+		assertNoFragments(t, codeblock.WithStderrTail("exit status 1", got), secret, 4)
 	}
 }

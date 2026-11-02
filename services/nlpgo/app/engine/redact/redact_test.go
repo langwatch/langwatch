@@ -2,6 +2,7 @@ package redact_test
 
 import (
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +25,7 @@ func TestRedactor_ManyOneCharSecretsDoNotGrowTheTextBeyondOneMarkerPerMatch(t *t
 
 	got := redactAll(input, secrets)
 
-	assert.Equal(t, matches, strings.Count(got, "[redacted]"))
+	assert.LessOrEqual(t, strings.Count(got, "[redacted]"), matches)
 	assert.LessOrEqual(t, len(got), len(input)+matches*len("[redacted]"))
 	for _, c := range []string{"a", "e", "d", "r"} {
 		assert.NotContains(t, strings.ReplaceAll(got, "[redacted]", ""), c)
@@ -113,9 +114,35 @@ func TestRedactor_OverlappingSecretsLeaveNoFragmentOfEither(t *testing.T) {
 	for _, c := range cases {
 		secrets := map[string]string{}
 		for i, s := range c.secrets {
-			secrets[string(rune('A'+i))] = s
+			secrets[strconv.Itoa(i)] = s
 		}
 		got := redactAll(c.text, secrets)
 		assert.Equal(t, "[redacted]", got)
 	}
+}
+
+func TestRedactor_SafeCutStaysOutOfASecretWhenRuneAlignmentWouldStepIntoIt(t *testing.T) {
+	r := redact.New(map[string]string{"k": "SECRET12"})
+	raw := strings.Repeat(".", 12) + "SECRET12" + "\x80tail"
+	assert.Equal(t, 12, r.SafeCut(raw, 20))
+}
+
+func TestRedactor_SafeCutStaysOutOfASecretEndingInALoneLeadByte(t *testing.T) {
+	r := redact.New(map[string]string{"k": "SECRET\xc3"})
+	raw := strings.Repeat(".", 12) + "SECRET\xc3\xa9tail"
+	assert.Equal(t, 12, r.SafeCut(raw, 19))
+}
+
+func TestRedactor_TenMiBOfOneCharSecretMatchesRedactsToOneMarker(t *testing.T) {
+	r := redact.New(map[string]string{"k": "a"})
+	assert.Equal(t, "[redacted]", r.Redact(strings.Repeat("a", 10<<20)))
+}
+
+func TestRedactor_ManyFormsMatchingTheWholeTextRedactToOneMarker(t *testing.T) {
+	secrets := map[string]string{}
+	for i := 0; i < 50; i++ {
+		secrets[strconv.Itoa(i)] = strings.Repeat("a", i+1)
+	}
+	r := redact.New(secrets)
+	assert.Equal(t, "[redacted]", r.Redact(strings.Repeat("a", 1<<20)))
 }

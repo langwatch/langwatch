@@ -394,9 +394,10 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     @unit
     Scenario: A runner error carries the end of the interpreter stderr
       Given a runner that exits without writing a result and wrote to stderr
-      When the code node runs
+      When the runner fails
       Then the error message is the exit reason followed by the end of that stderr
       And the stderr part of the message is bounded
+      And a stderr that is one long line keeps the end of that line
 
     @unit
     Scenario: A cut interpreter stderr ends with a truncation marker
@@ -416,7 +417,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     Scenario: A secret that crosses the stderr cap is never partly shown
       Given the workflow carries secrets of different lengths, one of them one character long
       And the runner wrote a stderr in which a long secret starts before the cap and ends after it
-      When the interpreter stderr is read back
+      When the runner fails
       Then the stored stderr and the error message show no fragment of that secret
       And the stored stderr ends with "[stderr truncated]"
 

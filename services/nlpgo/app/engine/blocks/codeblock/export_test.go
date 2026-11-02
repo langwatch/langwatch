@@ -13,9 +13,10 @@ import (
 func (e *Executor) ScratchRoot() string { return e.scratchRoot }
 
 // WithStderrTail exposes the runner-error stderr formatter to the tests.
-func WithStderrTail(message, stderr string) string {
-	return withStderrTail(message, stderr)
-}
+var WithStderrTail = withStderrTail
+
+// TruncatedMarker exposes the marker that ends a cut stderr to the tests.
+const TruncatedMarker = truncatedMarker
 
 // MaxStderrInMessage exposes the tail bound to the tests.
 const MaxStderrInMessage = maxStderrInMessage

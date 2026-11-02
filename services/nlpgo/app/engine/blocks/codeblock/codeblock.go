@@ -52,7 +52,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"unicode/utf8"
 
 	_ "embed"
 
@@ -684,27 +683,27 @@ const truncatedMarker = "\n[stderr truncated]"
 
 // withStderrTail appends the end of the kept interpreter stderr to a runner
 // failure, so "exit status 1" says why. That stderr is the project's own
-// output, already shown to it in the run, and the tail is bounded. The
-// stderr must already be redacted, as readRunnerStderr returns it.
+// output, already shown to it in the run, and the tail is bounded: it starts
+// on a line start when the window has one, else (a single long line) on the
+// first whole rune. The stderr must already be redacted, as readRunnerStderr
+// returns it.
 func withStderrTail(message, stderr string) string {
-	tail := strings.TrimSpace(stderr)
+	body, truncated := strings.CutSuffix(strings.TrimSpace(stderr), truncatedMarker)
+	tail := strings.TrimSpace(body)
 	if len(tail) > maxStderrInMessage {
 		tail = tail[len(tail)-maxStderrInMessage:]
-		// A line start is nicer, but a single long line has none to offer:
-		// then keep the byte tail from a rune boundary rather than nothing.
-		if _, rest, found := strings.Cut(tail, "\n"); found && strings.TrimSpace(strings.TrimSuffix(rest, strings.TrimSpace(truncatedMarker))) != "" {
+		if _, rest, found := strings.Cut(tail, "\n"); found {
 			tail = rest
-		} else {
-			for len(tail) > 0 && !utf8.RuneStart(tail[0]) {
-				tail = tail[1:]
-			}
 		}
 	}
 	tail = strings.TrimSpace(strings.ToValidUTF8(tail, ""))
+	if truncated {
+		tail += truncatedMarker
+	}
 	if tail == "" {
 		return message
 	}
-	return message + ": " + tail
+	return message + ": " + strings.TrimSpace(tail)
 }
 
 // newRunnerStderr opens the file the interpreter's own stderr goes to, in the
