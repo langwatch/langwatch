@@ -2,8 +2,8 @@ package engine
 
 import (
 	"regexp"
-	"strings"
 
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
@@ -62,16 +62,7 @@ func resolveSecretsInMap(m map[string]string, secrets map[string]string) map[str
 // stored stdout and stderr travel that same route, so a secret a code node
 // prints would otherwise land in all the same places.
 func redactSecrets(s string, secrets map[string]string) string {
-	if s == "" || len(secrets) == 0 {
-		return s
-	}
-	for _, v := range secrets {
-		if v == "" {
-			continue
-		}
-		s = strings.ReplaceAll(s, v, "[redacted]")
-	}
-	return s
+	return codeblock.RedactSecrets(s, secrets)
 }
 
 // resolveAuthSecrets resolves secret references in the credential-bearing

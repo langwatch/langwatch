@@ -53,7 +53,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"unicode/utf16"
 
 	_ "embed"
 
@@ -656,14 +655,14 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			Stderr:     stderrText,
 			Error: &Error{
 				Type:    RunnerErrorType,
-				Message: withStderrTail(runErr.Error(), stderrText, req.Secrets),
+				Message: withStderrTail(runErr.Error(), stderrText, req.Secrets, req.SandboxAPIKey),
 			},
 		}, nil
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
 		Stderr:     stderrText,
-		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText, req.Secrets)},
+		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText, req.Secrets, req.SandboxAPIKey)},
 	}, nil
 }
 
@@ -671,6 +670,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 // runner captures the user's own stderr into the result file, so this stream
 // carries interpreter-level diagnostics and a cap costs nothing — except to
 // code that writes gigabytes to its descriptor, which is why there is one.
+// readRunnerStderr cuts on a line boundary so no secret is left half-kept.
 const maxRunnerStderr = 64 << 10
 
 // maxStderrInMessage bounds the stderr tail appended to a runner error.
@@ -682,9 +682,11 @@ const maxStderrInMessage = 2 << 10
 // also hold what the project's own code wrote straight to file descriptor 2,
 // or a result the runner could not save: that is the same project's data,
 // already shown to it in the run, and the tail is bounded. Secret values are
-// redacted here before the cut (raw and JSON-escaped) and again downstream.
-func withStderrTail(message, stderr string, secrets map[string]string) string {
-	tail := strings.TrimSpace(redactStderrSecrets(stderr, secrets))
+// redacted here before the cut (the run's secrets and its sandbox key, in
+// every form they are written) and again downstream. A secret is never cut
+// first: readRunnerStderr ends on a whole line, and this redacts before cutting.
+func withStderrTail(message, stderr string, secrets map[string]string, sandboxKey string) string {
+	tail := strings.TrimSpace(RedactSecrets(stderr, secrets, sandboxKey))
 	if len(tail) > maxStderrInMessage {
 		tail = tail[len(tail)-maxStderrInMessage:]
 		if _, rest, found := strings.Cut(tail, "\n"); found {
@@ -696,48 +698,6 @@ func withStderrTail(message, stderr string, secrets map[string]string) string {
 		return message
 	}
 	return message + ": " + tail
-}
-
-// redactStderrSecrets replaces each secret value with "[redacted]" in its raw
-// form and in the escaped forms the runner's JSON fallback writes to stderr.
-func redactStderrSecrets(text string, secrets map[string]string) string {
-	for _, value := range secrets {
-		if value == "" {
-			continue
-		}
-		for _, form := range secretForms(value) {
-			text = strings.ReplaceAll(text, form, "[redacted]")
-		}
-	}
-	return text
-}
-
-// secretForms is the raw value, Go's JSON escaping and Python's
-// ensure_ascii escaping (non-ASCII as \uXXXX, surrogate pairs above the BMP).
-func secretForms(value string) []string {
-	forms := []string{value}
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false) // match Python's json.dumps, which leaves <, > and & as they are
-	if err := enc.Encode(value); err != nil {
-		return forms
-	}
-	marshalled := bytes.TrimSpace(buf.Bytes())
-	escaped := string(marshalled[1 : len(marshalled)-1])
-	forms = append(forms, escaped)
-	var ascii strings.Builder
-	for _, r := range escaped {
-		switch {
-		case r <= 0x7f:
-			ascii.WriteRune(r)
-		case r > 0xffff:
-			hi, lo := utf16.EncodeRune(r)
-			fmt.Fprintf(&ascii, "\\u%04x\\u%04x", hi, lo)
-		default:
-			fmt.Fprintf(&ascii, "\\u%04x", r)
-		}
-	}
-	return append(forms, ascii.String())
 }
 
 // newRunnerStderr opens the file the interpreter's own stderr goes to, in the
@@ -768,11 +728,22 @@ func readRunnerStderr(file *os.File) string {
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return ""
 	}
-	data, err := io.ReadAll(io.LimitReader(file, maxRunnerStderr))
+	data, err := io.ReadAll(io.LimitReader(file, maxRunnerStderr+1))
 	if err != nil {
 		return ""
 	}
-	return string(data)
+	if len(data) <= maxRunnerStderr {
+		return string(data)
+	}
+	// A secret crossing the cap would keep only its first part, which
+	// whole-value redaction cannot see; drop the incomplete last line.
+	data = data[:maxRunnerStderr]
+	if i := bytes.LastIndexByte(data, '\n'); i >= 0 {
+		data = data[:i]
+	} else {
+		data = nil
+	}
+	return string(data) + "\n[stderr truncated]"
 }
 
 // newRunToken mints the value every process in one execution carries in its
