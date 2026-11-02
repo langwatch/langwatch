@@ -15,7 +15,10 @@ export function lockedToggles(kind: AssistantKind): LockedToggles {
 
 type KindToggles = { allowVk?: boolean; allowOtelDirect?: boolean; bundledPlan?: boolean };
 
-/** The toggles a kind switches off when picked: its locked ones, and for pi the bundled plan, since pi runs on the provider keys it is given. */
+/**
+ * The toggles a kind switches off when picked: its locked ones, and for pi
+ * the bundled plan, since pi runs on the provider keys it is given.
+ */
 function switchedOff(kind: AssistantKind): KindToggles {
   return { ...lockedToggles(kind), ...(kind === "pi" ? { bundledPlan: false } : {}) };
 }

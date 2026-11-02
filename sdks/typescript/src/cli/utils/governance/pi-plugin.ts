@@ -50,9 +50,8 @@ export function piExtensionTarget(dirPath?: string): PiExtensionTarget {
 
 /**
  * Writes the extension, creating the extensions directory when missing.
- * Idempotent: a second run reports `unchanged`. A file already there that
- * isn't ours is left exactly as-is and reported `not_ours`, since pi then
- * sends nothing.
+ * A second run reports `unchanged`. A file there that isn't ours is left
+ * as-is and reported `not_ours`, since pi then sends nothing.
  */
 export function installPiTelemetryExtension({
   dirPath,

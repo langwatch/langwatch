@@ -14,10 +14,9 @@ import { CODING_AGENT_REGISTRY, SPAN_FED_MODEL_CALL_AGENT_IDS } from "../index.t
 import { piAgent } from "../pi.ts";
 
 /**
- * The keys the pi fold reads off a span's lifted facts. The allowlist is an
- * exact-match lookup that drops anything unlisted without erroring, so a
- * removal here has no runtime symptom: this test is the symptom. Everything
- * else the fold learns from pi arrives through the `gen_ai.*` mirrors.
+ * The keys the pi fold reads off a span's lifted facts. The allowlist drops
+ * anything unlisted silently, so this test is the only symptom of a removal.
+ * Everything else pi sends arrives through the `gen_ai.*` mirrors.
  */
 const PI_FOLD_KEYS = ["pi.ai.usage.cost"];
 
