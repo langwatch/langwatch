@@ -44368,7 +44368,7 @@ eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoye
 | `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
 | `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
 
-One query judges at most 1,000 distinct texts. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then carries the `INSTANT_EVAL_SKIPPED` diagnostic.
+One query judges at most 1,000 distinct texts. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
 
 **Also check:** [Instant Evals](/features/instant-evals/overview) runs the same kind of question from the CLI, and writes every verdict to the `judgments` view.
 
@@ -44570,7 +44570,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 | Queries running at once | 10, shared by the whole deployment, not per project or per key | 503 `lwql_busy` |
 {/* lwql-limits-end */}
 
-Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. A `SETTINGS` clause that tries to change them is refused.
+Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. LangWatchQL refuses a `SETTINGS` clause that changes them.
 
 ## How many queries can I run per minute
 
@@ -44615,7 +44615,7 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 | 400 | `validation_error` | The request body is not valid |
 | 400 | `lwql_unparseable` | The statement is not valid ClickHouse SQL |
 | 400 | `lwql_not_permitted` | The statement uses something LangWatchQL does not allow, such as a second statement, a view or a function |
-| 400 | `lwql_unknown_identifier` | The statement names a column that does not exist |
+| 400 | `lwql_unknown_identifier` | The statement uses a column that does not exist |
 | 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
 | 403 | `api_key_permission_denied` | The key does not have `analytics:view` |
 | 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
@@ -44647,7 +44647,7 @@ LangWatchQL is the ClickHouse SQL dialect that LangWatch accepts over its analyt
 
 On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name.
 
-A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`. That is `langwatch` in the shipped Helm chart and in `.env.example`. LangWatchQL is unavailable when `CLICKHOUSE_URL` names no database. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
+A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`. That is `langwatch` in the shipped Helm chart and in `.env.example`. LangWatchQL is unavailable when `CLICKHOUSE_URL` has no database in it. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
 
 ## What is LangWatchQL for
 
@@ -44657,7 +44657,7 @@ For finding individual traces with their spans and evaluations, use the trace fi
 
 ## How do I run a query
 
-You can send the same statement three ways. All three need the `analytics:view` permission. REST and the CLI use an API key. The hosted MCP server accepts OAuth sign-in or a personal API key, see [MCP](/integration/mcp).
+You can send the same statement from REST, the CLI or MCP, and each one needs the `analytics:view` permission. REST and the CLI sign in with an API key, while the hosted MCP server also accepts OAuth sign-in, see [MCP](/integration/mcp).
 
 
   ### REST

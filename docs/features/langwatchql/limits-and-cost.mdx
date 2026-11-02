@@ -20,7 +20,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 | Queries running at once | 10, shared by the whole deployment, not per project or per key | 503 `lwql_busy` |
 {/* lwql-limits-end */}
 
-Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. A `SETTINGS` clause that tries to change them is refused.
+Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. LangWatchQL refuses a `SETTINGS` clause that changes them.
 
 ## How many queries can I run per minute
 
@@ -65,7 +65,7 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 | 400 | `validation_error` | The request body is not valid |
 | 400 | `lwql_unparseable` | The statement is not valid ClickHouse SQL |
 | 400 | `lwql_not_permitted` | The statement uses something LangWatchQL does not allow, such as a second statement, a view or a function |
-| 400 | `lwql_unknown_identifier` | The statement names a column that does not exist |
+| 400 | `lwql_unknown_identifier` | The statement uses a column that does not exist |
 | 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
 | 403 | `api_key_permission_denied` | The key does not have `analytics:view` |
 | 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
