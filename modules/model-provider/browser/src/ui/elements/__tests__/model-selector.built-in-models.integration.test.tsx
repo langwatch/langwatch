@@ -38,7 +38,7 @@ import { ModelSelector } from "../model-selector.tsx";
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions (gpt-6-luna)",
+  label: "OpenAI Decisions API",
 };
 const UNSTORED_PROVIDER_BUILT_IN = { value: "cloudflare/decisions:clef", label: "Cloudflare Clef" };
 

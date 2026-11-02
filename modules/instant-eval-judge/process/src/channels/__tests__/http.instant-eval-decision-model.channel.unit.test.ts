@@ -90,6 +90,37 @@ describe("HttpInstantEvalDecisionModelChannel", () => {
 
       expect(authorization).toBe("Bearer customer-key");
     });
+
+    /** @scenario "An Azure decision model is sent to the project's own Azure resource" */
+    it("sends an Azure key in the api-key header and never as a bearer token", async () => {
+      const azureOrigin = "https://acme.openai.azure.com";
+      const azurePath = "/openai/v1/decisions";
+      let headers: Record<string, string> = {};
+      agent
+        .get(azureOrigin)
+        .intercept({ path: azurePath, method: "POST" })
+        .reply(200, (request) => {
+          headers = request.headers as Record<string, string>;
+          return { answers: [{ type: "predicate", name: "annoyed", probability: 0.7 }] };
+        });
+
+      const judgement = await channel().classify({
+        text: "I am fed up",
+        questions: [QUESTION],
+        decisionModel: {
+          model: "azure/decisions:gpt-6-luna",
+          wire: "openai_decisions",
+          providerModel: "gpt-6-luna",
+          endpoint: `${azureOrigin}${azurePath}`,
+          authHeader: "api_key",
+          apiKey: "azure-key",
+        },
+      });
+
+      expect(headers["api-key"]).toBe("azure-key");
+      expect(headers.authorization).toBeUndefined();
+      expect(judgement.verdicts).toEqual([{ questionId: "annoyed", probability: 0.7 }]);
+    });
   });
 
   describe("when the key is refused", () => {

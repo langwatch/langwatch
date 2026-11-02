@@ -1,6 +1,6 @@
 /**
- * An own decision model over HTTP: one POST per text with the organization's key, to the fixed
- * endpoint the catalogue names (ADR-182 decisions 8 and 9). The provider's own error text is
+ * An own decision model over HTTP: one POST per text with the organization's key, to the
+ * endpoint the catalogue builds (ADR-182 decisions 5, 8 and 9). The provider's own error text is
  * never read into a result or a log; only the status is.
  */
 
@@ -78,7 +78,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       const sent = await this.send({
         endpoint: decisionModel.endpoint,
-        apiKey: decisionModel.apiKey,
+        authorization: authorizationHeaderOf(decisionModel),
         body,
         signal,
       });
@@ -111,12 +111,12 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
 
   private async send({
     endpoint,
-    apiKey,
+    authorization,
     body,
     signal,
   }: {
     endpoint: string;
-    apiKey: string;
+    authorization: Readonly<Record<string, string>>;
     body: string;
     signal: AbortSignal | undefined;
   }): Promise<
@@ -132,7 +132,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     try {
       const response = await undiciFetch(endpoint, {
         method: "POST",
-        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        headers: { ...authorization, "content-type": "application/json" },
         body,
         signal: requestSignal(signal),
         ...(this.dispatcher ? { dispatcher: this.dispatcher } : {}),
@@ -166,6 +166,14 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     logger.warn({ model, reason, status }, "Own decision model call did not answer");
     return instantEvalSkipped(reason);
   }
+}
+
+/** Azure takes its key in `api-key`; every other provider takes a bearer token. */
+function authorizationHeaderOf({
+  authHeader,
+  apiKey,
+}: InstantEvalDecisionModelRequest["decisionModel"]): Readonly<Record<string, string>> {
+  return authHeader === "api_key" ? { "api-key": apiKey } : { authorization: `Bearer ${apiKey}` };
 }
 
 /**
