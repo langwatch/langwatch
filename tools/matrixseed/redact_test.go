@@ -69,6 +69,16 @@ func TestSnippetRemovesJSONEscapedForms(t *testing.T) {
 	}
 }
 
+// TestSnippetKeepsShortNonSecretWords: redacting "other" would turn the
+// control plane's "another field" into "an[redacted] field".
+/** @scenario "A refused request never prints a submitted secret" */
+func TestSnippetKeepsShortNonSecretWords(t *testing.T) {
+	got := snippet([]byte(`another field is wrong; key sk-longsecret`), []string{"other", "sk-longsecret"})
+	if !strings.Contains(got, "another field") || strings.Contains(got, "sk-longsecret") {
+		t.Fatalf("snippet = %q", got)
+	}
+}
+
 func TestRefusalTellsAWithheldBodyFromAnEmptyOne(t *testing.T) {
 	withheld := (&RefusedError{Call: "PUT /x", Status: 400, Withheld: true}).Error()
 	empty := (&RefusedError{Call: "POST /y", Status: 502}).Error()

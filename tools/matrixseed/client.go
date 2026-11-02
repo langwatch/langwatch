@@ -190,12 +190,16 @@ func stringValues(v any) []string {
 	return nil
 }
 
+// minSecretLen is the shortest submitted string treated as a secret: no key is
+// shorter, and redacting "other" would garble the control plane's message.
+const minSecretLen = 8
+
 // snippet keeps a refusal readable in the log. It first removes every secret
 // the request submitted, raw and JSON-escaped, then truncates.
 func snippet(raw []byte, secrets []string) string {
 	s := strings.TrimSpace(string(raw))
 	for _, secret := range secrets {
-		if secret == "" {
+		if len(secret) < minSecretLen {
 			continue
 		}
 		for _, form := range secretForms(secret) {

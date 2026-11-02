@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -97,5 +98,39 @@ func TestRefusedBootstrapWritesNoBootstrappedOutput(t *testing.T) {
 	got, _ := os.ReadFile(outputFile)
 	if strings.Contains(string(got), "bootstrapped") {
 		t.Fatalf("a refused bootstrap wrote %q to the step output", got)
+	}
+}
+
+// TestProviderRefusalStillBootstraps: a refused provider fails the step, yet
+// the project exists, so the gateway and matrix must still run on the rest.
+/** @scenario "The gateway and matrix run only once the seed has bootstrapped" */
+func TestProviderRefusalStillBootstraps(t *testing.T) {
+	plane := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/organizations":
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"organization": map[string]any{"id": "org_1"}, "team": map[string]any{"id": "team_1"},
+				"adminApiKey": map[string]any{"id": "key_1", "token": "admin-key"},
+			})
+		case "/api/v1/projects":
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "project_1", "serviceApiKey": "project-key", "serviceApiKeyId": "key_2"})
+		default:
+			http.Error(w, `{"error":"refused"}`, http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(plane.Close)
+	dir := t.TempDir()
+	out := files{env: filepath.Join(dir, "github_env"), output: filepath.Join(dir, "github_output")}
+	env := map[string]string{"OPENAI_API_KEY": "sk-test"}
+	opts := matrixseed.Options{BaseURL: plane.URL, InstanceAdminKey: "admin", Env: func(k string) string { return env[k] }}
+	if code := seed(context.Background(), opts, out); code != 1 {
+		t.Fatalf("a refused provider must fail the step, got exit %d", code)
+	}
+	got, _ := os.ReadFile(out.output)
+	if !strings.Contains(string(got), "bootstrapped=true") {
+		t.Fatalf("a seeded project must still set bootstrapped=true, output file = %q", got)
 	}
 }

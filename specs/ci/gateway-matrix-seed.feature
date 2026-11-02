@@ -75,7 +75,7 @@ Feature: The live gateway matrix seeds its own control plane
 
   @unit
   Scenario: The gateway and matrix run only once the seed has bootstrapped
-    Given the seed provisions the organisation and the project
+    Given the seed provisions the organization and the project
     When it has written the project's exports
     Then it sets the step output bootstrapped=true
     And when the bootstrap fails it exports nothing and sets no output
