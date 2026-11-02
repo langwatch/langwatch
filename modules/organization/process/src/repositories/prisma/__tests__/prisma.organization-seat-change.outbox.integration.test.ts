@@ -147,6 +147,27 @@ describe.skipIf(!DB_URL)("organization's seat changes (Postgres)", () => {
       expect(changes[1]).toMatchObject({ from: "full", to: "none", cause: "invitation_revoked" });
     });
 
+    it("records an extended invitation keeping its seat with its new expiry", async () => {
+      const organizationId = await organization("extended");
+      const created = await invite(organizationId);
+      const extended = nowInstant().add({ milliseconds: 2 * FOURTEEN_DAYS_MS });
+
+      await invites.extendInviteExpiration({
+        inviteId: created.id,
+        organizationId,
+        expiration: extended,
+      });
+
+      const changes = await seatChanges(organizationId);
+      expect(changes).toHaveLength(2);
+      expect(changes[1]).toMatchObject({
+        holder: { kind: "invitation", inviteId: created.id, expiresAt: extended.epochMilliseconds },
+        from: "full",
+        to: "full",
+        cause: "invited",
+      });
+    });
+
     it("records the invitation and the member separately when it is accepted", async () => {
       const organizationId = await organization("accepted");
       const created = await invite(organizationId);

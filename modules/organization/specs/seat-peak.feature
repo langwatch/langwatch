@@ -37,6 +37,14 @@ Feature: The most seats an organization held at once in a month
       Then the month's full seat peak is 11
 
     @unit
+    Scenario: Extending an invitation keeps its seat until the new expiry
+      Given the organization holds 10 full seats and a pending invitation to a full seat
+      And the invitation was due to expire yesterday
+      And an admin extended it before it expired
+      When an admin adds a full member today
+      Then the month's full seat peak is 12
+
+    @unit
     Scenario: Full and Lite Member seats peak separately
       Given the organization holds 10 full seats and 4 Lite Member seats
       When a Lite Member is given a full seat

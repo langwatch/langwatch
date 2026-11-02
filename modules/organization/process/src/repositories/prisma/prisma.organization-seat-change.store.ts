@@ -3,7 +3,12 @@ import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { SeatChangeCause, SeatHolder, SeatKind } from "../../eventing/seat-peak.events.ts";
-import { movesASeat, seatChangeAppend, seatKindOf } from "../../rules/seat-change.rules.ts";
+import {
+  movesAnInvitationExpiry,
+  movesASeat,
+  seatChangeAppend,
+  seatKindOf,
+} from "../../rules/seat-change.rules.ts";
 import { PrismaOrganizationSeatRepository } from "./prisma.organization-seat.repository.ts";
 
 /** One holder's seat on each side of a write, as the repository that made it knows them. */
@@ -55,7 +60,10 @@ export class PrismaOrganizationSeatChangeStore {
     return result;
   }
 
-  /** Reads the invitation's seat, runs the write, reads it again and records the move. */
+  /**
+   * Reads the invitation's seat, runs the write, reads it again and records the move. A live
+   * invitation whose expiry moved records its seat on both sides, so the fold keeps it longer.
+   */
   async movingInvitation<T>({
     inviteId,
     write,
@@ -64,10 +72,15 @@ export class PrismaOrganizationSeatChangeStore {
     const before = await this.#invitation({ ...change, inviteId });
     const result = await write();
     const after = await this.#invitation({ ...change, inviteId });
-    await this.record({
-      transaction: change.transaction,
-      change: { ...change, holder: after.holder, from: before.seat, to: after.seat },
-    });
+    const moved = { ...change, holder: after.holder, from: before.seat, to: after.seat };
+    if (movesAnInvitationExpiry({ before, after })) {
+      await this.#append({
+        transaction: change.transaction,
+        change: { ...moved, cause: "invited" },
+      });
+    } else {
+      await this.record({ transaction: change.transaction, change: moved });
+    }
     return result;
   }
 
@@ -92,6 +105,16 @@ export class PrismaOrganizationSeatChangeStore {
     change: OrganizationSeatChange;
   }): Promise<void> {
     if (!movesASeat(change)) return;
+    await this.#append({ transaction, change });
+  }
+
+  async #append({
+    transaction,
+    change,
+  }: {
+    transaction: Prisma.TransactionClient;
+    change: OrganizationSeatChange;
+  }): Promise<void> {
     const id = generate("seatchange");
     this.#outbox ??= PrismaProcessStore.create({ database: this.database });
     await this.#outbox.appendIntents({

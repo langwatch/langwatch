@@ -6,6 +6,7 @@ import {
   emptySeatPeak,
   foldSeatPeak,
   SEAT_PEAK_RECENT_CHANGE_IDS,
+  SEAT_PEAK_REORDER_WINDOW_MS,
   type SeatPeakFact,
   type SeatPeakState,
   seatPeakAsOf,
@@ -175,6 +176,53 @@ describe("foldSeatPeak", () => {
       ]);
 
       expect(novemberOf(state).fullPeak).toBe(12);
+    });
+
+    /** @scenario "Extending an invitation keeps its seat until the new expiry" */
+    it("keeps an extended invitation's seat past its old expiry, until the new one", () => {
+      const state = foldAll([
+        snapshot({
+          occurredAt: NOV_1,
+          full: 10,
+          extra: [{ holder: invitation("inv-1", NOV_2), seat: "full" }],
+        }),
+        change({
+          holder: invitation("inv-1", NOV_3),
+          from: "full",
+          to: "full",
+          occurredAt: NOV_1 + 1,
+        }),
+        change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_2 + 1 }),
+      ]);
+
+      expect(state.invitations).toEqual({ "inv-1": { seat: "full", expiresAt: NOV_3 } });
+      expect(state.counts.full).toBe(12);
+      expect(novemberOf(state).fullPeak).toBe(12);
+      expect(state.mismatches).toBe(0);
+    });
+
+    it("moves only the expiry when an invitation is extended, never the peak or its moment", () => {
+      const opened = foldAll([
+        snapshot({
+          occurredAt: NOV_1,
+          full: 10,
+          extra: [{ holder: invitation("inv-1", NOV_2), seat: "full" }],
+        }),
+      ]);
+      const extended = foldAll(
+        [
+          change({
+            holder: invitation("inv-1", NOV_3),
+            from: "full",
+            to: "full",
+            occurredAt: NOV_1 + 1,
+          }),
+        ],
+        opened,
+      );
+
+      expect(extended.counts).toEqual(opened.counts);
+      expect(extended.months).toEqual(opened.months);
     });
 
     /** @scenario "Full and Lite Member seats peak separately" */
@@ -405,6 +453,114 @@ describe("foldSeatPeak", () => {
       expect(first.months["2026-09"]).toMatchObject({ fullPeak: 6, litePeak: 3 });
       expect(first.months["2026-10"]).toMatchObject({ fullPeak: 6, litePeak: 3, fullAtEnd: 5 });
       expect(first.months["2026-11"]).toMatchObject({ fullPeak: 6, litePeak: 2 });
+    });
+  });
+
+  describe("given the outbox delivers a change after a later-dated one", () => {
+    const T = at("2026-10-31T23:30:00Z");
+    const minutes = (n: number) => T + n * 60_000;
+
+    function history(): SeatPeakFact[] {
+      return [
+        change({ holder: member("a"), from: "none", to: "full", occurredAt: minutes(5) }),
+        change({
+          holder: invitation("inv-1", minutes(50)),
+          from: "full",
+          to: "full",
+          occurredAt: minutes(10),
+        }),
+        change({ holder: member("full-0"), from: "full", to: "none", occurredAt: minutes(20) }),
+        change({ holder: member("b"), from: "none", to: "full", occurredAt: minutes(40) }),
+        change({ holder: member("full-1"), from: "full", to: "lite", occurredAt: minutes(45) }),
+      ];
+    }
+
+    function opening(): SeatPeakFact {
+      return snapshot({
+        occurredAt: T,
+        full: 10,
+        lite: 1,
+        extra: [{ holder: invitation("inv-1", minutes(30)), seat: "full" }],
+      });
+    }
+
+    /** @scenario "Rebuilding the count from the recorded changes gives the same peaks" */
+    it("gives the same peaks whatever order the changes arrive in", () => {
+      const inOrder = foldAll([opening(), ...history()]);
+      const reversed = foldAll([opening(), ...history().toReversed()]);
+      const shuffled = foldAll([opening(), ...[3, 0, 4, 2, 1].map((i) => history()[i]!)]);
+
+      for (const folded of [reversed, shuffled]) {
+        expect(folded.counts).toEqual(inOrder.counts);
+        expect(folded.months).toEqual(inOrder.months);
+        expect(folded.invitations).toEqual(inOrder.invitations);
+        expect(folded.mismatches).toBe(0);
+      }
+      expect(inOrder.months["2026-10"]).toMatchObject({ fullPeak: 12, fullAtEnd: 11 });
+      expect(inOrder.months["2026-11"]).toMatchObject({ fullPeak: 12, fullAtEnd: 11, litePeak: 2 });
+    });
+
+    it("attributes a late change to the month it happened in", () => {
+      const [joined, , , , moved] = history();
+      const state = foldAll([opening(), moved!, joined!]);
+
+      expect(state.months).toEqual(foldAll([opening(), joined!, moved!]).months);
+
+      expect(state.months["2026-10"]).toMatchObject({ fullPeak: 12, fullPeakAt: minutes(5) });
+      expect(state.months["2026-11"]).toMatchObject({ fullPeak: 12, fullAtEnd: 10, litePeak: 2 });
+    });
+
+    it("keeps an invitation's seat when its extension arrives after a change dated past the old expiry", () => {
+      const [, extended, , joined] = history();
+      const state = foldAll([opening(), joined!, extended!]);
+
+      expect(state.invitations["inv-1"]).toEqual({ seat: "full", expiresAt: minutes(50) });
+      expect(state.counts.full).toBe(12);
+      expect(state.mismatches).toBe(0);
+    });
+
+    it("applies a change later than the window where it lands and counts it as drift", () => {
+      const tooLate = change({
+        holder: member("c"),
+        from: "none",
+        to: "full",
+        occurredAt: minutes(1),
+      });
+      const state = foldAll([
+        opening(),
+        change({
+          holder: member("d"),
+          from: "none",
+          to: "full",
+          occurredAt: minutes(2) + SEAT_PEAK_REORDER_WINDOW_MS,
+        }),
+        change({
+          holder: member("e"),
+          from: "none",
+          to: "full",
+          occurredAt: minutes(3) + 2 * SEAT_PEAK_REORDER_WINDOW_MS,
+        }),
+        tooLate,
+      ]);
+
+      expect(state.counts.full).toBe(13);
+      expect(state.mismatches).toBe(1);
+    });
+
+    it("keeps no more changes for a replay than the reorder window holds", () => {
+      const state = foldAll([
+        opening(),
+        change({ holder: member("x"), from: "none", to: "full", occurredAt: minutes(1) }),
+        change({
+          holder: member("y"),
+          from: "none",
+          to: "full",
+          occurredAt: minutes(2) + SEAT_PEAK_REORDER_WINDOW_MS,
+        }),
+      ]);
+
+      expect(state.pending.map((pending) => pending.holder)).toEqual([member("y")]);
+      expect(state.settled?.counts.full).toBe(12);
     });
   });
 });
