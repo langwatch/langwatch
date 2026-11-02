@@ -18,7 +18,7 @@ What main already has, and the Connector can reuse:
 - **The hook lifecycle is on main and is caller-agnostic.** `ScenarioRunHooksService.around` runs setup, the turns, then teardown in a `finally`, records each hook, and never lets teardown change the score (`apps/scenario-child/src/services/scenario-run-hooks.service.ts:100-115`). It calls hooks through a two-member interface, `ScenarioHookCaller { runState; callHook({ kind, timeoutMs }) }` (`:20-23`). Only the wiring picks connected agents: `hookTargetOf` returns null for any other agent type (`apps/scenario-child/src/services/scenario-child-execution.service.ts:209-222`).
 - **The record is on main.** `ScenarioHookResult` with statuses `ok | failed | timed_out | skipped | not_run`, the 60 s `DEFAULT_HOOK_TIMEOUT_MS`, and "Not scored" when setup is not `ok` (`modules/scenario/contract/src/features/execution/scenario-hooks.ts:11,17,56-59`); the `lw.simulation_run.hooks_recorded` event (`modules/scenario/process/src/eventing/simulation-processing.commands.ts:115`); the Setup and Teardown bands on the run.
 - **Code execution from a scenario run is on main.** A code agent's turn runs as a one-node `entry -> code -> end` workflow on nlpgo's `/go/studio/execute_sync` (`apps/scenario-child/src/channels/http/http.serialized-code-agent.channel.ts:208,376`), with project secrets as the `secrets` namespace, resolved by the prefetch (`modules/scenario/process/src/features/prefetch/services/scenario-target-prefetch.service.ts:175-192`) through `SecretApi.getValuesByName` (`modules/secret/contract/src/secret.api.ts:28`).
-- **Code-block isolation.** https://github.com/langwatch/langwatch/pull/9050 (merged) isolates one execution from another inside nlpgo. The Python subprocess runtime has **no egress fence**: a code block may open any socket (`specs/nlp-go/code-block.feature:336-340`). https://github.com/langwatch/langwatch/pull/8991 (open, not on main; its ADR-183) runs JavaScript and TypeScript code blocks in WebAssembly, where every `fetch` passes the deployment's egress policy.
+- **Code-block isolation.** https://github.com/langwatch/langwatch/pull/9050 (merged) isolates one execution from another inside nlpgo. No code block has a network fence today: the Python subprocess runtime lets a block open any socket (`specs/nlp-go/code-block.feature:336-340`), and `specs/security/tenant-aware-egress-isolation.feature` marks "A code block is denied network access by default" as `@unimplemented`. https://github.com/langwatch/langwatch/pull/8991 (open, not on main; its ADR-183) adds a WebAssembly runtime for JavaScript and TypeScript code blocks, but keeps Python on the subprocess runtime by default (WebAssembly is opt-in through `NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm`).
 - **Datasets** are read through `DatasetApi.getDatasetPage` (`modules/dataset/contract/src/dataset.api.ts:132`).
 
 ## Decision
@@ -35,8 +35,8 @@ We will add a **Connector** to the HTTP agent: an optional setup step and teardo
     teardown?: ConnectorStep;
   }
   ConnectorStep = {
-    language: "javascript" | "typescript";
-    code: string;          // an ES module; its default export takes the input, returns the output. 64 KiB cap.
+    language: "python";                // other languages when the code-block runtime offers them
+    code: string;          // Python source; takes the input, returns the output, as a code agent's block does. 64 KiB cap.
     secretNames: string[]; // project secrets this step may read; nothing else travels
     datasetId?: string;    // optional fixture rows
   }
@@ -63,7 +63,10 @@ We will add a **Connector** to the HTTP agent: an optional setup step and teardo
 ### Isolation, egress and timeouts
 
 - Steps run only in nlpgo's code-block sandbox, never in the worker or the scenario child.
-- Steps are JavaScript or TypeScript on the WebAssembly runtime (ADR-183 on https://github.com/langwatch/langwatch/pull/8991). That runtime gives each run its own instance, memory caps, and the deployment's egress fence on every `fetch` and redirect. On cloud, private and metadata addresses are refused. Python is not offered for steps while its runtime has no egress fence. So phase 1 waits on that PR.
+- Steps are Python code blocks on today's nlpgo runner, sent by the scenario child as one `execute_sync` POST each, the same transport code agents use in scenarios. Other languages come when the runtime offers them.
+- **There is no network fence for steps, and none is a precondition.** No code block has one today (see Context), so a step adds no egress exposure beyond what a code agent already has on cloud. There, code blocks run in per-project NLP Lambdas whose IAM role covers only their own log groups and VPC network interfaces. A fence (code-block egress through the tenant-aware egress service) is follow-up work.
+- **Gate:** the product flag `release_scenario_connector_steps`. Self-hosted: steps always run. Cloud: the flag decides. When it is off, setup records "Connector steps are not released for this project yet.", the run ends `ERROR` and Not scored, and no code-runner call is made.
+- **Open question for the owner:** the cloud default of the flag. Proposal: on by default, the flag kept as an off switch. Not decided.
 - Each step has the ADR-180 budget: 60 s. The child aborts the execute call at the budget, and the code block's own `timeout_ms` is set just under it, so nlpgo stops the code first and reports why. The operator's code-block ceiling can lower it, never raise it. A timeout records `timed_out`.
 - No retries, as in ADR-180.
 
@@ -111,7 +114,7 @@ It is reversible: the branches stay, and a hooks URL can come back later as a se
 
 **Named secrets only.** A step is code that anyone who can edit the agent can write, and it calls out of LangWatch by design. Sending only the secrets it names limits what a careless or hostile step can read. Code agents and Studio code blocks today read every project secret, so this is narrower than what exists.
 
-**Waiting for the WebAssembly runtime.** The Python subprocess runtime would let phase 1 start now. But a Connector step is built to call external APIs with secrets. On cloud, the egress fence is the only thing between that code and the metadata address, and the subprocess runtime has none.
+**Waiting for the WebAssembly runtime (rejected).** Phase 1 would wait for https://github.com/langwatch/langwatch/pull/8991 and offer JavaScript and TypeScript only. But that PR keeps Python on the subprocess runtime by default, so landing it would not fence Python steps anyway. No code block has a network fence today, so steps add no exposure beyond code agents on cloud, and the flag gives a way to hold them back per project. Waiting would delay the feature for no gain in safety.
 
 ## Consequences
 
@@ -124,7 +127,7 @@ It is reversible: the branches stay, and a hooks URL can come back later as a se
 
 ### Build plan
 
-1. **Platform, no UI.** Land the WebAssembly runtime (https://github.com/langwatch/langwatch/pull/8991) first. Then: the `connector` config field and its save rules; the ported pieces of https://github.com/langwatch/langwatch/pull/9193; the prefetch of steps, secrets and rows; `ConnectorHookCaller`; and the spec rule with every scenario bound. Set through the agent REST API.
+1. **Platform, no UI.** Does not wait for the WebAssembly runtime. It adds the `connector` config field and its save rules; the ported pieces of https://github.com/langwatch/langwatch/pull/9193; the prefetch of steps, secrets and rows; `ConnectorHookCaller`; and the spec rule with every scenario bound. Set through the agent REST API.
 
    **Proof** (this is the epic's done-when), on a haven stack with the sim model:
    - A fixture HTTP service stands in for the customer. It has `POST /accounts`, `DELETE /accounts/:id`, `GET /accounts/:id`, and a chat endpoint that answers only for a live account.
