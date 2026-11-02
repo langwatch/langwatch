@@ -555,7 +555,10 @@ figure > .docs-shot {
 .docs-shell:has(.docs-top > [data-docs-banner]) {
   --docs-banners-h: 36px;
 }
-.docs-top > .docs-announcement:has([data-docs-dismiss]) ~ .docs-release-strip {
+.docs-shell:has(.docs-top > .docs-announcement:not([data-docs-dismissible]) ~ .docs-release-strip) {
+  --docs-banners-h: 72px;
+}
+.docs-top > .docs-announcement[data-docs-dismissible] ~ .docs-release-strip {
   display: none;
 }
 .docs-page-header {

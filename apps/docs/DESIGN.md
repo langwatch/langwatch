@@ -83,7 +83,8 @@ chunks, and revalidate mutable HTML and search files promptly.
 ## Scroll layout
 
 The page has three document-flow regions: sticky header, a flat paper page and a
-full-width footer, matching the brand site: white paper, ink type and hairline
+footer that sits in the layout grid beside the page list, so the list stays pinned and
+scrollable while the footer shows, matching the brand site: white paper, ink type and hairline
 rules, with no floating panel or gradient ground. The navigation rail stays below the
 header and scrolls on its own; a tall contents rail flows with the document and
 only one that fits the available viewport becomes sticky.
@@ -190,10 +191,9 @@ announcement and the release line both sit on paper with muted text; each leads
 with a mono tag behind a hairline (an orange status dot and "new", or "What's
 new" and the version), and both dismiss buttons are the same 24-pixel square.
 Sidebars and mobile navigation show the CLI command as one terminal line, with a
-setup-guide link, on every page. The command prefix stays readable;
-the idle reading script types successive supported agent names. It pauses while
-hovered or focused, stops on a deliberate choice, and stays still for reduced
-motion. The picker has a visible chevron and copies its complete command. Readers
+setup-guide link, on pages where tracing is the subject: the Observability and Coding
+Agents sections and the Platform section's Observability group. The command prefix stays
+readable; the wheel stays on the chosen agent until the reader turns it. The picker has a visible chevron and copies its complete command. Readers
 can click a faded neighbour, drag the wheel, flick it to spin with friction or turn it
 with the mouse wheel; a fast spin flashes casino names past that never reach the landing
 agent or assistive technology, and reduced motion steps one agent per drag. A

@@ -2,7 +2,8 @@ import { GITHUB_ACCEPT, REPOSITORY_API_URL, starCount } from "../../../lib/githu
 import { formatStars, githubLabel } from "../model/github-stars.ts";
 
 const STORAGE_KEY = "lw-docs:github-stars";
-/* GitHub allows 60 anonymous reads an hour per address; one an hour per reader stays inside it. */
+/* A star count an hour old still reads right. GitHub's anonymous limit is per address, so
+   readers behind one shared address can still spend it; the build's count then stays. */
 export const STARS_FRESH_MS = 60 * 60 * 1000;
 
 type StarsWindow = Pick<Window, "document" | "localStorage" | "fetch">;
@@ -47,7 +48,10 @@ function builtCount({ win }: { win: Pick<Window, "document"> }) {
 
 async function fetchStars({ win }: { win: StarsWindow }) {
   try {
-    const response = await win.fetch(REPOSITORY_API_URL, { headers: { accept: GITHUB_ACCEPT } });
+    const response = await win.fetch(REPOSITORY_API_URL, {
+      signal: AbortSignal.timeout(4000),
+      headers: { accept: GITHUB_ACCEPT },
+    });
     return response.ok ? starCount({ body: await response.json() }) : null;
   } catch {
     return null;

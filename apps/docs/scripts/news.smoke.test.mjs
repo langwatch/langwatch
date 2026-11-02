@@ -108,10 +108,17 @@ await it("leaves the release update in view beside an announcement the reader ca
         const announcement = page.getByRole("complementary", { name: "Announcement" });
         await announcement.waitFor();
         assert.equal(await release.isVisible(), false, "a dismissible announcement goes first");
-        /* The same page with a permanent announcement: one without its dismiss button. */
-        await announcement.locator("[data-docs-dismiss]").evaluate((button) => button.remove());
+        /* The same page with a permanent announcement, as docs.json renders one. */
+        await announcement.evaluate((node) => {
+          node.removeAttribute("data-docs-dismissible");
+          node.querySelector("[data-docs-dismiss]")?.remove();
+        });
         await release.waitFor();
         assert.equal(await announcement.isVisible(), true);
+        const offset = await page
+          .locator(".docs-shell")
+          .evaluate((shell) => getComputedStyle(shell).getPropertyValue("--docs-banners-h").trim());
+        assert.equal(offset, "72px", "the sticky rails clear both notice lines");
       } finally {
         await page.close();
       }

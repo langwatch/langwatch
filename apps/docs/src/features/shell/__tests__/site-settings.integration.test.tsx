@@ -45,6 +45,7 @@ describe("when docs.json has a banner", () => {
     expect(html).toContain('data-docs-banner="announcement:abc"');
     expect(html).toMatch(/<strong><a[^>]+href="\/skills\/directory"[^>]*>Skills<\/a>:<\/strong>/);
     expect(html).toContain("data-docs-dismiss");
+    expect(html).toContain("data-docs-dismissible");
   });
 
   /** @scenario "Show the authored announcement beside the release update" */
