@@ -372,7 +372,7 @@ Two engine knobs additionally accept a bare **deployed alias**, resolved in `ser
 
 `SERVER_DRAIN_DELAY_SECONDS` exists on the shared `pkg/config.Server` struct but nlpgo never calls `lifecycle.WithDrainDelay`, so setting it here does nothing. It is left in place because the field is shared, not nlpgo's to remove.
 
-Two further variables are read straight from the process environment rather than through `Config`, and are documented here so the list is complete: `LANGWATCH_ENDPOINT` (also the customer-trace export destination — see §12) and `NLPGO_SPAN_SYNC=1` (test-only; swaps the batch span processor for a synchronous one).
+Four further variables are read straight from the process environment rather than through `Config`, and are documented here so the list is complete: `LANGWATCH_ENDPOINT` (also the customer-trace export destination — see §12), `AWS_LAMBDA_FUNCTION_NAME` and `AWS_LAMBDA_RUNTIME_API` (both set means the engine is on AWS Lambda; `cmd/root.go` `allowVisibleProcess`), and `NLPGO_SPAN_SYNC=1` (test-only; swaps the batch span processor for a synchronous one).
 
 ### Engine knobs (`NLPGO_ENGINE_` prefix)
 
@@ -381,6 +381,7 @@ Two further variables are read straight from the process environment rather than
 | `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS`       | `15`      | `serve.go` `resolveStreamHeartbeat` → `httpapi.RouterDeps.StreamHeartbeat`                 |
 | `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`    | `720`     | `serve.go` `resolveStreamIdleTimeout` → `httpapi.RouterDeps.StreamIdleTimeout`             |
 | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`     | `600`     | `cmd/root.go` `newCodeExecutor` → `codeblock.Options.DefaultTimeout`                       |
+| `NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS` | `false` | `cmd/root.go` `allowVisibleProcess` → `codeblock.Options.AllowVisibleProcess`; honored only on AWS Lambda (see §7) |
 | `NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS`     | `720`     | `cmd/root.go` `newHTTPExecutor` → `httpblock.Options.DefaultTimeout`                       |
 | `NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS` | `720`     | `cmd/root.go` `newAgentWorkflowRunner` → `agentblock.WorkflowRunnerOptions.DefaultTimeout` |
 | `NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS`      | `720`     | `cmd/root.go` `newEvaluatorExecutor` → `evaluatorblock.Options.DefaultTimeout`             |

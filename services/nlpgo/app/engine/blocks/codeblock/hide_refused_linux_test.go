@@ -17,6 +17,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 )
@@ -139,6 +142,17 @@ func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
 	runChild(t, "refused-unset")
 }
 
+/** @scenario "the engine reports its hide mode once at start-up" */
+func TestHideRefused_LogsTheModeItChose(t *testing.T) {
+	for _, name := range []string{"not-refused", "refused-allowed", "refused-unset"} {
+		t.Run(name, func(t *testing.T) { runChild(t, name) })
+	}
+}
+
+func TestHideRefused_DisabledMessageNamesTheVariableWhenTheOptionIsOmitted(t *testing.T) {
+	runChild(t, "refused-unset-unnamed")
+}
+
 func TestHideRefused_RunnerHideStep(t *testing.T) {
 	t.Run("given prctl is refused and NLPGO_CODE_BLOCK_HIDE is unset", func(t *testing.T) {
 		t.Run("the runner exits 1 with the prctl message", func(t *testing.T) {
@@ -175,11 +189,19 @@ func TestHideRefusedChild(t *testing.T) {
 
 func runExecutorCase(t *testing.T, name string) {
 	t.Helper()
-	exe, err := codeblock.New(codeblock.Options{
+	core, logs := observer.New(zapcore.DebugLevel)
+	opts := codeblock.Options{
 		AllowVisibleProcess:        name == "refused-allowed",
 		AllowVisibleProcessSetting: settingName,
-	})
+		Logger:                     zap.New(core),
+	}
+	if name == "refused-unset-unnamed" {
+		opts.AllowVisibleProcessSetting = ""
+	}
+	exe, err := codeblock.New(opts)
 	require.NoError(t, err, "codeblock.New must never abort the engine over PR_SET_DUMPABLE")
+
+	assertHideModeLogged(t, logs, name)
 
 	res, runErr := exe.Execute(context.Background(), codeblock.Request{
 		Code:            trivialBlock,
@@ -188,7 +210,7 @@ func runExecutorCase(t *testing.T, name string) {
 	})
 
 	switch name {
-	case "refused-unset":
+	case "refused-unset", "refused-unset-unnamed":
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Error)
@@ -199,6 +221,25 @@ func runExecutorCase(t *testing.T, name string) {
 		require.Nil(t, res.Error, "expected success, got %+v", res.Error)
 		assert.EqualValues(t, 42, res.Outputs["answer"])
 	}
+}
+
+// assertHideModeLogged checks the one operator-facing record of the mode:
+// info when strict, a warning when the platform refused the hide step.
+func assertHideModeLogged(t *testing.T, logs *observer.ObservedLogs, name string) {
+	t.Helper()
+	want := map[string]struct {
+		mode  string
+		level zapcore.Level
+	}{
+		"not-refused":           {"strict", zapcore.InfoLevel},
+		"refused-allowed":       {"visible-process", zapcore.WarnLevel},
+		"refused-unset":         {"disabled", zapcore.WarnLevel},
+		"refused-unset-unnamed": {"disabled", zapcore.WarnLevel},
+	}[name]
+	entries := logs.FilterMessage("nlpgo_code_block_hide_mode").All()
+	require.Len(t, entries, 1, "the mode is logged exactly once")
+	assert.Equal(t, want.level, entries[0].Level)
+	assert.Equal(t, want.mode, entries[0].ContextMap()["mode"])
 }
 
 func runRunnerCase(t *testing.T, name string) {

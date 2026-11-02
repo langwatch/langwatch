@@ -197,7 +197,7 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, l
 }
 
 // allowVisibleProcessSetting is the full name of EngineConfig.CodeBlockAllowVisibleProcess.
-const allowVisibleProcessSetting = "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
+const allowVisibleProcessSetting = codeblock.DefaultAllowVisibleProcessSetting
 
 // allowVisibleProcess honors the setting only on AWS Lambda, the one platform
 // whose seccomp refuses the hide step; elsewhere it is ignored with a warning.

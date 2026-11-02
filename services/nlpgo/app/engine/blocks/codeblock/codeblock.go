@@ -115,7 +115,8 @@ type Options struct {
 	// the engine's /proc files. The caller decides whether the platform is one
 	// that may ask for this (AWS Lambda); see cmd/root.go.
 	AllowVisibleProcess bool
-	// AllowVisibleProcessSetting names that setting in the disabled-mode error.
+	// AllowVisibleProcessSetting names that setting in the disabled-mode error;
+	// empty means DefaultAllowVisibleProcessSetting.
 	AllowVisibleProcessSetting string
 	// Logger reports what teardown could not finish. Optional: a nil logger
 	// discards those reports rather than failing an execution.
@@ -180,6 +181,10 @@ type Executor struct {
 	// mode is decided once in New; see hideMode.
 	mode hideMode
 }
+
+// DefaultAllowVisibleProcessSetting is the operator variable the disabled-mode
+// error names when the caller does not say which one it read.
+const DefaultAllowVisibleProcessSetting = "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
 
 // hideMode says how the engine's own /proc files are protected.
 type hideMode string
@@ -268,6 +273,9 @@ func New(opts Options) (*Executor, error) {
 	if err != nil {
 		channel.close()
 		return nil, err
+	}
+	if opts.AllowVisibleProcessSetting == "" {
+		opts.AllowVisibleProcessSetting = DefaultAllowVisibleProcessSetting
 	}
 	return &Executor{
 		mode:           resolveHideMode(opts.AllowVisibleProcess, opts.logger()),
