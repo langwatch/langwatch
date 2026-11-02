@@ -322,9 +322,10 @@ describe("given the trigger digest", () => {
 
   describe("when a row links a trace with a start time and another a chart", () => {
     /** @scenario "Digest email links carry the marker" */
-    it("marks both links as an alert's, after the partition hint", async () => {
+    it("marks both links with the sender's marker, after the partition hint", async () => {
       const rendered = await html(triggerDigestEmailTemplate, {
         ...base,
+        linkMarker: { param: "lw_from", value: "alert" },
         entries: [{ traceId: "trace_1", occurredAtMs: 1_700_000_000_000 }, { graphId: "graph_1" }],
       });
 

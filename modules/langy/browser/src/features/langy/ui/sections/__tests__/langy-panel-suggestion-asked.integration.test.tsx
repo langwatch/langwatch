@@ -4,8 +4,6 @@
  * @vitest-environment jsdom
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
-import type * as BrowserHostAnalytics from "@langwatch/browser-host/analytics";
-import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -14,16 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const PROJECT_ID = "project-demo";
 
-const tracked = vi.hoisted(() => ({ events: [] as UiAnalyticsEvent[] }));
 const sendMessage = vi.hoisted(() => vi.fn());
-
-vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
-  const actual = await importActual<typeof BrowserHostAnalytics>();
-  return {
-    ...actual,
-    useUiAnalytics: () => ({ track: (event: UiAnalyticsEvent) => tracked.events.push(event) }),
-  };
-});
 
 // A loaded project with no traces yet, so the empty panel offers its first suggestions.
 vi.mock("../../../../../behavior/home/use-project-reach.ts", () => ({
@@ -157,7 +146,13 @@ import {
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
 import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
+import {
+  RecordingAnalyticsProvider,
+  RecordingUiAnalytics,
+} from "../../../__tests__/recording-analytics.test-helpers.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
+
+const tracked = new RecordingUiAnalytics();
 
 vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
@@ -205,9 +200,11 @@ class FakeLangyHost extends LangyHostApi {
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <DesignSystemProvider forcedTheme="light">
-    <LangyHostProvider value={new FakeLangyHost()}>
-      <LangyProvider>{children}</LangyProvider>
-    </LangyHostProvider>
+    <RecordingAnalyticsProvider analytics={tracked}>
+      <LangyHostProvider value={new FakeLangyHost()}>
+        <LangyProvider>{children}</LangyProvider>
+      </LangyHostProvider>
+    </RecordingAnalyticsProvider>
   </DesignSystemProvider>
 );
 

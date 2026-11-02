@@ -8,8 +8,6 @@
 
 import type { QueryCompleteness } from "@langwatch/analytics-contract";
 import { LWQL_MAX_RESULT_ROWS } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import type * as BrowserHostAnalytics from "@langwatch/browser-host/analytics";
-import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import {
   UiProcedureRefusal,
   type UiProcedureAnswer,
@@ -20,23 +18,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-const { frameProps, tracked } = vi.hoisted(() => ({
+const { frameProps } = vi.hoisted(() => ({
   frameProps: vi.fn<(props: SandboxedChartFrameProps) => void>(),
-  tracked: { events: [] as UiAnalyticsEvent[] },
 }));
-
-vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
-  const actual = await importActual<typeof BrowserHostAnalytics>();
-  const recorder = {
-    track: (event: UiAnalyticsEvent) => tracked.events.push(event),
-    register: () => void 0,
-    unregister: () => void 0,
-    identify: () => void 0,
-    group: () => void 0,
-    reset: () => void 0,
-  };
-  return { ...actual, useUiAnalytics: () => recorder };
-});
 
 vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
   SandboxedChartFrame: (props: SandboxedChartFrameProps) => {
@@ -51,7 +35,21 @@ import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { BoardWidgetCard } from "../ui/sections/board-widget-card.tsx";
 import { CuratedWidgetCard } from "../ui/sections/curated-widget-card.tsx";
-import { renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import {
+  RecordingUiAnalytics,
+  renderDashboards,
+  withAnalytics,
+} from "./render-dashboards.test-helpers.tsx";
+
+const tracked = new RecordingUiAnalytics();
+
+/** Renders like the shell, with the recording analytics installed through the host services. */
+function renderTracked({
+  element,
+  ...rest
+}: Parameters<typeof renderDashboards>[0]): ReturnType<typeof renderDashboards> {
+  return renderDashboards({ ...rest, element: withAnalytics(element, tracked) });
+}
 
 /** 2026-10-01T00:00:00Z to 2026-10-08T00:00:00Z: seven whole UTC days. */
 const PERIOD: BoardPeriod = {
@@ -121,7 +119,7 @@ async function frameRunsItsQuery() {
 
 function storedCard({ answer }: { answer: UiProcedureAnswer }) {
   const host = new StubAnalyticsHost();
-  renderDashboards({
+  renderTracked({
     element: (
       <BoardWidgetCard
         widget={WIDGET}
@@ -144,7 +142,7 @@ function storedCard({ answer }: { answer: UiProcedureAnswer }) {
 
 function curatedCard({ answer }: { answer: UiProcedureAnswer }) {
   const host = new StubAnalyticsHost();
-  renderDashboards({
+  renderTracked({
     element: (
       <CuratedWidgetCard
         widget={{

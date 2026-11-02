@@ -1,5 +1,3 @@
-import type * as BrowserHostAnalytics from "@langwatch/browser-host/analytics";
-import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,18 +6,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 import { useLangyStore } from "../../../../../../behavior/langy.store.ts";
+import {
+  RecordingAnalyticsProvider,
+  RecordingUiAnalytics,
+} from "../../../../__tests__/recording-analytics.test-helpers.tsx";
 import type { LangyProposal, ProposalHandlers } from "../../langy-proposal-card.tsx";
 import { useLangyProposalApply } from "../use-langy-panel-offers.ts";
 
-const tracked = vi.hoisted(() => ({ events: [] as UiAnalyticsEvent[] }));
-
-vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
-  const actual = await importActual<typeof BrowserHostAnalytics>();
-  return {
-    ...actual,
-    useUiAnalytics: () => ({ track: (event: UiAnalyticsEvent) => tracked.events.push(event) }),
-  };
-});
+const tracked = new RecordingUiAnalytics();
 
 const proposal = (kind: string): LangyProposal => ({
   langyProposal: true,
@@ -30,8 +24,13 @@ const proposal = (kind: string): LangyProposal => ({
 });
 
 function render(handlers: ProposalHandlers) {
-  const { result } = renderHook(() =>
-    useLangyProposalApply({ proposalHandlersRef: { current: handlers } }),
+  const { result } = renderHook(
+    () => useLangyProposalApply({ proposalHandlersRef: { current: handlers } }),
+    {
+      wrapper: ({ children }) => (
+        <RecordingAnalyticsProvider analytics={tracked}>{children}</RecordingAnalyticsProvider>
+      ),
+    },
   );
   return result;
 }

@@ -5,9 +5,6 @@
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 
-import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
-import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -18,7 +15,9 @@ import type { AnalyticsRouteReading } from "../../../../model/analytics-host.ts"
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../../testing.tsx";
 import {
   NO_PROCEDURES,
+  RecordingUiAnalytics,
   renderDashboards,
+  withAnalytics,
 } from "../../__tests__/render-dashboards.test-helpers.tsx";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import { boardSubject, SUGGESTED_QUESTIONS } from "../../langy/model/board-langy.ts";
@@ -35,33 +34,11 @@ import { useDashboardViewed } from "../use-dashboard-viewed.ts";
 import { useFavourites } from "../use-favourites.ts";
 import { useSavedDashboards } from "../use-saved-dashboards.ts";
 
-/** The analytics destination the shell installs, recording instead of sending. */
-class RecordingUiAnalytics extends UiAnalytics {
-  readonly events: UiAnalyticsEvent[] = [];
-
-  track(event: UiAnalyticsEvent): void {
-    this.events.push(event);
-  }
-
-  identify(): void {}
-
-  group(): void {}
-
-  reset(): void {}
-}
-
 const tracked = new RecordingUiAnalytics();
 
 /** Puts the recording destination above the element, through the real host-service seam. */
 function withTracking(element: ReactElement) {
-  const services = {
-    ...createUiHostServicesFromHost({
-      route: () => ({ params: {}, query: {} }),
-      navigate: () => void 0,
-    }),
-    analytics: tracked,
-  };
-  return <UiHostServicesContextProvider value={services}>{element}</UiHostServicesContextProvider>;
+  return withAnalytics(element, tracked);
 }
 
 const DASHBOARD_ID = "board-1";

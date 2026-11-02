@@ -56,19 +56,33 @@ export const triggerDigestMail = z.object({
    * mail can offer to write one; without it, it says nothing.
    */
   triggerId: z.string().min(1).optional(),
+  /**
+   * The query pair a row link to our own app carries so the app counts the landing. The sender
+   * names it (automation-contract's `ALERT_LINK_PARAM`/`ALERT_LINK_VALUE`); without it, links are
+   * left as they are.
+   */
+  linkMarker: z.object({ param: z.string().min(1), value: z.string().min(1) }).optional(),
 });
 
 export type TriggerDigestMail = z.infer<typeof triggerDigestMail>;
 
 /**
- * A row link with the alert marker the app counts a landing by, automation-contract's
- * `withAlertLinkMarker`: set on our own app's links only, kept before any `#hash`.
+ * A row link with the sender's marker, as automation-contract's `withAlertLinkMarker` sets it:
+ * on our own app's links only, kept before any `#hash`.
  */
-const markedAsAlert = ({ url, baseHost }: { url: string; baseHost: string }): string => {
-  if (!URL.canParse(url) || !URL.canParse(baseHost)) return url;
+const marked = ({
+  url,
+  baseHost,
+  linkMarker,
+}: {
+  url: string;
+  baseHost: string;
+  linkMarker: TriggerDigestMail["linkMarker"];
+}): string => {
+  if (!linkMarker || !URL.canParse(url) || !URL.canParse(baseHost)) return url;
   const link = new URL(url);
   if (link.origin !== new URL(baseHost).origin) return url;
-  link.searchParams.set("lw_from", "alert");
+  link.searchParams.set(linkMarker.param, linkMarker.value);
   return link.toString();
 };
 
@@ -79,11 +93,15 @@ const markedAsAlert = ({ url, baseHost }: { url: string; baseHost: string }): st
  */
 const linkFor = (
   entry: TriggerDigestEntry,
-  { projectSlug, baseHost }: { projectSlug: string; baseHost: string },
+  {
+    projectSlug,
+    baseHost,
+    linkMarker,
+  }: Pick<TriggerDigestMail, "projectSlug" | "baseHost" | "linkMarker">,
 ): string => {
   if (entry.graphId) {
     const url = `${baseHost}/${projectSlug}/analytics/custom/${entry.graphId}`;
-    return markedAsAlert({ url, baseHost });
+    return marked({ url, baseHost, linkMarker });
   }
   if (entry.traceId) {
     const trace = `${baseHost}/${projectSlug}/traces/${entry.traceId}`;
@@ -92,7 +110,7 @@ const linkFor = (
       hint !== undefined && Number.isFinite(hint) && hint > 0
         ? `${trace}?t=${Math.floor(hint)}`
         : trace;
-    return markedAsAlert({ url, baseHost });
+    return marked({ url, baseHost, linkMarker });
   }
   return "#";
 };
@@ -202,6 +220,7 @@ export const triggerDigestEmailTemplate = defineTemplate({
       triggerMessage: "Three or more low-satisfaction answers in the checkout flow.",
       projectSlug: "support-agent",
       baseHost: "https://app.langwatch.ai",
+      linkMarker: { param: "lw_from", value: "alert" },
       entries: [
         {
           traceId: "trace_4KpQ2mXv9dLbR7",
@@ -233,6 +252,7 @@ export const triggerDigestEmailTemplate = defineTemplate({
       triggerMessage: "",
       projectSlug: "support-agent",
       baseHost: "https://app.langwatch.ai",
+      linkMarker: { param: "lw_from", value: "alert" },
       entries: [{ traceId: "trace_4KpQ2mXv9dLbR7" }, { graphId: "graph_5RmB6qEs2vNkP4" }],
       triggerId: "auto_7Kd2ppQ4",
     },
@@ -242,6 +262,7 @@ export const triggerDigestEmailTemplate = defineTemplate({
       triggerMessage: "",
       projectSlug: "support-agent",
       baseHost: "https://app.langwatch.ai",
+      linkMarker: { param: "lw_from", value: "alert" },
       entries: Array.from({ length: 24 }, (_unused, index) => ({
         traceId: `trace_${String(index).padStart(4, "0")}aXcVbNmQwE`,
       })),

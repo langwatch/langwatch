@@ -5,25 +5,8 @@
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 
-import type * as BrowserHostAnalytics from "@langwatch/browser-host/analytics";
-import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import { act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const { tracked } = vi.hoisted(() => ({ tracked: { events: [] as UiAnalyticsEvent[] } }));
-
-vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
-  const actual = await importActual<typeof BrowserHostAnalytics>();
-  const recorder = {
-    track: (event: UiAnalyticsEvent) => tracked.events.push(event),
-    register: () => void 0,
-    unregister: () => void 0,
-    identify: () => void 0,
-    group: () => void 0,
-    reset: () => void 0,
-  };
-  return { ...actual, useUiAnalytics: () => recorder };
-});
 
 vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
   SandboxedChartFrame: () => <div data-testid="sandboxed-frame" />,
@@ -34,7 +17,21 @@ import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { BoardWidgetCard } from "../ui/sections/board-widget-card.tsx";
 import { CuratedWidgetCard } from "../ui/sections/curated-widget-card.tsx";
-import { renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import {
+  RecordingUiAnalytics,
+  renderDashboards,
+  withAnalytics,
+} from "./render-dashboards.test-helpers.tsx";
+
+const tracked = new RecordingUiAnalytics();
+
+/** Renders like the shell, with the recording analytics installed through the host services. */
+function renderTracked({
+  element,
+  ...rest
+}: Parameters<typeof renderDashboards>[0]): ReturnType<typeof renderDashboards> {
+  return renderDashboards({ ...rest, element: withAnalytics(element, tracked) });
+}
 
 const PERIOD: BoardPeriod = {
   periodStart: Date.UTC(2026, 9, 1),
@@ -80,7 +77,7 @@ function cardShows({ share }: { share: number }) {
 }
 
 function storedCard(widget: BoardWidget) {
-  renderDashboards({
+  renderTracked({
     element: (
       <BoardWidgetCard
         widget={widget}
@@ -173,7 +170,7 @@ describe("given a board's widget card", () => {
 describe("given a From LangWatch board's widget card", () => {
   /** @scenario "Telemetry: a widget on screen sends dashboards.viewed.widget once per board view" */
   it("sends one view with the curated source", () => {
-    renderDashboards({
+    renderTracked({
       element: (
         <CuratedWidgetCard
           widget={{

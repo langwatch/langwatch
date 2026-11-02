@@ -1,5 +1,3 @@
-import type * as BrowserHostAnalytics from "@langwatch/browser-host/analytics";
-import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,30 +6,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import {
+  RecordingAnalyticsProvider,
+  RecordingUiAnalytics,
+} from "../../__tests__/recording-analytics.test-helpers.tsx";
 import { useLangyPanelSend } from "../panel/use-langy-panel-send.ts";
 
-const tracked = vi.hoisted(() => ({ events: [] as UiAnalyticsEvent[] }));
-
-vi.mock("@langwatch/browser-host/analytics", async (importActual) => {
-  const actual = await importActual<typeof BrowserHostAnalytics>();
-  return {
-    ...actual,
-    useUiAnalytics: () => ({ track: (event: UiAnalyticsEvent) => tracked.events.push(event) }),
-  };
-});
+const tracked = new RecordingUiAnalytics();
 
 function render() {
   const sendMessage = vi.fn().mockResolvedValue(undefined);
-  const { result } = renderHook(() =>
-    useLangyPanelSend({
-      projectId: "proj_1",
-      isBusy: false,
-      latestAssistantMessageId: void 0,
-      lastSentTextRef: { current: null },
-      resetRecovery: vi.fn(),
-      sendMessage,
-      restoreDraftOnFailure: vi.fn(),
-    }),
+  const { result } = renderHook(
+    () =>
+      useLangyPanelSend({
+        projectId: "proj_1",
+        isBusy: false,
+        latestAssistantMessageId: void 0,
+        lastSentTextRef: { current: null },
+        resetRecovery: vi.fn(),
+        sendMessage,
+        restoreDraftOnFailure: vi.fn(),
+      }),
+    {
+      wrapper: ({ children }) => (
+        <RecordingAnalyticsProvider analytics={tracked}>{children}</RecordingAnalyticsProvider>
+      ),
+    },
   );
   return { send: result.current, sendMessage };
 }
