@@ -292,7 +292,11 @@ describe("given a board saved before the v2 templates, with its own widget code"
     await screen.findAllByTestId("sandboxed-frame");
     await everyFrameRuns();
   });
-  afterEach(() => vi.useRealTimers());
+  // Unmount on fake time first, so a timer the board arms while closing is dropped with the rest.
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
 
   describe("when the member opens it", () => {
     /** @scenario "AC11 Existing boards are unaffected" */
@@ -306,7 +310,8 @@ describe("given a board saved before the v2 templates, with its own widget code"
     /** @scenario "AC11 Existing boards are unaffected" */
     it("titles the widget's card with its stored label", () => {
       const [frame] = screen.getAllByTestId("sandboxed-frame");
-      const card = frame?.closest("[data-testid='widget-card']") as HTMLElement;
+      const card = frame?.closest<HTMLElement>("[data-testid='widget-card']");
+      if (!card) throw new Error("the frame is in no widget card");
       expect(within(card).getByTestId("widget-card-title")).toHaveTextContent(SAVED.name);
     });
 
@@ -322,7 +327,8 @@ describe("given a board saved before the v2 templates, with its own widget code"
     /** @scenario "AC11 Existing boards are unaffected" */
     it("writes nothing back to the board or its widgets, even after it settles", async () => {
       // A save from a timer or a late effect would land after the first pass: run ten minutes of
-      // the board's timers, which covers its debounces and a Live refresh.
+      // the board's timers (its debounces and refetches). jsdom lays out no grid, so a layout save
+      // cannot fire here; the running-app proof logged none over an open and a reload.
       await act(() => vi.advanceTimersByTimeAsync(10 * 60_000));
       expect(
         calls
