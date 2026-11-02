@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 import budgetsFile from "./budgets.json" with { type: "json" };
-import { pageTokensSchema } from "../../lib/page-tokens.ts";
 
 export const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"] as const;
 export const FORM_FACTORS = ["mobile", "desktop"] as const;
@@ -44,7 +43,8 @@ export const budgetsSchema = z.strictObject({
     known: z.record(z.string(), z.array(z.string())).default({}),
   }),
   agentReadiness: z.strictObject({
-    pageTokens: pageTokensSchema,
+    /** Approximate tokens (characters / 4) one page's Markdown export may hold. */
+    pageTokens: z.number().int().positive(),
     /** Which docs.json pages are integration pages: whole navigation groups, plus listed slugs. */
     integration: z.strictObject({
       groups: z.array(z.strictObject({ anchor: z.string(), group: z.string() })),
