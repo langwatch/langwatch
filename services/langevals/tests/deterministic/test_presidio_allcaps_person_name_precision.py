@@ -8,10 +8,11 @@ import json
 
 import pytest
 from langevals_presidio.allcaps_names import normalise_allcaps_runs
+from langevals_presidio.pii_detection import PresidioEntities
 from presidio_person_name_support import (
     LENGTH_BAND,
     MIN_THRESHOLD,
-    analysis_count,
+    analyze_calls,
     person_spans,
     second_pass_places,
 )
@@ -202,4 +203,7 @@ def test_no_false_place_from_the_second_pass(index: int):
 @pytest.mark.parametrize("text", PRECISION_CORPUS["place_context_non_names"])
 def test_place_context_strings_reach_the_second_pass(text: str):
     """Without a second pass the no-place check above has nothing to judge."""
-    assert analysis_count(text) == 2, f"no second pass over {text!r}"
+    calls = analyze_calls(
+        entities=PresidioEntities(person=True, location=True), text=text
+    )
+    assert len(calls) == 2, f"no second pass over {text!r}"

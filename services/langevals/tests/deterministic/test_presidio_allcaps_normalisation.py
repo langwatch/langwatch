@@ -7,7 +7,6 @@ specs/evaluators/langevals-presidio-allcaps-person-names.feature
 
 import sys
 import unicodedata
-from functools import lru_cache
 from typing import Any
 
 import pytest
@@ -20,59 +19,19 @@ from langevals_presidio.pii_detection import (
     PresidioEntities,
     PresidioPIIDetectionEntry,
     PresidioPIIDetectionEvaluator,
-    PresidioPIIDetectionSettings,
 )
 from presidio_analyzer import RecognizerResult
-from presidio_person_name_support import MIN_THRESHOLD, evaluator
+from presidio_person_name_support import (
+    MIN_THRESHOLD,
+    analyze_calls,
+    evaluator,
+    name_and_place_evaluator,
+)
 
 # U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE. Its lowercase mapping is two
 # characters, 'i' plus U+0307, which is what makes a naive lower() or title()
 # shift every offset after it.
 DOTTED_CAPITAL_I = "İ"
-
-
-class CountingAnalyzer:
-    """Passes every call through and records how many there were."""
-
-    def __init__(self, inner: Any):
-        self._inner = inner
-        self.calls: list[dict[str, Any]] = []
-
-    def analyze(self, **kwargs: Any) -> Any:
-        self.calls.append(kwargs)
-        return self._inner.analyze(**kwargs)
-
-
-def analyze_calls(*, entities: PresidioEntities, text: str) -> list[dict[str, Any]]:
-    """Every analyze() call one evaluate() of `text` makes.
-
-    The counter goes on the class: the pydantic evaluator refuses instance attributes.
-    """
-    subject = PresidioPIIDetectionEvaluator(
-        settings=PresidioPIIDetectionSettings(
-            entities=entities, min_threshold=MIN_THRESHOLD
-        )
-    )
-    inner = PresidioPIIDetectionEvaluator.analyzer
-    counting = CountingAnalyzer(inner)
-    PresidioPIIDetectionEvaluator.analyzer = counting  # type: ignore[assignment]
-    try:
-        result = subject.evaluate(PresidioPIIDetectionEntry(input=text))
-    finally:
-        PresidioPIIDetectionEvaluator.analyzer = inner  # type: ignore[assignment]
-    assert result.status == "processed", f"evaluator did not run: {result}"
-    return counting.calls
-
-
-@lru_cache(maxsize=1)
-def name_and_place_evaluator() -> PresidioPIIDetectionEvaluator:
-    """The default entities plus person and location, as strict redaction asks."""
-    return PresidioPIIDetectionEvaluator(
-        settings=PresidioPIIDetectionSettings(
-            entities=PresidioEntities(person=True, location=True),
-            min_threshold=MIN_THRESHOLD,
-        )
-    )
 
 
 def findings(
@@ -230,6 +189,7 @@ def test_no_second_pass_when_only_short_words_are_capitalised():
         "{'method': 'POST', 'url': '/v1', 'level': 'ERROR'}",
         '"method"; "POST"; "status"; "SUCCESS"',
         "{“method”: “POST”, “level”: “ERROR”}",
+        '{method: "POST", level: "ERROR"}',
     ],
 )
 def test_no_second_pass_when_every_capitalised_word_is_its_own_field(text: str):

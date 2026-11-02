@@ -43,12 +43,15 @@ person spans that copy reveals into the first pass's findings.
    unknown word (ZORBEX ULTRA). This refuses WIDGET PRO, SEPA ACH, API KEY
    and invented brands, which pass the shape rule.
 4. The second pass is skipped when neither person nor location detection is
-   on, or when every rewritten word is cut off from its neighbours by a field
-   end: a quote beside a colon, comma or semicolon, as in "method": "POST".
-   Any other gap (a space, comma, colon, quote, bracket or dash) may sit
-   inside a name, as in JOHN "JACK" WHITFIELD or Robert: MILLER. Prose with OK, ID or USD and JSON with a quoted
-   "POST" or "ERROR" cost one pass, since no span of one word can pass rule 2.
-   With location on and person off it asks for places only.
+   on, or when no rewritten word could join a name. A rewritten word joins one
+   when it sits beside another word, with no field end between them, and is
+   four or more letters or stands beside a second rewritten word. A field end
+   is a quote beside a colon, comma or semicolon, as in "method": "POST". Any
+   other gap (a space, comma, colon, quote, bracket or dash) may sit inside a
+   name, as in JOHN "JACK" WHITFIELD or Robert: MILLER. Prose with OK, ID or
+   USD and JSON with a quoted "POST" or "ERROR" cost one pass, since no span
+   of one word can pass rule 2. With location on and person off it asks for
+   places only.
 5. Only PERSON spans, and LOCATION spans when location is redacted, come out
    of the second pass. LOCATION is there because the model reads some
    surnames as places (Costa Pereira), so a person-only pass left them in
@@ -100,9 +103,9 @@ Alternatives rejected:
 A second spaCy pass costs CPU on the texts that carry a name-shaped capital
 run. The skip rule bounds that to those texts. The first skip rule fired on
 any rewritten word of four letters, so a trace with "method": "POST" took
-about twice the time (79 ms against 43 ms on a 1,365-character payload) for
-a pass that could not keep a span. Requiring a neighbouring word left the
-output of 3,089 recall and precision texts unchanged.
+about twice the time (81.5 ms against 47.8 ms on a 1,365-character
+payload) for a pass that could not keep a span. Requiring a neighbouring
+word left the output of 3,098 recall and precision texts unchanged.
 
 ## Consequences
 
