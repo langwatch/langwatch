@@ -61,7 +61,7 @@ export class SeatPeakCorrectionService {
     const corrections = memberSeatCorrections({
       readings: concerned.map((userId) => ({
         userId,
-        recorded: state.members[userId] ?? "none",
+        recorded: state.members[userId]?.seat ?? "none",
         live: live.get(userId) ?? "none",
       })),
       acrossViewOnlyLineOnly,
@@ -92,7 +92,7 @@ export class SeatPeakCorrectionService {
       if (holder.kind === "invitation") live.add(holder.inviteId);
     }
     for (const [inviteId, invitation] of Object.entries(state.invitations)) {
-      if (live.has(inviteId)) continue;
+      if (live.has(inviteId) || invitation.seat === "none") continue;
       // An invitation past its expiry gave its seat back when it expired; the fold knows that.
       if (invitation.expiresAt !== null && invitation.expiresAt < source.occurredAt) continue;
       await this.#record({

@@ -32,19 +32,22 @@ export const seatPeakMonthSchema = z.object({
 });
 export type SeatPeakMonth = z.infer<typeof seatPeakMonthSchema>;
 
+/** A holder's seat and the time of the last change applied to it; `none` is kept, so it orders. */
+const seatPeakMemberSchema = z.object({ seat: seatKindSchema, lastChangedAt: z.number() });
+
 const seatPeakInvitationSchema = z.object({
-  seat: seatKindSchema,
+  ...seatPeakMemberSchema.shape,
   expiresAt: z.number().nullable(),
 });
-export type SeatPeakInvitation = z.infer<typeof seatPeakInvitationSchema>;
+type SeatPeakInvitation = z.infer<typeof seatPeakInvitationSchema>;
 
 export const seatPeakStateSchema = z.object({
   /** When the opening snapshot was taken; null until one is, and nothing is folded before it. */
   openedAt: z.number().nullable(),
   counts: seatCountsSchema,
-  /** A member's seat by userId. A holder with no seat is not kept. */
-  members: z.record(z.string(), seatKindSchema),
-  /** A pending invitation's seat and expiry, by inviteId. */
+  /** A member's seat by userId. */
+  members: z.record(z.string(), seatPeakMemberSchema),
+  /** An invitation's seat and expiry, by inviteId. */
   invitations: z.record(z.string(), seatPeakInvitationSchema),
   /** Keyed `YYYY-MM`, only the months an event touched; a read fills the gaps. */
   months: z.record(z.string(), seatPeakMonthSchema),
@@ -95,8 +98,9 @@ export function seatPeakNextMonth(month: string): string {
 }
 
 /**
- * Folds one fact in the order it arrives (ADR-002 §7). A change before the opening snapshot, or
- * one already folded, changes nothing; invitations expired by the change's time give back first.
+ * Folds one fact in the order it arrives (ADR-002 §7). A change before the opening snapshot, one
+ * already folded, or one dated at or before its holder's last change moves nothing; invitations
+ * expired by the change's time give back first.
  */
 export function foldSeatPeak({
   state,
@@ -108,8 +112,10 @@ export function foldSeatPeak({
   if (fact.type === "seat_snapshot_taken") return openSnapshot({ state, snapshot: fact.data });
   if (state.openedAt === null) return state;
   if (state.recentChangeIds.includes(fact.data.changeId)) return state;
-  const expired = expireInvitations({ state, until: fact.data.occurredAt });
-  const moved = moveHolder({ state: expired, change: fact.data });
+  const stale =
+    fact.data.occurredAt <= holdingOf({ state, holder: fact.data.holder }).lastChangedAt;
+  const expired = stale ? state : expireInvitations({ state, until: fact.data.occurredAt });
+  const moved = stale ? state : moveHolder({ state: expired, change: fact.data });
   return {
     ...moved,
     recentChangeIds: [...moved.recentChangeIds, fact.data.changeId].slice(
@@ -127,12 +133,18 @@ export function expireInvitations({
   until: number;
 }): SeatPeakState {
   const expired = Object.entries(state.invitations)
-    .filter(([, invitation]) => invitation.expiresAt !== null && invitation.expiresAt < until)
+    .filter(
+      ([, invitation]) =>
+        invitation.seat !== "none" && invitation.expiresAt !== null && invitation.expiresAt < until,
+    )
     .toSorted(([, a], [, b]) => (a.expiresAt ?? 0) - (b.expiresAt ?? 0));
   let next = state;
   for (const [inviteId, invitation] of expired) {
     const at = invitation.expiresAt ?? until;
-    const { [inviteId]: _gone, ...invitations } = next.invitations;
+    const invitations = {
+      ...next.invitations,
+      [inviteId]: { ...invitation, seat: "none" as const, lastChangedAt: at },
+    };
     next = record({
       state: { ...next, invitations },
       counts: adjust({ counts: next.counts, seat: invitation.seat, by: -1 }),
@@ -149,16 +161,17 @@ function openSnapshot({
   state: SeatPeakState;
   snapshot: RecordSeatSnapshotCommandData;
 }): SeatPeakState {
-  const members: Record<string, SeatKind> = {};
+  const members: SeatPeakState["members"] = {};
   const invitations: Record<string, SeatPeakInvitation> = {};
   let counts: SeatCounts = { full: 0, lite: 0, developer: 0 };
+  const lastChangedAt = snapshot.occurredAt;
   for (const { holder, seat } of snapshot.holders) {
     if (seat === "none") continue;
     if (holder.kind === "invitation") {
       if (holder.expiresAt !== null && holder.expiresAt < snapshot.occurredAt) continue;
-      invitations[holder.inviteId] = { seat, expiresAt: holder.expiresAt };
+      invitations[holder.inviteId] = { seat, expiresAt: holder.expiresAt, lastChangedAt };
     } else {
-      members[holder.userId] = seat;
+      members[holder.userId] = { seat, lastChangedAt };
     }
     counts = adjust({ counts, seat, by: 1 });
   }
@@ -184,49 +197,49 @@ function moveHolder({
   const held = heldSeat({ state, holder: change.holder });
   if (change.from === change.to && held === change.to && change.holder.kind === "invitation") {
     // An extended invitation keeps its seat; only its expiry moves.
-    return withHolder({ state, holder: change.holder, seat: change.to });
+    return withHolder({ state, change });
   }
-  // Already on `to` is a change a snapshot captured before the change was folded, not drift.
-  const agrees = held === change.from || held === change.to;
-  const mismatches = agrees ? state.mismatches : state.mismatches + 1;
+  const mismatches = held === change.from ? state.mismatches : state.mismatches + 1;
   const counts = adjust({
     counts: adjust({ counts: state.counts, seat: held, by: -1 }),
     seat: change.to,
     by: 1,
   });
   return record({
-    state: { ...withHolder({ state, holder: change.holder, seat: change.to }), mismatches },
+    state: { ...withHolder({ state, change }), mismatches },
     counts,
     at: change.occurredAt,
   });
 }
 
+/** A holder the fold has never seen holds no seat and has had no change. */
+const UNSEEN = { seat: "none", lastChangedAt: Number.NEGATIVE_INFINITY } as const;
+
+function holdingOf({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): {
+  seat: SeatKind;
+  lastChangedAt: number;
+} {
+  if (holder.kind === "member") return state.members[holder.userId] ?? UNSEEN;
+  return state.invitations[holder.inviteId] ?? UNSEEN;
+}
+
 function heldSeat({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): SeatKind {
-  if (holder.kind === "member") return state.members[holder.userId] ?? "none";
-  return state.invitations[holder.inviteId]?.seat ?? "none";
+  return holdingOf({ state, holder }).seat;
 }
 
 function withHolder({
   state,
-  holder,
-  seat,
+  change,
 }: {
   state: SeatPeakState;
-  holder: SeatHolder;
-  seat: SeatKind;
+  change: RecordSeatChangedCommandData;
 }): SeatPeakState {
+  const { holder, to: seat, occurredAt: lastChangedAt } = change;
   if (holder.kind === "member") {
-    const { [holder.userId]: _previous, ...members } = state.members;
-    return { ...state, members: seat === "none" ? members : { ...members, [holder.userId]: seat } };
+    return { ...state, members: { ...state.members, [holder.userId]: { seat, lastChangedAt } } };
   }
-  const { [holder.inviteId]: _previous, ...invitations } = state.invitations;
-  return {
-    ...state,
-    invitations:
-      seat === "none"
-        ? invitations
-        : { ...invitations, [holder.inviteId]: { seat, expiresAt: holder.expiresAt } },
-  };
+  const invitation = { seat, expiresAt: holder.expiresAt, lastChangedAt };
+  return { ...state, invitations: { ...state.invitations, [holder.inviteId]: invitation } };
 }
 
 function adjust({
