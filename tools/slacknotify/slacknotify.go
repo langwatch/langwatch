@@ -68,12 +68,10 @@ func (n Notifier) postNow(ctx context.Context, run Run, why string) (Result, err
 	return Result{Job: run.Job, Posted: true, Reason: why}, nil
 }
 
-// Mode is what to post for: one Job, or each red leg named with Prefix, else Fallback.
+// Mode is what to post for: one Job, or each red leg the embedded Legs name.
 type Mode struct {
-	Job      string
-	Prefix   string
-	Fallback string
-	Attempt  int64 // the run attempt whose jobs are read, with Prefix
+	Job string
+	Legs
 }
 
 // Check needs exactly one of Job and Prefix, and Fallback exactly when Prefix is set.
@@ -102,7 +100,7 @@ func (n Notifier) NotifyMode(ctx context.Context, run Run, m Mode) ([]Result, er
 	ctx, cancel := context.WithTimeout(ctx, m.Deadline())
 	defer cancel()
 	if m.Prefix != "" {
-		return n.NotifyRedLegs(ctx, run, Legs{Attempt: m.Attempt, Prefix: m.Prefix, Fallback: m.Fallback})
+		return n.NotifyRedLegs(ctx, run, m.Legs)
 	}
 	run.Job = m.Job
 	result, err := n.Notify(ctx, run)

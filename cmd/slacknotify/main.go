@@ -24,7 +24,7 @@ func main() {
 	prefix := flag.String("job-prefix", "", "post once per red job of this run attempt named with this prefix")
 	fallback := flag.String("fallback-job", "", "with -job-prefix: the job to post as when no red job is found")
 	flag.Parse()
-	mode := slacknotify.Mode{Job: *job, Prefix: *prefix, Fallback: *fallback}
+	mode := slacknotify.Mode{Job: *job, Legs: slacknotify.Legs{Prefix: *prefix, Fallback: *fallback}}
 	if err := mode.Check(); err != nil {
 		fmt.Fprintln(os.Stderr, "slacknotify:", err)
 		os.Exit(2)
