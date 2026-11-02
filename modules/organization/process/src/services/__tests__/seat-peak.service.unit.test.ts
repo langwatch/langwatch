@@ -14,7 +14,7 @@ import type {
 import { MemoryOrganizationSeatPeakRepository } from "../../repositories/memory/memory.organization-seat-peak.repository.ts";
 import { MemoryOrganizationSeatRepository } from "../../repositories/memory/memory.organization-seat.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
-import { emptySeatPeak, foldSeatPeak, type SeatPeakFact } from "../../rules/seat-peak.rules.ts";
+import type { SeatPeakFact } from "../../rules/seat-peak.rules.ts";
 import { SeatPeakService } from "../seat-peak.service.ts";
 
 const ORG = "org-new";
@@ -75,33 +75,18 @@ function setup({ organizationIds = [ORG] }: { organizationIds?: string[] } = {})
   });
   const sent = recordingSenders();
   service.connect(sent.senders);
-  return { service, peaks, snapshots: sent.snapshots };
+  return { service, snapshots: sent.snapshots };
 }
 
-/** What the projection stores after folding the facts, as the worker would. */
+/** Folds the facts one at a time through the service, as the worker's fold subscriber would. */
 async function storeFolded({
-  peaks,
+  service,
   facts,
 }: {
-  peaks: MemoryOrganizationSeatPeakRepository;
+  service: SeatPeakService;
   facts: SeatPeakFact[];
 }) {
-  const state = facts.reduce(
-    (folded, fact) => foldSeatPeak({ state: folded, fact }),
-    emptySeatPeak(),
-  );
-  const at = CREATED_AT.epochMilliseconds;
-  await peaks.store(
-    {
-      state: { ...state, CreatedAt: at, UpdatedAt: at, LastEventOccurredAt: at },
-      cursor: { acceptedAt: at, eventId: "event-1" },
-      occurredAt: at,
-      createdAt: at,
-      updatedAt: at,
-      version: "2026-11-02",
-    },
-    { tenantId: ORG, aggregateId: ORG } as never,
-  );
+  for (const fact of facts) await service.fold({ organizationId: ORG, fact });
 }
 
 const founderJoined: SeatPeakFact = {
@@ -123,7 +108,7 @@ describe("SeatPeakService", () => {
   describe("when an organization is created with its first admin", () => {
     /** @scenario "A new organization starts counting from its first admin" */
     it("opens the count with the admin's full seat, whichever of the two is folded first", async () => {
-      const { service, peaks, snapshots } = setup();
+      const { service, snapshots } = setup();
 
       await service.open({ organizationId: ORG, occurredAt: CREATED_AT.epochMilliseconds });
       const [opening] = snapshots;
@@ -137,8 +122,9 @@ describe("SeatPeakService", () => {
         [openingFact, founderJoined],
         [founderJoined, openingFact],
       ]) {
-        await storeFolded({ peaks, facts });
-        const read = await service.read({ organizationId: ORG, now: CREATED_AT.epochMilliseconds });
+        const folded = setup().service;
+        await storeFolded({ service: folded, facts });
+        const read = await folded.read({ organizationId: ORG, now: CREATED_AT.epochMilliseconds });
         expect(read).toMatchObject({
           counted: true,
           seats: { full: 1, lite: 0, developer: 0 },
@@ -162,9 +148,9 @@ describe("SeatPeakService", () => {
 
   describe("when the opening snapshot step runs", () => {
     it("opens every organization not yet counted, and none twice", async () => {
-      const { service, peaks, snapshots } = setup({ organizationIds: [ORG, "org-other"] });
+      const { service, snapshots } = setup({ organizationIds: [ORG, "org-other"] });
       await storeFolded({
-        peaks,
+        service,
         facts: [
           {
             type: "seat_snapshot_taken",

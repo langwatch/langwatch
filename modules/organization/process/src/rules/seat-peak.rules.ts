@@ -11,12 +11,6 @@ import type {
 } from "../eventing/seat-peak.events.ts";
 import { type SeatHolder, type SeatKind, seatKindSchema } from "./seat-holder.rules.ts";
 
-/** How many recent change ids the fold remembers, so a redelivered change counts once. */
-export const SEAT_PEAK_RECENT_CHANGE_IDS = 1000;
-
-/** How long a holder with no seat is kept, so a late change to it is still known to be stale. */
-export const SEAT_PEAK_SETTLED_HOLDER_MS = 30 * 24 * 60 * 60 * 1000;
-
 export const seatCountsSchema = z.object({
   full: z.number().int().nonnegative(),
   lite: z.number().int().nonnegative(),
@@ -51,24 +45,30 @@ const seatPeakInvitationSchema = z.object({
   /** The fold gave its seat back at `expiresAt`: inferred, so it never outranks a real change. */
   expiredByFold: z.boolean().optional(),
 });
-type SeatPeakInvitation = z.infer<typeof seatPeakInvitationSchema>;
 
+/**
+ * The slice of an organization's stored count one fact needs (ADR-002 §2): the running counts,
+ * every touched month, and only the holders the repository loaded for it (the one a change
+ * moves and the invitations due to expire), never every holder.
+ */
 export const seatPeakStateSchema = z.object({
   /** When the opening snapshot was taken; null until one is, and nothing is folded before it. */
   openedAt: z.number().nullable(),
   counts: seatCountsSchema,
-  /** A member's seat by userId. */
+  /** The latest change time applied to any holder; invitations expire up to it. */
+  latestChangeAt: z.number(),
+  /** The loaded members' seats, by userId. */
   members: z.record(z.string(), seatPeakMemberSchema),
-  /** An invitation's seat and expiry, by inviteId; a settled one is dropped after a while. */
+  /** The loaded invitations' seats and expiries, by inviteId. */
   invitations: z.record(z.string(), seatPeakInvitationSchema),
   /** Keyed `YYYY-MM`, only the months an event touched; a read fills the gaps. */
   months: z.record(z.string(), seatPeakMonthSchema),
   /** Changes whose `from` disagreed with the seat the fold held: drift made visible. */
   mismatches: z.number().int().nonnegative(),
-  /** The last change ids folded, oldest first, bounded by SEAT_PEAK_RECENT_CHANGE_IDS. */
-  recentChangeIds: z.array(z.string()),
 });
 export type SeatPeakState = z.infer<typeof seatPeakStateSchema>;
+export type SeatPeakMember = z.infer<typeof seatPeakMemberSchema>;
+export type SeatPeakInvitation = z.infer<typeof seatPeakInvitationSchema>;
 
 export type SeatPeakFact =
   | Readonly<{ type: "seat_changed"; data: RecordSeatChangedCommandData }>
@@ -78,11 +78,11 @@ export function emptySeatPeak(): SeatPeakState {
   return {
     openedAt: null,
     counts: { full: 0, lite: 0, developer: 0 },
+    latestChangeAt: Number.NEGATIVE_INFINITY,
     members: {},
     invitations: {},
     months: {},
     mismatches: 0,
-    recentChangeIds: [],
   };
 }
 
@@ -110,9 +110,9 @@ export function seatPeakNextMonth(month: string): string {
 }
 
 /**
- * Folds one fact in the order it arrives (ADR-002 §7). A change before the opening snapshot, one
- * already folded, or one ordered at or before its holder's last change moves nothing; invitations
- * expired by the change's time give back first.
+ * Folds one fact in the order it arrives (ADR-002 §7). A change before the opening snapshot, or
+ * one ordered at or before its holder's last change (a redelivery ties) moves nothing; invitations
+ * expired by the change's time give back first. A second snapshot moves nothing.
  */
 export function foldSeatPeak({
   state,
@@ -121,26 +121,20 @@ export function foldSeatPeak({
   state: SeatPeakState;
   fact: SeatPeakFact;
 }): SeatPeakState {
-  if (fact.type === "seat_snapshot_taken") return openSnapshot({ state, snapshot: fact.data });
+  if (fact.type === "seat_snapshot_taken") {
+    return state.openedAt === null ? openSnapshot({ state, snapshot: fact.data }) : state;
+  }
   if (state.openedAt === null) return state;
-  if (state.recentChangeIds.includes(fact.data.changeId)) return state;
-  const stale = isStale({
-    holding: holdingOf({ state, holder: fact.data.holder }),
-    change: fact.data,
+  const change = fact.data;
+  if (isStale({ holding: holdingOf({ state, holder: change.holder }), change })) return state;
+  const applied = moveHolder({
+    state: expireInvitations({ state, until: change.occurredAt }),
+    change,
   });
-  const expired = stale ? state : expireInvitations({ state, until: fact.data.occurredAt });
-  const applied = stale ? state : moveHolder({ state: expired, change: fact.data });
+  const latestChangeAt = Math.max(applied.latestChangeAt, change.occurredAt);
   // A late invitation change may carry an expiry already past what the fold has seen.
-  const moved =
-    stale || fact.data.holder.kind === "member"
-      ? applied
-      : expireInvitations({ state: applied, until: latestChangeOf(applied) });
-  return {
-    ...forgetSettledHolders({ state: moved, at: fact.data.occurredAt }),
-    recentChangeIds: [...moved.recentChangeIds, fact.data.changeId].slice(
-      -SEAT_PEAK_RECENT_CHANGE_IDS,
-    ),
-  };
+  if (change.holder.kind === "member") return { ...applied, latestChangeAt };
+  return expireInvitations({ state: { ...applied, latestChangeAt }, until: latestChangeAt });
 }
 
 type Holding = Readonly<{ seat: SeatKind; lastChangedAt: number; lastChangeId?: string }>;
@@ -155,31 +149,6 @@ function isStale({
 }): boolean {
   if (change.occurredAt !== holding.lastChangedAt) return change.occurredAt < holding.lastChangedAt;
   return holding.lastChangeId === undefined || change.changeId <= holding.lastChangeId;
-}
-
-/**
- * Drops a member or invitation with no seat once it gave its seat back (last change, or
- * inferred expiry) longer ago than the settled window (ADR-002 §7): a revoked or accepted one
- * cannot move again, and a later change finds no stored seat and moves from none.
- */
-function forgetSettledHolders({ state, at }: { state: SeatPeakState; at: number }): SeatPeakState {
-  const horizon = at - SEAT_PEAK_SETTLED_HOLDER_MS;
-  const entries = Object.entries(state.invitations);
-  const kept = entries.filter(([, invitation]) => {
-    if (invitation.seat !== "none") return true;
-    const expired = invitation.expiredByFold === true ? invitation.expiresAt : null;
-    return Math.max(invitation.lastChangedAt, expired ?? Number.NEGATIVE_INFINITY) >= horizon;
-  });
-  const members = Object.entries(state.members);
-  const keptMembers = members.filter(
-    ([, member]) => member.seat !== "none" || member.lastChangedAt >= horizon,
-  );
-  if (kept.length === entries.length && keptMembers.length === members.length) return state;
-  return {
-    ...state,
-    invitations: Object.fromEntries(kept),
-    members: Object.fromEntries(keptMembers),
-  };
 }
 
 /** Gives back the seats of invitations that expired strictly before `until`, in expiry order. */
@@ -236,7 +205,8 @@ function openSnapshot({
   return record({
     state: {
       ...state,
-      openedAt: state.openedAt ?? snapshot.occurredAt,
+      openedAt: snapshot.occurredAt,
+      latestChangeAt: snapshot.occurredAt,
       members,
       invitations,
     },
@@ -282,15 +252,6 @@ function holdingOf({ state, holder }: { state: SeatPeakState; holder: SeatHolder
 
 function inferredExpiry({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): boolean {
   return holder.kind === "invitation" && state.invitations[holder.inviteId]?.expiredByFold === true;
-}
-
-/** The time of the latest change the fold applied to any holder. */
-function latestChangeOf(state: SeatPeakState): number {
-  const holdings = [...Object.values(state.members), ...Object.values(state.invitations)];
-  return holdings.reduce(
-    (latest, holding) => Math.max(latest, holding.lastChangedAt),
-    Number.NEGATIVE_INFINITY,
-  );
 }
 
 function heldSeat({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): SeatKind {

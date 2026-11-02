@@ -55,7 +55,7 @@ function setup({ foldLags }: { foldLags: boolean }) {
     }),
   });
   const pipeline = buildSeatPeakPipeline({
-    store: createApiFixture(),
+    fold: async () => undefined,
     opener: { open: async () => undefined },
     sender: () => ({ send: async () => undefined }),
     retention: { deleteDispatchedBefore: async () => 0 },

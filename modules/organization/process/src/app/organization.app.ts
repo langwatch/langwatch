@@ -406,8 +406,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       accounts: setup.repositories.privateS3Accounts,
       organizations: setup.repositories.organization,
     });
-    // The monthly seat peak (ADR-002): its fold's store, and the service that opens and reads it.
-    application.#seatPeakStore = setup.repositories.seatPeak;
+    // The monthly seat peak (ADR-002): the service that opens, folds and reads it.
     application.#seatPeak = SeatPeakService.create({
       seats: setup.repositories.seats,
       peaks: setup.repositories.seatPeak,
@@ -532,7 +531,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #joinRequests!: OrganizationJoinRequests;
   #initialization!: OrganizationInitializationService;
   #privateDataplanes!: PrivateDataplaneRecordService;
-  #seatPeakStore!: OrganizationSetup["repositories"]["seatPeak"];
   #seatPeak!: SeatPeakService;
   #seatPeakCorrections!: SeatPeakCorrectionService;
   /** Who may sign up and found an organization; absent only in a test's app, which is open. */
@@ -1640,7 +1638,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   /** organization_seat_peak: seat changes and the opening count, folded per organization. */
   seatPeakPipeline({ processStore }: { processStore: ProcessStore }): SeatPeakDefinition {
     return buildSeatPeakPipeline({
-      store: this.#seatPeakStore,
+      fold: (input) => this.#seatPeak.fold(input),
       opener: this.#seatPeak,
       sender: () => this.getSeatChangeSender(),
       retention: processStore,

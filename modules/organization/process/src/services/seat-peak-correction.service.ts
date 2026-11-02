@@ -49,7 +49,11 @@ export class SeatPeakCorrectionService {
     userId: string;
     source: CorrectionSource;
   }): Promise<void> {
-    const state = await this.dependencies.peaks.getState(organizationId);
+    const state = await this.dependencies.peaks.getState({
+      organizationId,
+      holders: [{ kind: "member", userId }],
+      dueBefore: 0,
+    });
     // Counting has not started: the opening snapshot reads every seat as it stands.
     if (state.openedAt === null) return;
     const live = seatKindOf(
@@ -75,7 +79,11 @@ export class SeatPeakCorrectionService {
     organizationId: string;
     source: CorrectionSource;
   }): Promise<void> {
-    const state = await this.dependencies.peaks.getState(organizationId);
+    const state = await this.dependencies.peaks.getState({
+      organizationId,
+      holders: "seated",
+      dueBefore: 0,
+    });
     if (state.openedAt === null) return;
     const holders = await this.dependencies.seats.findSeatHolders(organizationId);
     const corrections = organizationSeatCorrections({
@@ -98,7 +106,11 @@ export class SeatPeakCorrectionService {
     organizationId: string;
     source: CorrectionSource;
   }): Promise<void> {
-    const state = await this.dependencies.peaks.getState(organizationId);
+    const state = await this.dependencies.peaks.getState({
+      organizationId,
+      holders: "seated",
+      dueBefore: 0,
+    });
     if (state.openedAt === null) return;
     const live = new Set<string>();
     for (const { holder } of await this.dependencies.seats.findSeatHolders(organizationId)) {

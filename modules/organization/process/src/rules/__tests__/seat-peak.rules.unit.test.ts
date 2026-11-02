@@ -5,8 +5,6 @@ import type { SeatHolder, SeatKind } from "../seat-holder.rules.ts";
 import {
   emptySeatPeak,
   foldSeatPeak,
-  SEAT_PEAK_RECENT_CHANGE_IDS,
-  SEAT_PEAK_SETTLED_HOLDER_MS,
   type SeatPeakFact,
   type SeatPeakState,
   seatPeakAsOf,
@@ -349,21 +347,6 @@ describe("foldSeatPeak", () => {
     });
   });
 
-  describe("given a snapshot taken after counting started", () => {
-    it("replaces the holders and sets the counts, keeping when counting opened", () => {
-      const state = foldAll([
-        snapshot({ occurredAt: NOV_1, full: 3 }),
-        change({ holder: member("drifted"), from: "none", to: "full", occurredAt: NOV_2 }),
-        snapshot({ occurredAt: NOV_3, full: 2 }),
-      ]);
-
-      expect(state.openedAt).toBe(NOV_1);
-      expect(state.counts.full).toBe(2);
-      expect(Object.keys(state.members)).toEqual(["full-0", "full-1"]);
-      expect(novemberOf(state).fullPeak).toBe(4);
-    });
-  });
-
   describe("given a change whose `from` disagrees with the seat the fold holds", () => {
     it("trusts the held seat and counts the mismatch", () => {
       const state = foldAll([
@@ -466,15 +449,15 @@ describe("foldSeatPeak", () => {
       expect(novemberOf(state).fullPeak).toBe(11);
     });
 
-    it("remembers a bounded number of change ids", () => {
-      const facts: SeatPeakFact[] = [snapshot({ occurredAt: NOV_1 })];
-      for (let i = 0; i <= SEAT_PEAK_RECENT_CHANGE_IDS; i += 1) {
-        facts.push(
-          change({ holder: member(`m-${i}`), from: "none", to: "lite", occurredAt: NOV_2 }),
-        );
-      }
+    it("moves nothing on a second snapshot of an opened organization", () => {
+      const opened = foldAll([
+        snapshot({ occurredAt: NOV_1, full: 10 }),
+        change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_2 }),
+      ]);
 
-      expect(foldAll(facts).recentChangeIds).toHaveLength(SEAT_PEAK_RECENT_CHANGE_IDS);
+      expect(foldSeatPeak({ state: opened, fact: snapshot({ occurredAt: NOV_2, full: 3 }) })).toBe(
+        opened,
+      );
     });
 
     it("orders two changes stamped in one millisecond by change id, dropping neither", () => {
@@ -718,48 +701,7 @@ describe("foldSeatPeak", () => {
   });
 });
 
-describe("foldSeatPeak's settled members", () => {
-  it("drops a removed member after the window and counts them again when re-added", () => {
-    const removed = change({
-      holder: member("leaver"),
-      from: "full",
-      to: "none",
-      occurredAt: NOV_3,
-    });
-    const unrelated = change({
-      holder: member("joiner"),
-      from: "none",
-      to: "lite",
-      occurredAt: NOV_3 + SEAT_PEAK_SETTLED_HOLDER_MS + 1,
-    });
-    const readded = change({
-      holder: member("leaver"),
-      from: "none",
-      to: "full",
-      occurredAt: NOV_3 + SEAT_PEAK_SETTLED_HOLDER_MS + 2,
-    });
-    const settled = foldAll([
-      snapshot({ occurredAt: NOV_1, extra: [{ holder: member("leaver"), seat: "full" }] }),
-      removed,
-      unrelated,
-    ]);
-
-    expect(settled.members.leaver).toBeUndefined();
-    expect(settled.counts).toEqual({ full: 0, lite: 1, developer: 0 });
-
-    const state = foldAll([
-      snapshot({ occurredAt: NOV_1, extra: [{ holder: member("leaver"), seat: "full" }] }),
-      removed,
-      unrelated,
-      readded,
-    ]);
-    expect(state.members.leaver).toMatchObject({ seat: "full" });
-    expect(state.counts).toEqual({ full: 1, lite: 1, developer: 0 });
-    expect(state.mismatches).toBe(0);
-  });
-});
-
-describe("foldSeatPeak's settled invitations", () => {
+describe("foldSeatPeak's settled holders", () => {
   const NOV_25 = at("2026-11-25T09:00:00Z");
   const created = change({
     holder: invitation("inv-1", at("2026-11-20T00:00:00Z")),
@@ -773,27 +715,20 @@ describe("foldSeatPeak's settled invitations", () => {
     to: "none",
     occurredAt: NOV_3,
   });
-  const joinedLater = change({
-    holder: member("joiner"),
-    from: "none",
-    to: "full",
-    occurredAt: NOV_3 + SEAT_PEAK_SETTLED_HOLDER_MS + 1,
-  });
 
-  it("drops a revoked invitation once the settled window has passed, counting the same", () => {
+  it("counts a removed member again when they are re-added", () => {
     const state = foldAll([
-      snapshot({ occurredAt: NOV_1, full: 2 }),
-      created,
-      revoked,
-      joinedLater,
+      snapshot({ occurredAt: NOV_1, extra: [{ holder: member("leaver"), seat: "full" }] }),
+      change({ holder: member("leaver"), from: "full", to: "none", occurredAt: NOV_3 }),
+      change({ holder: member("leaver"), from: "none", to: "full", occurredAt: NOV_25 }),
     ]);
 
-    expect(state.invitations).toEqual({});
-    expect(state.counts).toEqual({ full: 3, lite: 0, developer: 0 });
-    expect(novemberOf(state).fullPeak).toBe(3);
+    expect(state.members.leaver).toMatchObject({ seat: "full" });
+    expect(state.counts.full).toBe(1);
+    expect(state.mismatches).toBe(0);
   });
 
-  it("keeps a revoked invitation inside the window, so its late creation stays stale", () => {
+  it("keeps a revoked invitation, so its late creation stays stale", () => {
     const state = foldAll([
       snapshot({ occurredAt: NOV_1, full: 2 }),
       revoked,
@@ -805,17 +740,17 @@ describe("foldSeatPeak's settled invitations", () => {
     expect(state.counts.full).toBe(3);
   });
 
-  it("takes a lapsed invitation's seat back when it is refreshed after being dropped", () => {
+  it("takes a lapsed invitation's seat back when it is refreshed", () => {
     const lapsing = invitation("inv-2", NOV_2);
-    const refreshedUntil = joinedLater.data.occurredAt + 60_000;
+    const refreshedUntil = NOV_25 + 60_000;
     const state = foldAll([
       snapshot({ occurredAt: NOV_1, full: 2, extra: [{ holder: lapsing, seat: "full" }] }),
-      joinedLater,
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_25 }),
       change({
         holder: invitation("inv-2", refreshedUntil),
         from: "none",
         to: "full",
-        occurredAt: joinedLater.data.occurredAt + 1,
+        occurredAt: NOV_25 + 1,
       }),
     ]);
 

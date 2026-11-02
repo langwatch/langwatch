@@ -38,10 +38,14 @@ counts, because the cap counts it.
    reads the member's seat by its own rule and records the seat change (§6). A change is stamped
    in milliseconds, strictly later than the last one the process stamped, so two changes to one
    holder in one write keep their order.
-2. **A projection folds them.** `organization_seat_peak` runs in the worker, per organization, in
-   the order the changes arrive (§7). It keeps the running count of each kind of seat and, per
-   calendar month (UTC), the highest count and when it was first reached. It adds the seat a change
-   moves to and takes away the seat it moves from; it never reads the memberships table.
+2. **A fold over rows applies them.** `organization_seat_peak`'s fold subscriber runs in the
+   worker, per organization, in the order the changes arrive (§7). It keeps the running count of
+   each kind of seat and, per calendar month (UTC), the highest count and when it was first
+   reached. It adds the seat a change moves to and takes away the seat it moves from; it never
+   reads the memberships table. The count is stored as rows, never as one document: one counts row
+   per organization, one row per holder and one per touched month. A change loads only its holder,
+   the invitations due to expire by then and the months, and writes back only the rows it moved,
+   under a per-organization lock, so its cost does not grow with the organization.
 3. **An invitation's expiry is folded by event time.** An invitation stops holding its seat when it
    expires, and no event says so. The fold keeps each pending invitation's expiry and, before applying
    a change, gives back the seats of invitations that expired before the change happened. It uses the
@@ -50,7 +54,8 @@ counts, because the cap counts it.
    count the month began with.
 5. **The fold opens from a snapshot.** Seat changes are recorded from this decision on, so there is
    no history to replay before it. A one-off system migration records `seat_snapshot_taken` per
-   organization with every holder's seat as it stands. It waits until no pod of the previous
+   organization with every holder's seat as it stands; a second snapshot of an opened organization
+   moves nothing. It waits until no pod of the previous
    release serves, since those move seats without recording the change. Until an organization has one, its changes are
    not folded and the ops console says counting has not started. A new organization opens at zero.
 6. **A custom role flips a seat across modules.** Whether a Lite Member holds a full seat depends on
@@ -76,9 +81,9 @@ counts, because the cap counts it.
    invitation's expiry is inferred, not recorded, so it never outranks a real change: a late
    extension restores the seat with its new expiry, which is expired again by event time if it
    too is already past. So the running count is exact in any order, and only a momentary peak can be one
-   seat out when two changes cross. A holder who leaves is kept with no seat, so a late change
-   cannot bring them back; a member or invitation holding no seat is dropped 30 days after its
-   last change (an invitation, after its expiry), once no change to it can still be on its way.
+   seat out when two changes cross. A holder who leaves keeps their row with no seat, so a late
+   change cannot bring them back, and a redelivered change ties its holder's last change and moves
+   nothing.
 
 ## Rationale / Trade-offs
 
@@ -98,9 +103,10 @@ ordered before its event is counted twice or not at all. That is one seat, once,
 - Peaks are kept for full and Lite Member seats; developer seats are unmetered (ADR-171) and only
   pass through the fold.
 - The ops console shows the month's peak beside the licence's cap. The customer does not see it.
-- Changing the seat rule means rebuilding the projection from the events, which the fold allows.
-- Changing the shape of the folded state also means a rebuild: a stored row that no longer
-  matches the schema fails loudly rather than reading as empty, which would silently stop counting.
+- Changing the seat rule means clearing an organization's rows and folding its events again in
+  order, which the fold allows; the subscriber is not replayed by the framework.
+- A stored seat that is not a seat kind fails loudly rather than reading as none, which would
+  silently skew every count.
 
 ## References
 

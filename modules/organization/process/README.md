@@ -2305,14 +2305,14 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 
 ### Pipeline `organization_seat_peak` (aggregate `organization_seat_peak`)
 
-Declared at `src/eventing/seat-peak.pipeline.ts:68`. Events: `seatChangedEventSchema`, `seatSnapshotTakenEventSchema`.
+Declared at `src/eventing/seat-peak.pipeline.ts:66`. Events: `seatChangedEventSchema`, `seatSnapshotTakenEventSchema`.
 
-| Kind                | Name                                         | Handles                                                                                                                   | Declared at                             |
-| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| command             | `recordSeatChanged`                          | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:73` |
-| command             | `recordSeatSnapshot`                         | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:74` |
-| process manager     | `organizationSeatPeak`                       | every 1 d (`SEAT_PEAK_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneSeatChanges`, `recordSeatChanged` (outbox) | `src/eventing/seat-peak.pipeline.ts:76` |
-| Postgres projection | `≈ SeatPeakFoldProjection.create({ store })` | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:75` |
+| Kind            | Name                   | Handles                                                                                                                   | Declared at                             |
+| --------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| command         | `recordSeatChanged`    | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:71` |
+| command         | `recordSeatSnapshot`   | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:72` |
+| process manager | `organizationSeatPeak` | every 1 d (`SEAT_PEAK_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneSeatChanges`, `recordSeatChanged` (outbox) | `src/eventing/seat-peak.pipeline.ts:74` |
+| subscriber      | `seatPeakFold`         | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:73` |
 
 ## Configuration
 

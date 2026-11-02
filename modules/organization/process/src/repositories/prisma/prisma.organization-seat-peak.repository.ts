@@ -1,87 +1,193 @@
-import type {
-  ProjectionStoreContext,
-  StoredProjection,
-  StoredProjectionRead,
-} from "@langwatch/eventing";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { type SeatKind, seatKindSchema } from "../../rules/seat-holder.rules.ts";
+import { type SeatPeakHolderRow, seatPeakWrites } from "../../rules/seat-peak-writes.rules.ts";
 import { emptySeatPeak, type SeatPeakState } from "../../rules/seat-peak.rules.ts";
 import {
   OrganizationSeatPeakRepository,
-  type SeatPeakFoldState,
-  seatPeakFoldStateSchema,
+  type SeatPeakSlice,
 } from "../organization-seat-peak.repository.ts";
 
-type PrismaSeatPeakDatabase = PrismaClient | Prisma.TransactionClient;
+type HolderRow = Prisma.OrganizationSeatPeakHolderGetPayload<object>;
 
-type Row = Prisma.OrganizationSeatPeakProjectionGetPayload<object>;
-
-/** An unreadable row throws: read as empty, the fold would silently stop counting (ADR-002). */
-function readRow(row: Row): Extract<StoredProjectionRead<SeatPeakFoldState>, { kind: "folded" }> {
-  const state = seatPeakFoldStateSchema.safeParse(row.folded);
-  if (!state.success) {
+/** A stored seat that is not a seat kind throws: read as none, it would skew every count. */
+function seatOf(row: HolderRow): SeatKind {
+  const seat = seatKindSchema.safeParse(row.seat);
+  if (!seat.success) {
     throw new Error(
-      `organization ${row.organizationId}'s seat-peak state does not match its schema; rebuild the projection`,
+      `organization ${row.organizationId}'s seat-peak holder ${row.holderId} holds an unknown seat "${row.seat}"; rebuild the seat peak`,
     );
   }
+  return seat.data;
+}
+
+function holderWhere({
+  organizationId,
+  holders,
+}: Pick<SeatPeakSlice, "organizationId" | "holders">): Prisma.OrganizationSeatPeakHolderWhereInput {
+  if (holders === "seated") return { organizationId, seat: { not: "none" } };
   return {
-    kind: "folded",
-    projection: {
-      state: state.data,
-      cursor: { acceptedAt: row.acceptedAt, eventId: row.lastEventId },
-      occurredAt: row.occurredAt,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      version: row.projectionVersion,
-    },
+    organizationId,
+    OR: holders.map((holder) =>
+      holder.kind === "member"
+        ? { holderKind: "member", holderId: holder.userId }
+        : { holderKind: "invitation", holderId: holder.inviteId },
+    ),
   };
 }
 
-/** Postgres row I/O for the seat-peak fold, one row per organization. */
+function holderData(row: SeatPeakHolderRow) {
+  return {
+    seat: row.holding.seat,
+    lastChangedAt: row.holding.lastChangedAt,
+    lastChangeId: row.holding.lastChangeId ?? null,
+    expiresAt: row.kind === "invitation" ? row.holding.expiresAt : null,
+    expiredByFold: row.kind === "invitation" ? row.holding.expiredByFold === true : false,
+  };
+}
+
+/** The seat peak's counts, holder and month rows in Postgres (ADR-002 §2). */
 export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRepository {
-  static create(database: PrismaSeatPeakDatabase): PrismaOrganizationSeatPeakRepository {
-    return new PrismaOrganizationSeatPeakRepository(database);
+  static create(prisma: PrismaClient): PrismaOrganizationSeatPeakRepository {
+    return new PrismaOrganizationSeatPeakRepository(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaSeatPeakDatabase) {
+  private constructor(private readonly prisma: PrismaClient) {
     super();
   }
 
-  async get(
-    organizationId: string,
-    _context: ProjectionStoreContext,
-  ): Promise<StoredProjectionRead<SeatPeakFoldState>> {
-    const row = await this.prisma.organizationSeatPeakProjection.findUnique({
-      where: { organizationId },
-    });
-    return row ? readRow(row) : { kind: "empty" };
+  async getState(slice: SeatPeakSlice): Promise<SeatPeakState> {
+    return this.#load({ database: this.prisma, slice });
   }
 
-  async store(
-    projection: StoredProjection<SeatPeakFoldState>,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
-    const organizationId = context.aggregateId;
-    const data = {
-      folded: projection.state,
-      createdAt: projection.createdAt,
-      updatedAt: projection.updatedAt,
-      occurredAt: projection.occurredAt,
-      acceptedAt: projection.cursor.acceptedAt,
-      lastEventId: projection.cursor.eventId,
-      projectionVersion: projection.version,
-    } satisfies Omit<Prisma.OrganizationSeatPeakProjectionUncheckedCreateInput, "organizationId">;
-    await this.prisma.organizationSeatPeakProjection.upsert({
-      where: { organizationId },
-      create: { organizationId, ...data },
-      update: data,
+  async update(slice: SeatPeakSlice, fold: (state: SeatPeakState) => SeatPeakState): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      // One fold per organization until commit: a second would load the slice before this writes.
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`organization-seat-peak:${slice.organizationId}`}, 0)) ${skipTenantCheck(
+        {
+          // A lock, not a read; its key is itself one organization's.
+          SKIP_TENANT_CHECK: true,
+        },
+      )}`;
+      const before = await this.#load({ database: transaction, slice });
+      await this.#write({
+        transaction,
+        organizationId: slice.organizationId,
+        before,
+        after: fold(before),
+      });
     });
   }
 
-  async getState(organizationId: string): Promise<SeatPeakState> {
-    const row = await this.prisma.organizationSeatPeakProjection.findUnique({
-      where: { organizationId },
+  async #load({
+    database,
+    slice,
+  }: {
+    database: PrismaClient | Prisma.TransactionClient;
+    slice: SeatPeakSlice;
+  }): Promise<SeatPeakState> {
+    const { organizationId } = slice;
+    const counts = await database.organizationSeatPeak.findUnique({ where: { organizationId } });
+    if (counts === null) return emptySeatPeak();
+    const named =
+      slice.holders === "seated" || slice.holders.length > 0
+        ? await database.organizationSeatPeakHolder.findMany({ where: holderWhere(slice) })
+        : [];
+    const due = await database.organizationSeatPeakHolder.findMany({
+      where: {
+        organizationId,
+        holderKind: "invitation",
+        seat: { not: "none" },
+        expiresAt: { lt: Math.max(slice.dueBefore, counts.latestChangeAt) },
+      },
     });
-    return row ? readRow(row).projection.state : emptySeatPeak();
+    const months = await database.organizationSeatPeakMonth.findMany({ where: { organizationId } });
+    const state: SeatPeakState = {
+      openedAt: counts.openedAt,
+      counts: { full: counts.fullSeats, lite: counts.liteSeats, developer: counts.developerSeats },
+      latestChangeAt: counts.latestChangeAt,
+      mismatches: counts.mismatches,
+      members: {},
+      invitations: {},
+      months: Object.fromEntries(
+        months.map(({ month, organizationId: _organizationId, ...values }) => [month, values]),
+      ),
+    };
+    for (const row of [...named, ...due]) {
+      const holding = {
+        seat: seatOf(row),
+        lastChangedAt: row.lastChangedAt,
+        ...(row.lastChangeId === null ? {} : { lastChangeId: row.lastChangeId }),
+      };
+      if (row.holderKind === "member") {
+        state.members[row.holderId] = holding;
+      } else {
+        state.invitations[row.holderId] = {
+          ...holding,
+          expiresAt: row.expiresAt,
+          ...(row.expiredByFold ? { expiredByFold: true } : {}),
+        };
+      }
+    }
+    return state;
+  }
+
+  async #write({
+    transaction,
+    organizationId,
+    before,
+    after,
+  }: {
+    transaction: Prisma.TransactionClient;
+    organizationId: string;
+    before: SeatPeakState;
+    after: SeatPeakState;
+  }): Promise<void> {
+    const writes = seatPeakWrites({ before, after });
+    if (writes.counts !== null) {
+      const data = {
+        openedAt: writes.counts.openedAt,
+        fullSeats: writes.counts.counts.full,
+        liteSeats: writes.counts.counts.lite,
+        developerSeats: writes.counts.counts.developer,
+        latestChangeAt: writes.counts.latestChangeAt,
+        mismatches: writes.counts.mismatches,
+      };
+      await transaction.organizationSeatPeak.upsert({
+        where: { organizationId },
+        create: { organizationId, ...data },
+        update: data,
+      });
+    }
+    if (writes.createdHolders.length > 0) {
+      await transaction.organizationSeatPeakHolder.createMany({
+        data: writes.createdHolders.map((row) => ({
+          organizationId,
+          holderKind: row.kind,
+          holderId: row.holderId,
+          ...holderData(row),
+        })),
+      });
+    }
+    for (const row of writes.updatedHolders) {
+      await transaction.organizationSeatPeakHolder.update({
+        where: {
+          organizationId_holderKind_holderId: {
+            organizationId,
+            holderKind: row.kind,
+            holderId: row.holderId,
+          },
+        },
+        data: holderData(row),
+      });
+    }
+    for (const { month, values } of writes.months) {
+      await transaction.organizationSeatPeakMonth.upsert({
+        where: { organizationId_month: { organizationId, month } },
+        create: { organizationId, month, ...values },
+        update: values,
+      });
+    }
   }
 }

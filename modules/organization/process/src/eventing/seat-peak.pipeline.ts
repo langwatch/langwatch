@@ -4,7 +4,6 @@ import {
   definePipeline,
   type EventingSetup,
   type ProcessStore,
-  type StateProjectionStore,
 } from "@langwatch/eventing";
 import {
   ORGANIZATION_CREATED_EVENT_TYPE,
@@ -12,7 +11,6 @@ import {
 } from "@langwatch/organization-contract";
 
 import type { OrganizationModule } from "../app/organization.app.ts";
-import type { SeatPeakFoldState } from "../repositories/organization-seat-peak.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import {
   SEAT_PEAK_PROCESS_NAME,
@@ -23,6 +21,7 @@ import {
   type SeatPeakCorrections,
   withSeatCorrections,
 } from "./seat-peak-correction.subscriber.ts";
+import { type SeatPeakFolder, seatPeakFoldSubscriber } from "./seat-peak-fold.subscriber.ts";
 import { RecordSeatChangedCommand, RecordSeatSnapshotCommand } from "./seat-peak.commands.ts";
 import {
   SEAT_PEAK_AGGREGATE_TYPE,
@@ -44,7 +43,6 @@ import {
   seatPeakPruneSchema,
   seatPeakPruneWake,
 } from "./seat-peak.process.ts";
-import { SeatPeakFoldProjection } from "./seat-peak.projection.ts";
 
 /** Opens an organization's count from every holder's seat as it stands. */
 export type SeatPeakOpener = Readonly<{
@@ -52,7 +50,7 @@ export type SeatPeakOpener = Readonly<{
 }>;
 
 type SeatPeakPipelineDependencies = Readonly<{
-  store: StateProjectionStore<SeatPeakFoldState>;
+  fold: SeatPeakFolder;
   opener: SeatPeakOpener;
   /** The seat-change sender; it throws until this pipeline registers, so a delivery retries. */
   sender: () => SeatPeakSender;
@@ -61,10 +59,10 @@ type SeatPeakPipelineDependencies = Readonly<{
 }>;
 
 function seatPeakCommands({
-  store,
+  fold,
   sender,
   retention,
-}: Pick<SeatPeakPipelineDependencies, "store" | "sender" | "retention">) {
+}: Pick<SeatPeakPipelineDependencies, "fold" | "sender" | "retention">) {
   return definePipeline({
     name: SEAT_PEAK_PIPELINE_NAME,
     aggregate: defineAggregate({ type: SEAT_PEAK_AGGREGATE_TYPE }),
@@ -72,7 +70,7 @@ function seatPeakCommands({
     .withEvents([seatChangedEventSchema, seatSnapshotTakenEventSchema])
     .withCommand("recordSeatChanged", RecordSeatChangedCommand)
     .withCommand("recordSeatSnapshot", RecordSeatSnapshotCommand)
-    .withPostgresProjection(SeatPeakFoldProjection.create({ store }))
+    .withEventSubscriber("seatPeakFold", seatPeakFoldSubscriber(fold))
     .withProcessManager(SEAT_PEAK_PROCESS_NAME, (pm) =>
       pm
         .state(seatPeakProcessStateSchema, SEAT_PEAK_PROCESS_INITIAL_STATE)
@@ -96,13 +94,13 @@ export type SeatPeakDefinition = ReturnType<ReturnType<typeof seatPeakCommands>[
  * The outbox delivers the changes writes commit (ADR-002 §1).
  */
 export function buildSeatPeakPipeline({
-  store,
+  fold,
   opener,
   sender,
   retention,
   corrections,
 }: SeatPeakPipelineDependencies): SeatPeakDefinition {
-  const pipeline = seatPeakCommands({ store, sender, retention }).withPeerSubscriber(
+  const pipeline = seatPeakCommands({ fold, sender, retention }).withPeerSubscriber(
     "seatPeakOrganizationCreated",
     {
       eventType: ORGANIZATION_CREATED_EVENT_TYPE,

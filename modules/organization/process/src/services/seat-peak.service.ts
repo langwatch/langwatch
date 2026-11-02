@@ -9,7 +9,7 @@ import type {
 import type { OrganizationSeatPeakRepository } from "../repositories/organization-seat-peak.repository.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { OrganizationRepository } from "../repositories/organization.repository.ts";
-import { seatPeakAsOf } from "../rules/seat-peak.rules.ts";
+import { foldSeatPeak, type SeatPeakFact, seatPeakAsOf } from "../rules/seat-peak.rules.ts";
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send" | "sendBatch">;
 
@@ -20,7 +20,7 @@ export type SeatPeakSenders = Readonly<{
 
 type SeatPeakDependencies = Readonly<{
   seats: Pick<OrganizationSeatRepository, "findSeatHolders">;
-  peaks: Pick<OrganizationSeatPeakRepository, "getState">;
+  peaks: Pick<OrganizationSeatPeakRepository, "getState" | "update">;
   organizations: Pick<OrganizationRepository, "listAllIds">;
   plans: Pick<EntitlementApi, "getActivePlan">;
 }>;
@@ -50,8 +50,29 @@ export class SeatPeakService {
   }
 
   /**
+   * Folds one fact into the stored count (ADR-002 §2), loading only the holder it moves and the
+   * invitations due to expire by then; a snapshot loads no holder and writes every one.
+   */
+  async fold({
+    organizationId,
+    fact,
+  }: {
+    organizationId: string;
+    fact: SeatPeakFact;
+  }): Promise<void> {
+    await this.dependencies.peaks.update(
+      {
+        organizationId,
+        holders: fact.type === "seat_changed" ? [fact.data.holder] : [],
+        dueBefore: fact.data.occurredAt,
+      },
+      (state) => foldSeatPeak({ state, fact }),
+    );
+  }
+
+  /**
    * Records every holder's seat as it stands. Keyed by the organization and `occurredAt`, so a
-   * redelivered opening records once; a later snapshot replaces the holders, never adds to them.
+   * redelivered opening records once; a second snapshot of an opened organization moves nothing.
    */
   async open({
     organizationId,
@@ -84,7 +105,11 @@ export class SeatPeakService {
     });
     const unopened: string[] = [];
     for (const organizationId of page.ids) {
-      const state = await this.dependencies.peaks.getState(organizationId);
+      const state = await this.dependencies.peaks.getState({
+        organizationId,
+        holders: [],
+        dueBefore: 0,
+      });
       if (state.openedAt === null) unopened.push(organizationId);
     }
     if (!dryRun && unopened.length > 0) {
@@ -110,7 +135,7 @@ export class SeatPeakService {
     now: number;
   }): Promise<OrganizationSeatPeak> {
     const [state, plan] = await Promise.all([
-      this.dependencies.peaks.getState(organizationId),
+      this.dependencies.peaks.getState({ organizationId, holders: [], dueBefore: now }),
       this.dependencies.plans.getActivePlan({ organizationId }),
     ]);
     const caps = { fullSeats: plan.maxMembers, liteSeats: plan.maxMembersLite };

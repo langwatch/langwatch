@@ -1,40 +1,34 @@
-import type {
-  ProjectionStoreContext,
-  StateProjectionStore,
-  StoredProjection,
-  StoredProjectionRead,
-} from "@langwatch/eventing";
-import { z } from "zod";
-
-import { type SeatPeakState, seatPeakStateSchema } from "../rules/seat-peak.rules.ts";
-
-/** The fold's state as stored: the pure state plus the fold base class's bookkeeping stamps. */
-export const seatPeakFoldStateSchema = z.object({
-  ...seatPeakStateSchema.shape,
-  CreatedAt: z.number(),
-  UpdatedAt: z.number(),
-  LastEventOccurredAt: z.number(),
-});
-export type SeatPeakFoldState = z.infer<typeof seatPeakFoldStateSchema>;
+import type { SeatHolder } from "../rules/seat-holder.rules.ts";
+import type { SeatPeakState } from "../rules/seat-peak.rules.ts";
 
 /**
- * The seat-peak fold's row per organization (ADR-002): written by the projection, read by the
- * seat-peak service. Rebuildable from the event log, which a change to the state's shape needs.
+ * Which part of an organization's stored count to load (ADR-002 §2). Pending invitations holding
+ * a seat that expire before `dueBefore`, or before the latest change folded, always load.
  */
-export abstract class OrganizationSeatPeakRepository implements StateProjectionStore<SeatPeakFoldState> {
-  abstract get(
-    organizationId: string,
-    context: ProjectionStoreContext,
-  ): Promise<StoredProjectionRead<SeatPeakFoldState>>;
+export type SeatPeakSlice = Readonly<{
+  organizationId: string;
+  /** The holders named, or every holder that holds a seat. */
+  holders: readonly SeatHolder[] | "seated";
+  dueBefore: number;
+}>;
 
-  abstract store(
-    projection: StoredProjection<SeatPeakFoldState>,
-    context: ProjectionStoreContext,
-  ): Promise<void>;
+/**
+ * The seat peak's rows (ADR-002 §2): one counts row per organization, one row per holder and one
+ * per touched month. A fold loads only the slice its fact needs and writes back only what moved.
+ */
+export abstract class OrganizationSeatPeakRepository {
+  /**
+   * The slice as stored; before the organization's snapshot, the empty state, whose `openedAt`
+   * is null (counting has not started).
+   */
+  abstract getState(slice: SeatPeakSlice): Promise<SeatPeakState>;
 
   /**
-   * The organization's folded state; before its first event was folded, the empty state, whose
-   * `openedAt` is null (counting has not started). An unreadable row throws.
+   * Loads the slice, applies the pure `fold` and writes the rows it moved, one organization at a
+   * time, so two folds of one organization never interleave.
    */
-  abstract getState(organizationId: string): Promise<SeatPeakState>;
+  abstract update(
+    slice: SeatPeakSlice,
+    fold: (state: SeatPeakState) => SeatPeakState,
+  ): Promise<void>;
 }
