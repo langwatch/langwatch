@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { withLinkMarker } from "../link-marker.ts";
 import {
   CountTiles,
   DataTable,
@@ -66,10 +67,7 @@ export const triggerDigestMail = z.object({
 
 export type TriggerDigestMail = z.infer<typeof triggerDigestMail>;
 
-/**
- * A row link with the sender's marker, as automation-contract's `withAlertLinkMarker` sets it:
- * on our own app's links only, kept before any `#hash`.
- */
+/** A row link with the sender's marker, when the sender names one. */
 const marked = ({
   url,
   baseHost,
@@ -78,13 +76,8 @@ const marked = ({
   url: string;
   baseHost: string;
   linkMarker: TriggerDigestMail["linkMarker"];
-}): string => {
-  if (!linkMarker || !URL.canParse(url) || !URL.canParse(baseHost)) return url;
-  const link = new URL(url);
-  if (link.origin !== new URL(baseHost).origin) return url;
-  link.searchParams.set(linkMarker.param, linkMarker.value);
-  return link.toString();
-};
+}): string =>
+  linkMarker ? withLinkMarker({ url, appBaseUrl: baseHost, marker: linkMarker }) : url;
 
 /**
  * Where a row points: a graph automation's match is a chart threshold, not

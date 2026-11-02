@@ -13,23 +13,8 @@ export const ALERT_LINK_VALUE = "alert";
 export const ALERT_LINK_LANDINGS = ["trace", "graph", "other"] as const;
 export type AlertLinkLanding = (typeof ALERT_LINK_LANDINGS)[number];
 
-/**
- * The link with the alert marker set, kept before any `#hash`; a link to another site, a
- * relative link or a dead `#` link is returned unchanged.
- */
-export function withAlertLinkMarker({
-  url,
-  appBaseUrl,
-}: {
-  url: string;
-  appBaseUrl: string;
-}): string {
-  if (!URL.canParse(url) || !URL.canParse(appBaseUrl)) return url;
-  const link = new URL(url);
-  if (link.origin !== new URL(appBaseUrl).origin) return url;
-  link.searchParams.set(ALERT_LINK_PARAM, ALERT_LINK_VALUE);
-  return link.toString();
-}
+/** The marker an alert link carries; `@langwatch/mail`'s `withLinkMarker` sets it. */
+export const ALERT_LINK_MARKER = { param: ALERT_LINK_PARAM, value: ALERT_LINK_VALUE } as const;
 
 /** True when the query string says the page was opened from an alert. */
 export function isAlertLinkSearch(search: string): boolean {
