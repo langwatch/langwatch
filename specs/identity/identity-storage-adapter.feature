@@ -785,3 +785,9 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Given a user with an identifier under a connection's issuer and provider id "auth0"
     When the user is resolved by that issuer and the subject
     Then the resolution names provider id "auth0"
+
+  @unit
+  Scenario: The credential account lookup is served with or without an issuer clause
+    Given better-auth looks up a credential account by user, provider and subject
+    When the lookup names an issuer as well, as better-auth 1.7.1 did, or names none, as 1.7.7 does
+    Then both are served as the same lookup, refined to the user that was asked about
