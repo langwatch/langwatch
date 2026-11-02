@@ -1,7 +1,7 @@
 /**
  * The Insights inbox, one person's own. What they read is timeline-shaped, what they act on is
  * inbox-shaped: a few insights, judged good or bad, that drop to Stale once they stop being
- * true and to Archived once marked done. Nobody else reads them; Copy is how one is shared.
+ * true and to Archived once marked done.
  * @see modules/insight/specs/insight-inbox.feature
  */
 
@@ -124,7 +124,7 @@ function InboxBody({
     return (
       <NoDataInfoBlock
         title="Langy writes your brief here"
-        description="Save a Langy answer as an insight and it lands here: judged good or bad news, kept until it stops being true. It is yours alone; copy one to share it."
+        description="Save a Langy answer as an insight and it lands here: judged good or bad news, kept until it stops being true. It is yours alone."
         icon={<Inbox size={24} />}
         testId="insights-day-zero"
       >
@@ -210,7 +210,6 @@ function FolderView({
                   onRestore: () => actions.restore(entry.id),
                   onChat: () =>
                     host.askLangy({ draft: `Follow up on the insight "${entry.title}": ` }),
-                  onCopy: () => void actions.copy(entry),
                   onNotUseful: () =>
                     host.askLangy({
                       draft: `The insight "${entry.title}" isn't useful because `,
