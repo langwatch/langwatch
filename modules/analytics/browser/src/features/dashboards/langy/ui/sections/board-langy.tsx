@@ -5,9 +5,9 @@
  */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { langyQuestionAsked } from "@langwatch/langy-contract";
 
 import type { BoardPeriod } from "../../../model/board-period.ts";
-import { langyAsked } from "../../../model/dashboard-usage-events.ts";
 import { useLangyAsk } from "../../behavior/use-board-langy.ts";
 import {
   type BoardSubject,
@@ -36,7 +36,7 @@ export function BoardLangy({
   const onAsk = langy.enabled
     ? (question: string) => {
         langy.ask(boardQuestion({ question, board, period }));
-        analytics.track(langyAsked());
+        analytics.track(langyQuestionAsked({ surface: "ask_bar" }));
       }
     : void 0;
   const chips = withSuggestions ? SUGGESTED_QUESTIONS : [];
