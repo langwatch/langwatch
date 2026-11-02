@@ -213,6 +213,13 @@ Feature: Agent versions and deploy labels
     Then no version holds the typed-in credential
     And archived agents get no version 1
 
+  @integration
+  Scenario: A save that keeps losing the version number race is reported as that race
+    Given an agent whose every save loses the race for the next version number
+    When the agent is saved
+    Then the save is tried three times
+    And it fails with the version number race, never as a duplicate agent
+
   @unit
   Scenario: The backfill dry run writes nothing
     Given an agent without versions
@@ -235,6 +242,13 @@ Feature: Agent versions and deploy labels
     When saving a label is refused by the server
     Then the dialog stays open and shows the error's registered copy, never its code
     And the agent's labels are read again so a retry starts from what was saved
+
+  @integration
+  Scenario: The history drawer says when its versions fail to load
+    Given an agent whose versions cannot be read
+    When the user opens the agent's history
+    Then the drawer says the versions failed to load
+    And no Deploy action is offered
 
   @integration
   Scenario: The deploy dialog adds a custom label and refuses a reserved one

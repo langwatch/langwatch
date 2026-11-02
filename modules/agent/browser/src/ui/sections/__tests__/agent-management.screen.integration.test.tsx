@@ -227,11 +227,14 @@ class TestAgentBrowser implements AgentClient {
 
   readonly labelsAssigned: unknown[] = [];
   versionsRead = 0;
+  /** When set, every versions read is refused. */
+  versionsRefusal: unknown = null;
   /** A handled error the next label assignment rejects with, once. */
   assignRefusal: unknown = null;
 
   listVersions(): Promise<AgentVersions> {
     this.versionsRead += 1;
+    if (this.versionsRefusal) return Promise.reject(this.versionsRefusal);
     return Promise.resolve(versions);
   }
 
@@ -322,9 +325,13 @@ class TestHost implements AgentManagementHost {
   }
 }
 
-async function mountScreen(query: Record<string, string | undefined> = {}) {
+async function mountScreen(
+  query: Record<string, string | undefined> = {},
+  prepare: (browser: TestAgentBrowser) => void = () => undefined,
+) {
   const { AgentManagementScreen } = await import("../agent-management-screen.tsx");
   const browser = new TestAgentBrowser();
+  prepare(browser);
   const host = new TestHost(browser, query);
   const content = () => (
     <AgentManagementHostProvider value={host}>
@@ -553,6 +560,18 @@ describe("given the agents page", () => {
           { projectId: "project_1", agentId: "agent_1", label: "staging", version: 2 },
         ]);
       });
+    });
+
+    /** @scenario "The history drawer says when its versions fail to load" */
+    it("says the versions failed to load and offers no Deploy action", async () => {
+      const { browser } = await mountScreen({ history: "agent_1" }, (client) => {
+        client.versionsRefusal = { code: "internal_error", httpStatus: 500, meta: {} };
+      });
+
+      expect(await screen.findByText("Failed to load versions.")).toBeInTheDocument();
+      expect(browser.versionsRead).toBeGreaterThan(0);
+      expect(screen.queryByRole("button", { name: "Deploy" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("agent-versions")).not.toBeInTheDocument();
     });
 
     /** @scenario "A failed label save shows the registered error and reads the labels again" */

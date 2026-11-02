@@ -293,6 +293,7 @@ describe.skipIf(!databaseUrl)("Prisma agent versions", () => {
     expect(versions).toEqual([]);
   });
 
+  /** @scenario "A save that keeps losing the version number race is reported as that race" */
   it("reports a save that loses every version number race as that race, not a duplicate agent", async () => {
     let attempts = 0;
     const versionRace = Object.assign(new Error("Unique constraint failed"), {
