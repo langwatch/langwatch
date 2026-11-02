@@ -241,3 +241,10 @@ func TestRedactor_ASecretHoldingInvalidBytesMatchesTheSanitizedTextAndLeavesVali
 	assert.True(t, utf8.ValidString(got), "%q", got)
 	assert.Equal(t, "a [redacted] b", got)
 }
+
+func TestRedactor_ASecretHoldingInvalidBytesMatchesTheRawTextToo(t *testing.T) {
+	secrets := map[string]string{"B": "ab\xffcd"}
+
+	assert.Equal(t, "x [redacted] y", redactAll("x ab\xffcd y", secrets))
+	assert.Equal(t, "x [redacted] y", redactAll("x ab\uFFFDcd y", secrets))
+}

@@ -22,8 +22,10 @@ type Redactor struct {
 
 type span struct{ start, end int }
 
-// New builds a Redactor for the secret values and the extra values. Each
-// value is matched raw and in the escaped forms a JSON writer produces.
+// New builds a Redactor for the secret values and the extra values. Secrets
+// arrive as valid UTF-8 from JSON; both the value and its sanitized form
+// (invalid bytes replaced) are matched, so raw and sanitized text redact.
+// Each is matched raw and in the escaped forms a JSON writer produces.
 func New(secrets map[string]string, extra ...string) *Redactor {
 	values := make([]string, 0, len(extra)+len(secrets))
 	values = append(values, extra...)
@@ -33,10 +35,10 @@ func New(secrets map[string]string, extra ...string) *Redactor {
 		if value == "" {
 			continue
 		}
-		// Callers match against text with invalid bytes already replaced.
-		value = strings.ToValidUTF8(value, "\uFFFD")
-		for _, form := range secretForms(value) {
-			seen[form] = struct{}{}
+		for _, v := range distinct(value, strings.ToValidUTF8(value, "\uFFFD")) {
+			for _, form := range secretForms(v) {
+				seen[form] = struct{}{}
+			}
 		}
 	}
 	if len(seen) == 0 {
@@ -171,7 +173,8 @@ func failureTable(form string, n int) []int {
 
 // prefixSuffixLen is the length of the longest prefix of form that ends
 // window; window must be shorter than form. The table needs only as many
-// entries as the window has bytes, so a huge secret costs nothing per call.
+// entries as the window has bytes (at most len(form)-1), so this saves work
+// only when the text is shorter than the secret.
 func prefixSuffixLen(form, window string) int {
 	fail := failureTable(form, len(window))
 	k := 0
@@ -268,4 +271,12 @@ func secretForms(value string) []string {
 		}
 	}
 	return append(forms, ascii.String())
+}
+
+// distinct returns value, then sanitized when it differs.
+func distinct(value, sanitized string) []string {
+	if value == sanitized {
+		return []string{value}
+	}
+	return []string{value, sanitized}
 }

@@ -356,6 +356,7 @@ func TestReadRunnerStderr_AStderrEndingInAPartOfASecretShowsNoFragmentOfIt(t *te
 	secret := "sk-\"\u00e9-abcdef"
 	forms := []string{secret, `sk-\"\u00e9-abcdef`, `sk-\"é-abcdef`}
 	dir := t.TempDir()
+	// Cut each form at every point and check no 4-byte fragment of it survives.
 	for _, form := range forms {
 		for n := 1; n < len(form); n++ {
 			got, err := codeblock.ReadRunnerStderr(dir, "Traceback\nBoom key="+form[:n], map[string]string{"K": secret})
