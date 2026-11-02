@@ -30,6 +30,8 @@ export interface LwqlClickHouseInventory {
   readonly relations: readonly string[];
   /** Each present relation's comment, by name; empty where it has none. */
   readonly comments: Readonly<Record<string, string>>;
+  /** Each present relation's column names, by name. */
+  readonly columns: Readonly<Record<string, readonly string[]>>;
   /** The named SQL user-defined functions present. */
   readonly functions: readonly string[];
 }

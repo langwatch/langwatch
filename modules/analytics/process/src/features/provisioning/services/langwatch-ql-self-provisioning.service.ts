@@ -398,8 +398,9 @@ export class LangWatchQLSelfProvisioningService {
   }
 
   /**
-   * Each expected relation absent or, for an engine table, not stamped with the current
-   * credential fingerprint (a table from before #8858 has none); then each app function absent.
+   * Each expected relation absent; an engine table not stamped with the current credentials
+   * (#8858); a view lacking a column this catalog declares, never one with extra columns, which
+   * are a newer deploy's (#9245); then each app function absent.
    */
   findDrift({
     names,
@@ -417,6 +418,8 @@ export class LangWatchQLSelfProvisioningService {
       functions: readonly string[];
       /** Each present relation's `system.tables` comment. */
       comments: Readonly<Record<string, string>>;
+      /** Each present relation's column names; a relation not listed is not compared. */
+      columns?: Readonly<Record<string, readonly string[]>>;
     };
     credentialFingerprint: string;
   }): LwqlClickHouseDrift {
@@ -424,8 +427,15 @@ export class LangWatchQLSelfProvisioningService {
     const current = postgresMapping.credentialComment({ fingerprint: credentialFingerprint });
     const isStale = (name: string) =>
       engineTables.includes(name) && found.comments[name] !== current;
+    const lacksColumns = (name: string) => {
+      const held = found.columns?.[name];
+      const view = LWQL_VIEW_CATALOG.find((entry) => entry.name === name);
+      return !!held && !!view && view.columns.some((column) => !held.includes(column.name));
+    };
     const objects = [
-      ...relations.filter((name) => !found.relations.includes(name) || isStale(name)),
+      ...relations.filter(
+        (name) => !found.relations.includes(name) || isStale(name) || lacksColumns(name),
+      ),
       ...functions.filter((name) => !found.functions.includes(name)),
     ];
     return { objects, isKeyMapMissing: objects.includes(names.keyMapTable) };

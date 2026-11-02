@@ -1083,17 +1083,30 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a PostgreSQL that cannot be read is unknown: a warning, no converge, and its last alert left as it was
 
   # During a rollout old and new workers run the check side by side. The check
-  # never compares columns, so a newer deploy that added a column or removed one
-  # looks healthy to an older worker, which leaves the newer view alone. Its
-  # grants are additive and never revoke, so a view only the newer catalog has
-  # keeps its SELECT. Column changes converge on a deploy only.
+  # counts a view as drift only when it lacks a column this worker's catalog
+  # declares, never for an extra one, so a newer deploy that added a column looks
+  # healthy to an older worker, which leaves the newer view alone. Its grants are
+  # additive and never revoke, so a view only the newer catalog has keeps its
+  # SELECT. A newer deploy that only removed a column is put back to the older
+  # view by an older worker, and the newer worker accepts the extra column: the
+  # view settles on the union both need, never flapping, until the next deploy.
   @unit
   Scenario: An older worker never rewrites a newer view
-    Given a newer deploy has converged views and approved views that added or removed columns this worker's catalog declares
+    Given a newer deploy has converged views and approved views that added columns this worker's catalog does not declare
     When this worker's reconvergence check runs
     Then it finds no drift and runs no DDL
     And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes
     And a deploy's converge still revokes and grants the reader role's whole set
+
+  # A deploy converges views after the engine tables and stops at the first
+  # failing statement, so a deploy whose PostgreSQL bridge fails never replaces
+  # the views over fact tables. The check is the backstop (#9245).
+  @unit
+  Scenario: The reconvergence check replaces a view a deploy left on an older definition
+    Given a view is present but lacks a column this worker's catalog declares
+    When the reconvergence check runs
+    Then it names that view as drift, and the converge replaces it with CREATE OR REPLACE VIEW
+    And it does so even when the named collection cannot be confirmed, before raising that
 
   @unit
   Scenario: The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place

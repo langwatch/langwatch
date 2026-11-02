@@ -584,6 +584,29 @@ describe("convergeLwqlAccessModel", () => {
   });
 });
 
+describe("when a view a deploy left stale drifts while the collection cannot be confirmed", () => {
+  const [engineTable = ""] = selfProvisioning.engineTablesIn({ only: undefined });
+
+  /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
+  it("replaces the view over a fact table, then raises the unconfirmed collection", async () => {
+    const clickHouse = clickHouseThat({ present: [engineTable], failingProbe: "collection" });
+
+    await expect(
+      convergeLwqlAccessModel({
+        database: postgresThat({ refuses: false }).database,
+        plan: clickHouse.plan,
+        failOnError: true,
+        only: { clickHouse: [engineTable, "trace_metrics"], postgres: [], isKeyMapMissing: false },
+      }),
+    ).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
+
+    expect(clickHouse.ran.some((s) => s.includes(`.${engineTable} (`))).toBe(false);
+    expect(clickHouse.ran).toContainEqual(
+      expect.stringMatching(/^CREATE OR REPLACE VIEW [^ .]+\.trace_metrics\n[\s\S]* AS `Source`/),
+    );
+  });
+});
+
 describe("findLwqlAppOwnedDrift", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
   const approvedViews = selfProvisioning.approvedPostgresViews();
@@ -644,18 +667,24 @@ describe("findLwqlAppOwnedDrift", () => {
   }
 
   /** @scenario "An older worker never rewrites a newer view" */
-  it.each([
-    {
-      shape: "a newer deploy's extra columns",
-      columns: [...catalogColumns, "AddedByANewerDeploy"],
-    },
-    { shape: "fewer columns than this worker's catalog declares", columns: ["TenantId"] },
-  ])("finds no drift in objects holding $shape", async ({ columns }) => {
-    expect(await presentWith({ columns })).toEqual({
+  it("finds no drift in objects holding a newer deploy's extra columns", async () => {
+    expect(await presentWith({ columns: [...catalogColumns, "AddedByANewerDeploy"] })).toEqual({
       clickHouse: [],
       postgres: [],
       isKeyMapMissing: false,
     });
+  });
+
+  /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
+  it("names each view that lacks a column this worker's catalog declares, and nothing else", async () => {
+    const drift = await presentWith({ columns: catalogColumns.filter((c) => c !== "Source") });
+
+    expect(drift.clickHouse).toEqual(
+      LWQL_VIEW_CATALOG.filter((view) => view.columns.some((c) => c.name === "Source")).map(
+        (view) => view.name,
+      ),
+    );
+    expect(drift.clickHouse).toContain("trace_metrics");
   });
 
   /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
