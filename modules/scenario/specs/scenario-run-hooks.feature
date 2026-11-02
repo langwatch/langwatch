@@ -412,6 +412,28 @@ Feature: Scenario run hooks: setup and teardown
       Then the code runner is not called
       And setup records "failed" naming the cap
 
+    # Off on the hosted product until the WebAssembly runner lands; self-hosted and local stay on.
+    @unit
+    Scenario: A hosted project without the Connector release flag does not run Connector steps
+      Given the hosted product and a project without release_scenario_connector_steps
+      And an HTTP agent whose Connector has a setup step
+      When the run is prefetched
+      Then the step carries a refusal that names the release
+      And setup records "failed" with that refusal
+      And the code runner is not called
+
+    @unit
+    Scenario: A hosted project with the Connector release flag runs Connector steps
+      Given the hosted product and a project with release_scenario_connector_steps on
+      When the run is prefetched
+      Then the step carries no refusal
+
+    @unit
+    Scenario: A self-hosted deployment runs Connector steps without the flag
+      Given a self-hosted deployment
+      When the run is prefetched
+      Then the step carries no refusal
+
     @integration
     Scenario: A secret in a Connector step's error is scrubbed
       Given a teardown step whose traceback prints a secret it was given

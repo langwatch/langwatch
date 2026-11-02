@@ -373,15 +373,15 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
 
     it("fails setup on rows over the cap without calling the code runner", async () => {
       const runner = fakeCodeRunner({});
-      const rowsRefusal = "The Connector step's dataset is over the 64 KiB a step may receive.";
-      const { service, turns } = runWith({ connector: { setup: step({ rowsRefusal }) }, runner });
+      const refusal = "The Connector step's dataset is over the 64 KiB a step may receive.";
+      const { service, turns } = runWith({ connector: { setup: step({ refusal }) }, runner });
 
       const failure = (await service
         .around(turns())
         .catch((error: unknown) => error)) as ScenarioRunHooksError;
 
       expect(runner.calls).toHaveLength(0);
-      expect(failure.hooks.setup).toMatchObject({ status: "failed", error: rowsRefusal });
+      expect(failure.hooks.setup).toMatchObject({ status: "failed", error: refusal });
     });
   });
 

@@ -416,6 +416,7 @@ export function createTestScenarioExecutionPrefetcherService(
         })),
     }),
     datasets: createApiFixture<DatasetApi>({}),
+    connectorSteps: { isEnabled: async () => true },
     traces: createApiFixture<TraceApi>({
       resolveIngestWaitTimeout: (input) =>
         deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),

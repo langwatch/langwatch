@@ -31,6 +31,10 @@ import { referencedSecretNames, type SecretApi } from "@langwatch/secret-contrac
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
+import {
+  CONNECTOR_STEPS_NOT_RELEASED_MESSAGE,
+  type ConnectorStepsGate,
+} from "../../../services/scenario-connector-steps-gate.service.ts";
 import type { ModelParamsFailureReason } from "../../../services/scenario-model-parameters.service.ts";
 import { ScenarioWorkflowAgentSecretsService } from "../../../services/scenario-workflow-agent-secrets.service.ts";
 import type { ScenarioWorkflowHydratorService } from "../../../services/scenario-workflow-hydrator.service.ts";
@@ -57,6 +61,7 @@ export class ScenarioTargetPrefetchService {
     workflows: WorkflowApi;
     secrets: SecretApi;
     datasets: ConnectorDatasetReader;
+    connectorSteps: ConnectorStepsGate;
     workflowHydrator: ScenarioWorkflowHydratorService;
     legacyDefaultModel: string;
     langwatchEndpoint: string;
@@ -76,6 +81,7 @@ export class ScenarioTargetPrefetchService {
       workflows: WorkflowApi;
       secrets: SecretApi;
       datasets: ConnectorDatasetReader;
+      connectorSteps: ConnectorStepsGate;
       workflowHydrator: ScenarioWorkflowHydratorService;
       legacyDefaultModel: string;
       langwatchEndpoint: string;
@@ -290,13 +296,29 @@ export class ScenarioTargetPrefetchService {
     runSecretValues: Record<string, string>;
   }): Promise<{ connector?: ConnectorData }> {
     if (!connector?.setup && !connector?.teardown) return {};
-    const stepData = (step: ConnectorStep | undefined) =>
-      step ? this.connectorStepData({ projectId, step, runSecretValues }) : undefined;
+    const released = await this.options.connectorSteps.isEnabled({ projectId });
+    const stepData = (step: ConnectorStep | undefined) => {
+      if (!step) return undefined;
+      return released
+        ? this.connectorStepData({ projectId, step, runSecretValues })
+        : this.unreleasedStepData(step);
+    };
     const [setup, teardown] = await Promise.all([
       stepData(connector.setup),
       stepData(connector.teardown),
     ]);
     return { connector: { ...(setup ? { setup } : {}), ...(teardown ? { teardown } : {}) } };
+  }
+
+  /** A step the release withholds: no secrets or rows are read, it only carries its refusal. */
+  private unreleasedStepData(step: ConnectorStep): ConnectorStepData {
+    return {
+      language: step.language,
+      code: step.code,
+      secretNames: [],
+      secrets: {},
+      refusal: CONNECTOR_STEPS_NOT_RELEASED_MESSAGE,
+    };
   }
 
   /** Only the secrets the step names travel to it; a run's own value of one wins (ADR-194). */
@@ -333,20 +355,20 @@ export class ScenarioTargetPrefetchService {
   }: {
     projectId: string;
     datasetId: string;
-  }): Promise<Pick<ConnectorStepData, "rows" | "rowsRefusal">> {
+  }): Promise<Pick<ConnectorStepData, "rows" | "refusal">> {
     const page = await this.options.datasets.findDatasetPage({
       projectId,
       slugOrId: datasetId,
       limit: DATASET_PAGE_LIMIT_MAX,
     });
-    if (!page) return { rowsRefusal: "The Connector step's dataset no longer exists." };
+    if (!page) return { refusal: "The Connector step's dataset no longer exists." };
     const rows = page.datasetRecords.map(({ entry }) => entry);
     const isOverCap =
       page.count > rows.length ||
       Buffer.byteLength(JSON.stringify(rows), "utf8") > CONNECTOR_ROWS_MAX_BYTES;
     if (!isOverCap) return { rows };
     return {
-      rowsRefusal: `The Connector step's dataset is over the ${CONNECTOR_ROWS_MAX_BYTES / 1024} KiB a step may receive.`,
+      refusal: `The Connector step's dataset is over the ${CONNECTOR_ROWS_MAX_BYTES / 1024} KiB a step may receive.`,
     };
   }
 

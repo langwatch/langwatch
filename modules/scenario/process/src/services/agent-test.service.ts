@@ -55,6 +55,7 @@ import {
 import type { ScenarioExecutionPrefetchConfig } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioTargetPrefetchService } from "../features/prefetch/services/scenario-target-prefetch.service.ts";
 import { ConnectedTargetService } from "./connected-target.service.ts";
+import type { ConnectorStepsGate } from "./scenario-connector-steps-gate.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
 import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
@@ -68,6 +69,7 @@ type AgentTestServiceOptions = {
   prompts: PromptApi;
   secrets: SecretApi;
   datasets: Pick<DatasetApi, "findDatasetPage">;
+  connectorSteps: ConnectorStepsGate;
   modelProviders: ModelProviderApi;
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;
@@ -115,6 +117,7 @@ export class AgentTestService {
       workflows: options.workflows,
       secrets: options.secrets,
       datasets: options.datasets,
+      connectorSteps: options.connectorSteps,
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,

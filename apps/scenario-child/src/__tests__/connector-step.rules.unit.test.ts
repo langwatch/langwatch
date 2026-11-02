@@ -93,9 +93,9 @@ describe("connectorStepRefusal()", () => {
 
   /** @scenario "A Connector step whose dataset is over 64 KiB fails before it runs" */
   it("passes on the prefetch's dataset refusal", () => {
-    expect(
-      connectorStepRefusal({ kind: "setup", step: { ...step, rowsRefusal: "over 64 KiB" } }),
-    ).toBe("over 64 KiB");
+    expect(connectorStepRefusal({ kind: "setup", step: { ...step, refusal: "over 64 KiB" } })).toBe(
+      "over 64 KiB",
+    );
   });
 
   it("refuses nothing when every name resolved and the rows are there", () => {

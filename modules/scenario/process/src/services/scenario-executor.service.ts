@@ -24,6 +24,7 @@ import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
 import type { VoicePublicUrl } from "../features/voice/services/voice-public-url.service.ts";
 import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
+import { ScenarioConnectorStepsGateService } from "./scenario-connector-steps-gate.service.ts";
 import type { ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
 import { ScenarioExecutionService } from "./scenario-execution.service.ts";
 import { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
@@ -131,6 +132,10 @@ export class ScenarioExecutorService {
       modelProviders: peers.modelProviders,
       secrets: peers.secrets,
       datasets: peers.datasets,
+      connectorSteps: ScenarioConnectorStepsGateService.create({
+        isSaas: config.isSaas,
+        featureFlags: peers.featureFlags,
+      }),
       traces: peers.traces,
       apiKeys: peers.apiKeys,
       voiceTargets: ScenarioVoiceTargetService.create({

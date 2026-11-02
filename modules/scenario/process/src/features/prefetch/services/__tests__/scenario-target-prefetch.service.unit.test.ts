@@ -28,6 +28,8 @@ type Answers = {
   secretReads?: string[][];
   /** The dataset entries a Connector step's bound dataset holds; null when it is gone. */
   datasetEntries?: Record<string, unknown>[] | null;
+  /** Whether the project's runs may execute Connector steps; defaults to released. */
+  connectorsReleased?: boolean;
 };
 
 function datasetPageOf(entries: Record<string, unknown>[]): DatasetPage {
@@ -144,6 +146,7 @@ function serviceAnswering(answers: Answers = {}) {
     workflows,
     secrets,
     datasets,
+    connectorSteps: { isEnabled: async () => answers.connectorsReleased ?? true },
     // Never reached: every workflow lookup below answers not-found, so the
     // target is refused before anything is hydrated.
     workflowHydrator: ScenarioWorkflowHydratorService.create(
@@ -400,6 +403,35 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       });
     });
 
+    /** @scenario "A hosted project without the Connector release flag does not run Connector steps" */
+    it("packs only a refusal, and reads no secret or row, while the release is off", async () => {
+      const service = serviceAnswering({
+        agent: withConnector({ setup: { ...step, datasetId: "dataset_personas" } }),
+        projectSecrets: { API_KEY: "key-from-project" },
+        datasetEntries: [{ persona: "gold" }],
+        connectorsReleased: false,
+      });
+
+      const adapter = await fetchFor(service, "http");
+
+      expect(adapter).toMatchObject({
+        connector: {
+          setup: { refusal: expect.stringContaining("not released"), secrets: {}, secretNames: [] },
+        },
+      });
+      expect(adapter).not.toHaveProperty("connector.setup.rows");
+    });
+
+    /** @scenario "A hosted project with the Connector release flag runs Connector steps" */
+    it("packs no refusal while the release is on", async () => {
+      const service = serviceAnswering({
+        agent: withConnector({ setup: step }),
+        connectorsReleased: true,
+      });
+
+      expect(await fetchFor(service, "http")).not.toHaveProperty("connector.setup.refusal");
+    });
+
     /** @scenario "A Connector step bound to a dataset receives its rows" */
     it("packs the bound dataset's entries as rows", async () => {
       const rows = [{ persona: "gold" }, { persona: "basic" }];
@@ -422,7 +454,7 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       const adapter = await fetchFor(service, "http");
 
       expect(adapter).toMatchObject({
-        connector: { setup: { rowsRefusal: expect.stringContaining("64 KiB") } },
+        connector: { setup: { refusal: expect.stringContaining("64 KiB") } },
       });
       expect(adapter).not.toHaveProperty("connector.setup.rows");
     });
@@ -434,7 +466,7 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       });
 
       await expect(fetchFor(service, "http")).resolves.toMatchObject({
-        connector: { setup: { rowsRefusal: expect.stringContaining("no longer exists") } },
+        connector: { setup: { refusal: expect.stringContaining("no longer exists") } },
       });
     });
 

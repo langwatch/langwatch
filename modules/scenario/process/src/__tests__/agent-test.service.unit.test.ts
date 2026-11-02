@@ -105,6 +105,7 @@ function serviceFor(options: {
     prompts: {} as never,
     secrets: {} as never,
     datasets: {} as never,
+    connectorSteps: { isEnabled: async () => true },
     modelProviders: {} as never,
     turns: { run: runTurn },
     nlpTimeouts: { engineCodeBlockTimeoutSeconds: Number.NaN, maxTimeoutMs: 90_000 },

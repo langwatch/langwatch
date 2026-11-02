@@ -114,8 +114,8 @@ const ConnectorStepDataSchemaDefinition = z.object({
   secrets: z.record(z.string(), z.string()).default({}),
   /** The bound dataset's entries. */
   rows: z.array(z.record(z.string(), z.unknown())).optional(),
-  /** Why the bound dataset cannot be given; the step fails with it before it runs. */
-  rowsRefusal: z.string().optional(),
+  /** Why the step must not run (no dataset rows, or the release is off); it fails with it. */
+  refusal: z.string().optional(),
 });
 export interface ConnectorStepDataSchema extends Named<typeof ConnectorStepDataSchemaDefinition> {}
 export const ConnectorStepDataSchema: ConnectorStepDataSchema = ConnectorStepDataSchemaDefinition;

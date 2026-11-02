@@ -64,7 +64,7 @@ export function connectorIdempotencyKey({
   return [run.scenarioRunId, attemptId, kind].filter(Boolean).join(":");
 }
 
-/** Why a step must fail before it runs: a named secret the run lacks, or rows it cannot have. */
+/** Why a step fails before it runs: a missing secret, rows it cannot have, or the release off. */
 export function connectorStepRefusal({
   kind,
   step,
@@ -76,7 +76,7 @@ export function connectorStepRefusal({
   if (missing.length > 0) {
     return `The ${kind} step names project secrets that do not exist: ${missing.join(", ")}.`;
   }
-  return step.rowsRefusal ?? null;
+  return step.refusal ?? null;
 }
 
 /** What the step's code is called with. Teardown alone gets the state setup returned. */

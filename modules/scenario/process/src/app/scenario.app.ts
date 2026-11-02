@@ -172,6 +172,7 @@ import { ConnectedTargetService } from "../services/connected-target.service.ts"
 import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 import { ResultAtomsService } from "../services/result-atoms.service.ts";
 import { RunConfigurationsService } from "../services/run-configurations.service.ts";
+import { ScenarioConnectorStepsGateService } from "../services/scenario-connector-steps-gate.service.ts";
 import { ScenarioCreationCapService } from "../services/scenario-creation-cap.service.ts";
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
@@ -352,6 +353,11 @@ export class ScenarioModule implements ScenarioApi {
       publicBaseUrl,
     });
 
+    const connectorSteps = ScenarioConnectorStepsGateService.create({
+      isSaas: config.isSaas,
+      featureFlags: peers.featureFlags,
+    });
+
     const childHost = { voicePublicUrl: voice.acquire, nlpServiceUrl };
 
     return new ScenarioModule({
@@ -363,6 +369,7 @@ export class ScenarioModule implements ScenarioApi {
         prompts: peers.prompts,
         secrets: peers.secrets,
         datasets: peers.datasets,
+        connectorSteps,
         modelProviders: peers.modelProviders,
         simulations,
         config: prefetchConfig,
@@ -394,6 +401,7 @@ export class ScenarioModule implements ScenarioApi {
         modelProviders: peers.modelProviders,
         secrets: peers.secrets,
         datasets: peers.datasets,
+        connectorSteps,
         traces: peers.traces,
         apiKeys: peers.apiKeys,
         voiceTargets: ScenarioVoiceTargetService.create({

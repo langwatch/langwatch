@@ -91,6 +91,7 @@ function prefetcher({ agent }: { agent: Agent | "missing" }) {
       getValuesByName: async () => ({}),
     }),
     datasets: createApiFixture<DatasetApi>({}),
+    connectorSteps: { isEnabled: async () => true },
     traces: createApiFixture<TraceApi>({}),
     apiKeys: createApiFixture<Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">>({
       mintRunKey: async () => "run-key",

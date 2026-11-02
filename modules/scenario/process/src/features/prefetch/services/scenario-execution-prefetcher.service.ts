@@ -19,6 +19,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ScenarioRunSecretSeal } from "../../../repositories/scenario.repository.ts";
 import { hookCallsEnvironment } from "../../../rules/scenario-run-hooks.rules.ts";
+import type { ConnectorStepsGate } from "../../../services/scenario-connector-steps-gate.service.ts";
 import { ScenarioExecutionLookupService } from "../../../services/scenario-execution-lookup.service.ts";
 import { ScenarioModelParametersService } from "../../../services/scenario-model-parameters.service.ts";
 import { ScenarioRunKeyService } from "../../../services/scenario-run-key.service.ts";
@@ -60,6 +61,8 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   secrets: SecretApi;
   /** A Connector step's bound dataset rows (ADR-194). */
   datasets: ConnectorDatasetReader;
+  /** Whether the project's runs may execute Connector steps. */
+  connectorSteps: ConnectorStepsGate;
   traces: TraceApi;
   /** Mints the run's keys: the child's, and a code agent's sandbox key. */
   apiKeys: Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">;
@@ -87,6 +90,7 @@ export class ScenarioExecutionPrefetcherService {
       workflows: options.workflows,
       secrets: options.secrets,
       datasets: options.datasets,
+      connectorSteps: options.connectorSteps,
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,
