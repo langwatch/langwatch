@@ -539,17 +539,24 @@ figure > .docs-shot {
   min-height: calc(100vh - var(--docs-header-h));
   padding-inline: 24px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "main";
+  grid-template-rows: 1fr auto;
+  grid-template-areas: "main" "footer";
 }
-/* The banners stay pinned above the header; dismissing one shrinks the pinned block. */
+/* The footer sits under the page, not the sidebar, so the page list stays pinned beside it. */
+.docs-layout > .docs-site-footer {
+  grid-area: footer;
+  min-width: 0;
+}
+/* One notice line at a time, pinned above the header: the release update waits behind the
+   announcement until the reader dismisses it. */
 .docs-shell {
   --docs-banners-h: 0px;
 }
 .docs-shell:has(.docs-top > [data-docs-banner]) {
   --docs-banners-h: 36px;
 }
-.docs-shell:has(.docs-top > [data-docs-banner] ~ [data-docs-banner]) {
-  --docs-banners-h: 72px;
+.docs-top > .docs-announcement ~ .docs-release-strip {
+  display: none;
 }
 .docs-page-header {
   position: relative;
@@ -619,7 +626,7 @@ figure > .docs-shot {
   .docs-layout {
     padding-inline: 24px 40px;
     grid-template-columns: 280px minmax(0, 1fr);
-    grid-template-areas: "nav main";
+    grid-template-areas: "nav main" "nav footer";
     column-gap: 32px;
   }
   .docs-layout > main {
@@ -634,7 +641,7 @@ figure > .docs-shot {
 @media (min-width: 80rem) {
   .docs-layout[data-has-toc="true"] {
     grid-template-columns: 280px minmax(0, 1fr) 200px;
-    grid-template-areas: "nav main toc";
+    grid-template-areas: "nav main toc" "nav footer footer";
     column-gap: 32px;
   }
 }
@@ -642,8 +649,8 @@ figure > .docs-shot {
   .docs-layout[data-kind="endpoint"] {
     padding-inline-end: 32px;
     grid-template-columns: 248px minmax(0, 1.1fr) minmax(0, 1fr);
-    grid-template-areas: "nav top play" "nav ref play";
-    grid-template-rows: auto 1fr;
+    grid-template-areas: "nav top play" "nav ref play" "nav footer footer";
+    grid-template-rows: auto 1fr auto;
     column-gap: 32px;
   }
 }
@@ -2534,7 +2541,8 @@ html[data-docs-theme-change]::view-transition-new(root) {
    height of the screen; the right rail holds the way out and drops below it on narrow screens. */
 .docs-layout[data-scene] {
   padding-inline: 0;
-  grid-template-areas: "main" "toc";
+  grid-template-rows: 1fr auto auto;
+  grid-template-areas: "main" "toc" "footer";
 }
 .docs-layout[data-scene] > .docs-scene-main {
   grid-area: main;
@@ -2555,7 +2563,7 @@ html[data-docs-theme-change]::view-transition-new(root) {
   .docs-layout[data-scene] {
     padding-inline-start: 24px;
     grid-template-columns: 280px minmax(0, 1fr);
-    grid-template-areas: "nav main" "nav toc";
+    grid-template-areas: "nav main" "nav toc" "nav footer";
     column-gap: 0;
   }
   .docs-scene-aside {
@@ -2565,7 +2573,8 @@ html[data-docs-theme-change]::view-transition-new(root) {
 @media (min-width: 80rem) {
   .docs-layout[data-scene] {
     grid-template-columns: 280px minmax(0, 1fr) 240px;
-    grid-template-areas: "nav main toc";
+    grid-template-rows: 1fr auto;
+    grid-template-areas: "nav main toc" "nav footer footer";
   }
   .docs-scene-aside {
     padding: 40px 24px;

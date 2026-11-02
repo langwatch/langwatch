@@ -83,7 +83,7 @@ Feature: docs.json stays the single source of truth for both documentation sites
     And an older kept count shows at once while the fresh one loads
     When this browser read the count within the hour
     Then the page shows that count without asking GitHub
-    And if GitHub does not answer with a count, the page keeps the count it has
+    And if GitHub does not answer with a count, the page keeps the count it has and asks again only after the hour
 
   @unit
   Scenario: Refuse arbitrary code from the tag manager

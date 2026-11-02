@@ -19,6 +19,9 @@ import { TocDisclosure, TocRail } from "./toc.tsx";
 import type { TocEntry } from "./toc.tsx";
 
 const ENDPOINT_QUERY = "@media (min-width: 80rem)";
+/* Tracing coding agents is one feature: its launcher shows where tracing is the subject, in the
+   Observability and Coding Agents sections and the Platform section's Observability group. */
+const LAUNCHER_PLACES = new Set(["Observability", "Coding Agents"]);
 
 type ShellProps = {
   slug: string;
@@ -136,7 +139,16 @@ export function DocsShell({
         data-scene={aside ? "true" : void 0}
       >
         <LeftRail>
-          <SideNav active={section} launcher={<AgentLauncher />} slug={slug} treeId="page-tree" />
+          <SideNav
+            active={section}
+            launcher={
+              [section?.title, trail[0]].some((place) => place && LAUNCHER_PLACES.has(place)) ? (
+                <AgentLauncher />
+              ) : null
+            }
+            slug={slug}
+            treeId="page-tree"
+          />
         </LeftRail>
         {aside ? (
           <>
@@ -227,8 +239,8 @@ export function DocsShell({
             </Box>
           </Box>
         ) : null}
+        <SiteFooter />
       </Box>
-      <SiteFooter />
       <MobileNav githubLink={<GithubLink site={site} />} site={site} />
       <SearchTemplates />
       <CookieNotice />

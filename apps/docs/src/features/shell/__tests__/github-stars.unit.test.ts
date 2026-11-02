@@ -98,10 +98,31 @@ describe("the live GitHub star count", () => {
       ["refuses the request", { ok: false }],
       ["answers without a count", { ok: true, stars: "lots" }],
     ])("keeps the build's count when GitHub %s", async (_label, github) => {
-      const { win, count, storage } = fakeWindow({ github });
+      const { win, count } = fakeWindow({ github });
       await refreshStars({ win: win as never, now: NOW });
       expect(count.textContent).toBe("5,000");
-      expect(storage.size).toBe(0);
+    });
+
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("waits the hour before asking again", async () => {
+      const { win, requests } = fakeWindow({ github: { ok: false } });
+      await refreshStars({ win: win as never, now: NOW });
+      await refreshStars({ win: win as never, now: NOW + STARS_FRESH_MS - 1 });
+      expect(requests).toHaveLength(1);
+      await refreshStars({ win: win as never, now: NOW + STARS_FRESH_MS });
+      expect(requests).toHaveLength(2);
+    });
+
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("keeps showing a stored count it could not refresh", async () => {
+      const { win, count, requests } = fakeWindow({
+        cached: { count: 6000, at: NOW - STARS_FRESH_MS },
+        github: { ok: false },
+      });
+      await refreshStars({ win: win as never, now: NOW });
+      await refreshStars({ win: win as never, now: NOW + 1 });
+      expect(count.textContent).toBe("6,000");
+      expect(requests).toHaveLength(1);
     });
   });
 });

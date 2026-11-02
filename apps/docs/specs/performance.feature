@@ -164,7 +164,7 @@ Feature: Static documentation with progressive interaction
     And the desktop page list sticks beneath the header and scrolls on its own
     And following a page list link keeps that link in view
     And a short contents rail may stick beneath the header
-    And the full-width footer follows the page and never clips navigation
+    And the footer follows the article, beside the page list, and never clips navigation
     And unrelated navigation groups start collapsed
     And the active page remains in an expanded branch
     And initial loading preserves the article heading and top gap

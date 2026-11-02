@@ -16,8 +16,21 @@ const outDir = path.resolve(values["out-dir"] ?? "dist");
 const screenshots = path.resolve(values.screenshots ?? "news-shots");
 await mkdir(screenshots, { recursive: true });
 
+/** The release update waits behind the announcement: dismiss that first. */
+async function revealRelease({ page }) {
+  const release = page.getByRole("complementary", { name: "Latest release" });
+  const announcement = page.getByRole("complementary", { name: "Announcement" });
+  if (await announcement.count()) {
+    assert.equal(await release.isVisible(), false, "one notice line at a time");
+    await announcement.getByRole("button", { name: "Hide notice" }).click();
+    await announcement.waitFor({ state: "detached" });
+  }
+  await release.waitFor();
+}
+
 async function assertStrip({ page, base, width, mode }) {
   await page.goto(base + "integration/quick-start");
+  await revealRelease({ page });
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => Boolean(document.querySelector("script[data-island=toc]")));
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
@@ -93,7 +106,11 @@ await it("keeps releases readable without scripts and can dismiss when storage i
       try {
         const staticPage = await staticContext.newPage();
         await staticPage.goto(base + "changelog");
-        const strip = staticPage.getByRole("complementary", { name: "Latest release" });
+        /* Without scripts the announcement stays, so the release update waits hidden behind it. */
+        const strip = staticPage.getByRole("complementary", {
+          name: "Latest release",
+          includeHidden: true,
+        });
         const version = await strip.locator(".docs-release-version").textContent();
         const heading = staticPage.getByRole("heading", { name: `Release ${version}` });
         await heading.waitFor();
@@ -108,6 +125,7 @@ await it("keeps releases readable without scripts and can dismiss when storage i
         });
         const page = await deniedContext.newPage();
         await page.goto(base + "support");
+        await revealRelease({ page });
         const announcement = page.getByRole("complementary", { name: "Latest release" });
         await announcement.getByRole("button", { name: "Dismiss announcement" }).click();
         await announcement.waitFor({ state: "detached" });
@@ -134,7 +152,7 @@ await it("links from every guide sidebar to the coding-agent quickstart", async 
           .click();
         await page.waitForURL(base + "coding-agents/quickstart");
         assert.equal(await page.locator(".docs-left-rail .docs-agent-launcher").count(), 1);
-        await page.goto(base + "introduction");
+        await page.goto(base + "integration/overview");
         assert.equal(await page.locator(".docs-left-rail .docs-agent-launcher").count(), 1);
       } finally {
         await page.close();

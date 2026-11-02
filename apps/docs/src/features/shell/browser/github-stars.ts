@@ -6,12 +6,14 @@ const STORAGE_KEY = "lw-docs:github-stars";
 export const STARS_FRESH_MS = 60 * 60 * 1000;
 
 type StarsWindow = Pick<Window, "document" | "localStorage" | "fetch">;
-type CachedStars = { count: number; at: number };
+/* `count` is null when GitHub was asked at `at` but gave no count: the next ask waits the hour. */
+type CachedStars = { count: number | null; at: number };
 
 function readCache({ win }: { win: StarsWindow }): CachedStars | null {
   try {
     const cached = JSON.parse(win.localStorage.getItem(STORAGE_KEY) ?? "null");
-    return Number.isInteger(cached?.count) && Number.isFinite(cached?.at) ? cached : null;
+    const count = cached?.count === null || Number.isInteger(cached?.count);
+    return count && Number.isFinite(cached?.at) ? cached : null;
   } catch {
     return null;
   }
@@ -52,7 +54,7 @@ async function fetchStars({ win }: { win: StarsWindow }) {
 /**
  * Replaces the build's star count with a live one. A count this browser read within the hour is
  * used as it is; an older one is painted at once and refreshed from GitHub. If GitHub does not
- * answer, the page keeps the count it has.
+ * answer, the page keeps the count it has and asks again after the hour.
  */
 export async function refreshStars({
   win = window,
@@ -60,16 +62,15 @@ export async function refreshStars({
   now = Math.round(performance.timeOrigin + performance.now()),
 }: { win?: StarsWindow; now?: number } = {}) {
   const cached = readCache({ win });
-  if (cached) paintStars({ win, stars: cached.count });
+  if (cached?.count != null) paintStars({ win, stars: cached.count });
   if (cached && now - cached.at < STARS_FRESH_MS) return;
   const count = await fetchStars({ win });
-  if (count === null) return;
-  writeCache({ win, stars: { count, at: now } });
-  paintStars({ win, stars: count });
+  writeCache({ win, stars: { count: count ?? cached?.count ?? null, at: now } });
+  if (count !== null) paintStars({ win, stars: count });
 }
 
 /** Paints the cached count again after an in-place navigation swaps the mobile menu. */
 export function repaintCachedStars({ win = window }: { win?: StarsWindow } = {}) {
   const cached = readCache({ win });
-  if (cached) paintStars({ win, stars: cached.count });
+  if (cached?.count != null) paintStars({ win, stars: cached.count });
 }
