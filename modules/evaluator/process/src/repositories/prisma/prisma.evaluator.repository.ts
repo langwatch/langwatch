@@ -512,7 +512,7 @@ export class PrismaEvaluatorRepository
       try {
         return await this.transaction((transaction) => this.#writeOnce({ transaction, ...input }));
       } catch (error) {
-        if (attempt < VERSION_WRITE_ATTEMPTS && isVersionRace(error)) continue;
+        if (isVersionRace(error)) continue;
         if (isRecordNotFoundError(error)) throw new EvaluatorNotFoundError(input.id);
         throw error;
       }

@@ -4,7 +4,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { parseAgentConfig } from "@langwatch/agent-contract";
+import { AgentAlreadyExistsError, parseAgentConfig } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -291,5 +291,35 @@ describe.skipIf(!databaseUrl)("Prisma agent versions", () => {
 
     const versions = await repository.findVersions({ projectId, agentId: savedId });
     expect(versions).toEqual([]);
+  });
+
+  it("reports a save that loses every version number race as that race, not a duplicate agent", async () => {
+    let attempts = 0;
+    const versionRace = Object.assign(new Error("Unique constraint failed"), {
+      code: "P2002",
+      meta: { target: ["agentId", "version"] },
+    });
+    const racing = new Proxy(connection.client, {
+      get(target, key, receiver) {
+        if (key !== "$transaction") return Reflect.get(target, key, receiver);
+        return async () => {
+          attempts += 1;
+          throw versionRace;
+        };
+      },
+    });
+
+    const update = PrismaAgentRepository.create({ prisma: racing }).update({
+      id: agentId,
+      projectId,
+      name: "Support bot",
+      type: "signature",
+      config: configAt("raced"),
+      author: userAuthor,
+    });
+
+    await expect(update).rejects.toThrow(/lost the version number race/);
+    await expect(update).rejects.not.toBeInstanceOf(AgentAlreadyExistsError);
+    expect(attempts).toBe(3);
   });
 });

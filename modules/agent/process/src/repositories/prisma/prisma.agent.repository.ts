@@ -261,14 +261,12 @@ export class PrismaAgentRepository
           updatedById: createdById,
         },
       });
-      if (created.type !== "connected") {
-        await this.#appendVersion({
-          transaction,
-          agent: created,
-          author: input.author,
-          commitMessage: input.commitMessage,
-        });
-      }
+      await this.#appendVersion({
+        transaction,
+        agent: created,
+        author: input.author,
+        commitMessage: input.commitMessage,
+      });
       return created;
     }).catch((error: unknown) => this.#writeError(error, input));
 
@@ -630,19 +628,16 @@ export class PrismaAgentRepository
               ...(input.author ? { updatedById: input.author.authorId } : {}),
             },
           });
-          if (updated.type !== "connected") {
-            await this.#appendVersion({
-              transaction,
-              agent: updated,
-              author: input.author,
-              commitMessage: input.commitMessage,
-            });
-          }
+          await this.#appendVersion({
+            transaction,
+            agent: updated,
+            author: input.author,
+            commitMessage: input.commitMessage,
+          });
           return updated;
         });
       } catch (error) {
-        if (attempt < VERSION_WRITE_ATTEMPTS && isVersionRace(error)) continue;
-        return this.#writeError(error, input);
+        if (!isVersionRace(error)) return this.#writeError(error, input);
       }
     }
     throw new Error(
