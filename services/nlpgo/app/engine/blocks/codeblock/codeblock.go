@@ -37,7 +37,6 @@
 package codeblock
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -57,6 +56,8 @@ import (
 	_ "embed"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/redact"
 )
 
 //go:embed runner.py
@@ -609,7 +610,8 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	elapsed := time.Since(started)
 
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
-	stderrText := readRunnerStderr(stderrFile)
+	redactor := redact.New(req.Secrets, req.SandboxAPIKey)
+	stderrText := readRunnerStderr(stderrFile, redactor)
 
 	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
 		var parsed struct {
@@ -655,14 +657,14 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			Stderr:     stderrText,
 			Error: &Error{
 				Type:    RunnerErrorType,
-				Message: withStderrTail(runErr.Error(), stderrText, req.Secrets, req.SandboxAPIKey),
+				Message: withStderrTail(runErr.Error(), stderrText, redactor),
 			},
 		}, nil
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
 		Stderr:     stderrText,
-		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText, req.Secrets, req.SandboxAPIKey)},
+		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText, redactor)},
 	}, nil
 }
 
@@ -670,23 +672,19 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 // runner captures the user's own stderr into the result file, so this stream
 // carries interpreter-level diagnostics and a cap costs nothing — except to
 // code that writes gigabytes to its descriptor, which is why there is one.
-// readRunnerStderr cuts on a line boundary so no secret is left half-kept.
+// readRunnerStderr redacts before it cuts, so no secret is left half-kept.
 const maxRunnerStderr = 64 << 10
 
 // maxStderrInMessage bounds the stderr tail appended to a runner error.
 const maxStderrInMessage = 2 << 10
 
 // withStderrTail appends the end of the kept interpreter stderr to a runner
-// failure, so "exit status 1" says why. That stderr holds the runner's own
-// messages and tracebacks; the runner never writes the payload there. It can
-// also hold what the project's own code wrote straight to file descriptor 2,
-// or a result the runner could not save: that is the same project's data,
-// already shown to it in the run, and the tail is bounded. Secret values are
-// redacted here before the cut (the run's secrets and its sandbox key, in
-// every form they are written) and again downstream. A secret is never cut
-// first: readRunnerStderr ends on a whole line, and this redacts before cutting.
-func withStderrTail(message, stderr string, secrets map[string]string, sandboxKey string) string {
-	tail := strings.TrimSpace(RedactSecrets(stderr, secrets, sandboxKey))
+// failure, so "exit status 1" says why. That stderr is the project's own
+// output, already shown to it in the run, and the tail is bounded. Secrets
+// are redacted again here: readRunnerStderr already redacted before its cut,
+// so a secret is never cut first.
+func withStderrTail(message, stderr string, redactor *redact.Redactor) string {
+	tail := strings.TrimSpace(redactor.Redact(stderr))
 	if len(tail) > maxStderrInMessage {
 		tail = tail[len(tail)-maxStderrInMessage:]
 		if _, rest, found := strings.Cut(tail, "\n"); found {
@@ -723,27 +721,33 @@ func newRunnerStderr(scratchRoot string) (*os.File, error) {
 // readRunnerStderr reads what the subprocess wrote to its stderr, for the
 // paths where the runner never produced a result file and that text is the
 // only account of why. The file has no name, so it is read back through the
-// descriptor the executor still holds.
-func readRunnerStderr(file *os.File) string {
+// descriptor the executor still holds. It reads past the cap by the longest
+// secret form and redacts that window first, so a secret that starts before
+// the cap is whole when matched; only then does it cut, on a line boundary.
+func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return ""
 	}
-	data, err := io.ReadAll(io.LimitReader(file, maxRunnerStderr+1))
+	limit := maxRunnerStderr + redactor.MaxFormLen() + 1
+	data, err := io.ReadAll(io.LimitReader(file, int64(limit)))
 	if err != nil {
 		return ""
 	}
-	if len(data) <= maxRunnerStderr {
-		return string(data)
+	text := redactor.Redact(string(data))
+	if len(data) == limit {
+		// The window may end inside a secret that starts past the cap.
+		text = text[:max(0, len(text)-redactor.MaxFormLen())]
 	}
-	// A secret crossing the cap would keep only its first part, which
-	// whole-value redaction cannot see; drop the incomplete last line.
-	data = data[:maxRunnerStderr]
-	if i := bytes.LastIndexByte(data, '\n'); i >= 0 {
-		data = data[:i]
+	if len(text) <= maxRunnerStderr && len(data) < limit {
+		return text
+	}
+	text = text[:min(len(text), maxRunnerStderr)]
+	if i := strings.LastIndexByte(text, '\n'); i >= 0 {
+		text = text[:i]
 	} else {
-		data = nil
+		text = ""
 	}
-	return string(data) + "\n[stderr truncated]"
+	return text + "\n[stderr truncated]"
 }
 
 // newRunToken mints the value every process in one execution carries in its

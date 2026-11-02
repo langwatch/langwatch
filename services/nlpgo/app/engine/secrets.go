@@ -3,8 +3,8 @@ package engine
 import (
 	"regexp"
 
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/redact"
 )
 
 // secretRefRE matches a secret reference like `{{ secrets.NAME }}` with
@@ -62,7 +62,7 @@ func resolveSecretsInMap(m map[string]string, secrets map[string]string) map[str
 // stored stdout and stderr travel that same route, so a secret a code node
 // prints would otherwise land in all the same places.
 func redactSecrets(s string, secrets map[string]string) string {
-	return codeblock.RedactSecrets(s, secrets)
+	return redact.New(secrets).Redact(s)
 }
 
 // resolveAuthSecrets resolves secret references in the credential-bearing

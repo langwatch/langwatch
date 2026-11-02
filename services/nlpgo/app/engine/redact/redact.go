@@ -1,4 +1,4 @@
-package codeblock
+package redact
 
 import (
 	"bytes"
@@ -11,17 +11,23 @@ import (
 
 const redactedMarker = "[redacted]"
 
-// RedactSecrets replaces every secret value, and the extra values, with
-// "[redacted]" in one pass over text. Each value is matched in its raw form
-// and in the escaped forms a JSON writer produces. Longest forms go first so
-// a secret that contains another is not left half-visible, and one pass keeps
-// a short secret from matching inside an earlier marker.
-func RedactSecrets(text string, secrets map[string]string, extra ...string) string {
-	if text == "" {
-		return text
-	}
+// Redactor replaces secret values with "[redacted]" in one pass over a text.
+// Build it once per run and reuse it.
+type Redactor struct {
+	replacer   *strings.Replacer
+	maxFormLen int
+}
+
+// New builds a Redactor for the secret values and the extra values. Each
+// value is matched raw and in the escaped forms a JSON writer produces.
+// Longest forms go first so a secret that contains another is not left
+// half-visible, and one pass keeps a short secret from matching in a marker.
+func New(secrets map[string]string, extra ...string) *Redactor {
+	values := make([]string, 0, len(extra)+len(secrets))
+	values = append(values, extra...)
+	values = append(values, mapValues(secrets)...)
 	seen := map[string]struct{}{}
-	for _, value := range append(extra, mapValues(secrets)...) {
+	for _, value := range values {
 		if value == "" {
 			continue
 		}
@@ -30,7 +36,7 @@ func RedactSecrets(text string, secrets map[string]string, extra ...string) stri
 		}
 	}
 	if len(seen) == 0 {
-		return text
+		return &Redactor{}
 	}
 	forms := make([]string, 0, len(seen))
 	for form := range seen {
@@ -42,14 +48,29 @@ func RedactSecrets(text string, secrets map[string]string, extra ...string) stri
 		}
 		return forms[i] < forms[j]
 	})
-	// The marker pair goes first: NewReplacer tries pairs in argument order, so an existing marker is consumed whole and its letters never match a short secret.
+	// The marker pair goes first: NewReplacer tries pairs in argument order,
+	// so an existing marker is consumed whole and its letters never match a
+	// short secret.
 	pairs := make([]string, 0, 2*len(forms)+2)
 	pairs = append(pairs, redactedMarker, redactedMarker)
 	for _, form := range forms {
 		pairs = append(pairs, form, redactedMarker)
 	}
-	return strings.NewReplacer(pairs...).Replace(text)
+	return &Redactor{replacer: strings.NewReplacer(pairs...), maxFormLen: len(forms[0])}
 }
+
+// Redact replaces every secret form in text with "[redacted]".
+func (r *Redactor) Redact(text string) string {
+	if r.replacer == nil || text == "" {
+		return text
+	}
+	return r.replacer.Replace(text)
+}
+
+// MaxFormLen is the length of the longest form Redact can match: a secret
+// that starts inside a window and is at most this long ends inside the
+// window extended by it.
+func (r *Redactor) MaxFormLen() int { return r.maxFormLen }
 
 func mapValues(m map[string]string) []string {
 	values := make([]string, 0, len(m))

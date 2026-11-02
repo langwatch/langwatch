@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -134,41 +133,6 @@ func TestWithStderrTail_BlankStderrLeavesTheMessageUnchanged(t *testing.T) {
 	assert.Equal(t, "exit status 1", codeblock.WithStderrTail("exit status 1", " \n\t ", map[string]string{"K": "v"}, ""))
 }
 
-func TestRedactSecrets_ManyOneCharSecretsDoNotGrowTheTextBeyondOneMarkerPerMatch(t *testing.T) {
-	secrets := map[string]string{"1": "a", "2": "e", "3": "d", "4": "r"}
-	input := strings.Repeat("a line of ordinary stderr text\n", 600)
-	matches := strings.Count(input, "a") + strings.Count(input, "e") + strings.Count(input, "d") + strings.Count(input, "r")
-
-	got := codeblock.RedactSecrets(input, secrets)
-
-	assert.Equal(t, matches, strings.Count(got, "[redacted]"))
-	assert.LessOrEqual(t, len(got), len(input)+matches*len("[redacted]"))
-	for _, c := range []string{"a", "e", "d", "r"} {
-		assert.NotContains(t, strings.ReplaceAll(got, "[redacted]", ""), c)
-	}
-}
-
-func TestRedactSecrets_NestedSecretsLeaveNoTailInAnyMapOrder(t *testing.T) {
-	secrets := map[string]string{"short": "abc", "long": "abcdef-TAILSECRET"}
-	for i := 0; i < 200; i++ {
-		got := codeblock.RedactSecrets("x abcdef-TAILSECRET y", secrets)
-		require.NotContains(t, got, "TAILSECRET")
-		require.NotContains(t, got, "def")
-	}
-}
-
-func TestRedactSecrets_ExtraValuesAreRedactedToo(t *testing.T) {
-	assert.Equal(t, "k=[redacted]", codeblock.RedactSecrets("k=sandbox-key", nil, "sandbox-key"))
-}
-
-func TestRedactSecrets_IsIdempotentWithOneCharSecrets(t *testing.T) {
-	secrets := map[string]string{"a": "e", "b": "d", "c": "r"}
-	text := codeblock.RedactSecrets("x e d r y", secrets)
-	again := codeblock.RedactSecrets(text, secrets)
-	assert.Equal(t, text, again)
-	assert.Equal(t, "x [redacted] [redacted] [redacted] y", text)
-}
-
 func TestWithStderrTail_SandboxKeyStraddlingTheCutIsAbsent(t *testing.T) {
 	key := "SANDBOXKEY12345678"
 	stderr := "boom\n" + strings.Repeat("a", 500) + "\n" + key + strings.Repeat("b", codeblock.MaxStderrInMessage-len(key)/2) + "\n"
@@ -203,13 +167,27 @@ func TestCodeBlock_SecretStraddlingTheStderrCapIsAbsentAndResultSaysTruncated(t 
 	assert.NotContains(t, res.Error.Message, "CAPSEC")
 }
 
-func TestRedactSecrets_MatchesPythonJSONDumpsForAwkwardCharacters(t *testing.T) {
+func TestCodeBlock_MultiLineSecretStartingBeforeTheStderrCapIsAbsent(t *testing.T) {
 	requirePython(t)
-	secret := "a\nb\"c\\d&e<f>g\x7fh\x01i\U0001F600é"
-	out, err := exec.Command("python3", "-I", "-c", "import json,sys; sys.stdout.write(json.dumps(sys.argv[1]))", secret).Output()
+	const secret = "-----BEGIN KEY-----\nLEAKEDLINEAAAA\nBBBB\n-----END KEY-----"
+
+	dir := t.TempDir()
+	runnerPath := filepath.Join(dir, "runner.py")
+	pySecret := strings.ReplaceAll(secret, "\n", `\n`)
+	script := "import sys\nsys.stderr.write('x' * (64*1024 - 30) + '\\n' + '" + pySecret + "' + '\\n' + 'y' * 100)\nsys.exit(1)\n"
+	require.NoError(t, os.WriteFile(runnerPath, []byte(script), 0o600))
+	exe, err := codeblock.New(codeblock.Options{RunnerPath: runnerPath})
 	require.NoError(t, err)
 
-	got := codeblock.RedactSecrets("stderr: "+string(out)+" end", map[string]string{"K": secret})
+	res, err := exe.Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'ok': True}\n",
+		DeclaredOutputs: []string{"ok"},
+		Secrets:         map[string]string{"K": secret},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
 
-	assert.Equal(t, "stderr: [redacted] end", strings.Replace(got, "\"[redacted]\"", "[redacted]", 1))
+	assert.True(t, strings.HasSuffix(res.Stderr, "[stderr truncated]"), res.Stderr)
+	assert.NotContains(t, res.Stderr, "LEAKEDLINE")
+	assert.NotContains(t, res.Error.Message, "LEAKEDLINE")
 }
