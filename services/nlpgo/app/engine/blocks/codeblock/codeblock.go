@@ -115,9 +115,6 @@ type Options struct {
 	// the engine's /proc files. The caller decides whether the platform is one
 	// that may ask for this (AWS Lambda); see cmd/root.go.
 	AllowVisibleProcess bool
-	// AllowVisibleProcessSetting names that setting in the disabled-mode error;
-	// empty means DefaultAllowVisibleProcessSetting.
-	AllowVisibleProcessSetting string
 	// Logger reports what teardown could not finish. Optional: a nil logger
 	// discards those reports rather than failing an execution.
 	Logger *zap.Logger
@@ -273,9 +270,6 @@ func New(opts Options) (*Executor, error) {
 	if err != nil {
 		channel.close()
 		return nil, err
-	}
-	if opts.AllowVisibleProcessSetting == "" {
-		opts.AllowVisibleProcessSetting = DefaultAllowVisibleProcessSetting
 	}
 	return &Executor{
 		mode:           resolveHideMode(opts.AllowVisibleProcess, opts.logger()),
@@ -534,7 +528,7 @@ func runnerEnv(credential map[string]string, runDir, token string) map[string]st
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if e.mode == hideDisabled {
-		return &Result{Error: &Error{Type: RunnerErrorType, Message: "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; set " + e.opts.AllowVisibleProcessSetting + "=true to run them anyway (AWS Lambda only)"}}, nil
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; set " + DefaultAllowVisibleProcessSetting + "=true to run them anyway (AWS Lambda only)"}}, nil
 	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape

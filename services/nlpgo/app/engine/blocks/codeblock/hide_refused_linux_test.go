@@ -30,7 +30,6 @@ import (
 
 const (
 	caseEnv      = "NLPGO_TEST_HIDE_CASE"
-	settingName  = codeblock.DefaultAllowVisibleProcessSetting
 	hideModeEnv  = "NLPGO_CODE_BLOCK_HIDE"
 	skipExitCode = 77
 	childTimeout = 90 * time.Second
@@ -145,10 +144,6 @@ func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
 	runChild(t, "refused-unset")
 }
 
-func TestHideRefused_DisabledMessageNamesTheVariableWhenTheOptionIsOmitted(t *testing.T) {
-	runChild(t, "refused-unset-unnamed")
-}
-
 func TestHideRefused_RunnerHideStep(t *testing.T) {
 	t.Run("given prctl is refused and NLPGO_CODE_BLOCK_HIDE is unset", func(t *testing.T) {
 		t.Run("the runner exits 1 with the prctl message", func(t *testing.T) {
@@ -187,12 +182,8 @@ func runExecutorCase(t *testing.T, name string) {
 	t.Helper()
 	core, logs := observer.New(zapcore.DebugLevel)
 	opts := codeblock.Options{
-		AllowVisibleProcess:        name == "refused-allowed",
-		AllowVisibleProcessSetting: settingName,
-		Logger:                     zap.New(core),
-	}
-	if name == "refused-unset-unnamed" {
-		opts.AllowVisibleProcessSetting = ""
+		AllowVisibleProcess: name == "refused-allowed",
+		Logger:              zap.New(core),
 	}
 	exe, err := codeblock.New(opts)
 	require.NoError(t, err, "codeblock.New must never abort the engine over PR_SET_DUMPABLE")
@@ -206,7 +197,7 @@ func runExecutorCase(t *testing.T, name string) {
 	})
 
 	switch name {
-	case "refused-unset", "refused-unset-unnamed":
+	case "refused-unset":
 		require.NoError(t, runErr)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Error)
@@ -227,10 +218,9 @@ func assertHideModeLogged(t *testing.T, logs *observer.ObservedLogs, name string
 		mode  string
 		level zapcore.Level
 	}{
-		"not-refused":           {"strict", zapcore.InfoLevel},
-		"refused-allowed":       {"visible-process", zapcore.WarnLevel},
-		"refused-unset":         {"disabled", zapcore.WarnLevel},
-		"refused-unset-unnamed": {"disabled", zapcore.WarnLevel},
+		"not-refused":     {"strict", zapcore.InfoLevel},
+		"refused-allowed": {"visible-process", zapcore.WarnLevel},
+		"refused-unset":   {"disabled", zapcore.WarnLevel},
 	}[name]
 	entries := logs.FilterMessage("nlpgo_code_block_hide_mode").All()
 	require.Len(t, entries, 1, "the mode is logged exactly once")

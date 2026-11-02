@@ -351,7 +351,7 @@ func TestAllowVisibleProcess_OnlyOnLambda(t *testing.T) {
 	}
 }
 
-/** @scenario "the engine warns when the visible-process setting is ignored off Lambda" */
+// @scenario "the engine warns when the visible-process setting is ignored off Lambda"
 func TestAllowVisibleProcess_WarnsWhenTheSettingIsIgnoredOffLambda(t *testing.T) {
 	lambdaEnv := map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn", "AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}
 	cases := []struct {
