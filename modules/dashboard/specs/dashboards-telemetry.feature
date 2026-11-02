@@ -58,6 +58,15 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then "langy.asked.question" is sent once with surface "composer"
     And a question handed over from a board and sent for the member sends no second one
 
+  @integration
+  Scenario: Telemetry: applying or discarding a Langy proposal sends its outcome by kind
+    Given Langy proposed a change in the panel
+    When the page carries the change out, or the member discards it
+    Then "langy.applied.proposal" or "langy.discarded.proposal" is sent once with the proposal's kind
+    And a failed apply, or a second click on a settled proposal, sends nothing
+    And a kind no handler on the page knows is sent as "other"
+    And it carries no summary or payload
+
   @unit
   Scenario: Telemetry: a draft the app seeds in Langy sends no ask
     Given the app seeds a Langy draft by itself

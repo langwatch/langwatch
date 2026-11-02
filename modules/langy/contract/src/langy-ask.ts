@@ -50,3 +50,28 @@ export function langyQuestionAsked({
 }): LangyQuestionAskedEvent {
   return { boundary: "langy", action: "asked", name: "question", attributes: { surface } };
 }
+
+/*
+ * What a member did with a change Langy proposed: `langy.applied.proposal` once the page carried
+ * it out, `langy.discarded.proposal` once they dismissed it. With `langy.asked.question` these
+ * chart the funnel from a question to a kept change. Browser only; never the summary or payload.
+ */
+
+/** The events, shaped as the browser host's analytics event. */
+export type LangyProposalEvent = Readonly<{
+  boundary: "langy";
+  action: "applied" | "discarded";
+  name: "proposal";
+  /** The kind as a page registered it; one no handler knows is the model's text, so "other". */
+  attributes: Readonly<{ kind: string }>;
+}>;
+
+/** A proposal the page carried out for the member. */
+export function langyProposalApplied({ kind }: { kind: string }): LangyProposalEvent {
+  return { boundary: "langy", action: "applied", name: "proposal", attributes: { kind } };
+}
+
+/** A proposal the member dismissed. */
+export function langyProposalDiscarded({ kind }: { kind: string }): LangyProposalEvent {
+  return { boundary: "langy", action: "discarded", name: "proposal", attributes: { kind } };
+}

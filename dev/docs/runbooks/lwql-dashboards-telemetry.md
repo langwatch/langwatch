@@ -16,6 +16,8 @@
 | one log line per run            | log       | `caller`, `queryHash`, board and widget ids    | same                                  |
 | `dashboards.<action>.<name>`    | PostHog   | attributes we set: no raw ids, SQL or text     | `dashboard-usage-events.ts` (browser) |
 | `langy.asked.question`          | PostHog   | `surface`: `composer`, `ask_bar`, `add_widget` | `langy-ask.ts` (browser)              |
+| `langy.applied.proposal`        | PostHog   | `kind` (or `other`)                            | `langy-ask.ts` (browser)              |
+| `langy.discarded.proposal`      | PostHog   | `kind` (or `other`)                            | `langy-ask.ts` (browser)              |
 | `insights.<act>.insight`        | PostHog   | a filing: `filedVia`, `tone`, `fromBoard`      | nurturing, from insight's events      |
 | `automations.opened.alert_link` | PostHog   | `landedOn`: `trace`, `graph` or `other`        | `use-alert-link-opened.ts` (shell)    |
 
