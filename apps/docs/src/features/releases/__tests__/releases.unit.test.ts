@@ -42,6 +42,21 @@ describe("when a release note links both its pull request and its commit", () =>
   });
 });
 
+const leftOut = "Earlier recent releases are left out of this Markdown copy";
+
+function changelogProject({ changelog }: { changelog: string }) {
+  const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-budget-"));
+  const docsRoot = path.join(project, "docs");
+  mkdirSync(docsRoot);
+  writeFileSync(path.join(project, "CHANGELOG.md"), changelog);
+  writeFileSync(path.join(docsRoot, "docs.json"), "{}");
+  writeFileSync(
+    path.join(docsRoot, "changelog.mdx"),
+    "---\ntitle: Changelog\n---\n<ReleaseNotes />\n\n## Older releases",
+  );
+  return { docsRoot, dispose: () => rmSync(project, { recursive: true, force: true }) };
+}
+
 describe("when the repository publishes release notes", () => {
   /** @scenario "Read published release notes" */
   it("selects the newest published versions with authored changes and stable anchors", () => {
@@ -102,21 +117,6 @@ describe("when the newest releases are longer than the page token budget", () =>
   const note = "* **traces:** a long note\n";
   const notesOf = ({ share }: { share: number }) =>
     note.repeat(Math.ceil((pageTokens * 4 * share) / note.length));
-  const leftOut = "Earlier recent releases are left out of this Markdown copy";
-
-  function changelogProject({ changelog }: { changelog: string }) {
-    const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-budget-"));
-    const docsRoot = path.join(project, "docs");
-    mkdirSync(docsRoot);
-    writeFileSync(path.join(project, "CHANGELOG.md"), changelog);
-    writeFileSync(path.join(docsRoot, "docs.json"), "{}");
-    writeFileSync(
-      path.join(docsRoot, "changelog.mdx"),
-      "---\ntitle: Changelog\n---\n<ReleaseNotes />\n\n## Older releases",
-    );
-    return { docsRoot, dispose: () => rmSync(project, { recursive: true, force: true }) };
-  }
-
   /** @scenario "Keep the changelog Markdown export within the page token budget" */
   it("exports the newest release and a note, while the page keeps every release", () => {
     const long = notesOf({ share: 2 / 3 });
@@ -184,23 +184,14 @@ describe("when only some of the older releases fit the page token budget", () =>
   const all = newestTwo + release({ version: "2.8.0", day: "01" });
 
   function exportOf({ changelog, pageTokens }: { changelog: string; pageTokens: number }) {
-    const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-fit-"));
-    const docsRoot = path.join(project, "docs");
-    mkdirSync(docsRoot);
-    writeFileSync(path.join(project, "CHANGELOG.md"), changelog);
-    writeFileSync(path.join(docsRoot, "docs.json"), "{}");
-    writeFileSync(
-      path.join(docsRoot, "changelog.mdx"),
-      "---\ntitle: Changelog\n---\n<ReleaseNotes />\n\n## Older releases",
-    );
+    const { docsRoot, dispose } = changelogProject({ changelog });
     try {
       return pageMarkdown({ docsRoot, slug: "changelog", pageTokens });
     } finally {
-      rmSync(project, { recursive: true, force: true });
+      dispose();
     }
   }
   const tokens = (text: string) => approximateTokens({ text });
-  const leftOut = "Earlier recent releases are left out of this Markdown copy";
 
   /** @scenario "Keep the changelog Markdown export within the page token budget" */
   it("keeps the newest releases that fit and notes the rest are left out", () => {
