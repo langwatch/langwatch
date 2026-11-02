@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS "OrganizationSeatPeakHolder" (
     CONSTRAINT "OrganizationSeatPeakHolder_pkey" PRIMARY KEY ("organizationId", "holderKind", "holderId")
 );
 
-CREATE INDEX IF NOT EXISTS "OrganizationSeatPeakHolder_organizationId_holderKind_seat_expiresAt_idx" ON "OrganizationSeatPeakHolder"("organizationId", "holderKind", "seat", "expiresAt");
+CREATE INDEX IF NOT EXISTS "OrganizationSeatPeakHolder_organizationId_holderKind_seat_e_idx" ON "OrganizationSeatPeakHolder"("organizationId", "holderKind", "seat", "expiresAt");
 
 CREATE TABLE IF NOT EXISTS "OrganizationSeatPeakMonth" (
     "organizationId" TEXT NOT NULL,
