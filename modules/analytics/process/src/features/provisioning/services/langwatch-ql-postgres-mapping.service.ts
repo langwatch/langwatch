@@ -195,8 +195,9 @@ export class LangWatchQLPostgresMappingService {
   }
 
   /**
-   * A short, one-way digest of every value the named collection holds, never the password itself.
-   * An engine table's pool keeps the values it was built with, so a changed digest means rebuild.
+   * A short, one-way digest of every value the named collection holds plus the schema the
+   * engine tables read, never the password itself. An engine table's pool keeps the values it
+   * was built with, so a changed digest means rebuild.
    */
   credentialFingerprint({
     connection,

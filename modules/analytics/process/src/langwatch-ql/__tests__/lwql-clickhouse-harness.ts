@@ -2193,7 +2193,7 @@ export async function mapPostgresIntoClickHouse({
     ...postgresViews.engineTableStatements({
       names: harness.names,
       collection,
-      schema: "public",
+      schema: PG_SCHEMA,
     }),
   ]);
   return lwqlTables;

@@ -111,6 +111,7 @@ describe("given two stacks whose databases share one ClickHouse server", () => {
       restrictedPassword: "pw",
       sourceDatabase: database,
       postgres: { ...POSTGRES, endpoint: { ...POSTGRES.endpoint, database } },
+      schema: SCHEMA,
     });
 
   /** @scenario "Each ClickHouse database provisions its own named collection" */
@@ -325,7 +326,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
     });
 
     /** @scenario "The reconvergence check rebuilds an engine table built before the schema was pinned" */
-    it("names an engine table stamped by a fingerprint that lacked this schema", () => {
+    it("names an engine table stamped by a fingerprint for another schema", () => {
       const [beforeSchema] = engineTables;
       if (!beforeSchema) throw new Error("the catalog maps no PostgreSQL dataset");
       const withoutSchema = selfProvisioning.credentialFingerprint({

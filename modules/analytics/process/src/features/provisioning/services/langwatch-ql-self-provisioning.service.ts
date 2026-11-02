@@ -201,7 +201,7 @@ export class LangWatchQLSelfProvisioningService {
     };
   }
 
-  /** The fingerprint of {@link namedCollectionValues}, which a current engine table carries. */
+  /** The fingerprint of {@link namedCollectionValues} and the schema, which a current table has. */
   credentialFingerprint({
     names,
     postgres,
