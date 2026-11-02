@@ -47,18 +47,24 @@ function loadVendorTags({ win }: { win: TagWindow }) {
  * Adds Google Tag Manager and PostHog once, when the reader first interacts or the page is idle,
  * and only after they accepted cookies. Accepting in another tab starts them here too.
  */
+const armed = new WeakSet<TagWindow>();
+
+/** Starts the tag manager here once another tab stores the reader's acceptance. */
+function startOnConsent({ win }: { win: TagWindow }) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== CONSENT_STORAGE_KEY || !analyticsConsented({ win })) return;
+    win.removeEventListener("storage", onStorage);
+    startTagManager({ win });
+  };
+  win.addEventListener("storage", onStorage);
+}
+
 export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
   const id = tagManagerId({ doc: win.document, host: win.location.hostname });
   if (!id) return;
-  if (!analyticsConsented({ win })) {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== CONSENT_STORAGE_KEY || !analyticsConsented({ win })) return;
-      win.removeEventListener("storage", onStorage);
-      startTagManager({ win });
-    };
-    win.addEventListener("storage", onStorage);
-    return;
-  }
+  if (!analyticsConsented({ win })) return startOnConsent({ win });
+  if (armed.has(win)) return;
+  armed.add(win);
   let started = false;
   const start = () => {
     if (started) return;

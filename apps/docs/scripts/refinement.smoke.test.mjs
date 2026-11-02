@@ -425,6 +425,7 @@ await it("shows the launcher only on tracing pages, and its wheel stays put", as
         for (const slug of [
           "introduction",
           "api-reference/traces/get-trace",
+          "api-reference/coding-agents/overview",
           "self-hosting/overview",
         ]) {
           await page.goto(base + slug);

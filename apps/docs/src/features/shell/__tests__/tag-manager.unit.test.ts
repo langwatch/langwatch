@@ -153,6 +153,21 @@ describe("the tag manager loader", () => {
       idle.forEach((callback) => callback());
       expect(appended).toHaveLength(6);
     });
+
+    /** @scenario "Ask the reader for cookie consent on the docs, sharing the marketing site's choice" */
+    it("loads the tag once when the reader accepts here and another tab accepts too", () => {
+      const { win, appended, fire, idle, stored } = fakeWindow({
+        id: "GTM-KJ4S6Z9C",
+        consent: null,
+      });
+      startTagManager({ win: win as never });
+      stored.value = "accepted";
+      startTagManager({ win: win as never });
+      fire("storage", { key: "lw-cookie-consent" });
+      fire("pointerdown");
+      idle.forEach((callback) => callback());
+      expect(appended).toHaveLength(6);
+    });
   });
 
   describe("when the reader accepted cookies", () => {

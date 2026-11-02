@@ -38,6 +38,13 @@ export function paintStars({ win, stars }: { win: Pick<Window, "document">; star
   });
 }
 
+/** Whether the page shows the count GitHub reported at build time. */
+function builtCount({ win }: { win: Pick<Window, "document"> }) {
+  return [...win.document.querySelectorAll<HTMLElement>("[data-docs-github]")].some(
+    (link) => link.querySelector<HTMLElement>("[data-docs-stars]")?.hidden === false,
+  );
+}
+
 async function fetchStars({ win }: { win: StarsWindow }) {
   try {
     const response = await win.fetch(REPOSITORY_URL, {
@@ -53,7 +60,7 @@ async function fetchStars({ win }: { win: StarsWindow }) {
 
 /**
  * Replaces the build's star count with a live one. A count this browser read within the hour is
- * used as it is; an older one is painted at once and refreshed from GitHub. If GitHub does not
+ * used as it is; an older one stands in only on a page built without a count. If GitHub does not
  * answer, the page keeps the count it has and asks again after the hour.
  */
 export async function refreshStars({
@@ -62,10 +69,12 @@ export async function refreshStars({
   now = Math.round(performance.timeOrigin + performance.now()),
 }: { win?: StarsWindow; now?: number } = {}) {
   const cached = readCache({ win });
-  if (cached?.count != null) paintStars({ win, stars: cached.count });
-  if (cached && now - cached.at < STARS_FRESH_MS) return;
+  const fresh = cached !== null && now - cached.at < STARS_FRESH_MS;
+  const fallback = fresh || !builtCount({ win }) ? (cached?.count ?? null) : null;
+  if (fallback !== null) paintStars({ win, stars: fallback });
+  if (fresh) return;
   const count = await fetchStars({ win });
-  writeCache({ win, stars: { count: count ?? cached?.count ?? null, at: now } });
+  writeCache({ win, stars: { count: count ?? fallback, at: now } });
   if (count !== null) paintStars({ win, stars: count });
 }
 

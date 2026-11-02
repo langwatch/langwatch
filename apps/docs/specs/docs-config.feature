@@ -80,9 +80,10 @@ Feature: docs.json stays the single source of truth for both documentation sites
     Given the page shows the star count GitHub reported at build time
     When the page is idle and this browser has no count from the last hour
     Then it asks GitHub once, shows the live count and keeps it in the browser with the time it was read
-    And an older kept count shows at once while the fresh one loads
+    And on a page built without a count, an older kept count shows at once while the fresh one loads
     When this browser read the count within the hour
     Then the page shows that count without asking GitHub
+    But an older kept count never replaces the build's count
     And if GitHub does not answer with a count, the page keeps the count it has and asks again only after the hour
 
   @unit

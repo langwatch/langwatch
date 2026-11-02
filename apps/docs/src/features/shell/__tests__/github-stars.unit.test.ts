@@ -59,10 +59,11 @@ describe("the live GitHub star count", () => {
     });
 
     /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
-    it("shows an older stored count at once, then the fresh one", async () => {
-      const { win, count, requests } = fakeWindow({
+    it("shows an older stored count at once on a page built without one, then the fresh one", async () => {
+      const { win, count, requests, wrapper } = fakeWindow({
         cached: { count: 6500, at: NOW - STARS_FRESH_MS - 1 },
       });
+      wrapper.hidden = true;
       const refreshed = refreshStars({ win: win as never, now: NOW });
       expect(count.textContent).toBe("6,500");
       await refreshed;
@@ -114,11 +115,24 @@ describe("the live GitHub star count", () => {
     });
 
     /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
-    it("keeps showing a stored count it could not refresh", async () => {
+    it("never puts an older stored count over the build's", async () => {
       const { win, count, requests } = fakeWindow({
+        cached: { count: 4000, at: NOW - STARS_FRESH_MS },
+        github: { ok: false },
+      });
+      await refreshStars({ win: win as never, now: NOW });
+      await refreshStars({ win: win as never, now: NOW + 1 });
+      expect(count.textContent).toBe("5,000");
+      expect(requests).toHaveLength(1);
+    });
+
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("keeps a stored count it could not refresh on a page built without one", async () => {
+      const { win, count, requests, wrapper } = fakeWindow({
         cached: { count: 6000, at: NOW - STARS_FRESH_MS },
         github: { ok: false },
       });
+      wrapper.hidden = true;
       await refreshStars({ win: win as never, now: NOW });
       await refreshStars({ win: win as never, now: NOW + 1 });
       expect(count.textContent).toBe("6,000");
