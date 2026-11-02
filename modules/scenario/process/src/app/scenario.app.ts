@@ -10,6 +10,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -252,6 +253,8 @@ const scenarioAppDependencyTokens = {
   prompts: PromptApi,
   secrets: SecretApi,
   workflows: WorkflowApi,
+  /** The rows a Connector step's bound dataset gives it (ADR-194). */
+  datasets: DatasetApi,
   /** Which testing interface a project reads, for the links this module hands out. */
   featureFlags: FeatureFlagApi,
   /** The voice doors' conditional permission probe (#8021). */
@@ -359,6 +362,7 @@ export class ScenarioModule implements ScenarioApi {
         workflows: peers.workflows,
         prompts: peers.prompts,
         secrets: peers.secrets,
+        datasets: peers.datasets,
         modelProviders: peers.modelProviders,
         simulations,
         config: prefetchConfig,
@@ -389,6 +393,7 @@ export class ScenarioModule implements ScenarioApi {
         projects: peers.projects,
         modelProviders: peers.modelProviders,
         secrets: peers.secrets,
+        datasets: peers.datasets,
         traces: peers.traces,
         apiKeys: peers.apiKeys,
         voiceTargets: ScenarioVoiceTargetService.create({

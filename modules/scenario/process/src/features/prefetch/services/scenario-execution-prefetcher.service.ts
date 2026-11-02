@@ -31,6 +31,7 @@ import {
   type ScenarioPrefetchLookups,
 } from "./scenario-prefetch-completion.service.ts";
 import {
+  type ConnectorDatasetReader,
   ScenarioTargetPrefetchService,
   type VoiceTargetReader,
 } from "./scenario-target-prefetch.service.ts";
@@ -57,6 +58,8 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   projects: ProjectApi;
   modelProviders: ModelProviderApi;
   secrets: SecretApi;
+  /** A Connector step's bound dataset rows (ADR-194). */
+  datasets: ConnectorDatasetReader;
   traces: TraceApi;
   /** Mints the run's keys: the child's, and a code agent's sandbox key. */
   apiKeys: Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">;
@@ -83,6 +86,7 @@ export class ScenarioExecutionPrefetcherService {
       agents: options.agents,
       workflows: options.workflows,
       secrets: options.secrets,
+      datasets: options.datasets,
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,

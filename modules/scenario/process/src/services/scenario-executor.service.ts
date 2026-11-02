@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -37,6 +38,7 @@ type ScenarioExecutorPeers = Readonly<{
   agents: AgentApi;
   prompts: PromptApi;
   secrets: SecretApi;
+  datasets: Pick<DatasetApi, "findDatasetPage">;
   traces: TraceApi;
   workflows: WorkflowApi;
   projects: ProjectApi;
@@ -128,6 +130,7 @@ export class ScenarioExecutorService {
       projects: peers.projects,
       modelProviders: peers.modelProviders,
       secrets: peers.secrets,
+      datasets: peers.datasets,
       traces: peers.traces,
       apiKeys: peers.apiKeys,
       voiceTargets: ScenarioVoiceTargetService.create({

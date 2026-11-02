@@ -104,6 +104,7 @@ function serviceFor(options: {
     workflows: {} as never,
     prompts: {} as never,
     secrets: {} as never,
+    datasets: {} as never,
     modelProviders: {} as never,
     turns: { run: runTurn },
     nlpTimeouts: { engineCodeBlockTimeoutSeconds: Number.NaN, maxTimeoutMs: 90_000 },

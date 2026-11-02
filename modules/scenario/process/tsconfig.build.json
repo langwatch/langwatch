@@ -112,6 +112,9 @@
       "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../data-retention/contract/tsconfig.build.json"
     },
     {

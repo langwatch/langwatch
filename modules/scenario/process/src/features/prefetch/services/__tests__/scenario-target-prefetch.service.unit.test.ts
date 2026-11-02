@@ -3,7 +3,10 @@ import {
   type Agent,
   type AgentApi,
   type AgentOverview,
+  type Connector,
+  type ConnectorStep,
 } from "@langwatch/agent-contract";
+import type { DatasetApi, DatasetPage } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
@@ -23,7 +26,29 @@ type Answers = {
   prompt?: Record<string, unknown> | null;
   projectSecrets?: Record<string, string>;
   secretReads?: string[][];
+  /** The dataset entries a Connector step's bound dataset holds; null when it is gone. */
+  datasetEntries?: Record<string, unknown>[] | null;
 };
+
+function datasetPageOf(entries: Record<string, unknown>[]): DatasetPage {
+  return {
+    id: "dataset_personas",
+    name: "Personas",
+    columnTypes: [],
+    datasetRecords: entries.map((entry, index) => ({
+      id: `record_${index}`,
+      datasetId: "dataset_personas",
+      projectId: PROJECT_ID,
+      entry,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    })),
+    count: entries.length,
+    page: 1,
+    limit: 1000,
+    totalPages: 1,
+  };
+}
 
 function serviceAnswering(answers: Answers = {}) {
   const prompts = createApiFixture<PromptApi>({
@@ -108,11 +133,17 @@ function serviceAnswering(answers: Answers = {}) {
     },
   });
 
+  const datasets = createApiFixture<DatasetApi>({
+    findDatasetPage: async () =>
+      answers.datasetEntries ? datasetPageOf(answers.datasetEntries) : null,
+  });
+
   return ScenarioTargetPrefetchService.create({
     prompts,
     agents,
     workflows,
     secrets,
+    datasets,
     // Never reached: every workflow lookup below answers not-found, so the
     // target is refused before anything is hydrated.
     workflowHydrator: ScenarioWorkflowHydratorService.create(
@@ -310,6 +341,101 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       });
 
       await expect(fetchFor(service, "http")).rejects.toMatchObject(TARGET_NOT_FOUND);
+    });
+  });
+
+  describe("given an http agent with a Connector", () => {
+    const step: ConnectorStep = {
+      language: "python",
+      code: "def execute(input):\n    return {}\n",
+      secretNames: ["API_KEY"],
+    };
+    const withConnector = (connector: Connector) =>
+      httpAgent({ url: "https://acme.test/chat", method: "POST", connector });
+
+    /** @scenario "A Connector step receives only the secrets it names" */
+    it("packs each step with only the secrets it names", async () => {
+      const service = serviceAnswering({
+        agent: withConnector({ setup: step }),
+        projectSecrets: { API_KEY: "key-from-project", OTHER_KEY: "never-sent" },
+      });
+
+      const adapter = await fetchFor(service, "http");
+
+      expect(adapter).toMatchObject({
+        connector: {
+          setup: { code: step.code, secretNames: ["API_KEY"], secrets: { API_KEY: "key-from-project" } },
+        },
+      });
+      expect(JSON.stringify(adapter)).not.toContain("never-sent");
+      expect(adapter).not.toHaveProperty("connector.teardown");
+    });
+
+    it("lets the run's own value of a named secret win, and nothing else of the run's", async () => {
+      const service = serviceAnswering({
+        agent: withConnector({ teardown: step }),
+        projectSecrets: { API_KEY: "key-from-project" },
+      });
+
+      const adapter = await fetchFor(service, "http", {
+        API_KEY: "key-from-run",
+        RUN_ONLY: "not-named",
+      });
+
+      expect(adapter).toMatchObject({ connector: { teardown: { secrets: { API_KEY: "key-from-run" } } } });
+      expect(JSON.stringify(adapter)).not.toContain("not-named");
+    });
+
+    it("packs a named secret the project lacks as missing, for the step to fail on", async () => {
+      const service = serviceAnswering({ agent: withConnector({ setup: step }) });
+
+      await expect(fetchFor(service, "http")).resolves.toMatchObject({
+        connector: { setup: { secretNames: ["API_KEY"], secrets: {} } },
+      });
+    });
+
+    /** @scenario "A Connector step bound to a dataset receives its rows" */
+    it("packs the bound dataset's entries as rows", async () => {
+      const rows = [{ persona: "gold" }, { persona: "basic" }];
+      const service = serviceAnswering({
+        agent: withConnector({ setup: { ...step, datasetId: "dataset_personas" } }),
+        datasetEntries: rows,
+      });
+
+      await expect(fetchFor(service, "http")).resolves.toMatchObject({
+        connector: { setup: { rows } },
+      });
+    });
+
+    it("packs a refusal instead of rows over 64 KiB", async () => {
+      const service = serviceAnswering({
+        agent: withConnector({ setup: { ...step, datasetId: "dataset_personas" } }),
+        datasetEntries: [{ notes: "x".repeat(64 * 1024) }],
+      });
+
+      const adapter = await fetchFor(service, "http");
+
+      expect(adapter).toMatchObject({ connector: { setup: { rowsRefusal: expect.stringContaining("64 KiB") } } });
+      expect(adapter).not.toHaveProperty("connector.setup.rows");
+    });
+
+    it("packs a refusal when the bound dataset is gone", async () => {
+      const service = serviceAnswering({
+        agent: withConnector({ setup: { ...step, datasetId: "dataset_gone" } }),
+        datasetEntries: null,
+      });
+
+      await expect(fetchFor(service, "http")).resolves.toMatchObject({
+        connector: { setup: { rowsRefusal: expect.stringContaining("no longer exists") } },
+      });
+    });
+
+    it("packs no Connector for an agent without one", async () => {
+      const service = serviceAnswering({
+        agent: httpAgent({ url: "https://acme.test/chat", method: "POST" }),
+      });
+
+      expect(await fetchFor(service, "http")).not.toHaveProperty("connector");
     });
   });
 

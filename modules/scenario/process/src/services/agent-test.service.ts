@@ -13,6 +13,7 @@ import type {
   AgentTestTurnResult,
 } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -66,6 +67,7 @@ type AgentTestServiceOptions = {
   workflows: WorkflowApi;
   prompts: PromptApi;
   secrets: SecretApi;
+  datasets: Pick<DatasetApi, "findDatasetPage">;
   modelProviders: ModelProviderApi;
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;
@@ -112,6 +114,7 @@ export class AgentTestService {
       agents: options.agents,
       workflows: options.workflows,
       secrets: options.secrets,
+      datasets: options.datasets,
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,
