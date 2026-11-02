@@ -102,6 +102,7 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
     Scenario: pi is offered as an AI tool that sets up with `langwatch pi`
       When the starter AI tools are listed
       Then one coding assistant tile is pi, set up with `langwatch pi`
+      And it starts with the virtual key and the bundled plan off, so every pi call is charged
 
   Rule: The ingestion env is the standard OTel block, with spans only
 

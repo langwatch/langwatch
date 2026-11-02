@@ -478,7 +478,7 @@ const TOOL_INSTALLATION_NOTES: Partial<Record<SupportedTool, (report: InstallRep
     `\nNote: opencode 1.14 emits structural spans but no gen_ai.* attributes yet.\n` +
     `Spans will land but per-call tokens/model/cost wait on upstream semconv support.\n`,
   pi_cli: (report) =>
-    (report.session_hooks_action
+    (isHookFileInstalled(report)
       ? `\nA telemetry extension was added to your pi extensions directory. It exports the\n` +
         `spans pi already declares, and reports the repository, branch and worktree each\n` +
         `session ran in. Your own extensions are untouched.\n`

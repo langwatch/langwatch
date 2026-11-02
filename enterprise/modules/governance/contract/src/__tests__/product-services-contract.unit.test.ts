@@ -38,7 +38,12 @@ describe("Governance product contracts", () => {
     expect(pi).toHaveLength(1);
     expect(pi[0]).toMatchObject({
       type: "coding_assistant",
-      config: { assistantKind: "pi", setupCommand: "langwatch pi" },
+      config: {
+        assistantKind: "pi",
+        setupCommand: "langwatch pi",
+        allowVk: false,
+        bundledPlan: false,
+      },
     });
   });
 

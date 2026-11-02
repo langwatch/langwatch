@@ -99,6 +99,7 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       When the user runs `langwatch ingest install pi_cli`
       Then the file is left exactly as it is
       And nothing of ours is installed over it
+      And the closing notes never say an extension was added
 
     @unit
     Scenario: Launching pi through the wrapper keeps the extension in place

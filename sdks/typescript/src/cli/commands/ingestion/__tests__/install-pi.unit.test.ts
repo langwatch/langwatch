@@ -113,6 +113,19 @@ describe("the pi ingestion install", () => {
       expect(stdout()).toContain('export OTEL_RESOURCE_ATTRIBUTES="service.name=pi"');
     });
 
+    /** @scenario "A file at that path without our marker is never overwritten" */
+    it("leaves a file without our marker alone and never says an extension was added", async () => {
+      const { installCommand } = await import("../install.js");
+      const ownFile = path.join(piExtensionDir, PI_EXTENSION_FILE_NAME);
+      fs.mkdirSync(piExtensionDir, { recursive: true });
+      fs.writeFileSync(ownFile, "// the developer's own extension\n");
+
+      await installCommand("pi_cli", { piExtensionDir });
+
+      expect(fs.readFileSync(ownFile, "utf8")).toBe("// the developer's own extension\n");
+      expect(stdout()).not.toContain("A telemetry extension was added");
+    });
+
     it("writes no extension when only the exports were asked for", async () => {
       const { installCommand } = await import("../install.js");
 
