@@ -263,6 +263,8 @@ describe("agent deploy labels", () => {
     expect((await app.getById({ id: "agent_1:3", projectId })).version).toBe(3);
     const latest = await app.getById({ id: "agent_1:latest", projectId });
     expect([latest.id, latest.version]).toEqual(["agent_1", 3]);
+    const latestByLabel = await app.getById({ id: "agent_1", projectId, label: "latest" });
+    expect(latestByLabel.version).toBe(3);
   });
 });
 

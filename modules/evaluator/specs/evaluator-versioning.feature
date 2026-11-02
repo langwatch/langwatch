@@ -57,6 +57,8 @@ Feature: Evaluator versions and deploy labels
     Then the version 1 settings are used
     When it resolves "toxicity"
     Then the latest settings are used
+    When a caller reads "toxicity" with the label "latest"
+    Then the latest settings are used
 
   # --- Protection ---
 

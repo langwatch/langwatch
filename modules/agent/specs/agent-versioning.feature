@@ -106,6 +106,8 @@ Feature: Agent versions and deploy labels
     Then version 3 is returned
     When a caller reads "agent_1:latest"
     Then the latest version is returned
+    When a caller reads "agent_1" with the label "latest"
+    Then the latest version is returned
 
   # --- Protection ---
 

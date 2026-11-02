@@ -2,6 +2,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EVALUATOR_SEEDED_LABELS,
+  EVALUATOR_LATEST_LABEL,
   EvaluatorDeployedLabelProtectedError,
   EvaluatorLabelInvalidError,
   EvaluatorNotFoundError,
@@ -105,7 +106,8 @@ export class EvaluatorVersionService {
         })
       : await this.#deps.repository.findById({ id: address.idOrSlug, projectId: input.projectId });
     if (!evaluator) throw new EvaluatorNotFoundError(address.idOrSlug);
-    const label = address.label ?? input.label;
+    // `latest` names the newest version, never a stored label, as the address suffix does.
+    const label = address.label ?? (input.label === EVALUATOR_LATEST_LABEL ? void 0 : input.label);
     const version = address.version ?? input.version;
     if (label === void 0 && version === void 0) {
       const latest = await this.#deps.repository.latestVersionNumbers({
@@ -304,8 +306,9 @@ export class EvaluatorVersionService {
     let written = 0;
     let wouldWrite = 0;
     for (const evaluator of input.page) {
+      if (await this.#hasVersions(evaluator)) continue;
       if (input.dryRun) {
-        if (!(await this.#hasVersions(evaluator))) wouldWrite += 1;
+        wouldWrite += 1;
         continue;
       }
       const createdById = evaluator.createdById ?? (await this.#creatorOf(evaluator));

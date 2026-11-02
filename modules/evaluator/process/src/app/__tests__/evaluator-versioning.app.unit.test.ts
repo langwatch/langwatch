@@ -203,6 +203,8 @@ describe("evaluator deploy labels", () => {
     expect(await settingsAt("toxicity:production")).toEqual({ threshold: 2 });
     expect(await settingsAt("toxicity:1")).toEqual({ threshold: 1 });
     expect(await settingsAt("toxicity")).toEqual({ threshold: 3 });
+    const latestByLabel = await app.getById({ id: "evaluator_1", projectId, label: "latest" });
+    expect(latestByLabel.version).toBe(3);
   });
 });
 

@@ -1,4 +1,5 @@
 import {
+  AGENT_LATEST_LABEL,
   AGENT_SEEDED_LABELS,
   AgentDeployedLabelProtectedError,
   AgentLabelInvalidError,
@@ -102,7 +103,8 @@ export class AgentVersionService {
     if (asked > 1 || (address.hadSuffix && asked > 0)) {
       throw new AgentVersionSelectorConflictError();
     }
-    const label = address.label ?? input.label;
+    // `latest` names the newest version, never a stored label, as the address suffix does.
+    const label = address.label ?? (input.label === AGENT_LATEST_LABEL ? void 0 : input.label);
     const version = address.version ?? input.version;
     const agent = await this.#repository.getById({ id: address.id, projectId: input.projectId });
     if (agent.type === "connected") {
@@ -261,8 +263,9 @@ export class AgentVersionService {
     let wouldWrite = 0;
     for (const agent of input.page) {
       if (!(await versionMayCopy(agent))) continue;
+      if (await this.#hasVersions(agent)) continue;
       if (input.dryRun) {
-        if (!(await this.#hasVersions(agent))) wouldWrite += 1;
+        wouldWrite += 1;
         continue;
       }
       const createdById = agent.createdById ?? (await this.#creatorOf(agent));

@@ -1,6 +1,7 @@
 import {
   evaluatorConfigSchema,
   evaluatorSchema,
+  EvaluatorVersionNotFoundError,
   type Evaluator,
   type EvaluatorConfig,
   type EvaluatorCopy,
@@ -253,7 +254,7 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
       evaluatorId: input.evaluatorId,
       versionId: input.versionId,
     });
-    if (!version) throw new Error(`Version ${input.versionId} is not on ${input.evaluatorId}`);
+    if (!version) throw new EvaluatorVersionNotFoundError({ evaluatorId: input.evaluatorId });
     const row = {
       projectId: input.projectId,
       evaluatorId: input.evaluatorId,
