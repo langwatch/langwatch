@@ -105,7 +105,7 @@ run. The skip rule bounds that to those texts. The first skip rule fired on
 any rewritten word of four letters, so a trace with "method": "POST" took
 about twice the time (81.5 ms against 47.8 ms on a 1,365-character
 payload) for a pass that could not keep a span. Requiring a neighbouring
-word left the output of 3,098 recall and precision texts unchanged.
+word left the output of 3,100 recall and precision texts unchanged.
 
 ## Consequences
 
