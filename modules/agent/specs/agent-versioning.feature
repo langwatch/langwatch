@@ -209,7 +209,7 @@ Feature: Agent versions and deploy labels
   @integration
   Scenario: No version copies a typed-in HTTP credential
     Given an HTTP agent whose config still holds a typed-in credential
-    When the backfill runs or the credential move saves the agent
+    When the backfill runs, the credential move saves the agent or any save writes it
     Then no version holds the typed-in credential
     And archived agents get no version 1
 

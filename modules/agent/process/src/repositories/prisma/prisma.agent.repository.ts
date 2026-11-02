@@ -665,6 +665,7 @@ export class PrismaAgentRepository
     });
   }
 
+  /** Appends the next version; a row holding a typed-in credential is never copied. */
   async #appendVersion(input: {
     transaction: VersionTransaction;
     agent: {
@@ -679,6 +680,7 @@ export class PrismaAgentRepository
     commitMessage: string | undefined;
   }): Promise<void> {
     const { transaction, agent } = input;
+    if (!(await versionMayCopy(agent))) return;
     const latest = await transaction.agentVersion.findFirst({
       where: { projectId: agent.projectId, agentId: agent.id },
       orderBy: { version: "desc" },

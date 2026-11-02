@@ -264,4 +264,32 @@ describe.skipIf(!databaseUrl)("Prisma agent versions", () => {
     expect(versions.map((row) => row.version)).toEqual([1]);
     expect(JSON.stringify(versions)).not.toContain("tok_live_old_123");
   });
+
+  /** @scenario "No version copies a typed-in HTTP credential" */
+  it("appends no version for a save that still holds a typed-in credential", async () => {
+    const savedId = `${namespace}-literal-save`;
+    const literal = {
+      url: "https://a.example",
+      method: "POST",
+      auth: { type: "bearer", token: "tok_live_old_123" },
+    };
+    await repository.create({
+      id: savedId,
+      projectId,
+      name: "Saved bot",
+      type: "http",
+      config: parseAgentConfig("http", literal),
+      author: userAuthor,
+    });
+    await repository.update({
+      id: savedId,
+      projectId,
+      type: "http",
+      config: parseAgentConfig("http", { ...literal, url: "https://b.example" }),
+      author: userAuthor,
+    });
+
+    const versions = await repository.findVersions({ projectId, agentId: savedId });
+    expect(versions).toEqual([]);
+  });
 });

@@ -147,7 +147,7 @@ export class MemoryAgentRepository implements AgentRepository {
     });
 
     this.#agents.set(agent.id, structuredClone(agent));
-    this.#appendVersion({ agent, author: input.author, commitMessage: input.commitMessage });
+    await this.#appendVersion({ agent, author: input.author, commitMessage: input.commitMessage });
 
     return structuredClone(agent);
   }
@@ -164,7 +164,11 @@ export class MemoryAgentRepository implements AgentRepository {
       workflowId: input.workflowId ?? agent.workflowId,
       ...(input.author ? { updatedById: input.author.authorId } : {}),
     });
-    this.#appendVersion({ agent: saved, author: input.author, commitMessage: input.commitMessage });
+    await this.#appendVersion({
+      agent: saved,
+      author: input.author,
+      commitMessage: input.commitMessage,
+    });
     return saved;
   }
 
@@ -181,7 +185,7 @@ export class MemoryAgentRepository implements AgentRepository {
     }
     await this.#baselineIfUnversioned(agent);
     const saved = this.#save({ ...agent, config: input.config });
-    this.#appendVersion({ agent: saved, author: undefined, commitMessage: undefined });
+    await this.#appendVersion({ agent: saved, author: undefined, commitMessage: undefined });
 
     return true;
   }
@@ -214,7 +218,7 @@ export class MemoryAgentRepository implements AgentRepository {
     Object.assign(updated.config, structuredClone(input.config));
     updated.updatedAt = toDate(nowInstant());
     this.#agents.set(agent.id, updated);
-    this.#appendVersion({ agent: updated, author: undefined, commitMessage: undefined });
+    await this.#appendVersion({ agent: updated, author: undefined, commitMessage: undefined });
   }
 
   async findCopies(sourceAgentId: string): Promise<AgentCopyRecord[]> {
@@ -232,7 +236,11 @@ export class MemoryAgentRepository implements AgentRepository {
       config: input.config,
       ...(input.author ? { updatedById: input.author.authorId } : {}),
     });
-    this.#appendVersion({ agent: saved, author: input.author, commitMessage: input.commitMessage });
+    await this.#appendVersion({
+      agent: saved,
+      author: input.author,
+      commitMessage: input.commitMessage,
+    });
   }
 
   async findVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]> {
@@ -367,13 +375,14 @@ export class MemoryAgentRepository implements AgentRepository {
     await this.backfillFirstVersion({ agent, createdById: agent.createdById ?? null });
   }
 
-  #appendVersion(input: {
+  /** Appends the next version; a row holding a typed-in credential is never copied. */
+  async #appendVersion(input: {
     agent: Agent;
     author: AgentWriteAuthor | undefined;
     commitMessage: string | undefined;
-  }): void {
+  }): Promise<void> {
     const { agent } = input;
-    if (agent.type === "connected") return;
+    if (!(await versionMayCopy(agent))) return;
     const latest = this.#versions
       .filter((row) => row.agentId === agent.id)
       .reduce((max, row) => Math.max(max, row.version), 0);
