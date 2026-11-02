@@ -1,3 +1,549 @@
+diff --git a/dist/chunks/index.D4dXTzh9.js b/dist/chunks/index.D4dXTzh9.js
+index 7f8ab40e591a03cffbb914d5bcd8f06702ae4619..f225ac1d63417509cf35a8da6515f61a20a40b37 100644
+--- a/dist/chunks/index.D4dXTzh9.js
++++ b/dist/chunks/index.D4dXTzh9.js
+@@ -665,6 +665,14 @@ function getCachedVitestImport(id, state) {
+ }
+ 
+ const { readFileSync } = fs__default;
++// LangWatch: a module from the shared fs module cache names the workspace root
++// with a token; the main process puts this checkout's root in the environment.
++// Only an entry marked portable has it: the forks pool's own copies are verbatim.
++function readCachedModuleCode(file, portable) {
++	const code = readFileSync(file, "utf-8");
++	const root = process.env.VITEST_FS_MODULE_CACHE_ROOT;
++	return portable && root && code.includes("@@vitest-fs-module-cache-root@@") ? code.replaceAll("@@vitest-fs-module-cache-root@@", root) : code;
++}
+ const VITEST_VM_CONTEXT_SYMBOL = "__vitest_vm_context__";
+ const cwd = process.cwd();
+ const isWindows = process.platform === "win32";
+@@ -787,7 +795,7 @@ function startVitestModuleRunner(options) {
+ 						const warmResult = warm && (Object.hasOwn(warm, id) ? warm[id] : Object.hasOwn(warm, rawId) ? warm[rawId] : void 0);
+ 						if (warmResult) if ("tmp" in warmResult) try {
+ 							return {
+-								code: readFileSync(warmResult.tmp, "utf-8"),
++								code: readCachedModuleCode(warmResult.tmp, warmResult.portable),
+ 								...warmResult
+ 							};
+ 						} catch {}
+@@ -796,7 +804,7 @@ function startVitestModuleRunner(options) {
+ 					const otelCarrier = traces?.getContextCarrier();
+ 					const result = await trackFetchTime(rpc().fetch(id, importer, environment(), options, otelCarrier));
+ 					if ("cached" in result) return {
+-						code: readFileSync(result.tmp, "utf-8"),
++						code: readCachedModuleCode(result.tmp, result.portable),
+ 						...result
+ 					};
+ 					return result;
+diff --git a/dist/chunks/index.DzobfTyw.js b/dist/chunks/index.DzobfTyw.js
+index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..d1246d7a1e17229a1ea5ac852daaaf77ef372b20 100644
+--- a/dist/chunks/index.DzobfTyw.js
++++ b/dist/chunks/index.DzobfTyw.js
+@@ -6310,7 +6310,7 @@ class ModuleFetcher {
+ 			if (!makeTmpCopies || !("code" in result)) return result;
+ 			const transformResult = moduleGraphModule.transformResult;
+ 			const tmpPath = transformResult?.__vitestTmp;
+-			if (typeof tmpPath === "string") return getCachedResult(result, tmpPath);
++			if (typeof tmpPath === "string") return getCachedResult(result, tmpPath, transformResult.__vitestPortable === true);
+ 			const tmpDir = join(this.tmpProjectDir, environment.name);
+ 			if (!this.tmpDirectories.has(tmpDir)) {
+ 				if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+@@ -6335,11 +6335,14 @@ class ModuleFetcher {
+ 		const importedUrls = this.getSerializedImports(moduleGraphModule);
+ 		const map = moduleGraphModule.transformResult?.map;
+ 		const mappings = map && !("version" in map) && map.mappings === "";
+-		const cachedResult = await this.cacheResult(result, cachePath, moduleGraphModule.transformResult, importedUrls, !!mappings);
++		const cachedResult = await this.cacheResult(result, cachePath, moduleGraphModule.transformResult, importedUrls, !!mappings, true);
+ 		// remember where the code is stored on disk so that repeat fetches and the
+ 		// `fetchWarmModules` snapshot can point at it in this session already, not
+ 		// only after the cache is read back in the next one
+-		if ("code" in result && moduleGraphModule.transformResult) moduleGraphModule.transformResult.__vitestTmp = cachePath;
++		if ("code" in result && moduleGraphModule.transformResult) {
++			moduleGraphModule.transformResult.__vitestTmp = cachePath;
++			moduleGraphModule.transformResult.__vitestPortable = true;
++		}
+ 		return cachedResult;
+ 	}
+ 	// we need this for UI to be able to show a module graph
+@@ -6398,6 +6401,7 @@ class ModuleFetcher {
+ 				file: moduleGraphModule.file,
+ 				id: moduleGraphModule.id,
+ 				tmp: moduleGraphModule.transformResult.__vitestTmp,
++				portable: moduleGraphModule.transformResult.__vitestPortable === true,
+ 				url: moduleGraphModule.url,
+ 				invalidate: false,
+ 				moduleType: await this.cachedModuleType(moduleGraphModule.file, moduleGraphModule.transformResult.code, moduleGraphModule.transformResult)
+@@ -6405,6 +6409,13 @@ class ModuleFetcher {
+ 		}
+ 		const cachedModule = await this.fsCache.getCachedModule(cachePath);
+ 		if (!cachedModule) return;
++		// LangWatch: the cache is shared with checkouts at other commits, where an
++		// import may have resolved to a file this checkout doesn't have
++		const missing = this.findMissingImport(environment, cachedModule.importedUrls) ?? this.findMissingImport(environment, cachedModule.deps) ?? this.findMissingImport(environment, cachedModule.dynamicDeps);
++		if (missing) {
++			debugFs$1?.(`cached ${cachedModule.id} imports ${missing}, which doesn't exist here, re-transforming`);
++			return;
++		}
+ 		// keep the module graph in sync
+ 		let map = extractSourceMap(cachedModule.code);
+ 		if (map && cachedModule.file) map.file = cachedModule.file;
+@@ -6418,6 +6429,7 @@ class ModuleFetcher {
+ 			deps: cachedModule.deps,
+ 			dynamicDeps: cachedModule.dynamicDeps,
+ 			__vitestTmp: cachePath,
++			__vitestPortable: cachedModule.portable,
+ 			__vitestModuleType: moduleType,
+ 			__vitestStaticMocks: cachedModule.staticMocks
+ 		};
+@@ -6438,11 +6450,28 @@ class ModuleFetcher {
+ 			file: cachedModule.file,
+ 			id: cachedModule.id,
+ 			tmp: cachePath,
++			portable: cachedModule.portable,
+ 			url: cachedModule.url,
+ 			invalidate: false,
+ 			moduleType
+ 		};
+ 	}
++	// The first import, by its URL in the transformed code, whose file is missing.
++	// Only file URLs are checked: `/@fs/` paths, absolute paths and paths from the
++	// project root. Bare and virtual ids aren't files.
++	findMissingImport(environment, urls) {
++		if (!urls) return;
++		for (const url of urls) {
++			if (typeof url !== "string" || url[0] !== "/") continue;
++			const path = cleanUrl(url);
++			if (path.startsWith("/@fs/")) {
++				if (!existsSync(path.slice(4))) return url;
++				continue;
++			}
++			if (path.startsWith("/@")) continue;
++			if (!existsSync(join(environment.config.root, path)) && !existsSync(path)) return url;
++		}
++	}
+ 	async fetchAndProcess(environment, url, importer, moduleGraphModule, options) {
+ 		const result = processResultSource(environment, await fetchModule(environment, url, importer, {
+ 			...options,
+@@ -6468,10 +6497,12 @@ class ModuleFetcher {
+ 		if (transformResult) transformResult.__vitestModuleType = moduleType;
+ 		return moduleType;
+ 	}
+-	async cacheResult(result, cachePath, transformResult, importedUrls = [], mappings = false) {
+-		const returnResult = "code" in result ? getCachedResult(result, cachePath) : result;
++	// `portable` only for the shared fs module cache: the forks pool's own copies
++	// stay as they are, since nothing puts a root back into them
++	async cacheResult(result, cachePath, transformResult, importedUrls = [], mappings = false, portable = false) {
++		const returnResult = "code" in result ? getCachedResult(result, cachePath, portable) : result;
+ 		if (saveCachePromises.has(cachePath)) return saveCachePromises.get(cachePath);
+-		const savePromise = this.fsCache.saveCachedModule(cachePath, result, transformResult, importedUrls, mappings).then(() => returnResult).catch((error) => {
++		const savePromise = this.fsCache.saveCachedModule(cachePath, result, transformResult, importedUrls, mappings, portable).then(() => returnResult).catch((error) => {
+ 			debugFs$1?.(`failed to cache ${cachePath}, serving it inline: ${error}`);
+ 			return result;
+ 		}).finally(() => {
+@@ -6537,12 +6568,14 @@ function genSourceMapUrl(map) {
+ 	if (typeof map !== "string") map = JSON.stringify(map);
+ 	return `data:application/json;base64,${Buffer.from(map).toString("base64")}`;
+ }
+-function getCachedResult(result, tmp) {
++// LangWatch: `portable` tells the reader the file names the root with a token
++function getCachedResult(result, tmp, portable = false) {
+ 	return {
+ 		cached: true,
+ 		file: result.file,
+ 		id: result.id,
+ 		tmp,
++		portable,
+ 		url: result.url,
+ 		invalidate: result.invalidate,
+ 		moduleType: result.moduleType
+@@ -7107,6 +7140,23 @@ const METADATA_FILE = "_metadata.json";
+ // workspace root so it's shared by every project and is naturally invalidated
+ // whenever dependencies are reinstalled.
+ const DEFAULT_CACHE_DIRNAME = ".vitest-cache";
++// LangWatch: the module cache is shared by every checkout (git worktree) of a
++// repository, in one per-user directory (dev/docs/adr/193-*). The key is built
++// from the module's path relative to the workspace root, and the transformed
++// code and its metadata are stored with the workspace root written as
++// FS_CACHE_ROOT_TOKEN. The token is put back on read, here and in the worker
++// that reads the cached file itself, which finds the root in FS_CACHE_ROOT_ENV.
++// Each lockfile gets its own directory under the cache root, so a lockfile
++// change starts a new directory instead of clearing one that another checkout
++// still uses; a directory no run has used for FS_CACHE_UNUSED_MS is removed.
++const FS_CACHE_ROOT_TOKEN = "@@vitest-fs-module-cache-root@@";
++const FS_CACHE_ROOT_ENV = "VITEST_FS_MODULE_CACHE_ROOT";
++const FS_CACHE_UNUSED_MS = 7 * 24 * 60 * 60 * 1e3;
++const FS_CACHE_LOCKFILE_DIR_RE = /^(?:[0-9a-f_]{8}|\.removing-.+)$/;
++function defaultFsModuleCacheRoot() {
++	if (process.env.VITEST_FS_MODULE_CACHE_DIR) return resolve$1(process.env.VITEST_FS_MODULE_CACHE_DIR);
++	return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "vitest", "fs-module-cache");
++}
+ const parallelFsCacheRead = /* @__PURE__ */ new Map();
+ class FileSystemModuleCache {
+ 	vitest;
+@@ -7119,8 +7169,13 @@ class FileSystemModuleCache {
+ 	* - lockfile changes are reflected for the whole workspace, not just for a single project
+ 	*/
+ 	rootCache;
+-	metadataFilePath;
+-	version = "1.0.0-beta.7";
++	workspaceRoot;
++	legacyCache;
++	// the absolute root, when the key must keep it: a path the token can't stand in for
++	pinnedRoot;
++	lockfileDirName;
++	tsconfigByDir = /* @__PURE__ */ new Map();
++	version = "1.0.0-beta.7+langwatch-shared.2";
+ 	fsCacheRoots = /* @__PURE__ */ new WeakMap();
+ 	fsEnvironmentHashMap = /* @__PURE__ */ new WeakMap();
+ 	fsCacheKeyGenerators = /* @__PURE__ */ new Set();
+@@ -7130,8 +7185,91 @@ class FileSystemModuleCache {
+ 	fsCacheKeys = /* @__PURE__ */ new WeakMap();
+ 	constructor(vitest) {
+ 		this.vitest = vitest;
+-		this.rootCache = vitest.config.fsModuleCachePath || join(searchForWorkspaceRoot(vitest.viteConfig.root), "node_modules", DEFAULT_CACHE_DIRNAME);
+-		this.metadataFilePath = join(this.rootCache, METADATA_FILE);
++		this.workspaceRoot = searchForWorkspaceRoot(vitest.viteConfig.root);
++		this.legacyCache = join(this.workspaceRoot, "node_modules", DEFAULT_CACHE_DIRNAME);
++		this.rootCache = vitest.config.fsModuleCachePath || defaultFsModuleCacheRoot();
++		const root = this.workspaceRoot;
++		this.pinnedRoot = isWindows || encodeURI(root) !== root ? root : "";
++	}
++	getLockfileDirName() {
++		this.lockfileDirName ??= getLockfileHash(this.vitest.viteConfig.root);
++		return this.lockfileDirName;
++	}
++	// The root as a whole path segment: inside a path, or a quoted string on its own.
++	toPortable(text) {
++		const root = this.workspaceRoot;
++		if (!text.includes(root)) return text;
++		return text.replaceAll(`${root}/`, `${FS_CACHE_ROOT_TOKEN}/`).replaceAll(`"${root}"`, `"${FS_CACHE_ROOT_TOKEN}"`);
++	}
++	fromPortable(text) {
++		return text.includes(FS_CACHE_ROOT_TOKEN) ? text.replaceAll(FS_CACHE_ROOT_TOKEN, this.workspaceRoot) : text;
++	}
++	// The tsconfig.json files that apply to a module: the nearest one up its directory
++	// tree and the files it extends. Vite's esbuild reads them to transform TypeScript,
++	// so an edit to compilerOptions or paths must change the key.
++	tsconfigContents(id) {
++		const file = cleanUrl(id);
++		if (!file.startsWith(`${this.workspaceRoot}/`)) return "";
++		const start = dirname(file);
++		const known = this.tsconfigByDir.get(start);
++		if (known !== undefined) return known;
++		let contents = "";
++		for (let dir = start; dir.startsWith(this.workspaceRoot); dir = dirname(dir)) {
++			const candidate = join(dir, "tsconfig.json");
++			if (existsSync(candidate)) {
++				contents = this.readTsconfigChain(candidate, /* @__PURE__ */ new Set());
++				break;
++			}
++		}
++		this.tsconfigByDir.set(start, contents);
++		return contents;
++	}
++	readTsconfigChain(file, seen) {
++		if (seen.has(file)) return "";
++		seen.add(file);
++		const text = tryReadFileSync(file);
++		let chain = this.toPortable(`${file}\n${text}\n`);
++		const extended = /"extends"\s*:\s*("[^"]*"|\[[^\]]*\])/.exec(text);
++		for (const [, spec] of extended ? extended[1].matchAll(/"([^"]+)"/g) : []) {
++			const name = spec.endsWith(".json") ? spec : `${spec}.json`;
++			try {
++				chain += this.readTsconfigChain(spec.startsWith(".") ? resolve$1(dirname(file), name) : createRequire(file).resolve(name), seen);
++			} catch {}
++		}
++		return chain;
++	}
++	// The inline source map is base64, out of reach of `toPortable`: its `file`
++	// becomes a bare name (the reader sets it again) and a `sources` entry under
++	// the root becomes relative to the module, which is how both the worker and
++	// the main process resolve it.
++	toPortableCode(code, file) {
++		const marker = `//# ${SOURCEMAPPING_URL}=data:application/json;base64,`;
++		const at = code.lastIndexOf(marker);
++		let result = code;
++		if (at !== -1) {
++			const start = at + marker.length;
++			const newline = code.indexOf("\n", start);
++			const end = newline === -1 ? code.length : newline;
++			const json = Buffer.from(code.slice(start, end), "base64").toString("utf-8");
++			const underRoot = (path) => typeof path === "string" && path.startsWith(`${this.workspaceRoot}/`);
++			const local = underRoot(file);
++			if (json.includes(this.workspaceRoot) || !local) {
++				const map = JSON.parse(json);
++				// a module outside the root (or with no file) has no directory every
++				// checkout shares: drop a map whose sources lead into this checkout
++				const intoRoot = (source) => typeof source === "string" && underRoot(file && !source.startsWith("/") ? resolve$1(dirname(file), source) : source);
++				if (!local && Array.isArray(map.sources) && map.sources.some(intoRoot)) return this.toPortable(`${code.slice(0, at)}${code.slice(end)}`);
++				if (json.includes(this.workspaceRoot)) {
++					if (typeof map.file === "string") map.file = basename(cleanUrl(map.file));
++					if (local && Array.isArray(map.sources)) {
++						const dir = dirname(file);
++						map.sources = map.sources.map((source) => underRoot(source) ? relative(dir, source) : source);
++					}
++					result = `${code.slice(0, start)}${Buffer.from(JSON.stringify(map)).toString("base64")}${code.slice(end)}`;
++				}
++			}
++		}
++		return this.toPortable(result);
+ 	}
+ 	defineCacheKeyGenerator(callback) {
+ 		this.fsCacheKeyGenerators.add(callback);
+@@ -7159,16 +7297,20 @@ class FileSystemModuleCache {
+ 		if (log) this.vitest.logger.log(`[cache] cleared fs module cache at ${uniquePaths.join(", ")}`);
+ 	}
+ 	readCachedFileConcurrently(cachedFilePath) {
+-		if (!parallelFsCacheRead.has(cachedFilePath)) parallelFsCacheRead.set(cachedFilePath, readFile(cachedFilePath, "utf-8").then((code) => {
+-			const matchIndex = code.lastIndexOf(cacheComment);
++		if (!parallelFsCacheRead.has(cachedFilePath)) parallelFsCacheRead.set(cachedFilePath, readFile(cachedFilePath, "utf-8").then((stored) => {
++			const matchIndex = stored.lastIndexOf(cacheComment);
+ 			if (matchIndex === -1) {
+ 				debugFs?.(`${y.red("[empty]")} ${cachedFilePath} exists, but doesn't have a ${cacheComment} comment, transforming by vite instead`);
+ 				return;
+ 			}
++			const meta = this.fromBase64(stored.slice(matchIndex + cacheCommentLength));
+ 			return {
+-				code,
+-				meta: this.fromBase64(code.slice(matchIndex + cacheCommentLength))
++				code: meta.portable === true ? this.fromPortable(stored) : stored,
++				meta
+ 			};
++		}, (error) => {
++			// another checkout removed the directory between the check and the read
++			debugFs?.(`${y.red("[empty]")} ${cachedFilePath} could not be read, transforming by vite instead: ${error}`);
+ 		}).finally(() => {
+ 			parallelFsCacheRead.delete(cachedFilePath);
+ 		}));
+@@ -7193,10 +7335,11 @@ class FileSystemModuleCache {
+ 			moduleType: meta.moduleType,
+ 			deps: meta.deps,
+ 			dynamicDeps: meta.dynamicDeps,
+-			staticMocks: meta.staticMocks
++			staticMocks: meta.staticMocks,
++			portable: meta.portable === true
+ 		};
+ 	}
+-	async saveCachedModule(cachedFilePath, fetchResult, transformResult, importedUrls = [], mappings = false) {
++	async saveCachedModule(cachedFilePath, fetchResult, transformResult, importedUrls = [], mappings = false, portable = false) {
+ 		if ("code" in fetchResult) {
+ 			const result = {
+ 				file: fetchResult.file,
+@@ -7207,19 +7350,23 @@ class FileSystemModuleCache {
+ 				moduleType: fetchResult.moduleType,
+ 				deps: transformResult?.deps,
+ 				dynamicDeps: transformResult?.dynamicDeps,
+-				staticMocks: transformResult?.__vitestStaticMocks
++				staticMocks: transformResult?.__vitestStaticMocks,
++				// only an entry marked portable has the token put back on read
++				portable: portable || void 0
+ 			};
+ 			debugFs?.(`${y.yellow("[write]")} ${fetchResult.id} is cached in ${cachedFilePath}`);
+-			await atomicWriteFile(cachedFilePath, `${fetchResult.code}${cacheComment}${this.toBase64(result)}`);
++			const code = portable ? this.toPortableCode(fetchResult.code, fetchResult.file) : fetchResult.code;
++			await atomicWriteFile(cachedFilePath, `${code}${cacheComment}${this.toBase64(result, portable)}`);
+ 		}
+ 	}
+-	toBase64(obj) {
+-		const json = stringify(obj);
++	toBase64(obj, portable = false) {
++		const json = portable ? this.toPortable(stringify(obj)) : stringify(obj);
+ 		return Buffer.from(json).toString("base64");
+ 	}
+ 	fromBase64(obj) {
+ 		const json = Buffer.from(obj, "base64").toString("utf-8");
+-		return parse(json);
++		const meta = parse(json);
++		return meta?.portable === true ? parse(this.fromPortable(json)) : meta;
+ 	}
+ 	invalidateCachePath(environment, id) {
+ 		debugFs?.(`cache for ${id} in ${environment.name} environment is invalidated`);
+@@ -7243,6 +7390,12 @@ class FileSystemModuleCache {
+ 			debugMemory?.(`${y.yellow("[write]")} ${id} was bailed out because it has "import.meta.glob"`);
+ 			return null;
+ 		}
++		// the token would be read back as this checkout's root
++		if (fileContent.includes(FS_CACHE_ROOT_TOKEN)) {
++			this.saveMemoryCache(environment, id, null);
++			debugMemory?.(`${y.yellow("[write]")} ${id} was bailed out because it contains the cache's root token`);
++			return null;
++		}
+ 		let hashString = "";
+ 		for (const generator of this.fsCacheKeyGenerators) {
+ 			const result = generator({
+@@ -7279,20 +7432,29 @@ class FileSystemModuleCache {
+ 				configFileDependencies: config.configFileDependencies.map((file) => tryReadFileSync(file)),
+ 				environment: environment.name,
+ 				// this affects Vitest CSS plugin
+-				css: vitestConfig.css
++				css: vitestConfig.css,
++				// replaced into the code by Vite, and in the shared cache no longer
++				// tied to the one checkout that reads the same environment
++				define: config.define,
++				env: config.env,
++				vitest: version$1,
++				vite: version
+ 			}, (_, value) => {
+ 				if (typeof value === "function" || value instanceof RegExp) return value.toString();
+ 				return value;
+ 			});
+ 			// everything in the key that does not depend on the module, as one digest
+-			environmentHash = hash("sha1", (process.env.NODE_ENV ?? "") + this.version + cacheConfig, "hex");
++			environmentHash = hash("sha1", (process.env.NODE_ENV ?? "") + this.version + this.toPortable(cacheConfig), "hex");
+ 			this.fsEnvironmentHashMap.set(environment, environmentHash);
+ 		}
+-		hashString += id + fileContent + environmentHash + coverageAffectsCache;
++		// a module that names this checkout's root itself keeps it in the key: only
++		// this checkout can use its result
++		const pinnedRoot = fileContent.includes(this.workspaceRoot) ? this.workspaceRoot : this.pinnedRoot;
++		hashString += this.toPortable(id) + fileContent + environmentHash + coverageAffectsCache + pinnedRoot + this.tsconfigContents(id);
+ 		const cacheKey = hash("sha1", hashString, "hex");
+ 		let cacheRoot = this.fsCacheRoots.get(vitestConfig);
+ 		if (cacheRoot == null) {
+-			cacheRoot = vitestConfig.fsModuleCachePath || this.rootCache;
++			cacheRoot = join(vitestConfig.fsModuleCachePath || this.rootCache, this.getLockfileDirName());
+ 			this.fsCacheRoots.set(vitestConfig, cacheRoot);
+ 			if (!existsSync(cacheRoot)) mkdirSync(cacheRoot, { recursive: true });
+ 		}
+@@ -7309,49 +7471,54 @@ class FileSystemModuleCache {
+ 		}
+ 		environmentKeys.set(id, cache);
+ 	}
+-	async readMetadata() {
+-		// metadata is shared between every project in the workspace, so we always read it from the root cache
+-		if (!existsSync(this.metadataFilePath)) return;
+-		try {
+-			const content = await readFile(this.metadataFilePath, "utf-8");
+-			return JSON.parse(content);
+-		} catch {}
++	// before Vitest starts running tests, mark this lockfile's directory as used
++	// and remove the ones no run has used for FS_CACHE_UNUSED_MS. The lockfile
++	// names the directory, so a dependency or Vite/Vitest upgrade starts a new
++	// one; the config file content in the key won't catch a change made in an
++	// external plugin either.
++	async ensureCacheIntegrity() {
++		if (![this.vitest.getRootProject(), ...this.vitest.projects].some((p) => p.config.fsModuleCache)) return;
++		// the worker reads cached files itself and puts this checkout's root back
++		process.env[FS_CACHE_ROOT_ENV] = this.workspaceRoot;
++		const roots = new Set([this.rootCache, ...this.vitest.projects.map((p) => p.config.fsModuleCachePath || this.rootCache)]);
++		await Promise.all([...roots].map((root) => this.markAndPrune(root)));
++		// the cache used to live in each checkout's node_modules
++		if (!this.vitest.config.fsModuleCachePath && this.legacyCache !== this.rootCache && existsSync(this.legacyCache)) await rm(this.legacyCache, {
++			force: true,
++			recursive: true
++		}).catch(() => {});
+ 	}
+-	async writeMetadata(lockfileHash) {
++	async markAndPrune(root) {
++		const current = this.getLockfileDirName();
+ 		try {
+-			if (!existsSync(this.rootCache)) mkdirSync(this.rootCache, { recursive: true });
+-			await writeFile(this.metadataFilePath, JSON.stringify({ lockfileHash }, null, 2), "utf-8");
++			await mkdir(join(root, current), { recursive: true });
++			// its mtime is when a run last used the directory
++			await writeFile(join(root, current, METADATA_FILE), JSON.stringify({ lockfileHash: current }, null, 2), "utf-8");
++			const now = Date.now();
++			for (const entry of await readdir(root, { withFileTypes: true })) {
++				if (!entry.isDirectory() || entry.name === current || !FS_CACHE_LOCKFILE_DIR_RE.test(entry.name)) continue;
++				const directory = join(root, entry.name);
++				try {
++					const lastUsed = await stat(join(directory, METADATA_FILE)).catch(() => stat(directory));
++					if (now - lastUsed.mtimeMs < FS_CACHE_UNUSED_MS) continue;
++					// renamed first, so a run still reading it finds its files gone rather than half-deleted
++					const removing = entry.name.startsWith(".removing-") ? directory : join(root, `.removing-${entry.name}-${process.pid}`);
++					if (removing !== directory) await rename(directory, removing);
++					await rm(removing, {
++						force: true,
++						recursive: true
++					});
++					debugFs?.(`removed ${directory}, unused since ${new Date(lastUsed.mtimeMs).toISOString()}`);
++				} catch (error) {
++					// another run got there first
++					debugFs?.(`failed to remove ${directory}: ${error}`);
++				}
++			}
+ 		} catch (error) {
+-			// Recording the metadata is best-effort and losing the file shouldn't
+-			// abort the entire execution
+-			debugFs?.(`failed to write fs cache metadata: ${error}`);
++			// best-effort: losing the mark or a removal shouldn't abort the run
++			debugFs?.(`failed to maintain fs cache at ${root}: ${error}`);
+ 		}
+ 	}
+-	// before vitest starts running tests, we check that the lockfile wasn't updated
+-	// if it was, we nuke the previous cache in case a custom plugin was updated
+-	// or a new version of vite/vitest is installed
+-	// for the same reason we also cache config file content, but that won't catch changes made in external plugins
+-	async ensureCacheIntegrity() {
+-		if (![this.vitest.getRootProject(), ...this.vitest.projects].some((p) => p.config.fsModuleCache)) return;
+-		const metadata = await this.readMetadata();
+-		const currentLockfileHash = getLockfileHash(this.vitest.vite.config.root);
+-		// no metadata found, just store a new one, don't reset the cache
+-		if (!metadata) {
+-			debugFs?.(`fs metadata file was created with hash ${currentLockfileHash}`);
+-			await this.writeMetadata(currentLockfileHash);
+-			return;
+-		}
+-		// if lockfile didn't change, don't do anything
+-		if (metadata.lockfileHash === currentLockfileHash) return;
+-		// lockfile changed, let's clear all caches
+-		await this.clearCache(false);
+-		await this.writeMetadata(currentLockfileHash);
+-		this.vitest.vite.config.logger.info(`fs cache was cleared because lockfile has changed`, {
+-			timestamp: true,
+-			environment: y.yellow("[vitest]")
+-		});
+-		debugFs?.(`fs cache was cleared because lockfile has changed`);
+-	}
+ }
+ /**
+ * Performs an atomic write operation using the write-then-rename pattern.
+@@ -9260,7 +9427,8 @@ class ServerModuleRunner extends ModuleRunner {
+ 				try {
+ 					const result = await fetcher(data[0], data[1], environment, false, data[2]);
+ 					if ("tmp" in result) {
+-						const code = await readFile(result.tmp);
++						// LangWatch: an entry marked portable names the root with the shared cache's token
++						const code = await readFile(result.tmp, "utf-8").then((text) => result.portable && process.env[FS_CACHE_ROOT_ENV] ? text.replaceAll(FS_CACHE_ROOT_TOKEN, process.env[FS_CACHE_ROOT_ENV]) : text);
+ 						return { result: {
+ 							...result,
+ 							code
+@@ -10502,6 +10670,7 @@ function createMethodsRPC(project, methodsOptions = {}) {
+ 					file: node.file,
+ 					id: node.id,
+ 					tmp,
++					portable: transformResult.__vitestPortable === true,
+ 					url: node.url,
+ 					invalidate: false,
+ 					moduleType: transformResult.__vitestModuleType
+diff --git a/dist/chunks/init.3UJvPvQg.js b/dist/chunks/init.3UJvPvQg.js
+index bce0952f82a0a6e8ff5a1b18db56d67ba988d1a2..a1e0847c7881135398bb185007f722ab2b15cba1 100644
+--- a/dist/chunks/init.3UJvPvQg.js
++++ b/dist/chunks/init.3UJvPvQg.js
+@@ -8,6 +8,14 @@ import { b as serializeValue, c as createStackString, p as parseStacktrace } fro
+ import './index.M2dsQ_UQ.js';
+ import { m } from './tinyrainbow.Ht9iggcq.js';
+ import { Traces } from '../traces.js';
++// LangWatch: a module from the shared fs module cache names the workspace root
++// with a token; the main process puts this checkout's root in the environment.
++// Only an entry marked portable has it: the forks pool's own copies are verbatim.
++function readCachedModuleCode(file, portable) {
++	const code = readFileSync(file, "utf-8");
++	const root = process.env.VITEST_FS_MODULE_CACHE_ROOT;
++	return portable && root && code.includes("@@vitest-fs-module-cache-root@@") ? code.replaceAll("@@vitest-fs-module-cache-root@@", root) : code;
++}
+ import { o as onCancel, V as VitestEvaluatedModules, a as rpcDone, c as createRuntimeRpc } from './rpc.Bvs-iVxs.js';
+ import { s as setupInspect } from './inspector.CvyFGlXm.js';
+ import { E as EnvironmentTeardownError } from './utils.DYj33du9.js';
+@@ -29,7 +37,7 @@ function createEnvironmentLoader(root, rpc) {
+ 				async fetchModule(id, importer, options) {
+ 					const result = await rpc.fetch(id, importer, "__vitest__", options);
+ 					if ("cached" in result) return {
+-						code: readFileSync(result.tmp, "utf-8"),
++						code: readCachedModuleCode(result.tmp, result.portable),
+ 						...result
+ 					};
+ 					if (isWindows && "externalize" in result)
 diff --git a/vitest.mjs b/vitest.mjs
 index 02dd4714b90340442ab2b2b72a704a99c9b5e4b8..7aa46c1f8d6b79550d27098684a53561b13db2ab 100755
 --- a/vitest.mjs
