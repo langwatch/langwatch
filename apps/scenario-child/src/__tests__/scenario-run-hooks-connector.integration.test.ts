@@ -6,11 +6,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  ConnectorData,
-  ConnectorStepData,
-  HttpAgentData,
-} from "@langwatch/scenario-contract";
+import type { ConnectorData, ConnectorStepData, HttpAgentData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import type { ExecuteSyncTransport } from "../channels/execute-sync.channel.ts";
@@ -85,7 +81,10 @@ function fakeCodeRunner(replies: Partial<Record<"setup" | "teardown", StepReply>
           ? { status: "error", error: { type: "code_block_timeout" } }
           : "raises" in reply
             ? { status: "error", error: { type: "code_runner_error", traceback: reply.raises } }
-            : { status: "success", nodes: { [CONNECTOR_STEP_NODE_ID]: { outputs: reply.outputs } } };
+            : {
+                status: "success",
+                nodes: { [CONNECTOR_STEP_NODE_ID]: { outputs: reply.outputs } },
+              };
       return { ok: true, status: 200, text: async () => JSON.stringify(body) };
     },
   };
@@ -100,7 +99,9 @@ function fakeAgent({ fails = false }: { fails?: boolean } = {}) {
   const http: ScenarioHttp = {
     fetch: async ({ url, init }) => {
       calls.push({ url, headers: init.headers });
-      const text = fails ? `bad token ${init.headers.Authorization}` : JSON.stringify({ output: "hi" });
+      const text = fails
+        ? `bad token ${init.headers.Authorization}`
+        : JSON.stringify({ output: "hi" });
       return {
         ok: !fails,
         status: fails ? 500 : 200,
@@ -158,11 +159,13 @@ function runWith({
     ...(keepData ? { keepData } : {}),
     ...(timeoutMs ? { timeoutMs } : {}),
   });
-  const turns = (success = true) => async () => {
-    await channel.call(turnInput("first"));
-    await channel.call(turnInput("second"));
-    return { success };
-  };
+  const turns =
+    (success = true) =>
+    async () => {
+      await channel.call(turnInput("first"));
+      await channel.call(turnInput("second"));
+      return { success };
+    };
   return { hooks, service, turns, agent };
 }
 
@@ -186,7 +189,10 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
   describe("when the Connector has both steps and the run passes", () => {
     /** @scenario "An HTTP agent with a Connector runs setup, then the turns, then teardown" */
     it("runs setup in the code runner, the turns at the agent URL, then teardown with the state", async () => {
-      const runner = fakeCodeRunner({ setup: setupReturningAccount, teardown: { outputs: { deleted: 1 } } });
+      const runner = fakeCodeRunner({
+        setup: setupReturningAccount,
+        teardown: { outputs: { deleted: 1 } },
+      });
       const { service, turns, agent } = runWith({
         connector: { setup: step(), teardown: step() },
         runner,
@@ -214,12 +220,17 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
         "https://shop.example.com/accounts/acc_1/chat",
         "https://shop.example.com/accounts/acc_1/chat",
       ]);
-      expect(agent.calls.every((call) => call.headers.Authorization === `Bearer ${ACCOUNT_TOKEN}`)).toBe(true);
+      expect(
+        agent.calls.every((call) => call.headers.Authorization === `Bearer ${ACCOUNT_TOKEN}`),
+      ).toBe(true);
     });
 
     it("gives each step its kind, the run, the parameters and its own key", async () => {
       const runner = fakeCodeRunner({ setup: setupReturningAccount });
-      const { service, turns } = runWith({ connector: { setup: step(), teardown: step() }, runner });
+      const { service, turns } = runWith({
+        connector: { setup: step(), teardown: step() },
+        runner,
+      });
 
       await service.around(turns());
 
@@ -236,7 +247,10 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
 
     it("gives teardown the run-scoped secrets setup returned beside its named ones", async () => {
       const runner = fakeCodeRunner({ setup: setupReturningAccount });
-      const { service, turns } = runWith({ connector: { setup: step(), teardown: step() }, runner });
+      const { service, turns } = runWith({
+        connector: { setup: step(), teardown: step() },
+        runner,
+      });
 
       await service.around(turns());
 
@@ -259,7 +273,12 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
     /** @scenario "Run-scoped secrets stay out of the record, the simulated user, the judge and every error" */
     it("records and shows the state with the value redacted, and redacts it from the turn error", async () => {
       const runner = fakeCodeRunner({
-        setup: { outputs: { state: { accountId: "acc_1", leaked: ACCOUNT_TOKEN }, secrets: { ACCOUNT_TOKEN } } },
+        setup: {
+          outputs: {
+            state: { accountId: "acc_1", leaked: ACCOUNT_TOKEN },
+            secrets: { ACCOUNT_TOKEN },
+          },
+        },
       });
       const { hooks, service, turns } = runWith({
         connector: { setup: step(), teardown: step() },
@@ -288,7 +307,9 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
         runner,
       });
 
-      const failure = (await service.around(turns()).catch((error: unknown) => error)) as ScenarioRunHooksError;
+      const failure = (await service
+        .around(turns())
+        .catch((error: unknown) => error)) as ScenarioRunHooksError;
 
       expect(agent.calls).toHaveLength(0);
       expect(failure.hooks.setup).toMatchObject({
@@ -309,7 +330,9 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
         timeoutMs: 50,
       });
 
-      const failure = (await service.around(turns()).catch((error: unknown) => error)) as ScenarioRunHooksError;
+      const failure = (await service
+        .around(turns())
+        .catch((error: unknown) => error)) as ScenarioRunHooksError;
 
       expect(failure.hooks.setup?.status).toBe("timed_out");
       expect(runner.calls.filter((call) => call.kind === "teardown")).toHaveLength(1);
@@ -319,7 +342,9 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
       const runner = fakeCodeRunner({ setup: "code_block_timeout" });
       const { service, turns } = runWith({ connector: { setup: step() }, runner });
 
-      const failure = (await service.around(turns()).catch((error: unknown) => error)) as ScenarioRunHooksError;
+      const failure = (await service
+        .around(turns())
+        .catch((error: unknown) => error)) as ScenarioRunHooksError;
 
       expect(failure.hooks.setup?.status).toBe("timed_out");
     });
@@ -333,10 +358,15 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
         runner,
       });
 
-      const failure = (await service.around(turns()).catch((error: unknown) => error)) as ScenarioRunHooksError;
+      const failure = (await service
+        .around(turns())
+        .catch((error: unknown) => error)) as ScenarioRunHooksError;
 
       expect(runner.calls).toHaveLength(0);
-      expect(failure.hooks.setup).toMatchObject({ status: "failed", error: expect.stringContaining("GONE_KEY") });
+      expect(failure.hooks.setup).toMatchObject({
+        status: "failed",
+        error: expect.stringContaining("GONE_KEY"),
+      });
     });
 
     it("fails setup on rows over the cap without calling the code runner", async () => {
@@ -344,7 +374,9 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
       const rowsRefusal = "The Connector step's dataset is over the 64 KiB a step may receive.";
       const { service, turns } = runWith({ connector: { setup: step({ rowsRefusal }) }, runner });
 
-      const failure = (await service.around(turns()).catch((error: unknown) => error)) as ScenarioRunHooksError;
+      const failure = (await service
+        .around(turns())
+        .catch((error: unknown) => error)) as ScenarioRunHooksError;
 
       expect(runner.calls).toHaveLength(0);
       expect(failure.hooks.setup).toMatchObject({ status: "failed", error: rowsRefusal });
@@ -365,7 +397,9 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
 
     /** @scenario "A secret in a Connector step's error is scrubbed" */
     it("scrubs a secret the step was given out of its traceback", async () => {
-      const runner = fakeCodeRunner({ teardown: { raises: `Traceback: 401 for key ${ADMIN_KEY}` } });
+      const runner = fakeCodeRunner({
+        teardown: { raises: `Traceback: 401 for key ${ADMIN_KEY}` },
+      });
       const { service, turns } = runWith({ connector: { teardown: step() }, runner });
 
       const { hooks } = await service.around(turns());
@@ -407,7 +441,10 @@ describe("the registry building an HTTP agent", () => {
     }) as HttpSerializedHttpAgentChannel;
 
   it("gives an agent with a Connector its steps as the run's hooks", () => {
-    expect(build({ setup: step() }).connectorHooks?.declared).toEqual({ setup: true, teardown: false });
+    expect(build({ setup: step() }).connectorHooks?.declared).toEqual({
+      setup: true,
+      teardown: false,
+    });
   });
 
   it("gives an agent without a Connector no hooks", () => {

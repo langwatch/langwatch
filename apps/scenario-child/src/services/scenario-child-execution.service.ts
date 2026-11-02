@@ -222,7 +222,8 @@ function hookTargetOf({
   const { adapterData } = jobData;
   if (jobData.script) return null;
   if (adapterData.type === "http") {
-    const caller = adapter instanceof HttpSerializedHttpAgentChannel ? adapter.connectorHooks : null;
+    const caller =
+      adapter instanceof HttpSerializedHttpAgentChannel ? adapter.connectorHooks : null;
     return caller ? { caller, declared: caller.declared } : null;
   }
   if (adapterData.type !== "connected") return null;

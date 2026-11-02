@@ -364,7 +364,11 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
 
       expect(adapter).toMatchObject({
         connector: {
-          setup: { code: step.code, secretNames: ["API_KEY"], secrets: { API_KEY: "key-from-project" } },
+          setup: {
+            code: step.code,
+            secretNames: ["API_KEY"],
+            secrets: { API_KEY: "key-from-project" },
+          },
         },
       });
       expect(JSON.stringify(adapter)).not.toContain("never-sent");
@@ -382,7 +386,9 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
         RUN_ONLY: "not-named",
       });
 
-      expect(adapter).toMatchObject({ connector: { teardown: { secrets: { API_KEY: "key-from-run" } } } });
+      expect(adapter).toMatchObject({
+        connector: { teardown: { secrets: { API_KEY: "key-from-run" } } },
+      });
       expect(adapter).not.toHaveProperty("connector.teardown.secrets.RUN_ONLY");
     });
 
@@ -415,7 +421,9 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
 
       const adapter = await fetchFor(service, "http");
 
-      expect(adapter).toMatchObject({ connector: { setup: { rowsRefusal: expect.stringContaining("64 KiB") } } });
+      expect(adapter).toMatchObject({
+        connector: { setup: { rowsRefusal: expect.stringContaining("64 KiB") } },
+      });
       expect(adapter).not.toHaveProperty("connector.setup.rows");
     });
 

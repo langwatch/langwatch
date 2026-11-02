@@ -216,7 +216,9 @@ export function connectorStepOutputs({
   try {
     answer = JSON.parse(rawBody) as EngineAnswer;
   } catch {
-    throw new ConnectorStepError({ message: `The code runner answered the ${kind} step with no JSON.` });
+    throw new ConnectorStepError({
+      message: `The code runner answered the ${kind} step with no JSON.`,
+    });
   }
   if (answer.status === "error") {
     const error = answer.nodes?.[CONNECTOR_STEP_NODE_ID]?.error ?? answer.error;
@@ -267,7 +269,13 @@ export function connectorStepAnswer({
 }
 
 /** A JSON value with every known secret value in its strings replaced by the placeholder. */
-export function scrubbedJson<T>({ value, secrets }: { value: T; secrets: Record<string, string> }): T {
+export function scrubbedJson<T>({
+  value,
+  secrets,
+}: {
+  value: T;
+  secrets: Record<string, string>;
+}): T {
   if (typeof value === "string") {
     return ScenarioSecretReferenceAdapter.redact({ message: value, secrets }) as T;
   }

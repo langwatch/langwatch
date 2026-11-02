@@ -54,21 +54,25 @@ describe("connectorStepInput()", () => {
   it("gives setup no state and teardown the state setup returned", () => {
     const state = { accountId: "acc_1" };
 
-    expect(connectorStepInput({ ...base, kind: "setup", rows: undefined, state })).not.toHaveProperty(
-      "state",
+    expect(
+      connectorStepInput({ ...base, kind: "setup", rows: undefined, state }),
+    ).not.toHaveProperty("state");
+    expect(connectorStepInput({ ...base, kind: "teardown", rows: undefined, state })).toMatchObject(
+      {
+        kind: "teardown",
+        run,
+        params: { persona: "gold" },
+        state,
+      },
     );
-    expect(connectorStepInput({ ...base, kind: "teardown", rows: undefined, state })).toMatchObject({
-      kind: "teardown",
-      run,
-      params: { persona: "gold" },
-      state,
-    });
   });
 
   it("carries the bound rows only when there are some", () => {
     const rows = [{ persona: "gold" }];
 
-    expect(connectorStepInput({ ...base, kind: "setup", rows, state: null })).toMatchObject({ rows });
+    expect(connectorStepInput({ ...base, kind: "setup", rows, state: null })).toMatchObject({
+      rows,
+    });
     expect(
       connectorStepInput({ ...base, kind: "setup", rows: undefined, state: null }),
     ).not.toHaveProperty("rows");

@@ -126,7 +126,11 @@ export class ConnectorHookCaller implements ScenarioHookCaller {
     if (!step) throw new ConnectorStepError({ message: `The Connector has no ${kind} step.` });
     const refusal = connectorStepRefusal({ kind, step });
     if (refusal) throw new ConnectorStepError({ message: refusal });
-    const idempotencyKey = connectorIdempotencyKey({ run: this.run, attemptId: this.attemptId, kind });
+    const idempotencyKey = connectorIdempotencyKey({
+      run: this.run,
+      attemptId: this.attemptId,
+      kind,
+    });
     const input = connectorStepInput({
       kind,
       run: this.run,
@@ -195,7 +199,8 @@ export class ConnectorHookCaller implements ScenarioHookCaller {
           isTimeout: true,
         });
       }
-      const code = typeof error === "object" && error !== null && "code" in error ? error.code : null;
+      const code =
+        typeof error === "object" && error !== null && "code" in error ? error.code : null;
       throw new ConnectorStepError({
         message: `The code runner could not be reached for the ${kind} step${typeof code === "string" ? ` (${code})` : ""}.`,
       });
