@@ -244,10 +244,31 @@ describe("POST /search", () => {
   });
 
   describe("when includeSpans asks for a page larger than a spans page may be", () => {
-    /** @scenario "Public trace search with spans answers at most 100 traces per page" */
-    it("clamps the page to the spans page bound, leaving scrollId to page on", async () => {
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("refuses with 422 naming the spans page bound, reading nothing", async () => {
       const { send, listTraces } = mount();
-      await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 4000 });
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        includeSpans: true,
+        pageSize: 4000,
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { code?: string; meta?: { maxPageSize?: number } };
+      expect(body.code).toBe("trace_page_size_too_large");
+      expect(body.meta?.maxPageSize).toBe(SEARCH_WITH_SPANS_PAGE_SIZE_MAX);
+      expect(listTraces).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("accepts a page exactly at the spans page bound", async () => {
+      const { send, listTraces } = mount();
+      await send({
+        startDate: 1000,
+        endDate: 5000,
+        includeSpans: true,
+        pageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX,
+      });
       expect(listTraces).toHaveBeenCalledWith(
         expect.objectContaining({
           query: expect.objectContaining({ pageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX }),
@@ -255,7 +276,18 @@ describe("POST /search", () => {
       );
     });
 
-    /** @scenario "Public trace search with spans answers at most 100 traces per page" */
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("answers pages of the spans page bound when no pageSize is named", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, includeSpans: true });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ pageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX }),
+        }),
+      );
+    });
+
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
     it("keeps a smaller requested page as it is", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 20 });
@@ -264,7 +296,7 @@ describe("POST /search", () => {
       );
     });
 
-    /** @scenario "Public trace search with spans answers at most 100 traces per page" */
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
     it("leaves a search without spans at the requested size", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, pageSize: 4000 });

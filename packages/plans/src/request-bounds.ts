@@ -60,8 +60,7 @@ export const requestBounds = [
   },
   {
     key: "tracesWithSpansPageSizeMax",
-    description:
-      "Trace search page size when spans are included; each page is buffered whole, REST.",
+    description: "Trace search page size when spans are included; a larger page is refused, REST.",
     unit: "items",
     free: 100,
     paid: 100,

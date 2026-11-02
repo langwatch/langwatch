@@ -34,6 +34,7 @@ import {
   type Trace,
   type TraceSearchBody,
   type TraceSharedFiltersInput,
+  TracePageSizeTooLargeError,
 } from "@langwatch/trace-contract";
 import type { z } from "zod";
 
@@ -60,8 +61,9 @@ const logger = createLogger("langwatch:api:traces");
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
 
 /**
- * The most traces one `includeSpans` search page answers: a page with spans is buffered whole,
- * and an enterprise-sized one held gigabytes (an api pod OOM). The caller pages on with `scrollId`.
+ * The most traces one `includeSpans` search page answers, and its default: a page with spans is
+ * buffered whole (an api pod OOM). A larger pageSize is refused, not clamped, so no caller reads
+ * a short page as the end of the export.
  */
 export const SEARCH_WITH_SPANS_PAGE_SIZE_MAX = resolveRequestBound(
   "tracesWithSpansPageSizeMax",
@@ -251,10 +253,14 @@ async function searchTraces({
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 
-  const requestedPageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
-  const pageSize = includeSpans
-    ? Math.min(requestedPageSize, SEARCH_WITH_SPANS_PAGE_SIZE_MAX)
-    : requestedPageSize;
+  if (includeSpans && rawPageSize !== undefined && rawPageSize > SEARCH_WITH_SPANS_PAGE_SIZE_MAX) {
+    throw new TracePageSizeTooLargeError({
+      maxPageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX,
+      bound: "tracesWithSpansPageSizeMax",
+    });
+  }
+  const pageSize =
+    rawPageSize ?? (includeSpans ? SEARCH_WITH_SPANS_PAGE_SIZE_MAX : DEFAULT_TRACES_PAGE_SIZE);
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
     principal: caller.principal,

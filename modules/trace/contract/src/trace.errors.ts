@@ -186,7 +186,7 @@ export class TracePageSizeTooLargeError extends HandledError {
     bound,
   }: {
     maxPageSize: number;
-    bound: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+    bound: "tracesPageSizeMax" | "tracesDownloadPageSizeMax" | "tracesWithSpansPageSizeMax";
   }) {
     super(
       "trace_page_size_too_large",

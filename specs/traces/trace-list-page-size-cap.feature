@@ -15,6 +15,8 @@ Feature: Trace list page size cap
   #     bound (10 000 on every plan, also their default)
   #   - the public REST search routes clamp instead of rejecting, so existing
   #     API clients that ask for more keep working
+  #   - except a search with spans: a short page there reads as the end of an
+  #     export to older clients, so above 100 it is refused, never clamped
   #   - the filtered annotations page needs more than one page of trace ids, so
   #     it follows scrollId, at most 10 pages (the old 10 000-trace ceiling)
   #     and only shows ids once the whole walk finished without a failure
@@ -46,10 +48,11 @@ Feature: Trace list page size cap
     Then the request is accepted
 
   @unit
-  Scenario: Public trace search with spans answers at most 100 traces per page
+  Scenario: Public trace search with spans refuses a page above 100 traces
     When the public trace search asks for spans with pageSize 4000
-    Then the page holds at most 100 traces and the caller pages on with scrollId
-    And a smaller page, or a search without spans, keeps the size it asked for
+    Then the request is refused with 422 "trace_page_size_too_large" naming the bound 100
+    And a page of 100 or fewer, or a search without spans, keeps the size it asked for
+    And a search with spans that names no pageSize answers pages of 100
 
   @integration
   Scenario: The filtered annotations list walks trace pages at the cap

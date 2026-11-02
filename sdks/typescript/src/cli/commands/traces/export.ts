@@ -25,8 +25,8 @@ const PROGRESS_CHUNK = 25;
 const SERVER_PAGE_CAP = 1000;
 
 /**
- * Page size used when spans are requested: the server answers at most this many traces per
- * page with spans, so asking for more only wastes the request. The cursor walk covers the rest.
+ * Page size used when spans are requested: the server refuses a larger page with spans
+ * (422 `trace_page_size_too_large`). The cursor walk covers the rest.
  */
 const SPANS_PAGE_CAP = 100;
 

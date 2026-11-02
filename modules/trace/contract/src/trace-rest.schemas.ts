@@ -24,7 +24,7 @@ import {
 } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 
-/** The most traces one `includeSpans` search page answers; the REST handler clamps to it. */
+/** The most traces one `includeSpans` search page answers; the REST handler refuses above it. */
 const TRACES_WITH_SPANS_PAGE_SIZE_MAX = resolveRequestBound("tracesWithSpansPageSizeMax", "FREE");
 
 /** Longest `filter` string the boundary accepts; a shape ceiling, not a cost one. */
@@ -57,9 +57,9 @@ export const traceSearchBodyExtensions = {
     .optional()
     .describe(
       "When true, fetches full span data for each trace. Useful for bulk export. Default false. " +
-        `A page with spans holds at most ${TRACES_WITH_SPANS_PAGE_SIZE_MAX} traces, whatever ` +
-        "`pageSize` asks for. When a " +
-        "response carries a `scrollId`, send it to fetch the next page.",
+        `A page with spans holds at most ${TRACES_WITH_SPANS_PAGE_SIZE_MAX} traces, and that is ` +
+        "its default; a larger `pageSize` is refused with 422 `trace_page_size_too_large`. " +
+        "When a response carries a `scrollId`, send it to fetch the next page.",
     ),
   llmMode: z.boolean().optional(),
   dateField: z
