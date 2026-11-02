@@ -17,6 +17,8 @@ import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { recordSeatChangedCommandDataSchema } from "../../../eventing/seat-peak.events.ts";
+import { emptySeatPeak, foldSeatPeak, type SeatPeakFact } from "../../../rules/seat-peak.rules.ts";
 import { PrismaOrganizationInviteRepository } from "../prisma.organization-invite.repository.ts";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 
@@ -381,6 +383,48 @@ describe.skipIf(!DB_URL)("organization's seat changes (Postgres)", () => {
         expect.objectContaining({ from: "full", to: "lite", cause: "role_changed" }),
         expect.objectContaining({ from: "lite", to: "full", cause: "role_changed" }),
       ]);
+    });
+
+    it("stamps a move down and straight back up apart, so either order folds to the table's seat", async () => {
+      const organizationId = await organization("role-bounce");
+      const userId = await memberOn(organizationId, OrganizationUserRole.MEMBER);
+      const change = (role: OrganizationUserRole) =>
+        members.updateMemberRole({
+          caller: { type: "system" },
+          organizationId,
+          userId,
+          role,
+          effectiveTeamRoleUpdates: [],
+          currentUserId: adminUserId,
+        });
+
+      await change(OrganizationUserRole.EXTERNAL);
+      await change(OrganizationUserRole.MEMBER);
+      const [down, up] = (await seatChanges(organizationId)).map((row) =>
+        recordSeatChangedCommandDataSchema.parse(row),
+      );
+      const opening: SeatPeakFact = {
+        type: "seat_snapshot_taken",
+        data: {
+          tenantId: organizationId,
+          organizationId,
+          holders: [{ holder: { kind: "member", userId }, seat: "full" }],
+          occurredAt: (down?.occurredAt ?? 0) - 1,
+        },
+      };
+
+      expect(up?.occurredAt).toBeGreaterThan(down?.occurredAt ?? Number.POSITIVE_INFINITY);
+      for (const order of [
+        [down, up],
+        [up, down],
+      ]) {
+        const folded = [
+          opening,
+          ...order.map((data) => ({ type: "seat_changed", data }) as SeatPeakFact),
+        ].reduce((state, fact) => foldSeatPeak({ state, fact }), emptySeatPeak());
+
+        expect(folded.members[userId]?.seat).toBe("full");
+      }
     });
 
     it("records nothing when they are made an admin, as no seat moves", async () => {

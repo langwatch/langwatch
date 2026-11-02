@@ -1,6 +1,7 @@
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant } from "@langwatch/time";
 
 import type { SeatChangeCause } from "../../eventing/seat-peak.events.ts";
 import {
@@ -40,6 +41,9 @@ export class PrismaOrganizationSeatChangeStore {
   static create({ database }: { database: PrismaClient }): PrismaOrganizationSeatChangeStore {
     return new PrismaOrganizationSeatChangeStore(database);
   }
+
+  /** The last moment stamped in this process; the next stamp is always later (ADR-002 §7). */
+  static #lastStampedAt = 0;
 
   #outbox: PrismaProcessStore | undefined;
 
@@ -128,12 +132,22 @@ export class PrismaOrganizationSeatChangeStore {
           to: change.to,
           cause: change.cause,
           actorUserId: change.actorUserId,
-          occurredAt: id.date.getTime(),
+          occurredAt: PrismaOrganizationSeatChangeStore.#stamp(),
           changeId: id.toString(),
         },
       }),
       transaction,
     });
+  }
+
+  /** Millisecond time, strictly increasing per call: two changes in one write keep their order. */
+  static #stamp(): number {
+    const stamped = Math.max(
+      nowInstant().epochMilliseconds,
+      PrismaOrganizationSeatChangeStore.#lastStampedAt + 1,
+    );
+    PrismaOrganizationSeatChangeStore.#lastStampedAt = stamped;
+    return stamped;
   }
 
   async #memberSeat({

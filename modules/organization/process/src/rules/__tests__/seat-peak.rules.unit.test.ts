@@ -6,6 +6,7 @@ import {
   emptySeatPeak,
   foldSeatPeak,
   SEAT_PEAK_RECENT_CHANGE_IDS,
+  SEAT_PEAK_SETTLED_INVITATION_MS,
   type SeatPeakFact,
   type SeatPeakState,
   seatPeakAsOf,
@@ -197,7 +198,12 @@ describe("foldSeatPeak", () => {
       ]);
 
       expect(state.invitations).toEqual({
-        "inv-1": { seat: "full", expiresAt: NOV_3, lastChangedAt: NOV_1 + 1 },
+        "inv-1": {
+          seat: "full",
+          expiresAt: NOV_3,
+          lastChangedAt: NOV_1 + 1,
+          lastChangeId: expect.any(String),
+        },
       });
       expect(state.counts.full).toBe(12);
       expect(novemberOf(state).fullPeak).toBe(12);
@@ -221,7 +227,12 @@ describe("foldSeatPeak", () => {
       ]);
 
       expect(state.invitations).toEqual({
-        "inv-1": { seat: "full", expiresAt: NOV_3, lastChangedAt: NOV_1 + 1 },
+        "inv-1": {
+          seat: "full",
+          expiresAt: NOV_3,
+          lastChangedAt: NOV_1 + 1,
+          lastChangeId: expect.any(String),
+        },
       });
       expect(state.counts.full).toBe(12);
       expect(state.mismatches).toBe(0);
@@ -466,6 +477,61 @@ describe("foldSeatPeak", () => {
       expect(foldAll(facts).recentChangeIds).toHaveLength(SEAT_PEAK_RECENT_CHANGE_IDS);
     });
 
+    it("orders two changes stamped in one millisecond by change id, dropping neither", () => {
+      const down = change({
+        holder: member("full-0"),
+        from: "full",
+        to: "lite",
+        occurredAt: NOV_2,
+        changeId: "seatchange_a",
+      });
+      const up = change({
+        holder: member("full-0"),
+        from: "lite",
+        to: "full",
+        occurredAt: NOV_2,
+        changeId: "seatchange_b",
+      });
+
+      for (const order of [
+        [down, up],
+        [up, down],
+      ]) {
+        const state = foldAll([snapshot({ occurredAt: NOV_1, full: 2 }), ...order]);
+
+        expect(state.members["full-0"]).toMatchObject({
+          seat: "full",
+          lastChangeId: "seatchange_b",
+        });
+        expect(state.counts).toEqual({ full: 2, lite: 0, developer: 0 });
+      }
+    });
+
+    it("ends at the table's seat when a role goes down and straight back up, in either order", () => {
+      const down = change({
+        holder: member("full-0"),
+        from: "full",
+        to: "lite",
+        occurredAt: NOV_2,
+      });
+      const up = change({
+        holder: member("full-0"),
+        from: "lite",
+        to: "full",
+        occurredAt: NOV_2 + 1,
+      });
+
+      for (const order of [
+        [down, up],
+        [up, down],
+      ]) {
+        const state = foldAll([snapshot({ occurredAt: NOV_1, full: 2 }), ...order]);
+
+        expect(state.members["full-0"]?.seat).toBe("full");
+        expect(state.counts.full).toBe(2);
+      }
+    });
+
     /** @scenario "Rebuilding the count from the recorded changes gives the same peaks" */
     it("gives identical state when the same three months are folded twice from empty", () => {
       const facts: SeatPeakFact[] = [
@@ -537,6 +603,26 @@ describe("foldSeatPeak", () => {
       ];
     }
 
+    /** The last touched month's ends and an untouched later month, against the running count. */
+    function closingOf(state: SeatPeakState) {
+      const december = seatPeakAsOf({ state, now: at("2026-12-15T00:00:00Z") }).months.at(-1);
+      expect(state.months["2026-11"]).toMatchObject({
+        fullAtEnd: state.counts.full,
+        liteAtEnd: state.counts.lite,
+      });
+      expect(december).toMatchObject({
+        month: "2026-12",
+        carried: true,
+        fullPeak: state.counts.full,
+        litePeak: state.counts.lite,
+      });
+      const november = state.months["2026-11"];
+      return {
+        november: { fullAtEnd: november?.fullAtEnd, liteAtEnd: november?.liteAtEnd },
+        december: { fullPeak: december?.fullPeak, litePeak: december?.litePeak },
+      };
+    }
+
     function orders<T>(items: readonly T[]): T[][] {
       if (items.length <= 1) return [[...items]];
       return items.flatMap((item, i) =>
@@ -545,17 +631,19 @@ describe("foldSeatPeak", () => {
     }
 
     it("ends at the same running counts and holders in any order", () => {
-      const inOrder = foldAll([opening(), ...history()]);
+      const changes = history();
+      const inOrder = foldAll([opening(), ...changes]);
 
-      for (const order of orders(history())) {
+      for (const order of orders(changes)) {
         const folded = foldAll([opening(), ...order]);
 
         expect(folded.counts).toEqual(inOrder.counts);
         expect(folded.members).toEqual(inOrder.members);
         expect(folded.invitations).toEqual(inOrder.invitations);
+        expect(closingOf(folded)).toEqual(closingOf(inOrder));
       }
       expect(inOrder.counts).toEqual({ full: 10, lite: 3, developer: 0 });
-      expect(inOrder.members.c).toEqual({ seat: "lite", lastChangedAt: minutes(42) });
+      expect(inOrder.members.c).toMatchObject({ seat: "lite", lastChangedAt: minutes(42) });
       expect(inOrder.months["2026-10"]).toMatchObject({ fullPeak: 13, fullAtEnd: 12 });
     });
 
@@ -578,23 +666,121 @@ describe("foldSeatPeak", () => {
 
         expect(folded.counts).toEqual(inOrder.counts);
         expect(folded.mismatches).toBeLessThanOrEqual(1);
+        expect(closingOf(folded)).toMatchObject({
+          december: { fullPeak: inOrder.counts.full, litePeak: inOrder.counts.lite },
+        });
         for (const month of ["2026-10", "2026-11"]) {
           const peak = folded.months[month];
           const exact = inOrder.months[month];
           expect(Math.abs((peak?.fullPeak ?? 0) - (exact?.fullPeak ?? 0))).toBeLessThanOrEqual(1);
           expect(Math.abs((peak?.litePeak ?? 0) - (exact?.litePeak ?? 0))).toBeLessThanOrEqual(1);
+          expect(Math.abs((peak?.fullAtEnd ?? 0) - (exact?.fullAtEnd ?? 0))).toBeLessThanOrEqual(1);
+          expect(Math.abs((peak?.liteAtEnd ?? 0) - (exact?.liteAtEnd ?? 0))).toBeLessThanOrEqual(1);
         }
       }
     });
 
-    it("attributes a change that arrives late to the month it happened in", () => {
+    it("attributes a change that arrives late to its month, and carries it into later ones", () => {
       const [joined, , , , , moved] = history();
       const state = foldAll([opening(), moved!, joined!]);
 
-      expect(state.months["2026-10"]).toMatchObject({ fullAtEnd: 10 });
-      expect(state.months["2026-11"]).toMatchObject({ fullAtEnd: 9, litePeak: 2 });
+      // October closed on 10 full, the invitation and `a`; November lost the invitation and full-1.
+      expect(state.months["2026-10"]).toMatchObject({ fullPeak: 12, fullAtEnd: 12 });
+      expect(state.months["2026-11"]).toMatchObject({
+        fullPeak: 12,
+        fullAtEnd: 10,
+        litePeak: 2,
+        liteAtEnd: 2,
+      });
       expect(state.counts).toEqual({ full: 10, lite: 2, developer: 0 });
+      expect(state.months).toEqual(foldAll([opening(), joined!, moved!]).months);
     });
+
+    it("never lowers a later month's peak when a late change gives a seat back", () => {
+      const removed = change({
+        holder: member("full-0"),
+        from: "full",
+        to: "none",
+        occurredAt: minutes(10),
+      });
+      const joined = change({
+        holder: member("b"),
+        from: "none",
+        to: "full",
+        occurredAt: minutes(40),
+      });
+      const state = foldAll([opening(), joined, removed]);
+
+      expect(state.months["2026-10"]).toMatchObject({ fullPeak: 11, fullAtEnd: 10 });
+      expect(state.months["2026-11"]).toMatchObject({ fullPeak: 11, fullAtEnd: 10 });
+      expect(state.counts.full).toBe(10);
+    });
+  });
+});
+
+describe("foldSeatPeak's settled invitations", () => {
+  const NOV_25 = at("2026-11-25T09:00:00Z");
+  const created = change({
+    holder: invitation("inv-1", at("2026-11-20T00:00:00Z")),
+    from: "none",
+    to: "full",
+    occurredAt: NOV_2,
+  });
+  const revoked = change({
+    holder: invitation("inv-1", at("2026-11-20T00:00:00Z")),
+    from: "full",
+    to: "none",
+    occurredAt: NOV_3,
+  });
+  const joinedLater = change({
+    holder: member("joiner"),
+    from: "none",
+    to: "full",
+    occurredAt: NOV_3 + SEAT_PEAK_SETTLED_INVITATION_MS + 1,
+  });
+
+  it("drops a revoked invitation once the settled window has passed, counting the same", () => {
+    const state = foldAll([
+      snapshot({ occurredAt: NOV_1, full: 2 }),
+      created,
+      revoked,
+      joinedLater,
+    ]);
+
+    expect(state.invitations).toEqual({});
+    expect(state.counts).toEqual({ full: 3, lite: 0, developer: 0 });
+    expect(novemberOf(state).fullPeak).toBe(3);
+  });
+
+  it("keeps a revoked invitation inside the window, so its late creation stays stale", () => {
+    const state = foldAll([
+      snapshot({ occurredAt: NOV_1, full: 2 }),
+      revoked,
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_25 }),
+      created,
+    ]);
+
+    expect(state.invitations["inv-1"]).toMatchObject({ seat: "none", lastChangedAt: NOV_3 });
+    expect(state.counts.full).toBe(3);
+  });
+
+  it("takes a lapsed invitation's seat back when it is refreshed after being dropped", () => {
+    const lapsing = invitation("inv-2", NOV_2);
+    const refreshedUntil = joinedLater.data.occurredAt + 60_000;
+    const state = foldAll([
+      snapshot({ occurredAt: NOV_1, full: 2, extra: [{ holder: lapsing, seat: "full" }] }),
+      joinedLater,
+      change({
+        holder: invitation("inv-2", refreshedUntil),
+        from: "none",
+        to: "full",
+        occurredAt: joinedLater.data.occurredAt + 1,
+      }),
+    ]);
+
+    expect(state.invitations["inv-2"]).toMatchObject({ seat: "full", expiresAt: refreshedUntil });
+    expect(state.counts.full).toBe(4);
+    expect(state.mismatches).toBe(0);
   });
 });
 

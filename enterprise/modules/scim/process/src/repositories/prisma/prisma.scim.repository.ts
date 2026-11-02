@@ -367,7 +367,7 @@ export class PrismaScimRepository extends ScimRepository {
             organizationId: input.organizationId,
             userId: input.userId,
             seat: input.seat,
-            occurredAt: createId.date.getTime(),
+            occurredAt: nowInstant().epochMilliseconds,
             createId: createId.toString(),
           },
         }),
