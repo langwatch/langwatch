@@ -11,17 +11,18 @@ from functools import lru_cache
 from typing import Any
 
 import pytest
-from presidio_analyzer import RecognizerResult
-
-from langevals_presidio.pii_detection import (
+from langevals_presidio.allcaps_names import (
     MIN_NORMALISED_TOKEN_LENGTH,
     MIN_SPAN_WORDS,
+    normalise_allcaps_runs,
+)
+from langevals_presidio.pii_detection import (
     PresidioEntities,
     PresidioPIIDetectionEntry,
     PresidioPIIDetectionEvaluator,
     PresidioPIIDetectionSettings,
-    normalise_allcaps_runs,
 )
+from presidio_analyzer import RecognizerResult
 from presidio_person_name_support import MIN_THRESHOLD, evaluator
 
 # U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE. Its lowercase mapping is two
@@ -448,6 +449,27 @@ def test_a_short_name_read_as_an_acronym_or_word_is_harvested(name: str):
     assert person_names(PLAN_TEMPLATE.format(name=name)) == [name]
 
 
+# @scenario "A listed name that is also an everyday word does not make a name of everyday words"
+@pytest.mark.parametrize(
+    "text,phrase",
+    [
+        ("Order 4412: RAM MODULE replaced, follow-up booked.", "RAM MODULE"),
+        ("Order 4412: BIN LOCATION replaced, follow-up booked.", "BIN LOCATION"),
+        ("Order 4412: SKU BIN LOCATION A4 MAN HOURS replaced.", "SKU BIN LOCATION A4 MAN HOURS"),
+    ],
+)
+def test_a_listed_everyday_word_beside_an_everyday_word_is_not_harvested(text: str, phrase: str):
+    """RAM, BIN and LONG are listed surnames and everyday words alike."""
+    assert names_and_places(text) == [], f"a name or place was invented in {phrase}"
+
+
+# @scenario "A listed name that is also an everyday word does not make a name of everyday words"
+def test_a_name_of_listed_words_only_is_still_harvested():
+    """SONG and TAN are everyday words too; with only listed words, they count."""
+    assert person_names(PLAN_TEMPLATE.format(name="MIN SONG")) == ["MIN SONG"]
+    assert person_names(PLAN_TEMPLATE.format(name="CEM TAN")) == ["CEM TAN"]
+
+
 # @scenario "An unknown word beside an everyday word is not harvested"
 @pytest.mark.parametrize(
     "text,phrase",
@@ -486,7 +508,7 @@ def test_a_wider_span_replaces_the_narrower_one_it_covers():
     assert person_names(ONE_REWRITTEN_WORD_TEXT) == ["Tobias OKONKWO"]
 
 
-# @scenario "The analysis service redacts a name whose surname is written in capitals"
+# @scenario "The evaluator redacts a name whose surname is written in capitals"
 def test_a_capitalised_surname_is_redacted_whole():
     result = evaluator().evaluate(
         PresidioPIIDetectionEntry(input=ONE_REWRITTEN_WORD_TEXT)

@@ -1,6 +1,6 @@
 """Name words the frequency rule misreads, kept so a capitalised name is not refused.
 
-The frequency rule in pii_detection reads a word as a name when the model's
+The frequency rule in allcaps_names reads a word as a name when the model's
 corpus writes it mostly in Titlecase. Short names from several traditions are
 written there mostly as something else: Ngo and Seo as acronyms (NGO, SEO),
 Hung, Song and Tan as everyday words. Without this list HUNG NGO, WOO SEO and
@@ -8,7 +8,9 @@ CEM TAN stay in clear while Hung Ngo is redacted.
 
 The words are common surnames and given-name syllables, in lowercase ASCII
 with diacritics removed, as they are written in romanised text. English stop
-words are not honoured even if listed (see pii_detection._is_name_word).
+words are not honoured even if listed. Many entries are also English words
+(Long, Song, Tan), so a listed word only counts beside other listed or unseen
+words (see allcaps_names.normalisation_justifies_span).
 """
 
 _CHINESE = """

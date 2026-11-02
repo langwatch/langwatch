@@ -7,8 +7,7 @@ the list. History: specs/evaluators/langevals-presidio-allcaps-person-names.feat
 import json
 
 import pytest
-
-from langevals_presidio.pii_detection import normalise_allcaps_runs
+from langevals_presidio.allcaps_names import normalise_allcaps_runs
 from presidio_person_name_support import (
     LENGTH_BAND,
     MIN_THRESHOLD,
@@ -52,6 +51,10 @@ PRECISION_CORPUS: dict[str, list[str]] = {
         '{"order": "O-9003", "sku": "AURORA DESK LAMP SLIM", "note": "The shade arrived cracked so a fresh one was picked from the reserve bin."}',
         '{"order": "O-9004", "model": "RANGER TRAIL BOOT GTX", "note": "The size exchange was approved and the return label has now been emailed."}',
         '{"order": "O-9005", "label": "ACME_CORP_LTD", "note": "The underscored identifier must survive the analysis exactly as it was written."}',
+        # RAM and BIN are also listed surnames; beside an everyday word they are parts.
+        '{"order": "O-9006", "body": "Order 4412: RAM MODULE replaced, follow-up booked for the next working day at the depot."}',
+        '{"order": "O-9007", "body": "Order 4412: BIN LOCATION replaced, follow-up booked for the next working day at the depot."}',
+        '{"order": "O-9008", "body": "Order 4412: SKU BIN LOCATION A4 MAN HOURS replaced, follow-up booked for the next working day at the depot."}',
     ],
     "notice_and_status_codes": [
         '{"ref": "N-5501", "code": "INVOICE OVERDUE NOTICE", "note": "A reminder was issued because the balance has not been cleared for ten days."}',

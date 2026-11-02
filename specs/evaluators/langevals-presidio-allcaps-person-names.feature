@@ -48,8 +48,10 @@ Feature: A name written in capitals is still redacted
   Shape alone is not enough. WIDGET PRO has a rewritten word of four letters
   and SEPA ACH has two rewritten words side by side, and both were redacted
   as people. So a span the second pass finds must also hold one name word: a
-  word the model's own corpus writes in ordinary case at least one and a half
-  times as often as in lowercase or in capitals. Lee, Whitfield and Okonkwo
+  word whose ordinary-case form sits at least one and a half times nearer the
+  top of the model's frequency-sorted vocabulary than its lowercase and
+  capital forms. Frequency falls roughly as one over that position, so this
+  is close to one and a half times as frequent. Lee, Whitfield and Okonkwo
   are name words. Widget and Key are written mostly in lowercase, SEPA and API
   mostly in capitals, and Pro only slightly more often in ordinary case. The
   lookup reads the model's frequency table and adds nothing to it.
@@ -61,8 +63,12 @@ Feature: A name written in capitals is still redacted
   up to one capitalised Vietnamese name in eleven. So a bundled list of
   common surnames and given-name syllables from the traditions the corpus
   misreads (Chinese, Korean, Vietnamese, Japanese, Turkish, Arabic, West
-  African and South Asian) also counts as name words. English stop words
-  never count from it, so AN and DO stay ordinary words.
+  African and South Asian) also counts. English stop words never count from
+  it, so AN and DO stay ordinary words. Many listed words are English words
+  too (Long, Song, Tan, Bin, Ram, Man), and counting them anywhere redacted
+  RAM MODULE and BIN LOCATION as people. So a listed word only counts in a
+  span whose every word is listed or unknown to the model: CEM TAN and
+  HUNG NGO are kept, RAM MODULE is refused.
 
   A span of words the corpus holds in no form at all is a rare name, and is
   kept (TAVRIK ZOLNEY). A single unknown word is not enough when the span
@@ -74,14 +80,16 @@ Feature: A name written in capitals is still redacted
   tradition, so it is measured on names the list was not built from. Over 480
   capitalised names from twelve traditions (Vietnamese, Korean, mainland and
   overseas Chinese, Japanese, Turkish, Arabic, Nigerian, Indian, Polish,
-  Spanish, Filipino) in three trace sentences, the rule refuses none: every
-  one of the 144 of 1,440 cases still in clear is one neither analysis finds,
-  and main leaves 1,238 in clear. Over 51,072 pairings of common English
-  forenames and surnames, 1.2% hold no name word, because both words are
-  everyday words as well (ROSE WHITE, GRACE BROWN). The second pass refuses
-  those, which leaves them where they were before it existed. One name word
+  Spanish, Filipino) in three trace sentences, the rule refuses one name,
+  KIN FAI HO, whose listed HO sits beside two everyday words. The other 144
+  of the 1,440 cases still in clear are ones neither analysis finds, and main
+  leaves 1,238 in clear. Over 51,072 pairings of common English forenames and
+  surnames, 1.3% are refused, because both words are everyday words as well
+  (ROSE WHITE, GRACE BROWN) or the surname is a listed word that is also an
+  everyday one (GRACE LONG, ROSE YOUNG). The second pass refuses those, which
+  leaves them where they were before it existed. One ordinary-case name word
   is enough, so GRACE NWOSU is still found. A stricter margin of two refuses
-  1.5% and buys nothing: WIDGET PRO MAX stays redacted at any margin because
+  1.6% and buys nothing: WIDGET PRO MAX stays redacted at any margin because
   Max is a name. Over 80 capitalised non-names in two trace sentences, main
   reports 8 of 160 as people or places and the second pass adds 2, both
   VELTRIX MAX. A brand word that is a name word in its own right (NOVA, MAX,
@@ -93,7 +101,7 @@ Feature: A name written in capitals is still redacted
   38 were clean. The first build of the second pass dropped that to 33 of 38,
   because ERP, SOW or CFO turned into Erp, Sow or Cfo and were read as
   surnames, and the shape rule above is what brought it back to 37 of 38. The
-  corpus is now 46 strings with two known false positives, named one by one
+  corpus is now 49 strings with two known false positives, named one by one
   in the test: one predates the second pass, and one is a product line named
   after its founder, which has the shape and the words of a name because it
   holds one. A third fails the build. If it does, the second pass is
@@ -114,6 +122,12 @@ Feature: A name written in capitals is still redacted
   worse, and is tracked separately.
 
   Rule: Capitals do not hide a name
+
+    @unit
+    Scenario: The evaluator redacts a name whose surname is written in capitals
+      Given content holding a forename beside a surname written in capitals
+      When the content is redacted by the evaluator with person detection on
+      Then the redacted content holds neither the forename nor the surname
 
     @unit
     Scenario: An ordinarily capitalised name is still detected
@@ -234,6 +248,13 @@ Feature: A name written in capitals is still redacted
       Given a short name written wholly in capitals whose words the corpus writes mostly as acronyms or everyday words
       When the content is analysed for personal information
       Then the whole name is reported as a person
+
+    @unit
+    Scenario: A listed name that is also an everyday word does not make a name of everyday words
+      Given a listed name word that is also an everyday word, beside another everyday word, in capitals
+      When the content is analysed for personal information
+      Then no person span is reported over it
+      And a short name of listed words only is still reported
 
     @unit
     Scenario: An unknown word beside an everyday word is not harvested

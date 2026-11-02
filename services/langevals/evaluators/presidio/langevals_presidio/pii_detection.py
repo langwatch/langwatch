@@ -1,26 +1,27 @@
 import json
 import logging
 import os
-import unicodedata
 from typing import Any, Literal, Optional
+
+import spacy
+import spacy.cli
 from langevals_core.base_evaluator import (
     BaseEvaluator,
+    EvaluationResult,
+    EvaluationResultSkipped,
     EvaluatorEntry,
     EvaluatorSettings,
     SingleEvaluationResult,
-    EvaluationResult,
-    EvaluationResultSkipped,
 )
-from pydantic import BaseModel, Field
-import spacy
-import spacy.cli
-from spacy.lang.en.stop_words import STOP_WORDS
-from spacy.strings import hash_string
+from langevals_presidio.allcaps_names import (
+    has_name_shaped_rewrite,
+    normalisation_justifies_span,
+    normalise_allcaps_runs,
+)
 from presidio_analyzer import AnalyzerEngine
-from presidio_anonymizer import AnonymizerEngine
 from presidio_analyzer.nlp_engine import SpacyNlpEngine
-
-from langevals_presidio.name_words import NAME_WORDS
+from presidio_anonymizer import AnonymizerEngine
+from pydantic import BaseModel, Field
 
 # Presidio's analyzer emits a WARNING for every requested entity that has
 # no recognizer in the active language. Our entity list intentionally
@@ -39,160 +40,6 @@ LOCATION_ENTITY = "LOCATION"
 # LOCATION is here because the model splits a name across both: in Titlecase
 # it reads Maria Fernanda as a person and Costa Pereira as a place.
 CASE_SENSITIVE_ENTITIES = (PERSON_ENTITY, LOCATION_ENTITY)
-
-# The shape a harvested span needs to be a name and not a titlecased acronym.
-# Measured bounds and their trade-offs: specs/evaluators/langevals-presidio-allcaps-person-names.feature
-MIN_SPAN_WORDS = 2
-MIN_NORMALISED_TOKEN_LENGTH = 4
-
-# A word reads as a name when the model's corpus writes it in Titlecase this
-# many times more often than in lowercase or in capitals. Pro (Titlecase
-# 1.2x) is not one; Lee (19x) is. Measured: same feature file.
-NAME_FORM_DOMINANCE = 1.5
-
-
-def _is_upper_letter(character: str) -> bool:
-    return character.isalpha() and character.isupper()
-
-
-def _is_word_char(character: str) -> bool:
-    return character.isalnum() or character == "_"
-
-
-def normalise_allcaps_runs(text: str) -> str:
-    """Titlecase every whole-word run of two or more capitals, keeping the length.
-
-    U+0130 (lowercase is two characters) stays as it is, and a run touching a
-    letter, digit or underscore (ACME_CORP_LTD) is not a word.
-    """
-    characters = list(text)
-    total = len(characters)
-    index = 0
-    while index < total:
-        starts_word = index == 0 or not _is_word_char(characters[index - 1])
-        if not _is_upper_letter(characters[index]) or not starts_word:
-            index += 1
-            continue
-
-        run_end = index
-        while run_end < total and _is_upper_letter(characters[run_end]):
-            run_end += 1
-        ends_word = run_end == total or not _is_word_char(characters[run_end])
-
-        if run_end - index >= 2 and ends_word:
-            for position in range(index + 1, run_end):
-                lowered = characters[position].lower()
-                if len(lowered) == 1:
-                    characters[position] = lowered
-
-        index = max(run_end, index + 1)
-
-    return "".join(characters)
-
-
-def _word_runs(text: str) -> list[tuple[int, int]]:
-    """Every maximal run of word characters, as (start, end) into `text`."""
-    runs: list[tuple[int, int]] = []
-    start: Optional[int] = None
-    for index, character in enumerate(text):
-        if _is_word_char(character):
-            if start is None:
-                start = index
-        elif start is not None:
-            runs.append((start, index))
-            start = None
-    if start is not None:
-        runs.append((start, len(text)))
-    return runs
-
-
-def _rewritten_runs(*, original: str, normalised: str) -> list[tuple[int, int]]:
-    """The word runs normalisation changed, as (start, end) into both texts."""
-    return [
-        (run_start, run_end)
-        for run_start, run_end in _word_runs(original)
-        if original[run_start:run_end] != normalised[run_start:run_end]
-    ]
-
-
-def _has_name_shaped_rewrite(*, original: str, normalised: str) -> bool:
-    """A rewritten word of 4+ letters, or two rewritten words side by side.
-
-    The second clause is AMY LEE and VAN DER BERG; a lone short one is the CFO.
-    """
-    rewritten = _rewritten_runs(original=original, normalised=normalised)
-    if any(end - start >= MIN_NORMALISED_TOKEN_LENGTH for start, end in rewritten):
-        return True
-    return any(
-        original[left_end:right_start].isspace()
-        for (_, left_end), (right_start, _) in zip(rewritten, rewritten[1:])
-    )
-
-
-def _frequency_rank(vectors: Any, form: str) -> float:
-    """The form's row in the frequency-sorted vector table, or infinity if absent.
-
-    Looked up by hash so an unseen word is not added to the shared vocab.
-    """
-    row = vectors.key2row.get(hash_string(form), -1)
-    return float("inf") if row < 0 else float(row)
-
-
-def _folded(word: str) -> str:
-    """Lowercase ASCII, so NGÔ and NGO both read as ngo."""
-    decomposed = unicodedata.normalize("NFKD", word.lower())
-    return "".join(c for c in decomposed if not unicodedata.combining(c))
-
-
-def _is_known_word(word: str, vectors: Any) -> bool:
-    return any(
-        _frequency_rank(vectors, form) != float("inf")
-        for form in (word, word.lower(), word.upper(), word[:1].upper() + word[1:].lower())
-    )
-
-
-def _is_name_word(word: str, vectors: Any) -> bool:
-    """Whether `word` is a listed name, or one the model's corpus writes mostly in Titlecase.
-
-    Names are; product words (WIDGET), acronyms (SEPA, API) and everyday
-    words (KEY) are not. The list catches names the corpus writes mostly as
-    something else (NGO, Hung); English stop words never count from it.
-    """
-    folded = _folded(word)
-    if folded in NAME_WORDS and folded not in STOP_WORDS:
-        return True
-    title = _frequency_rank(vectors, word[:1].upper() + word[1:].lower())
-    other = min(
-        _frequency_rank(vectors, word.lower()),
-        _frequency_rank(vectors, word.upper()),
-    )
-    return title * NAME_FORM_DOMINANCE < other
-
-
-def _normalisation_justifies_span(
-    *, original: str, normalised: str, start: int, end: int, vectors: Any
-) -> bool:
-    """Whether a span found only after normalisation is shaped and worded like a name.
-
-    Titlecasing restores the cue on WHITFIELD and invents one on CEO and on
-    WIDGET PRO. A span of words the model has never seen (a rare name) is
-    kept; one unseen word beside an everyday word (ZORBEX ULTRA) is not.
-    Measured bounds: specs/evaluators/langevals-presidio-allcaps-person-names.feature
-    """
-    span = original[start:end]
-    if len(span.split()) < MIN_SPAN_WORDS:
-        return False
-    if not _has_name_shaped_rewrite(original=span, normalised=normalised[start:end]):
-        return False
-    words = [
-        span[word_start:word_end]
-        for word_start, word_end in _word_runs(span)
-        if span[word_start:word_end].isalpha()
-    ]
-    if any(_is_name_word(word, vectors) for word in words):
-        return True
-    return bool(words) and not any(_is_known_word(word, vectors) for word in words)
-
 
 def _covers(outer: Any, inner: Any) -> bool:
     return outer.start <= inner.start and outer.end >= inner.end
@@ -316,7 +163,7 @@ class PresidioPIIDetectionEvaluator(
         rewrite, since no span could pass without one.
         """
         normalised = normalise_allcaps_runs(content)
-        if not _has_name_shaped_rewrite(original=content, normalised=normalised):
+        if not has_name_shaped_rewrite(original=content, normalised=normalised):
             return []
 
         placed = {
@@ -331,7 +178,7 @@ class PresidioPIIDetectionEvaluator(
             if result.score >= self.settings.min_threshold
             and result.entity_type in entities
             and (result.entity_type, result.start, result.end) not in placed
-            and _normalisation_justifies_span(
+            and normalisation_justifies_span(
                 original=content,
                 normalised=normalised,
                 start=result.start,

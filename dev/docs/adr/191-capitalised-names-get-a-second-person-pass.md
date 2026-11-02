@@ -32,14 +32,16 @@ person spans that copy reveals into the first pass's findings.
    or more words, and either a rewritten word of four or more letters or two
    rewritten words side by side. A short capitalised word on its own (CFO,
    ROI) is the acronym shape and is refused.
-3. The span must also hold one name word: a word on a bundled list of common
-   surnames and given-name syllables from the naming traditions the English
-   corpus misreads (NGO, SEO, HUNG, TAN), or a word the model's frequency
-   table holds in ordinary case at least 1.5 times as often as in lowercase
-   or in capitals. A span of words the table does not hold at all is a rare
-   name and is kept; one unknown word beside a known ordinary word
-   (ZORBEX ULTRA) is not. This refuses WIDGET PRO, SEPA ACH, API KEY and
-   invented brands beside an ordinary word, which pass the shape rule.
+3. The span must also be worded like a name. Either one word's
+   ordinary-case form sits at least 1.5 times nearer the top of the model's
+   frequency-sorted vocabulary than its lowercase and capital forms (roughly
+   1.5 times as frequent, since frequency falls as one over rank), or every
+   word is on a bundled list of common surnames and given-name syllables from
+   the traditions the English corpus misreads (NGO, SEO, HUNG, TAN) or is
+   unknown to the model. Many listed words are also English words, so beside
+   an everyday word they do not count (RAM MODULE), and neither does an
+   unknown word (ZORBEX ULTRA). This refuses WIDGET PRO, SEPA ACH, API KEY
+   and invented brands, which pass the shape rule.
 4. The second pass is skipped when neither person nor location detection is
    on, or when the text holds no such shape, so prose with OK, ID or USD costs
    one pass. With location on and person off it asks for places only.
@@ -52,7 +54,7 @@ person spans that copy reveals into the first pass's findings.
 ## Rationale / Trade-offs
 
 Titlecasing restores the name cue on WHITFIELD and invents the same cue on
-ERP. The shape and name-word rules are what price that: a 46-string corpus
+ERP. The shape and name-word rules are what price that: a 49-string corpus
 of capitalised non-names (merchants, carriers, departments, SKUs, codes,
 headings, acronym prose, particle-shaped places) keeps two known false
 positives. One predates the second pass, and the other is a product line
@@ -67,11 +69,12 @@ tradition: it refused up to one capitalised Vietnamese name in eleven, and
 Korean and Turkish names at 5 to 7%, because the corpus is English. The
 bundled list is the answer to that, measured on names it was not built from:
 over 480 capitalised names from twelve traditions in three trace sentences,
-the rule refuses none, and the 144 of 1,440 cases still in clear are ones
-neither analysis finds (main leaves 1,238). Of 51,072 pairings of common
-English forenames and surnames, 1.2% hold only everyday words (ROSE WHITE,
-GRACE BROWN) and are refused, which leaves them as they were before the
-second pass. On 80 capitalised non-names in two trace sentences the branch
+the rule refuses one (KIN FAI HO, a listed word beside two everyday ones),
+and the other 144 of 1,440 cases still in clear are ones neither analysis
+finds (main leaves 1,238). Of 51,072 pairings of common English forenames
+and surnames, 1.3% are refused because they hold only everyday words
+(ROSE WHITE, GRACE BROWN, GRACE LONG), which leaves them as they were before
+the second pass. On 80 capitalised non-names in two trace sentences the branch
 reports 10 of 160 as people or places against 8 on main; the extra two are
 VELTRIX MAX, a brand word that is also a name. The list is a maintained
 artefact: a tradition it does not cover pays the frequency price again, and
