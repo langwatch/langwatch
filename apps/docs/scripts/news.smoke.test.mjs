@@ -120,7 +120,7 @@ await it("leaves the release update in view beside an announcement the reader ca
 });
 
 /** @scenario "Read and dismiss a release update" */
-await it("keeps releases readable without scripts and can dismiss when storage is denied", async () => {
+await it("keeps the changelog readable without scripts and can dismiss when storage is denied", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -137,7 +137,11 @@ await it("keeps releases readable without scripts and can dismiss when storage i
         const version = await strip.locator(".docs-release-version").textContent();
         const heading = staticPage.getByRole("heading", { name: `Release ${version}` });
         await heading.waitFor();
-        assert.equal(await heading.count(), 1, "the latest release reads without scripts");
+        assert.equal(
+          await heading.count(),
+          1,
+          "the changelog shows the latest release without scripts",
+        );
         await deniedContext.addInitScript(() => {
           Storage.prototype.getItem = () => {
             throw new Error("Storage denied");
