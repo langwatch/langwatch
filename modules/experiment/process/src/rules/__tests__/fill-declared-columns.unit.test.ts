@@ -47,6 +47,21 @@ describe("fillDeclaredColumns", () => {
     });
   });
 
+  describe("given a JSON column no row has a value in", () => {
+    /** @scenario "A JSON column empty in a row is left out of that row" */
+    it("leaves that column out instead of sending empty text", () => {
+      const rows = fillDeclaredColumns({
+        rows: [{ input: "hi" }],
+        columns: [
+          { name: "input", type: "string" },
+          { name: "messages", type: "chat_messages" },
+        ],
+      });
+
+      expect(rows[0]).not.toHaveProperty("messages");
+    });
+  });
+
   describe("given a run parameter naming a column that is empty in every row", () => {
     /** @scenario "A parameter overrides a column that is empty in every row" */
     it("sets that column to the parameter on every row", () => {
