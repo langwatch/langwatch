@@ -11,8 +11,7 @@ import { privateDataplaneRecorderEventing } from "./eventing/organization-privat
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { seatPeakEventing } from "./eventing/seat-peak.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
-import { OrganizationPresenceSettingBackfillService } from "./services/organization-presence-setting-backfill.service.ts";
-import { SeatPeakOpeningBackfillService } from "./services/seat-peak-opening-backfill.service.ts";
+import { OrganizationPageBackfillService } from "./services/organization-page-backfill.service.ts";
 import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
@@ -67,15 +66,21 @@ export const organizationProcessModule: PublishedProcessModule<
       description: "Records every existing organization's presence setting, for presence to fold.",
       run: async ({ checkpoint, dryRun, signal }) => {
         const resumed = checkpoint.resumeFrom?.afterOrganizationId;
-        const report = await OrganizationPresenceSettingBackfillService.create({
-          peers: { recordPage: (input) => app.recordStoredPresenceSettingPage(input) },
+        const { changed, ...report } = await OrganizationPageBackfillService.create({
+          peers: {
+            page: async (input) => {
+              const page = await app.recordStoredPresenceSettingPage(input);
+              return { ...page, changed: input.dryRun ? 0 : page.organizations };
+            },
+          },
+          pageSize: 2000,
         }).backfill({
           after: typeof resumed === "string" ? resumed : undefined,
           dryRun,
           signal,
           onPage: (page) => checkpoint.save({ report: page }),
         });
-        return { ...report, dryRun };
+        return { ...report, recorded: changed, dryRun };
       },
     }),
     // Seat changes are recorded from ADR-002 on; this opens every organization's count once.
@@ -89,15 +94,21 @@ export const organizationProcessModule: PublishedProcessModule<
         "Records every organization's seat holders as they stand, to open its seat peak.",
       run: async ({ checkpoint, dryRun, signal }) => {
         const resumed = checkpoint.resumeFrom?.afterOrganizationId;
-        const report = await SeatPeakOpeningBackfillService.create({
-          peers: { openPage: (input) => app.openSeatPeakPage(input) },
+        const { changed, ...report } = await OrganizationPageBackfillService.create({
+          peers: {
+            page: async (input) => {
+              const { opened, ...page } = await app.openSeatPeakPage(input);
+              return { ...page, changed: opened };
+            },
+          },
+          pageSize: 200,
         }).backfill({
           after: typeof resumed === "string" ? resumed : undefined,
           dryRun,
           signal,
           onPage: (page) => checkpoint.save({ report: page }),
         });
-        return { ...report, dryRun };
+        return { ...report, opened: changed, dryRun };
       },
     }),
   ]);

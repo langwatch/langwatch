@@ -138,7 +138,7 @@ export class SeatPeakService {
       this.dependencies.peaks.getState({ organizationId, holders: [], dueBefore: now }),
       this.dependencies.plans.getActivePlan({ organizationId }),
     ]);
-    const caps = { fullSeats: plan.maxMembers, liteSeats: plan.maxMembersLite };
+    const caps = seatCapsOf({ fullSeats: plan.maxMembers, liteSeats: plan.maxMembersLite });
     if (state.openedAt === null) return { counted: false, caps };
     const asOf = seatPeakAsOf({ state, now });
     return {
@@ -175,4 +175,10 @@ export class SeatPeakService {
     if (!sender) throw new Error("organization_seat_peak is not registered in this process");
     return sender;
   }
+}
+
+/** An uncapped plan reports its cap as `Number.MAX_SAFE_INTEGER`, never a number to show. */
+function seatCapsOf(caps: { fullSeats: number; liteSeats: number }): OrganizationSeatPeak["caps"] {
+  const shown = (cap: number) => (cap >= Number.MAX_SAFE_INTEGER ? null : cap);
+  return { fullSeats: shown(caps.fullSeats), liteSeats: shown(caps.liteSeats) };
 }

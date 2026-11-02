@@ -61,7 +61,8 @@ function SeatPeakBody({ organizationId }: { organizationId: string }) {
       {earlier.length > 0 && <EarlierMonths months={earlier} />}
       {peak.data.mismatches > 0 && (
         <Text fontSize="sm" color="fg.muted" data-testid="ops-seat-peak-mismatches">
-          {peak.data.mismatches} seat changes disagreed with the count
+          {peak.data.mismatches} seat {peak.data.mismatches === 1 ? "change" : "changes"} disagreed
+          with the count
         </Text>
       )}
     </VStack>

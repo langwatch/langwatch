@@ -16,7 +16,7 @@ import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.org
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import type { TeamRepository } from "../../repositories/team.repository.ts";
 import { OrganizationLifecycleNoticeService } from "../organization-lifecycle-notice.service.ts";
-import { OrganizationPresenceSettingBackfillService } from "../organization-presence-setting-backfill.service.ts";
+import { OrganizationPageBackfillService } from "../organization-page-backfill.service.ts";
 import { OrganizationService, type OrganizationSettingsNotices } from "../organization.service.ts";
 import type { TeamIdentity } from "../team-identity.service.ts";
 
@@ -147,8 +147,14 @@ describe("given two organizations whose presence settings were stored before the
         },
       });
       const service = serviceOver(notices);
-      const step = OrganizationPresenceSettingBackfillService.create({
-        peers: { recordPage: (input) => service.recordStoredPresenceSettingPage(input) },
+      const step = OrganizationPageBackfillService.create({
+        peers: {
+          page: async (input) => ({
+            ...(await service.recordStoredPresenceSettingPage(input)),
+            changed: 0,
+          }),
+        },
+        pageSize: 2000,
       });
       const backfill = () =>
         step.backfill({

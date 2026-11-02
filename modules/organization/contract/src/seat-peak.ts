@@ -22,10 +22,10 @@ export const organizationSeatPeakMonthSchema: OrganizationSeatPeakMonthSchema =
   organizationSeatPeakMonthSchemaDefinition;
 export type OrganizationSeatPeakMonth = z.infer<typeof organizationSeatPeakMonthSchema>;
 
-/** The seats the active plan sells; developer seats are never capped (ADR-171). */
+/** The seats the plan sells, null when unlimited; developer seats are never capped (ADR-171). */
 const seatCapsSchema = z.object({
-  fullSeats: z.number().int(),
-  liteSeats: z.number().int(),
+  fullSeats: z.number().int().nullable(),
+  liteSeats: z.number().int().nullable(),
 });
 
 const organizationSeatPeakSchemaDefinition = z.discriminatedUnion("counted", [

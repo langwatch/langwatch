@@ -47,6 +47,10 @@ function holderData(row: SeatPeakHolderRow) {
   };
 }
 
+/** Waiting on another fold of the same organization counts against this; Prisma's 5s is short. */
+const SEAT_PEAK_FOLD_TIMEOUT_MS = 60_000;
+const SEAT_PEAK_FOLD_MAX_WAIT_MS = 10_000;
+
 /** The seat peak's counts, holder and month rows in Postgres (ADR-002 §2). */
 export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRepository {
   static create(prisma: PrismaClient): PrismaOrganizationSeatPeakRepository {
@@ -62,22 +66,25 @@ export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
   }
 
   async update(slice: SeatPeakSlice, fold: (state: SeatPeakState) => SeatPeakState): Promise<void> {
-    await this.prisma.$transaction(async (transaction) => {
-      // One fold per organization until commit: a second would load the slice before this writes.
-      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`organization-seat-peak:${slice.organizationId}`}, 0)) ${skipTenantCheck(
-        {
-          // A lock, not a read; its key is itself one organization's.
-          SKIP_TENANT_CHECK: true,
-        },
-      )}`;
-      const before = await this.#load({ database: transaction, slice });
-      await this.#write({
-        transaction,
-        organizationId: slice.organizationId,
-        before,
-        after: fold(before),
-      });
-    });
+    await this.prisma.$transaction(
+      async (transaction) => {
+        // One fold per organization until commit: a second would load the slice before this writes.
+        await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`organization-seat-peak:${slice.organizationId}`}, 0)) ${skipTenantCheck(
+          {
+            // A lock, not a read; its key is itself one organization's.
+            SKIP_TENANT_CHECK: true,
+          },
+        )}`;
+        const before = await this.#load({ database: transaction, slice });
+        await this.#write({
+          transaction,
+          organizationId: slice.organizationId,
+          before,
+          after: fold(before),
+        });
+      },
+      { timeout: SEAT_PEAK_FOLD_TIMEOUT_MS, maxWait: SEAT_PEAK_FOLD_MAX_WAIT_MS },
+    );
   }
 
   async #load({

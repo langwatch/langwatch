@@ -124,17 +124,13 @@ describe("Feature: our team sees the seat peak at renewal", () => {
 
   describe("given the organization is on an unlimited plan", () => {
     /** @scenario "The ops console reads an unlimited licence's seats as unlimited" */
-    it("reads the caps as unlimited, never the stand-in number", () => {
-      peakState.answer = {
-        ...counted,
-        caps: { fullSeats: Number.MAX_SAFE_INTEGER, liteSeats: 1_000_000 },
-      };
+    it("reads an unlimited cap as unlimited and a large finite one as its number", () => {
+      peakState.answer = { ...counted, caps: { fullSeats: null, liteSeats: 1_000_000 } };
       openOrganization();
 
       const summary = screen.getByTestId("ops-seat-peak");
       expect(summary).toHaveTextContent("Full seats: 48 of unlimited in use");
-      expect(summary).toHaveTextContent("Lite Member seats: 3 of unlimited in use");
-      expect(summary).not.toHaveTextContent(String(Number.MAX_SAFE_INTEGER));
+      expect(summary).toHaveTextContent("Lite Member seats: 3 of 1,000,000 in use");
     });
   });
 

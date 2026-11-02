@@ -56,10 +56,9 @@ export function formatDate(value: TimeInput | null | undefined): string {
   return toDate(moment).toLocaleDateString();
 }
 
-/** A plan's seat cap; an unlimited plan's cap (a million or more) reads as "unlimited". */
-export function formatSeatCap(cap: number): string {
-  if (!Number.isFinite(cap) || cap >= 1_000_000) return "unlimited";
-  return cap.toLocaleString();
+/** A plan's seat cap; null is an unlimited plan. */
+export function formatSeatCap(cap: number | null): string {
+  return cap === null ? "unlimited" : cap.toLocaleString();
 }
 
 /** Calendar date in UTC as `YYYY-MM-DD`, for instants that are UTC by definition (seat peaks). */
