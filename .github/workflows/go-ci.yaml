@@ -1,6 +1,5 @@
-# Always-run workflow with internal path gating + aggregator. See #3223.
-# Branch protection requires `go-ci-complete`. Upstream jobs skip when paths
-# don't match, and `alls-green` reports the final consolidated status.
+# Called by pr.yml and the nightly suite; no check here is required, pr.yml's
+# ci-complete is. `changes` gates the jobs and `go-ci-complete` sums them up.
 name: go-ci
 
 on:

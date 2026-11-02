@@ -1,11 +1,6 @@
-# Always-run workflow with internal path gating + aggregator. See #3223.
-#
-# Why: branch protection on `main` requires specific checks to pass on
-# every PR. A top-level `paths:` filter would make this workflow silently
-# absent on unrelated PRs, leaving any required check stuck pending. So
-# the workflow always runs; `changes` decides whether jobs do real work
-# or skip; `sdk-python-complete` aggregates and reports one final status
-# that branch protection requires.
+# Called by pr.yml and the nightly suite, and run for forks through
+# pull_request_target once labelled approved-ci. No check here is required;
+# pr.yml's ci-complete is. `changes` gates the jobs, `sdk-python-complete` sums them up.
 name: sdk-python-ci
 
 on:

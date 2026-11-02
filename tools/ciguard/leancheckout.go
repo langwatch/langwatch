@@ -21,7 +21,7 @@ var LeanCheckoutWorkflows = []string{
 	// readme-links builds the checker from source, so it takes a working tree
 	// — and the media is the one part of it no link check ever opens.
 	".github/workflows/readme-links.yml",
-	// pr.yml's checks job runs the same link check after a narrower checkout.
+	// pr.yml's checks job runs the same link check on every pull request.
 	".github/workflows/pr.yml",
 }
 

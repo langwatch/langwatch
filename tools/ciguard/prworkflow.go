@@ -77,11 +77,12 @@ type prFile struct {
 }
 
 type prJob struct {
-	If      string            `yaml:"if"`
-	Needs   needs             `yaml:"needs"`
-	Uses    string            `yaml:"uses"`
-	Outputs map[string]string `yaml:"outputs"`
-	Steps   []prStep          `yaml:"steps"`
+	If          string            `yaml:"if"`
+	Environment any               `yaml:"environment"`
+	Needs       needs             `yaml:"needs"`
+	Uses        string            `yaml:"uses"`
+	Outputs     map[string]string `yaml:"outputs"`
+	Steps       []prStep          `yaml:"steps"`
 }
 
 // needs is a job's `needs:`, written as one name or a list.
@@ -273,6 +274,9 @@ func settleProblems(pr *prFile) []string {
 	var problems []string
 	if !strings.Contains(pr.Jobs[settleJob].If, "needs.changes.outputs.wait == 'true'") {
 		problems = append(problems, PRWorkflowFile+": settle does not wait on the changes job's wait output")
+	}
+	if pr.Jobs[settleJob].Environment != settleJob {
+		problems = append(problems, PRWorkflowFile+": settle does not declare environment: settle, so nothing waits")
 	}
 	readsLabel := false
 	for _, step := range pr.Jobs["changes"].Steps {

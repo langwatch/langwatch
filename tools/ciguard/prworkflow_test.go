@@ -55,8 +55,8 @@ func prTree(t *testing.T, edit func(name, content string) string) string {
 	write(NightlyWorkflowFile, "name: nightly\njobs:\n  main-checks:\n    uses: ./.github/workflows/pr.yml\n")
 	write(PRWorkflowFile, "name: pr\non:\n  pull_request:\njobs:\n  changes:\n    outputs:\n"+outputs.String()+
 		"    steps:\n      - run: gh api labels | grep -qx 'ci:now'\n"+
-		"  settle:\n    needs: changes\n    if: needs.changes.outputs.wait == 'true'\n"+
-		"  checks:\n    needs: changes\n"+calls.String()+
+		"  settle:\n    needs: changes\n    if: needs.changes.outputs.wait == 'true'\n    environment: settle\n"+
+		"  checks:\n    runs-on: ubuntu-latest\n"+calls.String()+
 		"  ci-complete:\n    steps:\n      - env:\n          RESULTS: >-\n"+results.String()+
 		"          CHANGES: ${{ needs.changes.result }}\n"+
 		"        run: case \"$result\" in success | skipped) state=success ;; esac; [ \"$CHANGES\" = success ] || state=failure\n"+
@@ -186,6 +186,19 @@ func TestPRWorkflowReportsACheckThatDoesNotWait(t *testing.T) {
 	require.Contains(t, problems, PRWorkflowFile+": job e2e does not wait for a quiet branch (settle)")
 }
 
+// @scenario "Heavy checks wait until the branch has been quiet"
+func TestPRWorkflowReportsASettleJobThatHoldsNothing(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "    environment: settle\n", "", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": settle does not declare environment: settle, so nothing waits")
+}
+
 // @scenario "The ci:now label skips the wait"
 func TestPRWorkflowReportsAWaitTheLabelCannotSkip(t *testing.T) {
 	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
@@ -203,7 +216,7 @@ func TestPRWorkflowReportsAWaitTheLabelCannotSkip(t *testing.T) {
 func TestPRWorkflowReportsCheapChecksThatWait(t *testing.T) {
 	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
 		if name == PRWorkflowFile {
-			return strings.Replace(content, "  checks:\n    needs: changes\n", "  checks:\n    needs: [changes, settle]\n", 1)
+			return strings.Replace(content, "  checks:\n", "  checks:\n    needs: [changes, settle]\n", 1)
 		}
 
 		return content

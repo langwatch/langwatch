@@ -79,8 +79,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+        # A failed read fails the step rather than reading as "no label".
         run: |
-          if gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '.[].name' | grep -qxE 'ci:now|firefighting'; then
+          labels=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '.[].name')
+          if grep -qxE 'ci:now|firefighting' <<<"$labels"; then
             echo "wait=false" >> "$GITHUB_OUTPUT"
           else
             echo "wait=true" >> "$GITHUB_OUTPUT"
@@ -111,10 +113,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
+          # The link checker builds from source, so it takes the tree, never the
+          # 165 MB of media (specs/ci/lean-checkout.feature).
           sparse-checkout: |
-            /.github/
-            /.gitattributes
-            /README.md
+            /*
+            !/docs/media/
+            !/docs/images/
           sparse-checkout-cone-mode: false
       - name: Fetch the base branch
         env:
@@ -124,28 +128,12 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: ./.github/scripts/check-added-images.sh "origin/${BASE_REF}"
-      - name: Did README.md change
-        id: readme
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          if git diff --quiet "origin/${BASE_REF}...HEAD" -- README.md; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-      # The link checker builds from source, so it takes the tree, never the
-      # 165 MB of media (specs/ci/lean-checkout.feature).
-      - name: Check out the tree for the link checker
-        if: steps.readme.outputs.changed == 'true'
-        run: git sparse-checkout set --no-cone '/*' '!/docs/media/' '!/docs/images/'
+      # README links run on every pull request (specs/ci/readme-link-check.feature).
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: steps.readme.outputs.changed == 'true'
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - name: README links
-        if: steps.readme.outputs.changed == 'true'
         run: go run ./cmd/linkcheck README.md
       - name: Test the token usage comment builder
         if: github.event.pull_request.head.repo.full_name == github.repository
