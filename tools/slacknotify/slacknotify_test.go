@@ -348,17 +348,17 @@ func TestOneJobGetsAMinuteAndRedLegsGetFive(t *testing.T) {
 // @scenario "A red main posts once per red package-suites leg"
 func TestNotifyModePostsOneJobOrEachRedLeg(t *testing.T) {
 	one := &fake{previous: "success"}
-	results, err := one.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{Job: job}, 0)
+	results, err := one.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{Job: job})
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, []string{job}, one.posted())
 
 	red := &fake{legs: map[string]string{job: "failure", "package-suites (browser)": "failure"}}
-	results, err = red.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{Prefix: legs.Prefix, Fallback: job}, 2)
+	results, err = red.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{Prefix: legs.Prefix, Fallback: job, Attempt: 2})
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.ElementsMatch(t, []string{job, "package-suites (browser)"}, red.posted())
 
-	_, err = red.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{}, 2)
+	_, err = red.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{})
 	assert.Error(t, err)
 }

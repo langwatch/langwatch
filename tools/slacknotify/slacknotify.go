@@ -73,6 +73,7 @@ type Mode struct {
 	Job      string
 	Prefix   string
 	Fallback string
+	Attempt  int64 // the run attempt whose jobs are read, with Prefix
 }
 
 // Check needs exactly one of Job and Prefix, and Fallback exactly when Prefix is set.
@@ -94,14 +95,14 @@ func (m Mode) Deadline() time.Duration {
 }
 
 // NotifyMode checks m, then posts for run.Job or for each red leg of this run attempt.
-func (n Notifier) NotifyMode(ctx context.Context, run Run, m Mode, attempt int64) ([]Result, error) {
+func (n Notifier) NotifyMode(ctx context.Context, run Run, m Mode) ([]Result, error) {
 	if err := m.Check(); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, m.Deadline())
 	defer cancel()
 	if m.Prefix != "" {
-		return n.NotifyRedLegs(ctx, run, Legs{Attempt: attempt, Prefix: m.Prefix, Fallback: m.Fallback})
+		return n.NotifyRedLegs(ctx, run, Legs{Attempt: m.Attempt, Prefix: m.Prefix, Fallback: m.Fallback})
 	}
 	run.Job = m.Job
 	result, err := n.Notify(ctx, run)
@@ -133,20 +134,7 @@ func (n Notifier) NotifyRedLegs(ctx context.Context, run Run, legs Legs) ([]Resu
 	for _, name := range names {
 		leg := run
 		leg.Job = name
-		// Each leg gets its own minute, so a slow first leg cannot starve the next.
-		legCtx, cancel := context.WithTimeout(ctx, time.Minute)
-		var result Result
-		var err error
-		if lookup != nil && n.Webhook != "" {
-			// The red leg is unknown, so the fallback skips the repeat check.
-			result, err = n.postNow(legCtx, leg, fmt.Sprintf("jobs lookup failed: %v", lookup))
-		} else {
-			result, err = n.Notify(legCtx, leg)
-		}
-		cancel()
-		if err != nil && lookup != nil {
-			err = fmt.Errorf("%w (jobs lookup failed: %v)", err, lookup)
-		}
+		result, err := n.notifyLeg(ctx, leg, lookup)
 		if err != nil {
 			failed = append(failed, fmt.Errorf("%s: %w", name, err))
 			continue
@@ -155,6 +143,22 @@ func (n Notifier) NotifyRedLegs(ctx context.Context, run Run, legs Legs) ([]Resu
 	}
 
 	return results, errors.Join(failed...)
+}
+
+// notifyLeg posts one leg on a minute of its own, so a slow leg cannot starve the next.
+// After a failed lookup the red leg is unknown, so the fallback skips the repeat check.
+func (n Notifier) notifyLeg(ctx context.Context, leg Run, lookup error) (Result, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	if lookup == nil || n.Webhook == "" {
+		return n.Notify(ctx, leg)
+	}
+	result, err := n.postNow(ctx, leg, fmt.Sprintf("jobs lookup failed: %v", lookup))
+	if err != nil {
+		return result, fmt.Errorf("%w (jobs lookup failed: %w)", err, lookup)
+	}
+
+	return result, nil
 }
 
 // redLegs are the jobs of this run attempt named with legs.Prefix that failed or were cancelled.

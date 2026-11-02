@@ -39,7 +39,7 @@ func main() {
 		os.Exit(2)
 	}
 	// A bad attempt fails the jobs lookup, and the fallback leg still posts.
-	attempt, _ := strconv.ParseInt(os.Getenv("GITHUB_RUN_ATTEMPT"), 10, 64)
+	mode.Attempt, _ = strconv.ParseInt(os.Getenv("GITHUB_RUN_ATTEMPT"), 10, 64)
 	n := slacknotify.Notifier{
 		API:     "https://api.github.com",
 		Token:   os.Getenv("GH_TOKEN"),
@@ -53,7 +53,7 @@ func main() {
 		SHA: os.Getenv("GITHUB_SHA"), Subject: subject, Author: slacknotify.Checkout{Dir: "."}.Or(ctx, os.Getenv("COMMIT_AUTHOR"), "%an"),
 	}
 	cancel()
-	results, err := n.NotifyMode(context.Background(), run, mode, attempt)
+	results, err := n.NotifyMode(context.Background(), run, mode)
 	for _, result := range results {
 		fmt.Printf("slacknotify: %s posted=%t (%s)\n", result.Job, result.Posted, result.Reason)
 	}
