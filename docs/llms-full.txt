@@ -35825,11 +35825,11 @@ Split the suite into two run plans. The smoke plan runs a handful of fast, high-
 
 ```bash
 # On every pull request: the scenarios labelled smoke
-langwatch run-plan run --label smoke --target connected:support-agent \
+langwatch run-plan run --label smoke --target connected:support-agent@staging \
   --name "Support smoke" --wait
 
 # On a schedule: every scenario of the project, three times each
-langwatch run-plan run --all --target connected:support-agent \
+langwatch run-plan run --all --target connected:support-agent@staging \
   --name "Support nightly" --repeat 3 --wait
 ```
 
@@ -36056,7 +36056,7 @@ The span is a tool span inside the agent's trace, so the judge reads it with the
 | `refund_charge` | The second charge, 49.95, approved |
 | `state_of_world` (after) | `{"refund_count": 1, "refund_total": 49.95, "original_charge_status": "captured"}` |
 
-The trace tree can list the second `state_of_world` above `invoke_agent`. The timing bar shows the true order.
+The trace tree can list the second `state_of_world` above the agent's own span. The timing bar shows the true order.
 
 The judge cited the span in its reasoning (shortened):
 
@@ -36078,7 +36078,7 @@ def refund_total(thread_id: str) -> float:
 
 Call it after the turn, next to `state_of_world`. Then attach an Exact Match evaluator to the [test suite](/agent-testing/evaluators):
 
-1. Run the scenario once first. The tool calls picker lists every span name the project has seen, not only tool spans. Only a span reported with `type="tool"` answers a tool call mapping, so a name from any other span never resolves. A span name shows only after a run has produced it, so `refund_total` is not there before that.
+1. Run the scenario once first. The tool calls picker lists the span names the project recorded over the last 30 days, not only tool spans. Only a span reported with `type="tool"` answers a tool call mapping, so a name from any other span never resolves. A span name shows only after a run has produced it, so `refund_total` is not there before that.
 2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
 3. Set `expected_output` to the literal `49.95`. Type `49.95`, then click **Use "49.95" as value**.
 

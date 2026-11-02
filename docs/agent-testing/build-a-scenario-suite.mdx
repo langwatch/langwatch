@@ -35,11 +35,11 @@ Split the suite into two run plans. The smoke plan runs a handful of fast, high-
 
 ```bash
 # On every pull request: the scenarios labelled smoke
-langwatch run-plan run --label smoke --target connected:support-agent \
+langwatch run-plan run --label smoke --target connected:support-agent@staging \
   --name "Support smoke" --wait
 
 # On a schedule: every scenario of the project, three times each
-langwatch run-plan run --all --target connected:support-agent \
+langwatch run-plan run --all --target connected:support-agent@staging \
   --name "Support nightly" --repeat 3 --wait
 ```
 
