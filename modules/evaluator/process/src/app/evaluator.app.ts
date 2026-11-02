@@ -278,11 +278,6 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     return evaluator;
   }
 
-  /** One evaluator with its computed fields. */
-  getByIdWithFields(input: { id: string; projectId: string }): Promise<EvaluatorWithFields> {
-    return this.#dependencies.evaluators.getByIdWithFields(input);
-  }
-
   /** One evaluator, or undefined. */
   async findById(input: { id: string; projectId: string }): Promise<Evaluator | undefined> {
     const [evaluator] = await this.#dependencies.evaluators.findById(input);

@@ -76,7 +76,6 @@ function buildApi(overrides: Partial<EvaluatorApi> = {}, denied?: string) {
   const mocks = {
     getAllWithFields: vi.fn(async () => [enriched]),
     findByIdOrSlugWithFields: vi.fn(async () => enriched),
-    getByIdWithFields: vi.fn(async () => enriched),
     findById: vi.fn(async () => evaluator),
     createWithResolvedDefaults: vi.fn(async () => evaluator),
     update: vi.fn(async () => evaluator),

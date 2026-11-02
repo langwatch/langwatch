@@ -428,14 +428,14 @@ describe("EvaluatorService", () => {
         }),
       });
 
-      const result = await evaluators.getByIdWithFields({
+      const [result] = await evaluators.findByIdWithFields({
         id: "e1",
         projectId: "p1",
       });
 
-      expect(result.fields).toEqual(fields);
-      expect(result.outputFields).toEqual(outputFields);
-      expect(result.outputFields).not.toContainEqual(
+      expect(result?.fields).toEqual(fields);
+      expect(result?.outputFields).toEqual(outputFields);
+      expect(result?.outputFields).not.toContainEqual(
         expect.objectContaining({ identifier: "details" }),
       );
     },
@@ -450,13 +450,13 @@ describe("EvaluatorService", () => {
       }),
     });
 
-    const result = await evaluators.getByIdWithFields({
+    const [result] = await evaluators.findByIdWithFields({
       id: "e1",
       projectId: "p1",
     });
 
-    expect(result.fields).toEqual([]);
-    expect(result.outputFields).toEqual(standardEvaluatorOutputFields);
+    expect(result?.fields).toEqual([]);
+    expect(result?.outputFields).toEqual(standardEvaluatorOutputFields);
   });
 
   it("uses configured code inputs and outputs", async () => {
@@ -475,13 +475,13 @@ describe("EvaluatorService", () => {
       }),
     });
 
-    const result = await evaluators.getByIdWithFields({
+    const [result] = await evaluators.findByIdWithFields({
       id: "e1",
       projectId: "p1",
     });
 
-    expect(result.fields).toEqual([{ identifier: "input", type: "str" }]);
-    expect(result.outputFields).toEqual([{ identifier: "passed", type: "bool" }]);
+    expect(result?.fields).toEqual([{ identifier: "input", type: "str" }]);
+    expect(result?.outputFields).toEqual([{ identifier: "passed", type: "bool" }]);
   });
 
   it("gets workflow fields through the canonical workflow service", async () => {
@@ -499,7 +499,7 @@ describe("EvaluatorService", () => {
       workflows: workflows({ getFields }),
     });
 
-    const result = await evaluators.getByIdWithFields({
+    const [result] = await evaluators.findByIdWithFields({
       id: "e1",
       projectId: "p1",
     });
@@ -508,10 +508,10 @@ describe("EvaluatorService", () => {
       workflowId: "w1",
       projectId: "p1",
     });
-    expect(result.fields).toEqual([{ identifier: "input", type: "str" }]);
-    expect(result.outputFields).toEqual([{ identifier: "result", type: "float" }]);
-    expect(result.workflowName).toBe("Workflow");
-    expect(result.workflowIcon).toBe("sparkles");
+    expect(result?.fields).toEqual([{ identifier: "input", type: "str" }]);
+    expect(result?.outputFields).toEqual([{ identifier: "result", type: "float" }]);
+    expect(result?.workflowName).toBe("Workflow");
+    expect(result?.workflowIcon).toBe("sparkles");
   });
 
   it("falls back to standard outputs when a workflow declares none", async () => {
@@ -521,13 +521,13 @@ describe("EvaluatorService", () => {
       }),
     });
 
-    const result = await evaluators.getByIdWithFields({
+    const [result] = await evaluators.findByIdWithFields({
       id: "e1",
       projectId: "p1",
     });
 
-    expect(result.fields).toEqual([]);
-    expect(result.outputFields).toEqual(standardEvaluatorOutputFields);
+    expect(result?.fields).toEqual([]);
+    expect(result?.outputFields).toEqual(standardEvaluatorOutputFields);
   });
 
   it("enriches every evaluator returned by the repository", async () => {

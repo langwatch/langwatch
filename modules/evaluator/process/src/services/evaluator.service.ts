@@ -154,10 +154,6 @@ export class EvaluatorService {
     return Promise.all(evaluators.map((evaluator) => this.enrichWithFields(evaluator)));
   }
 
-  async getByIdWithFields(input: { id: string; projectId: string }): Promise<EvaluatorWithFields> {
-    return this.enrichWithFields(await this.getById(input));
-  }
-
   resolveForExecution(input: EvaluatorIdOrSlugInput): Promise<ResolvedEvaluatorExecution> {
     const parsed = evaluatorIdOrSlugInputSchema.parse(input);
 

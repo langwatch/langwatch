@@ -93,8 +93,6 @@ export interface EvaluatorApi {
   getById(input: EvaluatorScope & EvaluatorVersionSelector): Promise<Evaluator>;
   /** One evaluator, or `undefined` when the project has none. */
   findById(input: EvaluatorScope): Promise<Evaluator | undefined>;
-  /** One evaluator with its computed fields. */
-  getByIdWithFields(input: EvaluatorScope): Promise<EvaluatorWithFields>;
   /** One evaluator with its computed fields, or `undefined`. */
   findByIdWithFields(input: EvaluatorScope): Promise<EvaluatorWithFields | undefined>;
   /** One evaluator by its project-unique slug, or `undefined`. */

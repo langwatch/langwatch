@@ -78,14 +78,6 @@ One evaluator, or `undefined` when the project has none.
 findById(input: EvaluatorScope): Promise<Evaluator | undefined>;
 ```
 
-#### `getByIdWithFields`
-
-One evaluator with its computed fields.
-
-```typescript
-getByIdWithFields(input: EvaluatorScope): Promise<EvaluatorWithFields>;
-```
-
 #### `findByIdWithFields`
 
 One evaluator with its computed fields, or `undefined`.
