@@ -810,6 +810,8 @@ export const createInitialResults = (): EvaluationResults => ({
 
 // Default concurrency limit for parallel execution
 export const DEFAULT_CONCURRENCY = 10;
+/** The most cells a run may hold in flight at once. */
+export const MAX_CONCURRENCY = 24;
 
 export const createInitialUIState = (): UIState => ({
   selectedRows: new Set(),

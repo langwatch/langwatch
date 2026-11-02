@@ -1,7 +1,11 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { agentPersonViewSchema, agentVersionSchema } from "./agent-version.ts";
+import {
+  agentPersonViewSchema,
+  agentVersionSchema,
+  agentVersionSelectorSchema,
+} from "./agent-version.ts";
 import { connectedParameterDefinitionSchema } from "./config/connected.ts";
 import { agentTypeSchema } from "./config/index.ts";
 import { CONNECTED_AGENT_NOT_SELECTABLE_REASONS } from "./connected-agent.selectable.ts";
@@ -15,13 +19,10 @@ export const agentRestParamsSchema: AgentRestParamsSchema = agentRestParamsSchem
 
 /** `?label=` or `?version=` on a single read; the `id:label` address is the shorthand. */
 const agentRestGetQuerySchemaDefinition = z.object({
-  label: z
-    .string()
-    .min(1)
-    .max(64)
-    .optional()
-    .describe("A deploy label, for example production. Omit both to read the latest version."),
-  version: z.coerce.number().int().positive().optional().describe("A version number."),
+  label: agentVersionSelectorSchema.shape.label.describe(
+    "A deploy label, for example production. Omit both to read the latest version.",
+  ),
+  version: agentVersionSelectorSchema.shape.version.describe("A version number."),
 });
 export interface AgentRestGetQuerySchema extends Named<typeof agentRestGetQuerySchemaDefinition> {}
 export const agentRestGetQuerySchema: AgentRestGetQuerySchema = agentRestGetQuerySchemaDefinition;

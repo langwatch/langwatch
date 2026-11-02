@@ -167,6 +167,17 @@ export class EvaluatorSourcePermissionDeniedError extends HandledError {
 }
 
 /** A label or a version an evaluator read asked for that the evaluator does not have. */
+function versionNotFoundMessage(input: {
+  evaluatorId: string;
+  label?: string;
+  version?: number;
+}): string {
+  if (input.label)
+    return `Evaluator "${input.evaluatorId}" has no version labelled "${input.label}".`;
+  if (input.version === void 0) return `Evaluator "${input.evaluatorId}" has no version.`;
+  return `Evaluator "${input.evaluatorId}" has no version ${input.version}.`;
+}
+
 export class EvaluatorVersionNotFoundError extends HandledError {
   declare readonly code: "evaluator_version_not_found";
 
@@ -179,17 +190,11 @@ export class EvaluatorVersionNotFoundError extends HandledError {
     label?: string;
     version?: number;
   }) {
-    super(
-      "evaluator_version_not_found",
-      label
-        ? `Evaluator "${evaluatorId}" has no version labelled "${label}".`
-        : `Evaluator "${evaluatorId}" has no version ${version ?? ""}.`.replace(" .", "."),
-      {
-        httpStatus: 404,
-        fault: "customer",
-        meta: { evaluatorId, ...(label ? { label } : {}), ...(version ? { version } : {}) },
-      },
-    );
+    super("evaluator_version_not_found", versionNotFoundMessage({ evaluatorId, label, version }), {
+      httpStatus: 404,
+      fault: "customer",
+      meta: { evaluatorId, ...(label ? { label } : {}), ...(version ? { version } : {}) },
+    });
     this.name = "EvaluatorVersionNotFoundError";
   }
 }

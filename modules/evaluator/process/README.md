@@ -309,16 +309,16 @@ Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:214`
 Answers at `/api/evaluators/:idOrSlug`, `/api/v1/evaluators/:idOrSlug`; also, undocumented, `/api/evaluators/2026-08-07/:idOrSlug`, `/api/v1/evaluators/2026-08-07/:idOrSlug`, `/api/evaluators/latest/:idOrSlug`, `/api/v1/evaluators/latest/:idOrSlug`.
 
 ```typescript
-// Params: evaluatorIdOrSlugParamsSchema, ../contract/src/evaluator-rest.schemas.ts:68
+// Params: evaluatorIdOrSlugParamsSchema, ../contract/src/evaluator-rest.schemas.ts:72
 interface Params {
   idOrSlug: string;
 }
-// Query: evaluatorRestGetQuerySchema, ../contract/src/evaluator-rest.schemas.ts:174
+// Query: evaluatorRestGetQuerySchema, ../contract/src/evaluator-rest.schemas.ts:175
 interface Query {
   label?: string;
   version?: number;
 }
-type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluator-rest.schemas.ts:53
+type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluator-rest.schemas.ts:57
 ```
 
 #### `POST /` · `postApiEvaluators`
@@ -330,12 +330,12 @@ Permission `evaluations:create`. Credential `project`. Declared at `src/transpor
 Answers at `/api/evaluators`, `/api/v1/evaluators`; also, undocumented, `/api/evaluators/2026-08-07`, `/api/v1/evaluators/2026-08-07`, `/api/evaluators/latest`, `/api/v1/evaluators/latest`.
 
 ```typescript
-// Body: createEvaluatorInputSchema, ../contract/src/evaluator-rest.schemas.ts:143
+// Body: createEvaluatorInputSchema, ../contract/src/evaluator-rest.schemas.ts:147
 interface Body {
   name: string;
   config: Record<string, unknown>;
 }
-type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluator-rest.schemas.ts:53
+type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluator-rest.schemas.ts:57
 ```
 
 #### `PUT /:id` · `putApiEvaluatorsById`
@@ -347,17 +347,17 @@ Permission `evaluations:update`. Credential `project`. Declared at `src/transpor
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 
 ```typescript
-// Params: evaluatorIdParamsSchema, ../contract/src/evaluator-rest.schemas.ts:59
+// Params: evaluatorIdParamsSchema, ../contract/src/evaluator-rest.schemas.ts:63
 interface Params {
   id: string;
 }
-// Body: updateEvaluatorInputSchema, ../contract/src/evaluator-rest.schemas.ts:158
+// Body: updateEvaluatorInputSchema, ../contract/src/evaluator-rest.schemas.ts:162
 interface Body {
   name?: string;
   config?: Record<string, unknown>;
   commitMessage?: string;
 }
-type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluator-rest.schemas.ts:53
+type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluator-rest.schemas.ts:57
 ```
 
 #### `DELETE /:id` · `deleteApiEvaluatorsById`
@@ -369,8 +369,8 @@ Permission `evaluations:manage`. Credential `project`. Declared at `src/transpor
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof evaluatorIdParamsSchema>; // ../contract/src/evaluator-rest.schemas.ts:59
-// Response: archivedEvaluatorResponseSchema, ../contract/src/evaluator-rest.schemas.ts:75
+type Params = z.infer<typeof evaluatorIdParamsSchema>; // ../contract/src/evaluator-rest.schemas.ts:63
+// Response: archivedEvaluatorResponseSchema, ../contract/src/evaluator-rest.schemas.ts:79
 interface Response {
   success: boolean;
 }
@@ -385,11 +385,11 @@ Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:311`
 Answers at `/api/evaluators/:evaluatorId/versions`, `/api/v1/evaluators/:evaluatorId/versions`; also, undocumented, `/api/evaluators/2026-08-07/:evaluatorId/versions`, `/api/v1/evaluators/2026-08-07/:evaluatorId/versions`, `/api/evaluators/latest/:evaluatorId/versions`, `/api/v1/evaluators/latest/:evaluatorId/versions`.
 
 ```typescript
-// Params: evaluatorVersionsRestParamsSchema, ../contract/src/evaluator-rest.schemas.ts:183
+// Params: evaluatorVersionsRestParamsSchema, ../contract/src/evaluator-rest.schemas.ts:184
 interface Params {
   evaluatorId: string;
 }
-type Response = z.infer<typeof evaluatorVersionListResponseSchema>; // ../contract/src/evaluator-rest.schemas.ts:212
+type Response = z.infer<typeof evaluatorVersionListResponseSchema>; // ../contract/src/evaluator-rest.schemas.ts:213
 ```
 
 #### `PUT /:evaluatorId/labels/:label` · `putApiEvaluatorsLabel`
@@ -401,16 +401,16 @@ Permission `evaluators:deploy`. Credential `project`. Declared at `src/transport
 Answers at `/api/evaluators/:evaluatorId/labels/:label`, `/api/v1/evaluators/:evaluatorId/labels/:label`; also, undocumented, `/api/evaluators/2026-08-07/:evaluatorId/labels/:label`, `/api/v1/evaluators/2026-08-07/:evaluatorId/labels/:label`, `/api/evaluators/latest/:evaluatorId/labels/:label`, `/api/v1/evaluators/latest/:evaluatorId/labels/:label`.
 
 ```typescript
-// Params: evaluatorLabelRestParamsSchema, ../contract/src/evaluator-rest.schemas.ts:193
+// Params: evaluatorLabelRestParamsSchema, ../contract/src/evaluator-rest.schemas.ts:194
 interface Params {
   evaluatorId: string;
   label: string;
 }
-// Body: evaluatorLabelRestBodySchema, ../contract/src/evaluator-rest.schemas.ts:202
+// Body: evaluatorLabelRestBodySchema, ../contract/src/evaluator-rest.schemas.ts:203
 interface Body {
   version: number;
 }
-// Response: evaluatorLabelResponseSchema, ../contract/src/evaluator-rest.schemas.ts:223
+// Response: evaluatorLabelResponseSchema, ../contract/src/evaluator-rest.schemas.ts:224
 interface Response {
   label: string;
   version: number;
@@ -427,8 +427,8 @@ Permission `evaluators:deploy`. Declared at `src/transport/evaluator.rest.ts:355
 Answers at `/api/evaluators/:evaluatorId/labels/:label`, `/api/v1/evaluators/:evaluatorId/labels/:label`; also, undocumented, `/api/evaluators/2026-08-07/:evaluatorId/labels/:label`, `/api/v1/evaluators/2026-08-07/:evaluatorId/labels/:label`, `/api/evaluators/latest/:evaluatorId/labels/:label`, `/api/v1/evaluators/latest/:evaluatorId/labels/:label`.
 
 ```typescript
-type Params = z.infer<typeof evaluatorLabelRestParamsSchema>; // ../contract/src/evaluator-rest.schemas.ts:193
-// Response: evaluatorLabelRemovedSchema, ../contract/src/evaluator-rest.schemas.ts:233
+type Params = z.infer<typeof evaluatorLabelRestParamsSchema>; // ../contract/src/evaluator-rest.schemas.ts:194
+// Response: evaluatorLabelRemovedSchema, ../contract/src/evaluator-rest.schemas.ts:234
 interface Response {
   label: string;
   removed: true;

@@ -1,10 +1,10 @@
-import { DEFAULT_CONCURRENCY } from "@langwatch/experiment-contract";
+import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "@langwatch/experiment-contract";
 
 /**
  * How an experiment run started from CI executes its cells: one at a time in
- * row order, or up to a concurrency at once. The run API accepts 1 to 24.
+ * row order, or up to a concurrency at once, as many as the run API accepts.
  */
-export const MAX_RUN_CONCURRENCY = 24;
+export const MAX_RUN_CONCURRENCY = MAX_CONCURRENCY;
 
 export type RunExecution = {
   mode: "sequential" | "parallel";

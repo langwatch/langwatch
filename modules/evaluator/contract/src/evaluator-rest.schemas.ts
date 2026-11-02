@@ -1,7 +1,11 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { evaluatorLabelSchema, evaluatorVersionSchema } from "./evaluator-version.ts";
+import {
+  evaluatorLabelSchema,
+  evaluatorVersionSchema,
+  evaluatorVersionSelectorSchema,
+} from "./evaluator-version.ts";
 import { evaluatorPersonViewSchema } from "./evaluator.ts";
 import { AVAILABLE_EVALUATORS } from "./evaluators.ts";
 
@@ -159,13 +163,10 @@ export const updateEvaluatorInputSchema: UpdateEvaluatorInputSchema =
 
 /** `?label=` or `?version=` on a single read; the `idOrSlug:label` address is the shorthand. */
 const evaluatorRestGetQuerySchemaDefinition = z.object({
-  label: z
-    .string()
-    .min(1)
-    .max(64)
-    .optional()
-    .describe("A deploy label, for example production. Omit both to read the latest version."),
-  version: z.coerce.number().int().positive().optional().describe("A version number."),
+  label: evaluatorVersionSelectorSchema.shape.label.describe(
+    "A deploy label, for example production. Omit both to read the latest version.",
+  ),
+  version: evaluatorVersionSelectorSchema.shape.version.describe("A version number."),
 });
 export interface EvaluatorRestGetQuerySchema extends Named<
   typeof evaluatorRestGetQuerySchemaDefinition
