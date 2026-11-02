@@ -1089,7 +1089,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # additive and never revoke, so a view only the newer catalog has keeps its
   # SELECT. A newer deploy that only removed a column is put back to the older
   # view by an older worker, and the newer worker accepts the extra column: the
-  # view settles on the union both need, never flapping, until the next deploy.
+  # view stops flapping, until the next deploy. The check compares column names
+  # only, and a repair rewrites the whole view from the older worker's catalog,
+  # so it can also revert a newer deploy's type, expression, dedup or filter
+  # change, which the newer worker does not detect. Ship such a change in two
+  # deploys too: the second only once no older worker runs.
   # A deploy that removes one column and adds another (a rename included) is not
   # settled by the union: a worker that needs the removed column and one that
   # needs the added column would each replace the other's view at every check

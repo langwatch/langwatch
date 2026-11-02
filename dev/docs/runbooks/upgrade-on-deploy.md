@@ -203,7 +203,9 @@ to an image with the check repairs them within 5 minutes.
 objects that are missing (engine tables, views, key map, app functions, approved PostgreSQL views)
 and grants the reader SELECT on an approved view that lacks it. It also replaces a view that lacks
 a column its catalog declares (an extra column is left alone), so a view a deploy left on an older
-definition is repaired within 5 minutes. It never revokes and never creates the reader role, so a
+definition is repaired within 5 minutes. The comparison is by column name only and a repair rewrites
+the whole view, so during a rollout an older worker can revert a newer deploy's column type,
+expression, dedup or filter change, and the newer worker does not notice. Ship those in two deploys. It never revokes and never creates the reader role, so a
 missing role or a changed column type converges only on a deploy: use Ops > Upgrades Retry. Alert
 on `level=error` with the message "lwql provisioning failed creating ClickHouse objects" or "lwql
 provisioning failed creating PostgreSQL objects". The check runs
