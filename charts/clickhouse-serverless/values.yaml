@@ -158,7 +158,7 @@ autogen:
 # A startup guard inside the Job fails fast if jq is missing from the image.
 preflight:
   enabled: true
-  image: alpine/k8s:1.30.0
+  image: alpine/k8s:1.34.9
   imagePullPolicy: IfNotPresent
   activeDeadlineSeconds: 60
 
