@@ -83,26 +83,45 @@ export function inbandExceptionOf(row: unknown): string | undefined {
   return CLICKHOUSE_EXCEPTION_SIGNATURE.test(exception) ? exception : undefined;
 }
 
+/** A run of SQL code, or a quoted identifier kept verbatim. */
+type SqlPart = { text: string; quoted: boolean };
+
 /**
- * Replaces each string literal with `?` and drops comments outside quoted identifiers, in one
- * linear pass (a backtracking regex is quadratic), so no quote or comment swallows later SQL.
+ * The query as code and quoted identifiers, each string literal as `?` and comments dropped, in
+ * one linear pass (a backtracking regex is quadratic), so no quote or comment swallows later SQL.
  */
-function withoutLiteralsOrComments(query: string): string {
-  let out = "";
+function sqlPartsOf(query: string): SqlPart[] {
+  const parts: SqlPart[] = [];
+  let code = "";
   let i = 0;
   while (i < query.length) {
     const skipped = skipLiteralOrComment({ query, i });
     if (skipped === null) {
-      out += query[i];
+      code += query[i];
       i++;
+    } else if (skipped.quoted) {
+      parts.push({ text: code, quoted: false }, { text: skipped.replacement, quoted: true });
+      code = "";
+      i = skipped.next;
     } else {
-      out += skipped.replacement;
+      code += skipped.replacement;
       i = skipped.next;
     }
   }
+  parts.push({ text: code, quoted: false });
 
-  return out;
+  return parts;
 }
+
+/** The query with each string literal as `?` and its comments dropped; identifiers kept. */
+export function withoutLiteralsOrComments(query: string): string {
+  return sqlPartsOf(query)
+    .map((part) => part.text)
+    .join("");
+}
+
+/** ClickHouse's line comment openers: `--`, `//`, `#!` and `# `. */
+const LINE_COMMENT_OPENERS = new Set(["--", "//", "#!", "# "]);
 
 /** What a literal or comment starting at `i` becomes, and where the SQL resumes; null if none. */
 function skipLiteralOrComment({
@@ -111,16 +130,16 @@ function skipLiteralOrComment({
 }: {
   query: string;
   i: number;
-}): { replacement: string; next: number } | null {
+}): { replacement: string; next: number; quoted?: true } | null {
   const ch = query[i];
   if (ch === "'") return { replacement: "?", next: endOfQuoted({ query, i: i + 1, quote: "'" }) };
   if (ch === "$") return heredocAt({ query, i });
   if (ch === '"' || ch === "`") {
     const next = endOfQuoted({ query, i: i + 1, quote: ch });
-    return { replacement: query.slice(i, next), next };
+    return { replacement: query.slice(i, next), next, quoted: true };
   }
   const pair = query.slice(i, i + 2);
-  if (pair === "--") {
+  if (LINE_COMMENT_OPENERS.has(pair)) {
     const end = query.indexOf("\n", i);
     return { replacement: "", next: end === -1 ? query.length : end };
   }
@@ -169,9 +188,11 @@ function endOfQuoted({ query, i, quote }: { query: string; i: number; quote: str
  * tenant, time window or limit is one key. The warning is about the statement's form.
  */
 export function queryShapeOf(rawQuery: string): string {
-  const shape = withoutLiteralsOrComments(rawQuery)
-    .replace(/\b\d+(?:\.\d+)?\b/g, "?")
-    .replace(/\s+/g, " ")
+  const shape = sqlPartsOf(rawQuery)
+    .map((part) =>
+      part.quoted ? part.text : part.text.replace(/\b\d+(?:\.\d+)?\b/g, "?").replace(/\s+/g, " "),
+    )
+    .join("")
     .trim();
 
   return createHash("sha256").update(shape).digest("base64url");

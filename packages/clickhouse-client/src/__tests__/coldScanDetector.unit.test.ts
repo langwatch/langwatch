@@ -101,6 +101,26 @@ describe("detectColdScan", () => {
     expect(detectColdScan(blockComment)).toBe("stored_spans");
   });
 
+  it.each(["//", "#!", "#"])(
+    "does not let a %s-commented time predicate clear the flag",
+    (opener) => {
+      const query = `
+      SELECT SpanId FROM stored_spans
+      WHERE TenantId = {tenantId:String}
+      ${opener} AND StartTime >= something
+    `;
+      expect(detectColdScan(query)).toBe("stored_spans");
+    },
+  );
+
+  it("reads a heredoc as one literal, so a quote inside it hides no predicate", () => {
+    const query = `
+      SELECT SpanId FROM stored_spans
+      WHERE Name = $tag$it's$tag$ AND StartTime >= {fromMs:Int64}
+    `;
+    expect(detectColdScan(query)).toBeNull();
+  });
+
   it("returns null for tables that are not time-partitioned", () => {
     expect(detectColdScan("SELECT * FROM trace_checks WHERE project_id = 'x'")).toBeNull();
   });

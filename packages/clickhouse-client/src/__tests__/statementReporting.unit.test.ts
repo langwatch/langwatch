@@ -249,6 +249,46 @@ describe("StatementReporter", () => {
       expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(2);
     });
 
+    /** @scenario "A cold scan warns once per query shape per hour" */
+    it.each(["//", "#!", "#"])(
+      "reads %s as a line comment, so an apostrophe in it hides nothing",
+      (opener) => {
+        const outcomeLogger = recordingSink();
+        const reporter = coldScanning(outcomeLogger, () => 0);
+
+        for (const column of ["a", "b"]) {
+          reporter.success({
+            operation: "query",
+            durationMs: 5,
+            params: {
+              query: `SELECT * ${opener} operator's note\nFROM evaluation_runs WHERE ${column} = 1`,
+            },
+          });
+        }
+
+        expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(2);
+      },
+    );
+
+    /** @scenario "A cold scan warns once per query shape per hour" */
+    it.each([
+      ['"field-1"', '"field-2"'],
+      ['"a  b"', '"a b"'],
+    ])("keeps the quoted identifiers %s and %s apart", (first, second) => {
+      const outcomeLogger = recordingSink();
+      const reporter = coldScanning(outcomeLogger, () => 0);
+
+      for (const field of [first, second]) {
+        reporter.success({
+          operation: "query",
+          durationMs: 5,
+          params: { query: `SELECT ${field} FROM evaluation_runs` },
+        });
+      }
+
+      expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(2);
+    });
+
     it("reads an unterminated literal without stalling", () => {
       const outcomeLogger = recordingSink();
       const reporter = coldScanning(outcomeLogger, () => 0);

@@ -226,13 +226,10 @@ export class StatementReporter {
       // including any cold tier on object storage - a burst of GET requests
       // per call. Worth warning even when fast, because the cost is request
       // count, not latency.
+      const rawQuery = extractRawQuery(params);
       const coldScanTable =
-        operation === "query" && !declaresFullScan(params)
-          ? this.detectColdScan(extractRawQuery(params))
-          : null;
-
-      const coldScanClaim =
-        coldScanTable !== null ? this.claimColdScanWarning(extractRawQuery(params)) : null;
+        operation === "query" && !declaresFullScan(params) ? this.detectColdScan(rawQuery) : null;
+      const coldScanClaim = coldScanTable === null ? null : this.claimColdScanWarning(rawQuery);
 
       if (coldScanTable !== null && coldScanClaim !== null) {
         this.outcomeLogger.warn(
