@@ -508,7 +508,8 @@ describe("the grok ingestion install", () => {
       await runGrokInstall();
 
       expect(stdout()).toContain(`~/.grok/hooks/${GROK_HOOK_FILE_NAME} session hooks created`);
-      expect(stdout()).toContain("once the folder\nis trusted");
+      expect(stdout()).toContain("once you trust\nthe folder");
+      expect(stdout()).not.toContain("--trust");
     });
   });
 

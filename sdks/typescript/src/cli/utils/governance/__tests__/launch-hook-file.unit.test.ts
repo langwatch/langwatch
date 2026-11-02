@@ -1,0 +1,48 @@
+/**
+ * `langwatch grok` writes Grok's hook file itself: the rc prompt that used to
+ * be its only writer is skipped once an OTLP endpoint is already set.
+ * @see specs/ai-governance/cli-wrappers/grok-hook-install.feature
+ */
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { assertLaunchHookFile } from "../shell-rc";
+
+const origGrokHome = process.env.GROK_HOME;
+let grokHome: string;
+
+beforeEach(() => {
+  grokHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-grok-home-"));
+  process.env.GROK_HOME = grokHome;
+  vi.spyOn(console, "log").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  if (origGrokHome === undefined) delete process.env.GROK_HOME;
+  else process.env.GROK_HOME = origGrokHome;
+  fs.rmSync(grokHome, { recursive: true, force: true });
+});
+
+describe("assertLaunchHookFile", () => {
+  describe("when the wrapper prepares a grok launch", () => {
+    /** @scenario Launching through langwatch grok writes LangWatch's own hook file */
+    it("writes the LangWatch hook file that runs the grok hook", () => {
+      assertLaunchHookFile({ tool: "grok" });
+
+      const written = fs.readFileSync(path.join(grokHome, "hooks", "langwatch.json"), "utf8");
+      expect(written).toContain("langwatch ingest hook grok");
+    });
+  });
+
+  describe("when the wrapper prepares a launch of an agent without a launch-written hook", () => {
+    it("writes nothing to the Grok hooks folder", () => {
+      assertLaunchHookFile({ tool: "claude" });
+
+      expect(fs.existsSync(path.join(grokHome, "hooks"))).toBe(false);
+    });
+  });
+});

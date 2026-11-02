@@ -421,8 +421,8 @@ const TOOL_INSTALLATION_NOTES: Record<string, (report: InstallReport) => string>
   grok_cli: (report) =>
     isHookFileInstalled(report)
       ? `\nA LangWatch hook file was added to your Grok hooks folder, so every Grok session\n` +
-        `reports the repository, branch and worktree it ran in. Grok runs it once the folder\n` +
-        `is trusted (\`/hooks-trust\` or \`--trust\`). Your own hook files are untouched.\n` +
+        `reports the repository, branch and worktree it ran in. Grok runs it once you trust\n` +
+        `the folder, at its startup prompt or with \`/hooks-trust\`. Your own hook files are untouched.\n` +
         `Run \`langwatch logout\` to remove it.\n`
       : "",
   opencode: (report) =>

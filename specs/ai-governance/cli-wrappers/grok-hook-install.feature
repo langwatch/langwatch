@@ -26,8 +26,9 @@
 # Grok session id. That record would make a phantom Claude row, so the Claude
 # hook steps aside when Grok is the one running it.
 #
-# Grok runs global hooks only once the folder is trusted (`/hooks-trust` or
-# `--trust`), as Claude Code asks for workspace trust; the install says so.
+# Grok runs global hooks only once the folder is trusted (its startup prompt
+# or `/hooks-trust`; there is no flag), as Claude Code asks for workspace
+# trust; the install says so.
 
 Feature: Grok session context hook
 
@@ -39,6 +40,15 @@ Rule: Installing writes one hook file LangWatch owns
     When the grok ingestion install runs twice
     Then exactly one LangWatch hook file is present at ~/.grok/hooks/langwatch.json
     And it runs the hook command for grok on SessionStart, Stop and SubagentStart
+
+  # The proof run on 1.0.70 found `langwatch grok` alone left no hook file:
+  # only the install, instrument or the shell rc prompt wrote it.
+  @unit
+  Scenario: Launching through langwatch grok writes LangWatch's own hook file
+    Given a Grok hooks folder without the LangWatch file
+    When the wrapper prepares a grok launch
+    Then the LangWatch hook file is present in the Grok hooks folder
+    And it runs the hook command for grok
 
   @unit
   Scenario: The Grok hook file follows GROK_HOME

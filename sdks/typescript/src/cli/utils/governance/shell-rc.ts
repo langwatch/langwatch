@@ -617,6 +617,17 @@ function installRawSessionContextHooks(): void {
 }
 
 /**
+ * Agents whose `langwatch <tool>` launch writes their hook file itself: the rc
+ * prompt, its other writer, is skipped once an OTLP endpoint is set.
+ */
+const LAUNCH_WRITES_HOOK_FILE: ReadonlySet<string> = new Set(["grok"]);
+
+/** Writes the launched agent's own hook file, for the agents above. */
+export function assertLaunchHookFile({ tool }: { tool: string }): void {
+  if (LAUNCH_WRITES_HOOK_FILE.has(tool)) assertOwnedSessionHookFile({ tool });
+}
+
+/**
  * Writes the hook file the launched agent loads from a folder of ours alone
  * (Copilot), so its sessions report their repository and branch. Driven by the
  * per-agent table; idempotent, quiet unless it changed something, never fatal.
