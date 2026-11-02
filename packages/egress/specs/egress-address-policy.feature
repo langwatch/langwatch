@@ -79,7 +79,7 @@ Feature: Egress address policy and the pinned fetch
     Then the fetch fails with an error naming the proxy setting, not the destination
     And the error does not repeat the setting's value
 
-  # Every caller opts in by passing its proxy setting (ADR-187). These have not yet.
+  # Every caller opts in by passing its proxy setting (ADR-195). These have not yet.
   @integration @unimplemented
   Scenario Outline: A caller that fetches a user-supplied address passes the outbound proxy
     Given an outbound proxy is configured

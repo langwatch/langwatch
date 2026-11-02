@@ -70,7 +70,10 @@ does so for issuer discovery and the domain proof file.
 
 A proxied hop is resolved by the proxy, not pinned. The address judged is not
 guaranteed to be the one connected to, so the DNS rebinding protection does not
-hold for that hop. The operator runs the proxy and decides what it may reach.
+hold for that hop, nor does the connect-time metadata refusal. The operator runs
+the proxy and decides what it may reach, so the SSO docs tell them to make the
+proxy refuse private, link-local and metadata addresses itself. This applies to
+every install that already sets `HTTPS_PROXY`, not only ones set up for SSO.
 Unproxied hops keep the pin.
 
 The judgement still needs the install's own resolver. A public SSO destination

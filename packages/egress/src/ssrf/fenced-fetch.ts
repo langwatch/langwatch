@@ -31,12 +31,6 @@ import {
  */
 
 /**
- * With `proxy` set, a judged hop the proxy applies to travels through it
- * instead: the policy still decides first, the proxy only carries the request.
- * The proxy resolves the name itself, so the operator's proxy owns that address.
- */
-
-/**
  * Two independent timeout bounds, both opt-in: `init.signal` carries across
  * every hop; `headersTimeoutMs` / `bodyTimeoutMs` back it as a socket-level
  * backstop if the signal drops. Omitted, undici's 300s defaults apply.
@@ -220,7 +214,11 @@ function createProxyAgent({
   });
 }
 
-/** How this hop travels: through the proxy when one applies to its host, else pinned. */
+/**
+ * How this hop travels: through the proxy when one applies to its host, else
+ * pinned. The policy has already judged the hop; the proxy only carries it and
+ * resolves the name itself, so the operator's proxy owns that address.
+ */
 function createDispatcher({
   validated,
   init,
