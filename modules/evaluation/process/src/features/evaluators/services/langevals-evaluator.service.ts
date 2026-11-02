@@ -17,10 +17,8 @@ import {
   type LangevalsPayloadStaging,
   PayloadTooLargeError,
 } from "../../../channels/langevals.channel.ts";
-import {
-  toLangevalsContexts,
-  toLangevalsConversation,
-} from "../../../rules/langevals-contexts.rules.ts";
+import { toLangevalsContexts } from "../../../rules/langevals-contexts.rules.ts";
+import { toLangevalsConversation } from "../../../rules/langevals-conversation.rules.ts";
 import type { EvaluationExecutionMetricsService } from "../../execution/services/evaluation-execution-metrics.service.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
