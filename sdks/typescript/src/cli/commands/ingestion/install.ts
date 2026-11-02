@@ -9,7 +9,10 @@ import {
 import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
 import { buildOtelEnvBlock, TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
-import { installPiTelemetryExtension } from "@/cli/utils/governance/pi-plugin";
+import {
+  installPiTelemetryExtension,
+  piExtensionNotOursNotice,
+} from "@/cli/utils/governance/pi-plugin";
 import {
   sessionContextAgentByKeySourceType,
   type SessionContextAgentId,
@@ -388,7 +391,10 @@ function renderSessionHooks(report: InstallReport): void {
   if (report.session_hooks_action === "not_ours" && hooked) {
     const displayPath = report.session_hooks_path ?? "";
     const command = TOOL_BY_SOURCE_TYPE[report.tool] ?? report.tool;
-    const notice = hookFileNotOursNotice({ displayPath, agentId: hooked.id, command });
+    const notice =
+      report.tool === "pi_cli"
+        ? piExtensionNotOursNotice({ displayPath })
+        : hookFileNotOursNotice({ displayPath, agentId: hooked.id, command });
     process.stdout.write(`${chalk.yellow("!")} ${notice}\n`);
   } else if (report.session_hooks_action === "user_file_runs_hook") {
     process.stdout.write(

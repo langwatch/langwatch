@@ -53,8 +53,8 @@
 #      minimum pi version as UNVERIFIED, and a refusal below an unknown floor
 #      would be a guess.
 #   2. The declared-vocabulary check: pi's schema package is not a dependency
-#      of the SDK, and the extension also emits gen_ai.* mirrors and the
-#      langwatch.attributes.estimated marker, which pi does not declare.
+#      of the SDK, and the extension also emits gen_ai.* mirrors, which pi
+#      does not declare.
 #   3. The community aliases: they live in pi's definition under
 #      modules/coding-agent/, not in the CLI.
 

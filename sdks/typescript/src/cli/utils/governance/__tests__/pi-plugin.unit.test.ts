@@ -103,13 +103,14 @@ describe("installPiTelemetryExtension", () => {
 
   describe("when a file at that path carries no LangWatch marker", () => {
     /** @scenario "A file at that path without our marker is never overwritten" */
-    it("leaves the file exactly as it is", () => {
+    it("leaves the file exactly as it is and reports it is not ours", () => {
       fs.mkdirSync(extensionDir, { recursive: true });
       const theirs = "// somebody else's pi extension\nexport default () => {};\n";
       fs.writeFileSync(extensionPath, theirs);
 
-      installPiTelemetryExtension({});
+      const result = installPiTelemetryExtension({});
 
+      expect(result.action).toBe("not_ours");
       expect(fs.readFileSync(extensionPath, "utf8")).toBe(theirs);
       expect(hasPiTelemetryExtension()).toBe(false);
     });
@@ -127,7 +128,20 @@ describe("ensurePiTelemetryExtension", () => {
 
     expect(fs.readFileSync(extensionPath, "utf8")).toBe(piExtensionSource());
     expect(lines).toEqual([
-      "created the pi telemetry extension at ~/.pi/agent/extensions/pi-plugin.ts.",
+      `created the pi telemetry extension at ~/.pi/agent/extensions/${PI_EXTENSION_FILE_NAME}.`,
+    ]);
+  });
+
+  it("tells the user pi sends nothing when a file of theirs holds the path", () => {
+    fs.mkdirSync(extensionDir, { recursive: true });
+    fs.writeFileSync(extensionPath, "// not ours\n");
+    const lines: string[] = [];
+
+    ensurePiTelemetryExtension({ notify: (l) => lines.push(l) });
+
+    expect(lines).toEqual([
+      `~/.pi/agent/extensions/${PI_EXTENSION_FILE_NAME} is not a LangWatch file, so it was ` +
+        "left alone, and pi sessions send no telemetry. Rename yours, then run `langwatch pi` again.",
     ]);
   });
 

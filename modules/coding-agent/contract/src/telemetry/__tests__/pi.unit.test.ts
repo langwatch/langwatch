@@ -31,9 +31,6 @@ const PI_FOLD_KEYS = [
   "pi.ai.error.type",
   "pi.ai.usage.input_tokens",
   "pi.ai.usage.output_tokens",
-  "pi.ai.usage.cache_read_tokens",
-  "pi.ai.usage.cache_write_tokens",
-  "pi.ai.usage.reasoning_tokens",
   "pi.ai.usage.total_tokens",
   "pi.ai.usage.cost",
   "pi.error.code",
@@ -129,9 +126,14 @@ describe("the pi coding-agent definition", () => {
       expect(missing).toEqual([]);
     });
 
-    /** Marks a span carrying stand-in values, so no reader prices a constant. */
-    it("holds the estimated-attribute marker", () => {
-      expect(CODING_AGENT_CONTRIBUTION_KEYS).toContain("langwatch.attributes.estimated");
+    /** The pi canonicaliser takes these off the span before the allowlist runs. */
+    it("leaves out the token counts the canonicaliser consumes", () => {
+      const consumed = [
+        "pi.ai.usage.cache_read_tokens",
+        "pi.ai.usage.cache_write_tokens",
+        "pi.ai.usage.reasoning_tokens",
+      ];
+      expect(consumed.filter((key) => CODING_AGENT_CONTRIBUTION_KEYS.includes(key))).toEqual([]);
     });
   });
 });

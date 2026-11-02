@@ -40,12 +40,6 @@ const TOOL_RECOVERY = false;
 const AI_OPERATION = "stream";
 const AI_STREAMING = true;
 const STEP_ATTEMPT = 1;
-
-// Marks a span carrying any stand-in above, as langwatch.tokens.estimated
-// marks estimated token counts. Covers pi.lane.name, pi.operation.recovery,
-// pi.tool.replay, pi.tool.recovery, pi.ai.operation, pi.ai.streaming and
-// pi.step.attempt. pi.operation.id is derived, not invented. ADR-188 D5.
-const ESTIMATED_MARKER = "langwatch.attributes.estimated";
 `;
 
 const PI_EXTENSION_ENCODER = `
@@ -266,7 +260,6 @@ const operationAttributes = (kind, id) => ({
   "pi.operation.id": id,
   "pi.operation.recovery": OPERATION_RECOVERY,
   "pi.operation.kind": kind,
-  [ESTIMATED_MARKER]: true,
 });
 
 const runHook = (cwd, hookEvent) => {
@@ -326,13 +319,19 @@ const aiAttributes = (message, ctx) => {
     "gen_ai.response.model": message?.responseModel,
     "gen_ai.usage.input_tokens": usage.input,
     "gen_ai.usage.output_tokens": usage.output,
-    [ESTIMATED_MARKER]: true,
   };
 };
 
 export default (pi) => {
+  // A pi build without the session manager gets no run, so nothing under it
+  // is recorded: a span without pi's session id joins no session.
   pi.on("agent_start", (_event, ctx) => {
-    sessionId = ctx.sessionManager.getSessionId();
+    const id = ctx?.sessionManager?.getSessionId?.();
+    if (typeof id !== "string" || id === "") {
+      run = null;
+      return;
+    }
+    sessionId = id;
     operationId = nextOperationId("run");
     run = { spanId: spanId(), startNano: nowNano() };
     runHook(ctx.cwd, "SessionStart");
@@ -361,14 +360,13 @@ export default (pi) => {
         "pi.lane.name": LANE_NAME,
         "pi.operation.id": operationId,
         "pi.turn.id": turn.turnId,
-        [ESTIMATED_MARKER]: true,
       },
     });
     turn = null;
   });
 
   pi.on("tool_execution_start", (event) => {
-    if (typeof event?.toolCallId !== "string") return;
+    if (run === null || typeof event?.toolCallId !== "string") return;
     toolSpans.set(event.toolCallId, {
       spanId: spanId(),
       startNano: nowNano(),
@@ -401,7 +399,6 @@ export default (pi) => {
         "pi.tool.replay": TOOL_REPLAY,
         "pi.tool.recovery": TOOL_RECOVERY,
         "pi.tool.is_error": isError,
-        [ESTIMATED_MARKER]: true,
       },
     });
   });
@@ -417,7 +414,7 @@ export default (pi) => {
 
   pi.on("message_end", (event, ctx) => {
     const message = event?.message;
-    if (message?.role !== "assistant") return;
+    if (run === null || message?.role !== "assistant") return;
     const endNano = nowNano();
     record({
       traceId: traceId(),
@@ -456,7 +453,6 @@ export default (pi) => {
         "pi.step.attempt": STEP_ATTEMPT,
         "pi.compaction.reason": event?.reason,
         "pi.step.outcome": "succeeded",
-        [ESTIMATED_MARKER]: true,
       },
     });
     record({

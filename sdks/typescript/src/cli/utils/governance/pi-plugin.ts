@@ -11,9 +11,10 @@ import * as path from "node:path";
 import { PI_EXTENSION_MARKER, piExtensionSource } from "./pi-extension-source";
 
 /** File name of the extension, inside pi's extension directory. */
-export const PI_EXTENSION_FILE_NAME = "pi-plugin.ts";
+export const PI_EXTENSION_FILE_NAME = "langwatch-pi-telemetry.ts";
 
-export type PiExtensionAction = "created" | "updated" | "unchanged";
+/** `not_ours`: a file without our marker holds the path, so nothing was written. */
+export type PiExtensionAction = "created" | "updated" | "unchanged" | "not_ours";
 
 export interface PiExtensionTarget {
   /** Absolute path of the extension file. */
@@ -50,7 +51,8 @@ export function piExtensionTarget(dirPath?: string): PiExtensionTarget {
 /**
  * Writes the extension, creating the extensions directory when missing.
  * Idempotent: a second run reports `unchanged`. A file already there that
- * isn't ours is left exactly as-is, reported `unchanged` rather than replaced.
+ * isn't ours is left exactly as-is and reported `not_ours`, since pi then
+ * sends nothing.
  */
 export function installPiTelemetryExtension({
   dirPath,
@@ -59,7 +61,7 @@ export function installPiTelemetryExtension({
   const existing = readFileOrNull(target.path);
 
   if (existing !== null && !isLangwatchExtension(existing)) {
-    return { action: "unchanged", ...target };
+    return { action: "not_ours", ...target };
   }
 
   const source = piExtensionSource();
@@ -84,7 +86,9 @@ export function ensurePiTelemetryExtension({
 }): void {
   try {
     const result = installPiTelemetryExtension({ dirPath });
-    if (result.action !== "unchanged") {
+    if (result.action === "not_ours") {
+      notify(piExtensionNotOursNotice(result));
+    } else if (result.action !== "unchanged") {
       notify(`${result.action} the pi telemetry extension at ${result.displayPath}.`);
     }
   } catch (err) {
@@ -92,6 +96,14 @@ export function ensurePiTelemetryExtension({
       `could not write the pi telemetry extension, so this session sends no telemetry: ${(err as Error).message}`,
     );
   }
+}
+
+/** What to tell the user when a file of theirs holds the extension's path. */
+export function piExtensionNotOursNotice({ displayPath }: { displayPath: string }): string {
+  return (
+    `${displayPath} is not a LangWatch file, so it was left alone, and pi sessions send no ` +
+    `telemetry. Rename yours, then run \`langwatch pi\` again.`
+  );
 }
 
 /** Whether our extension is currently on disk, for the logout scan. */

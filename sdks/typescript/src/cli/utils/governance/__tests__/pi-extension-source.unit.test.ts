@@ -130,12 +130,17 @@ describe("the generated pi extension", () => {
       });
     });
 
-    it("marks every span carrying a stand-in value as estimated", async () => {
-      await runSession({ turns: [[{ name: "read" }]] });
+    it("records nothing when pi's context carries no session manager", async () => {
+      const ctx = { cwd: tmpDir };
+      await pi.emit("agent_start", {}, ctx);
+      await pi.emit("turn_start", { turnIndex: 0 }, ctx);
+      await pi.emit("message_end", { message: assistant() }, ctx);
+      await pi.emit("tool_execution_start", { toolCallId: "c-1", toolName: "read" }, ctx);
+      await pi.emit("tool_execution_end", { toolCallId: "c-1", toolName: "read" }, ctx);
+      await pi.emit("turn_end", { turnIndex: 0 }, ctx);
+      await pi.emit("agent_end", { messages: [assistant()] }, ctx);
 
-      for (const span of exported()) {
-        expect(span.attributes["langwatch.attributes.estimated"]).toBe(true);
-      }
+      expect(exported()).toEqual([]);
     });
 
     /** @scenario "Every span the extension emits carries pi's session id" */
