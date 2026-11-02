@@ -465,6 +465,26 @@ describe("when a version is restored", () => {
     expect(second.rows.find((row) => row.id === "a")?.entry).toEqual({ input: "changed" });
   });
 
+  /** @scenario "Restoring a version first saves the edits made since the latest version" */
+  it("saves the unsaved edits as a version before writing the restore", async () => {
+    const datasetId = await createDataset();
+    await save(datasetId);
+    await edit(datasetId, "a", "unsaved edit");
+
+    const restored = await app.restoreVersion({
+      projectId: PROJECT,
+      datasetId,
+      version: 1,
+      editedBy: ALICE,
+    });
+
+    expect(restored.version).toMatchObject({ version: 3, restoredFromVersion: 1 });
+    const kept = await app.getVersionPage({ projectId: PROJECT, datasetId, version: 2 });
+    expect(kept.rows.find((row) => row.id === "a")?.entry).toMatchObject({
+      input: "unsaved edit",
+    });
+  });
+
   /** @scenario "Restoring a version writes a new version" */
   it("restores an object-storage dataset's rows and ids into its chunks", async () => {
     const datasetId = await createDataset([]);

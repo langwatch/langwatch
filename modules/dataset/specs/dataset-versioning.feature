@@ -137,6 +137,13 @@ Feature: Dataset version history
     And versions 1 and 2 are unchanged
 
   @unit
+  Scenario: Restoring a version first saves the edits made since the latest version
+    Given a dataset with version 1 and an edit to row "a" that no version holds yet
+    When a user restores version 1
+    Then version 2 holds the edited row "a"
+    And version 3 is the restore of version 1
+
+  @unit
   Scenario: Restoring a version that holds the current content changes nothing
     Given a dataset whose latest version 2 holds its current content
     When a user restores version 2
