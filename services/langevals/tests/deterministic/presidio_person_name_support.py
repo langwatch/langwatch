@@ -1,6 +1,6 @@
 """The evaluator, span helper and corpus bounds the Presidio name tests share."""
 
-from functools import lru_cache
+from functools import cache, lru_cache
 
 from langevals_presidio.pii_detection import (
     PresidioEntities,
@@ -25,7 +25,39 @@ def evaluator() -> PresidioPIIDetectionEvaluator:
     )
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=1)
+def name_and_place_evaluator() -> PresidioPIIDetectionEvaluator:
+    """Person and location both on, as strict redaction asks."""
+    return PresidioPIIDetectionEvaluator(
+        settings=PresidioPIIDetectionSettings(
+            entities=PresidioEntities(person=True, location=True),
+            min_threshold=MIN_THRESHOLD,
+        )
+    )
+
+
+@cache
+def second_pass_places(text: str) -> tuple[str, ...]:
+    """LOCATION spans the evaluator reports that the analyzer alone does not."""
+    subject = name_and_place_evaluator()
+    result = subject.evaluate(PresidioPIIDetectionEntry(input=text))
+    assert result.status == "processed", f"evaluator did not run: {result}"
+    first_pass = {
+        (found.start, found.end)
+        for found in subject.analyzer.analyze(
+            text=text, entities=["LOCATION"], language="en"
+        )
+        if found.score >= MIN_THRESHOLD
+    }
+    return tuple(
+        text[finding["start"] : finding["end"]]
+        for finding in result.raw_response["results"]
+        if finding["entity_type"] == "LOCATION"
+        and (finding["start"], finding["end"]) not in first_pass
+    )
+
+
+@cache
 def person_spans(text: str) -> tuple[tuple[int, int, float], ...]:
     """PERSON spans the real evaluator reports, after its own threshold filter."""
     result = evaluator().evaluate(PresidioPIIDetectionEntry(input=text))

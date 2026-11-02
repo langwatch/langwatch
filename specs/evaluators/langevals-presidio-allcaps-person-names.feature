@@ -101,12 +101,15 @@ Feature: A name written in capitals is still redacted
   38 were clean. The first build of the second pass dropped that to 33 of 38,
   because ERP, SOW or CFO turned into Erp, Sow or Cfo and were read as
   surnames, and the shape rule above is what brought it back to 37 of 38. The
-  corpus is now 49 strings with two known false positives, named one by one
+  corpus is now 54 strings with two known false positives, named one by one
   in the test: one predates the second pass, and one is a product line named
   after its founder, which has the shape and the words of a name because it
   holds one. A third fails the build. If it does, the second pass is
   inventing people on a shape nobody has priced. Fix the rule. Do not loosen
-  the corpus or the list.
+  the corpus or the list. The same corpus runs with places switched on, and
+  the second pass may add no place over it. Five of its strings put a
+  non-name where a place would go (moved to API KEY overnight); without the
+  name-word rule the second pass reads every one of them as a place.
 
   Against a rule that demanded every rewritten word be four letters or more,
   the side-by-side clause lifted wholly capitalised names with a short word
@@ -177,6 +180,18 @@ Feature: A name written in capitals is still redacted
       Then the content is analysed once and not twice
 
     @unit
+    Scenario: The second pass is skipped when every capitalised word stands alone
+      Given trace data whose capitalised words are lone field values such as "method": "POST"
+      When the content is analysed for personal information
+      Then the content is analysed once and not twice
+
+    @unit
+    Scenario: The second pass still runs for a capitalised word beside another word
+      Given a capitalised name written beside another word of it, after a comma or across a hyphen
+      When the content is analysed for personal information
+      Then the content is analysed twice
+
+    @unit
     Scenario: The second pass also looks for places when places are redacted
       Given content carrying a wholly capitalised name
       And person and location detection are both switched on
@@ -223,6 +238,13 @@ Feature: A name written in capitals is still redacted
       Given capitalised merchant, carrier, department, product, code and heading strings
       When the content is analysed for personal information
       Then no person span is reported over any of them
+
+    @unit
+    Scenario: An ALL-CAPS string that is not a place is not read as one
+      Given capitalised non-names, some standing where a place would go
+      And person and location detection are both switched on
+      When the content is analysed for personal information
+      Then the second analysis adds no place span over any of them
 
     @unit
     Scenario: A titlecased acronym is not harvested as a name
