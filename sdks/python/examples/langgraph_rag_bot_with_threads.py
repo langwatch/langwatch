@@ -247,7 +247,10 @@ retriever_tool = create_retriever_tool(
 
 tools = [retriever_tool]
 tool_node = ToolNode(tools)
-model = ChatOpenAI(model="gpt-5-mini", streaming=True).bind_tools(tools)
+# gpt-6-luna takes function tools on Chat Completions only with reasoning off.
+model = ChatOpenAI(
+    model="gpt-6-luna", reasoning_effort="none", streaming=True
+).bind_tools(tools)
 
 
 def should_continue(state: MessagesState):

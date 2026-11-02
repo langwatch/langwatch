@@ -72,7 +72,7 @@ A [connected agent](/agent-testing/connect-your-agent) declares its parameters i
     async def support_agent(
         messages: list[dict],
         *,
-        model: Literal["gpt-5", "gpt-5-mini"] = "gpt-5-mini",
+        model: Literal["gpt-6-sol", "gpt-6-luna"] = "gpt-6-luna",
         plan: str = "free",
         max_tools: int = 5,
     ) -> str:
@@ -90,19 +90,19 @@ A [connected agent](/agent-testing/connect-your-agent) declares its parameters i
         name: "support-agent",
         environment: process.env.APP_ENV ?? "development",
         parameters: z.object({
-          model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+          model: z.enum(["gpt-6-sol", "gpt-6-luna"]).default("gpt-6-luna"),
           plan: z.string().default("free").describe("Customer plan"),
           maxTools: z.number().int().default(5),
         }),
       },
-      // params is typed: { model: "gpt-5" | "gpt-5-mini"; plan: string; maxTools: number }
+      // params is typed: { model: "gpt-6-sol" | "gpt-6-luna"; plan: string; maxTools: number }
       async ({ messages, params }) => runMyAgent(messages, { model: params.model }),
     );
     ```
 
     `z.enum` becomes a closed option list, `.default()` the default, `.describe()` the description, and `z.number()` or `z.boolean()` the type. Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
-    valibot and arktype work the same way, and so does any other Standard Schema object that carries a JSON Schema converter. For a project with no schema library, `parameters` also takes a definition map (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`) or a plain JSON Schema object.
+    valibot and arktype work the same way, and so does any other Standard Schema object that carries a JSON Schema converter. For a project with no schema library, `parameters` also takes a definition map (`{ model: { options: ["gpt-6-sol", "gpt-6-luna"], default: "gpt-6-luna" } }`) or a plain JSON Schema object.
 
   </Tab>
 </Tabs>
@@ -304,13 +304,12 @@ import langwatch
 langwatch.setup()
 
 result = langwatch.test_suites.run(
-"suite_abc123",
-targets=[{"type": "http", "referenceId": "agent_abc123"}],
-parameters={"plan": "enterprise", "region": "eu-central"},
+    "suite_abc123",
+    targets=[{"type": "http", "referenceId": "agent_abc123"}],
+    parameters={"plan": "enterprise", "region": "eu-central"},
 )
 print(result["batchRunId"])
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -323,7 +322,7 @@ const result = await langwatch.testSuites.run("suite_abc123", {
   parameters: { plan: "enterprise", region: "eu-central" },
 });
 console.log(result.batchRunId);
-````
+```
 
   </Tab>
 </Tabs>

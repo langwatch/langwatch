@@ -1237,6 +1237,14 @@
               "available": true
             },
             {
+              "name": "Source",
+              "type": "String",
+              "description": "The source the trace counts under: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list. Filter it with {dashboard_context_sources:Array(String)}.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "Models",
               "type": "Array(String)",
               "description": "Every model used anywhere in the trace.",
@@ -1756,6 +1764,14 @@
               "name": "Origin",
               "type": "Nullable(String)",
               "description": "Which product surface produced the evaluated trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Source",
+              "type": "String",
+              "description": "The source the evaluated trace counts under: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list.",
               "unit": null,
               "gates": [],
               "available": true

@@ -496,7 +496,7 @@
               },
               "cli": ["run-plan run", "run-plan list", "run-plan get", "run-plan archive"],
               "hints": {
-                "run-plan run": "langwatch run-plan run --all --target 'http:agent_abc123?model=gpt-5' --target 'http:agent_abc123?model=gpt-5-mini' --evaluator pii-leak-scanner --name \"nightly regression\" --wait",
+                "run-plan run": "langwatch run-plan run --all --target 'http:agent_abc123?model=gpt-6-sol' --target 'http:agent_abc123?model=gpt-6-luna' --evaluator pii-leak-scanner --name \"nightly regression\" --wait",
                 "run-plan list": "langwatch run-plan list -o json",
                 "run-plan get": "langwatch run-plan get <id> -o json",
                 "run-plan archive": "langwatch run-plan archive <id>"
@@ -730,7 +730,7 @@
                 "evaluator get": "langwatch evaluator get <idOrSlug> -o json",
                 "evaluator types": "langwatch evaluator types -o json",
                 "evaluator create": "langwatch evaluator create \"my judge\" --type langevals/llm_boolean",
-                "evaluator update": "langwatch evaluator update <idOrSlug> --settings '{\"model\":\"openai/gpt-5-mini\"}'",
+                "evaluator update": "langwatch evaluator update <idOrSlug> --settings '{\"model\":\"openai/gpt-6-luna\"}'",
                 "evaluator delete": "langwatch evaluator delete <idOrSlug>"
               },
               "skill": "evaluations",

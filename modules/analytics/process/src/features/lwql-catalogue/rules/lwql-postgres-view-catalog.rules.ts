@@ -394,6 +394,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       CreatedById: { source: "createdById" },
       Scope: { source: "scope" },
       organizationId: "omit", // set only once a board is shared with the organization
+      excludedOrigins: "omit", // deprecated, unread since queries name their sources (AC200)
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },

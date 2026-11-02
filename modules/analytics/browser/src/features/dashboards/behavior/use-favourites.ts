@@ -54,7 +54,7 @@ export function useFavourites() {
       { projectId, star },
       {
         onSuccess: () => void refresh(),
-        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change your stars" }),
+        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change your pins" }),
       },
     );
   };
