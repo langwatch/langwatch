@@ -270,6 +270,26 @@ describe("signing in through a domain-matched organization's identity provider",
     });
   });
 
+  describe("given a concurrent sign-in already wrote the membership", () => {
+    it("asks for the admission once and announces nothing, leaving the grant to that sign-in", async () => {
+      const { mocks, organizations } = signupRepo(ACME, {
+        outcome: "already-present",
+        seat: "MEMBER",
+        pending: false,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(mocks.createMembership).toHaveBeenCalledTimes(1);
+      expect(announcements.announceSignup).not.toHaveBeenCalled();
+      expect(announcements.ssoAutoAddNurturing).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a credential signup whose email nobody has verified", () => {
     /** @scenario Unverified signup with a matching ssoDomain does not auto-join the SSO org */
     it("creates no membership and no grant at the domain-matched organization", async () => {

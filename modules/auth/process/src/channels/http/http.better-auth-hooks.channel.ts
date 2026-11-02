@@ -219,8 +219,8 @@ const joinSsoOrganization = async ({
 
 /**
  * Called after a new user is created. Records the sign-up for nurturing,
- * then auto-onboards the user into an SSO-matched organization, granting
- * access via a re-assertable ledger command (ADR-092 delivery-plan PR 2).
+ * then auto-onboards the user into an SSO-matched organization through the
+ * organization's seat-checked admission, which writes the matching grant.
  */
 export const afterUserCreate = async ({
   user,
