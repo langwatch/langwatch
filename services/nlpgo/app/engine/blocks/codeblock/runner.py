@@ -132,6 +132,8 @@ def _hide_from_other_executions() -> None:
 
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) != 0:
+        if os.environ.get("NLPGO_CODE_BLOCK_HIDE") == "best-effort":
+            return
         raise OSError(ctypes.get_errno(), "prctl(PR_SET_DUMPABLE) failed")
 
 

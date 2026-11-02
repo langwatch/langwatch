@@ -111,6 +111,10 @@ type Options struct {
 	// an endpoint with no key, gives agent code half a credential and one
 	// failure it cannot read.
 	SandboxEndpoint string
+	// AllowVisibleProcess lets code blocks run when the platform refuses to hide
+	// the engine's /proc files (AWS Lambda). Honoured only when
+	// AWS_LAMBDA_FUNCTION_NAME is set; elsewhere it is ignored with a warning.
+	AllowVisibleProcess bool
 	// Logger reports what teardown could not finish. Optional: a nil logger
 	// discards those reports rather than failing an execution.
 	Logger *zap.Logger
@@ -171,6 +175,45 @@ type Executor struct {
 	// payload is how an execution's payload reaches its interpreter, nil
 	// where there is no channel and the payload goes on stdin.
 	payload *payloadChannel
+	// mode is decided once in New; see hideMode.
+	mode hideMode
+}
+
+// hideMode says how the engine's own /proc files are protected.
+type hideMode string
+
+const (
+	// hideStrict: PR_SET_DUMPABLE took; the runner must hide itself too.
+	hideStrict hideMode = "strict"
+	// hideVisibleProcess: the platform refused it and the operator allowed that.
+	hideVisibleProcess hideMode = "visible-process"
+	// hideDisabled: refused and not allowed; code blocks are not served.
+	hideDisabled hideMode = "disabled"
+
+	allowVisibleSetting = "NLPGO_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
+	hideModeEnvVar      = "NLPGO_CODE_BLOCK_HIDE"
+)
+
+// resolveHideMode decides the mode and logs it once. A refusal never fails New:
+// the other block types must keep working.
+func resolveHideMode(allow bool, logger *zap.Logger) hideMode {
+	onLambda := os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != ""
+	if allow && !onLambda {
+		logger.Warn("nlpgo_code_block_allow_visible_process_ignored",
+			zap.String("setting", allowVisibleSetting),
+			zap.String("hint", "only honoured on AWS Lambda; elsewhere the hide step stays required"))
+		allow = false
+	}
+	mode := hideStrict
+	switch {
+	case !hideRefused:
+	case allow:
+		mode = hideVisibleProcess
+	default:
+		mode = hideDisabled
+	}
+	logger.Info("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)))
+	return mode
 }
 
 // New builds an Executor, reading the runner sources it holds in memory for
@@ -230,6 +273,7 @@ func New(opts Options) (*Executor, error) {
 		return nil, err
 	}
 	return &Executor{
+		mode:           resolveHideMode(opts.AllowVisibleProcess, opts.logger()),
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
@@ -422,11 +466,14 @@ func (e *Executor) childEnv() []string {
 	if allow == nil {
 		allow = defaultEnvAllowlist
 	}
-	env := make([]string, 0, len(allow))
+	env := make([]string, 0, len(allow)+1)
 	for _, name := range allow {
 		if v, ok := os.LookupEnv(name); ok {
 			env = append(env, name+"="+v)
 		}
+	}
+	if e.mode == hideVisibleProcess {
+		env = append(env, hideModeEnvVar+"=best-effort")
 	}
 	return env
 }
@@ -477,6 +524,9 @@ func runnerEnv(credential map[string]string, runDir, token string) map[string]st
 
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
+	if e.mode == hideDisabled {
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; set " + allowVisibleSetting + "=true to run them anyway (AWS Lambda only)"}}, nil
+	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape
 	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS by writing a bigger number into

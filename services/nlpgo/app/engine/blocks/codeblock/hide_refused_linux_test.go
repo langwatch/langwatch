@@ -21,16 +21,9 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 )
 
-// AWS Lambda answers EPERM to prctl(PR_SET_DUMPABLE) through seccomp. A filter
-// cannot be removed and the engine hardens itself once per process, so every
-// case runs in its own re-executed copy of this test binary, installs the same
-// kind of filter, and then runs the case. The parent only reports the child's
-// verdict.
-//
-// Production API these tests expect:
-//   - codeblock.Options.AllowVisibleProcess bool
-//   - codeblock.New honours it only when AWS_LAMBDA_FUNCTION_NAME is set
-//   - runner.py continues past a refused prctl when NLPGO_CODE_BLOCK_HIDE is "best-effort"
+// Lambda's seccomp answers EPERM to prctl(PR_SET_DUMPABLE). A filter cannot be
+// removed, so each case runs in a re-executed copy of this test binary that
+// installs one; the parent reports the child's verdict.
 
 const (
 	caseEnv         = "NLPGO_TEST_HIDE_CASE"

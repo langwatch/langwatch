@@ -190,8 +190,18 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, l
 			engineCfg.LangWatchBaseURL,
 			getenv,
 		),
-		DefaultTimeout: resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
+		DefaultTimeout:      resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
+		AllowVisibleProcess: isTruthy(getenv("NLPGO_CODE_BLOCK_ALLOW_VISIBLE_PROCESS")),
 	})
+}
+
+// isTruthy reads "true" or "1" (any case, trimmed) as on.
+func isTruthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1":
+		return true
+	}
+	return false
 }
 
 // newHTTPExecutor builds the HTTP-block executor from the operator-facing

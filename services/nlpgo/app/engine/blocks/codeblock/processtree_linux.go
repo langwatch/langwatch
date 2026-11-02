@@ -45,10 +45,12 @@ const (
 // records whether the subreaper flag took. Without that flag a detached
 // grandchild reparents to PID 1 and leaves the sweep with no way to tell it
 // apart from the rest of the container, so the orphan rule is only applied
-// when this is true.
+// when this is true. hideRefused records that the platform (AWS Lambda's
+// seccomp) answered PR_SET_DUMPABLE with an error.
 var (
 	hardeningOnce   sync.Once
 	subreaperActive bool
+	hideRefused     bool
 )
 
 // teardownDeadline bounds the sweep. SIGKILL is not refusable, so a pass that
@@ -81,7 +83,8 @@ func enableProcessHardening() {
 	hardeningOnce.Do(func() {
 		_, _, errno := syscall.Syscall(syscall.SYS_PRCTL, prSetChildSubreaper, 1, 0)
 		subreaperActive = errno == 0
-		_, _, _ = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
+		_, _, errno = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
+		hideRefused = errno != 0
 	})
 }
 

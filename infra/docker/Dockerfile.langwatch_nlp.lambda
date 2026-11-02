@@ -83,6 +83,10 @@ ENV SANDBOX_PYTHON=/usr/bin/python3.11
 ENV PYTHONPATH=/opt/sandbox-libs
 ENV SERVER_ADDR=:8080
 
+# One function per project, and Lambda's seccomp refuses PR_SET_DUMPABLE, so the
+# code-block hide step must be allowed to fail here. Not set for k8s/self-hosted.
+ENV NLPGO_CODE_BLOCK_ALLOW_VISIBLE_PROCESS=true
+
 # The adapter probes nlpgo's liveness and streams each SSE flush as its own
 # response chunk.
 ENV AWS_LWA_READINESS_CHECK_PATH=/healthz
