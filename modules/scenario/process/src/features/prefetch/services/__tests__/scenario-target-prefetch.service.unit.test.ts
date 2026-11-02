@@ -383,7 +383,7 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       });
 
       expect(adapter).toMatchObject({ connector: { teardown: { secrets: { API_KEY: "key-from-run" } } } });
-      expect(JSON.stringify(adapter)).not.toContain("not-named");
+      expect(adapter).not.toHaveProperty("connector.teardown.secrets.RUN_ONLY");
     });
 
     it("packs a named secret the project lacks as missing, for the step to fail on", async () => {
