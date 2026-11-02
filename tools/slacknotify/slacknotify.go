@@ -68,6 +68,50 @@ func (n Notifier) postNow(ctx context.Context, run Run, why string) (Result, err
 	return Result{Job: run.Job, Posted: true, Reason: why}, nil
 }
 
+// Mode is what to post for: one Job, or each red leg named with Prefix, else Fallback.
+type Mode struct {
+	Job      string
+	Prefix   string
+	Fallback string
+}
+
+// Check needs exactly one of Job and Prefix, and Fallback exactly when Prefix is set.
+func (m Mode) Check() error {
+	if (m.Job == "") == (m.Prefix == "") || (m.Prefix == "") != (m.Fallback == "") {
+		return errors.New("either -job, or -job-prefix with -fallback-job, is required")
+	}
+
+	return nil
+}
+
+// Deadline bounds a whole call: a minute for one job, 5 for the red legs (each leg times itself).
+func (m Mode) Deadline() time.Duration {
+	if m.Prefix != "" {
+		return 5 * time.Minute
+	}
+
+	return time.Minute
+}
+
+// NotifyMode checks m, then posts for run.Job or for each red leg of this run attempt.
+func (n Notifier) NotifyMode(ctx context.Context, run Run, m Mode, attempt int64) ([]Result, error) {
+	if err := m.Check(); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, m.Deadline())
+	defer cancel()
+	if m.Prefix != "" {
+		return n.NotifyRedLegs(ctx, run, Legs{Attempt: attempt, Prefix: m.Prefix, Fallback: m.Fallback})
+	}
+	run.Job = m.Job
+	result, err := n.Notify(ctx, run)
+	if err != nil {
+		return nil, err
+	}
+
+	return []Result{result}, nil
+}
+
 // Legs picks the jobs of one run attempt to report: every job named with
 // Prefix that failed or was cancelled, else Fallback.
 type Legs struct {

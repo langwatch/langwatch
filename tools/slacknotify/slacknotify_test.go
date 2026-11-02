@@ -314,3 +314,51 @@ func TestALookupThatUsesUpTheDeadlineStillPosts(t *testing.T) {
 	assert.True(t, result.Posted, result.Reason)
 	require.Len(t, f.raw, 1)
 }
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestAModeNeedsOneJobOrAPrefixWithAFallback(t *testing.T) {
+	for name, tc := range map[string]struct {
+		mode slacknotify.Mode
+		ok   bool
+	}{
+		"one job":                     {slacknotify.Mode{Job: "typecheck"}, true},
+		"a prefix with a fallback":    {slacknotify.Mode{Prefix: "package-suites (", Fallback: job}, true},
+		"nothing":                     {slacknotify.Mode{}, false},
+		"a job and a prefix":          {slacknotify.Mode{Job: "typecheck", Prefix: "package-suites (", Fallback: job}, false},
+		"a prefix without a fallback": {slacknotify.Mode{Prefix: "package-suites ("}, false},
+		"a fallback without a prefix": {slacknotify.Mode{Job: "typecheck", Fallback: job}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := tc.mode.Check()
+			if tc.ok {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestOneJobGetsAMinuteAndRedLegsGetFive(t *testing.T) {
+	assert.Equal(t, time.Minute, slacknotify.Mode{Job: "typecheck"}.Deadline())
+	assert.Equal(t, 5*time.Minute, slacknotify.Mode{Prefix: "package-suites (", Fallback: job}.Deadline())
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestNotifyModePostsOneJobOrEachRedLeg(t *testing.T) {
+	one := &fake{previous: "success"}
+	results, err := one.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{Job: job}, 0)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, []string{job}, one.posted())
+
+	red := &fake{legs: map[string]string{job: "failure", "package-suites (browser)": "failure"}}
+	results, err = red.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{Prefix: legs.Prefix, Fallback: job}, 2)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	assert.ElementsMatch(t, []string{job, "package-suites (browser)"}, red.posted())
+
+	_, err = red.start(t).NotifyMode(context.Background(), failing, slacknotify.Mode{}, 2)
+	assert.Error(t, err)
+}

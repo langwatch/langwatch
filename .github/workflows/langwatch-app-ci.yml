@@ -779,15 +779,17 @@ jobs:
       # downloading Chromium. Cached by Playwright version, that install finds the
       # browser already there and only checks the system libraries. Keyed on the
       # version rather than the lockfile, so an unrelated dependency bump keeps
-      # the cache and the repository's cache quota is not churned.
+      # the cache and the repository's cache quota is not churned. Browser leg only.
       - name: Read the Playwright version
         id: playwright
+        if: matrix.lanes == 'browser'
         run: |
           version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache the Playwright browser
+        if: matrix.lanes == 'browser'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
