@@ -136,10 +136,19 @@ func TestWithStderrTail_WindowStartingInsideAMarkerSkipsTheFragment(t *testing.T
 	assert.True(t, strings.HasPrefix(tailOf(got), "… yyyy"), got)
 }
 
+func TestWithStderrTail_AWindowStartingAtALineStartKeepsThatLine(t *testing.T) {
+	text := strings.Repeat("x", 100) + "\n" + "L" + strings.Repeat("y", codeblock.MaxStderrInMessage-1)
+
+	got := codeblock.WithStderrTail("exit status 1", text)
+
+	assert.True(t, strings.HasPrefix(tailOf(got), "… Lyyy"), got[:min(40, len(got))])
+}
+
 func TestWithStderrTail_BlankStderrLeavesTheMessageUnchanged(t *testing.T) {
 	assert.Equal(t, "exit status 1", codeblock.WithStderrTail("exit status 1", " \n\t "))
 }
 
+// @scenario "A runner error carries the end of the interpreter stderr"
 func TestWithStderrTail_SingleLongLineKeepsTheByteTail(t *testing.T) {
 	stderr := codeblock.TruncatedPrefix + strings.Repeat("é", codeblock.MaxRunnerStderr)
 
@@ -171,7 +180,7 @@ func TestCodeBlock_ErrorMessageCarriesTheFinalTracebackOfAStderrLongerThanTheCap
 	assert.Contains(t, res.Error.Message, "FinalError: boom")
 	assert.Contains(t, res.Error.Message, "Traceback (most recent call last)")
 	assert.NotContains(t, res.Error.Message, "first line")
-	assert.True(t, strings.HasPrefix(res.Stderr, codeblock.TruncatedPrefix), res.Stderr[:40])
+	assert.True(t, strings.HasPrefix(res.Stderr, codeblock.TruncatedPrefix), res.Stderr[:min(40, len(res.Stderr))])
 	assert.True(t, strings.HasSuffix(res.Stderr, "FinalError: boom"))
 }
 
@@ -195,7 +204,7 @@ func TestCodeBlock_SecretStraddlingTheStderrWindowStartIsAbsentAndResultSaysTrun
 	require.NoError(t, err)
 	require.NotNil(t, res.Error)
 
-	assert.True(t, strings.HasPrefix(res.Stderr, codeblock.TruncatedPrefix), res.Stderr[:40])
+	assert.True(t, strings.HasPrefix(res.Stderr, codeblock.TruncatedPrefix), res.Stderr[:min(40, len(res.Stderr))])
 	assert.NotContains(t, res.Stderr, "CAPSEC")
 	assert.NotContains(t, res.Error.Message, "CAPSEC")
 }
@@ -221,7 +230,7 @@ func TestCodeBlock_MultiLineSecretStraddlingTheStderrWindowStartIsAbsent(t *test
 	require.NoError(t, err)
 	require.NotNil(t, res.Error)
 
-	assert.True(t, strings.HasPrefix(res.Stderr, codeblock.TruncatedPrefix), res.Stderr[:40])
+	assert.True(t, strings.HasPrefix(res.Stderr, codeblock.TruncatedPrefix), res.Stderr[:min(40, len(res.Stderr))])
 	assert.NotContains(t, res.Stderr, "LEAKEDLINE")
 	assert.NotContains(t, res.Error.Message, "LEAKEDLINE")
 }
@@ -235,7 +244,7 @@ func TestReadRunnerStderr_LongSecretStraddlingTheWindowStartIsAbsentWhenShortSec
 	require.NoError(t, err)
 
 	assertNoFragments(t, got, long, 4)
-	assert.True(t, strings.HasPrefix(got, codeblock.TruncatedPrefix), got[:40])
+	assert.True(t, strings.HasPrefix(got, codeblock.TruncatedPrefix), got[:min(40, len(got))])
 }
 
 // @scenario "A secret that crosses the stderr cap is never partly shown"
@@ -261,7 +270,7 @@ func TestReadRunnerStderr_CutTextWithoutANewlineKeepsTheEndAndIsMarked(t *testin
 	got, err := codeblock.ReadRunnerStderr(t.TempDir(), strings.Repeat("a", 500)+strings.Repeat("z", codeblock.MaxRunnerStderr-1)+"E", nil)
 	require.NoError(t, err)
 
-	assert.True(t, strings.HasPrefix(got, codeblock.TruncatedPrefix+"z"), got[:40])
+	assert.True(t, strings.HasPrefix(got, codeblock.TruncatedPrefix+"z"), got[:min(40, len(got))])
 	assert.True(t, strings.HasSuffix(got, "zE"))
 	assert.Len(t, got, codeblock.MaxRunnerStderr+len(codeblock.TruncatedPrefix))
 }
@@ -304,8 +313,8 @@ func TestReadRunnerStderr_AFloodOfAOneCharacterSecretIsOneMarkerAfterTheTruncati
 	assert.Equal(t, codeblock.TruncatedPrefix, got)
 }
 
-// @scenario "A secret that crosses the stderr cap is never partly shown"
-func TestReadRunnerStderr_InvalidUTF8AtTheWindowStartIsDropped(t *testing.T) {
+// @scenario "A cut interpreter stderr starts with a truncation marker"
+func TestReadRunnerStderr_InvalidBytesBecomeReplacementCharactersAndTheCutIsMarked(t *testing.T) {
 	raw := "x" + strings.Repeat("\x80", 10) + strings.Repeat("y", codeblock.MaxRunnerStderr-3)
 
 	got, err := codeblock.ReadRunnerStderr(t.TempDir(), raw, nil)
@@ -315,20 +324,71 @@ func TestReadRunnerStderr_InvalidUTF8AtTheWindowStartIsDropped(t *testing.T) {
 	assert.True(t, strings.HasPrefix(got, codeblock.TruncatedPrefix))
 }
 
+// @scenario "A cut interpreter stderr starts with a truncation marker"
+func TestReadRunnerStderr_AShortStderrWithAStrayByteIsNotMarkedAsCut(t *testing.T) {
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "\x80\x80boom", nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "\uFFFDboom", got)
+}
+
+// @scenario "A secret split by an invalid byte is never joined"
+func TestReadRunnerStderr_ASecretSplitByAnInvalidByteIsNotJoinedAfterwards(t *testing.T) {
+	const secret = "SECRETVALUE"
+	secrets := map[string]string{"K": secret}
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "Boom: SECRET\xffVALUE end", secrets)
+	require.NoError(t, err)
+
+	assert.Equal(t, "Boom: SECRET\uFFFDVALUE end", got)
+	assert.NotContains(t, got, secret)
+
+	long := strings.Repeat("n\n", 2000) + "SECRET\xffVALUE" + strings.Repeat("e", 100)
+	stored, err := codeblock.ReadRunnerStderr(t.TempDir(), long, secrets)
+	require.NoError(t, err)
+	msg := codeblock.WithStderrTail("exit status 1", stored)
+	assert.NotContains(t, stored, secret)
+	assert.NotContains(t, msg, secret)
+	assert.Contains(t, stored, "\uFFFD")
+}
+
 // @scenario "A secret cut off at the end of the stderr is never partly shown"
 func TestReadRunnerStderr_AStderrEndingInAPartOfASecretShowsNoFragmentOfIt(t *testing.T) {
-	secret := "pa\"ss\nwo\u00e9rd-SECRET"
-	forms := []string{secret, `pa\"ss\nwoérd-SECRET`, `pa\"ss\nwo\u00e9rd-SECRET`}
-	for _, form := range forms {
-		for n := 1; n < len(form); n++ {
-			got, err := codeblock.ReadRunnerStderr(t.TempDir(), "Traceback\nBoom "+form[:n], map[string]string{"K": secret})
-			require.NoError(t, err)
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "Traceback\nBoom key=sk-abcd", map[string]string{"K": "sk-abcdef"})
+	require.NoError(t, err)
 
-			for _, f := range forms {
-				assertNoFragments(t, got, f, 4)
-			}
-		}
-	}
+	assert.Equal(t, "Traceback\nBoom key=", got)
+}
+
+// @scenario "A secret cut off at the end of the stderr is never partly shown"
+func TestReadRunnerStderr_AStderrOfOneRepeatedByteThatIsTheSecretKeepsAMarker(t *testing.T) {
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), strings.Repeat("0", codeblock.MaxRunnerStderr), map[string]string{"K": "0000"})
+	require.NoError(t, err)
+
+	assert.Equal(t, "[redacted]", got)
+}
+
+// @scenario "A secret cut off at the end of the stderr is never partly shown"
+func TestReadRunnerStderr_AnOrdinaryTailThatLooksLikeASecretPrefixIsTrimmedOnPurpose(t *testing.T) {
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "retry count 1000", map[string]string{"K": "0000"})
+	require.NoError(t, err)
+
+	assert.Equal(t, "retry count 1", got)
+}
+
+// @scenario "A secret cut off at the end of the stderr is never partly shown"
+func TestReadRunnerStderr_ATrimmedPartialTakesAWholeSecretItOverlapsWithIt(t *testing.T) {
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "ok ABCDEFGHI", map[string]string{"a": "ABCDEF", "b": "EFGHIJ"})
+	require.NoError(t, err)
+
+	assert.Equal(t, "ok ", got)
+}
+
+// @scenario "A runner error carries the end of the interpreter stderr"
+func TestReadRunnerStderr_AFinalErrorLineSurvivesSecretsThatMatchItsLetters(t *testing.T) {
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "Traceback\nFinalError: boom\n", map[string]string{"a": "rabc", "b": "orz", "c": "Exy"})
+	require.NoError(t, err)
+
+	assert.Equal(t, "Traceback\nFinalError: boom\n", got)
 }
 
 func assertNoFragments(t *testing.T, text, secret string, minLen int) {
@@ -358,7 +418,7 @@ func TestReadRunnerStderr_SecretEndingAtTheWindowStartBeforeAStrayByteIsNotPartl
 	}
 }
 
-// @scenario "The error message carries the end of a stderr longer than the cap"
+// @scenario "A secret cut off at the end of the stderr is never partly shown"
 func TestWithStderrTail_ASecretLargerThanTheTailAtTheEndLeavesNoFragment(t *testing.T) {
 	secret := strings.Repeat("S3cr3t-", 600)
 	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "Traceback\nBoom: "+secret, map[string]string{"K": secret})

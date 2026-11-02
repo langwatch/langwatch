@@ -191,9 +191,44 @@ func TestRedactor_TrimPartialTailKeepsWholeSecretsAndOrdinaryText(t *testing.T) 
 	assert.Equal(t, "", r.TrimPartialTail("SECR"))
 }
 
-func TestRedactor_TrimPartialTailFollowsAChainOfPrefixes(t *testing.T) {
-	r := redact.New(map[string]string{"a": "XYZW123", "b": "ABCDXYZW"})
-	assert.Equal(t, "", r.TrimPartialTail("ABCDXYZW"[:8]))
+func TestRedactor_TrimPartialTailTrimsOnceAndDoesNotEatTheTextBeforeIt(t *testing.T) {
+	r := redact.New(map[string]string{"a": "rabc", "b": "orz", "c": "Exy"})
+	assert.Equal(t, "boom FinalErr", r.TrimPartialTail("boom FinalError"))
+}
+
+func TestRedactor_TrimPartialTailOfALongSecretOverLargeTextCutsOnlyTheLastByte(t *testing.T) {
+	secret := "x" + strings.Repeat("Q", 4000)
+	r := redact.New(map[string]string{"k": secret})
+	text := strings.Repeat("x", 64<<10)
+	got := r.TrimPartialTail(text)
+	assert.Len(t, got, len(text)-1)
+}
+
+func TestRedactor_TrimPartialTailKeepsAPartialThatIsInsideAWholeMatch(t *testing.T) {
+	r := redact.New(map[string]string{"k": "0000"})
+	in := strings.Repeat("0", 64<<10)
+	assert.Equal(t, in, r.TrimPartialTail(in))
+	assert.Equal(t, "[redacted]", r.Redact(r.TrimPartialTail(in)))
+}
+
+func TestRedactor_TrimPartialTailStillTrimsARealCutOffPartial(t *testing.T) {
+	r := redact.New(map[string]string{"k": "sk-abcdef"})
+	assert.Equal(t, "key=", r.TrimPartialTail("key=sk-ab"))
+}
+
+func TestRedactor_TrimPartialTailOfAnOrdinaryTailIsTheAcceptedTradeOff(t *testing.T) {
+	r := redact.New(map[string]string{"k": "0000"})
+	assert.Equal(t, "retry count 1", r.TrimPartialTail("retry count 1000"))
+}
+
+func TestRedactor_TrimPartialTailNeverCutsAWholeSecretInHalf(t *testing.T) {
+	r := redact.New(map[string]string{"a": "ABCDEF", "b": "EFGHIJ"})
+	got := r.TrimPartialTail("ok ABCDEFGHI")
+	assert.Equal(t, "ok ", got)
+}
+
+func TestRedactor_MarkerIsTheTextARedactionLeaves(t *testing.T) {
+	assert.Equal(t, redact.Marker, redactAll("secret", map[string]string{"k": "secret"}))
 }
 
 func TestRedactor_TrimPartialTailLeavesTextWithoutSecretsAlone(t *testing.T) {

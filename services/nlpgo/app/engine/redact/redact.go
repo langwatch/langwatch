@@ -11,7 +11,8 @@ import (
 	"unicode/utf8"
 )
 
-const redactedMarker = "[redacted]"
+// Marker is the text a redacted secret is replaced with.
+const Marker = "[redacted]"
 
 // Redactor replaces secret values with "[redacted]" in a text.
 type Redactor struct {
@@ -46,7 +47,7 @@ func New(secrets map[string]string, extra ...string) *Redactor {
 		maxLen = max(maxLen, len(form))
 	}
 	// The marker is matched like a form so a short secret never splits it.
-	return &Redactor{forms: append(forms, redactedMarker), maxFormLen: max(maxLen, len(redactedMarker))}
+	return &Redactor{forms: append(forms, Marker), maxFormLen: max(maxLen, len(Marker))}
 }
 
 // Redact replaces every secret form in text with "[redacted]". Forms that
@@ -65,7 +66,7 @@ func (r *Redactor) Redact(text string) string {
 	last := 0
 	for _, s := range spans {
 		out.WriteString(text[last:s.start])
-		out.WriteString(redactedMarker)
+		out.WriteString(Marker)
 		last = s.end
 	}
 	out.WriteString(text[last:])
@@ -113,32 +114,72 @@ func endOfSpanContaining(spans []span, pos int) int {
 	return pos
 }
 
-// TrimPartialTail removes the longest suffix of raw that is a proper prefix
-// of a secret form, repeatedly. A secret cut off at the end of a stream is
-// not matched whole, so its first characters would otherwise show.
+// TrimPartialTail removes the longest suffix of raw that is a proper prefix of
+// a secret form, once: a secret cut off at the end of a stream is not matched
+// whole, so its first characters would otherwise show. A suffix inside a whole
+// match is kept (it is redacted anyway); one that cuts a whole match in two
+// takes the match with it. An ordinary tail that looks like a prefix goes too:
+// a leak is worse than losing up to MaxFormLen-1 bytes.
 func (r *Redactor) TrimPartialTail(raw string) string {
-	for {
-		n := r.partialTailLen(raw)
-		if n == 0 {
+	k := r.partialTailLen(raw)
+	if k == 0 {
+		return raw
+	}
+	cut := len(raw) - k
+	for _, s := range r.mergedSpans(raw) {
+		if s.start <= cut && s.end >= len(raw) {
 			return raw
 		}
-		raw = raw[:len(raw)-n]
+		if s.start < cut && cut < s.end {
+			cut = s.start
+		}
 	}
+	return raw[:cut]
 }
 
+// partialTailLen is the longest proper prefix of any form that ends raw,
+// found with a KMP scan of the last len(form)-1 bytes: O(len(form)) per form.
 func (r *Redactor) partialTailLen(raw string) int {
 	longest := 0
 	for _, form := range r.forms {
-		if form == redactedMarker {
+		if form == Marker {
 			continue
 		}
-		for n := min(len(form)-1, len(raw)); n > longest; n-- {
-			if strings.HasSuffix(raw, form[:n]) {
-				longest = n
-			}
-		}
+		window := raw[max(0, len(raw)-(len(form)-1)):]
+		longest = max(longest, prefixSuffixLen(form, window))
 	}
 	return longest
+}
+
+// failureTable is the KMP table: for each prefix of form, the length of its
+// longest proper prefix that is also its suffix.
+func failureTable(form string) []int {
+	fail := make([]int, len(form))
+	for i, k := 1, 0; i < len(form); i++ {
+		for k > 0 && form[i] != form[k] {
+			k = fail[k-1]
+		}
+		if form[i] == form[k] {
+			k++
+		}
+		fail[i] = k
+	}
+	return fail
+}
+
+// prefixSuffixLen is the length of the longest prefix of form that ends window.
+func prefixSuffixLen(form, window string) int {
+	fail := failureTable(form)
+	k := 0
+	for i := 0; i < len(window); i++ {
+		for k > 0 && window[i] != form[k] {
+			k = fail[k-1]
+		}
+		if window[i] == form[k] {
+			k++
+		}
+	}
+	return k
 }
 
 // mergedSpans is the sorted, disjoint spans every form (and the marker)

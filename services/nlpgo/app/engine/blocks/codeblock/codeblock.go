@@ -679,35 +679,41 @@ const truncatedPrefix = "[stderr truncated]\n"
 
 // withStderrTail appends the end of the redacted stderr to a runner failure,
 // so "exit status 1" says why. The tail is the last maxStderrInMessage bytes,
-// from the next line start when the window has one; "… " marks a tail that
-// does not begin at the start of the stored text. Never pass raw text.
+// from a line start when the window has one; "… " marks a tail that does not
+// begin at the start of the stored text. Never pass raw text.
 func withStderrTail(message, stderr string) string {
 	text := strings.TrimSpace(stderr)
-	from := max(0, len(text)-maxStderrInMessage)
-	tail := text[from:]
-	if _, rest, found := strings.Cut(tail, "\n"); found && from > 0 {
-		from += len(tail) - len(rest)
-		tail = rest
-	} else if from > 0 {
-		tail = skipMarkerFragment(text[:from], tail)
+	from := len(text) - maxStderrInMessage
+	if from <= 0 {
+		return appendTail(message, text, "")
 	}
+	tail := text[from:]
+	if text[from-1] != '\n' {
+		if _, rest, found := strings.Cut(tail, "\n"); found {
+			tail = rest
+		} else {
+			tail = skipMarkerFragment(text[:from], tail)
+		}
+	}
+	return appendTail(message, tail, "… ")
+}
+
+// appendTail adds tail to message, after prefix; a blank tail adds nothing.
+// A window cut can leave a partial rune at the tail start, which is dropped.
+func appendTail(message, tail, prefix string) string {
 	tail = strings.TrimSpace(strings.ToValidUTF8(tail, ""))
 	if tail == "" {
 		return message
 	}
-	if from > 0 {
-		tail = "… " + tail
-	}
-	return message + ": " + tail
+	return message + ": " + prefix + tail
 }
 
-// skipMarkerFragment drops the rest of a "[redacted]" that the window start
+// skipMarkerFragment drops the rest of a redact.Marker that the window start
 // cut in two: before is the text left of the window, tail the window.
 func skipMarkerFragment(before, tail string) string {
-	const marker = "[redacted]"
-	for n := 1; n < len(marker); n++ {
-		if strings.HasSuffix(before, marker[:n]) && strings.HasPrefix(tail, marker[n:]) {
-			return tail[len(marker)-n:]
+	for n := 1; n < len(redact.Marker); n++ {
+		if strings.HasSuffix(before, redact.Marker[:n]) && strings.HasPrefix(tail, redact.Marker[n:]) {
+			return tail[len(redact.Marker)-n:]
 		}
 	}
 	return tail
@@ -748,16 +754,18 @@ func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
 	if err != nil {
 		return ""
 	}
-	// Every form containing `from` starts at most MaxFormLen before it, inside
-	// the buffer, so SafeStart sees it whole and `from` never lands in one.
-	raw := redactor.TrimPartialTail(string(buf))
-	from := min(int(max(0, size-maxRunnerStderr-offset)), len(raw))
-	start := redactor.SafeStart(raw, from)
-	text := strings.ToValidUTF8(redactor.Redact(raw[start:]), "")
-	if offset > 0 || start > 0 {
-		return truncatedPrefix + text
+	// Invalid bytes go before any matching: dropped later they would join the
+	// bytes around them into a secret the redactor never saw.
+	raw := strings.ToValidUTF8(string(buf), "\uFFFD")
+	capStart := max(0, len(raw)-maxRunnerStderr)
+	raw = redactor.TrimPartialTail(raw)
+	if offset == 0 && capStart == 0 {
+		return redactor.Redact(raw)
 	}
-	return text
+	// Every form containing capStart starts at most MaxFormLen before it,
+	// inside the buffer, so SafeStart sees it whole and the cut lands in none.
+	start := redactor.SafeStart(raw, min(capStart, len(raw)))
+	return truncatedPrefix + redactor.Redact(raw[start:])
 }
 
 // newRunToken mints the value every process in one execution carries in its

@@ -391,7 +391,11 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # stream holds interpreter-level diagnostics, read back only when no
     # result was produced. It keeps the last 64 KiB; the cut is chosen on the
     # raw bytes so it falls inside no secret, a secret cut off at the end is
-    # dropped, and only the kept part is redacted.
+    # dropped, and only the kept part is redacted. Invalid UTF-8 is replaced
+    # before any matching so a dropped byte never joins a secret. Trimming a
+    # partial at the end may drop up to MaxFormLen-1 trailing bytes on
+    # purpose, even an ordinary tail such as "1000" for a secret "0000":
+    # a leak is worse than a lost byte. A partial inside a whole match stays.
     @unit
     Scenario: A runner error carries the end of the interpreter stderr
       Given a runner that exits without writing a result and wrote to stderr
@@ -405,7 +409,6 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Given a runner that exits without writing a result and wrote more stderr than the cap
       When the runner fails
       Then the error message carries the final lines of that stderr, not the first
-      And the stored stderr keeps the end and starts with "[stderr truncated]"
 
     @unit
     Scenario: A cut interpreter stderr starts with a truncation marker
@@ -420,6 +423,14 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the runner wrote a stderr that ends partway through that secret
       When the interpreter stderr is read back
       Then no fragment of that secret is shown
+
+    @unit
+    Scenario: A secret split by an invalid byte is never joined
+      Given the workflow carries a secret
+      And the runner wrote a stderr in which an invalid byte splits that secret
+      When the interpreter stderr is read back
+      Then the stored stderr shows the replacement character where the byte was
+      And the secret is not shown joined
 
     @unit
     Scenario: A secret is scrubbed from stderr in its JSON-escaped forms
