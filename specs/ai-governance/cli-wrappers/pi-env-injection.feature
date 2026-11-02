@@ -92,6 +92,13 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
       And an opened or saved pi tile keeps the virtual key off, whatever the toggle said
 
     @unit
+    Scenario: Moving a tile off a kind that fixes toggles switches them back on
+      Given a coding assistant tile whose kind switched toggles off, as pi or Cursor does
+      When an admin picks another kind for it
+      Then every toggle the old kind had switched off is back on, its default
+      And the new kind still switches off what it fixes
+
+    @unit
     Scenario: pi is offered as an AI tool that sets up with `langwatch pi`
       When the starter AI tools are listed
       Then one coding assistant tile is pi, set up with `langwatch pi`

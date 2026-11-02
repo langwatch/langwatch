@@ -18,7 +18,7 @@ describe("coding-assistant toggles", () => {
   });
 
   describe("when an admin moves a tile from pi to another kind", () => {
-    /** @scenario "An admin picking pi in the tile drawer gets the virtual key and bundled plan switched off" */
+    /** @scenario "Moving a tile off a kind that fixes toggles switches them back on" */
     it("switches the virtual key and the bundled plan back on", () => {
       expect(togglesOnKindChange({ from: "pi", to: "codex" })).toEqual({
         allowVk: true,
@@ -39,6 +39,15 @@ describe("coding-assistant toggles", () => {
     it("locks direct OTLP off and leaves the bundled plan alone", () => {
       expect(togglesOnKindChange({ from: "codex", to: "cursor" })).toEqual({
         allowOtelDirect: false,
+      });
+    });
+  });
+
+  describe("when an admin moves a tile from Cursor to another kind", () => {
+    /** @scenario "Moving a tile off a kind that fixes toggles switches them back on" */
+    it("switches direct OTLP back on", () => {
+      expect(togglesOnKindChange({ from: "cursor", to: "codex" })).toEqual({
+        allowOtelDirect: true,
       });
     });
   });
