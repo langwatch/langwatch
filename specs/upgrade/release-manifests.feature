@@ -78,6 +78,16 @@ Feature: Release manifests order every migration step release by release
     Then the first manifest's previous release is the 3.18.1 baseline
     And every release from 3.19.0 to 3.20.1 has a manifest whose previous release is the one before it
 
+  # 3.21.0 shipped with no manifest: its release pull request merged before the stamp commit
+  # landed, and nothing noticed until a later image tree check failed on every branch.
+  @unit
+  Scenario: Every release in the changelog after the baseline has a manifest
+    Given the changelog names the releases shipped after the 3.18.1 baseline
+    When the manifests shipped in the package are loaded
+    Then each of those releases has a manifest
+    And each manifest's previous release is the release before it in the changelog
+    And a missing one is reported with the command that stamps it
+
   @unit
   Scenario: An upgrade across several releases steps release by release
     Given an installation recorded at 3.20.1

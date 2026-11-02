@@ -1,7 +1,21 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
+import { loadReleaseBaseline } from "../baseline.ts";
 import { loadReleases, parseManifests } from "../manifest-loader.ts";
-import { ManifestLoadError } from "../manifest.ts";
+import { compareReleases, ManifestLoadError } from "../manifest.ts";
+
+const CHANGELOG = fileURLToPath(new URL("../../../../../CHANGELOG.md", import.meta.url));
+
+/** The platform releases the root changelog names, oldest first. */
+function changelogReleases(): string[] {
+  const headings = readFileSync(CHANGELOG, "utf8").matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm);
+  return [...headings]
+    .map((match) => match[1] ?? "")
+    .toSorted((left, right) => compareReleases({ left, right }));
+}
 
 function manifestFile({ name, release, ids }: { name: string; release: string; ids: string[] }) {
   return {
@@ -87,5 +101,30 @@ describe("loadReleases()", () => {
         ...chain.slice(0, -1),
       ]);
     });
+  });
+});
+
+describe("the shipped manifests against the changelog", () => {
+  describe("when every release after the baseline is looked up", () => {
+    const baseline = loadReleaseBaseline().release;
+    const released = changelogReleases().filter(
+      (release) => compareReleases({ left: release, right: baseline }) > 0,
+    );
+    const { manifests } = loadReleases();
+
+    /** @scenario "Every release in the changelog after the baseline has a manifest" */
+    it.each(released.map((release, index) => [release, released[index - 1] ?? baseline]))(
+      "finds a manifest for %s that follows %s",
+      (release, previous) => {
+        const stamp =
+          "node --experimental-transform-types packages/upgrade/scripts/stamp-release.ts " +
+          `--release ${release} --previous ${previous} --tree langwatch@v${release} ` +
+          "--table-owners <pnpm --filter @langwatch/architecture-enforcer print:table-owners>";
+        const manifest = manifests.find((each) => each.release === release);
+
+        expect(manifest, `${release} shipped with no manifest; stamp it: ${stamp}`).toBeDefined();
+        expect(manifest?.previous).toBe(previous);
+      },
+    );
   });
 });

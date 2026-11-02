@@ -1,0 +1,49 @@
+name: release-manifests
+
+# Fails a PR when a platform release in CHANGELOG.md has no upgrade manifest in
+# packages/upgrade/releases/. A release PR adds its changelog heading, so it stays
+# red until the stamp job's manifest commit lands on it. 3.21.0 merged without
+# one, and nothing noticed until a later image tree check failed on every branch.
+#
+# Spec: specs/upgrade/release-manifests.feature
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "CHANGELOG.md"
+      - ".github/.release-please-manifest.json"
+      - "packages/upgrade/releases/**"
+      - "packages/upgrade/src/manifest/**"
+      - ".github/workflows/release-manifests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-manifests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  release-manifests:
+    name: Every release has a manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+
+      - name: Install the upgrade package
+        run: CI=true pnpm install --frozen-lockfile --filter "@langwatch/upgrade..."
+
+      - name: Check the manifests against the changelog
+        run: pnpm --filter @langwatch/upgrade test src/manifest/__tests__/manifest-loader.unit.test.ts
