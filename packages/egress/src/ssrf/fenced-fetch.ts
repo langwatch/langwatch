@@ -5,6 +5,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   Agent,
   type Dispatcher,
+  Pool,
   type Response as FetchResponse,
   ProxyAgent,
   fetch as undiciFetch,
@@ -81,6 +82,30 @@ export class OutboundProxyMisconfiguredError extends Error {
     super("The outbound proxy setting (HTTPS_PROXY or HTTP_PROXY) is not a valid proxy URL");
     this.name = "OutboundProxyMisconfiguredError";
   }
+}
+
+/**
+ * The operator's proxy failed this hop: it could not be reached, or it refused
+ * the tunnel. Names the proxy's host and port, never its credentials, so the
+ * destination is not blamed for the deployment's own network.
+ */
+export class OutboundProxyUnreachableError extends Error {
+  constructor({ proxy, detail }: { proxy: URL; detail: string }) {
+    super(`The outbound proxy at ${proxy.host} failed: ${detail}`);
+    this.name = "OutboundProxyUnreachableError";
+  }
+}
+
+/** Whether a failure, or any cause under it, came from the proxy rather than the destination. */
+function isProxyFailure({ error, proxy }: { error: unknown; proxy: URL }): boolean {
+  const port = Number(proxy.port || (proxy.protocol === "https:" ? 443 : 80));
+  for (let at = error; at instanceof Error; at = (at as { cause?: unknown }).cause) {
+    if (/^Proxy response \(\d+\)/.test(at.message)) return true;
+    const failed = at as { port?: unknown; hostname?: unknown; address?: unknown };
+    if (failed.hostname === proxy.hostname) return true;
+    if (failed.port === port && failed.address !== undefined) return true;
+  }
+  return false;
 }
 
 /**
@@ -211,6 +236,8 @@ function createProxyAgent({
     ...timeouts,
     uri: proxyUrl,
     requestTls: { rejectUnauthorized: tls.rejectUnauthorized },
+    // The client to the proxy gets the same bounds, so a stalled CONNECT times out too.
+    clientFactory: (origin, options) => new Pool(origin, { ...options, ...timeouts }),
   });
 }
 
@@ -227,7 +254,7 @@ function createDispatcher({
   validated: SsrfValidationResult;
   init: FencedFetchOptions | undefined;
   tls: EgressTlsPolicy;
-}): Dispatcher {
+}): { dispatcher: Dispatcher; proxy: URL | undefined } {
   const timeouts = resolveAgentTimeouts(init);
   const proxyUrl =
     init?.proxy && !init.bypassProxy?.(validated)
@@ -239,18 +266,22 @@ function createDispatcher({
       "Sending the judged hop through the outbound proxy",
     );
     try {
-      return createProxyAgent({ proxyUrl, tls, timeouts });
+      return {
+        dispatcher: createProxyAgent({ proxyUrl, tls, timeouts }),
+        proxy: new URL(proxyUrl),
+      };
     } catch {
       throw new OutboundProxyMisconfiguredError();
     }
   }
 
   const resolvedIp = getResolvedIpForPinning(validated);
-  return createGuardedAgent({
+  const dispatcher = createGuardedAgent({
     pinnedIp: resolvedIp && isIP(resolvedIp) !== 0 ? resolvedIp : null,
     tls,
     timeouts,
   });
+  return { dispatcher, proxy: undefined };
 }
 
 function getResolvedIpForPinning(result: SsrfValidationResult): string | null {
@@ -283,10 +314,11 @@ export async function fetchValidatedDestination(
 
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
   let dispatcher: Dispatcher | undefined;
+  let proxy: URL | undefined;
 
   try {
     // Inside the try, so the dispatcher is destroyed on every later failure.
-    dispatcher = createDispatcher({ validated, init, tls });
+    ({ dispatcher, proxy } = createDispatcher({ validated, init, tls }));
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
       // Entries, not the `Headers` instance: two copies of the undici types
@@ -322,21 +354,37 @@ export async function fetchValidatedDestination(
     return response;
   } catch (err) {
     void dispatcher?.destroy().catch(() => undefined);
-    // Our own refusal, or the operator's proxy setting, not the network's.
-    // Everything below rewrites an error into "Connection failed to host:port: …",
-    // the right shape for a socket problem and the wrong one for these.
-    if (err instanceof RedirectRefusedError || err instanceof OutboundProxyMisconfiguredError) {
-      throw err;
-    }
-    if (err instanceof Error) {
-      const cause = (err as Error & { cause?: Error }).cause;
-      if (cause) {
-        throw formatConnectionError(cause, validated.hostname, validated.port);
-      }
-      throw formatConnectionError(err, validated.hostname, validated.port);
-    }
-    throw err;
+    throw failureFor({ err, validated, proxy });
   }
+}
+
+/**
+ * What a failed hop throws. Our own refusals and the operator's proxy pass
+ * through; a failure the proxy caused names the proxy; anything else is
+ * rewritten as "Connection failed to host:port: …", a socket problem's shape.
+ */
+function failureFor({
+  err,
+  validated,
+  proxy,
+}: {
+  err: unknown;
+  validated: SsrfValidationResult;
+  proxy: URL | undefined;
+}): unknown {
+  if (
+    err instanceof RedirectRefusedError ||
+    err instanceof OutboundProxyMisconfiguredError ||
+    err instanceof OutboundProxyUnreachableError ||
+    !(err instanceof Error)
+  ) {
+    return err;
+  }
+  const cause = (err as Error & { cause?: Error }).cause;
+  if (proxy && isProxyFailure({ error: err, proxy })) {
+    return new OutboundProxyUnreachableError({ proxy, detail: (cause ?? err).message });
+  }
+  return formatConnectionError(cause ?? err, validated.hostname, validated.port);
 }
 
 async function followRedirect({

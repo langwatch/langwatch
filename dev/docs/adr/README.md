@@ -106,6 +106,7 @@ Reusable framework decisions live with their packages:
 | [187](./187-async-inserts-waiting-for-a-slot-share-a-statement.md)             | Async inserts waiting for a statement slot share one statement                                                             | Proposed                  |
 | [190](./190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md) | A routed Instant Evals judgement is priced from the summed cost of its calls, at the one published markup                  | Proposed                  |
 | [191](./191-capitalised-names-get-a-second-person-pass.md)                     | A name written in capitals gets a second person pass                                                                       | Proposed                  |
+| [195](./195-outbound-proxy-in-the-egress-fence.md)                             | The egress fence carries a request through the outbound proxy                                                              | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

@@ -1,6 +1,3 @@
-/** The reason both SSO fetches give when the outbound proxy setting will not parse. */
-export const PROXY_MISCONFIGURED_REASON = "proxy_misconfigured";
-
 /**
  * Whether an issuer answers as one. Two answers, not the proof's three:
  * "unreachable" and "not a provider" both stop the registration, and the

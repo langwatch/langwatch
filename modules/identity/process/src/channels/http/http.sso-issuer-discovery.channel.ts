@@ -7,6 +7,7 @@ import {
   isBlockedCloudDomain,
   type OutboundProxyConfig,
   OutboundProxyMisconfiguredError,
+  OutboundProxyUnreachableError,
   RedirectRefusedError,
   type SsrfUrlValidator,
   type SsrfValidationResult,
@@ -19,10 +20,10 @@ import {
   discoveryEndpointFor,
   looksLikeDiscoveryDocument,
 } from "../../features/sso-connection/rules/sso-idp-registration.rules.ts";
-import {
-  PROXY_MISCONFIGURED_REASON,
-  type SsoIssuerDiscovery,
-  type SsoIssuerDiscoveryChannel,
+import { OUTBOUND_PROXY_REASONS } from "../../rules/outbound-proxy.rules.ts";
+import type {
+  SsoIssuerDiscovery,
+  SsoIssuerDiscoveryChannel,
 } from "../sso-issuer-discovery.channel.ts";
 import type { SsoDomainProofEgressPolicy } from "./http.sso-domain-proof-file.channel.ts";
 
@@ -249,7 +250,8 @@ function reasonFor({ error, aborted }: { error: unknown; aborted: boolean }): st
   if (error instanceof DiscoveryDowngradedError) return "not_https";
   if (error instanceof VouchedOriginUnresolvableError) return "unresolvable";
   if (error instanceof RedirectRefusedError) return "redirect_refused";
-  if (error instanceof OutboundProxyMisconfiguredError) return PROXY_MISCONFIGURED_REASON;
+  if (error instanceof OutboundProxyMisconfiguredError) return OUTBOUND_PROXY_REASONS.misconfigured;
+  if (error instanceof OutboundProxyUnreachableError) return OUTBOUND_PROXY_REASONS.unreachable;
   if (aborted) return "timeout";
   const code =
     typeof error === "object" &&

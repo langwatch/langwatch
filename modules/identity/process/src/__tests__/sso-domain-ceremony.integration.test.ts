@@ -27,7 +27,6 @@ import type {
   SsoDomainProofChannel,
   SsoDomainTxtLookup,
 } from "../channels/sso-domain-proof.channel.ts";
-import { PROXY_MISCONFIGURED_REASON } from "../channels/sso-issuer-discovery.channel.ts";
 import type {
   SsoConnectionRegistrationRepository,
   SsoConnectionRegistrationSlot,
@@ -41,6 +40,7 @@ import type { SsoConnectionLedger } from "../features/sso-connection/rules/sso-c
 import { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../features/sso-connection/services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../features/sso-domain/services/sso-domain-ceremony.service.ts";
+import { OUTBOUND_PROXY_REASONS } from "../rules/outbound-proxy.rules.ts";
 import { sha256Hex } from "../rules/pkce.rules.ts";
 import { licensingFixture, StubPlatformOperators } from "./support/in-memory-connections.ts";
 
@@ -529,7 +529,7 @@ describe("checking what the domain publishes", () => {
 
   it("blames the outbound proxy setting, not the domain, when the proxy is misconfigured", async () => {
     await issue();
-    files.answer = { outcome: "unreachable", reason: PROXY_MISCONFIGURED_REASON };
+    files.answer = { outcome: "unreachable", reason: OUTBOUND_PROXY_REASONS.misconfigured };
 
     await expect(
       ceremony.checkDomainFile({

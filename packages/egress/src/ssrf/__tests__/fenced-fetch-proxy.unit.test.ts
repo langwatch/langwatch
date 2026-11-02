@@ -3,7 +3,11 @@ import net from "node:net";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { fetchValidatedDestination, OutboundProxyMisconfiguredError } from "../fenced-fetch.ts";
+import {
+  fetchValidatedDestination,
+  OutboundProxyMisconfiguredError,
+  OutboundProxyUnreachableError,
+} from "../fenced-fetch.ts";
 import type { SsrfUrlValidator, SsrfValidationResult } from "../url-validator.ts";
 
 /**
@@ -45,6 +49,28 @@ function admitted({
     path,
     resolvedIp,
   };
+}
+
+/** An https hop to a named host, judged at an address nothing answers on. */
+function httpsHop(): SsrfValidationResult {
+  return {
+    ...admitted({
+      hostname: "idp.example.test",
+      port: originPort,
+      path: "/",
+      resolvedIp: UNREACHABLE_IP,
+    }),
+    originalUrl: `https://idp.example.test:${originPort}/`,
+    protocol: "https:",
+  };
+}
+
+/** A loopback port that was free a moment ago, so a connection to it is refused. */
+async function portNothingListensOn(): Promise<number> {
+  const probe = http.createServer();
+  const port = await listen(probe);
+  await new Promise((resolve) => probe.close(resolve));
+  return port;
 }
 
 let origin: http.Server;
@@ -143,6 +169,80 @@ describe("the pinned fetch with an outbound proxy", () => {
         fetchValidatedDestination(validated, { proxy: { httpsProxy: proxyUrl } }, tls),
       ).rejects.toThrow(/idp\.example\.test/);
       expect(tunnelled).toEqual([`idp.example.test:${originPort}`]);
+    });
+
+    it("blames the destination, not the proxy, when the tunnelled handshake fails", async () => {
+      const failure = await fetchValidatedDestination(
+        httpsHop(),
+        { proxy: { httpsProxy: proxyUrl } },
+        tls,
+      ).catch((error: unknown) => error);
+
+      expect(failure).not.toBeInstanceOf(OutboundProxyUnreachableError);
+    });
+  });
+
+  describe("given a proxy that cannot be reached", () => {
+    /** @scenario "A proxy that cannot be reached is named as the failure, not the destination" */
+    it("fails naming the proxy's host, without its credentials", async () => {
+      const closedPort = await portNothingListensOn();
+
+      const failure = await fetchValidatedDestination(
+        httpsHop(),
+        { proxy: { httpsProxy: `http://user:secret@127.0.0.1:${closedPort}` } },
+        tls,
+      ).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(OutboundProxyUnreachableError);
+      expect((failure as Error).message).toContain(`127.0.0.1:${closedPort}`);
+      expect((failure as Error).message).not.toMatch(/secret|idp\.example\.test/);
+    });
+  });
+
+  describe("given a proxy that refuses the tunnel", () => {
+    /** @scenario "A proxy that refuses the tunnel is named as the failure" */
+    it("fails naming the proxy, not the destination", async () => {
+      const refusing = http.createServer();
+      refusing.on("connect", (_req: http.IncomingMessage, client: net.Socket) => {
+        client.end("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n");
+      });
+      const port = await listen(refusing);
+      try {
+        const failure = await fetchValidatedDestination(
+          httpsHop(),
+          { proxy: { httpsProxy: `http://127.0.0.1:${port}` } },
+          tls,
+        ).catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(OutboundProxyUnreachableError);
+        expect((failure as Error).message).toContain(`127.0.0.1:${port}`);
+      } finally {
+        refusing.closeAllConnections();
+        refusing.close();
+      }
+    });
+  });
+
+  describe("given a proxy that never answers a tunnel request", () => {
+    /** @scenario "The headers timeout also bounds the proxy's answer to a tunnel request" */
+    it("fails once the headers timeout passes", async () => {
+      const stalled = http.createServer();
+      stalled.on("connect", () => undefined);
+      const port = await listen(stalled);
+      try {
+        const started = Date.now();
+        await expect(
+          fetchValidatedDestination(
+            httpsHop(),
+            { proxy: { httpsProxy: `http://127.0.0.1:${port}` }, headersTimeoutMs: 200 },
+            tls,
+          ),
+        ).rejects.toThrow(/Headers Timeout/);
+        expect(Date.now() - started).toBeLessThan(5_000);
+      } finally {
+        stalled.closeAllConnections();
+        stalled.close();
+      }
     });
   });
 

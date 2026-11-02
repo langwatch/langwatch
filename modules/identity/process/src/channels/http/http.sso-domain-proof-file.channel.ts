@@ -4,6 +4,7 @@ import {
   type FencedFetchOptions,
   type OutboundProxyConfig,
   OutboundProxyMisconfiguredError,
+  OutboundProxyUnreachableError,
   RedirectRefusedError,
   type SsrfUrlValidator,
   type SsrfValidationResult,
@@ -11,11 +12,11 @@ import {
 } from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
 
+import { OUTBOUND_PROXY_REASONS } from "../../rules/outbound-proxy.rules.ts";
 import type {
   SsoDomainFileFetch,
   SsoDomainProofFileChannel,
 } from "../sso-domain-proof-file.channel.ts";
-import { PROXY_MISCONFIGURED_REASON } from "../sso-issuer-discovery.channel.ts";
 
 const logger = createLogger("langwatch:identity:sso-domain-file");
 
@@ -186,7 +187,8 @@ export class HttpsSsoDomainProofFileChannel implements SsoDomainProofFileChannel
 function reasonFor({ error, aborted }: { error: unknown; aborted: boolean }): string {
   if (error instanceof ProofFileDowngradedError) return "not_https";
   if (error instanceof RedirectRefusedError) return "redirect_refused";
-  if (error instanceof OutboundProxyMisconfiguredError) return PROXY_MISCONFIGURED_REASON;
+  if (error instanceof OutboundProxyMisconfiguredError) return OUTBOUND_PROXY_REASONS.misconfigured;
+  if (error instanceof OutboundProxyUnreachableError) return OUTBOUND_PROXY_REASONS.unreachable;
   if (aborted) return "timeout";
   const code =
     typeof error === "object" &&

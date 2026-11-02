@@ -79,6 +79,26 @@ Feature: Egress address policy and the pinned fetch
     Then the fetch fails with an error naming the proxy setting, not the destination
     And the error does not repeat the setting's value
 
+  @unit
+  Scenario: A proxy that cannot be reached is named as the failure, not the destination
+    Given an outbound proxy that refuses connections
+    When a destination the policy admitted is fetched through it
+    Then the fetch fails with an error naming the proxy's host, not the destination
+    And the error does not repeat the proxy's credentials
+
+  @unit
+  Scenario: A proxy that refuses the tunnel is named as the failure
+    Given an outbound proxy that answers a tunnel request with 407
+    When an https destination the policy admitted is fetched through it
+    Then the fetch fails with an error naming the proxy, not the destination
+
+  @unit
+  Scenario: The headers timeout also bounds the proxy's answer to a tunnel request
+    Given an outbound proxy that never answers a tunnel request
+    And a fetch with a headers timeout
+    When an https destination the policy admitted is fetched through it
+    Then the fetch fails once the headers timeout passes
+
   # Every caller opts in by passing its proxy setting (ADR-195). These have not yet.
   @integration @unimplemented
   Scenario Outline: A caller that fetches a user-supplied address passes the outbound proxy

@@ -109,9 +109,15 @@ identity provider inside your network needs its origin in
 `SSO_TRUSTED_IDP_ORIGINS`. LangWatch then reaches that origin directly, never
 through the proxy, so it needs no `NO_PROXY` entry.
 
-The proxy looks up the hostname itself, so LangWatch cannot hold the
-connection to the address it checked. Configure the proxy to refuse private,
-link-local and cloud metadata addresses (such as `169.254.169.254`) itself.
+The proxy looks up the hostname itself, so LangWatch cannot hold the connection
+to the address it checked. Configure the proxy to refuse every address that is
+not public: loopback (such as `127.0.0.1` and `::1`), private and link-local
+ranges, and cloud metadata addresses (such as `169.254.169.254`).
+
+Only these two requests use the proxy today. Sign-in itself (the token exchange
+and the signing keys) does not go through `HTTPS_PROXY` yet, so the app and
+workers must reach your identity provider's token and keys endpoints directly
+for sign-in to work.
 
 ### Microsoft Entra ID
 

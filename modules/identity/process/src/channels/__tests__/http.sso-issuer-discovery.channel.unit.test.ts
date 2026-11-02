@@ -1,5 +1,9 @@
 import type { SsrfUrlValidator, SsrfValidationResult } from "@langwatch/egress";
-import { OutboundProxyMisconfiguredError, RedirectRefusedError } from "@langwatch/egress";
+import {
+  OutboundProxyMisconfiguredError,
+  OutboundProxyUnreachableError,
+  RedirectRefusedError,
+} from "@langwatch/egress";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -122,6 +126,20 @@ describe("given an issuer an administrator typed", () => {
     await expect(channel.discover({ issuer: ISSUER })).resolves.toEqual({
       reachable: false,
       reason: "redirect_refused",
+    });
+  });
+
+  it("names a proxy that failed the request, not the issuer", async () => {
+    const { channel } = channelAnswering(async () => {
+      throw new OutboundProxyUnreachableError({
+        proxy: new URL("http://proxy.corp:3128"),
+        detail: "connect ECONNREFUSED",
+      });
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toEqual({
+      reachable: false,
+      reason: "proxy_unreachable",
     });
   });
 
