@@ -118,8 +118,8 @@ override-dependencies = [
   # covering <13.0.0, three of them critical.
   "pillow>=13.0.0",
   # nltk unsafe deserialization in the pickle loader path, plus the advisories
-  # closed in 3.10.1 and 3.10.3.
-  "nltk>=3.10.3",
+  # closed in 3.10.1, 3.10.3 and 3.10.4 (#3259).
+  "nltk>=3.10.4",
   # authlib (via arize-phoenix and fastmcp): JWS empty-signature validation
   # (CRITICAL) and further advisories, all fixed by 1.9.1.
   "authlib>=1.9.1",
@@ -138,8 +138,8 @@ override-dependencies = [
   "setuptools>=84.1.0",
   # torch: deserialization advisory in torch.load.
   "torch>=2.13.0",
-  # tornado: HTTP header and multipart parsing advisories.
-  "tornado>=6.5.9",
+  # tornado: HTTP header, multipart and chunked body advisories (#3331-#3333).
+  "tornado>=6.6",
   # httpx2: two advisories fixed in 2.11.0 and one in 2.12.0.
   "httpx2>=2.12.0",
   #
@@ -163,7 +163,10 @@ constraint-dependencies = [
   "datasets>=5.0.1", # datasets advisory covering <5.0.1; 4.x also caps fsspec below its fix
   "mako>=1.4.2", # Mako advisory covering <=1.4.1
   "multidict>=6.9.1", # multidict advisory covering 6.7.0-6.9.0
-  "langgraph-sdk>=0.4.4", # langgraph-sdk advisory covering <=0.4.3
+  "langgraph-sdk>=0.4.6", # langgraph-sdk advisories covering <=0.4.3 and 0.4.0-0.4.5 (#3301)
+  "langgraph>=1.2.14", # LangGraph SDK v3 streaming identifiers advisory (#3302)
+  "joserfc>=1.7.6", # joserfc JWE recipients and compact JWS size advisories (#3364, #3365)
+  "filelock>=4.2.1", # filelock lock-file advisories covering <=4.2.0 (#3303, #3304)
   # pydantic-ai: 2.30.0 is the highest floor that resolves. From 2.44.0 its
   # openai extra needs openai>=3.8.0, whose jiter requirement every
   # instructor release (a dependency of the notebooks and tutorials) excludes
