@@ -169,6 +169,7 @@ function serviceOver({
       adoption: { adopt },
     }),
     isMember,
+    getMemberSeat,
     getConnection,
     requestFromSsoArrival,
     recordSsoArrival,
@@ -681,6 +682,8 @@ describe("given somebody who already belongs to the organization", () => {
 
     expect(parts.attachBindings).not.toHaveBeenCalled();
     expect(parts.completeAdmission).not.toHaveBeenCalled();
+    // Nothing is pending, so the seat is never read.
+    expect(parts.getMemberSeat).not.toHaveBeenCalled();
   });
 
   /** @scenario "A Lite Member's unfinished admission is resumed with the Viewer grant, never a full one" */

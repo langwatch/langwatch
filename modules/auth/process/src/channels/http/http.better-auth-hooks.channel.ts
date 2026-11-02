@@ -197,8 +197,8 @@ const joinSsoOrganization = async ({
     },
   });
   if (admission.outcome === "already-present") {
-    // A concurrent callback wrote the row, and its admission finishes the grant: a second
-    // binding here would leave that admission unconfirmed.
+    // A concurrent callback wrote the row and finishes its own grant; a second binding would
+    // leave that admission unconfirmed. Only a connection arrival resumes one left unfinished.
     logger.info(
       { userId: user.id, organizationId: org.id },
       "Auto-add SSO membership was already present (P2002) — treating as success",
