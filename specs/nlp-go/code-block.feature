@@ -389,8 +389,9 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
     # The runner captures the user's own stderr into the result file; this
     # stream holds interpreter-level diagnostics, read back only when no
-    # result was produced. It is capped; the cut is chosen on the raw bytes
-    # so it falls inside no secret, and only the kept part is redacted.
+    # result was produced. It keeps the last 64 KiB; the cut is chosen on the
+    # raw bytes so it falls inside no secret, a secret cut off at the end is
+    # dropped, and only the kept part is redacted.
     @unit
     Scenario: A runner error carries the end of the interpreter stderr
       Given a runner that exits without writing a result and wrote to stderr
@@ -400,11 +401,25 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And a stderr that is one long line keeps the end of that line
 
     @unit
-    Scenario: A cut interpreter stderr ends with a truncation marker
+    Scenario: The error message carries the end of a stderr longer than the cap
+      Given a runner that exits without writing a result and wrote more stderr than the cap
+      When the runner fails
+      Then the error message carries the final lines of that stderr, not the first
+      And the stored stderr keeps the end and starts with "[stderr truncated]"
+
+    @unit
+    Scenario: A cut interpreter stderr starts with a truncation marker
       Given a runner that wrote more stderr than the cap
       When the interpreter stderr is read back
-      Then the stored stderr ends with "[stderr truncated]"
-      And the text kept before the marker is not dropped when it has no newline
+      Then the stored stderr starts with "[stderr truncated]" and keeps the end
+      And the kept text is the last 64 KiB even when it has no newline
+
+    @unit
+    Scenario: A secret cut off at the end of the stderr is never partly shown
+      Given the workflow carries a secret
+      And the runner wrote a stderr that ends partway through that secret
+      When the interpreter stderr is read back
+      Then no fragment of that secret is shown
 
     @unit
     Scenario: A secret is scrubbed from stderr in its JSON-escaped forms
@@ -416,10 +431,10 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     @unit
     Scenario: A secret that crosses the stderr cap is never partly shown
       Given the workflow carries secrets of different lengths, one of them one character long
-      And the runner wrote a stderr in which a long secret starts before the cap and ends after it
+      And the runner wrote a stderr in which a long secret starts before the kept part and ends inside it
       When the runner fails
       Then the stored stderr and the error message show no fragment of that secret
-      And the stored stderr ends with "[stderr truncated]"
+      And the stored stderr starts with "[stderr truncated]"
 
   Rule: A run's own LangWatch credential reaches user code through the environment
 

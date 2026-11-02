@@ -610,8 +610,6 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	elapsed := time.Since(started)
 
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
-	redactor := redact.New(req.Secrets, req.SandboxAPIKey)
-	stderrText := readRunnerStderr(stderrFile, redactor)
 
 	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
 		var parsed struct {
@@ -643,6 +641,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 
 	// No result file (most likely: timeout killed the process before
 	// it finished writing, or invalid runner). Synthesize a result.
+	stderrText := readRunnerStderr(stderrFile, redact.New(req.Secrets, req.SandboxAPIKey))
 	if timedOut {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
@@ -668,42 +667,50 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}, nil
 }
 
-// maxRunnerStderr bounds what is read back from the subprocess's stderr. The
-// runner captures the user's own stderr into the result file, so this stream
-// carries interpreter-level diagnostics and a cap costs nothing — except to
-// code that writes gigabytes to its descriptor, which is why there is one.
-// readRunnerStderr's cut never falls inside a secret.
+// maxRunnerStderr bounds what is kept of the subprocess's stderr: the last
+// maxRunnerStderr bytes, since the final traceback is what explains a failure.
 const maxRunnerStderr = 64 << 10
 
 // maxStderrInMessage bounds the stderr tail appended to a runner error.
 const maxStderrInMessage = 2 << 10
 
-// truncatedMarker ends a stderr that was cut at the cap.
-const truncatedMarker = "\n[stderr truncated]"
+// truncatedPrefix starts a stderr whose beginning was dropped at the cap.
+const truncatedPrefix = "[stderr truncated]\n"
 
-// withStderrTail appends the end of the kept interpreter stderr to a runner
-// failure, so "exit status 1" says why. That stderr is the project's own
-// output, already shown to it in the run, and the tail is bounded: it starts
-// on a line start when the window has one, else (a single long line) on the
-// first whole rune. The stderr must already be redacted, as readRunnerStderr
-// returns it.
+// withStderrTail appends the end of the redacted stderr to a runner failure,
+// so "exit status 1" says why. The tail is the last maxStderrInMessage bytes,
+// from the next line start when the window has one; "… " marks a tail that
+// does not begin at the start of the stored text. Never pass raw text.
 func withStderrTail(message, stderr string) string {
-	body, truncated := strings.CutSuffix(strings.TrimSpace(stderr), truncatedMarker)
-	tail := strings.TrimSpace(body)
-	if len(tail) > maxStderrInMessage {
-		tail = tail[len(tail)-maxStderrInMessage:]
-		if _, rest, found := strings.Cut(tail, "\n"); found {
-			tail = rest
-		}
+	text := strings.TrimSpace(stderr)
+	from := max(0, len(text)-maxStderrInMessage)
+	tail := text[from:]
+	if _, rest, found := strings.Cut(tail, "\n"); found && from > 0 {
+		from += len(tail) - len(rest)
+		tail = rest
+	} else if from > 0 {
+		tail = skipMarkerFragment(text[:from], tail)
 	}
 	tail = strings.TrimSpace(strings.ToValidUTF8(tail, ""))
-	if truncated {
-		tail += truncatedMarker
-	}
 	if tail == "" {
 		return message
 	}
-	return message + ": " + strings.TrimSpace(tail)
+	if from > 0 {
+		tail = "… " + tail
+	}
+	return message + ": " + tail
+}
+
+// skipMarkerFragment drops the rest of a "[redacted]" that the window start
+// cut in two: before is the text left of the window, tail the window.
+func skipMarkerFragment(before, tail string) string {
+	const marker = "[redacted]"
+	for n := 1; n < len(marker); n++ {
+		if strings.HasSuffix(before, marker[:n]) && strings.HasPrefix(tail, marker[n:]) {
+			return tail[len(marker)-n:]
+		}
+	}
+	return tail
 }
 
 // newRunnerStderr opens the file the interpreter's own stderr goes to, in the
@@ -726,29 +733,31 @@ func newRunnerStderr(scratchRoot string) (*os.File, error) {
 	return file, nil
 }
 
-// readRunnerStderr reads what the subprocess wrote to its stderr, for the
-// paths where the runner never produced a result file and that text is the
-// only account of why. The file has no name, so it is read back through the
-// descriptor the executor still holds. It reads past the cap by the longest
-// secret form, so a secret that crosses the cap is seen whole; the cut is
-// chosen on the raw bytes, off any secret, and only the kept part is redacted.
+// readRunnerStderr reads the last maxRunnerStderr bytes the subprocess wrote
+// to its stderr, redacted, for the paths where it produced no result file.
+// It reads a lookback of one longest secret form before them, so a secret that
+// crosses the start is seen whole, and prefixes truncatedPrefix when it cut.
 func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return ""
-	}
-	data, err := io.ReadAll(io.LimitReader(file, int64(maxRunnerStderr+redactor.MaxFormLen()+1)))
+	info, err := file.Stat()
 	if err != nil {
 		return ""
 	}
-	raw := string(data)
-	if len(raw) <= maxRunnerStderr {
-		return redactor.Redact(raw)
+	size := info.Size()
+	offset := max(0, size-maxRunnerStderr-int64(redactor.MaxFormLen()))
+	buf, err := io.ReadAll(io.NewSectionReader(file, offset, size-offset))
+	if err != nil {
+		return ""
 	}
-	text := redactor.Redact(raw[:redactor.SafeCut(raw, maxRunnerStderr)])
-	if i := strings.LastIndexByte(text, '\n'); i >= 0 {
-		text = text[:i]
+	// Every form containing `from` starts at most MaxFormLen before it, inside
+	// the buffer, so SafeStart sees it whole and `from` never lands in one.
+	raw := redactor.TrimPartialTail(string(buf))
+	from := min(int(max(0, size-maxRunnerStderr-offset)), len(raw))
+	start := redactor.SafeStart(raw, from)
+	text := strings.ToValidUTF8(redactor.Redact(raw[start:]), "")
+	if offset > 0 || start > 0 {
+		return truncatedPrefix + text
 	}
-	return text + truncatedMarker
+	return text
 }
 
 // newRunToken mints the value every process in one execution carries in its

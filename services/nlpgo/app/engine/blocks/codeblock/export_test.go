@@ -15,8 +15,8 @@ func (e *Executor) ScratchRoot() string { return e.scratchRoot }
 // WithStderrTail exposes the runner-error stderr formatter to the tests.
 var WithStderrTail = withStderrTail
 
-// TruncatedMarker exposes the marker that ends a cut stderr to the tests.
-const TruncatedMarker = truncatedMarker
+// TruncatedPrefix exposes the marker that starts a cut stderr to the tests.
+const TruncatedPrefix = truncatedPrefix
 
 // MaxStderrInMessage exposes the tail bound to the tests.
 const MaxStderrInMessage = maxStderrInMessage

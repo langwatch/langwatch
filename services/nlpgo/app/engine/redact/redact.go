@@ -46,7 +46,7 @@ func New(secrets map[string]string, extra ...string) *Redactor {
 		maxLen = max(maxLen, len(form))
 	}
 	// The marker is matched like a form so a short secret never splits it.
-	return &Redactor{forms: append(forms, redactedMarker), maxFormLen: maxLen}
+	return &Redactor{forms: append(forms, redactedMarker), maxFormLen: max(maxLen, len(redactedMarker))}
 }
 
 // Redact replaces every secret form in text with "[redacted]". Forms that
@@ -77,42 +77,68 @@ func (r *Redactor) Redact(text string) string {
 // window extended by it.
 func (r *Redactor) MaxFormLen() int { return r.maxFormLen }
 
-// SafeCut returns the largest cut point at or below limit that falls inside
-// no secret and on a rune boundary, so raw[:cut] holds whole secrets or none.
-// It works on the raw text: Redact changes lengths, so an offset taken from
-// redacted text does not point at the same place in raw.
-func (r *Redactor) SafeCut(raw string, limit int) int {
-	cut := min(limit, len(raw))
-	if len(r.forms) == 0 {
-		return alignToRune(raw, cut)
-	}
+// SafeStart returns the smallest start at or after from that falls inside no
+// secret and on a rune start, so raw[start:] holds whole secrets or none.
+// Work on raw: Redact changes lengths, so redacted offsets do not map back.
+func (r *Redactor) SafeStart(raw string, from int) int {
+	start := min(max(from, 0), len(raw))
 	spans := r.mergedSpans(raw)
-	// Leaving a span can land mid-rune and stepping back can land in the
-	// span again, so the two moves repeat until neither changes the cut.
+	// Leaving a span can land mid-rune and a rune start can land in a span,
+	// so the two moves repeat until neither changes the start.
 	for {
-		moved := alignToRune(raw, startOutsideSpans(spans, cut))
-		if moved == cut {
-			return cut
+		moved := alignForward(raw, endOfSpanContaining(spans, start))
+		if moved == start {
+			return start
 		}
-		cut = moved
+		start = moved
 	}
 }
 
-func alignToRune(raw string, cut int) int {
-	for cut > 0 && cut < len(raw) && !utf8.RuneStart(raw[cut]) {
-		cut--
+// alignForward moves start to a rune start, giving up after UTFMax-1 bytes;
+// what stays invalid is for strings.ToValidUTF8 to drop.
+func alignForward(raw string, start int) int {
+	for i := 0; i < utf8.UTFMax-1 && start < len(raw) && !utf8.RuneStart(raw[start]); i++ {
+		start++
 	}
-	return cut
+	return start
 }
 
-// startOutsideSpans moves cut to the start of the span that strictly contains it.
-func startOutsideSpans(spans []span, cut int) int {
+// endOfSpanContaining moves pos to the end of the span that strictly contains it.
+func endOfSpanContaining(spans []span, pos int) int {
 	for _, s := range spans {
-		if s.start < cut && cut < s.end {
-			return s.start
+		if s.start < pos && pos < s.end {
+			return s.end
 		}
 	}
-	return cut
+	return pos
+}
+
+// TrimPartialTail removes the longest suffix of raw that is a proper prefix
+// of a secret form, repeatedly. A secret cut off at the end of a stream is
+// not matched whole, so its first characters would otherwise show.
+func (r *Redactor) TrimPartialTail(raw string) string {
+	for {
+		n := r.partialTailLen(raw)
+		if n == 0 {
+			return raw
+		}
+		raw = raw[:len(raw)-n]
+	}
+}
+
+func (r *Redactor) partialTailLen(raw string) int {
+	longest := 0
+	for _, form := range r.forms {
+		if form == redactedMarker {
+			continue
+		}
+		for n := min(len(form)-1, len(raw)); n > longest; n-- {
+			if strings.HasSuffix(raw, form[:n]) {
+				longest = n
+			}
+		}
+	}
+	return longest
 }
 
 // mergedSpans is the sorted, disjoint spans every form (and the marker)
