@@ -18427,15 +18427,18 @@ Three things have to be in place for a pull request to show its cost: the agent 
 ## Set it up
 
 <Steps>
-  <Step title="Sign in">
+  <Step title="Install the command-line tool and sign in">
     ```bash
-    npx langwatch login --device
+    npm install -g langwatch
+    langwatch login --device
     ```
+
+    Install it globally, not through `npx`. The Claude Code hooks that `langwatch instrument` writes call the `langwatch` command, and the Codex `notify` entry points at the copy that ran the setup, so a copy that npm deletes from its `npx` cache stops the reporting.
   </Step>
   <Step title="Wire the agent">
     ```bash
-    npx langwatch instrument claude
-    npx langwatch instrument codex
+    langwatch instrument claude
+    langwatch instrument codex
     ```
 
     Run the line for each agent you use. The command prints every file it wrote and where the telemetry goes, then exits.
@@ -18529,7 +18532,7 @@ Both `langwatch instrument` and any `langwatch <tool>` wrapper run write the rem
 ## Undo it
 
 ```bash
-npx langwatch logout
+langwatch logout
 ```
 
 `langwatch logout` signs this machine out and removes every block LangWatch wrote: the Claude Code variables and hooks, the Codex `[otel]` and `notify` blocks and the `AGENTS.md` instruction, and the shell functions. It removes only blocks LangWatch wrote, and leaves the rest of each file as it was.
