@@ -97,6 +97,29 @@ await it("renders real notes and remembers dismissal by release at desktop and p
 });
 
 /** @scenario "Read and dismiss a release update" */
+await it("leaves the release update in view beside an announcement the reader cannot dismiss", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+      try {
+        await page.goto(base + "integration/quick-start");
+        const release = page.getByRole("complementary", { name: "Latest release" });
+        const announcement = page.getByRole("complementary", { name: "Announcement" });
+        await announcement.waitFor();
+        assert.equal(await release.isVisible(), false, "a dismissible announcement goes first");
+        /* The same page with a permanent announcement: one without its dismiss button. */
+        await announcement.locator("[data-docs-dismiss]").evaluate((button) => button.remove());
+        await release.waitFor();
+        assert.equal(await announcement.isVisible(), true);
+      } finally {
+        await page.close();
+      }
+    },
+  });
+});
+
+/** @scenario "Read and dismiss a release update" */
 await it("keeps releases readable without scripts and can dismiss when storage is denied", async () => {
   await withPreviewBrowser({
     outDir,

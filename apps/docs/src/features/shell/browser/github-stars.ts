@@ -54,12 +54,19 @@ async function fetchStars({ win }: { win: StarsWindow }) {
   }
 }
 
+let inFlight: Promise<void> | undefined;
+
 /**
  * Replaces the build's star count with a live one. A count this browser read within the hour is
  * used as it is; an older one stands in only on a page built without a count. If GitHub does not
- * answer, the page keeps the count it has and asks again after the hour.
+ * answer, the page keeps the count it has and asks again after the hour. One ask at a time.
  */
-export async function refreshStars({
+export function refreshStars(options: { win?: StarsWindow; now?: number } = {}) {
+  inFlight ??= askAndPaint(options).finally(() => (inFlight = undefined));
+  return inFlight;
+}
+
+async function askAndPaint({
   win = window,
   // The performance clock gives epoch milliseconds without pulling Temporal into this island.
   now = Math.round(performance.timeOrigin + performance.now()),

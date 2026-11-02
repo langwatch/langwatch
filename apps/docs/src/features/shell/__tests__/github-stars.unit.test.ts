@@ -72,6 +72,19 @@ describe("the live GitHub star count", () => {
     });
   });
 
+  describe("when the reader navigates while GitHub is still answering", () => {
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("asks GitHub once", async () => {
+      const { win, count, requests } = fakeWindow();
+      await Promise.all([
+        refreshStars({ win: win as never, now: NOW }),
+        refreshStars({ win: win as never, now: NOW }),
+      ]);
+      expect(requests).toHaveLength(1);
+      expect(count.textContent).toBe("7,000");
+    });
+  });
+
   describe("when the browser read the count within the hour", () => {
     /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
     it("shows the stored count without asking GitHub", async () => {
