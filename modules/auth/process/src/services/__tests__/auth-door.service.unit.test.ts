@@ -561,6 +561,24 @@ describe("given an OAuth sign-in Better Auth would not link to the account holdi
     });
 
     /** @scenario "A refused link is logged with the sign-in method and the email domain" */
+    it("still logs the refusal when the provider returned no address", async () => {
+      loggerSpies.warn.mockClear();
+      const handler = vi.fn(
+        async () => new Response(null, { status: 302, headers: { location: NOT_LINKED_AT } }),
+      );
+      const { service } = door({ betterAuth: async () => ({ handler }) });
+
+      await service.betterAuthHandshake(callback());
+
+      expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
+      expect(loggerSpies.warn.mock.calls[0]![0]).toEqual({
+        provider: "google",
+        emailDomain: "unknown",
+        governingConnectionId: null,
+      });
+    });
+
+    /** @scenario "A refused link is logged with the sign-in method and the email domain" */
     it("never writes the full address", async () => {
       loggerSpies.warn.mockClear();
       const { service } = doorRefusingLink({ governing: {} });
@@ -582,6 +600,18 @@ describe("given an OAuth sign-in Better Auth would not link to the account holdi
       await service.betterAuthHandshake(callback());
 
       expect(asked).toEqual([]);
+    });
+
+    it("logs no refused-link warning", async () => {
+      loggerSpies.warn.mockClear();
+      const { service } = doorRefusingLink({
+        governing: { "andrei@acme.com": ["ssoc_acme"] },
+        location: `${BASE_URL}/auth/error?error=DIFFERENT_EMAIL_NOT_ALLOWED`,
+      });
+
+      await service.betterAuthHandshake(callback());
+
+      expect(loggerSpies.warn).not.toHaveBeenCalled();
     });
   });
 

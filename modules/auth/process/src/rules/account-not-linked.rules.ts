@@ -45,15 +45,15 @@ function parsedLocation(location: string): { parsed: true; url: URL } | { parsed
 }
 
 /**
- * The sign-in method a callback path names: `/callback/<provider>` for a social provider,
- * `/oauth2/callback/<id>` for a generic OIDC one, `/sso/callback/<id>` for a connection.
- * `unknown` on any other path, so a refusal log never guesses.
+ * The sign-in method a callback path names: `/callback/<provider>` (social, `oauth2/` OIDC and
+ * `sso/` connection callbacks) or a SAML connection's `/sso/saml2/sp/acs/<id>`. Kept as sent,
+ * never decoded, so a log field cannot fail the request; `unknown` on any other path.
  */
 export function signInMethodOfPath({ url }: { url: string }): string {
   const target = parsedLocation(url);
   if (!target.parsed) return UNKNOWN;
-  const match = /\/callback\/([^/?#]+)/.exec(target.url.pathname);
-  return match?.[1] ? decodeURIComponent(match[1]) : UNKNOWN;
+  const match = /\/(?:callback|saml2\/sp\/acs)\/([^/?#]+)/.exec(target.url.pathname);
+  return match?.[1] ?? UNKNOWN;
 }
 
 /**
