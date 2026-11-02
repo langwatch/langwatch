@@ -31,7 +31,8 @@ counts, because the cap counts it.
    held before and the seat it holds after (`full`, `lite`, `developer` or `none`) and when. A change
    that moves no seat (an admin made from a member) records nothing. Organization classifies the
    seat with the same rule the cap counts by (`classifyMemberType`), so the peak and the cap cannot
-   disagree about what a seat is.
+   disagree about what a seat is. The change is committed with the write through the outbox the
+   audit intents use, never sent after it: a lost change would skew every later count.
 2. **A projection folds them.** `organization_seat_peak` runs in the worker, per organization, in
    order. It keeps the running count of each kind of seat and, per calendar month (UTC), the highest
    count and when it was first reached. It adds the seat a change moves to and takes away the seat it
