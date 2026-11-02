@@ -9,7 +9,10 @@ import type { UiActor } from "@langwatch/browser-host/capabilities";
 import { uiLeaveTo } from "@langwatch/browser-host/navigation";
 import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
 import { clearReaderUiStorage, clearSessionUiStorage } from "@langwatch/browser-host/storage";
+import { createLogger } from "@langwatch/observability/browser";
 import { createAuthClient } from "better-auth/react";
+
+const logger = createLogger("langwatch:auth:session");
 
 /** The session endpoint, relative to the auth client's own base URL. */
 export const UI_SESSION_PATH = "/session";
@@ -109,7 +112,7 @@ async function forget(what: string, clear: () => void | Promise<void>): Promise<
   try {
     await clear();
   } catch (error) {
-    console.debug(`Signing out could not clear ${what}`, error);
+    logger.warn({ error, what }, "Signing out could not clear what this device remembered");
   }
 }
 
