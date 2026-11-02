@@ -35,8 +35,9 @@ type Notifier struct {
 	HTTP    *http.Client
 }
 
-// Result says what Notify did and why.
+// Result says what Notify did for which job, and why.
 type Result struct {
+	Job    string
 	Posted bool
 	Reason string
 }
@@ -45,17 +46,65 @@ type Result struct {
 // A failed lookup posts anyway: a duplicate alert beats a silent red main.
 func (n Notifier) Notify(ctx context.Context, run Run) (Result, error) {
 	if n.Webhook == "" {
-		return Result{Reason: "no webhook set"}, nil
+		return Result{Job: run.Job, Reason: "no webhook set"}, nil
 	}
 	repeat, why := n.wasRed(ctx, run)
 	if repeat {
-		return Result{Reason: why}, nil
+		return Result{Job: run.Job, Reason: why}, nil
 	}
 	if err := n.post(ctx, run); err != nil {
-		return Result{}, err
+		return Result{Job: run.Job}, err
 	}
 
-	return Result{Posted: true, Reason: why}, nil
+	return Result{Job: run.Job, Posted: true, Reason: why}, nil
+}
+
+// Legs picks the jobs of one run attempt to report: every job named with
+// Prefix that failed or was cancelled, else Fallback.
+type Legs struct {
+	Attempt  int64
+	Prefix   string
+	Fallback string
+}
+
+// NotifyRedLegs runs Notify once per red leg, as run.Job. A failed jobs lookup,
+// or one that finds no red leg, reports Fallback: a red main never posts nothing.
+// One post failing does not stop the others; the error names every failed one.
+func (n Notifier) NotifyRedLegs(ctx context.Context, run Run, legs Legs) ([]Result, error) {
+	names, err := n.redLegs(ctx, run, legs)
+	if err != nil || len(names) == 0 {
+		names = []string{legs.Fallback}
+	}
+	var results []Result
+	var failed []error
+	for _, name := range names {
+		leg := run
+		leg.Job = name
+		result, err := n.Notify(ctx, leg)
+		if err != nil {
+			failed = append(failed, fmt.Errorf("%s: %w", name, err))
+			continue
+		}
+		results = append(results, result)
+	}
+
+	return results, errors.Join(failed...)
+}
+
+// redLegs are the jobs of this run attempt named with legs.Prefix that failed or were cancelled.
+func (n Notifier) redLegs(ctx context.Context, run Run, legs Legs) ([]string, error) {
+	var jobs jobsPage
+	if err := n.get(ctx, fmt.Sprintf("/repos/%s/actions/runs/%d/attempts/%d/jobs?per_page=100", run.Repository, run.RunID, legs.Attempt), &jobs); err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, j := range jobs.Jobs {
+		if strings.HasPrefix(j.Name, legs.Prefix) && (j.Conclusion == "failure" || j.Conclusion == "cancelled") {
+			names = append(names, j.Name)
+		}
+	}
+
+	return names, nil
 }
 
 type runsPage struct {

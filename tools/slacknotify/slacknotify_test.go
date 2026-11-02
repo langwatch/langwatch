@@ -30,6 +30,11 @@ type fake struct {
 
 	broken bool
 	raw    []string
+
+	// legs are this run attempt's jobs by name and conclusion; nil fails the lookup.
+	legs map[string]string
+	// refuse is a leg name whose post Slack rejects.
+	refuse string
 }
 
 func (f *fake) start(t *testing.T) slacknotify.Notifier {
@@ -52,6 +57,12 @@ func (f *fake) start(t *testing.T) slacknotify.Notifier {
 				runs = append(runs, map[string]any{"id": 20})
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"workflow_runs": runs})
+		case r.URL.Path == "/repos/langwatch/langwatch/actions/runs/30/attempts/2/jobs" && f.legs != nil:
+			var jobs []map[string]any
+			for name, conclusion := range f.legs {
+				jobs = append(jobs, map[string]any{"name": name, "conclusion": conclusion})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": jobs})
 		case r.URL.Path == "/repos/langwatch/langwatch/actions/runs/25/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": []map[string]any{}})
 		case r.URL.Path == "/repos/langwatch/langwatch/actions/runs/20/jobs":
@@ -68,6 +79,10 @@ func (f *fake) start(t *testing.T) slacknotify.Notifier {
 		raw, _ := io.ReadAll(r.Body)
 		if !json.Valid(raw) {
 			t.Errorf("Slack got a body that is not JSON: %s", raw)
+		}
+		if f.refuse != "" && strings.Contains(string(raw), f.refuse) {
+			http.Error(w, "no", http.StatusInternalServerError)
+			return
 		}
 		f.raw = append(f.raw, string(raw))
 	}))
@@ -174,4 +189,72 @@ func TestACommitSubjectCannotPingTheChannel(t *testing.T) {
 	posted := strings.Join(texts, "\n")
 	assert.NotContains(t, posted, "<!channel>")
 	assert.Contains(t, posted, "&lt;!channel&gt; &amp; co")
+}
+
+var legs = slacknotify.Legs{Attempt: 2, Prefix: "package-suites (", Fallback: job}
+
+// posted is the leg each Slack post names, in post order.
+func (f *fake) posted() []string {
+	var names []string
+	for _, raw := range f.raw {
+		for _, name := range []string{job, "package-suites (browser)", "package-suites (2/8)"} {
+			if strings.Contains(raw, "*Job:* "+name+"\\n") {
+				names = append(names, name)
+			}
+		}
+	}
+
+	return names
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestARedMainPostsOncePerRedLeg(t *testing.T) {
+	for name, tc := range map[string]struct {
+		legs map[string]string
+		want []string
+	}{
+		"two red legs post once each": {
+			legs: map[string]string{job: "failure", "package-suites (browser)": "cancelled", "lint": "failure"},
+			want: []string{job, "package-suites (browser)"},
+		},
+		"a green leg posts nothing": {
+			legs: map[string]string{job: "success", "package-suites (browser)": "failure"},
+			want: []string{"package-suites (browser)"},
+		},
+		"a failed jobs lookup posts as the fallback leg": {
+			legs: nil,
+			want: []string{job},
+		},
+		"no red leg posts as the fallback leg": {
+			legs: map[string]string{job: "success", "lint": "failure"},
+			want: []string{job},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := &fake{legs: tc.legs}
+			results, err := f.start(t).NotifyRedLegs(context.Background(), failing, legs)
+
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tc.want, f.posted())
+			require.Len(t, results, len(tc.want))
+			for _, result := range results {
+				assert.True(t, result.Posted, result.Reason)
+				assert.Contains(t, tc.want, result.Job)
+			}
+		})
+	}
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestOneRejectedPostStillPostsTheOtherLegs(t *testing.T) {
+	f := &fake{
+		legs:   map[string]string{job: "failure", "package-suites (browser)": "failure", "package-suites (2/8)": "failure"},
+		refuse: "package-suites (browser)",
+	}
+
+	_, err := f.start(t).NotifyRedLegs(context.Background(), failing, legs)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "package-suites (browser)")
+	assert.ElementsMatch(t, []string{job, "package-suites (2/8)"}, f.posted())
 }

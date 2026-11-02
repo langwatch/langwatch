@@ -55,8 +55,9 @@ Feature: The real-browser test lane runs, and only where React is
       When the lane is checked
       Then the check fails naming the uncollected file
 
-  # Bound by .github/scripts/run-package-suites.test.ts (the scheduler) and
-  # tools/ciguard/mainsuites_test.go (the workflow's legs).
+  # Bound by .github/scripts/run-package-suites.test.ts (the scheduler),
+  # tools/ciguard/mainsuites_test.go (the workflow's legs) and
+  # .github/scripts/nightly-workflows.test.ts (the nightly hunt's legs).
   Rule: browser suites run on a runner of their own
 
     # A suite that starts a container changes the runner's network, and Chromium
@@ -74,7 +75,19 @@ Feature: The real-browser test lane runs, and only where React is
       Given the package suites run with no lane filter set
       When the suites are scheduled
       Then every lane runs, browser suites included, as a local run always has
-      And a lane filter other than browser or no-browser is refused
+
+    @unit
+    Scenario: A lane filter other than browser or no-browser is refused
+      Given PACKAGE_SUITES_LANES is set to anything but browser or no-browser
+      When the package suites job starts
+      Then it fails instead of running every lane on every leg
+
+    @unit
+    Scenario: The nightly flaky-test hunt runs browser suites on a leg of their own
+      Given the nightly hunt runs the package suites over shards, three times each
+      When each of its legs schedules its suites
+      Then every numbered shard runs every suite except the browser suites
+      And each run index has one leg that runs only the browser suites
 
   Rule: React testing dependencies belong only to web packages
 

@@ -951,7 +951,7 @@ void describe("given the lanes a leg of the job runs", () => {
   });
 
   void describe("when the lane filter is malformed", () => {
-    /** @scenario "Without a lane filter every lane runs" */
+    /** @scenario "A lane filter other than browser or no-browser is refused" */
     void it("refuses it rather than running every lane on every leg", () => {
       assert.throws(() => parseLanes("chromium"));
     });

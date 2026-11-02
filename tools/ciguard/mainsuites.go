@@ -181,7 +181,7 @@ func notifyProblems(jobs map[string]suitesJob) []string {
 		}
 		var problems []string
 		// One post per red leg; a failed jobs lookup falls back to the one-job leg instead of posting nothing.
-		for _, want := range []string{`-job "$leg"`, ` || legs=""`, `${legs:-package-suites (1/1)}`} {
+		for _, want := range []string{`-job-prefix "package-suites ("`, `-fallback-job "package-suites (1/1)"`} {
 			if !runsScript(job.Steps, want) {
 				problems = append(problems, "the package-suites Slack step must run "+want)
 			}

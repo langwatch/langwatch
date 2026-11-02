@@ -147,7 +147,7 @@ func TestARedOrTimedOutMainSuitesRunPostsToSlack(t *testing.T) {
 
 	breakEach(t, good, map[string][2]string{
 		"no Slack job": {
-			`go run ./cmd/slacknotify -job "$leg"`,
+			`go run ./cmd/slacknotify -job-prefix`,
 			"echo skipped",
 		},
 		"a timeout that does not post": {
@@ -165,16 +165,16 @@ func TestARedOrTimedOutMainSuitesRunPostsToSlack(t *testing.T) {
 func TestARedMainPostsOncePerRedLeg(t *testing.T) {
 	breakEach(t, realAppCI(t), map[string][2]string{
 		"one fixed leg name": {
-			`go run ./cmd/slacknotify -job "$leg"`,
+			`go run ./cmd/slacknotify -job-prefix "package-suites ("`,
 			`go run ./cmd/slacknotify -job "package-suites (1/1)"`,
 		},
-		"a jobs lookup whose failure stops the post": {
-			` || legs=""`,
-			"",
+		"a prefix no leg is named with": {
+			`-job-prefix "package-suites ("`,
+			`-job-prefix "package suites ("`,
 		},
-		"no fallback when the lookup finds no leg": {
-			`${legs:-package-suites (1/1)}`,
-			`$legs`,
+		"no fallback when the lookup fails or finds no leg": {
+			` -fallback-job "package-suites (1/1)"`,
+			"",
 		},
 	})
 }
