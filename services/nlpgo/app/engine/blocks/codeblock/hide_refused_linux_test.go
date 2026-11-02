@@ -127,26 +127,20 @@ func runChild(t *testing.T, name string, extra ...string) {
 	require.NoError(t, err, "child case %s failed:\n%s", name, out.String())
 }
 
-/**
- * @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode"
- * @scenario "the engine reports its hide mode once at start-up"
- */
+// @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode"
+// @scenario "the engine reports its hide mode once at start-up"
 func TestHideRefused_StrictWhenPlatformAllowsIt(t *testing.T) {
 	runChild(t, "not-refused")
 }
 
-/**
- * @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed"
- * @scenario "the engine reports its hide mode once at start-up"
- */
+// @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed"
+// @scenario "the engine reports its hide mode once at start-up"
 func TestHideRefused_VisibleProcessWhenAllowed(t *testing.T) {
 	runChild(t, "refused-allowed")
 }
 
-/**
- * @scenario "a platform that refuses the hide step serves no code blocks unless visible-process is allowed"
- * @scenario "the engine reports its hide mode once at start-up"
- */
+// @scenario "a platform that refuses the hide step serves no code blocks unless visible-process is allowed"
+// @scenario "the engine reports its hide mode once at start-up"
 func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
 	runChild(t, "refused-unset")
 }
