@@ -39,6 +39,10 @@ Feature: Redacting personal data from traces
     Then the stored input has the name redacted
     And the analysis service was called
 
+  # Strict stores what the analysis service redacts, and that service reads
+  # capitals as evidence of a name. How a name in capitals is still found:
+  # specs/evaluators/langevals-presidio-allcaps-person-names.feature
+
   # Strict layers names and locations on top of the essential entities. If the
   # analysis service is unreachable (or simply not configured in development),
   # strict must not leave everything exposed: the native essential pass still
