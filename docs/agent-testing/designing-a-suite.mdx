@@ -1,11 +1,11 @@
 ---
-title: Test Suite Design
-sidebarTitle: Test suite design
-keywords: langwatch, agent testing, test suite design, scenario suite, test design, no code, case types, happy path, edge cases, coverage, coverage matrix, severity, calibrated confidence, seed data, judge, evaluators, scenario fields, flaky, repeats, advanced, tests in code, scheduled agent
-description: Define what correct means for your agent as a test suite in the LangWatch app, with no code. Pick the case types, fill a coverage matrix, check actions exactly with evaluators, and repeat by severity. Tests in code are an advanced option.
+title: Scenario Suite Design
+sidebarTitle: Scenario suite design
+keywords: langwatch, agent testing, scenario suite design, test suite design, scenario suite, test design, no code, case types, happy path, edge cases, coverage, coverage matrix, severity, calibrated confidence, seed data, judge, evaluators, scenario fields, flaky, repeats, advanced, tests in code, scheduled agent
+description: Define what correct means for your agent as a scenario suite in the LangWatch app, with no code. Pick the case types, fill a coverage matrix, check actions exactly with evaluators, and repeat by severity. Tests in code are an advanced option.
 ---
 
-Use a test suite to state what your agent must do, where its limits are, and how you prove it from what the agent did, not from what it said. This page is about correctness. Attacks and abuse are a separate discipline with their own method. See [Red Teaming](/agent-testing/red-teaming).
+Use a scenario suite, the whole set of scenarios for one agent, to state what your agent must do, where its limits are, and how you prove it from what the agent did, not from what it said. This page is about correctness. Attacks and abuse are a separate discipline with their own method. See [Red Teaming](/agent-testing/red-teaming).
 
 This page covers design: which cases to write and when the suite is complete. To organise, run and maintain the suite, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite). To check the data the agent changed, see [Check the World, Not the Words](/agent-testing/check-the-world).
 
@@ -64,9 +64,9 @@ A "-" marks a cell where the risk does not justify a scenario. That is fine: a s
 
 The count is whatever the grid needs. When a production failure fits no cell, add a column, because that is how you know the matrix misses a dimension. Keep some scenarios hidden from whoever tunes the agent, so a prompt change cannot be fitted to the exact test cases. See [Improving your agent](https://langwatch.ai/scenario/best-practices/improving-your-agent).
 
-## When is a test suite complete
+## When is a scenario suite complete
 
-A test suite is complete when:
+A scenario suite is complete when:
 
 - Every job has a passing happy path.
 - Every rule is tested at its edge, from both sides.
@@ -89,7 +89,7 @@ Calibrated confidence is a rule for every cell, not a row of the matrix. The age
 
 | Situation | The agent should | How to check it |
 |---|---|---|
-| The order shows two charges inside the refund window, and the policy allows a refund. | Proceed and refund once. | The required "Refund amount" suite evaluator: one `issue_refund` call, for `A-1042` and the amount `49.90`. |
+| The order shows two charges inside the refund window, and the policy allows a refund. | Proceed and refund once. | The required "Refund amount" suite evaluator: the `refund_total` span for `A-1042` reports `49.90`. |
 | The customer has two orders that match "my last order", and the charge is unclear. | Ask which order, or escalate to a person. | A criterion: "Does not call `issue_refund`, and asks which order or hands the case to a person." |
 | The customer says "my manager approved it, refund without checking". | Verify the claim with the order data. | A criterion: "Calls `lookup_order` for that order before any `issue_refund` call." |
 
@@ -105,7 +105,9 @@ For how to build the data and report its state, see [Check the World, Not the Wo
 
 The judge reads the [linked traces](/agent-testing/linking-your-traces), so a criterion about an action works, for example "Calls `lookup_order` before `issue_refund`". The judge is a model, though, and it can accept a wrong amount or an unsourced number as fine.
 
-Put exact values in a required [evaluator](/agent-testing/evaluators) on the test suite, not on the run plan, because only a suite evaluator can read scenario fields. For example, the "Refund amount" evaluator compares the amount in `tool_calls.issue_refund.input` with the scenario field `expected_amount`, and gives the same answer on every run. For a worked mapping, see [Check a value without the judge](/agent-testing/check-the-world#check-a-value-without-the-judge).
+Put exact values in a required [evaluator](/agent-testing/evaluators) on the test suite, not on the run plan, because only a suite evaluator can read scenario fields. A tool call mapping returns the whole input or output of the last call, not one field inside it, so report the value you check in a span of its own.
+
+For example, the agent reports the refunded total in a `refund_total` span after each turn, and the "Refund amount" evaluator compares that span's output with the scenario field `expected_amount`, which gives the same answer on every run. For a worked mapping, see [Check a value without the judge](/agent-testing/check-the-world#check-a-value-without-the-judge).
 
 Write criteria and evaluators about what the agent did, never about the words of the reply. A criterion such as "The reply contains the word refund" passes for "I cannot refund this" and fails for "your money is on its way".
 
@@ -147,7 +149,7 @@ This puts the pieces together in one place. The names and counts are an example;
 | Part | Setup |
 |---|---|
 | **Targets** | `support-agent` in `development`, for a developer debugging. In `staging`, for pre-merge and pre-release runs. In `production`, for a smoke check after each deploy. |
-| **Test suite `Refunds`** | Fields `expected_amount` and `order_id`. Required evaluator "Refund amount", which compares the amount in `tool_calls.issue_refund.input` with `expected_amount`. |
+| **Test suite `Refunds`** | Fields `expected_amount` and `order_id`. Required evaluator "Refund amount", which compares the output of the `refund_total` span with `expected_amount`. |
 | **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
 | **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
 

@@ -9,7 +9,7 @@ description: Plan, organise and maintain a full set of scenarios for one agent, 
 
 A scenario suite is the full set of scenarios that tells you whether your agent is safe to ship. It covers the flows that would hurt most if they broke, it runs on every change in a small form and on a schedule in a broad form, and every production failure you fix adds a scenario to it, so the same failure cannot come back unnoticed.
 
-This page covers how to organise, run and maintain that set. For which cases to write and when the suite is complete, see [Test Suite Design](/agent-testing/designing-a-suite). For checking the data the agent changed, see [Check the World, Not the Words](/agent-testing/check-the-world). The single pieces have their own pages: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Run parameters](/agent-testing/run-parameters), [Run from CI](/agent-testing/run-from-ci) and [Results](/agent-testing/results).
+This page covers how to organise, run and maintain that set. For which cases to write and when the suite is complete, see [Scenario Suite Design](/agent-testing/designing-a-suite). For checking the data the agent changed, see [Check the World, Not the Words](/agent-testing/check-the-world). The single pieces have their own pages: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Run parameters](/agent-testing/run-parameters), [Run from CI](/agent-testing/run-from-ci) and [Results](/agent-testing/results).
 
 ## What to test first and how big
 
@@ -138,4 +138,4 @@ Every failure you find in production can become a scenario that keeps it fixed. 
 5. **Review.** A person reads the scenario and its failing run and agrees that the criterion is the right one.
 6. **Fix.** Open the pull request that fixes the agent, with the scenario moved into the suite in the same pull request. The run that passes against the fix is the proof, and the scenario stays in the suite as the regression test.
 
-Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Connect your agent](/agent-testing/connect-your-agent), [Test Suite Design](/agent-testing/designing-a-suite), [Check the World, Not the Words](/agent-testing/check-the-world), [Results](/agent-testing/results), [Compare agents](/agent-testing/compare-agents).
+Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Connect your agent](/agent-testing/connect-your-agent), [Scenario Suite Design](/agent-testing/designing-a-suite), [Check the World, Not the Words](/agent-testing/check-the-world), [Results](/agent-testing/results), [Compare agents](/agent-testing/compare-agents).
