@@ -627,7 +627,8 @@ async function expectedAppFunctions({
 /**
  * Which app-owned objects are absent, from catalog reads only (key map, engine tables, views,
  * app functions; approved views and their grant). An engine table not stamped with the current
- * credentials counts as absent; columns are never compared. Throws when ClickHouse is unreadable.
+ * credentials counts as absent, and so does a view that lacks a column its catalog entry declares
+ * (an extra column is never drift). Throws when ClickHouse is unreadable.
  */
 export async function findLwqlAppOwnedDrift({
   database,

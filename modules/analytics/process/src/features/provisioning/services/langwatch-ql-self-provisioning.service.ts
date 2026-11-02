@@ -76,7 +76,10 @@ export type LwqlAccessModelMode = "rendered" | "sql";
 
 /** What the app-owned ClickHouse objects lack; names only, never DDL. */
 interface LwqlClickHouseDrift {
-  /** Each object absent, and each engine table not stamped with the current credentials. */
+  /**
+   * Each object absent, each engine table not stamped with the current credentials, and each view
+   * that lacks a column its catalog entry declares.
+   */
   readonly objects: readonly string[];
   /** The key map was among them, so a converge that repairs it is followed by a fill. */
   readonly isKeyMapMissing: boolean;
