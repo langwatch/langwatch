@@ -4,6 +4,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,12 +66,56 @@ func TestRedactor_MatchesPythonJSONDumpsForAwkwardCharacters(t *testing.T) {
 	assert.Equal(t, "stderr: [redacted] end", strings.Replace(got, "\"[redacted]\"", "[redacted]", 1))
 }
 
-func TestRedactor_CutBeforeMovesOffASecretThatCrossesTheLimitAndNothingElse(t *testing.T) {
+func TestRedactor_SafeCutMovesOffASecretThatCrossesTheLimitAndNothingElse(t *testing.T) {
 	r := redact.New(map[string]string{"L": "LONGSECRET", "S": "x"})
 	raw := "xx.LONGSECRET.xx"
-	assert.Equal(t, 3, r.CutBefore(raw, 7))
-	assert.Equal(t, 3, r.CutBefore(raw, 4))
-	assert.Equal(t, 13, r.CutBefore(raw, 13))
-	assert.Equal(t, 2, r.CutBefore(raw, 2))
-	assert.Equal(t, len(raw), r.CutBefore(raw, 99))
+	assert.Equal(t, 3, r.SafeCut(raw, 7))
+	assert.Equal(t, 3, r.SafeCut(raw, 4))
+	assert.Equal(t, 13, r.SafeCut(raw, 13))
+	assert.Equal(t, 2, r.SafeCut(raw, 2))
+	assert.Equal(t, len(raw), r.SafeCut(raw, 99))
+}
+
+func TestRedactor_SafeCutFollowsAChainOfOverlappingSecrets(t *testing.T) {
+	r := redact.New(map[string]string{"a": "abcdef", "b": "cdefgh"})
+	assert.Equal(t, 1, r.SafeCut(".abcdefgh.", 7))
+}
+
+func TestRedactor_SafeCutStepsBackToARuneBoundary(t *testing.T) {
+	raw := strings.Repeat("é", 10)
+	got := redact.New(map[string]string{"k": "nomatch"}).SafeCut(raw, 5)
+	assert.Equal(t, 4, got)
+	assert.True(t, utf8.ValidString(raw[:got]))
+}
+
+func TestRedactor_SelfOverlappingSecretOverLargeTextIsLinearEnough(t *testing.T) {
+	text := strings.Repeat("a", 64<<10)
+	for _, secret := range []string{"aa", "aaa", "0000"} {
+		r := redact.New(map[string]string{"k": secret})
+		in := strings.ReplaceAll(text, "a", secret[:1])
+		start := time.Now()
+		cut := r.SafeCut(in, 32<<10)
+		got := r.Redact(in)
+		assert.Less(t, time.Since(start), 2*time.Second, secret)
+		assert.LessOrEqual(t, cut, 32<<10)
+		assert.NotContains(t, strings.ReplaceAll(got, "[redacted]", ""), secret[:1], secret)
+	}
+}
+
+func TestRedactor_OverlappingSecretsLeaveNoFragmentOfEither(t *testing.T) {
+	cases := []struct {
+		secrets []string
+		text    string
+	}{
+		{[]string{"ZA", "ABCDEF"}, "ZABCDEF"},
+		{[]string{"abcdef", "cdefgh"}, "abcdefgh"},
+	}
+	for _, c := range cases {
+		secrets := map[string]string{}
+		for i, s := range c.secrets {
+			secrets[string(rune('A'+i))] = s
+		}
+		got := redactAll(c.text, secrets)
+		assert.Equal(t, "[redacted]", got)
+	}
 }

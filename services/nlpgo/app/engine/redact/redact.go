@@ -2,28 +2,29 @@ package redact
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
 const redactedMarker = "[redacted]"
 
-// Redactor replaces secret values with "[redacted]" in one pass over a text.
-// Building one sorts the forms and compiles a replacer, so reuse it across
-// the texts of one run.
+// Redactor replaces secret values with "[redacted]" in a text.
+// Building one sorts the forms; reuse it across the texts of one run.
 type Redactor struct {
-	replacer   *strings.Replacer
 	forms      []string
 	maxFormLen int
 }
 
+type span struct{ start, end int }
+
 // New builds a Redactor for the secret values and the extra values. Each
 // value is matched raw and in the escaped forms a JSON writer produces.
-// Longest forms go first so a secret that contains another is not left
-// half-visible, and one pass keeps a short secret from matching in a marker.
 func New(secrets map[string]string, extra ...string) *Redactor {
 	values := make([]string, 0, len(extra)+len(secrets))
 	values = append(values, extra...)
@@ -44,29 +45,35 @@ func New(secrets map[string]string, extra ...string) *Redactor {
 	for form := range seen {
 		forms = append(forms, form)
 	}
-	sort.Slice(forms, func(i, j int) bool {
-		if len(forms[i]) != len(forms[j]) {
-			return len(forms[i]) > len(forms[j])
-		}
-		return forms[i] < forms[j]
-	})
-	// The marker pair goes first: NewReplacer tries pairs in argument order,
-	// so an existing marker is consumed whole and its letters never match a
-	// short secret.
-	pairs := make([]string, 0, 2*len(forms)+2)
-	pairs = append(pairs, redactedMarker, redactedMarker)
+	sort.Strings(forms)
+	maxLen := 0
 	for _, form := range forms {
-		pairs = append(pairs, form, redactedMarker)
+		maxLen = max(maxLen, len(form))
 	}
-	return &Redactor{replacer: strings.NewReplacer(pairs...), forms: forms, maxFormLen: len(forms[0])}
+	return &Redactor{forms: forms, maxFormLen: maxLen}
 }
 
-// Redact replaces every secret form in text with "[redacted]".
+// Redact replaces every secret form in text with "[redacted]". Forms that
+// overlap are replaced as one span, so no part of either is left showing, and
+// an existing marker is kept whole so a short secret never matches inside it.
 func (r *Redactor) Redact(text string) string {
-	if r.replacer == nil || text == "" {
+	if len(r.forms) == 0 || text == "" {
 		return text
 	}
-	return r.replacer.Replace(text)
+	spans := r.mergedSpans(text)
+	if len(spans) == 0 {
+		return text
+	}
+	var out strings.Builder
+	out.Grow(len(text))
+	last := 0
+	for _, s := range spans {
+		out.WriteString(text[last:s.start])
+		out.WriteString(redactedMarker)
+		last = s.end
+	}
+	out.WriteString(text[last:])
+	return out.String()
 }
 
 // MaxFormLen is the length of the longest form Redact can match: a secret
@@ -74,32 +81,55 @@ func (r *Redactor) Redact(text string) string {
 // window extended by it.
 func (r *Redactor) MaxFormLen() int { return r.maxFormLen }
 
-// CutBefore returns the largest cut point at or below limit that falls inside
-// no secret form in raw, so raw[:cut] holds whole secrets or none. It works on
-// the raw text: Redact changes lengths, so an offset taken from redacted text
-// does not point at the same place in raw.
-func (r *Redactor) CutBefore(raw string, limit int) int {
+// SafeCut returns the largest cut point at or below limit that falls inside
+// no secret and on a rune boundary, so raw[:cut] holds whole secrets or none.
+// It works on the raw text: Redact changes lengths, so an offset taken from
+// redacted text does not point at the same place in raw.
+func (r *Redactor) SafeCut(raw string, limit int) int {
 	cut := min(limit, len(raw))
-	for moved := true; moved; {
-		moved = false
-		for _, form := range r.forms {
-			for from := 0; ; {
-				i := strings.Index(raw[from:], form)
-				if i < 0 {
-					break
-				}
-				start := from + i
-				if start >= cut {
-					break
-				}
-				if start+len(form) > cut {
-					cut, moved = start, true
-				}
-				from = start + 1
+	if len(r.forms) > 0 {
+		for _, s := range r.mergedSpans(raw) {
+			if s.start < cut && cut < s.end {
+				cut = s.start
+				break
 			}
 		}
 	}
+	for cut > 0 && cut < len(raw) && !utf8.RuneStart(raw[cut]) {
+		cut--
+	}
 	return cut
+}
+
+// mergedSpans finds every occurrence of every form (and of the marker),
+// overlapping ones included, and merges the overlapping ones. Cost is
+// O(len(text) * forms): each search resumes one byte past the last start.
+func (r *Redactor) mergedSpans(text string) []span {
+	var spans []span
+	for _, form := range append([]string{redactedMarker}, r.forms...) {
+		for from := 0; from < len(text); {
+			i := strings.Index(text[from:], form)
+			if i < 0 {
+				break
+			}
+			start := from + i
+			spans = append(spans, span{start, start + len(form)})
+			from = start + 1
+		}
+	}
+	if len(spans) == 0 {
+		return nil
+	}
+	slices.SortFunc(spans, func(a, b span) int { return cmp.Or(cmp.Compare(a.start, b.start), cmp.Compare(b.end, a.end)) })
+	merged := spans[:1]
+	for _, s := range spans[1:] {
+		if last := &merged[len(merged)-1]; s.start < last.end {
+			last.end = max(last.end, s.end)
+		} else {
+			merged = append(merged, s)
+		}
+	}
+	return merged
 }
 
 func mapValues(m map[string]string) []string {

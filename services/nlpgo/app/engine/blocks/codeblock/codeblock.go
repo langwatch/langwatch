@@ -52,6 +52,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	_ "embed"
 
@@ -672,11 +673,14 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 // runner captures the user's own stderr into the result file, so this stream
 // carries interpreter-level diagnostics and a cap costs nothing — except to
 // code that writes gigabytes to its descriptor, which is why there is one.
-// readRunnerStderr cuts on a raw offset that is inside no secret.
+// readRunnerStderr's cut never falls inside a secret.
 const maxRunnerStderr = 64 << 10
 
 // maxStderrInMessage bounds the stderr tail appended to a runner error.
 const maxStderrInMessage = 2 << 10
+
+// truncatedMarker ends a stderr that was cut at the cap.
+const truncatedMarker = "\n[stderr truncated]"
 
 // withStderrTail appends the end of the kept interpreter stderr to a runner
 // failure, so "exit status 1" says why. That stderr is the project's own
@@ -686,8 +690,14 @@ func withStderrTail(message, stderr string) string {
 	tail := strings.TrimSpace(stderr)
 	if len(tail) > maxStderrInMessage {
 		tail = tail[len(tail)-maxStderrInMessage:]
-		if _, rest, found := strings.Cut(tail, "\n"); found {
+		// A line start is nicer, but a single long line has none to offer:
+		// then keep the byte tail from a rune boundary rather than nothing.
+		if _, rest, found := strings.Cut(tail, "\n"); found && strings.TrimSpace(strings.TrimSuffix(rest, strings.TrimSpace(truncatedMarker))) != "" {
 			tail = rest
+		} else {
+			for len(tail) > 0 && !utf8.RuneStart(tail[0]) {
+				tail = tail[1:]
+			}
 		}
 	}
 	tail = strings.TrimSpace(strings.ToValidUTF8(tail, ""))
@@ -735,11 +745,11 @@ func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
 	if len(raw) <= maxRunnerStderr {
 		return redactor.Redact(raw)
 	}
-	text := redactor.Redact(raw[:redactor.CutBefore(raw, maxRunnerStderr)])
+	text := redactor.Redact(raw[:redactor.SafeCut(raw, maxRunnerStderr)])
 	if i := strings.LastIndexByte(text, '\n'); i >= 0 {
 		text = text[:i]
 	}
-	return text + "\n[stderr truncated]"
+	return text + truncatedMarker
 }
 
 // newRunToken mints the value every process in one execution carries in its

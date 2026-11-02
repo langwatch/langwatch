@@ -13,8 +13,8 @@ import (
 func (e *Executor) ScratchRoot() string { return e.scratchRoot }
 
 // WithStderrTail exposes the runner-error stderr formatter to the tests.
-func WithStderrTail(message, stderr string, secrets map[string]string, sandboxKey string) string {
-	return withStderrTail(message, redact.New(secrets, sandboxKey).Redact(stderr))
+func WithStderrTail(message, stderr string) string {
+	return withStderrTail(message, stderr)
 }
 
 // MaxStderrInMessage exposes the tail bound to the tests.

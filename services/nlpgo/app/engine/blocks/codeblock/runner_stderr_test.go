@@ -78,7 +78,7 @@ func TestWithStderrTail_CutDropsTheStartAndBeginsOnALine(t *testing.T) {
 		b.WriteString("line-filler-text\n")
 	}
 
-	got := codeblock.WithStderrTail("exit status 1", b.String(), nil, "")
+	got := codeblock.WithStderrTail("exit status 1", b.String())
 
 	assert.NotContains(t, got, "boom")
 	assert.True(t, strings.HasPrefix(tailOf(got), "line-filler-text"), got)
@@ -87,34 +87,22 @@ func TestWithStderrTail_CutDropsTheStartAndBeginsOnALine(t *testing.T) {
 
 func TestWithStderrTail_CutInsideAMultiByteCharacterStaysValidUTF8(t *testing.T) {
 	for _, prefix := range []string{"", "a"} {
-		got := codeblock.WithStderrTail("exit status 1", prefix+strings.Repeat("é", 3000), nil, "")
+		got := codeblock.WithStderrTail("exit status 1", prefix+strings.Repeat("é", 3000))
 		assert.True(t, utf8.ValidString(got), "prefix %q", prefix)
 		assert.NotEmpty(t, tailOf(got))
 	}
 }
 
-func TestWithStderrTail_SecretStraddlingTheCutIsNotPresentEvenPartially(t *testing.T) {
-	secret := "SECRETVALUE12345678"
-	head := "boom\n" + strings.Repeat("a", 500) + "\n"
-	after := strings.Repeat("b", codeblock.MaxStderrInMessage-len(secret)/2) + "\n"
-	stderr := head + secret + after
-
-	got := codeblock.WithStderrTail("exit status 1", stderr, map[string]string{"K": secret}, "")
-
-	assert.NotContains(t, got, "SECR")
-	assert.NotContains(t, got, "5678")
-	assert.NotContains(t, got, "boom")
-}
-
 // @scenario "A secret is scrubbed from stderr in its JSON-escaped forms"
-func TestWithStderrTail_JSONEscapedSecretIsRedacted(t *testing.T) {
+func TestReadRunnerStderr_JSONEscapedSecretIsRedacted(t *testing.T) {
 	secret := "pa\"ss\nwo\\rd\u00e9\U0001F600"
 	encoded, err := json.Marshal(map[string]string{"stderr": secret})
 	require.NoError(t, err)
 	pythonStyle := `{"stderr": "pa\"ss\nwo\\rd\u00e9\ud83d\ude00"}`
 	stderr := "trace\nraw " + secret + "\n" + string(encoded) + "\n" + pythonStyle + "\n"
 
-	got := codeblock.WithStderrTail("exit status 1", stderr, map[string]string{"K": secret}, "")
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), stderr, map[string]string{"K": secret})
+	require.NoError(t, err)
 
 	assert.NotContains(t, got, "wo")
 	assert.NotContains(t, got, "pa")
@@ -123,28 +111,19 @@ func TestWithStderrTail_JSONEscapedSecretIsRedacted(t *testing.T) {
 }
 
 // @scenario "A secret is scrubbed from stderr in its JSON-escaped forms"
-func TestWithStderrTail_PythonJSONEscapedSecretWithHTMLCharsIsRedacted(t *testing.T) {
+func TestReadRunnerStderr_PythonJSONEscapedSecretWithHTMLCharsIsRedacted(t *testing.T) {
 	secret := "a&b<c>\nd"
 	stderr := "x \"a&b<c>\\nd\" y"
 
-	got := codeblock.WithStderrTail("exit status 1", stderr, map[string]string{"K": secret}, "")
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), stderr, map[string]string{"K": secret})
+	require.NoError(t, err)
 
 	assert.NotContains(t, got, "a&b")
 	assert.Contains(t, got, "[redacted]")
 }
 
 func TestWithStderrTail_BlankStderrLeavesTheMessageUnchanged(t *testing.T) {
-	assert.Equal(t, "exit status 1", codeblock.WithStderrTail("exit status 1", " \n\t ", map[string]string{"K": "v"}, ""))
-}
-
-func TestWithStderrTail_SandboxKeyStraddlingTheCutIsAbsent(t *testing.T) {
-	key := "SANDBOXKEY12345678"
-	stderr := "boom\n" + strings.Repeat("a", 500) + "\n" + key + strings.Repeat("b", codeblock.MaxStderrInMessage-len(key)/2) + "\n"
-
-	got := codeblock.WithStderrTail("exit status 1", stderr, nil, key)
-
-	assert.NotContains(t, got, "SANDB")
-	assert.NotContains(t, got, "5678")
+	assert.Equal(t, "exit status 1", codeblock.WithStderrTail("exit status 1", " \n\t "))
 }
 
 // @scenario "A secret that crosses the stderr cap is never partly shown"
@@ -199,7 +178,7 @@ func TestCodeBlock_MultiLineSecretStartingBeforeTheStderrCapIsAbsent(t *testing.
 }
 
 // @scenario "A secret that crosses the stderr cap is never partly shown"
-func TestReadRunnerStderr_ShortSecretsInTheWindowDoNotMoveACutThroughALongSecret(t *testing.T) {
+func TestReadRunnerStderr_LongSecretCrossingTheCapIsAbsentWhenShortSecretsAreNearby(t *testing.T) {
 	const long = "LONGSECRET-ABCDEFGHIJ"
 	raw := strings.Repeat("xx\n", 40) + strings.Repeat(".", codeblock.MaxRunnerStderr-80-len(long)/2) + long + strings.Repeat(".", 200)
 
@@ -207,7 +186,7 @@ func TestReadRunnerStderr_ShortSecretsInTheWindowDoNotMoveACutThroughALongSecret
 	require.NoError(t, err)
 
 	assertNoFragments(t, got, long, 4)
-	assert.True(t, strings.HasSuffix(got, "[stderr truncated]"), got[len(got)-40:])
+	assert.True(t, strings.HasSuffix(got, "[stderr truncated]"), got)
 }
 
 // @scenario "A secret that crosses the stderr cap is never partly shown"
@@ -229,7 +208,6 @@ func TestReadRunnerStderr_NoFragmentOfASecretSurvivesAnyOffsetAroundTheCap(t *te
 	}
 }
 
-// @scenario "A cut interpreter stderr ends with a truncation marker"
 // @scenario "A cut interpreter stderr ends with a truncation marker"
 func TestReadRunnerStderr_CutTextWithoutANewlineIsKeptAndMarked(t *testing.T) {
 	got, err := codeblock.ReadRunnerStderr(t.TempDir(), strings.Repeat("z", codeblock.MaxRunnerStderr+500), nil)
@@ -262,5 +240,28 @@ func assertNoFragments(t *testing.T, text, secret string, minLen int) {
 				t.Fatalf("fragment %q of a secret is shown", secret[i:j])
 			}
 		}
+	}
+}
+
+// @scenario "A runner error carries the end of the interpreter stderr"
+func TestWithStderrTail_SingleLongLineKeepsTheByteTail(t *testing.T) {
+	stderr := strings.Repeat("é", codeblock.MaxRunnerStderr) + "\n[stderr truncated]"
+
+	got := codeblock.WithStderrTail("exit status 1", stderr)
+
+	assert.True(t, utf8.ValidString(got))
+	assert.Contains(t, tailOf(got), "éééé")
+	assert.True(t, strings.HasSuffix(got, "[stderr truncated]"), got)
+	assert.LessOrEqual(t, len(tailOf(got)), codeblock.MaxStderrInMessage+len("\n[stderr truncated]"))
+}
+
+// @scenario "A cut interpreter stderr ends with a truncation marker"
+func TestReadRunnerStderr_CutInsideAMultiByteRuneWithoutANewlineStaysValidUTF8(t *testing.T) {
+	for _, prefix := range []string{"", "a", "ab", "abc"} {
+		got, err := codeblock.ReadRunnerStderr(t.TempDir(), prefix+strings.Repeat("é", codeblock.MaxRunnerStderr), nil)
+		require.NoError(t, err)
+
+		assert.True(t, utf8.ValidString(got), "prefix %q", prefix)
+		assert.True(t, strings.HasSuffix(got, "é\n[stderr truncated]"), "prefix %q", prefix)
 	}
 }
