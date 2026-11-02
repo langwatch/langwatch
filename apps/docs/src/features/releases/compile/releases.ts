@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { Temporal } from "@langwatch/time";
 
+import { approximateTokens } from "../../../site/audit/agent-markdown.ts";
+import { readBudgets } from "../../../site/audit/budgets.ts";
 import { releaseSchema, type Release } from "../model/release.ts";
 
 export const RELEASES_SLUG = "changelog";
@@ -119,12 +121,24 @@ export function withReleaseNotes({
   }
   const entries = readReleases({ docsRoot });
   if (!entries.length) return source.replace(NOTES_TAG, "");
-  const notes = entries
-    .map(
-      ({ version, label, body, compare }) =>
-        `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
-    )
-    .join("\n");
+  const sections = entries.map(
+    ({ version, label, body, compare }) =>
+      `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
+  );
+  // The newest release always shows; each older one only while the page stays
+  // within the agent readiness token budget. The page links to the full
+  // changelog for the rest.
+  const { pageTokens } = readBudgets().agentReadiness;
+  let page = placeNotes({ source, notes: sections[0] ?? "" });
+  for (let count = 2; count <= sections.length; count++) {
+    const longer = placeNotes({ source, notes: sections.slice(0, count).join("\n") });
+    if (approximateTokens({ text: longer }) > pageTokens) break;
+    page = longer;
+  }
+  return page;
+}
+
+function placeNotes({ source, notes }: { source: string; notes: string }) {
   if (NOTES_TAG.test(source)) return source.replace(NOTES_TAG, () => notes);
   const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/)?.[0] ?? "";
   return `${frontmatter}\n${notes}\n${source.slice(frontmatter.length)}`;

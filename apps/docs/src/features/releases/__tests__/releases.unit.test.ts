@@ -4,6 +4,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { approximateTokens } from "../../../site/audit/agent-markdown.ts";
+import { readBudgets } from "../../../site/audit/budgets.ts";
 import { parseReleases, readReleases, withReleaseNotes } from "../compile/releases.ts";
 
 const compare = "https://github.com/langwatch/langwatch/compare/v1...v2";
@@ -88,6 +90,38 @@ describe("when the repository publishes release notes", () => {
       });
       expect(placed.indexOf("Intro")).toBeLessThan(placed.indexOf("## Release v2.1.1"));
       expect(placed.indexOf("## Release v2.1.1")).toBeLessThan(placed.indexOf("## Older releases"));
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("when the newest releases are longer than the page token budget", () => {
+  /** @scenario "Keep the changelog page within the page token budget" */
+  it("shows the newest release and only the older ones that still fit", () => {
+    const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-budget-"));
+    const docsRoot = path.join(project, "docs");
+    mkdirSync(docsRoot);
+    try {
+      const { pageTokens } = readBudgets().agentReadiness;
+      // Each long release fills about two thirds of the budget on its own.
+      const long = "* **traces:** a long note\n".repeat(Math.ceil((pageTokens * 4 * 2) / 3 / 26));
+      writeFileSync(
+        path.join(project, "CHANGELOG.md"),
+        `## [3.0.0](${compare}) (2026-11-02)\n### Features\n${long}` +
+          `## [2.9.0](${compare}) (2026-10-21)\n### Features\n${long}` +
+          `## [2.8.0](${compare}) (2026-10-01)\n### Features\n* Small fix\n`,
+      );
+      const page = withReleaseNotes({
+        source: "---\ntitle: Changelog\n---\n<ReleaseNotes />\n\n## Older releases",
+        slug: "changelog",
+        docsRoot,
+      });
+      expect(page).toContain("## Release v3.0.0");
+      expect(page).not.toContain("## Release v2.9.0");
+      expect(page).not.toContain("## Release v2.8.0");
+      expect(approximateTokens({ text: page })).toBeLessThanOrEqual(pageTokens);
+      expect(page).toContain("## Older releases");
     } finally {
       rmSync(project, { recursive: true, force: true });
     }

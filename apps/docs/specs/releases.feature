@@ -12,6 +12,13 @@ Feature: Useful release updates in the documentation
     And missing or invalid notes produce no announcement
 
   @unit
+  Scenario: Keep the changelog page within the page token budget
+    Given the newest published releases are together longer than the agent readiness page token budget
+    When the changelog page is built
+    Then it always shows the newest release
+    And it shows each older release only while the page stays within the budget
+
+  @unit
   Scenario: Show what is new on the home page
     Given the repository changelog has published releases
     When the introduction page is built
