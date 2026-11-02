@@ -170,6 +170,12 @@ Feature: The most seats an organization held at once in a month
       And they see the peak of each earlier month
 
     @integration
+    Scenario: The ops console reads an unlimited licence's seats as unlimited
+      Given the organization's licence covers unlimited full seats
+      When somebody on our team opens the organization on the ops console
+      Then they see the full seats in use beside "unlimited", not a number
+
+    @integration
     Scenario: The ops console says how many seat changes disagreed with the count
       Given seat changes for the organization named a seat its count did not hold
       When somebody on our team opens the organization on the ops console

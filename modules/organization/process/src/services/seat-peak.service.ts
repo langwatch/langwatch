@@ -147,13 +147,12 @@ export class SeatPeakService {
       seats: asOf.counts,
       caps,
       months: asOf.months
-        .map(({ month, fullPeak, fullPeakAt, litePeak, litePeakAt, carried }) => ({
+        .map(({ month, fullPeak, fullPeakAt, litePeak, litePeakAt }) => ({
           month,
           fullPeak,
           fullPeakAt,
           litePeak,
           litePeakAt,
-          carried,
         }))
         .reverse(),
       mismatches: state.mismatches,

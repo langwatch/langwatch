@@ -73,7 +73,6 @@ const counted: OrganizationSeatPeak = {
       fullPeakAt: PEAK_REACHED,
       litePeak: 4,
       litePeakAt: at("2026-11-03T09:00:00Z"),
-      carried: false,
     },
     {
       month: "2026-10",
@@ -81,7 +80,6 @@ const counted: OrganizationSeatPeak = {
       fullPeakAt: at("2026-10-01T00:00:00Z"),
       litePeak: 3,
       litePeakAt: at("2026-10-01T00:00:00Z"),
-      carried: true,
     },
     {
       month: "2026-09",
@@ -89,7 +87,6 @@ const counted: OrganizationSeatPeak = {
       fullPeakAt: at("2026-09-20T10:00:00Z"),
       litePeak: 3,
       litePeakAt: at("2026-09-15T00:00:00Z"),
-      carried: false,
     },
   ],
 };
@@ -122,6 +119,22 @@ describe("Feature: our team sees the seat peak at renewal", () => {
       expect(earlier.getByRole("row", { name: /2026-10/ })).toHaveTextContent(/51/);
       expect(earlier.getByRole("row", { name: /2026-09/ })).toHaveTextContent(/51/);
       expect(earlier.queryByRole("row", { name: /2026-11/ })).toBeNull();
+    });
+  });
+
+  describe("given the organization is on an unlimited plan", () => {
+    /** @scenario "The ops console reads an unlimited licence's seats as unlimited" */
+    it("reads the caps as unlimited, never the stand-in number", () => {
+      peakState.answer = {
+        ...counted,
+        caps: { fullSeats: Number.MAX_SAFE_INTEGER, liteSeats: 1_000_000 },
+      };
+      openOrganization();
+
+      const summary = screen.getByTestId("ops-seat-peak");
+      expect(summary).toHaveTextContent("Full seats: 48 of unlimited in use");
+      expect(summary).toHaveTextContent("Lite Member seats: 3 of unlimited in use");
+      expect(summary).not.toHaveTextContent(String(Number.MAX_SAFE_INTEGER));
     });
   });
 

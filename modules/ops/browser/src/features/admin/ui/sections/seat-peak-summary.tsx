@@ -6,7 +6,7 @@ import { Table, Text, VStack } from "@langwatch/design-system/primitives";
 import type { OrganizationSeatPeakMonth } from "@langwatch/organization-contract";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { formatDateUtc, SectionHeading } from "../elements/admin-cells.tsx";
+import { formatDateUtc, formatSeatCap, SectionHeading } from "../elements/admin-cells.tsx";
 
 export function SeatPeakSummary({ organizationId }: { organizationId: string }) {
   return (
@@ -47,13 +47,13 @@ function SeatPeakBody({ organizationId }: { organizationId: string }) {
   return (
     <VStack align="stretch" gap={2} data-testid="ops-seat-peak">
       <Text fontSize="sm">
-        Full seats: {seats.full} of {caps.fullSeats} in use
+        Full seats: {seats.full} of {formatSeatCap(caps.fullSeats)} in use
         {thisMonth
           ? `, peak this month ${thisMonth.fullPeak} (${formatDateUtc(thisMonth.fullPeakAt)})`
           : ""}
       </Text>
       <Text fontSize="sm">
-        Lite Member seats: {seats.lite} of {caps.liteSeats} in use
+        Lite Member seats: {seats.lite} of {formatSeatCap(caps.liteSeats)} in use
         {thisMonth
           ? `, peak this month ${thisMonth.litePeak} (${formatDateUtc(thisMonth.litePeakAt)})`
           : ""}

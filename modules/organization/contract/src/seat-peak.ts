@@ -14,8 +14,6 @@ const organizationSeatPeakMonthSchemaDefinition = z.object({
   fullPeakAt: z.number(),
   litePeak: z.number().int().nonnegative(),
   litePeakAt: z.number(),
-  /** True when no seat moved this month, so its peaks are the count carried in. */
-  carried: z.boolean(),
 });
 export interface OrganizationSeatPeakMonthSchema extends Named<
   typeof organizationSeatPeakMonthSchemaDefinition
