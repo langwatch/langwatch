@@ -1,4 +1,4 @@
-import { agentHooksSchema } from "@langwatch/agent-contract";
+import { agentHooksSchema, CONNECTOR_STEP_LANGUAGES } from "@langwatch/agent-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -104,6 +104,31 @@ export interface AuthConfigSchema extends Named<typeof AuthConfigSchemaDefinitio
 export const AuthConfigSchema: AuthConfigSchema = AuthConfigSchemaDefinition;
 export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 
+/** One Connector step as the child runs it, with what the prefetch resolved for it (ADR-194). */
+const ConnectorStepDataSchemaDefinition = z.object({
+  language: z.enum(CONNECTOR_STEP_LANGUAGES),
+  code: z.string(),
+  /** The names the step reads; one missing from `secrets` fails the step before it runs. */
+  secretNames: z.array(z.string()),
+  /** The named secrets' values for this run; no other secret travels to the step. */
+  secrets: z.record(z.string(), z.string()).default({}),
+  /** The bound dataset's entries. */
+  rows: z.array(z.record(z.string(), z.unknown())).optional(),
+  /** Why the bound dataset cannot be given; the step fails with it before it runs. */
+  rowsRefusal: z.string().optional(),
+});
+export interface ConnectorStepDataSchema extends Named<typeof ConnectorStepDataSchemaDefinition> {}
+export const ConnectorStepDataSchema: ConnectorStepDataSchema = ConnectorStepDataSchemaDefinition;
+export type ConnectorStepData = z.infer<typeof ConnectorStepDataSchema>;
+
+const ConnectorDataSchemaDefinition = z.object({
+  setup: ConnectorStepDataSchema.optional(),
+  teardown: ConnectorStepDataSchema.optional(),
+});
+export interface ConnectorDataSchema extends Named<typeof ConnectorDataSchemaDefinition> {}
+export const ConnectorDataSchema: ConnectorDataSchema = ConnectorDataSchemaDefinition;
+export type ConnectorData = z.infer<typeof ConnectorDataSchema>;
+
 /**
  * Pre-fetched HTTP agent configuration for serialized execution.
  * Contains all data needed to execute HTTP-based scenarios without DB access.
@@ -136,6 +161,8 @@ const HttpAgentDataSchemaDefinition = z.object({
    * http targets still parses.
    */
   secrets: z.record(z.string(), z.string()).default({}),
+  /** Setup and teardown run in the code runner around the turns; absent when none is set. */
+  connector: ConnectorDataSchema.optional(),
 });
 export interface HttpAgentDataSchema extends Named<typeof HttpAgentDataSchemaDefinition> {}
 export const HttpAgentDataSchema: HttpAgentDataSchema = HttpAgentDataSchemaDefinition;
