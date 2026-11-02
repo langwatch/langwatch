@@ -3,6 +3,7 @@
  * refuse never reaches the repository.
  * @see modules/dashboard/specs/dashboard-widget-validation.feature
  */
+import { LangWatchQLProjectNotFoundError } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -21,11 +22,11 @@ const QUERY = { name: "traces", sql: "SELECT count() AS value FROM analytics.tra
 const VALID = [QUERY];
 const INVALID = [{ ...QUERY, parameters: [{ name: "prototype", type: "string" as const }] }];
 
-function setUp() {
+function setUp(analytics = createDashboardTestAnalytics()) {
   const repository = MemoryDashboardWidgetRepository.create();
   const service = DashboardWidgetService.create({
     repository,
-    analytics: createDashboardTestAnalytics(),
+    analytics,
     boards: DashboardAccessService.create({
       repository: MemoryBoardRepository.create(),
       projects: createDashboardTestProjects(),
@@ -147,6 +148,202 @@ describe("given a query's sources", () => {
 
       expect(kept.definition.queries[0]?.sources).toEqual(["langy"]);
       expect(cleared.definition.queries[0]).not.toHaveProperty("sources");
+    });
+  });
+});
+
+describe("given a query's projects", () => {
+  const scope = { projectId: "project-1" };
+  const readsOnly = (readable: string[]) =>
+    createDashboardTestAnalytics({
+      assertProjectsReadable: async ({ projectIds }) => {
+        if (projectIds.some((id) => !readable.includes(id))) {
+          throw new LangWatchQLProjectNotFoundError();
+        }
+      },
+    });
+
+  /** @scenario "AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources" */
+  it("stores the projects a member can read, and reads them back in order", async () => {
+    const { service } = setUp(readsOnly(["A", "B"]));
+
+    const created = await service.createWidget({
+      ...scope,
+      viewer: { userId: "user-1" },
+      input: { name: "Traces", code: CODE, queries: [{ ...QUERY, projects: ["B", "A"] }] },
+    });
+
+    expect(created.definition.queries[0]?.projects).toEqual(["B", "A"]);
+  });
+
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("refuses a project the writer cannot read, with no id and nothing stored", async () => {
+    const { repository, service } = setUp(readsOnly(["A"]));
+
+    const refusal = await service
+      .createWidget({
+        ...scope,
+        viewer: { userId: "user-1" },
+        input: { name: "Traces", code: CODE, queries: [{ ...QUERY, projects: ["A", "C"] }] },
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(JSON.stringify(refusal, ["message", "meta"])).not.toContain('"C"');
+    expect(await repository.findAll(scope)).toEqual([]);
+  });
+
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("lets a project credential name its own project and no other", async () => {
+    const { service } = setUp();
+
+    const own = await service.createWidget({
+      ...scope,
+      input: { name: "Own", code: CODE, queries: [{ ...QUERY, projects: ["project-1"] }] },
+    });
+    const other = service
+      .createWidget({
+        ...scope,
+        input: { name: "Other", code: CODE, queries: [{ ...QUERY, projects: ["project-2"] }] },
+      })
+      .catch((error: unknown) => error);
+
+    expect(own.definition.queries[0]?.projects).toEqual(["project-1"]);
+    await expect(other).resolves.toMatchObject({ code: "project_not_found" });
+  });
+
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("judges a key's write by the key's reach, not by its owner's grants", async () => {
+    const asked: unknown[] = [];
+    const analytics = createDashboardTestAnalytics({
+      assertProjectsReadable: async (input) => {
+        asked.push(input);
+        if (input.reach !== undefined && input.projectIds.includes("secret")) {
+          throw new LangWatchQLProjectNotFoundError();
+        }
+      },
+    });
+    const { repository, service } = setUp(analytics);
+    const keyReach = {
+      kind: "apiKey",
+      apiKeyId: "key-1",
+      userId: "user-1",
+      organizationId: "org-1",
+    } as const;
+
+    const refusal = await service
+      .createWidget({
+        ...scope,
+        viewer: { userId: "user-1" },
+        keyReach,
+        input: { name: "Traces", code: CODE, queries: [{ ...QUERY, projects: ["secret"] }] },
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(asked).toEqual([
+      { reach: keyReach, projectIds: ["secret"], anchorProjectId: scope.projectId },
+    ]);
+    expect(await repository.findAll(scope)).toEqual([]);
+  });
+
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("judges the projects an update keeps, not only those it sends", async () => {
+    const asked: string[][] = [];
+    let isRefusing = false;
+    const analytics = createDashboardTestAnalytics({
+      assertProjectsReadable: async ({ projectIds }) => {
+        if (!isRefusing) return;
+        asked.push([...projectIds]);
+        if (projectIds.includes("P2")) throw new LangWatchQLProjectNotFoundError();
+      },
+    });
+    const { service } = setUp(analytics);
+    const row = await service.createWidget({
+      ...scope,
+      viewer: { userId: "user-1" },
+      input: { name: "Stored", code: CODE, queries: [{ ...QUERY, projects: ["P1", "P2"] }] },
+    });
+    isRefusing = true;
+
+    const refusal = await service
+      .updateWidget({
+        ...scope,
+        id: row.id,
+        viewer: { userId: "user-1" },
+        input: { queries: [{ ...QUERY, sql: "SELECT 1" }] },
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(asked).toEqual([["P1", "P2"]]);
+  });
+
+  /** @scenario "AC210e Compatibility: a project key cannot change the SQL of a widget whose stored query names other projects" */
+  it("refuses a project key's SQL edit when the stored query names another project", async () => {
+    const { service } = setUp();
+    const created = await service.createWidget({
+      ...scope,
+      viewer: { userId: "user-1" },
+      input: {
+        name: "Stored",
+        code: CODE,
+        queries: [{ ...QUERY, projects: ["project-1", "project-2"] }],
+      },
+    });
+
+    const refusal = await service
+      .updateWidget({
+        ...scope,
+        id: created.id,
+        input: { queries: [{ ...QUERY, sql: "SELECT 2" }] },
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    const stored = await service.getById({ ...scope, id: created.id });
+    expect(stored.definition.queries[0]?.projects).toEqual(["project-1", "project-2"]);
+  });
+
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
+  it("checks the projects of all queries in one call, each query being within the cap", async () => {
+    const asked: number[] = [];
+    const analytics = createDashboardTestAnalytics({
+      assertProjectsReadable: async ({ projectIds }) => void asked.push(projectIds.length),
+    });
+    const { service } = setUp(analytics);
+    const sixty = (prefix: string) => Array.from({ length: 60 }, (_, index) => `${prefix}${index}`);
+
+    await service.createWidget({
+      ...scope,
+      viewer: { userId: "user-1" },
+      input: {
+        name: "Two",
+        code: CODE,
+        queries: [
+          { ...QUERY, name: "one", projects: sixty("a") },
+          { ...QUERY, name: "two", projects: sixty("b") },
+        ],
+      },
+    });
+
+    expect(asked).toEqual([120]);
+  });
+
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
+  it("refuses more projects than a member's list may hold", async () => {
+    const { service } = setUp();
+    const tooMany = Array.from({ length: 101 }, (_, index) => `p${index}`);
+
+    await expect(
+      service.createWidget({
+        ...scope,
+        input: { name: "Many", code: CODE, queries: [{ ...QUERY, projects: tooMany }] },
+      }),
+    ).rejects.toMatchObject({
+      code: "dashboard_widget_definition_refused",
+      httpStatus: 422,
+      message: "This dashboard widget's definition is invalid.",
     });
   });
 });

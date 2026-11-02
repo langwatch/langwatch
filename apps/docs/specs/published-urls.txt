@@ -27,6 +27,7 @@
 /ai-gateway/api
 /ai-gateway/api/audio
 /ai-gateway/api/chat-completions
+/ai-gateway/api/decisions
 /ai-gateway/api/elevenlabs
 /ai-gateway/api/embeddings
 /ai-gateway/api/errors
