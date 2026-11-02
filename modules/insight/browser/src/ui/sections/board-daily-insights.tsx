@@ -24,7 +24,7 @@ import {
 import { useInsightHost } from "../../model/insight-host.ts";
 import { DailyInsightsDialog } from "./daily-insights-dialog.tsx";
 
-/** Keyed by board: a page that moves to another board starts a new visit. */
+/** Keyed by board: moving to another board resets the control's dialog state. */
 export function BoardDailyInsights(props: BoardHeaderActionProps) {
   return <DailyInsightsControl key={`${props.boardKind}:${props.boardId}`} {...props} />;
 }

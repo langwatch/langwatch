@@ -961,7 +961,7 @@ Feature: The daily insights run
 
     @unit
     Scenario: A board that is gone turns off no daily run the person never turned on
-      Given a board a person never decided on, or said no thanks to
+      Given a board a person never decided on, or turned off before choosing a run
       When a run finds the board gone
       Then their setting stays as it was
 

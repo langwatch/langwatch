@@ -4,7 +4,7 @@
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
+import { Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { InsightRunSettings } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
 import { useState } from "react";
@@ -39,22 +39,15 @@ export function DailyInsightsDialog({
           <Dialog.CloseTrigger />
         </Dialog.Header>
         <Dialog.Body>
-          <Box>
-            <DailyRunSettings
-              value={draft}
-              ownTimezone={ownTimezone}
-              now={now}
-              onChange={setDraft}
-            />
+          <DailyRunSettings value={draft} ownTimezone={ownTimezone} now={now} onChange={setDraft} />
+          <Text marginTop={1} textStyle="caption" color="fg.muted">
+            This is your own setting, and only you see the insights it files.
+          </Text>
+          {note && (
             <Text marginTop={1} textStyle="caption" color="fg.muted">
-              This is your own setting, and only you see the insights it files.
+              {note}
             </Text>
-            {note && (
-              <Text marginTop={1} textStyle="caption" color="fg.muted">
-                {note}
-              </Text>
-            )}
-          </Box>
+          )}
         </Dialog.Body>
         <Dialog.Footer>
           <HStack width="full" gap={3} flexWrap="wrap">

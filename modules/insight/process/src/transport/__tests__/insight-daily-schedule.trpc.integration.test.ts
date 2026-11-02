@@ -162,10 +162,10 @@ describe("given a member with analytics:view and a board they can open", () => {
       const member = (await project()).as({ userId: MEMBER });
 
       await member.turnOffBoardDailyRun(OFF);
-      const declined = await member.getBoardDailyRun(SCOPE);
+      const turnedOff = await member.getBoardDailyRun(SCOPE);
       await member.configureBoardDailyRun({ ...ON, maxInsights: 5 });
 
-      expect(declined).toEqual({ state: "off", settings: null, lastRun: null, offReason: null });
+      expect(turnedOff).toEqual({ state: "off", settings: null, lastRun: null, offReason: null });
       expect(await member.getBoardDailyRun(SCOPE)).toMatchObject({ state: "on" });
     });
   });

@@ -34,7 +34,7 @@ const TURN_OFF = "insights.turnOffBoardDailyRun";
 
 const NOTHING_YET = { settings: null, lastRun: null, offReason: null };
 const UNDECIDED: InsightDailyRunSetting = { state: "undecided", ...NOTHING_YET };
-const DECLINED: InsightDailyRunSetting = { state: "off", ...NOTHING_YET };
+const OFF_WITHOUT_CHOICES: InsightDailyRunSetting = { state: "off", ...NOTHING_YET };
 const ON: InsightDailyRunSetting = {
   state: "on",
   settings: { hour: 9, timezone: AMSTERDAM, maxInsights: 3 },
@@ -210,7 +210,7 @@ describe("given a member turned a board off before choosing a run", () => {
   describe("when they open the board", () => {
     /** @scenario "A board that is off shows the quiet control" */
     it("shows the quiet control, no dialog, and turns on with the defaults", async () => {
-      const board = openBoard({ setting: DECLINED });
+      const board = openBoard({ setting: OFF_WITHOUT_CHOICES });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
       expect(screen.queryByRole("dialog")).toBeNull();
 
@@ -263,7 +263,10 @@ describe("given a member turned a board's daily run off", () => {
   describe("when the server has not answered the write yet", () => {
     /** @scenario "The control changes before the server answers" */
     it("already shows the dropdown of a board that is on", async () => {
-      const board = openBoard({ setting: DECLINED, write: () => new Promise(() => void 0) });
+      const board = openBoard({
+        setting: OFF_WITHOUT_CHOICES,
+        write: () => new Promise(() => void 0),
+      });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
 
       await board.user.click(quietControl()!);
@@ -279,7 +282,7 @@ describe("given a member turned a board's daily run off", () => {
     /** @scenario "A refused write puts the control back and says so" */
     it("goes back to off and tells the member it could not be turned on", async () => {
       const board = openBoard({
-        setting: DECLINED,
+        setting: OFF_WITHOUT_CHOICES,
         write: () => Promise.reject(new UiProcedureRefusal("dashboard_not_found", 404)),
       });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
@@ -334,7 +337,16 @@ describe("given a member turned a board's daily run on", () => {
       );
       expect(settings.getByLabelText("Run time")).toHaveValue("9");
       expect(settings.getByLabelText("Time zone")).toHaveValue(AMSTERDAM);
+      expect(within(settings.getByLabelText("Run time")).getAllByRole("option")).toHaveLength(24);
+      expect(
+        within(settings.getByLabelText("Most insights per run"))
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["1", "3", "5", "10"]);
+
       await board.user.selectOptions(settings.getByLabelText("Run time"), "07:00");
+      await board.user.selectOptions(settings.getByLabelText("Time zone"), "Asia/Tokyo");
+      await board.user.selectOptions(settings.getByLabelText("Most insights per run"), "10");
       await board.user.click(settings.getByRole("button", { name: "Save" }));
 
       await waitFor(() =>
@@ -343,8 +355,8 @@ describe("given a member turned a board's daily run on", () => {
             projectId: "project-1",
             board: { kind: "dashboard", id: "board-1", name: "Checkout health" },
             hour: 7,
-            timezone: AMSTERDAM,
-            maxInsights: 3,
+            timezone: "Asia/Tokyo",
+            maxInsights: 10,
           },
         ]),
       );
