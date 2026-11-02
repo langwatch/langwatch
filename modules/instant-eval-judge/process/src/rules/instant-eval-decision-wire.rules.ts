@@ -1,7 +1,7 @@
 /**
  * An own decision model's request and answer (ADR-182 decision 8). The Jev body is shared by
- * Inception, Perplexity and Cloudflare; OpenAI's Decisions API takes a list of named questions,
- * which is turned back into the Jev answer shape so one reader serves every wire.
+ * every System One host; OpenAI's Decisions API (also Azure and Fireworks) takes a list of named
+ * questions, which is turned back into the Jev answer shape so one reader serves every wire.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 

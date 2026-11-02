@@ -64,6 +64,12 @@ Feature: Instant Evals decision model column in Default models
     And a deployment name stored on the row replaces the model name in the request
 
   @unit
+  Scenario: An admin can name the Azure deployment of a decision model
+    When an admin edits the project's Azure provider without the API gateway
+    Then the form shows an optional deployment name for each Azure decision model
+    And the deployment names are shown as typed, never masked as a secret
+
+  @unit
   Scenario: An Azure key is never sent to a host outside Azure
     Given the flag is on for the organization
     And the Instant Evals column is "Azure OpenAI Decisions API"
@@ -300,4 +306,4 @@ Feature: Instant Evals decision model column in Default models
   Scenario: Each decision model provider draws its own brand mark
     When the icon for a decision model provider is drawn
     Then the LangWatch hosted model draws the LangWatch logo
-    And Inception, Perplexity and Cloudflare each draw a mark of their own, not the generic one
+    And Inception, Perplexity, Cloudflare, TypeSafe, OpenRouter and Fireworks each draw a mark of their own, not the generic one
