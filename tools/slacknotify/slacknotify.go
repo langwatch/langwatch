@@ -83,7 +83,7 @@ func (m Mode) Check() error {
 	return nil
 }
 
-// Deadline bounds a whole call: a minute for one job, 5 for the red legs (each leg times itself).
+// Deadline bounds the lookups: a minute for one job, 5 for the red legs. Each post has 20s of its own on top.
 func (m Mode) Deadline() time.Duration {
 	if m.Prefix != "" {
 		return 5 * time.Minute
@@ -148,8 +148,11 @@ func (n Notifier) NotifyRedLegs(ctx context.Context, run Run, legs Legs) ([]Resu
 func (n Notifier) notifyLeg(ctx context.Context, leg Run, lookup error) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
-	if lookup == nil || n.Webhook == "" {
+	if lookup == nil {
 		return n.Notify(ctx, leg)
+	}
+	if n.Webhook == "" {
+		return Result{Job: leg.Job, Reason: fmt.Sprintf("no webhook set; jobs lookup failed: %v", lookup)}, nil
 	}
 	result, err := n.postNow(ctx, leg, fmt.Sprintf("jobs lookup failed: %v", lookup))
 	if err != nil {

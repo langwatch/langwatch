@@ -43,7 +43,11 @@ type fake struct {
 func (f *fake) start(t *testing.T) slacknotify.Notifier {
 	t.Helper()
 	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(f.slow)
+		select {
+		case <-time.After(f.slow):
+		case <-r.Context().Done():
+			return
+		}
 		if f.broken {
 			http.Error(w, "boom", http.StatusBadGateway)
 			return
@@ -278,6 +282,18 @@ func TestAFailedLegLookupStillPostsAndSaysWhy(t *testing.T) {
 			assert.Contains(t, results[0].Reason, "jobs lookup failed")
 		})
 	}
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestWithNoWebhookAFailedLegLookupStillSaysWhy(t *testing.T) {
+	n := (&fake{}).start(t)
+	n.Webhook = ""
+	results, err := n.NotifyRedLegs(context.Background(), failing, legs)
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Contains(t, results[0].Reason, "no webhook set")
+	assert.Contains(t, results[0].Reason, "jobs lookup failed")
 }
 
 // @scenario "A red main posts once per red package-suites leg"
