@@ -42,6 +42,12 @@ const evaluationRunDataSchemaDefinition = z.object({
   startedAt: z.number().nullable(),
   completedAt: z.number().nullable(),
   costId: z.string().nullable(),
+  /** Attempts that failed while the evaluator service was not up; absent reads as none. */
+  attempts: z.number().int().nonnegative().optional(),
+  lastAttemptAt: z.number().nullable().optional(),
+  lastAttemptError: z.string().nullable().optional(),
+  /** When the next attempt is due; null once the run ends. */
+  nextAttemptAt: z.number().nullable().optional(),
 });
 export interface EvaluationRunDataSchema extends Named<typeof evaluationRunDataSchemaDefinition> {}
 export const evaluationRunDataSchema: EvaluationRunDataSchema = evaluationRunDataSchemaDefinition;
@@ -71,6 +77,10 @@ const traceEvaluationDataSchemaDefinition = z.object({
     startedAt: z.number().nullable(),
     completedAt: z.number().nullable(),
   }),
+  attempts: z.number().int().nonnegative().optional(),
+  lastAttemptAt: z.number().nullable().optional(),
+  lastAttemptError: z.string().nullable().optional(),
+  nextAttemptAt: z.number().nullable().optional(),
 });
 export interface TraceEvaluationDataSchema extends Named<
   typeof traceEvaluationDataSchemaDefinition

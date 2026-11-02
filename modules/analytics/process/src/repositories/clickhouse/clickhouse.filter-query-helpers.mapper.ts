@@ -1,3 +1,5 @@
+import { tenantScope } from "@langwatch/clickhouse-client";
+
 import type { FilterOption } from "../filter-options.repository.ts";
 import type { ClickHouseFilterQueryParams } from "./clickhouse.filter-shapes.mapper.ts";
 
@@ -13,11 +15,13 @@ export const ATTRIBUTE_KEYS = {
 } as const;
 
 /**
- * Build common WHERE conditions for trace_summaries queries.
+ * Build common WHERE conditions for trace_summaries queries. Each table's helper writes the
+ * fence marker on its own time column, so a picker reads its tenants from the route's proof
+ * (ADR-177): an aggregate's members inside their windows, a plain project itself.
  */
 export function buildTraceSummariesConditions(_params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
-    "TenantId = {tenantId:String}",
+    tenantScope("OccurredAt"),
     "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
@@ -29,23 +33,40 @@ export function buildTraceSummariesConditions(_params: ClickHouseFilterQueryPara
  */
 export function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
-    "TenantId = {tenantId:String}",
+    tenantScope("StartTime"),
     "StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
   return conditions.join(" AND ");
 }
 
+/** A side table's rows narrowed to the traces `conditions` pick, matched on tenant and trace. */
+function inTraces(conditions: string): string {
+  return `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_summaries ts WHERE ${conditions})`;
+}
+
 /**
- * Build common WHERE conditions for evaluation_runs queries.
+ * Build common WHERE conditions for evaluation_runs queries. An evaluation is timed when it ran,
+ * so on an aggregate it is also held to its trace being inside the member's window: a trace
+ * from before the share, evaluated after it, stays out (ADR-177 v4.15).
  */
-export function buildEvaluationRunsConditions(_params: ClickHouseFilterQueryParams): string {
+export function buildEvaluationRunsConditions(params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
-    "TenantId = {tenantId:String}",
+    tenantScope("ScheduledAt"),
     "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
+  if (params.readsMembers) conditions.push(inTraces(buildTraceSummariesConditions(params)));
   return conditions.join(" AND ");
+}
+
+/**
+ * Narrows a stored_spans or evaluation_runs picker to the traces the other filters pick. Matched
+ * on tenant as well as trace: an aggregate's members can carry the same trace id.
+ */
+export function buildTraceScopeJoin(params: ClickHouseFilterQueryParams): string {
+  const { sql: scopeSql } = buildScopeConditions(params);
+  return scopeSql ? `AND ${inTraces(`${buildTraceSummariesConditions(params)} ${scopeSql}`)}` : "";
 }
 
 /**

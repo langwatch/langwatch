@@ -33,6 +33,91 @@ afterEach(() => {
 });
 
 describe("installTelemetryWiring", () => {
+  describe("when a Copilot surface is wired", () => {
+    it.each(["copilot", "code"])(
+      "writes the one hook file both Copilot surfaces load, for %s",
+      (tool) => {
+        installTelemetryWiring({ cfg: baseCfg(), tool, endpoint: ENDPOINT, token: TOKEN });
+
+        const hookFile = path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+        expect(JSON.parse(fs.readFileSync(hookFile, "utf8"))).toMatchObject({
+          hooks: {
+            sessionStart: [{ bash: "langwatch ingest hook copilot" }],
+            agentStop: [{ bash: "langwatch ingest hook copilot" }],
+          },
+        });
+      },
+    );
+
+    describe("given a langwatch.json the user wrote at the hook file's path", () => {
+      const theirs = JSON.stringify({ hooks: { preToolUse: [{ bash: "echo guard" }] } });
+      const hookFile = () => path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(hookFile()), { recursive: true });
+        fs.writeFileSync(hookFile(), theirs);
+      });
+
+      /** @scenario "Instrumenting Copilot over the user's langwatch.json says repository linking is off" */
+      it.each(["copilot", "code"])(
+        "leaves it alone and warns that repository linking is off, for %s",
+        (tool) => {
+          const result = installTelemetryWiring({
+            cfg: baseCfg(),
+            tool,
+            endpoint: ENDPOINT,
+            token: TOKEN,
+          });
+
+          expect(fs.readFileSync(hookFile(), "utf8")).toBe(theirs);
+          const warning = result.warnings.find((line) => line.includes("langwatch.json"));
+          expect(warning).toContain("~/.copilot/hooks/langwatch.json is not a LangWatch file");
+          expect(warning).toContain("will not report their repository or branch");
+          expect(warning).toContain(`langwatch instrument ${tool}`);
+        },
+      );
+    });
+
+    describe("given a langwatch.json the user wrote that runs the LangWatch hook", () => {
+      const theirs = JSON.stringify({
+        hooks: {
+          sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+          preToolUse: [{ bash: "echo guard" }],
+        },
+      });
+      const hookFile = () => path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(hookFile()), { recursive: true });
+        fs.writeFileSync(hookFile(), theirs);
+      });
+
+      /** @scenario "A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off" */
+      it("leaves it alone without saying repository linking is off", () => {
+        const result = installTelemetryWiring({
+          cfg: baseCfg(),
+          tool: "copilot",
+          endpoint: ENDPOINT,
+          token: TOKEN,
+        });
+
+        expect(fs.readFileSync(hookFile(), "utf8")).toBe(theirs);
+        expect(result.warnings.join("\n")).not.toContain("langwatch.json");
+      });
+    });
+
+    it("writes no Copilot hook file for another tool", () => {
+      installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "opencode",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
+
+      expect(fs.existsSync(path.join(temp.home, ".copilot"))).toBe(false);
+    });
+  });
+
   describe("when langwatch code is running", () => {
     const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
     const install = (token = TOKEN) =>

@@ -215,8 +215,11 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 // complexity. See the ModifyResponse call site for what it is responsible
 // for.
 func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error {
+	if resp.StatusCode < 400 && isEventStream(resp) {
+		promoteBareJSONStreamError(resp)
+	}
 	if resp.StatusCode < 400 {
-		if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+		if isEventStream(resp) {
 			// A 200 stream can still fail: providers signal hard limits
 			// (OpenAI's insufficient_quota) as an in-stream error event
 			// after the stream opens. Watch the frames as they pass through
@@ -412,6 +415,7 @@ var hardLimitReasonCodes = map[herr.Code]bool{
 	"codex_plan_limit":           true,
 	"insufficient_quota":         true,
 	"billing_hard_limit_reached": true,
+	ErrProviderOutOfCredit:       true,
 }
 
 // hasHardLimitReason walks a captured LLM error's code and reason chain for a

@@ -246,7 +246,7 @@ function isSubmitDisabled({
 
 /**
  * ADR-177: the Governance checkbox and, once checked, what the new aggregate
- * reads, nested under it. Shown to organisation admins only.
+ * reads, in the form's single column. Shown to organisation admins only.
  */
 function GovernanceFields({
   control,
@@ -281,13 +281,11 @@ function GovernanceFields({
           control={control}
           name="aggregateMembers"
           render={({ field }) => (
-            <Box paddingStart={6}>
-              <AggregateMemberPicker
-                organizationId={organizationId}
-                value={field.value}
-                onChange={field.onChange}
-              />
-            </Box>
+            <AggregateMemberPicker
+              organizationId={organizationId}
+              value={field.value}
+              onChange={field.onChange}
+            />
           )}
         />
       )}

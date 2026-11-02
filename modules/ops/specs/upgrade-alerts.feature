@@ -73,3 +73,38 @@ Feature: Upgrade alerts reach platform operators
       Given no step failed and no lease expired since the last wake
       When the upgrade alert check runs
       Then no email is sent
+
+  Rule: A failed step's diagnostics reach LangWatch when the installation allows it
+
+    # Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
+    @unit
+    Scenario: A newly failed step's diagnostics are sent automatically and the email says so
+      Given the installation sends diagnostics by itself
+      And a step failed since the last wake
+      When the upgrade alert check runs
+      Then that step's diagnostics are sent once, marked automatic
+      And the email says the diagnostics were sent
+
+    @unit
+    Scenario: Without automatic sending nothing is sent and the email offers to send
+      Given the installation can send diagnostics but not by itself
+      And a step failed since the last wake
+      When the upgrade alert check runs
+      Then no diagnostics are sent
+      And the email offers to send them
+
+    @unit
+    Scenario: Without a way to send, the email offers to download the diagnostics
+      Given the installation cannot send diagnostics
+      And a step failed since the last wake
+      When the upgrade alert check runs
+      Then no diagnostics are sent
+      And the email offers to download them
+
+    @unit
+    Scenario: A diagnostics send that fails still sends the email, which asks the operator to send
+      Given the installation sends diagnostics by itself but the send fails
+      And a step failed since the last wake
+      When the upgrade alert check runs
+      Then the email is still sent
+      And it offers to send the diagnostics

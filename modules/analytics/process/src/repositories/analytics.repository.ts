@@ -8,11 +8,16 @@ import type {
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
+import type { Authorization } from "@langwatch/authorization";
 import type { Instant } from "@langwatch/time";
 
 export interface AnalyticsTimeseriesQuery {
   readonly table: AnalyticsTable;
-  readonly tenantId: string;
+  /**
+   * The proof the read runs under (ADR-177). Every table reads every project it fences, a
+   * shared one inside its grant's window.
+   */
+  readonly authorization: Authorization;
   readonly input: AnalyticsTimeseriesInput;
   readonly startDate: Instant;
   readonly endDate: Instant;
@@ -23,6 +28,8 @@ export interface AnalyticsTimeseriesQuery {
 
 export interface AnalyticsLegacyReadInput {
   readonly projectId: string;
+  /** The route's `cost:view` proof (ADR-177 v4.15); its fence picks the tenants read. */
+  readonly authorization: Authorization;
   readonly startDate: number;
   readonly endDate: number;
   readonly filters?: AnalyticsFilters;
@@ -46,6 +53,15 @@ export interface AnalyticsFeedbackPageRead {
   readonly hasMore: boolean;
 }
 
+/** How the read is scoped, beside what it asks for. */
+export type AnalyticsTableReadScope = {
+  /**
+   * The proof reads an aggregate's members, so evaluations are read through their trace's time,
+   * not their own: the legacy builder windows the trace (ADR-177 v4.15).
+   */
+  readsMembers?: boolean;
+};
+
 /** The single persistence capability owned by Analytics. */
 export abstract class AnalyticsRepository {
   /**
@@ -53,7 +69,10 @@ export abstract class AnalyticsRepository {
    * depends on which columns each table carries and which of them the query needs, so it
    * belongs beside the builders that know those tables rather than in the service.
    */
-  abstract tableFor(input: AnalyticsTimeseriesInput): AnalyticsTable;
+  abstract tableFor(
+    input: AnalyticsTimeseriesInput,
+    scope?: AnalyticsTableReadScope,
+  ): AnalyticsTable;
 
   abstract runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult>;
 

@@ -1,5 +1,4 @@
 import { isLegacyOnlineEvaluationWorkbenchState } from "@langwatch/experiment-contract";
-import { useMemo } from "react";
 
 import { monitorApi } from "./monitor-api.ts";
 
@@ -36,24 +35,18 @@ export function useOnlineEvaluations({
     },
   );
 
-  const performanceByMonitor = useMemo(
-    () => new Map(performance.data?.map((item) => [item.monitorId, item] as const) ?? []),
-    [performance.data],
+  const performanceByMonitor = new Map(
+    performance.data?.map((item) => [item.monitorId, item] as const) ?? [],
   );
 
-  const experimentSlugs = useMemo(
-    () =>
-      new Map(
-        (experiments.data ?? [])
-          .filter((experiment) => isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState))
-          .map((experiment) => [experiment.id, experiment.slug] as const),
-      ),
-    [experiments.data],
+  const experimentSlugs = new Map(
+    (experiments.data ?? [])
+      .filter((experiment) => isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState))
+      .map((experiment) => [experiment.id, experiment.slug] as const),
   );
 
-  const monitorById = useMemo(
-    () => new Map((monitors.data ?? []).map((monitor) => [monitor.id, monitor] as const)),
-    [monitors.data],
+  const monitorById = new Map(
+    (monitors.data ?? []).map((monitor) => [monitor.id, monitor] as const),
   );
 
   const rows =
@@ -62,6 +55,7 @@ export function useOnlineEvaluations({
       name: monitor.name,
       checkType: monitor.checkType,
       enabled: monitor.enabled,
+      autoPausedReason: monitor.enabled ? null : (monitor.autoPausedReason ?? null),
       executionMode: monitor.executionMode,
       performance: performanceByMonitor.get(monitor.id),
       hasPerformanceError: performance.isError,

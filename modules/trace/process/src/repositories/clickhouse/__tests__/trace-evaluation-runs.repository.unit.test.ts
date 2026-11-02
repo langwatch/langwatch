@@ -173,6 +173,84 @@ describe("given reading a trace's evaluations with their inputs exceeds ClickHou
   });
 });
 
+describe("given the target's evaluation_runs does not have the attempt columns yet", () => {
+  describe("when trace reads the evaluations of a trace", () => {
+    /** @scenario "Attempt columns a target has not added yet read as no attempts" */
+    it("names each missing attempt column as its default and reads no attempts", async () => {
+      const ch = client(() => [
+        {
+          ...SUMMARY_ROW,
+          Details: null,
+          Error: null,
+          ScheduledAt: "1000",
+          StartedAt: null,
+          CompletedAt: null,
+        },
+      ]);
+      const withoutColumns = {
+        ...ch,
+        select: async () =>
+          "toUInt16(0) AS `Attempts`, CAST(NULL AS Nullable(DateTime64(3))) AS `LastAttemptAt`, CAST(NULL AS Nullable(String)) AS `LastAttemptError`, CAST(NULL AS Nullable(DateTime64(3))) AS `NextAttemptAt`",
+      };
+      const repository = ClickHouseTraceEvaluationRunsRepository.create({
+        resolveClient: async () => withoutColumns,
+        clickhouse: new AuthorizedClickHouse({
+          resolveClient: async () => clickHouseQueryClientDouble({}),
+        }),
+      });
+
+      const read = await repository.findTraceEvaluations({
+        tenantId: TENANT,
+        traceIds: ["trace-1"],
+      });
+
+      expect(ch.query.mock.calls[0]?.[0].query).toContain("toUInt16(0) AS `Attempts`");
+      expect(read["trace-1"]?.[0]).toMatchObject({ attempts: 0, lastAttemptError: null });
+    });
+  });
+});
+
+describe("given a run with failed attempts", () => {
+  describe("when trace reads the evaluations of a trace", () => {
+    /** @scenario "A run's attempts reach the trace's evaluation" */
+    it("reads the attempt moments as epoch milliseconds, not as timezone-less text", async () => {
+      const ch = client(() => [
+        {
+          ...SUMMARY_ROW,
+          Details: null,
+          Error: null,
+          ScheduledAt: "1000",
+          StartedAt: null,
+          CompletedAt: null,
+          Attempts: 2,
+          LastAttemptAtMs: "1700000015000",
+          NextAttemptAtMs: 1_700_000_025_000,
+        },
+      ]);
+      const repository = ClickHouseTraceEvaluationRunsRepository.create({
+        resolveClient: async () => ch,
+        clickhouse: new AuthorizedClickHouse({
+          resolveClient: async () => clickHouseQueryClientDouble({}),
+        }),
+      });
+
+      const read = await repository.findTraceEvaluations({
+        tenantId: TENANT,
+        traceIds: ["trace-1"],
+      });
+
+      expect(ch.query.mock.calls[0]?.[0].query).toContain(
+        "toUnixTimestamp64Milli(LastAttemptAt) AS LastAttemptAtMs",
+      );
+      expect(read["trace-1"]?.[0]).toMatchObject({
+        attempts: 2,
+        lastAttemptAt: 1_700_000_015_000,
+        nextAttemptAt: 1_700_000_025_000,
+      });
+    });
+  });
+});
+
 describe("given no traces", () => {
   describe("when trace reads evaluation summaries or evaluations for them", () => {
     /** @scenario "Trace asks nothing of evaluation_runs for an empty list of traces" */

@@ -73,8 +73,9 @@ Feature: The TypeScript compiler can never take the machine down
   # two classes — two classes would weigh each half of the machine's compilers
   # against the whole budget and reclaim neither.
   @unit
-  Scenario: The compiler is governed under both of its names
+  Scenario: The compiler is governed under each of its names
     Given a run of the compiler installed as "tsc" and one installed as "tsgo"
+    And the Rust port the repo's "tsc" runs is watched as "tsrs" in that same class
     And they exceed the machine budget only when counted together
     When the daemon takes its next sample
     Then both are watched as one class

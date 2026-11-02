@@ -118,3 +118,83 @@ Feature: Per-project NLP Lambda resolution
     Given the UpdateFunctionConfiguration call rejects with an unrelated error
     When getProjectLambdaArn resolves that project
     Then the unrelated error is rethrown
+
+  # Rollout order: during a rollout, pods of the previous release keep serving
+  # next to the new ones. The fleet configuration's image_order grows with each
+  # new image, the function records the order of the image last put on it, and
+  # a pod never moves a function to a lower order.
+
+  @unit
+  Scenario: A pod on an older release leaves a function a newer release moved
+    Given a function tagged with an image order above the pod's own
+    And its image and memory size differ from the pod's configuration
+    When the pod resolves that project
+    Then it answers with the function's ARN
+    And it sends no UpdateFunctionCode, UpdateFunctionConfiguration or TagResource call
+
+  @unit
+  Scenario: A pod that cannot read the function's order leaves it alone
+    Given the fleet configuration names an image_order
+    And Lambda answers GetFunction with a TagsError instead of the function's tags
+    When the pod resolves that project
+    Then it answers with the function's ARN, marked as left unprotected
+    And it sends no UpdateFunctionCode, UpdateFunctionConfiguration or TagResource call
+
+  @unit
+  Scenario: A pod that cannot record its order does not move the image
+    Given a function on an older release's image
+    And Lambda refuses the TagResource call
+    When the pod resolves that project
+    Then it sends no UpdateFunctionCode or UpdateFunctionConfiguration call
+
+  @unit
+  Scenario: An ImageOrder tag that is not a whole number counts as no order
+    Given a function whose ImageOrder tag is not a whole number
+    When a pod with an image_order compares its standing
+    Then the pod is ahead of the function
+
+  @unit
+  Scenario: A pod on a newer release upgrades an older or untagged function
+    Given a function tagged with a lower image order, or with none
+    When the pod resolves that project
+    Then it tags the function with its own image order before it updates the image
+    And the image is updated to the pod's image
+
+  @unit
+  Scenario: A pod on the same release converges the function as before
+    Given a function tagged with the pod's own image order but another image
+    When the pod resolves that project
+    Then the image is updated to the pod's image without retagging
+
+  @unit
+  Scenario: A fleet that names no image order converges as before
+    Given the fleet configuration names no image_order
+    When the pod resolves a function on another image
+    Then the image is updated to the pod's image
+    And the function is not tagged
+
+  @unit
+  Scenario: A newly created function records the pod's image order
+    Given the fleet configuration names an image_order
+    When the pod creates a project's function
+    Then the function is created with that image order as a tag
+
+  @unit
+  Scenario: A cached ARN from a newer release keeps serving an older pod
+    Given "projectA" has an ARN cached by a pod on a higher image order and another image
+    When a runtime on a lower image order resolves "projectA"
+    Then it returns the cached ARN without calling AWS
+    And it leaves the shared entry in place
+
+  @unit
+  Scenario: A pod that leaves a newer function alone files it under the newer image
+    Given a pod on a lower image order resolves "projectA" and its resolver leaves the function alone
+    Then the shared entry carries the image and order the function holds
+    And a pod on that newer order serves the entry without calling AWS
+
+  @unit
+  Scenario: A function left unmoved for want of an order is served briefly from cache
+    Given the pod's resolver left a function unmoved because it could not read or record the order
+    When the runtime shares that resolution
+    Then the entry is filed under the pod's own image and order with a 60 second TTL
+    And the next resolution on any pod of that release is served from cache without deleting it

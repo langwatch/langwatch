@@ -468,11 +468,15 @@ export class CodingAgentSessionStateProjection {
     };
   }
 
-  foldModelCall(
-    next: CodingAgentSessionData,
-    attrs: Record<string, unknown>,
-    fallbackDurationMs: number,
-  ): CodingAgentSessionData {
+  foldModelCall({
+    state: next,
+    attrs,
+    fallbackDurationMs,
+  }: {
+    state: CodingAgentSessionData;
+    attrs: Record<string, unknown>;
+    fallbackDurationMs: number;
+  }): CodingAgentSessionData {
     const agentId = this.coerceString(attrs.agent_id);
     if (agentId !== null) Object.assign(next, this.recordSubAgent(next, agentId));
     const stopReason = this.coerceString(attrs.stop_reason);

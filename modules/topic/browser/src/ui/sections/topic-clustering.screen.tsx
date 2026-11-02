@@ -69,6 +69,11 @@ const CLUSTERING_FAILURE_GUIDANCE: Partial<
     description:
       "This usually means the account is out of quota or credit. Check your limits and billing with the provider, then run topic clustering again.",
   },
+  model_restricted: {
+    title: "This model can't run topic clustering",
+    description:
+      "It's licensed for coding-assistant features only. Choose a different model for topic clustering in Settings → Model Providers → Default Models, then run it again.",
+  },
 };
 
 const HISTORY_PAGE_SIZE = 20;

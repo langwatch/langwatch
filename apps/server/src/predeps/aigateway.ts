@@ -5,20 +5,14 @@ import { fileURLToPath } from "node:url";
 import { execa } from "execa";
 
 import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
-import { downloadWithProgress } from "./_download.ts";
+import { downloadWithProgress, releaseAssetSlug } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // The Go AI Gateway monobinary is built per-platform in CI and uploaded to a
 // GitHub release named v$VERSION. The npm package version is in lockstep with
 // the langwatch release tag — see .github/workflows/npx-server-publish.yml.
 function downloadUrl(version: string, platform: string): string {
-  const map: Record<string, string> = {
-    "darwin-arm64": "darwin-arm64",
-    "darwin-x64": "darwin-amd64",
-    "linux-arm64": "linux-arm64",
-    "linux-x64": "linux-amd64",
-  };
-  const slug = map[platform];
+  const slug = releaseAssetSlug(platform);
   if (!slug) throw new Error(`No aigateway build for ${platform}`);
   return `https://github.com/langwatch/langwatch/releases/download/v${version}/aigateway-${slug}`;
 }

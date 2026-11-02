@@ -2,7 +2,9 @@ import type { ListedRun, ListedWork } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 
 import type { UpgradeStep } from "../ledger.ts";
+import { redactSecrets } from "../runner/run-log.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
+import { type LedgerTextRedactor, StepLogTail, ledgerText } from "../step/step-log.ts";
 
 /** The ledger writes a background run needs; the two upgrade repositories answer them as built. */
 export interface BackgroundStepsLedger {
@@ -23,6 +25,8 @@ export interface BackgroundStepsLedger {
     runId: string;
     lastError?: string | null;
     report?: Record<string, unknown>;
+    /** The attempt's last log lines, redacted; omitted keeps the stored tail. */
+    logTail?: readonly string[];
   }): Promise<void>;
   saveReport(input: { id: string; report: Record<string, unknown> }): Promise<void>;
   /** Sets a running step pending with its checkpoint cleared, as a rollback reopens a done one. */
@@ -98,6 +102,8 @@ export interface BackgroundStepsOptions {
   queue?: BackgroundStepsQueue;
   /** How many steps run side by side; defaults to `BACKGROUND_STEP_CONCURRENCY`. */
   concurrency?: number;
+  /** Masks what an error or log line may quote; defaults to the URL and `key=value` masks. */
+  redact?: LedgerTextRedactor;
 }
 
 /** The job queue's listed runs: a run's jobs, and the jobs they cause, run ahead of any backlog. */
@@ -226,6 +232,11 @@ export class BackgroundStepsService {
     const module = moduleOf(step.id);
     const runId = `background:${identity.owner}`;
     const held = this.holdLease({ name, ttlMs, signal, step: step.id, deadlineMs });
+    const stepLog = StepLogTail.create({
+      redact: this.redact,
+      forward: (level, message, fields) =>
+        log(level, message, { step: step.id, module, ...fields }),
+    });
     let run: ReturnType<MigrationStep["run"]> | undefined;
     try {
       // Another worker may have finished it, or moved its checkpoint, since the sweep read it.
@@ -233,7 +244,7 @@ export class BackgroundStepsService {
       if (!current || !RUNNABLE.has(current.status)) return "held";
       const resumeFrom = current.report ?? null;
       await ledger.markRunning({ id: step.id, runId });
-      log("info", "background step started", { step: step.id, module, resumed: !!resumeFrom });
+      stepLog.info("background step started", { resumed: !!resumeFrom });
       run = this.runQueueWork({
         step,
         work: (list) =>
@@ -254,18 +265,25 @@ export class BackgroundStepsService {
             },
             dryRun: false,
             signal: held.signal,
+            log: stepLog,
           }),
       });
       const report = await Promise.race([run, held.deadline]);
-      if (held.signal.aborted) return await this.suspend({ step, runId, held });
+      if (held.signal.aborted) return await this.suspend({ step, runId, held, stepLog });
       if (await this.reopenedByRollback({ step })) return "waiting";
-      await ledger.setStatus({ ids: [step.id], status: "done", runId, report });
+      stepLog.info("background step done");
+      await ledger.setStatus({
+        ids: [step.id],
+        status: "done",
+        runId,
+        report,
+        logTail: stepLog.tail(),
+      });
       this.failures.delete(step.id);
-      log("info", "background step done", { step: step.id, module });
       return "done";
     } catch (error) {
-      if (held.signal.aborted) return await this.suspend({ step, runId, held });
-      return await this.recordFailure({ step, runId, error });
+      if (held.signal.aborted) return await this.suspend({ step, runId, held, stepLog });
+      return await this.recordFailure({ step, runId, error, stepLog });
     } finally {
       await this.releaseWhenSettled({ step: step.id, held, run });
     }
@@ -415,22 +433,28 @@ export class BackgroundStepsService {
     step,
     runId,
     held,
+    stepLog,
   }: {
     step: MigrationStep;
     runId: string;
     held: { signal: AbortSignal; lost: () => boolean; expired: () => boolean };
+    stepLog: StepLogTail;
   }): Promise<"held"> {
     const lost = held.lost();
-    const lastError = held.expired() ? messageOf(held.signal.reason) : null;
-    if (!lost) {
-      await this.options.ledger.setStatus({ ids: [step.id], status: "pending", runId, lastError });
-    }
-    this.options.log("info", "background step stopped; it resumes from its checkpoint", {
-      step: step.id,
-      module: moduleOf(step.id),
+    const lastError = held.expired() ? this.errorText(held.signal.reason) : null;
+    stepLog.info("background step stopped; it resumes from its checkpoint", {
       leaseLost: lost,
       expired: held.expired(),
     });
+    if (!lost) {
+      await this.options.ledger.setStatus({
+        ids: [step.id],
+        status: "pending",
+        runId,
+        lastError,
+        logTail: stepLog.tail(),
+      });
+    }
     return "held";
   }
 
@@ -439,32 +463,55 @@ export class BackgroundStepsService {
     step,
     runId,
     error,
+    stepLog,
   }: {
     step: MigrationStep;
     runId: string;
     error: unknown;
+    stepLog: StepLogTail;
   }): Promise<"failed" | "retrying"> {
-    const { ledger, log } = this.options;
+    const { ledger } = this.options;
     const retry = this.options.retry ?? BACKGROUND_STEP_RETRY;
-    const lastError = messageOf(error);
+    const lastError = this.errorText(error);
     const attempt = (this.failures.get(step.id)?.count ?? 0) + 1;
-    const fields = { step: step.id, module: moduleOf(step.id), error: lastError, attempt };
+    const fields = { error: lastError, attempt };
     if (attempt < retry.attempts) {
       const retryInMs = Math.min(retry.firstBackoffMs * 2 ** (attempt - 1), retry.maxBackoffMs);
       this.failures.set(step.id, { count: attempt, retryAt: this.now() + retryInMs });
-      await ledger.setStatus({ ids: [step.id], status: "pending", runId, lastError });
-      log("warn", "background step failed; retrying after a backoff", { ...fields, retryInMs });
+      stepLog.warn("background step failed; retrying after a backoff", { ...fields, retryInMs });
+      await ledger.setStatus({
+        ids: [step.id],
+        status: "pending",
+        runId,
+        lastError,
+        logTail: stepLog.tail(),
+      });
       return "retrying";
     }
     this.failures.delete(step.id);
-    await ledger.setStatus({ ids: [step.id], status: "failed", runId, lastError });
-    log("warn", "background step failed", {
+    stepLog.warn("background step failed", {
       ...fields,
       attempts: retry.attempts,
       alert: true,
       next: "fix the cause; the next `pnpm task upgrade` run sets it pending again",
     });
+    await ledger.setStatus({
+      ids: [step.id],
+      status: "failed",
+      runId,
+      lastError,
+      logTail: stepLog.tail(),
+    });
     return "failed";
+  }
+
+  private get redact(): LedgerTextRedactor {
+    return this.options.redact ?? redactSecrets;
+  }
+
+  /** The error as the ledger stores it: redacted and cut to its cap. */
+  private errorText(error: unknown): string {
+    return ledgerText({ text: messageOf(error), redact: this.redact });
   }
 }
 

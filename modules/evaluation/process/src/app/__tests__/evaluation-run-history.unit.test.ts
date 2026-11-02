@@ -1,6 +1,10 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import {
+  ClickHouseColumns,
+  type ClickHouseQueryClient,
+  type QueryRequest,
+} from "@langwatch/clickhouse-client";
 import { idIndexedClientDouble } from "@langwatch/clickhouse-client/testing";
 /**
  * @vitest-environment node
@@ -136,6 +140,7 @@ describe("given the live evaluation repositories over the process's ClickHouse m
           statements.push({ tenantId: request.tenantId, settings: request.settings });
           return { rows: [] };
         },
+        columns: () => ClickHouseColumns.over({ read: async () => [] }),
       });
       const repositories = LiveEvaluationRepositories.create({
         prisma: createApiFixture<PrismaClient>(),

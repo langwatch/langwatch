@@ -38,6 +38,8 @@ class Evaluation:
         inputs (EvaluationInputsType0 | None | Unset):
         error (EvaluationErrorType0 | None | Unset):
         retries (float | None | Unset):
+        attempts (int | Unset):
+        last_attempt_error (None | str | Unset):
     """
 
     evaluation_id: str
@@ -56,6 +58,8 @@ class Evaluation:
     inputs: EvaluationInputsType0 | None | Unset = UNSET
     error: EvaluationErrorType0 | None | Unset = UNSET
     retries: float | None | Unset = UNSET
+    attempts: int | Unset = UNSET
+    last_attempt_error: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -145,6 +149,14 @@ class Evaluation:
         else:
             retries = self.retries
 
+        attempts = self.attempts
+
+        last_attempt_error: None | str | Unset
+        if isinstance(self.last_attempt_error, Unset):
+            last_attempt_error = UNSET
+        else:
+            last_attempt_error = self.last_attempt_error
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -178,6 +190,10 @@ class Evaluation:
             field_dict["error"] = error
         if retries is not UNSET:
             field_dict["retries"] = retries
+        if attempts is not UNSET:
+            field_dict["attempts"] = attempts
+        if last_attempt_error is not UNSET:
+            field_dict["last_attempt_error"] = last_attempt_error
 
         return field_dict
 
@@ -339,6 +355,17 @@ class Evaluation:
 
         retries = _parse_retries(d.pop("retries", UNSET))
 
+        attempts = d.pop("attempts", UNSET)
+
+        def _parse_last_attempt_error(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        last_attempt_error = _parse_last_attempt_error(d.pop("last_attempt_error", UNSET))
+
         evaluation = cls(
             evaluation_id=evaluation_id,
             evaluator_id=evaluator_id,
@@ -356,6 +383,8 @@ class Evaluation:
             inputs=inputs,
             error=error,
             retries=retries,
+            attempts=attempts,
+            last_attempt_error=last_attempt_error,
         )
 
         evaluation.additional_properties = d

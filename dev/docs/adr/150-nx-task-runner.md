@@ -446,3 +446,15 @@ packages run as `test:repo`, and `build:storybook` (whose adoption counts grep
 every source tree) is `cache: false`. The same change now reaches 8 projects.
 The architecture enforcer keeps its whole-tree row: nothing depends on it, so it
 costs only its own run.
+
+## Amendment, 2026-10-21: CI's package suites replay through Nx
+
+`package-suites` ran every suite through `pnpm run`, so CI never used the `test`
+cache this ADR built: each push reran about 130 runner-minutes of suites a
+change had not touched. `test` and `test:unit` now run as
+`nx run-many --excludeTaskDependencies` (the job builds dependencies first);
+`test:integration` and `test:browser` stay on pnpm, uncached. The job keeps its
+own cache, `.nx/suites`, apart from the build cache, so it holds only test
+results: one per shard, saved by main and same-repository pull requests (one
+copy kept). A re-push splits the same way and replays its unchanged suites. A
+shard whose split changed restores a partial match and runs the rest.

@@ -13,8 +13,13 @@ const { CurrencyService, EUR_COUNTRIES } = await import("../currency.service.ts"
 
 const service = CurrencyService.create();
 
-const detect = (headers: Record<string, string | string[] | undefined>) =>
-  service.detect({ headers });
+const detect = (
+  headers: Record<string, string | string[] | undefined>,
+  callerAddress: string | null = null,
+) => service.detect({ headers, callerAddress });
+
+/** A request carrying only the address the door resolved. */
+const from = (callerAddress: string) => detect({}, callerAddress);
 
 beforeEach(() => {
   lookup.mockReset();
@@ -90,7 +95,7 @@ describe("CurrencyService.detect", () => {
     it("prefers a stated country over the address it could infer one from", () => {
       // A stated country is the CDN's own answer about where the request
       // entered; an address is a lookup that can be wrong.
-      expect(detect({ "x-vercel-ip-country": "US", "cf-connecting-ip": "1.1.1.1" })).toEqual({
+      expect(detect({ "x-vercel-ip-country": "US" }, "1.1.1.1")).toEqual({
         currency: Currency.USD,
         country: "US",
       });
@@ -118,7 +123,7 @@ describe("CurrencyService.detect", () => {
         "172.16.0.1",
         "172.31.255.254",
       ]) {
-        expect(detect({ "cf-connecting-ip": ip })).toEqual({
+        expect(from(ip)).toEqual({
           currency: Currency.EUR,
           country: null,
         });
@@ -130,8 +135,8 @@ describe("CurrencyService.detect", () => {
     it("still looks up 172.15 and 172.32, because the private block is 16 to 31", () => {
       // Reading the range too widely would silently refuse to locate real
       // customers on those addresses.
-      detect({ "cf-connecting-ip": "172.15.0.1" });
-      detect({ "cf-connecting-ip": "172.32.0.1" });
+      from("172.15.0.1");
+      from("172.32.0.1");
 
       expect(lookup.mock.calls.map((call) => call[0])).toEqual(["172.15.0.1", "172.32.0.1"]);
     });
@@ -141,7 +146,7 @@ describe("CurrencyService.detect", () => {
     it("bills by the country the lookup names", () => {
       lookup.mockReturnValue({ country: "FR" });
 
-      expect(detect({ "cf-connecting-ip": "8.8.8.8" })).toEqual({
+      expect(from("8.8.8.8")).toEqual({
         currency: Currency.EUR,
         country: "FR",
       });
@@ -150,7 +155,7 @@ describe("CurrencyService.detect", () => {
     it("falls back to euros when the lookup names nobody", () => {
       lookup.mockReturnValue(null);
 
-      expect(detect({ "cf-connecting-ip": "8.8.8.8" })).toEqual({
+      expect(from("8.8.8.8")).toEqual({
         currency: Currency.EUR,
         country: null,
       });
@@ -163,42 +168,35 @@ describe("CurrencyService.detect", () => {
         throw new Error("geoip database unavailable");
       });
 
-      expect(detect({ "cf-connecting-ip": "8.8.8.8" })).toEqual({
+      expect(from("8.8.8.8")).toEqual({
         currency: Currency.EUR,
         country: null,
       });
     });
   });
 
-  describe("when choosing which address header to read", () => {
-    it("prefers Cloudflare's over the others", () => {
-      detect({
-        "cf-connecting-ip": "9.9.9.9",
-        "x-real-ip": "8.8.8.8",
-        "x-forwarded-for": "1.1.1.1",
+  describe("given a forged address header and no stated country", () => {
+    /** @scenario "Currency detection looks up the resolved address" */
+    it("looks up the address the door resolved, never a header", () => {
+      detect(
+        {
+          "cf-connecting-ip": "9.9.9.9",
+          "true-client-ip": "9.9.9.8",
+          "x-real-ip": "8.8.8.8",
+          "x-forwarded-for": "1.1.1.1",
+        },
+        "203.0.113.9",
+      );
+
+      expect(lookup.mock.calls.map((call) => call[0])).toEqual(["203.0.113.9"]);
+    });
+
+    it("looks nothing up where the door resolved no address", () => {
+      expect(detect({ "cf-connecting-ip": "9.9.9.9" })).toEqual({
+        currency: Currency.EUR,
+        country: null,
       });
-
-      expect(lookup).toHaveBeenCalledWith("9.9.9.9");
-    });
-
-    it("falls to x-real-ip when Cloudflare's is absent", () => {
-      detect({ "x-real-ip": "8.8.8.8", "x-forwarded-for": "1.1.1.1" });
-
-      expect(lookup).toHaveBeenCalledWith("8.8.8.8");
-    });
-
-    it("takes the first hop of a forwarded chain, which is the client", () => {
-      // The rest of the chain is the proxies it passed through, and locating
-      // a proxy would bill everyone behind it in the proxy's currency.
-      detect({ "x-forwarded-for": "1.1.1.1, 8.8.8.8" });
-
-      expect(lookup).toHaveBeenCalledWith("1.1.1.1");
-    });
-
-    it("reads a header that arrived as a list", () => {
-      detect({ "cf-connecting-ip": ["1.1.1.1", "8.8.8.8"] });
-
-      expect(lookup).toHaveBeenCalledWith("1.1.1.1");
+      expect(lookup).not.toHaveBeenCalled();
     });
   });
 });

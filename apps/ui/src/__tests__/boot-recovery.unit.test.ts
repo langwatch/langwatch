@@ -107,16 +107,27 @@ const CODE_ERRORED: Resource[] = [
 ];
 const ONLY_API_FETCHED: Resource[] = [{ name: "https://app.example/api/session", transferSize: 9 }];
 
+/** What the document held before the case, so the case removes only what it added. */
+let inDocumentBefore = new Set<Node>();
+const headAndBodyNodes = () => [...document.head.childNodes, ...document.body.childNodes];
+
 beforeEach(() => {
   vi.useFakeTimers();
   Object.defineProperty(document, "readyState", { configurable: true, value: "loading" });
+  inDocumentBefore = new Set(headAndBodyNodes());
 });
 
 afterEach(() => {
   vi.useRealTimers();
-  document.head.innerHTML = "";
-  document.body.innerHTML = "";
+  // The document outlives this file when files share a worker. Clearing the
+  // whole head would also drop the style tags the design system's style cache
+  // still holds, and the next file that renders would fail inserting after them.
+  for (const node of headAndBodyNodes()) {
+    if (!inDocumentBefore.has(node)) node.remove();
+  }
   status()?.remove();
+  // Back to jsdom's own `readyState` rather than the stand-in value.
+  Reflect.deleteProperty(document, "readyState");
 });
 
 describe("given the page has not shown yet", () => {

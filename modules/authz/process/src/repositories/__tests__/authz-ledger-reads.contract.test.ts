@@ -25,12 +25,14 @@ import { PostgresAuthzRepositories } from "../prisma/prisma.authz.repositories.t
 
 type LedgerRepositories = Pick<AuthzRepositories, "grantProjection" | "revocation" | "ledgerReads">;
 
+type TeamInput = { personalFor?: string };
+
 type LedgerFixture = Readonly<{
   repositories: LedgerRepositories;
   organizationId: string;
   user: () => Promise<string>;
   isMember: (userId: string) => Promise<boolean>;
-  team: (input?: { personalFor?: string }) => Promise<string>;
+  team: (input?: TeamInput) => Promise<string>;
   teamMember: (input: { teamId: string; userId: string }) => Promise<void>;
   group: (input: { memberIds: readonly string[] }) => Promise<string>;
   apiKey: (input: { userId: string; revoked?: boolean }) => Promise<string>;
@@ -73,7 +75,7 @@ function memoryLedgerFixture(): LedgerFixture {
       return userId;
     },
     isMember: async (userId) => memory.isMember(organizationId, userId),
-    team: async ({ personalFor } = {}) => {
+    team: async ({ personalFor }: TeamInput = {}) => {
       const teamId = id("team");
       memory.teams.push({
         id: teamId,
@@ -157,7 +159,7 @@ async function postgresLedgerFixture(): Promise<LedgerFixture> {
     },
     isMember: async (userId) =>
       (await database.organizationUser.count({ where: { userId, organizationId } })) > 0,
-    team: async ({ personalFor } = {}) => {
+    team: async ({ personalFor }: TeamInput = {}) => {
       const teamId = id("team");
       await database.team.create({
         data: {

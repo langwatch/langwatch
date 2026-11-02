@@ -59,4 +59,6 @@ export interface SessionModelTotalsRow {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   costUsd: number;
+  /** The calls' AI units, a count beside the dollar figure; 0 for an agent that reports none. */
+  aiUnits: number;
 }

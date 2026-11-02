@@ -28,5 +28,7 @@ export type UpgradeRunDetailView = OpsUpgradeRun;
 export type UpgradeVersionView = OpsUpgradeStatus["version"];
 /** The newest release cloud's usage-report reply names; null when it names none. */
 export type UpgradeLatestReleaseView = OpsUpgradeStatus["latestRelease"];
+/** A notice cloud sent that the running release does not fix; security first. */
+export type UpgradeNoticeView = OpsUpgradeStatus["notices"][number];
 /** W7: one ClickHouse target's latest done version, outstanding steps and latest error. */
 export type UpgradeTargetSummaryView = OpsUpgradeTargetSummary;

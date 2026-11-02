@@ -84,6 +84,9 @@
       "path": "../../billing/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/coding-agent/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/auth/contract/tsconfig.build.json"
     },
     {

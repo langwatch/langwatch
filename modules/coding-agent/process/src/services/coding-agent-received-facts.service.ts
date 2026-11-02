@@ -49,7 +49,9 @@ export class CodingAgentReceivedFactsService {
       );
       return;
     }
-    await this.commands.contributeSpanFacts(liftSpanContribution({ tenantId, occurredAt, span }));
+    const lifted = liftSpanContribution({ tenantId, occurredAt, span });
+    if (lifted.outcome === "ignored") return;
+    await this.commands.contributeSpanFacts(lifted.contribution);
   }
 
   private decodeCanonicalSpan({

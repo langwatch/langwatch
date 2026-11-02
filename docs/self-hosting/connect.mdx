@@ -93,7 +93,7 @@ Both endpoints must be `https`; plain `http` is accepted for a loopback host onl
 
 Connect needs two destinations open, both on port 443:
 
-```
+```text
 gateway.langwatch.ai:443
 connect.langwatch.ai:443
 ```
@@ -166,10 +166,10 @@ With **Managed models** on, the LangWatch AI Gateway in your install can call a 
 curl https://<your-gateway>/v1/chat/completions \
   -H "Authorization: Bearer <your virtual key>" \
   -H "Content-Type: application/json" \
-  -d '{"model": "langwatch/gpt-5-mini", "messages": [{"role": "user", "content": "hi"}]}'
+  -d '{"model": "langwatch/gpt-6-luna", "messages": [{"role": "user", "content": "hi"}]}'
 ```
 
-Only a model spelled with the `langwatch/` prefix reaches the LangWatch slot. A model with another provider prefix, for example `openai/gpt-5-mini`, stays with that provider, including its retries. A bare model name never reaches LangWatch either. In an organization whose only provider is the LangWatch slot, the gateway refuses a bare name with `model_not_recognized`.
+Only a model spelled with the `langwatch/` prefix reaches the LangWatch slot. A model with another provider prefix, for example `openai/gpt-6-luna`, stays with that provider, including its retries. A bare model name never reaches LangWatch either. In an organization whose only provider is the LangWatch slot, the gateway refuses a bare name with `model_not_recognized`.
 
 Calls served by the LangWatch slot are metered against the same cap as every other hosted service.
 

@@ -1,11 +1,11 @@
-import { existsSync, globSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, matchesGlob, relative, resolve } from "node:path";
 
 import { configDefaults, type ViteUserConfig } from "vitest/config";
 
 import { mocksModules } from "./mocks-modules.ts";
+import { literalGlob, suiteFiles } from "./suite-files.ts";
 
-const GLOB_SPECIAL = /[\\*?[\]{}()!+@]/g;
 const RELATIVE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'](\.{1,2}\/[^"']+)["']/g;
 const SOURCE_EXTENSIONS = ["", ".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"];
 const INDEX_FILES = ["/index.ts", "/index.tsx"];
@@ -29,12 +29,7 @@ export function splitIsolationByMocking({
   const base = test.dir === undefined ? root : join(root, test.dir);
   const { include = configDefaults.include, ...inherited } = test;
   const exclude = test.exclude ?? configDefaults.exclude;
-  const files = globSync(include, {
-    cwd: base,
-    exclude: (entry) => /(^|\/)(node_modules|dist)$/.test(String(entry)),
-  })
-    .filter((file) => !exclude.some((pattern) => matchesGlob(file, pattern)))
-    .toSorted();
+  const files = suiteFiles(base, include, exclude);
   const named = (file: string) =>
     alsoIsolate.some((pattern) => matchesGlob(relative(root, file), pattern));
   const needsIsolation = reachesIsolation(named);
@@ -43,7 +38,7 @@ export function splitIsolationByMocking({
   // Nothing in the suite needs a fresh registry, so nothing gets one.
   if (isolated.length === 0) return { ...test, isolate: false };
 
-  const asGlobs = isolated.map((file) => file.replace(GLOB_SPECIAL, "\\$&"));
+  const asGlobs = isolated.map(literalGlob);
   // `extends: true` concatenates arrays, so `include` stays off the root: left
   // there, the isolated project would collect every file as well as its own.
   return {

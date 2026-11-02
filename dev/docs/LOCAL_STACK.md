@@ -198,7 +198,8 @@ LANGWATCH_HAVEN_OBS=0  # skip the LGTM telemetry stack
 ```
 
 Postgres and Redis stay haven-managed either way (through brew, not a
-container). The langy worker resolves its own host tier without a runtime;
+container). Local Redis is Valkey (`brew install valkey`, a drop-in; `haven
+play` runs `valkey/valkey:9.1`); an existing brew Redis still works. The langy worker resolves its own host tier without a runtime;
 `LANGY_UNSAFE_HOST_ACCESS=0` refuses that and `=1` forces it. Integration
 suites run against native services when `LANGWATCH_TEST_CLICKHOUSE_URL`,
 `LANGWATCH_TEST_REDIS_URL` and `LANGWATCH_TEST_DATABASE_URL` are set (dedicated

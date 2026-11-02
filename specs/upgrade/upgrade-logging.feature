@@ -52,6 +52,12 @@ Feature: An upgrade tells the operator what it is doing and what to do next
     Then the line reads the user, host and database but neither "s3cret" nor "abc"
 
   @unit
+  Scenario: A credential in JSON or a header in a log line is written masked
+    Given a line carrying an apiKey in JSON, an Authorization bearer header and "password: hunter2"
+    When it is redacted for the log
+    Then each value reads "***" and the names and the rest of the line stay
+
+  @unit
   Scenario: The upgrade task's last line names the UI and what upgrade status shows
     Given BASE_HOST is "https://langwatch.example.test"
     When the upgrade task finishes

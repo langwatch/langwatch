@@ -172,6 +172,8 @@ const sharedEvaluationPickedSchema = evaluationSchema.pick({
   label: true,
   details: true,
   retries: true,
+  attempts: true,
+  last_attempt_error: true,
   timestamps: true,
 });
 

@@ -42,10 +42,11 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       const expected = `${hashFileSafely(spec.lockFile)}|extras=${(spec.extras ?? []).slice().toSorted().join(",")}`;
       const isUpToDate = existsSync(venvDir) && readFileSafely(hashFile) === expected;
       if (!isUpToDate) {
-        await syncVenv({ spec, venvDir, hashFile, expected, uvBin, bus });
+        await syncVenv({ spec, venvDir, hashFile, expected, uvBin, bus, logsDir: ctx.paths.logs });
       }
       await ensureLangevalsTiktokenCache({
         paths: ctx.paths,
+        appRootDir: appRoot(),
         bus,
         uvBin,
         projectDir: spec.projectDir,
@@ -63,6 +64,7 @@ async function syncVenv({
   expected,
   uvBin,
   bus,
+  logsDir,
 }: {
   spec: VenvSpec;
   venvDir: string;
@@ -70,6 +72,7 @@ async function syncVenv({
   expected: string;
   uvBin: string;
   bus: EventBus;
+  logsDir: string;
 }): Promise<void> {
   bus.emit({ type: "starting", service: `prepare:${spec.name}` as never });
   const start = nowInstant().epochMilliseconds;
@@ -81,6 +84,7 @@ async function syncVenv({
     service: `prepare:${spec.name}`,
     bin: uvBin,
     args: ["sync", "--project", spec.projectDir, ...extraArgs],
+    logsDir,
     options: {
       env: {
         ...process.env,

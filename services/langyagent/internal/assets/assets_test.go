@@ -86,6 +86,33 @@ func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
 	}
 }
 
+// Langy's CLI runs in its own sandbox, so a credential failure is Langy's to
+// report, never the user's to fix by signing in; `unauthorized` (HTTP 401) is
+// that credential being refused. A permission refusal (`forbidden`,
+// `permission_denied`, HTTP 403) is the user's missing access.
+//
+// @scenario "The prompt reports a sandbox credential failure as an internal error"
+func TestAgentsTemplate_ReportsSandboxCredentialFailureAsInternalError(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	for _, phrase := range []string{
+		"`missing_api_key`, `unauthorized`, `not_authenticated` or \"Not logged in\" is your sandbox credential",
+		"never tell them to sign in",
+		"never claim you lack the CLI or tools",
+		"say you hit an internal error, name the read or write that failed",
+		"`forbidden` or `permission_denied` is a permission refusal: name the access they lack",
+	} {
+		if !strings.Contains(tmpl, phrase) {
+			t.Errorf("AGENTS.md failure rule never says %q", phrase)
+		}
+	}
+	if strings.Contains(tmpl, "`unauthorized` is a permission refusal") {
+		t.Errorf("AGENTS.md calls unauthorized (HTTP 401, an expired or revoked sandbox key) a permission refusal, so Langy blames its own credential on the user")
+	}
+}
+
 // The prompt has a byte budget so it cannot silently grow back into a rule
 // pile. It once reached 52,795 bytes by accreting one rule per observed
 // failure. A fix that needs the ceiling raised is a fix at the wrong layer:
@@ -245,7 +272,7 @@ func TestDailyInsightsSkill_IsEmbeddedAndAnswersWithACard(t *testing.T) {
 	}
 }
 
-// QA on main found a chart placed on a board the user never named: the skills
+// QA on main found a chart placed on a dashboard the user never named: the skills
 // only said where ids come from, so the model picked one off the list.
 //
 // @scenario "Langy places a chart on the dashboard in context and asks when none is"
@@ -254,25 +281,60 @@ func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
 	if err := MaterializeSkills(dest); err != nil {
 		t.Fatalf("MaterializeSkills: %v", err)
 	}
-	// A widget goes on a Dashboards board; a saved chart on an Analytics Reports one.
-	refusals := map[string]string{
-		"dashboard-widgets": "Never choose a board for the user.",
-		"lwql-charts":       "Never pick one from `langwatch dashboard list` on your own",
+	// A widget goes on a Dashboards dashboard; a saved chart on an Analytics Report.
+	wants := map[string][]string{
+		"dashboard-widgets": {
+			"dashboard in the user's context",
+			"ask which one with the `question` tool",
+			"Never choose a dashboard for the user.",
+		},
+		"lwql-charts": {
+			"Analytics Report in the user's context",
+			"ask which one with the `question` tool",
+			"Never pick one from `langwatch analytics-report list` on your own",
+		},
 	}
-	for name, refusal := range refusals {
+	for name, skillWants := range wants {
 		body, err := os.ReadFile(filepath.Join(dest, name, "SKILL.md"))
 		if err != nil {
 			t.Fatalf("read %s skill: %v", name, err)
 		}
 		skill := string(body)
-		for _, want := range []string{
-			"dashboard in the user's context",
-			"ask which board with the `question` tool",
-			refusal,
-		} {
+		for _, want := range skillWants {
 			if !strings.Contains(skill, want) {
 				t.Errorf("the %s skill lacks %q", name, want)
 			}
+		}
+	}
+}
+
+// Langy drives boards through the CLI: the skill must carry the create and
+// delete commands, a confirm-before-delete rule and the not-released answer.
+//
+// @scenario "The dashboard-widgets skill never picks a board for the user"
+// @scenario "The dashboard-widgets skill confirms before deleting a board or a widget"
+// @scenario "The dashboard-widgets skill reads dashboards_not_released as Dashboards being off"
+func TestDashboardWidgetsSkill_TeachesBoardCommands(t *testing.T) {
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(dest, "dashboard-widgets", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read dashboard-widgets skill: %v", err)
+	}
+	for _, want := range []string{
+		"langwatch dashboard create",
+		"langwatch dashboard delete <dashboardId>",
+		"langwatch dashboard widget add <dashboardId>",
+		"Never pick a dashboard for the user",
+		"one option per dashboard from `langwatch dashboard list`",
+		"Confirm before any delete",
+		"run the command only on Delete",
+		"dashboards_not_released` means it is off: tell the user, do not retry",
+	} {
+		if !strings.Contains(string(body), want) {
+			t.Errorf("the dashboard-widgets skill lacks %q", want)
 		}
 	}
 }

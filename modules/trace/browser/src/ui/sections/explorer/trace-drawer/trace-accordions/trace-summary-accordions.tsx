@@ -41,7 +41,7 @@ import { CorrectedFieldFrame } from "../edit-mode/corrected-field.tsx";
 import { TraceEditableInput } from "../edit-mode/trace-editable-input.tsx";
 import { TraceEditableOutput } from "../edit-mode/trace-editable-output.tsx";
 import { useTraceMetadataEditing } from "../edit-mode/use-trace-metadata-editing.ts";
-import { EvalsList } from "../eval-cards/index.ts";
+import { EvalsList, RetryingEvalRow } from "../eval-cards/index.ts";
 import { IOViewer } from "../io-viewer.tsx";
 import { PromptsPanel } from "../prompts-panel.tsx";
 import { AccordionShell, Section } from "./accordion-shell.tsx";
@@ -102,7 +102,12 @@ export function TraceSummaryAccordions({
   const { hasAttributes, hasResourceAttributes, hasScope, hasTraceAttributes } =
     traceAttributeFlags({ resources, traceAttributes });
 
-  const { rich: richEvals, pendingCount, isLoading: evalsLoading } = useTraceEvaluations();
+  const {
+    rich: richEvals,
+    retrying,
+    pendingCount,
+    isLoading: evalsLoading,
+  } = useTraceEvaluations();
 
   // What has been said about the trace's own parts: a count on each section
   // header, and the comments each metadata row carries.
@@ -160,6 +165,7 @@ export function TraceSummaryAccordions({
       evalsLoading,
       eventsLoading,
       pendingCount,
+      retryingCount: retrying.length,
       trace,
       traceEvents,
     });
@@ -257,6 +263,7 @@ export function TraceSummaryAccordions({
             outputCorrected,
             pendingCount,
             promptsHref,
+            retrying,
             requestFocus,
             resources,
             sectionComments,
@@ -411,6 +418,7 @@ interface TraceSectionContext {
   onSelectSpan?: (spanId: string) => void;
   pendingCount: number;
   promptsHref: string | undefined;
+  retrying: ReturnType<typeof useTraceEvaluations>["retrying"];
   requestFocus: ReturnType<typeof useFocusSectionStore.getState>["request"];
   resources: ReturnType<typeof useTraceResources>;
   sectionComments: ReturnType<typeof commentCountsBySection>;
@@ -599,7 +607,12 @@ function evalsTraceSection(ctx: TraceSectionContext): ReactNode {
       title="Evals"
       spotlightAnchor={ctx.hasEvalsContent ? "drawer-evals" : undefined}
       count={ctx.evalsForList.length > 0 ? ctx.evalsForList.length : undefined}
-      empty={!ctx.evalsLoading && ctx.evalsForList.length === 0 && ctx.pendingCount === 0}
+      empty={
+        !ctx.evalsLoading &&
+        ctx.evalsForList.length === 0 &&
+        ctx.pendingCount === 0 &&
+        ctx.retrying.length === 0
+      }
       isFirst={ctx.isFirst}
       open={ctx.isOpen}
     >
@@ -607,6 +620,9 @@ function evalsTraceSection(ctx: TraceSectionContext): ReactNode {
         <EmptyHint>Loading evaluations…</EmptyHint>
       ) : (
         <VStack align="stretch" gap={2}>
+          {ctx.retrying.map((run) => (
+            <RetryingEvalRow key={run.evaluationId} run={run} />
+          ))}
           {ctx.pendingCount > 0 && (
             <Text textStyle="xs" color="fg.muted">
               {ctx.pendingCount} evaluation{ctx.pendingCount === 1 ? "" : "s"} pending
@@ -813,6 +829,7 @@ function traceSignalFlags({
   evalsLoading,
   eventsLoading,
   pendingCount,
+  retryingCount,
   trace,
   traceEvents,
 }: {
@@ -821,6 +838,7 @@ function traceSignalFlags({
   evalsLoading: boolean;
   eventsLoading: boolean;
   pendingCount: number;
+  retryingCount: number;
   trace: TraceHeader;
   traceEvents: TraceSectionContext["traceEvents"];
 }): {
@@ -831,7 +849,7 @@ function traceSignalFlags({
   hasEventsContent: boolean;
   promptsEmpty: boolean;
 } {
-  const hasEvalsContent = evalsForList.length > 0 || pendingCount > 0;
+  const hasEvalsContent = evalsForList.length > 0 || pendingCount > 0 || retryingCount > 0;
   const hasEventsContent = traceEvents.length > 0;
   return {
     evalsEmpty: !hasEvalsContent && !evalsLoading,

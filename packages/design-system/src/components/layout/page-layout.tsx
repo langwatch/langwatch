@@ -37,9 +37,15 @@ export type { PageTab } from "./page-header-tabs.tsx";
 /** The one left and right edge a page's header and body share; the shell area may set it. */
 const PAGE_INSET = "var(--page-inset, var(--chakra-spacing-6))";
 
-/** The page body: `default` fits beside the sidebar; `fill` takes the whole width. */
+/** The content width of a `narrow` body: one reading column, such as a section's overview. */
+const NARROW_MEASURE = "900px";
+
+/**
+ * The page body: `default` fits beside the sidebar; `fill` takes the whole width; `narrow` is one
+ * centred reading column.
+ */
 export interface PageContainerProps {
-  width?: "default" | "fill";
+  width?: "default" | "fill" | "narrow";
   children: ReactNode;
   "data-testid"?: string;
 }
@@ -47,6 +53,19 @@ export interface PageContainerProps {
 /** @deprecated Open style props; pass `width="fill"` instead of `maxWidth="full"`. */
 interface LegacyContainerProps extends ChakraContainerProps {
   sidebarWidth?: number;
+}
+
+/** How wide the body may grow: the whole page, the reading column, or beside the sidebar. */
+function bodyMaxWidth({
+  width,
+  sidebarWidth,
+}: {
+  width: LegacyContainerProps["width"];
+  sidebarWidth: number;
+}): LegacyContainerProps["maxW"] {
+  if (width === "fill") return "full";
+  if (width === "narrow") return `calc(${NARROW_MEASURE} + 2 * ${PAGE_INSET})`;
+  return { base: "full", md: `calc(100vw - ${sidebarWidth}px)` };
 }
 
 function Container(props: PageContainerProps): ReactNode;
@@ -58,12 +77,14 @@ function Container({
   width,
   ...props
 }: PropsWithChildren<LegacyContainerProps> & { "data-testid"?: string }): ReactNode {
-  const named = width === "fill" || width === "default";
+  const named = width === "fill" || width === "default" || width === "narrow";
   return (
     <ChakraContainer
       data-page-container
+      data-width={named ? width : undefined}
       // A phone has no sidebar beside the page, so the page takes the full width.
-      maxW={width === "fill" ? "full" : { base: "full", md: `calc(100vw - ${sidebarWidth}px)` }}
+      maxW={bodyMaxWidth({ width, sidebarWidth })}
+      marginX={width === "narrow" ? "auto" : undefined}
       paddingX={PAGE_INSET}
       paddingY={3}
       width={named ? undefined : width}

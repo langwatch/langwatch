@@ -1,4 +1,4 @@
-/** Analytics' saved and starred dashboards, drawn where navigation places them (§10.1). */
+/** Analytics' saved dashboards and its Dashboards section, placed by navigation (§10.1). */
 
 import {
   SavedDashboardsToken,
@@ -11,7 +11,7 @@ export function SavedDashboards(props: SavedDashboardsProps) {
   return <Lent of={SavedDashboardsToken} props={props} />;
 }
 
-/** The member's starred dashboards; analytics draws nothing when there are none. */
+/** The Dashboards section: the member's pinned dashboards and the "+" that adds one. */
 export function StarredDashboards() {
   return <Lent of={StarredDashboardsToken} props={{}} />;
 }

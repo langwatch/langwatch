@@ -27,6 +27,7 @@ import {
   USAGE_ROWS,
   type SelfHostedInstance,
 } from "../../model/self-hosted-instance.ts";
+import { InstanceDiagnostics } from "../blocks/instance-diagnostics.tsx";
 import { EmptyCell } from "../elements/admin-cells.tsx";
 import { ShortId } from "../elements/short-id.tsx";
 
@@ -77,6 +78,7 @@ function DrawerContent({
       <DomainsSection instance={instance} />
       <LadderSection instance={instance} />
       <UsageSection instance={instance} />
+      <InstanceDiagnostics instanceRowId={instance.id} />
       <HistorySection reports={reports} />
     </VStack>
   );

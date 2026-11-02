@@ -10,6 +10,7 @@ export const providerDefaultBaseUrls: Record<string, string> = {
   groq: "https://api.groq.com/openai/v1",
   xai: "https://api.x.ai/v1",
   cerebras: "https://api.cerebras.ai/v1",
+  doubleword: "https://api.doubleword.ai/v1",
 };
 
 /** Per provider, the API root a deployment probes in place of the vendor default. */
@@ -62,6 +63,10 @@ export const NOT_PROBEABLE: ReadonlySet<string> = new Set([
   "vertex_ai",
   "azure",
   "azure_safety",
+  // Decision model providers have no models list to probe (ADR-182).
+  "inception",
+  "perplexity",
+  "cloudflare",
 ] as const);
 
 /**

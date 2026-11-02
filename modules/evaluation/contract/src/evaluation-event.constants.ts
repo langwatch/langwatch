@@ -11,6 +11,7 @@ export const EVALUATION_EVENT_TYPES = {
   STARTED: "lw.evaluation.started",
   COMPLETED: "lw.evaluation.completed",
   REPORTED: "lw.evaluation.reported",
+  ATTEMPT_FAILED: "lw.evaluation.attempt_failed",
 } as const;
 
 // Legacy exports for backwards compatibility
@@ -18,6 +19,7 @@ export const EVALUATION_SCHEDULED_EVENT_TYPE = EVALUATION_EVENT_TYPES.SCHEDULED;
 export const EVALUATION_STARTED_EVENT_TYPE = EVALUATION_EVENT_TYPES.STARTED;
 export const EVALUATION_COMPLETED_EVENT_TYPE = EVALUATION_EVENT_TYPES.COMPLETED;
 export const EVALUATION_REPORTED_EVENT_TYPE = EVALUATION_EVENT_TYPES.REPORTED;
+export const EVALUATION_ATTEMPT_FAILED_EVENT_TYPE = EVALUATION_EVENT_TYPES.ATTEMPT_FAILED;
 
 /**
  * Event schema versions using calendar versioning (YYYY-MM-DD). When the schema
@@ -32,6 +34,8 @@ export const EVALUATION_EVENT_VERSIONS = {
   COMPLETED: "2025-01-14",
   /** Initial schema version for single-event custom SDK evaluations */
   REPORTED: "2025-01-14",
+  /** An attempt whose evaluator service was not up, with the next attempt it scheduled */
+  ATTEMPT_FAILED: "2026-10-19",
 } as const;
 
 // Legacy exports for backwards compatibility
@@ -39,12 +43,15 @@ export const EVALUATION_SCHEDULED_EVENT_VERSION_LATEST = EVALUATION_EVENT_VERSIO
 export const EVALUATION_STARTED_EVENT_VERSION_LATEST = EVALUATION_EVENT_VERSIONS.STARTED;
 export const EVALUATION_COMPLETED_EVENT_VERSION_LATEST = EVALUATION_EVENT_VERSIONS.COMPLETED;
 export const EVALUATION_REPORTED_EVENT_VERSION_LATEST = EVALUATION_EVENT_VERSIONS.REPORTED;
+export const EVALUATION_ATTEMPT_FAILED_EVENT_VERSION_LATEST =
+  EVALUATION_EVENT_VERSIONS.ATTEMPT_FAILED;
 
 export const EVALUATION_PROCESSING_EVENT_TYPES = [
   EVALUATION_EVENT_TYPES.SCHEDULED,
   EVALUATION_EVENT_TYPES.STARTED,
   EVALUATION_EVENT_TYPES.COMPLETED,
   EVALUATION_EVENT_TYPES.REPORTED,
+  EVALUATION_EVENT_TYPES.ATTEMPT_FAILED,
 ] as const;
 
 export type EvaluationProcessingEventType = (typeof EVALUATION_PROCESSING_EVENT_TYPES)[number];

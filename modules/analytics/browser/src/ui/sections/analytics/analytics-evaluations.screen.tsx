@@ -3,6 +3,7 @@ import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { Box, GridItem, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
 
@@ -12,7 +13,6 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
-import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -391,10 +391,15 @@ function traceExplorerQuery(params: GraphClickParams): string {
 function EvaluationsContent() {
   const host = useAnalyticsHost();
   const project = host.project();
-  const checks = useProjectMonitors({ projectId: project?.id ?? "" });
+  // No monitor runs on an aggregate's member traces, so it reads none and shows only the cards
+  // over every evaluation, never a card, banner or setup link for one monitor (ADR-177 v4.15).
+  const isAggregate = isAggregateProjectKind(project?.kind);
+  const checks = useProjectMonitors({ projectId: isAggregate ? "" : (project?.id ?? "") });
+  const monitors = isAggregate ? [] : checks.data;
   const selectedEvaluationId = host.route().query.evaluationId;
-  const selectedEvaluation = checks.data?.find((check) => check.id === selectedEvaluationId);
-  const visibleChecks = selectedEvaluation ? [selectedEvaluation] : (checks.data ?? []);
+  const selectedEvaluation = monitors?.find((check) => check.id === selectedEvaluationId);
+  const visibleChecks = selectedEvaluation ? [selectedEvaluation] : (monitors ?? []);
+  const showsOverallCards = (isAggregate || visibleChecks.length > 0) && !selectedEvaluation;
 
   const handleGraphClick = useCallback(
     (params: GraphClickParams) => {
@@ -408,7 +413,7 @@ function EvaluationsContent() {
 
   return (
     <AnalyticsLayout tab="evaluations">
-      {checks.data && checks.data?.length === 0 && (
+      {monitors && monitors.length === 0 && !isAggregate && (
         <Box marginBottom={6}>
           <Banner
             status="warning"
@@ -444,7 +449,7 @@ function EvaluationsContent() {
       )}
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
-          {visibleChecks.length > 0 && !selectedEvaluation && (
+          {showsOverallCards && (
             <>
               <GridItem colSpan={1} display="inline-grid">
                 <Card padding="lg" title="Overall Health">
@@ -482,4 +487,4 @@ function EvaluationsContent() {
  * gating and layout chrome are stated once in `analytics-routes.tsx`, in
  * front of the loader registry these screens are children of.
  */
-export default withAggregateAnalyticsGate("Online Evaluations", EvaluationsContent);
+export default EvaluationsContent;

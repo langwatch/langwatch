@@ -284,4 +284,5 @@ export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {
   azureContentSafetyEndpoint: undefined,
   enablePresidio: undefined,
   enableLingua: undefined,
+  evaluatorRetryWindowMinutes: 120,
 };

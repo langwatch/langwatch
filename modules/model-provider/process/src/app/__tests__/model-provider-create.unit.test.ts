@@ -1,5 +1,6 @@
 import { sealAuthorization } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderServerConfig } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
@@ -129,6 +130,7 @@ function createRealModelProviderApp(
       dataPrivacy: createModelProviderTestDataPrivacy(),
       managed: createModelProviderTestManagedProviders(),
       secrets: createModelProviderTestSecrets(),
+      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     },
     config: {
       blockLocalHttpCalls: true,

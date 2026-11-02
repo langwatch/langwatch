@@ -27,7 +27,11 @@ import {
   readOtlpBody,
   OTLP_REFUSED_MEDIA_TYPES,
 } from "@langwatch/otlp";
-import { otlpIngestCredentialSchema, type OtlpIngestCredential } from "@langwatch/otlp/door";
+import {
+  otlpIngestCredentialSchema,
+  otlpIngestKeyOf,
+  type OtlpIngestCredential,
+} from "@langwatch/otlp/door";
 import { resolveRequestBound } from "@langwatch/plans";
 import { TraceApi, type TraceOtlpIngestApi } from "@langwatch/trace-contract";
 import { SpanKind, type Span } from "@opentelemetry/api";
@@ -66,7 +70,12 @@ export const otlpIngestDoor = defineRestDoor("otlp_ingest", {
       const { apiKeyId } = resolution.identity;
       const actor = apiKeyId ? { type: "api_key" as const, id: apiKeyId } : null;
 
-      return { actor, scope: { tier: "project", id: resolution.project.id }, session: resolution };
+      return {
+        actor,
+        scope: { tier: "project", id: resolution.project.id },
+        session: resolution,
+        key: otlpIngestKeyOf(resolution.identity),
+      };
     } catch (error) {
       if (!isIngestDoorRefusal(error)) throw error;
 

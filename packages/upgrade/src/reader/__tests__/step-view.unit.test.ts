@@ -142,3 +142,47 @@ describe("viewRecordedStep for an imported row", () => {
     });
   });
 });
+
+describe("logTail", () => {
+  const row = {
+    id: "ops:fill",
+    kind: "data",
+    release: "3.23.0",
+    mode: "background",
+    status: "failed",
+    inferred: false,
+    attempt: 2,
+    last_error: "boom",
+    report: null,
+    run_id: null,
+    started_at: null,
+    finished_at: null,
+    updated_at: null,
+    owner: null,
+    description: null,
+    finish_by: null,
+  };
+
+  describe("when the step row carries a log tail", () => {
+    /** @scenario "The reader shows a step's log tail" */
+    it("reads it into the view, and reads an empty tail where the row has none", () => {
+      const lines = ["2026-10-20T00:00:00.000Z info background step started"];
+
+      expect(
+        viewRecordedStep({ row: { ...row, log_tail: lines }, declared: undefined, roster: [] })
+          .logTail,
+      ).toEqual(lines);
+      expect(
+        viewRecordedStep({ row: { ...row, log_tail: null }, declared: undefined, roster: [] })
+          .logTail,
+      ).toEqual([]);
+      expect(
+        viewDeclaredStep({
+          step: { id: "ops:fill", kind: "data", mode: "background" },
+          imageRelease: "3.23.0",
+          roster: [],
+        }).logTail,
+      ).toEqual([]);
+    });
+  });
+});

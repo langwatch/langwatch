@@ -6,6 +6,7 @@ import { CodingAgentSessionsTable } from "../../../behavior/lent-coding-agent-ta
 import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
 import { PERSONAL_WORKSPACE_WAIT_HINT } from "../../../behavior/use-personal-workspace-wait.ts";
+import { useRecordPageOpened } from "../../../behavior/use-record-page-opened.ts";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 
 /**
@@ -15,6 +16,7 @@ import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
  */
 export function PersonalSessionsScreen() {
   const router = usePersonalRouter();
+  useRecordPageOpened({ page: "me_sessions" });
   const {
     ready,
     isPersonalProjectResolved,

@@ -12,7 +12,7 @@ func tsgoAt(pid int, class TsgoClass, rssGiB int64, started time.Time) TsgoProce
 }
 
 // @scenario "The governor only ever touches the TypeScript compiler"
-// @scenario "The compiler is governed under both of its names"
+// @scenario "The compiler is governed under each of its names"
 func TestIsTypeScriptCompilerCommand(t *testing.T) {
 	t.Run("matches the binary path, not the arguments", func(t *testing.T) {
 		yes := []string{
@@ -25,6 +25,8 @@ func TestIsTypeScriptCompilerCommand(t *testing.T) {
 			"/Users/x/repo/node_modules/.pnpm/@typescript+typescript-darwin-arm64@7.0.2/node_modules/@typescript/typescript-darwin-arm64/lib/tsc --noEmit --project ./tsconfig.tsgo.json",
 			"./node_modules/.bin/tsc --noEmit -p tsconfig.tsgo.json",
 			"tsc --lsp --stdio",
+			// The repo's tsc launcher execve()s the Rust port instead (ADR-181).
+			"/Users/x/repo/node_modules/.pnpm/@tsrs+darwin-arm64@0.18.0/node_modules/@tsrs/darwin-arm64/tsrs -b --builders 1",
 		}
 		no := []string{
 			"node dev/scripts/check-queue.mjs ./node_modules/.bin/tsgo.real",
@@ -34,6 +36,7 @@ func TestIsTypeScriptCompilerCommand(t *testing.T) {
 			"/usr/bin/vim tsgo.go",
 			"/x/bin/tsclint --fix",
 			"/x/bin/mytsc --noEmit",
+			"grep -rn tsrs dev/scripts",
 			"/x/node --tsc",
 			"clickhouse-server --daemon",
 		}
@@ -73,14 +76,16 @@ func TestClassifyTsgo(t *testing.T) {
 	})
 }
 
-// @scenario "The compiler is governed under both of its names"
-func TestClassifyWatchedProcessPutsBothCompilerNamesInOneClass(t *testing.T) {
+// @scenario "The compiler is governed under each of its names"
+func TestClassifyWatchedProcessPutsEveryCompilerNameInOneClass(t *testing.T) {
 	t.Run("given the compiler under each of its names", func(t *testing.T) {
 		cases := map[string]TsgoClass{
 			"/Users/x/repo/node_modules/.pnpm/@typescript+typescript-darwin-arm64@7.0.2/node_modules/@typescript/typescript-darwin-arm64/lib/tsc --noEmit --project ./tsconfig.tsgo.json": TsgoRun,
 			"/x/lib/tsgo --noEmit -p tsconfig.tsgo.json": TsgoRun,
 			"/x/lib/tsc --lsp --stdio":                   TsgoLSP,
 			"/x/lib/tsgo --lsp --stdio":                  TsgoLSP,
+			"/Users/x/repo/node_modules/.pnpm/@tsrs+darwin-arm64@0.18.0/node_modules/@tsrs/darwin-arm64/tsrs -b --builders 1 --checkers 2": TsgoRun,
+			"/x/@tsrs/linux-x64-gnu/tsrs --lsp -stdio": TsgoLSP,
 		}
 
 		t.Run("each lands in the one class, with its own role", func(t *testing.T) {
@@ -206,7 +211,7 @@ func TestGovernTsgo(t *testing.T) {
 
 	// One compiler, one budget: the two names have to be weighed together or
 	// each half of a machine's compilers is governed against the whole budget.
-	// @scenario "The compiler is governed under both of its names"
+	// @scenario "The compiler is governed under each of its names"
 	t.Run("given a tsc run and a tsgo run that only exceed the budget together", func(t *testing.T) {
 		procs := governedSubset(t, []sampled{
 			{command: "/x/lib/tsc --noEmit -p tsconfig.tsgo.json", rssGiB: 7, started: now.Add(-10 * time.Minute)},

@@ -319,13 +319,13 @@ function LangyPanel({
     activeConversationId,
     historyMessages: history.messages,
     isFetchingHistory: history.isFetching,
-    applyHistoryToEngine: engine.applyHistoryToEngine,
   };
-  useLangyEngineHistorySync(historySync);
+  useLangyEngineHistorySync({ ...historySync, loadStoredHistory: engine.loadStoredHistory });
   useLangyForeignTurnRehydration({
     ...historySync,
     isBusy,
     engineMessageCount: engine.messages.length,
+    applyHistoryToEngine: engine.applyHistoryToEngine,
   });
   useLangyAdoptedTurnResume({
     dispatchedTurnIdRef: refs.dispatchedTurnIdRef,

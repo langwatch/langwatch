@@ -46,25 +46,26 @@ type TsgoProcess struct {
 }
 
 // typeScriptCompilerBinaries are the names the native TypeScript compiler is
-// installed under. They are one binary under two package identities:
+// installed under. Two are one Go binary under two package identities:
 // @typescript/native-preview published it as `tsgo`, and typescript@7 renamed
 // it to `tsc` — the package picks the name (`lib/getExePath.js`:
 // `baseName === "typescript" ? "tsc" : "tsgo"`), and a local repo build still
-// produces `tsgo`, so both names stay live on real machines. One compiler is
-// one class with one set of limits: two classes would split the machine budget
-// in half and govern neither half of it.
-var typeScriptCompilerBinaries = []string{"tsc", "tsgo"}
+// produces `tsgo`, so both names stay live on real machines. `tsrs`, the Rust
+// port, is what the repo's `tsc` launcher runs (ADR-181). One compiler is one
+// class with one set of limits: separate classes would split the machine
+// budget and govern none of it.
+var typeScriptCompilerBinaries = []string{"tsc", "tsgo", "tsrs"}
 
-// TypeScriptCompilerClass is the single process class both compiler binaries
+// TypeScriptCompilerClass is the single process class every compiler binary
 // land in. Deliberately still spelled "tsgo" after the rename: the string is
 // the `class` attribute on every haven_proc_* series, the Kind of a persisted
 // reap event, and the key the daemon selects the governed subset by — renaming
 // it would cut the recorded history in two at exactly the moment the point of
-// the change is to join the two binaries together.
+// the change is to join the binaries together.
 const TypeScriptCompilerClass = "tsgo"
 
 // IsTypeScriptCompilerCommand reports whether a process command line invokes
-// the native TypeScript compiler under either of its names — the whole
+// the native TypeScript compiler under any of its names — the whole
 // selection rule, so the governor can never touch anything else. Matched on
 // the binary path, not the args: an unrelated process mentioning "tsc" or
 // "tsgo" in an argument is not a candidate, and neither is the `tsc.real` /
@@ -75,13 +76,13 @@ func IsTypeScriptCompilerCommand(command string) bool {
 }
 
 // isTypeScriptCompilerBinary reports whether a binary base name is the
-// compiler's, under either name.
+// compiler's, under any of its names.
 func isTypeScriptCompilerBinary(base string) bool {
 	return slices.Contains(typeScriptCompilerBinaries, base)
 }
 
 // ClassifyTsgo reads the class off a compiler command line. Arg-based, so it
-// reads the same under either binary name.
+// reads the same under every binary name.
 func ClassifyTsgo(command string) TsgoClass {
 	if strings.Contains(command, "--lsp") {
 		return TsgoLSP
@@ -114,14 +115,14 @@ type WatchedProcess struct {
 // ClassifyWatchedProcess maps a command line to the process class haven
 // tracks, or ok=false for everything haven has no interest in. The class list
 // is deliberately the dev-tooling that shapes machine health: compilers and
-// checkers (the TypeScript compiler under either name, gopls, oxlint), test
+// checkers (the TypeScript compiler under any of its names, gopls, oxlint), test
 // workers (vitest — matched on the worker path, the same marker the orphan
 // sweep uses), the JS runtimes every dev server and script runs on (node,
 // bun), and coding agents (claude). Only the TypeScript compiler carries kill
 // limits (ADR-095); every other class is observe-only — node and claude in
 // particular are the user's own work and are never touched.
 //
-// `tsc` and `tsgo` return the SAME class, so limits, dashboards and reap
+// `tsc`, `tsgo` and `tsrs` return the SAME class, so limits, dashboards and reap
 // events aggregate the one compiler into one budget however it was installed.
 func ClassifyWatchedProcess(command string) (WatchedProcess, bool) {
 	base := binaryBase(command)

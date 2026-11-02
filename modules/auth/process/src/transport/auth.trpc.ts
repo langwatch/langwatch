@@ -248,6 +248,18 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
     }),
   )
 
+  .procedure("recordPageOpened")
+  .withMiddlewareContext(browserSessionContext)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(({ app, actor, input }, browserSession) =>
+    app.recordPageOpened({
+      userId: actor.id,
+      browserSessionId: browserSession,
+      page: input.page,
+      impersonatorId: actor.impersonatorId,
+    }),
+  )
+
   // `register` predates the account it creates, so it runs with no caller at all and the
   // address it arrived from is the only thing to throttle on (D-A1U-2, wire from `user.*`).
   .procedure("register")

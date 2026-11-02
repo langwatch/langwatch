@@ -7,9 +7,20 @@ import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwat
 import { defineMiddlewareContext, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { LWQL_ACCEPTED_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
-import { lwqlTimeWindowSchema, type LangWatchQLProtections } from "./analytics.lwql.ts";
-import { MAX_LWQL_LENGTH } from "./langwatch-ql-limits.ts";
+import {
+  isLangWatchQLSurfaceParameter,
+  LWQL_ACCEPTED_GRANULARITY_STEPS,
+} from "./analytics.lwql-time-window.ts";
+import {
+  lwqlTimeWindowSchema,
+  traceSourcesSchema,
+  type LangWatchQLProtections,
+} from "./analytics.lwql.ts";
+import {
+  LWQL_MAX_MEMBER_PROJECTS,
+  LWQL_MAX_NAMED_PROJECTS,
+  MAX_LWQL_LENGTH,
+} from "./langwatch-ql-limits.ts";
 
 /**
  * The caller-specific content gates the catalog understands, as a value a
@@ -55,6 +66,7 @@ export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discr
           .object({ id: z.string().min(1), teamId: z.string().min(1) })
           .strict()
           .optional(),
+        isLangySessionKey: z.boolean().optional(),
       })
       .strict(),
   ],
@@ -81,6 +93,23 @@ export const lwqlParameterValueSchema: LwqlParameterValueSchema =
   lwqlParameterValueSchemaDefinition;
 
 /**
+ * The caller's parameters. A reserved name's value is not shape-checked: the refusal naming the
+ * request field to send instead (`lwql_reserved_parameter_supplied`) answers, not a shape error.
+ */
+const lwqlParametersSchemaDefinition = z.preprocess(
+  (parameters) =>
+    typeof parameters === "object" && parameters !== null && !Array.isArray(parameters)
+      ? Object.fromEntries(
+          Object.entries(parameters).map(([name, value]) => [
+            name,
+            isLangWatchQLSurfaceParameter(name) ? null : value,
+          ]),
+        )
+      : parameters,
+  z.record(z.string(), lwqlParameterValueSchema),
+);
+
+/**
  * The datapoint step a caller may request, as every door accepts it — one of
  * the {@link LWQL_ACCEPTED_GRANULARITY_STEPS}, nothing else, so an off-list
  * value is a schema rejection rather than the service's backstop.
@@ -104,7 +133,7 @@ const lwqlStatementSchemaDefinition = z.object({
   // that was submitted, and normalising it here — however harmlessly — is the
   // first step of the rewriting this API promises never to do.
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
-  parameters: z.record(z.string(), lwqlParameterValueSchema).optional(),
+  parameters: lwqlParametersSchemaDefinition.optional(),
   /**
    * The period this caller is reporting over. Honoured on both doors, because
    * the same saved chart is readable from both and a statement that follows the
@@ -122,6 +151,82 @@ export const lwqlStatementSchema: LwqlStatementSchema = lwqlStatementSchemaDefin
 
 export type LangWatchQLStatementRequest = z.infer<typeof lwqlStatementSchema>;
 
+/** A list of project ids a run names: at least one, at most the capability ceiling. */
+const lwqlProjectsSchemaDefinition = z
+  .array(z.string().min(1))
+  .min(1, "projects must hold at least one id")
+  .max(LWQL_MAX_NAMED_PROJECTS, `projects holds at most ${LWQL_MAX_NAMED_PROJECTS} ids`);
+export interface LwqlProjectsSchema extends Named<typeof lwqlProjectsSchemaDefinition> {}
+export const lwqlProjectsSchema: LwqlProjectsSchema = lwqlProjectsSchemaDefinition;
+
+/** The same list for a signed-in member, at most {@link LWQL_MAX_MEMBER_PROJECTS} ids. */
+const lwqlMemberProjectsSchemaDefinition = z
+  .array(z.string().min(1), 'projects holds project ids; "all" is not stored in a widget')
+  .min(1, "projects must hold at least one id")
+  .max(LWQL_MAX_MEMBER_PROJECTS, `projects holds at most ${LWQL_MAX_MEMBER_PROJECTS} ids`);
+export interface LwqlMemberProjectsSchema extends Named<
+  typeof lwqlMemberProjectsSchemaDefinition
+> {}
+export const lwqlMemberProjectsSchema: LwqlMemberProjectsSchema =
+  lwqlMemberProjectsSchemaDefinition;
+
+/**
+ * A union hides why its list branch refused ("projects holds at most 100 ids"); this gives that
+ * reason back, so naming too many projects reads the same with or without "all" as a choice.
+ */
+function listRefusalOr(issue: {
+  code?: string;
+  input?: unknown;
+  errors?: readonly (readonly { message: string }[])[];
+}) {
+  if (issue.code !== "invalid_union") return undefined;
+  // Neither the word nor a list (a stray string, a number, an object): say what is accepted.
+  if (!Array.isArray(issue.input)) return LWQL_PROJECTS_SEND_ALL_OR_LIST;
+
+  return issue.errors?.[1]?.[0]?.message ?? LWQL_PROJECTS_SEND_ALL_OR_LIST;
+}
+
+/** The word that asks for every project the caller can read, sent as the string, not in a list. */
+export const LWQL_ALL_PROJECTS = "all";
+
+/** The refusal of a list holding the word; raised by the run, so it is the answer's own message. */
+export const LWQL_ALL_STANDS_ALONE = '"all" stands alone; send it by itself, or list project ids';
+
+/** The refusal of `projects` that is neither the word nor a list of ids. */
+export const LWQL_PROJECTS_SEND_ALL_OR_LIST = 'projects: send "all" or a list of project ids';
+
+/** Whether a list holds the word that asks for every project, which must be sent alone. */
+export function holdsAllWord(ids: readonly string[]): boolean {
+  return ids.some((id) => id.trim().toLowerCase() === LWQL_ALL_PROJECTS);
+}
+
+/** The lone word, in any case and with spaces around it. A pattern, so the OpenAPI carries it. */
+const allWordSchema = z
+  .string()
+  .regex(/^\s*[aA][lL][lL]\s*$/)
+  .transform((): typeof LWQL_ALL_PROJECTS => LWQL_ALL_PROJECTS);
+
+/** What a run's `projects` holds for a key: the ids to read, or "all" of those it can read. */
+const lwqlProjectsRequestSchemaDefinition = z.union([allWordSchema, lwqlProjectsSchemaDefinition], {
+  error: listRefusalOr,
+});
+export interface LwqlProjectsRequestSchema extends Named<
+  typeof lwqlProjectsRequestSchemaDefinition
+> {}
+export const lwqlProjectsRequestSchema: LwqlProjectsRequestSchema =
+  lwqlProjectsRequestSchemaDefinition;
+
+/** The same for a signed-in member, whose list holds at most {@link LWQL_MAX_MEMBER_PROJECTS}. */
+const lwqlMemberProjectsRequestSchemaDefinition = z.union(
+  [allWordSchema, lwqlMemberProjectsSchemaDefinition],
+  { error: listRefusalOr },
+);
+export interface LwqlMemberProjectsRequestSchema extends Named<
+  typeof lwqlMemberProjectsRequestSchemaDefinition
+> {}
+export const lwqlMemberProjectsRequestSchema: LwqlMemberProjectsRequestSchema =
+  lwqlMemberProjectsRequestSchemaDefinition;
+
 /**
  * `POST /api/v1/query`'s body: a statement, optionally narrowed to one project the key reads.
  * The workbench runs inside one project already, so only the key door accepts `projectId`.
@@ -133,7 +238,17 @@ const lwqlKeyStatementSchemaDefinition = z.object({
     .min(1)
     .optional()
     .describe(
-      "Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.",
+      "Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both.",
+    ),
+  projects: lwqlProjectsRequestSchema
+    .optional()
+    .describe(
+      'The projects to read, each one the key holds analytics:view on, or the string "all" for every project the key can read. A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.',
+    ),
+  sources: traceSourcesSchema
+    .optional()
+    .describe(
+      "The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter by itself: the statement keeps its rows with a predicate such as WHERE Source IN {dashboard_context_sources:Array(String)}. A statement that never uses the placeholder counts every origin.",
     ),
 });
 export interface LwqlKeyStatementSchema extends Named<typeof lwqlKeyStatementSchemaDefinition> {}

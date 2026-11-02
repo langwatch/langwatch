@@ -2,6 +2,7 @@ import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/loca
 import { resolveEffectiveFeatures } from "../shared/features.ts";
 import { paths } from "../shared/paths.ts";
 import { makeAigatewayPredep } from "./aigateway.ts";
+import { makeAppPredep } from "./app.ts";
 import { clickhousePredep } from "./clickhouse.ts";
 import { goosePredep } from "./goose.ts";
 import { makeOpencodePredep } from "./opencode.ts";
@@ -18,10 +19,12 @@ export function predepRegistry({
   version: string;
   development: LocalOrchestratorDevelopmentConfig;
 }): Predep[] {
-  // pnpm first, assistant runtime last (optional). Feature-gated.
+  // pnpm first, then the app every service runs from; the assistant runtime last (optional,
+  // feature-gated).
   const features = resolveEffectiveFeatures(paths.envFile);
   return [
     pnpmPredep,
+    makeAppPredep({ version, development }),
     uvPredep,
     makePostgresPredep(development),
     redisPredep,

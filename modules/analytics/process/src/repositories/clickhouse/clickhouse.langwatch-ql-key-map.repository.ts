@@ -1,6 +1,9 @@
 import type { LwqlKeyMapRow } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import { LwqlKeyMapRepository } from "../langwatch-ql-key-map.repository.ts";
-import type { ClickHouseClientResolver } from "./clickhouse.filter-options.repository.ts";
+import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
+
+/** How this repository reaches the tenant's ClickHouse client. */
+type ClickHouseClientResolver = (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient>;
 
 /**
  * The key-map insert contract, shared because two paths write this table:

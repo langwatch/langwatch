@@ -108,6 +108,7 @@ export { opsBugReportTrpc } from "./ops-bug-report.trpc.ts";
 // Browser types only until the screens move to enterprise-ops (.claude/handoffs/boundary-b2a.md).
 export { licenseRegistryTrpc } from "./features/license-registry/license-registry.trpc.ts";
 export { selfHostedInstancesTrpc } from "./features/license-registry/self-hosted-instance.ts";
+export { selfHostedNoticesTrpc } from "./features/license-registry/self-hosted-notice.trpc.ts";
 export { opsDashboardTrpc } from "./features/dashboard/ops-dashboard.trpc.ts";
 export { opsEventLogTrpc } from "./features/event-log/ops-event-log.trpc.ts";
 export { opsPlatformTrpc } from "./ops-platform.trpc.ts";
@@ -115,8 +116,10 @@ export { opsOperatorsTrpc } from "./ops-operators.trpc.ts";
 export { opsProcessTrpc } from "./features/process/ops-process.trpc.ts";
 export { opsQueueTrpc } from "./features/queue/ops-queue.trpc.ts";
 export * from "./features/migrations/ops-upgrade.ts";
+export * from "./features/migrations/ops-upgrade-diagnostics.ts";
 export * from "./features/migrations/ops-upgrade.errors.ts";
 export * from "./ops.config.ts";
+export * from "./self-hosted-notice.ts";
 export * from "./usage-report.ts";
 export * from "./usage-report-docs.ts";
 export * from "./features/checkup/checkup.ts";
@@ -124,9 +127,12 @@ export * from "./features/checkup/checkup-usage-report.ts";
 export {
   checkupAnswerSchema,
   checkupTrpc,
+  upgradeDiagnosticsAutoSendAnswerSchema,
   usageReportAnswerSchema,
   type CheckupAnswer,
+  type UpgradeDiagnosticsAutoSendAnswer,
   type UsageReportAnswer,
   type CheckupAnswerSchema,
+  type UpgradeDiagnosticsAutoSendAnswerSchema,
   type UsageReportAnswerSchema,
 } from "./features/checkup/checkup.trpc.ts";

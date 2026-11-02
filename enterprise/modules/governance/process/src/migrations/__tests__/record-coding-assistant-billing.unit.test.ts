@@ -177,6 +177,7 @@ describe("given a worker installing governance", () => {
       const saves: Record<string, unknown>[] = [];
       try {
         const run = step(STEP_ID).run({
+          log: { info: () => undefined, warn: () => undefined },
           checkpoint: { resumeFrom: null, save: async ({ report }) => void saves.push(report) },
           dryRun: false,
           signal: new AbortController().signal,

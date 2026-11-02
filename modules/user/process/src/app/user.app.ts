@@ -18,6 +18,7 @@ import type {
   CredentialAccountInput,
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
+  PasswordHolder,
   SetFirstUserPasswordInput,
   SetFirstUserPasswordResult,
   SetOwnAvatarInput,
@@ -415,6 +416,14 @@ export class UserModule implements UserApi {
   /** Whether this account can sign in with a password at all. */
   hasPassword(input: UserIdInput): Promise<boolean> {
     return this.#users.hasPassword(input);
+  }
+
+  findPasswordHolders(input: { emails: readonly string[] | null }): Promise<PasswordHolder[]> {
+    return this.#users.findPasswordHolders(input);
+  }
+
+  markPasswordResetRequired(input: { userIds: readonly string[] }): Promise<{ marked: number }> {
+    return this.#users.markPasswordResetRequired(input);
   }
 
   /** Sets a first password on an account that has none. */

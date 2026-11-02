@@ -1,6 +1,8 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
+  type ClickHouseClientResolver,
+  ClickHouseColumns,
   type IdBoundOptions,
   type IdBoundResolved,
   ownProjectIdOf,
@@ -37,6 +39,28 @@ const RUNS = "runs" as const;
 const inputsRowSchema = z.object({ TenantId: z.string(), Inputs: z.string().nullable() });
 const inputsRowsSchema = z.array(inputsRowSchema);
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");
+
+/**
+ * The attempt columns goose 00122 adds, each with the default it reads as until the tenant's
+ * target has it (`ClickHouseColumns.select`, NO-HOLDS, ARCHITECTURE.md section 7).
+ */
+const ATTEMPT_COLUMNS = {
+  Attempts: "toUInt16(0)",
+  LastAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
+  LastAttemptError: "CAST(NULL AS Nullable(String))",
+  NextAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
+} as const;
+
+/** The attempt moments in epoch ms, read off the attempt columns' aliases. */
+const ATTEMPT_MOMENTS = [
+  "toUnixTimestamp64Milli(LastAttemptAt) AS LastAttemptAtMs",
+  "toUnixTimestamp64Milli(NextAttemptAt) AS NextAttemptAtMs",
+].join(", ");
+
+type ClickHouseEvaluationRunRow = ClickHouseEvaluationRunRecord & {
+  LastAttemptAtMs: number | string | null;
+  NextAttemptAtMs: number | string | null;
+};
 
 /** The tenant an unhinted read's retention floor is read for: the one it reads, else its own. */
 function retentionTenantOf(authorization: Authorization): string {
@@ -117,6 +141,8 @@ export class EvaluationRunClickHouseReadRepository {
   static create(options: {
     /** The proof-fenced reader every read goes through (ADR-177 block C; AGG-EVAL-PROOF). */
     clickhouse: AuthorizedClickHouse;
+    /** The client whose column list says which attempt columns the tenant's target has. */
+    resolveQueryClient?: ClickHouseClientResolver;
   }): EvaluationRunClickHouseReadRepository {
     return new EvaluationRunClickHouseReadRepository(options);
   }
@@ -127,8 +153,27 @@ export class EvaluationRunClickHouseReadRepository {
   private constructor(
     private readonly options: {
       clickhouse: AuthorizedClickHouse;
+      resolveQueryClient?: ClickHouseClientResolver;
     },
   ) {}
+
+  /** The attempt columns the reader's own target answers, the missing ones as defaults. */
+  private async attemptColumns({
+    authorization,
+    alias,
+  }: {
+    authorization: Authorization;
+    alias: string;
+  }): Promise<string> {
+    const input = { table: TABLE_NAME, alias, columns: ATTEMPT_COLUMNS };
+    const { resolveQueryClient } = this.options;
+    if (!resolveQueryClient) return ClickHouseColumns.named(input);
+    const tenantId = ownProjectIdOf({ authorization, reads: "traces" });
+    // An unreachable client names every column; the read itself then fails as it would have.
+    const client = await resolveQueryClient(tenantId).catch(() => undefined);
+    if (!client) return ClickHouseColumns.named(input);
+    return client.columns({ tenantId }).select(input);
+  }
 
   /** The tenant's retention plus the floor's margin; the platform default when unreadable. */
   private floorOver(retention: EvaluationRetentionLookup): RetentionFloorService {
@@ -144,7 +189,7 @@ export class EvaluationRunClickHouseReadRepository {
   }
 
   async getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
-    let row: ClickHouseEvaluationRunRecord | undefined;
+    let row: ClickHouseEvaluationRunRow | undefined;
     try {
       row = await this.findRunRow(input);
     } catch (error) {
@@ -168,7 +213,7 @@ export class EvaluationRunClickHouseReadRepository {
    */
   private findRunRow(
     input: EvaluationRunFloorLookup,
-  ): Promise<ClickHouseEvaluationRunRecord | undefined> {
+  ): Promise<ClickHouseEvaluationRunRow | undefined> {
     const slackMs = input.scheduledAtSlackMs ?? DEFAULT_SCHEDULED_AT_SLACK_MS;
     const idBound: IdBoundOptions = input.scheduledAt
       ? { occurredAtHint: input.scheduledAt.getTime(), windowMs: slackMs, fallback: "none" }
@@ -182,11 +227,12 @@ export class EvaluationRunClickHouseReadRepository {
   }: {
     input: EvaluationRunFloorLookup;
     idBound: IdBoundOptions;
-  }): Promise<ClickHouseEvaluationRunRecord | undefined> {
+  }): Promise<ClickHouseEvaluationRunRow | undefined> {
     const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+    const attempts = await this.attemptColumns({ authorization: input.authorization, alias: "t" });
     // The outer scope's bare `ScheduledAt` is the UInt64 alias below, so the windowed fence
     // reads the raw column in the dedup subquery; the outer scope takes the tenant set alone.
-    const result = await client.query<ClickHouseEvaluationRunRecord>({
+    const result = await client.query<ClickHouseEvaluationRunRow>({
       query: `
         SELECT
           t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
@@ -202,7 +248,8 @@ export class EvaluationRunClickHouseReadRepository {
           toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAt,
           toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
           toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
-          t.CostId AS CostId, t.LastProcessedEventId AS LastProcessedEventId,
+          t.CostId AS CostId, ${attempts}, ${ATTEMPT_MOMENTS},
+          t.LastProcessedEventId AS LastProcessedEventId,
           toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
         FROM ${TABLE_NAME} AS t
         PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
@@ -231,7 +278,11 @@ export class EvaluationRunClickHouseReadRepository {
   }): Promise<EvaluationRunData[]> {
     try {
       const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
-      const result = await client.query<ClickHouseEvaluationRunRecord>({
+      const attempts = await this.attemptColumns({
+        authorization: input.authorization,
+        alias: RUNS,
+      });
+      const result = await client.query<ClickHouseEvaluationRunRow>({
         query: `
           SELECT ProjectionId, TenantId, EvaluationId, Version, EvaluatorId,
             EvaluatorType, EvaluatorName, TraceId, IsGuardrail, Status, Score,
@@ -242,7 +293,7 @@ export class EvaluationRunClickHouseReadRepository {
             toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt,
             toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId,
-            LastProcessedEventId,
+            ${attempts}, ${ATTEMPT_MOMENTS}, LastProcessedEventId,
             toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME} AS ${RUNS}
           WHERE ${tenantSet()}
@@ -473,7 +524,7 @@ export class EvaluationRunClickHouseReadRepository {
     return Number.isFinite(value) && value > 0 ? value : undefined;
   }
 
-  private fromClickHouseRecord(row: ClickHouseEvaluationRunRecord): EvaluationRunData {
+  private fromClickHouseRecord(row: ClickHouseEvaluationRunRow): EvaluationRunData {
     return evaluationRunDataSchema.parse({
       evaluationId: row.EvaluationId,
       evaluatorId: row.EvaluatorId,
@@ -497,6 +548,10 @@ export class EvaluationRunClickHouseReadRepository {
       startedAt: toNumberOrNull(row.StartedAt),
       completedAt: toNumberOrNull(row.CompletedAt),
       costId: row.CostId,
+      attempts: Number(row.Attempts ?? 0),
+      lastAttemptAt: toNumberOrNull(row.LastAttemptAtMs ?? null),
+      lastAttemptError: row.LastAttemptError ?? null,
+      nextAttemptAt: toNumberOrNull(row.NextAttemptAtMs ?? null),
     });
   }
 }

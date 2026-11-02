@@ -29,6 +29,7 @@ import {
   type ServingRoster,
 } from "../serving-roster/serving-roster.service.ts";
 import { isDeclaredMigrationStep, isMigrationStep } from "../step/migration-step.ts";
+import { type LedgerTextRedactor, ledgerRedactor } from "../step/step-log.ts";
 import type { FirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, imageRelease, readImageTree } from "./image-tree.ts";
@@ -106,6 +107,7 @@ export function upgradeGateOver({
   targetsCatchingUp = null,
   warn = emitWarning,
   wait = (ms) => sleep(ms),
+  secretValues = [],
 }: {
   role: ServingRole;
   postgres: UpgradePostgres;
@@ -121,6 +123,8 @@ export function upgradeGateOver({
   warn?: ServingGateWarn;
   /** The worker's pause between asks; tests pass their own. */
   wait?: (ms: number) => Promise<unknown>;
+  /** Store URLs the process resolved, masked in what a step's error or log line quotes. */
+  secretValues?: readonly (string | undefined)[];
 }): UpgradeGate {
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
@@ -225,6 +229,7 @@ export function upgradeGateOver({
             release,
             warn,
             catchUp: { upgrade: firstInstall, findLeaseHolder, targetsCatchingUp },
+            redact: ledgerRedactor({ secretValues }),
           }),
         }
       : {}),
@@ -558,6 +563,7 @@ function backgroundStepsOver({
   release,
   warn,
   catchUp,
+  redact,
 }: {
   postgres: UpgradePostgres;
   roster: Pick<ServingRoster, "oldWritersGoneFor">;
@@ -571,9 +577,10 @@ function backgroundStepsOver({
     findLeaseHolder: UpgradeLeaseHolder;
     targetsCatchingUp: TargetsCatchingUpStore | null;
   };
+  redact: LedgerTextRedactor;
 }) {
-  const ledger = UpgradeLedgerRepository.create({ postgres });
-  const runner = UpgradeRunnerRepository.create({ postgres });
+  const ledger = UpgradeLedgerRepository.create({ postgres, redact });
+  const runner = UpgradeRunnerRepository.create({ postgres, redact });
   const log = (level: "info" | "warn", message: string, fields: object) =>
     level === "warn" ? warn(message, { processId, ...fields }) : undefined;
   return {
@@ -595,6 +602,7 @@ function backgroundStepsOver({
         oldWritersGoneFor: (input) => roster.oldWritersGoneFor(input),
         identity: { owner: processId, image: release ?? "unreleased", host: hostname() },
         log,
+        redact,
         ...(queue === undefined ? {} : { queue }),
       });
       const sweeping = startBackgroundSteps({ service, log });
@@ -728,6 +736,7 @@ export async function servingUpgradeGate({
               environment,
             }),
             warn,
+            secretValues: [databaseUrl, clickhouse, redis, ...routes.values()],
           });
           return { ...gate, runOnce };
         }),

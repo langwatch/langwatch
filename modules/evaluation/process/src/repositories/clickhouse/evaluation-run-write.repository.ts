@@ -47,6 +47,10 @@ export interface ClickHouseEvaluationRunRecord {
   StartedAt: number | string | null;
   CompletedAt: number | string | null;
   CostId: string | null;
+  Attempts: number;
+  LastAttemptAt: number | string | null;
+  LastAttemptError: string | null;
+  NextAttemptAt: number | string | null;
   LastProcessedEventId: string;
   LastEventOccurredAt: number | string;
   _retention_days: number;
@@ -60,6 +64,8 @@ type ClickHouseWriteRecord = Omit<
   | "ScheduledAt"
   | "StartedAt"
   | "CompletedAt"
+  | "LastAttemptAt"
+  | "NextAttemptAt"
   | "LastEventOccurredAt"
 > & {
   CreatedAt: ClickHouseMoment;
@@ -68,6 +74,8 @@ type ClickHouseWriteRecord = Omit<
   ScheduledAt: ClickHouseMoment;
   StartedAt: ClickHouseMoment | null;
   CompletedAt: ClickHouseMoment | null;
+  LastAttemptAt: ClickHouseMoment | null;
+  NextAttemptAt: ClickHouseMoment | null;
   LastEventOccurredAt: ClickHouseMoment;
 };
 
@@ -214,6 +222,7 @@ export class EvaluationRunClickHouseWriteRepository {
     const details = capText(data.details);
     const error = capText(data.error);
     const errorDetails = capText(data.errorDetails);
+    const lastAttemptError = capText(data.lastAttemptError ?? null);
     if (inputs.truncated || details.truncated || error.truncated || errorDetails.truncated) {
       logger.warn(
         {
@@ -257,6 +266,10 @@ export class EvaluationRunClickHouseWriteRepository {
       StartedAt: data.startedAt === null ? null : clickHouseMomentOf(data.startedAt),
       CompletedAt: data.completedAt === null ? null : clickHouseMomentOf(data.completedAt),
       CostId: data.costId,
+      Attempts: data.attempts ?? 0,
+      LastAttemptAt: data.lastAttemptAt == null ? null : clickHouseMomentOf(data.lastAttemptAt),
+      LastAttemptError: lastAttemptError.value,
+      NextAttemptAt: data.nextAttemptAt == null ? null : clickHouseMomentOf(data.nextAttemptAt),
       LastProcessedEventId: projectionId,
       LastEventOccurredAt: clickHouseMomentOf(data.LastEventOccurredAt || 0),
       _retention_days: retentionDays ?? DEFAULT_RETENTION_DAYS,

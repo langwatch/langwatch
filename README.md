@@ -30,7 +30,7 @@ npx langwatch claude  # or codex, copilot, opencode, ...
 npx @langwatch/server
 ```
 
-Only Node.js required. For production, see [Self-hosting LangWatch](https://langwatch.ai/docs/self-hosting/overview).
+Only Node.js 24 or newer required (macOS or glibc Linux). For production, see [Self-hosting LangWatch](https://langwatch.ai/docs/self-hosting/overview).
 
 ## Demo
 

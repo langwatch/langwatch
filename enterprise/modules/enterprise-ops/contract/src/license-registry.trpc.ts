@@ -24,6 +24,10 @@ import {
   selfHostedInstanceIdInputSchema,
   selfHostedInstancePageSchema,
   selfHostedInstanceSummarySchema,
+  findUpgradeDiagnosticsInputSchema,
+  upgradeDiagnosticsDownloadSchema,
+  upgradeDiagnosticsIdInputSchema,
+  upgradeDiagnosticsReportSchema,
 } from "@langwatch/enterprise-licensing-contract";
 /**
  * The license registry surface (ADR-156), as the admin console reads and writes
@@ -102,4 +106,12 @@ export const selfHostedInstancesTrpc = defineTrpcContract("selfHostedInstances")
   .query("summary")
   .withInput(z.void())
   .withOutput(selfHostedInstanceSummarySchema)
+
+  .query("findDiagnostics")
+  .withInput(findUpgradeDiagnosticsInputSchema)
+  .withOutput(z.array(upgradeDiagnosticsReportSchema))
+
+  .mutation("getDiagnosticsDownload")
+  .withInput(upgradeDiagnosticsIdInputSchema)
+  .withOutput(upgradeDiagnosticsDownloadSchema)
   .build();

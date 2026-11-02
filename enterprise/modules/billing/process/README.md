@@ -206,7 +206,7 @@ type Output = z.infer<typeof connectedInvoiceTargetSchema>; // ../contract/src/c
 
 ### `currency`
 
-Contract `../contract/src/currency.trpc.ts:22`, router `src/transport/currency.trpc.ts:46`.
+Contract `../contract/src/currency.trpc.ts:22`, router `src/transport/currency.trpc.ts:47`.
 
 | Procedure                 | Kind  | Gate                                                                                                                                     | Input                       | Output                   |
 | ------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------ |

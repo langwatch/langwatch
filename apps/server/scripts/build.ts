@@ -14,6 +14,8 @@ await build({
   target: "node20",
   format: "cjs",
   outfile: resolve(__dirname, "../dist/cli.cjs"),
+  // pg loads these only for its native driver and Cloudflare Workers, neither of which runs here.
+  external: ["pg-native", "pg-cloudflare"],
   // The `__cli_url` banner constant lets every bundled module resolve
   // `import.meta.url` correctly — esbuild's CJS output otherwise leaves
   // `import.meta.url` as `undefined`, which trips `fileURLToPath(...)`

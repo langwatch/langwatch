@@ -13,6 +13,7 @@ import {
 import {
   type ApiDoor,
   BrowserBundle,
+  EmbeddedDocument,
   FramedDocument,
   type HttpFailureAnswer,
   HttpMux,
@@ -33,6 +34,7 @@ import {
   loggerMiddleware,
   openConfirmationGate,
   recordAnsweredCause,
+  recordRequestPrincipal,
   RestHost,
   type RestConfirmationGate,
 } from "@langwatch/api/rest";
@@ -52,6 +54,7 @@ import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
 import type { ApiUiBundle } from "./bundle-config.ts";
+import { docsCrossOrigin } from "./docs-cross-origin.ts";
 
 export type ApiSurfaceComposition = Readonly<{
   members: ProcessMemberSource;
@@ -60,9 +63,13 @@ export type ApiSurfaceComposition = Readonly<{
   bundle: ApiUiBundle | undefined;
   instanceAdmin: RestIdentity;
   trustedProxies: readonly string[] | undefined;
+  /** TRUST_CLOUDFLARE_CLIENT_IP: honour CF-Connecting-IP from a peer inside `trustedProxies`. */
+  trustCloudflare: boolean;
   executionProxyBaseUrl: string | undefined;
   /** The deployment's public address, which a proxy in front of the API may hide from it. */
   publicBaseUrl: string | undefined;
+  /** The documentation sites whose playground may call REST cross-origin (ADR-185). */
+  docsOrigins: readonly string[];
   production: boolean;
   selection: TransportSelection;
   /** The process's one upgrade router, where every declared socket protocol mounts. */
@@ -203,16 +210,33 @@ class ApiSurface {
         : {}),
     });
     this.#rest?.assertEveryRouteDeclared();
-    const api = composeApiApplication({ rest: this.#rest, trpc: this.#trpc }, selected);
+    const api = composeApiApplication(
+      { rest: this.#rest, trpc: this.#trpc, docsOrigins: composition.docsOrigins },
+      selected,
+    );
+    const clientAddress = ClientAddress.fromTrustedProxies({
+      addresses: composition.trustedProxies,
+      trustCloudflare: composition.trustCloudflare,
+    });
     const mux = HttpMux.create({ reporter: composition.logger })
-      .use(ClientAddress.fromTrustedProxies({ addresses: composition.trustedProxies }))
+      .use(clientAddress)
       .use(SecurityHeaders.strict({ production: composition.production }))
       .route("/api", api, { onFailure: answerApiFailure });
     for (const path of apiRootPaths(api))
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
     for (const document of selected.documents)
       mux.route(document.path, FramedDocument.create(document));
-    return composition.doors.ahead(mux.route("/", page).handler);
+    for (const selection of selected.embedded)
+      mux.route(
+        selection.path,
+        EmbeddedDocument.create({ selection, embedders: composition.docsOrigins }),
+      );
+    const listener = composition.doors.ahead(mux.route("/", page).handler);
+    // A raw door (hosted MCP) answers ahead of the mux, so it reads the same resolved address.
+    return (request, response) => {
+      clientAddress.handleIncoming(request);
+      return listener(request, response);
+    };
   }
 
   #browserDoor(): RestIdentity {
@@ -345,10 +369,12 @@ export function composeApiApplication(
   hosts: {
     rest?: RestHost | undefined;
     trpc?: TrpcHost | undefined;
+    docsOrigins?: readonly string[] | undefined;
   },
   policies: { trpc?: SecurityHeaders; rest?: SecurityHeaders } = {},
 ): Hono {
   const root = new Hono();
+  root.use("*", docsCrossOrigin({ origins: hosts.docsOrigins ?? [] }));
 
   root.use("*", async (context, next) => {
     await next();
@@ -443,27 +469,47 @@ function trpcLanes(trpc: TrpcHost): Hono {
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
     recordTrpcFailure({ context, failure, status: response.status });
+    const caller = resolved ? await resolved.catch(() => void 0) : void 0;
+    recordRequestPrincipal({ context, read: () => trpcPrincipalOf(caller) });
 
     return response;
   });
 
+  // The context each subscription's caller was built over, so its access record names the user.
+  const sseContexts = new WeakMap<Request, TrpcRequestContext>();
   const sse = SseLane.create({
     members: {
       procedureTypeAt: (path) => trpc.procedureTypeAt(path),
-      createCaller: async ({ request, signal }) =>
-        trpc.router.createCaller(
+      createCaller: async ({ request, signal }) => {
+        const resolvedContext = await trpc.context({ request, signal });
+        sseContexts.set(request, resolvedContext);
+        return trpc.router.createCaller(
           // On the context AND in the caller's options: a subscription
           // procedure reads whichever its own transport gives it, and only
           // the context reaches one resolved through a v10-shaped caller.
-          { ...(await trpc.context({ request, signal })), signal },
+          { ...resolvedContext, signal },
           signal ? { signal } : {},
-        ),
+        );
+      },
     },
   });
 
-  app.get("/api/sse/*", (context) => sse.answer(context.req.raw, context.res.headers));
+  app.get("/api/sse/*", async (context) => {
+    const request = context.req.raw;
+    try {
+      return await sse.answer(request, context.res.headers);
+    } finally {
+      recordRequestPrincipal({ context, read: () => trpcPrincipalOf(sseContexts.get(request)) });
+    }
+  });
 
   return app;
+}
+
+/** The user a tRPC request's session resolved, for its access record. */
+function trpcPrincipalOf(context: TrpcRequestContext | undefined): { userId?: string } {
+  const userId = context?.tryActor()?.id;
+  return userId ? { userId } : {};
 }
 
 /** Records a failed answer's handled cause, not tRPC's wrapper, with its code and fault. */

@@ -40,6 +40,8 @@ export const upgradeAlertEmailProps = z
     runnerStopped: z
       .object({ owner: z.string().nullable(), host: z.string().nullable() })
       .nullable(),
+    /** How the details reach LangWatch: already sent, sendable from the step page, or by email. */
+    diagnostics: z.enum(["sent", "send", "download"]).default("download"),
   })
   .refine((props) => props.failedSteps.length > 0 || props.runnerStopped !== null, {
     message: "An upgrade alert names at least one failed step or a stopped runner.",
@@ -182,6 +184,30 @@ const servingSentence = ({
   return `${count} background ${isSingleStep ? "step" : "steps"} of the LangWatch upgrade at ${installation} didn't finish. LangWatch keeps running, but the work ${isSingleStep ? "this step does is" : "these steps do is"} not complete until ${isSingleStep ? "it finishes" : "they finish"}.`;
 };
 
+/** What the operator does if a retry fails, by how the details reach the LangWatch team. */
+const DiagnosticsSentence = ({
+  diagnostics,
+  isSingleStep,
+}: {
+  diagnostics: UpgradeAlertEmailProps["diagnostics"];
+  isSingleStep: boolean;
+}) => {
+  const retry = `You can retry ${isSingleStep ? "the step" : "each step"} from its page.`;
+  if (diagnostics === "sent") {
+    return `${retry} We have already received the details and are looking into it.`;
+  }
+  if (diagnostics === "send") {
+    return `${retry} If it fails again, it is most likely a problem on our side: send the details to the LangWatch team from the step page, and we will look into it.`;
+  }
+  return (
+    <>
+      {`${retry} If it fails again, it is most likely a problem on our side: download the diagnostics from the step page and send them to `}
+      <InlineLink href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</InlineLink>
+      {", and the LangWatch team will look into it."}
+    </>
+  );
+};
+
 const PlainBody = (props: UpgradeAlertEmailProps) => {
   const { installation, upgradesUrl, failedSteps, runnerStopped } = props;
   const isSingleStep = failedSteps.length === 1;
@@ -196,9 +222,7 @@ const PlainBody = (props: UpgradeAlertEmailProps) => {
             <PlainStep key={step.id} step={step} isHolding={isMixed && step.mode === "blocking"} />
           ))}
           <Paragraph style={{ margin: "24px 0 16px" }}>
-            {`You can retry ${isSingleStep ? "the step" : "each step"} from its page. If it fails again, it is most likely a problem on our side: copy the details shown on the step page and send them to `}
-            <InlineLink href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</InlineLink>
-            {", and the LangWatch team will look into it."}
+            <DiagnosticsSentence diagnostics={props.diagnostics} isSingleStep={isSingleStep} />
           </Paragraph>
         </>
       )}
@@ -296,6 +320,7 @@ export const upgradeAlertEmailTemplate = defineTemplate({
         },
       ],
       runnerStopped: null,
+      diagnostics: "download",
     },
     "several steps failed": {
       installation: "langwatch.acme.example",
@@ -303,6 +328,23 @@ export const upgradeAlertEmailTemplate = defineTemplate({
       audience: "self-hosted",
       failedSteps: severalFailedSteps(),
       runnerStopped: null,
+      diagnostics: "download",
+    },
+    "several steps failed, details already sent": {
+      installation: "langwatch.acme.example",
+      upgradesUrl: "https://langwatch.acme.example/ops/upgrades",
+      audience: "self-hosted",
+      failedSteps: severalFailedSteps(),
+      runnerStopped: null,
+      diagnostics: "sent",
+    },
+    "several steps failed, details sendable from the step page": {
+      installation: "langwatch.acme.example",
+      upgradesUrl: "https://langwatch.acme.example/ops/upgrades",
+      audience: "self-hosted",
+      failedSteps: severalFailedSteps(),
+      runnerStopped: null,
+      diagnostics: "send",
     },
     "several steps failed on LangWatch Cloud": {
       installation: "app.langwatch.ai",
@@ -310,6 +352,7 @@ export const upgradeAlertEmailTemplate = defineTemplate({
       audience: "langwatch-cloud",
       failedSteps: severalFailedSteps("app.langwatch.ai"),
       runnerStopped: null,
+      diagnostics: "download",
     },
     "runner stopped": {
       installation: "langwatch.acme.example",
@@ -317,6 +360,7 @@ export const upgradeAlertEmailTemplate = defineTemplate({
       audience: "self-hosted",
       failedSteps: [],
       runnerStopped: { owner: "worker-7f9c", host: "node-3" },
+      diagnostics: "download",
     },
   },
 });

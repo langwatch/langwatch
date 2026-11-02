@@ -13,13 +13,12 @@ on:
     paths:
       - "docs/**"
       - ".github/workflows/docs-release.yml"
+      - ".github/scripts/release-docs.sh"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Only the newest cache-bust matters, so a newer push supersedes an older run.
+  cancel-in-progress: true
 
 jobs:
   docs:
@@ -35,33 +34,12 @@ jobs:
           token: ${{ secrets.RELEASE_DOCS_TOKEN }}
           fetch-depth: 0
 
-      - name: Update cache buster redirect
-        run: |
-          CURRENT_TIME=$(date +%s)
-          jq --arg current_time_val "$CURRENT_TIME" \
-            '([.redirects[] | select(.source | startswith("/ci/cache/busted/"))] | length) as $n
-            | if $n == 1 then
-                .redirects |= map(
-                  if (.source | startswith("/ci/cache/busted/"))
-                  then .source = ("/ci/cache/busted/" + $current_time_val)
-                  else . end)
-              else
-                error("Error: expected exactly one redirect with source /ci/cache/busted/*, found \($n)")
-              end' \
-            docs.json > docs.json.tmp && \
-          mv docs.json.tmp docs.json
-
       - name: Configure Git
         run: |
           git config --global user.name "LangWatch Docs Bot"
           git config --global user.email "y.budnyk789@gmail.com"
 
       - name: Trigger Release
-        run: |
-          git add docs.json
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            git commit -m "Release docs (${{ github.event.inputs.release_reason }}) [skip ci]"
-          else
-            git commit -m "Release docs (auto-release on merge to main) [skip ci]"
-          fi
-          git push origin HEAD:main
+        env:
+          REASON: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_reason || 'auto-release on merge to main' }}
+        run: bash ../.github/scripts/release-docs.sh "$REASON"

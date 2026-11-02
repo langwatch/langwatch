@@ -117,3 +117,10 @@ Feature: Strict versioned feature source layout
     When the module has no registry in any repositories folder, or a concern's Prisma folder has no memory twin, or its memory twin has no contract test
     Then architecture lint reports the piece, exactly as for a top-level repositories folder
     And a registry in the top-level repositories folder satisfies every concern
+
+  @unit @architecture
+  Scenario: An opted-in framework package's services are held to the same ceiling
+    Given a framework package whose manifest opts into the feature layout and one that does not
+    When architecture lint measures service ceilings
+    Then the opted-in package's concern services are measured
+    And the package that has not opted in is left alone

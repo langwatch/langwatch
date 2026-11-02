@@ -1,4 +1,4 @@
-FROM node:24-alpine
+FROM node:24.22.1-alpine
 
 # node-pty requires native compilation tools
 RUN apk add --no-cache python3 make g++

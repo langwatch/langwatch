@@ -17,6 +17,12 @@ export const CLUSTERING_ERROR_CODES = {
    *  langevals' `model_provider_rate_limited` failure code. */
   MODEL_PROVIDER_QUOTA: "model_provider_quota",
   /**
+   * The model the project set for clustering is licensed for coding-assistant
+   * surfaces only (a Codex model) and cannot run clustering. Raised by the
+   * model-resolution cascade or the execution guard with a named code.
+   */
+  MODEL_RESTRICTED: "model_restricted",
+  /**
    * The clustering service (langevals) itself failed. Ours to fix, and the
    * default for a langevals failure precisely because its response body is not
    * reliable evidence about whose fault it was.
@@ -42,6 +48,7 @@ const USER_ACTIONABLE_CODES = new Set<ClusteringErrorCode>([
   CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
   CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
   CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,
+  CLUSTERING_ERROR_CODES.MODEL_RESTRICTED,
 ]);
 
 /**

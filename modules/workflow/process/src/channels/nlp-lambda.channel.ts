@@ -9,13 +9,24 @@ export type NlpLambdaArnEntry = Readonly<{
   arn: string;
   /** The deployment image it was resolved under; a change invalidates it. */
   imageUri: string;
+  /** That image's rollout order, where the fleet names one. */
+  imageOrder?: number | undefined;
   /** The function configuration it was reconciled to; a change invalidates it. */
   configFingerprint: string;
 }>;
 
+/** The function a resolution answered with, and the image and order it carries afterwards. */
+export type NlpLambdaResolution = Readonly<{
+  arn: string;
+  imageUri: string;
+  imageOrder?: number | undefined;
+  /** The pod could not read or record the order, so it left the function on its old image. */
+  unprotected?: boolean | undefined;
+}>;
+
 /** The AWS flow that finds, creates or updates the project's function. */
 export interface NlpLambdaArnResolver {
-  resolve(input: { projectId: string; imageUri: string }): Promise<string>;
+  resolve(input: { projectId: string; imageUri: string }): Promise<NlpLambdaResolution>;
 }
 
 /**

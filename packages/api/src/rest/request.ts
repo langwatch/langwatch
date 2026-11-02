@@ -13,6 +13,14 @@ import {
   type RequestLogData,
 } from "@langwatch/observability";
 import { runWithContext, updateCurrentContext } from "@langwatch/observability/context";
+import {
+  censusClientOf,
+  credentialSpanAttributes,
+  recordCredentialCensus,
+  runWithCredentialSlot,
+  type CredentialSlot,
+  type RequestCredential,
+} from "@langwatch/observability/credential-census";
 import { nowInstant } from "@langwatch/time";
 import {
   context as otContext,
@@ -36,15 +44,22 @@ import {
   type ResolvedError,
 } from "../errors.ts";
 import type { RestIdentity } from "../hosting/api-door.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import type { RestDoorCredential } from "./declaration.ts";
+import {
+  REQUEST_PRINCIPAL,
+  type RequestPrincipal,
+  requestPrincipalLogFields,
+} from "./request-principal.ts";
 import type { RestProtocolRefusal } from "./response-kind.ts";
 import {
   DECLARED_ANSWER,
   ENDPOINT_ROUTE,
   REQUEST_FAMILY,
   REQUEST_LOG_CLAIM,
+  ROUTE_TEMPLATE,
   type Declined,
   type ServiceContext,
 } from "./response.ts";
@@ -683,12 +698,14 @@ export async function isBodyAbsent(request: HonoRequest): Promise<boolean> {
 
 /** The request a route reads after the body has been drained to measure it. */
 function withBufferedBody(request: Request, body: Uint8Array<ArrayBuffer>): Request {
-  return new Request(request.url, {
+  const buffered = new Request(request.url, {
     method: request.method,
     headers: request.headers,
     body,
     signal: request.signal,
   });
+
+  return ClientAddress.carried({ from: request, to: buffered });
 }
 
 /** Caps the size of a request body, rejecting anything larger with 413. */
@@ -771,12 +788,21 @@ function logRequestOutcome({
   error,
   start,
   name,
+  clientAddress,
+  credential,
+  span,
 }: {
   logger: ReturnType<typeof createLogger>;
   c: Context;
   error: unknown;
   start: number;
   name: string | undefined;
+  /** Read when the request arrived: a body cap replaces the request it was resolved on. */
+  clientAddress: string | undefined;
+  /** What the request authenticated with, when a door or the key directory noted it. */
+  credential: RequestCredential | undefined;
+  /** The request's span, open while the request is answered. */
+  span: Span | undefined;
 }): void {
   const duration = nowInstant().epochMilliseconds - start;
   // Prefer what the error handler resolved. Re-deriving the error and
@@ -797,6 +823,8 @@ function logRequestOutcome({
   // The family that resolved the route, which is not the family whose
   // logger claimed the record when several share a base path.
   const family = (c.get(REQUEST_FAMILY) as string | undefined) ?? name;
+  const projectId = credential?.projectId ?? (c.get("project") as { id?: string } | undefined)?.id;
+  if (credential) countCredentialUse({ c, credential, statusCode, route, family, span });
 
   const record: RequestLogData = {
     method: c.req.method,
@@ -813,6 +841,13 @@ function logRequestOutcome({
       ...(route ? { route } : {}),
       ...(family ? { family } : {}),
       ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
+      // The client address is logged on purpose: the access record exists to tell callers apart.
+      ...requestPrincipalLogFields({
+        principal: c.get(REQUEST_PRINCIPAL) as RequestPrincipal | undefined,
+        clientAddress,
+      }),
+      ...(projectId ? { projectId } : {}),
+      ...(credential ? { credentialType: credential.credentialType } : {}),
     },
   };
 
@@ -830,6 +865,40 @@ function logRequestOutcome({
   }
 
   logHttpRequest(logger, record);
+}
+
+/** Counts the request into the credential census and tags its span; never fails the request. */
+function countCredentialUse({
+  c,
+  credential,
+  statusCode,
+  route,
+  family,
+  span,
+}: {
+  c: Context;
+  credential: RequestCredential;
+  statusCode: number;
+  route: string | undefined;
+  family: string | undefined;
+  span: Span | undefined;
+}): void {
+  try {
+    const client = censusClientOf((header) => c.req.header(header));
+    const template =
+      (c.get(ROUTE_TEMPLATE) as string | undefined) ?? route?.split(" ", 2)[1] ?? "<unrouted>";
+    span?.setAttributes(credentialSpanAttributes(credential, client));
+    recordCredentialCensus({
+      ...credential,
+      ...client,
+      method: c.req.method,
+      route: template,
+      family,
+      status: statusCode,
+    });
+  } catch {
+    // The census only observes.
+  }
 }
 
 /** Creates a Hono middleware that wraps each request in an OTel span. */
@@ -907,37 +976,65 @@ export function loggerMiddleware(options?: { name?: string }) {
       userId: c.get("user")?.id,
     };
 
-    return runWithContext(ctx, async () => {
-      const start = nowInstant().epochMilliseconds;
-      let error: unknown = c.error;
-
-      try {
-        await next();
-
-        // Update context after auth resolves org/project/user
-        updateCurrentContext({
-          organizationId: c.get("organization")?.id,
-          projectId: c.get("project")?.id,
-          userId: c.get("user")?.id,
-        });
-      } catch (err) {
-        error = err;
-
-        throw err;
-      } finally {
-        const logRequest = () =>
-          logRequestOutcome({ logger, c, error, start, name: options?.name });
-
-        runAfterSSECompletion({
-          c,
-          onSettled: logRequest,
-          onStreamError: (streamError) => {
-            error = streamError;
-          },
-        });
-      }
-    });
+    return runWithContext(ctx, () =>
+      runWithCredentialSlot((slot) => logAround({ c, next, logger, name: options?.name, slot })),
+    );
   };
+}
+
+/** Runs the request, then writes its one record and counts its credential. */
+async function logAround({
+  c,
+  next,
+  logger,
+  name,
+  slot,
+}: {
+  c: Context;
+  next: Next;
+  logger: ReturnType<typeof createLogger>;
+  name: string | undefined;
+  slot: CredentialSlot;
+}): Promise<void> {
+  const span = trace.getActiveSpan();
+  const clientAddress = ClientAddress.resolvedFor(c.req.raw);
+  const start = nowInstant().epochMilliseconds;
+  let error: unknown = c.error;
+
+  try {
+    await next();
+
+    // Update context after auth resolves org/project/user
+    updateCurrentContext({
+      organizationId: c.get("organization")?.id,
+      projectId: c.get("project")?.id,
+      userId: c.get("user")?.id,
+    });
+  } catch (err) {
+    error = err;
+
+    throw err;
+  } finally {
+    const logRequest = () =>
+      logRequestOutcome({
+        logger,
+        c,
+        error,
+        start,
+        name,
+        credential: slot.credential,
+        span,
+        clientAddress,
+      });
+
+    runAfterSSECompletion({
+      c,
+      onSettled: logRequest,
+      onStreamError: (streamError) => {
+        error = streamError;
+      },
+    });
+  }
 }
 
 /**

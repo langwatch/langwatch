@@ -43,7 +43,7 @@ def chat(message: str, context: str = "") -> str:
     messages.append({"role": "user", "content": message})
 
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=messages,
     )
     return response.choices[0].message.content

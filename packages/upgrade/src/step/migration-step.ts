@@ -4,6 +4,7 @@ import { z } from "zod";
 import { upgradeStepKindSchema, upgradeStepModeSchema } from "../ledger.ts";
 import { releaseVersionSchema } from "../manifest/manifest.ts";
 import type { CodeStepId } from "./code-step-ids.generated.ts";
+import type { MigrationStepLog } from "./step-log.ts";
 
 /**
  * The kinds a module declares with `.withMigrations` (rethink 6.1). A subset of the ledger's
@@ -78,6 +79,8 @@ export type MigrationStepRun = (args: {
   checkpoint: MigrationStepCheckpoint;
   dryRun: boolean;
   signal: AbortSignal;
+  /** Lines kept, redacted, on the step's ledger row for its diagnostics. */
+  log: MigrationStepLog;
 }) => Promise<MigrationStepReport>;
 
 export type MigrationStep = Readonly<MigrationStepDeclaration & { run: MigrationStepRun }>;

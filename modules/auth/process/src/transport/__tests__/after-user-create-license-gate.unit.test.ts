@@ -70,6 +70,7 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     flagPendingSsoSetup: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
+    clearPasswordResetRequirement: unused,
     ...members,
   };
 }

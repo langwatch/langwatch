@@ -1,7 +1,7 @@
 /**
- * One board in the Dashboards sidebar: a star that toggles it, one truncated line linking to
- * it with its scope mark, and a "⋮" menu. A stored board offers Star and its order, then what
- * this reader may do with it; a From LangWatch board offers Star and Duplicate to edit.
+ * One board in the Dashboards sidebar: a pin that toggles it, one truncated line linking to
+ * it with its scope mark, and a "⋮" menu. A stored board offers Pin and its order, then what
+ * this reader may do with it; a From LangWatch board offers Pin and Duplicate to edit.
  */
 
 import type { DashboardScope } from "@langwatch/dashboard-contract";
@@ -19,9 +19,9 @@ import {
   Copy,
   MoreVertical,
   Pencil,
+  Pin,
+  PinOff,
   Sparkles,
-  Star,
-  StarOff,
   Trash2,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -139,8 +139,8 @@ function StarItems({ name, actions }: { name: string; actions: StarActions }) {
   return (
     <>
       <Menu.Item value="star" onClick={actions.onToggleStar}>
-        <MenuRow icon={actions.isStarred ? <StarOff size={13} /> : <Star size={13} />}>
-          {actions.isStarred ? "Unstar" : "Star"}
+        <MenuRow icon={actions.isStarred ? <PinOff size={13} /> : <Pin size={13} />}>
+          {actions.isStarred ? "Unpin" : "Pin"}
         </MenuRow>
       </Menu.Item>
       {actions.move && (

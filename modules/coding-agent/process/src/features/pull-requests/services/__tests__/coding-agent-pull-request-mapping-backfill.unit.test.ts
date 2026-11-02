@@ -14,6 +14,7 @@ import {
   session,
 } from "../../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { CodingAgentFeatureService } from "../../../../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../../../services/model-catalog-cost-estimator.service.ts";
 import {
   PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP,
   PULL_REQUEST_MAPPING_BACKFILL_SESSIONS_PER_PROJECT,
@@ -34,6 +35,7 @@ function serviceWith(input: {
     projects: input.projects,
     billing: new TestBillingPolicy(),
     clock: new TestClock(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
 }
 

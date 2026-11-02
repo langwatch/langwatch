@@ -18,14 +18,10 @@ import {
 } from "@langwatch/api-key-contract";
 import type { AuthzGrantCaller } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import { fromDate } from "@langwatch/time";
 import type { z } from "zod";
 
-import type {
-  ApiKeyCreateRecord,
-  ApiKeyRepository,
-  StoredApiKey,
-} from "../repositories/api-key.repository.ts";
+import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { createRecord } from "../rules/api-key-record.rules.ts";
 import { ApiKeyBindingValidationService } from "./api-key-binding-validation.service.ts";
 import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
@@ -327,6 +323,36 @@ export class ApiKeyLifecycleService {
       throw new ApiKeyAlreadyRevokedError(input.id);
     }
 
+    return this.retire({ existing, input });
+  }
+
+  /**
+   * Retires a key the platform minted for itself, which no customer path may touch: the same
+   * steps as `revoke`, past its system-managed guard. Answers false for one already gone.
+   */
+  async revokeSystemManaged(input: {
+    id: string;
+    organizationId: string;
+    callerUserId: string | null;
+    cause: ApiKeyRevocationCause;
+  }): Promise<boolean> {
+    const existing = await this.repository.findByIdInOrganization(input);
+    if (!existing || !existing.isSystemManaged || existing.revokedAt) return false;
+
+    await this.retire({
+      existing: await this.bindings.attachOne(existing),
+      input: { ...input, callerIsAdmin: true, cascadeToChildren: false },
+    });
+    return true;
+  }
+
+  private async retire({
+    existing,
+    input,
+  }: {
+    existing: StoredApiKey;
+    input: RevokeApiKeyInput;
+  }): Promise<ApiKey> {
     // The row first, then the shared answer, then the grants: a failure part-way leaves a key
     // that is refused, never one that is live with its grants gone.
     const cause = input.cause ?? "user";
@@ -445,36 +471,4 @@ export class ApiKeyLifecycleService {
 
     return this.bindings.attachOne(row);
   }
-}
-
-/** The stored row a create writes: disabled until its grants land, then activated. */
-function createRecord({
-  parsed,
-  lookupId,
-  hashedSecret,
-  grants,
-}: {
-  parsed: z.output<typeof createApiKeyInputSchema>;
-  lookupId: string;
-  hashedSecret: string;
-  grants: ApiKeyScope[];
-}): ApiKeyCreateRecord {
-  return {
-    name: parsed.name,
-    description: parsed.description ?? null,
-    lookupId,
-    hashedSecret,
-    permissionMode: parsed.permissionMode ?? "default",
-    userId: parsed.userId ?? null,
-    createdByUserId: parsed.createdByUserId ?? null,
-    createdByDeviceLabel: parsed.createdByDeviceLabel ?? null,
-    parentApiKeyId: parsed.parentApiKeyId ?? null,
-    organizationId: parsed.organizationId,
-    expiresAt: parsed.expiresAt ? fromDate(parsed.expiresAt) : null,
-    ingestSourceType: parsed.ingestSourceType ?? null,
-    ingestionTemplateId: parsed.ingestionTemplateId ?? null,
-    isSystemManaged: parsed.isSystemManaged ?? false,
-    startsDisabled: true,
-    grants,
-  };
 }

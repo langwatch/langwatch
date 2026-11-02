@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as NodeDeps from "../../src/services/node-deps.ts";
+
 const execCalls: {
   bin: string;
   args: string[];
@@ -58,11 +60,10 @@ vi.mock("../../src/services/app-dir.ts", () => ({
   appRoot: () => appRootDir,
 }));
 
-vi.mock("../../src/services/node-deps.ts", () => ({
-  locateApiDir: () => join(appRootDir, "apps", "api"),
+vi.mock("../../src/services/node-deps.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof NodeDeps>()),
   locateBackendDir: () => join(appRootDir, "apps", "backend"),
   locateTasksDir: () => join(appRootDir, "apps", "tasks"),
-  resolvePnpm: async () => ({ command: "pnpm", args: [] }),
 }));
 
 const { startLangwatch } = await import("../../src/services/langwatch.ts");
@@ -79,6 +80,7 @@ function ctx() {
       langwatch: 5560,
       langevals: 5562,
       workerHealth: 5565,
+      backend: 5566,
       postgres: 6560,
       clickhouseHttp: 6562,
     },
@@ -154,6 +156,23 @@ describe("outbound defaults in the service env", () => {
     });
   });
 
+  describe("when the prebuilt app shipped the tokenizer files", () => {
+    /** @scenario "The tokenizer files arrive with the app" */
+    it("points the backend and LangEvals at the app's own copies", async () => {
+      mkdirSync(join(appRootDir, "tiktoken"), { recursive: true });
+      mkdirSync(join(appRootDir, "tiktoken-python"), { recursive: true });
+
+      await startLangwatch(ctx(), bus, {});
+      await startLangevals(ctx(), bus, {});
+
+      expect(spawnedEnvs.langwatch?.TIKTOKENS_PATH).toBe(join(appRootDir, "tiktoken"));
+      expect(spawnedEnvs.langevals?.TIKTOKEN_CACHE_DIR).toBe(join(appRootDir, "tiktoken-python"));
+      expect(spawnedEnvs.langevals?.CUSTOM_TIKTOKEN_CACHE_DIR).toBe(
+        join(appRootDir, "tiktoken-python"),
+      );
+    });
+  });
+
   describe("when the user's .env sets a value", () => {
     /** @scenario A value in the user's .env overrides a default */
     it("passes the user's value through", async () => {
@@ -180,7 +199,8 @@ describe("outbound defaults in the service env", () => {
 
 describe("tokenizer files for the app", () => {
   function fakeApp(files: string[]) {
-    const workerDir = join(appRootDir, "apps", "worker");
+    const workerDir = join(appRootDir, "modules", "trace", "process");
+    mkdirSync(workerDir, { recursive: true });
     writeFileSync(join(workerDir, "package.json"), "{}");
     const tiktoken = join(workerDir, "node_modules", "tiktoken");
     mkdirSync(tiktoken, { recursive: true });
@@ -213,7 +233,7 @@ describe("tokenizer files for the app", () => {
 
   describe("when the cache misses a file", () => {
     /** @scenario A missing tokenizer file is downloaded at install time */
-    it("runs the download script from the worker app into the cache", async () => {
+    it("runs the download script from the trace module into the cache", async () => {
       const workerDir = fakeApp(["a.tiktoken", "b.tiktoken"]);
       const cache = join(home, "cache", "tiktoken-encodings");
       mkdirSync(cache, { recursive: true });
@@ -234,12 +254,48 @@ describe("tokenizer files for the app", () => {
   });
 });
 
+describe("tokenizer files shipped with the prebuilt app", () => {
+  describe("when the app tree holds both tokenizer directories", () => {
+    /** @scenario "The tokenizer files arrive with the app" */
+    it("downloads nothing at first start, for the app or for LangEvals", async () => {
+      const traceDir = join(appRootDir, "modules", "trace", "process");
+      const tiktoken = join(traceDir, "node_modules", "tiktoken");
+      mkdirSync(tiktoken, { recursive: true });
+      writeFileSync(join(traceDir, "package.json"), "{}");
+      writeFileSync(join(tiktoken, "package.json"), JSON.stringify({ name: "tiktoken" }));
+      writeFileSync(
+        join(tiktoken, "registry.json"),
+        JSON.stringify({ a: { load_tiktoken_bpe: "https://example.test/enc/a.tiktoken" } }),
+      );
+      mkdirSync(join(appRootDir, "tiktoken"), { recursive: true });
+      writeFileSync(join(appRootDir, "tiktoken", "a.tiktoken"), "x");
+      mkdirSync(join(appRootDir, "tiktoken-python"), { recursive: true });
+      const lockFile = join(appRootDir, "services", "langevals", "uv.lock");
+      writeFileSync(lockFile, "lock-v1");
+
+      await ensureTiktokenEncodings({ paths: { root: home }, bus, appRootDir });
+      await ensureLangevalsTiktokenCache({
+        paths: { root: home },
+        appRootDir,
+        bus,
+        uvBin: "/usr/bin/uv",
+        projectDir: join(appRootDir, "services", "langevals"),
+        venvDir: join(home, "venvs", "langevals"),
+        lockFile,
+      });
+
+      expect(execCalls).toEqual([]);
+    });
+  });
+});
+
 describe("tokenizer cache for LangEvals", () => {
   function fill() {
     const lockFile = join(appRootDir, "services", "langevals", "uv.lock");
     writeFileSync(lockFile, "lock-v1");
     return ensureLangevalsTiktokenCache({
       paths: { root: home },
+      appRootDir,
       bus,
       uvBin: "/usr/bin/uv",
       projectDir: join(appRootDir, "services", "langevals"),

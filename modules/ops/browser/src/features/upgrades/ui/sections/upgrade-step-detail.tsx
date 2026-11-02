@@ -38,7 +38,7 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetView[] }) {
   );
 }
 
-/** W3, read-only: one step's facts, its last error, its report (the checkpoint) and targets. */
+/** W3, read-only: one step's facts, last error, checkpoint report, recent log and targets. */
 export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
   return (
     <Stack gap={5} data-testid="upgrade-step-detail">
@@ -85,6 +85,18 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
             language="json"
             filename="Checkpoint report"
             lineNumbers
+            compact
+            maxHeight="320px"
+          />
+        </Stack>
+      )}
+      {step.logTail.length > 0 && (
+        <Stack gap={2} data-testid="upgrade-step-log">
+          <Heading size="xs">Recent log</Heading>
+          <CodePreview
+            code={step.logTail.join("\n")}
+            language="text"
+            filename="Last attempt"
             compact
             maxHeight="320px"
           />

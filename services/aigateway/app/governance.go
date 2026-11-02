@@ -12,12 +12,11 @@ import (
 )
 
 // accountExhaustionMessage is the message shown to a governed user when an
-// upstream provider account is exhausted (credit/quota/billing). The user
-// can't act on the provider's billing portal — the org admin owns the account
-// — so we point them at the right contact. Avoids credit/billing wording so
-// wrapper clients (e.g. Claude Code) render it verbatim instead of overlaying
-// their own billing UI.
-const accountExhaustionMessage = "Your organization's AI gateway access is exhausted. Contact your LangWatch admin."
+// upstream provider account is exhausted (credit/quota/billing). It avoids
+// credit/billing wording so wrapper clients (e.g. Claude Code) render it
+// verbatim instead of overlaying their own billing UI. The rewrite also sets
+// error.code, which is what readers past the gateway classify on.
+const accountExhaustionMessage = providererr.GatewayAccountExhaustedMessage
 
 // applyGovernanceMessage rewrites the human-facing message of a terminal
 // account-level provider error to the gateway's governance message. It covers
@@ -25,20 +24,24 @@ const accountExhaustionMessage = "Your organization's AI gateway access is exhau
 // raw-forward Response (a 4xx carrying the provider's native body) and a
 // streaming *domain.UpstreamError.
 //
-// Only the message text changes — the HTTP status, error type, and
-// retry-signaling headers are preserved verbatim, so the terminal-vs-retryable
+// Only the message text changes, plus error.code set to
+// provider_account_exhausted when the provider gave none. The HTTP status,
+// error type and retry-signaling headers are preserved, so the terminal-vs-retryable
 // contract is untouched. It is a no-op for any error that is not account-level
 // exhaustion: a transient rate-limit 429, a 5xx, or a user's own bad request
 // all pass through unchanged.
 func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response, error) {
 	if resp != nil && providererr.AccountExhausted(resp.StatusCode, resp.Body) {
-		resp.Body = rewriteErrorMessage(resp.Body, accountExhaustionMessage)
+		resp.Body = markAccountExhausted(rewriteErrorMessage(resp.Body, accountExhaustionMessage))
 		return resp, err
 	}
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) && isAccountExhaustionError(ue) {
 		ue.Message = accountExhaustionMessage
-		ue.Body = rewriteErrorMessage(ue.Body, accountExhaustionMessage)
+		ue.Body = markAccountExhausted(rewriteErrorMessage(ue.Body, accountExhaustionMessage))
+		if ue.ErrorCode == "" {
+			ue.ErrorCode = providererr.GatewayAccountExhaustedCode
+		}
 	}
 	return resp, err
 }
@@ -70,6 +73,20 @@ func rewriteErrorMessage(body []byte, msg string) []byte {
 		return body
 	}
 	out, err := sjson.SetBytes(body, "error.message", msg)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+// markAccountExhausted sets error.code to provider_account_exhausted, which
+// readers past the gateway classify on instead of the sentence. A provider's
+// own code (OpenAI's insufficient_quota) is kept, as is a body with no error.
+func markAccountExhausted(body []byte) []byte {
+	if !gjson.GetBytes(body, "error").Exists() || gjson.GetBytes(body, "error.code").String() != "" {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "error.code", providererr.GatewayAccountExhaustedCode)
 	if err != nil {
 		return body
 	}

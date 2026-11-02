@@ -39,6 +39,19 @@ describe("evaluation server configuration", () => {
     });
   });
 
+  describe("given the evaluator retry window", () => {
+    /** @scenario "An evaluator service that stays down is recorded as an error once the retry window ends" */
+    it("is two hours unless the deployment sets fewer minutes, and refuses more than 120", () => {
+      expect(read({}).evaluatorRetryWindowMinutes).toBe(120);
+      expect(
+        read({ LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES: "30" }).evaluatorRetryWindowMinutes,
+      ).toBe(30);
+      expect(() => read({ LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES: "121" })).toThrow(
+        /LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES/,
+      );
+    });
+  });
+
   describe("given a deployment runs no evaluator service", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("boots with no endpoint rather than refusing", () => {

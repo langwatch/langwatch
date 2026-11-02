@@ -1,6 +1,7 @@
 {{- if .Values.redis.chartManaged }}
 {{- $authEnabled := .Values.redis.auth.enabled }}
 {{- $secretName := .Values.redis.auth.existingSecret | default (printf "%s-redis" .Release.Name) }}
+{{- $maxmemory := include "langwatch.redisMaxmemory" . }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -56,9 +57,9 @@ spec:
           # exec makes redis-server PID 1, so it receives SIGTERM, saves and
           # exits at once. Behind a shell that does not forward the signal it
           # would sit out terminationGracePeriodSeconds and be killed unsaved.
-          command: ["sh", "-c", "exec redis-server --maxmemory-policy noeviction --requirepass \"$REDIS_PASSWORD\""]
+          command: ["sh", "-c", "exec redis-server --maxmemory-policy noeviction{{ if $maxmemory }} --maxmemory {{ $maxmemory }}{{ end }} --requirepass \"$REDIS_PASSWORD\""]
           {{- else }}
-          command: ["redis-server", "--maxmemory-policy", "noeviction"]
+          command: ["redis-server", "--maxmemory-policy", "noeviction"{{ if $maxmemory }}, "--maxmemory", {{ $maxmemory | quote }}{{ end }}]
           {{- end }}
           ports:
             - name: redis

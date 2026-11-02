@@ -138,6 +138,19 @@ Feature: The transactional messages LangWatch sends
     And it says the other step runs in the background
 
   @unit
+  Scenario: A self-hosted upgrade alert says the details were already sent
+    Given the hourly check already sent each failed step's diagnostics to LangWatch
+    When the self-hosted upgrade alert is rendered
+    Then it says LangWatch has the details and is looking into it
+    And it does not ask the operator to send anything
+
+  @unit
+  Scenario: A self-hosted upgrade alert points at Send to LangWatch where Connect is available
+    Given the installation can send diagnostics to LangWatch but did not send them by itself
+    When the self-hosted upgrade alert is rendered
+    Then it asks the operator to send the details from the step page
+
+  @unit
   Scenario: A self-hosted upgrade alert falls back to the step id when a step has no description
     Given a failed upgrade step that declares no description
     When the self-hosted upgrade alert is rendered
@@ -145,10 +158,10 @@ Feature: The transactional messages LangWatch sends
 
   @unit
   Scenario: A self-hosted upgrade alert offers a retry and a way to reach the LangWatch team
-    Given an upgrade step failed on a self-hosted installation
+    Given an upgrade step failed on a self-hosted installation that cannot reach LangWatch
     When the upgrade alert is rendered
     Then it says the step can be retried from its page
-    And it asks the operator to send the step page's details to support@langwatch.ai
+    And it asks the operator to download the diagnostics and send them to support@langwatch.ai
     And it never asks the operator to fix the cause
 
   @unit

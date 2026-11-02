@@ -356,15 +356,24 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Then it sets terminationGracePeriodSeconds
     And the value covers the drain budget plus thirty seconds
 
-  # The app had no preStop, so SIGTERM could reach it before every proxy had
-  # dropped its endpoint, and requests still routed to it were refused.
+  # Without a preStop, SIGTERM reached the app before every proxy had dropped its
+  # endpoint, and requests still routed to it were refused. The 5s sleep added
+  # for that proved too short: a cloud load balancer still routed new requests to
+  # a pod over 10s after its endpoint went, so the default is fifteen.
 
   @regression @helm-grace-period
   Scenario: The app pod sleeps before SIGTERM so its endpoint removal propagates
     Given the app Deployment is rendered
-    Then its container has a preStop sleep of app.preStopSleepSeconds, five by default
+    Then its container has a preStop sleep of app.preStopSleepSeconds, fifteen by default
     And a preStop sleep the grace period cannot fit beside the drain refuses to render
     And app.preStopSleepSeconds of zero renders no preStop
+
+  @regression @helm-grace-period
+  Scenario: An unset preStop sleep fits a grace period an install pinned before the default rose
+    Given an install that pins app.terminationGracePeriodSeconds and leaves app.preStopSleepSeconds unset
+    When the app Deployment is rendered
+    Then the preStop sleep is fifteen seconds, shortened to the room the pinned grace period leaves
+    And a preStop sleep the install sets itself still refuses to render when it does not fit
 
   @regression @helm-grace-period
   Scenario: The process is told the same drain budget the pod is sized for

@@ -785,7 +785,9 @@
     ["Level", "level", ["output"]],
     ["ThreadIdleTimeout", "threadIdleTimeout", []],
     ["CreatedAt", "createdAt", []],
-    ["UpdatedAt", "updatedAt", []]
+    ["UpdatedAt", "updatedAt", []],
+    ["AutoPausedAt", "autoPausedAt", []],
+    ["AutoPausedReason", "autoPausedReason", ["output"]]
   ],
   "notifications": [
     ["TenantId", "projectId", []],

@@ -31,7 +31,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
-import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 
 /**
  * The deep link back into the workbench for the project this credential
@@ -257,9 +257,13 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     resource: "chart",
     action: "delete",
     idParam: "chartId",
-    name: ({ app, projectId, id }) =>
+    name: ({ app, projectId, id, ownerUserId }) =>
       nameUnlessMissing({
-        read: app.getSavedWorkbenchChart({ projectId, chartId: id }),
+        read: app.getSavedWorkbenchChart({
+          projectId,
+          chartId: id,
+          ...viewerOfOwner({ ownerUserId }),
+        }),
         missing: SavedWorkbenchChartNotFoundError,
         nameOf: (chart) => chart.name,
       }),
@@ -337,9 +341,13 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     resource: "dashboard chart",
     action: "remove",
     idParam: "chartId",
-    name: ({ app, projectId, id }) =>
+    name: ({ app, projectId, id, ownerUserId }) =>
       nameUnlessMissing({
-        read: app.getSavedWorkbenchChart({ projectId, chartId: id }),
+        read: app.getSavedWorkbenchChart({
+          projectId,
+          chartId: id,
+          ...viewerOfOwner({ ownerUserId }),
+        }),
         missing: SavedWorkbenchChartNotFoundError,
         nameOf: (chart) => chart.name,
       }),

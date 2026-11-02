@@ -252,8 +252,18 @@ export async function deleteMonitor(id: string): Promise<void> {
   );
 }
 
+/**
+ * Every board a "create a dashboard" request could land on: the Analytics Reports boards, and the
+ * Dashboards boards where the project has Dashboards on (404 while it is off).
+ */
 export async function listDashboards(): Promise<{ id: string; name?: string }[]> {
-  return toArray(await lwGet("/api/dashboards"));
+  const reports = toArray<{ id: string; name?: string }>(await lwGet("/api/v1/analytics/reports"));
+  const dashboards = await lwGet("/api/v1/dashboards").catch((error: unknown) => {
+    if (error instanceof LwHttpError && error.message.includes("-> 404")) return [];
+    throw error;
+  });
+
+  return [...reports, ...toArray<{ id: string; name?: string }>(dashboards)];
 }
 
 export async function listWorkflows(): Promise<{ id: string; name?: string }[]> {

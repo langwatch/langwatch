@@ -29,6 +29,7 @@ Anything else hosted-mcp needs belongs to another module and is reached through 
 | Name            | Token               | Module                                                      |
 | --------------- | ------------------- | ----------------------------------------------------------- |
 | `authorization` | `AuthzApi`          | [authz](../authz/README.md)                                 |
+| `featureFlags`  | `FeatureFlagApi`    | [feature-flag](../feature-flag/README.md)                   |
 | `governance`    | `GovernanceRestApi` | [governance](../../enterprise/modules/governance/README.md) |
 | `projects`      | `ProjectApi`        | [project](../project/README.md)                             |
 | `sessions`      | `AuthApi`           | [auth](../auth/README.md)                                   |

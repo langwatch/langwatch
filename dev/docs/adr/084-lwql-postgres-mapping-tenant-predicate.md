@@ -87,6 +87,21 @@ identity sees exactly the row its own hash matches — so it yields this caller'
 tenant, and an unknown or empty key yields no row, which folds to `NULL` and
 matches nothing in PostgreSQL.
 
+**Amended for group projects (tasks#935).** A group project's session carries one
+key hash per member project, so the self-policed key map admits one row per
+member and an equality could only ever keep one of them. The predicate is now a
+range of two scalars, which still fold to constants and still push down:
+
+```sql
+WHERE src.`TenantId` >= (SELECT min(km.`TenantId`) FROM analytics.api_key_tenants AS km)
+  AND src.`TenantId` <= (SELECT max(km.`TenantId`) FROM analytics.api_key_tenants AS km)
+```
+
+One project sends `>= 'a' AND <= 'a'`, the same rows as before. A group sends
+the span of its member ids, so PostgreSQL may also read projects whose ids fall
+between two members; the row policy drops those, as with the foreign-tenant
+probe below. An unknown key folds both bounds to `''` and reads nothing.
+
 Nothing about the caller's statement changes. The predicate lives in a
 server-side view definition, which is where every other LangWatchQL view's body
 already lives, so the `never rewritten` guard is untouched.

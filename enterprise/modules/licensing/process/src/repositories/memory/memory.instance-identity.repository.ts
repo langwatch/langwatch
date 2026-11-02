@@ -38,7 +38,7 @@ export class MemoryInstanceIdentityRepository implements InstanceIdentityReposit
   }
 
   async setReportSwitches({
-    switches: { optionalMetricsOptOut, hostnameOptOut },
+    switches: { optionalMetricsOptOut, hostnameOptOut, upgradeDiagnosticsOptOut },
     instanceIdIfMissing,
   }: {
     switches: InstanceReportSwitches;
@@ -49,6 +49,7 @@ export class MemoryInstanceIdentityRepository implements InstanceIdentityReposit
       ...row,
       ...(optionalMetricsOptOut === undefined ? {} : { optionalMetricsOptOut }),
       ...(hostnameOptOut === undefined ? {} : { hostnameOptOut }),
+      ...(upgradeDiagnosticsOptOut === undefined ? {} : { upgradeDiagnosticsOptOut }),
     };
   }
 
@@ -76,5 +77,6 @@ function blankRow(instanceId: string, createdAt: Instant): InstanceIdentityRecor
     lastReportError: null,
     optionalMetricsOptOut: false,
     hostnameOptOut: false,
+    upgradeDiagnosticsOptOut: false,
   };
 }

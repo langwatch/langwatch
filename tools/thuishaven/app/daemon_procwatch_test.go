@@ -75,8 +75,8 @@ func TestProcessWatchKillsARunawayTsgo(t *testing.T) {
 // lib/tsc.js execve()s it, so this — argv[0] and all — is what ps reports for
 // an ordinary `pnpm typecheck` today. It went ungoverned and unobserved while
 // the governor selected on the old name.
-// @scenario "The compiler is governed under both of its names"
-func TestProcessWatchGovernsTheCompilerUnderBothNames(t *testing.T) {
+// @scenario "The compiler is governed under each of its names"
+func TestProcessWatchGovernsTheCompilerUnderEachName(t *testing.T) {
 	now := time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)
 
 	t.Run("given a runaway typescript@7 run", func(t *testing.T) {

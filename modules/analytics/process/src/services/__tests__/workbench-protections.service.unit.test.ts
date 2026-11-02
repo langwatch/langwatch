@@ -11,6 +11,7 @@ import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import {
   WorkbenchProtectionsService,
   type WorkbenchProtectionsDependencies,
@@ -139,6 +140,41 @@ describe("resolveMemberProtections", () => {
         canSeeCapturedOutput: true,
         catalogue: EVERY_CATALOGUE_PERMISSION,
       });
+    });
+  });
+
+  describe("given an aggregate whose member project B hides captured input", () => {
+    /** @scenario "The strictest member privacy policy applies" */
+    it("hides captured input, reading one policy across the aggregate and its members", async () => {
+      const { authz } = authzAnswering(true);
+      const asked: (readonly string[])[] = [];
+      const dataPrivacy = createApiFixture<DataPrivacyApi>(
+        {
+          getResolvedForProject: async () => PLATFORM_DEFAULT_DATA_PRIVACY,
+          getResolvedForProjects: async ({ projectIds }) => {
+            asked.push(projectIds);
+            return projectIds.includes("project_b")
+              ? inputRestrictedTo("nobody")
+              : PLATFORM_DEFAULT_DATA_PRIVACY;
+          },
+        },
+        "workbench data privacy",
+      );
+
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
+        userId: "user-1",
+        projectId: "project-1",
+        authorization: analyticsProof({
+          projectId: "project-1",
+          shared: [
+            { projectId: "project_a", from: 0 },
+            { projectId: "project_b", from: 0 },
+          ],
+        }),
+      });
+
+      expect(asked).toEqual([["project-1", "project_a", "project_b"]]);
+      expect(resolved.canSeeCapturedInput).toBe(false);
     });
   });
 

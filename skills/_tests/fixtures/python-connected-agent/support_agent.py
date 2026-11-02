@@ -81,7 +81,7 @@ def support_agent(
     messages: list[langwatch.Message],
     thread_id: str,
     session: dict | None,
-    model: Literal["gpt-5-mini", "gpt-5"] = "gpt-5-mini",
+    model: Literal["gpt-6-luna", "gpt-6-sol"] = "gpt-6-luna",
     plan: Literal["free", "pro"] = "free",
 ) -> langwatch.AgentReply:
     """One conversation turn.
@@ -105,6 +105,9 @@ def support_agent(
             model=model,
             messages=history,
             tools=TOOLS,
+            # gpt-6 models take function tools on Chat Completions only with
+            # reasoning off.
+            reasoning_effort="none",
         )
         reply = completion.choices[0].message
         if not reply.tool_calls:
@@ -129,6 +132,7 @@ def support_agent(
             messages=history,
             tools=TOOLS,
             tool_choice="none",
+            reasoning_effort="none",
         )
         output = completion.choices[0].message.content or ""
     return langwatch.AgentReply(

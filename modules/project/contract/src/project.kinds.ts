@@ -40,14 +40,14 @@ const EVERYTHING: ProjectNavigation = {
 
 /**
  * ADR-177 decision 8: an aggregate is read only, so its navigation is Traces
- * alone; every other kind keeps the whole menu.
+ * and Analytics over its members (v4.15); every other kind keeps the whole menu.
  */
 export function projectNavigation(kind: string | null | undefined): ProjectNavigation {
   if (!isAggregateProjectKind(kind)) return EVERYTHING;
   return {
     home: false,
     observe: true,
-    analytics: false,
+    analytics: true,
     onlineEvaluations: false,
     test: false,
     build: false,
@@ -97,6 +97,17 @@ export function hasTracesToShow(project: { kind?: string | null; firstMessage: b
 export const NON_DESTINATION_PROJECT_KINDS: readonly string[] = [
   PROJECT_KIND.INTERNAL_GOVERNANCE,
   PROJECT_KIND.AGGREGATE,
+];
+
+/**
+ * The kinds holding no project key anyone manages: an aggregate owns no
+ * credential (ADR-177 decision 7) and the internal kinds are nobody's to open.
+ * Meant for a Prisma `kind: { notIn }` filter.
+ */
+export const UNMANAGED_PROJECT_KEY_KINDS: readonly string[] = [
+  PROJECT_KIND.AGGREGATE,
+  PROJECT_KIND.INTERNAL_GOVERNANCE,
+  PROJECT_KIND.INTERNAL_CHECKUP,
 ];
 
 /**

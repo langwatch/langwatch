@@ -58,7 +58,7 @@ async def main(message: cl.Message):
         return False
 
     completion = await client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",

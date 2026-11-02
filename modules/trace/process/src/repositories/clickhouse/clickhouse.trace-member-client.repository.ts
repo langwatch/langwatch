@@ -1,5 +1,6 @@
 import {
   AuthorizedClickHouse,
+  type ClickHouseColumns,
   type ClickHouseQueryClient,
   type IdBoundOptions,
 } from "@langwatch/clickhouse-client";
@@ -14,6 +15,8 @@ export interface TraceClickHouseClient {
     /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
     idBound?: IdBoundOptions;
   }): Promise<{ json(): Promise<unknown[]> }>;
+  /** A select list naming only the columns this tenant's target has, the rest as defaults. */
+  select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
 }
 
 export interface TraceClickHouseWriteClient extends TraceClickHouseClient {
@@ -83,6 +86,10 @@ export class MemberTraceClickHouseClientRepository implements TraceClickHouseWri
       ...(input.idBound ? { idBound: input.idBound } : {}),
     });
     return { json: async () => result.rows };
+  }
+
+  select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
+    return this.clickhouse.columns({ tenantId: this.tenantId }).select(input);
   }
 
   async insert(input: {

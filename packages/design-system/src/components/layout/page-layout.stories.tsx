@@ -38,6 +38,25 @@ export const Default: Story = {
   ),
 };
 
+/** One centred reading column, such as a section's overview: the body sets the measure. */
+export const NarrowBody: Story = {
+  render: () => (
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflow="hidden">
+      <PageLayout.Header>
+        <PageLayout.Heading>AI Governance</PageLayout.Heading>
+      </PageLayout.Header>
+      <PageLayout.Container width="narrow">
+        <PageLayout.Content>
+          <Text>
+            A greeting, one field and two short lists read as one column, centred however wide the
+            window is.
+          </Text>
+        </PageLayout.Content>
+      </PageLayout.Container>
+    </Box>
+  ),
+};
+
 export const HeaderWithoutBorder: Story = {
   render: (args) => (
     <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflow="hidden">

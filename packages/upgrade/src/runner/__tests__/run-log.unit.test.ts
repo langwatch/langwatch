@@ -31,6 +31,26 @@ describe("redactSecrets", () => {
     });
   });
 
+  describe("when a line carries credentials as JSON, as a header and as `key: value`", () => {
+    /** @scenario "A credential in JSON or a header in a log line is written masked" */
+    it("masks each value and keeps the names and the rest of the line", () => {
+      const text = redactSecrets(
+        '{"apiKey":"k-123","rows":4} Authorization: Bearer abcdefgh123 password: hunter2 bearer zyxwvut987',
+      );
+      expect(text).toBe(
+        '{"apiKey":"***","rows":4} Authorization: Bearer *** password: *** bearer ***',
+      );
+    });
+  });
+
+  describe("when a line names tokens without quoting one", () => {
+    it("leaves it as it was", () => {
+      expect(redactSecrets("used max_tokens=512 and 30 tokens: ok")).toBe(
+        "used max_tokens=512 and 30 tokens: ok",
+      );
+    });
+  });
+
   describe("when a URL has no password", () => {
     it("leaves it as it was", () => {
       expect(redactSecrets("http://127.0.0.1:58123/langwatch")).toBe(

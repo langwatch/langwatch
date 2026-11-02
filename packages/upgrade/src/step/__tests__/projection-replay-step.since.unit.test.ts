@@ -57,6 +57,7 @@ function runOnce({
     checkpoint: { resumeFrom, save: async ({ report: next }) => void saved.push(next) },
     dryRun: false,
     signal: new AbortController().signal,
+    log: { info: () => undefined, warn: () => undefined },
   });
   return { step, report, saved };
 }

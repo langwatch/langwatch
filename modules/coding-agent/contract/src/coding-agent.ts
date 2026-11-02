@@ -224,9 +224,13 @@ export interface CodingAgentSessionEventSchema extends Named<
 export const codingAgentSessionEventSchema: CodingAgentSessionEventSchema =
   codingAgentSessionEventSchemaDefinition;
 
-/** One durable row in the ordered coding-agent session-event read model. */
+/**
+ * One durable row in the ordered coding-agent session-event read model. `aiUnits` is what the
+ * call consumed in its agent's AI units (migration 00123), a count beside the dollar figure;
+ * written for the pull-request read, not part of the events answer.
+ */
 const codingAgentSessionEventRecordSchemaDefinition = codingAgentSessionEventSchema
-  .safeExtend({ tenantId: z.string() })
+  .safeExtend({ tenantId: z.string(), aiUnits: z.number() })
   .strict();
 export interface CodingAgentSessionEventRecordSchema extends Named<
   typeof codingAgentSessionEventRecordSchemaDefinition
@@ -507,6 +511,9 @@ export const codingAgentSessionListPullRequestSchema: CodingAgentSessionListPull
 /** The exact row returned by the sessions screen. */
 const codingAgentSessionListRowSchemaDefinition = z
   .object({
+    /** The member project that recorded the session; a group project lists several. */
+    tenantId: z.string(),
+    projectName: z.string(),
     sessionId: z.string(),
     title: z.string().nullable(),
     agent: z.string(),
@@ -605,6 +612,8 @@ const codingAgentModelUsageSchemaDefinition = z
     totalTokens: z.number(),
     costUsd: z.number().nullable(),
     tokensKnown: z.boolean(),
+    /** AI units the model's calls consumed, never part of `costUsd`; null when not known. */
+    aiUnits: z.number().nullable(),
   })
   .strict();
 export interface CodingAgentModelUsageSchema extends Named<

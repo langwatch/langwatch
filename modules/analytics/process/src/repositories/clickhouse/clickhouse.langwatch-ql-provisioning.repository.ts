@@ -20,6 +20,7 @@ import {
   LangWatchQLProvisioningRepository,
   type LwqlClickHouseInventory,
   type LwqlKeyMapInsertRow,
+  type LwqlPostgresCredentials,
   type ProvisioningFailureLevel,
   type RunClickHouseStatementsResult,
   type SkippedProvisioningStatement,
@@ -93,7 +94,7 @@ async function readClickHouseInventory({
   functions: readonly string[];
 }): Promise<LwqlClickHouseInventory> {
   const present = await client.rows(
-    "SELECT name FROM system.tables " +
+    "SELECT name, comment FROM system.tables " +
       "WHERE database = {database:String} AND has({relations:Array(String)}, name)",
     { database, relations: [...relations] },
   );
@@ -107,8 +108,38 @@ async function readClickHouseInventory({
         );
   return {
     relations: present.map((row) => String(row.name)),
+    comments: Object.fromEntries(
+      present.map((row) => [String(row.name), typeof row.comment === "string" ? row.comment : ""]),
+    ),
     functions: held.map((row) => String(row.name)),
   };
+}
+
+/**
+ * Dials PostgreSQL through `postgresql(...)` without reading a row; every value is a query
+ * parameter, so no password enters the query text. On a cluster each replica reads with its own
+ * collection, and one failing fails the read. Every approved view exposes `TenantId`.
+ */
+async function readThroughPostgres({
+  client,
+  source,
+  params,
+  cluster,
+}: {
+  client: ClickHouseAdminStatements;
+  source: string;
+  params: Readonly<Record<string, unknown>>;
+  cluster: string | undefined;
+}): Promise<void> {
+  if (cluster === undefined) {
+    await client.rows(`DESCRIBE TABLE postgresql(${source})`, params);
+    return;
+  }
+  await client.rows(
+    `SELECT count() FROM clusterAllReplicas({cluster:String}, postgresql(${source})) ` +
+      "WHERE TenantId = ''",
+    { ...params, cluster },
+  );
 }
 
 /** An unreadable inventory degrades to "none owned", so the statements then fail loudly. */
@@ -194,7 +225,8 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
           const result = await client.query({
             query: sql,
             format: "JSONEachRow",
-            ...(params ? { query_params: { ...params } } : {}),
+            // In the body: ClickHouse logs a request's URL, query parameters included, at trace.
+            ...(params ? { query_params: { ...params }, use_multipart_params: true } : {}),
           });
           return result.json<Record<string, unknown>>();
         },
@@ -225,6 +257,48 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
     functions: readonly string[];
   }): Promise<LwqlClickHouseInventory> {
     return readClickHouseInventory({ client: this.client, ...input });
+  }
+
+  /** @param collection Validated as an identifier by `collectionProbe`. */
+  probePostgresCollection({
+    collection,
+    relation,
+    cluster,
+  }: {
+    collection: string;
+    relation: string;
+    cluster: string | undefined;
+  }): Promise<void> {
+    return readThroughPostgres({
+      client: this.client,
+      source: `${collection}, table = {relation:String}`,
+      params: { relation },
+      cluster,
+    });
+  }
+
+  probePostgresCredentials({
+    credentials,
+    relation,
+    cluster,
+  }: {
+    credentials: LwqlPostgresCredentials;
+    relation: string;
+    cluster: string | undefined;
+  }): Promise<void> {
+    return readThroughPostgres({
+      client: this.client,
+      cluster,
+      source:
+        "{address:String}, {database:String}, {relation:String}, {user:String}, {password:String}",
+      params: {
+        address: `${credentials.host}:${credentials.port}`,
+        database: credentials.database,
+        relation,
+        user: credentials.user,
+        password: credentials.password,
+      },
+    });
   }
 
   inventoryConfigStore({

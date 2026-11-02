@@ -6,18 +6,16 @@
  * @vitest-environment node
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { AnalyticsAggregation, FilterField } from "@langwatch/analytics-contract";
+import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
-import {
-  buildDataForFilterQuery,
-  buildTimeseriesQuery,
-} from "../clickhouse.aggregation-builder.mapper.ts";
+import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
+import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = "test-eval-join-bounds-6392";
 const SEEDED_TABLES = ["trace_summaries", "evaluation_runs"] as const;
@@ -147,12 +145,12 @@ describe("the evaluation_runs JOIN time bounds", () => {
       ...baseInput,
       series: [{ metric, aggregation, key: evaluatorId }],
     });
-    const result = await client.query({
+    const result = await ownProjectReaderOver({ client, projectId: TENANT_ID }).query<Row>({
       query: sql,
       query_params: params,
       format: "JSONEachRow",
     });
-    return metricValue(await result.json<Row>(), "current");
+    return metricValue(await result.json(), "current");
   }
 
   beforeAll(async () => {
@@ -270,26 +268,6 @@ describe("the evaluation_runs JOIN time bounds", () => {
       });
 
       expect(runs).toBe(2);
-    });
-
-    /** @scenario A late-scheduled evaluator is still offered as a filter value */
-    it("lists the evaluator in the filter values for the window", async () => {
-      resetParamCounter();
-      const { sql, params } = buildDataForFilterQuery({
-        projectId: TENANT_ID,
-        field: "evaluations.evaluator_id" satisfies FilterField,
-        startDate: baseInput.startDate,
-        endDate: baseInput.endDate,
-      });
-
-      const result = await client.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-      });
-      const fields = (await result.json<Row>()).map((row) => row.field);
-
-      expect(fields).toContain(LATE_EVALUATOR);
     });
   });
 

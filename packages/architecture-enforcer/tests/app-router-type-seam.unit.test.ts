@@ -15,11 +15,11 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
+ * 1,540 with `pnpm ensure:built` (#8795); 1,561 with ADR-185 (docs consent reads api-key config).
+ * 1,562 with ADR-190: instant-eval-judge's api, config and pricing read its route contract.
  * A ceiling, not a target. Lower it when earned; never raise it without saying why.
- * 1,710: main is 1,699 in CI (1,690 + 9 built SDK files), the hooks contract adds 1, 10 spare.
- * The count depends on `pnpm ensure:built`: https://github.com/langwatch/langwatch/issues/8795
  */
-const CEILING = 1_710;
+const CEILING = 1_562;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

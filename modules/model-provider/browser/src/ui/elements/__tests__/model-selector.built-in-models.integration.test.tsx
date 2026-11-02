@@ -4,17 +4,30 @@
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-// The project has no enabled model provider.
+// The reason rides on the trigger, so a test reads it without driving a hover jsdom
+// never completes. The same stand-in model-costs-screen's suite uses.
+vi.mock("@langwatch/design-system/tooltip", () => ({
+  Tooltip: ({ children, content }: { children?: ReactNode; content?: string }) => (
+    <span data-tooltip={content}>{children}</span>
+  ),
+}));
+
+// The project's stored providers, per test; empty unless a test enables one.
+const storedProviders: { current: unknown[] } = { current: [] };
+
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   api: {
     modelProvider: {
-      listAllForProjectForFrontend: { useQuery: () => ({ data: [], isLoading: false }) },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: storedProviders.current, isLoading: false }),
+      },
     },
   },
 }));
@@ -23,8 +36,32 @@ import { LLMModelDisplay } from "../llm-model-display.tsx";
 import { ModelSelector } from "../model-selector.tsx";
 
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
+const OWN_DECISION_BUILT_IN = {
+  value: "openai/decisions:gpt-6-luna",
+  label: "OpenAI Decisions (gpt-6-luna)",
+};
+const UNSTORED_PROVIDER_BUILT_IN = { value: "cloudflare/decisions:clef", label: "Cloudflare Clef" };
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  storedProviders.current = [];
+});
+
+const STORED_OPENAI = { provider: "openai", enabled: true, customModels: null };
+
+/** The struck-through label is the refusal mark; only the chosen value ever carries it. */
+function isStruckThrough(label: string): boolean {
+  return screen
+    .getAllByText(label)
+    .some((node) => getComputedStyle(node).textDecoration.includes("line-through"));
+}
+
+/** The reason a member reads by pointing at the refusal mark. */
+function reasonShown(): string {
+  const mark = screen.getByText(/Update needed/i).closest("[data-tooltip]");
+
+  return mark?.getAttribute("data-tooltip") ?? "";
+}
 
 describe("<ModelSelector/>", () => {
   describe("given a project with no model provider", () => {
@@ -55,6 +92,91 @@ describe("<ModelSelector/>", () => {
       });
     });
   });
+
+  describe("given a stored provider and a built-in model carrying its prefix", () => {
+    it("heads one built-in group, apart from that provider's own group", () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model=""
+          options={["openai/gpt-5-mini"]}
+          onChange={() => undefined}
+          builtInModels={[BUILT_IN, OWN_DECISION_BUILT_IN]}
+        />,
+      );
+
+      const listbox = screen.getByRole("listbox", { hidden: true });
+      expect(within(listbox).getAllByText("LangWatch")).toHaveLength(1);
+      expect(within(listbox).getByText("OpenAI")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a chosen built-in model whose prefix heads no group of the project's", () => {
+    it("shows its label and asks for no update", () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model={UNSTORED_PROVIDER_BUILT_IN.value}
+          options={["openai/gpt-5-mini"]}
+          onChange={() => undefined}
+          builtInModels={[BUILT_IN, UNSTORED_PROVIDER_BUILT_IN]}
+        />,
+      );
+
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+      expect(isStruckThrough(UNSTORED_PROVIDER_BUILT_IN.label)).toBe(false);
+    });
+  });
+
+  describe("given a chosen decision model the picker no longer offers", () => {
+    const renderUnoffered = () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model={OWN_DECISION_BUILT_IN.value}
+          options={["openai/gpt-5-mini"]}
+          onChange={() => undefined}
+          builtInModels={[BUILT_IN]}
+        />,
+      );
+    };
+
+    /** @scenario "A judge holding a decision model nobody offers any more asks for an update" */
+    it("asks for an update even though its provider is stored", () => {
+      renderUnoffered();
+
+      expect(screen.getByText(/Update needed/i)).toBeInTheDocument();
+    });
+
+    /** @scenario "A decision model nobody offers tells the member to pick another model" */
+    it("asks for another model, never for a provider that is already stored", () => {
+      renderUnoffered();
+
+      expect(reasonShown()).not.toMatch(/re-add the provider/i);
+      expect(reasonShown()).toMatch(/no longer available to this project/i);
+    });
+  });
+
+  describe("given a chosen model whose provider the project has not stored", () => {
+    /** @scenario "A model whose provider is not enabled still asks for the provider" */
+    it("keeps asking for the provider", () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model="anthropic/claude-sonnet-4-6"
+          options={["openai/gpt-5-mini", "anthropic/claude-sonnet-4-6"]}
+          onChange={() => undefined}
+          builtInModels={[BUILT_IN]}
+        />,
+      );
+
+      expect(reasonShown()).toMatch(/anthropic provider isn't enabled here\. Re-add the provider/i);
+    });
+  });
 });
 
 describe("<LLMModelDisplay/>", () => {
@@ -66,6 +188,64 @@ describe("<LLMModelDisplay/>", () => {
 
       expect(await screen.findByText("Instant Evals")).toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a built-in model whose prefix heads no group of the project's", () => {
+    it("shows its label and asks for no update", async () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <LLMModelDisplay
+          model={UNSTORED_PROVIDER_BUILT_IN.value}
+          builtInModels={[BUILT_IN, UNSTORED_PROVIDER_BUILT_IN]}
+        />,
+      );
+
+      expect(await screen.findByText(UNSTORED_PROVIDER_BUILT_IN.label)).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a decision model the picker no longer offers", () => {
+    /** @scenario "A judge holding a decision model nobody offers any more asks for an update" */
+    it("asks for an update even though its provider is stored", async () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <LLMModelDisplay model={OWN_DECISION_BUILT_IN.value} builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText(/Update needed/i)).toBeInTheDocument();
+    });
+
+    /** @scenario "A decision model nobody offers tells the member to pick another model" */
+    it("asks for another model, never for a provider that is already stored", async () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <LLMModelDisplay model={OWN_DECISION_BUILT_IN.value} builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText(/Update needed/i)).toBeInTheDocument();
+
+      expect(reasonShown()).not.toMatch(/re-add the provider/i);
+      expect(reasonShown()).toMatch(/no longer available to this project/i);
+    });
+  });
+
+  describe("given a model whose provider the project has not stored", () => {
+    /** @scenario "A model whose provider is not enabled still asks for the provider" */
+    it("keeps asking for the provider", async () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <LLMModelDisplay model="anthropic/claude-sonnet-4-6" builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText(/Update needed/i)).toBeInTheDocument();
+
+      expect(reasonShown()).toMatch(/anthropic provider isn't enabled here\. Re-add the provider/i);
     });
   });
 });

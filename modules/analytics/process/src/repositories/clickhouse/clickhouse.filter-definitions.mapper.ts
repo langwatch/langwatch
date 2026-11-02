@@ -7,6 +7,7 @@ import {
   buildQueryFilter,
   buildScopeConditions,
   buildStoredSpansConditions,
+  buildTraceScopeJoin,
   buildTraceSummariesConditions,
   extractStandardResults,
 } from "./clickhouse.filter-query-helpers.mapper.ts";
@@ -23,10 +24,7 @@ function buildEvaluatorIdClickHouseFilter(additionalWhere: string): ClickHouseFi
   return {
     tableName: "evaluation_runs",
     buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           EvaluatorId as field,
@@ -340,10 +338,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
   "spans.type": {
     tableName: "stored_spans",
     buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           SpanAttributes['langwatch.span.type'] as field,
@@ -429,10 +424,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           if(Passed = 1, 'true', 'false') as field,
@@ -456,10 +448,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           min(Score) as min_score,
@@ -489,10 +478,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           Status as field,
@@ -530,10 +516,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           Label as field,
@@ -560,10 +543,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
   "events.event_type": {
     tableName: "stored_spans",
     buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           SpanAttributes['event.type'] as field,
@@ -588,10 +568,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           arrayJoin(arrayFilter(k -> startsWith(k, 'event.metrics.'), mapKeys(SpanAttributes))) as full_key,
@@ -618,10 +595,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key || !params.subkey) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       // Note: subkey is passed via query_params, we construct the full attribute key there
       return `
         SELECT
@@ -652,10 +626,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           arrayJoin(arrayFilter(k -> startsWith(k, 'event.details.'), mapKeys(SpanAttributes))) as full_key,

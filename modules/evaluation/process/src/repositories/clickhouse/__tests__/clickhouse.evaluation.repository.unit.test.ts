@@ -121,9 +121,13 @@ function harness(rows: Record<string, unknown>[][] = []): {
     }),
   };
   const floor = new TestRetention();
+  // Every column present: the column list is the schema's, never a scripted answer.
   const queryClient = idIndexedClientDouble({
     indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
-    driver: { execute: reader },
+    driver: {
+      execute: async (request) =>
+        request.sql.includes("system.columns") ? { rows: [] } : reader(request),
+    },
   });
   return {
     client,

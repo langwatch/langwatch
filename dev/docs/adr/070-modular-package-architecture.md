@@ -4,6 +4,8 @@
 
 **Status:** Accepted
 
+**Amended:** 2026-10-19 by [ADR-181](181-framework-packages-are-layered-like-a-process-half.md): eventing's `./server` tier holds its Prisma repositories; its root entry never reaches Prisma.
+
 **Related:** [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md),
 [Group Queue framework boundary](../../../packages/group-queue/adrs/20260820-group-queue-framework-boundary.md),
 and [automation process managers](./052-automations-on-process-manager-substrate.md).

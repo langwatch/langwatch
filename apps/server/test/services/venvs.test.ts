@@ -104,7 +104,18 @@ describe("evaluator environment", () => {
     });
   });
 
+  describe("when nothing the environment depends on changed between runs", () => {
+    /** @scenario "LangEvals' environment is reused while nothing it depends on changed" */
+    it("does not sync again", async () => {
+      await syncVenvs(ctxWith("ENVIRONMENT=local\n"), bus);
+      await syncVenvs(ctxWith("ENVIRONMENT=local\n"), bus);
+
+      expect(syncCalls()).toHaveLength(1);
+    });
+  });
+
   describe("when the toggle changes between runs", () => {
+    /** @scenario "A changed evaluator toggle rebuilds LangEvals' environment" */
     it("re-syncs rather than reusing the environment it already built", async () => {
       await syncVenvs(ctxWith("ENVIRONMENT=local\n"), bus);
       expect(syncCalls()).toHaveLength(1);

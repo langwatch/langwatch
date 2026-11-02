@@ -100,6 +100,7 @@ describe("defineMigrationStep", () => {
         checkpoint,
         dryRun: true,
         signal: new AbortController().signal,
+        log: { info: () => undefined, warn: () => undefined },
       });
 
       expect(report).toEqual({ resumedAfter: "ds_41", dryRun: true, aborted: false });

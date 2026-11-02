@@ -30,7 +30,11 @@ import type {
   StartImpersonationInput,
   StopImpersonationInput,
 } from "./features/admin/admin.ts";
-import type { CheckupAnswer, UsageReportAnswer } from "./features/checkup/checkup.trpc.ts";
+import type {
+  CheckupAnswer,
+  UpgradeDiagnosticsAutoSendAnswer,
+  UsageReportAnswer,
+} from "./features/checkup/checkup.trpc.ts";
 import type {
   CheckupResult,
   ExplicitCheckInput,
@@ -66,12 +70,18 @@ import type {
   OpsMigrationTargetedRunResult,
 } from "./features/migrations/ops-system-migration.ts";
 import type {
+  OpsUpgradeDiagnosticsAvailability,
+  OpsUpgradeDiagnosticsReceipt,
+  UpgradeDiagnosticsBundle,
+} from "./features/migrations/ops-upgrade-diagnostics.ts";
+import type {
   OpsUpgradeAttentionNotice,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
   OpsUpgradeListTenantsInput,
   OpsUpgradeReleasePage,
+  OpsUpgradeSendDiagnosticsInput,
   OpsUpgradeRun,
   OpsUpgradeRunPage,
   OpsUpgradeStatus,
@@ -588,7 +598,8 @@ export interface OpsApi {
   /** One report as the intake door received it, answered in the bodies released builds read. */
   receiveBugReport(input: {
     report: SubmitBugReport;
-    forwardedFor: string | null;
+    /** The address the door resolved for the caller; null shares the one unknown bucket. */
+    callerAddress: string | null;
     linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer>;
   findDashboardData(): DashboardData | null;
@@ -695,6 +706,16 @@ export interface OpsApi {
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
   }): Promise<UsageReportAnswer>;
+  /** Install-wide: whether the hourly check sends a failed step's diagnostics by itself. */
+  getUpgradeDiagnosticsAutoSend(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer>;
+  setUpgradeDiagnosticsAutoSend(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+    enabled: boolean;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer>;
   /** What `langwatch doctor` reads over a project key, which is never an install admin. */
   getProjectCheckup(input: { projectId: string }): Promise<ProjectCheckupReport>;
   /** The paid checks over a project key; refused on LangWatch Cloud. */
@@ -713,6 +734,13 @@ export interface OpsApi {
   listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
   /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+  /** The step's redacted diagnostics; refuses with `upgrade_not_found` like `getUpgradeStep`. */
+  getUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<UpgradeDiagnosticsBundle>;
+  getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability>;
+  /** Sends the bundle the operator reviewed to LangWatch over Connect, as the asking operator. */
+  sendUpgradeStepDiagnostics(
+    input: OpsUpgradeSendDiagnosticsInput,
+  ): Promise<OpsUpgradeDiagnosticsReceipt>;
 }
 
 export const OpsApi = moduleApi<OpsApi>()("ops");

@@ -7,10 +7,8 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestClock, createTestProjects } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import {
-  CODING_AGENT_SESSION_SEEN_WINDOW_MS,
-  CodingAgentSessionSeenService,
-} from "../coding-agent-session-seen.service.ts";
+import { CODING_AGENT_SESSION_SEEN_WINDOW_MS } from "../coding-agent-hold-window.service.ts";
+import { CodingAgentSessionSeenService } from "../coding-agent-session-seen.service.ts";
 
 function createFixture(at = 1_000_000) {
   const clock = new TestClock(at);

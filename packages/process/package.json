@@ -31,6 +31,10 @@
       "types": "./dist/lifecycle/backend-host.d.ts",
       "default": "./src/lifecycle/backend-host.ts"
     },
+    "./liveness-thread": {
+      "types": "./dist/lifecycle/liveness-thread.d.ts",
+      "default": "./src/lifecycle/liveness-thread.ts"
+    },
     "./process-globals": {
       "types": "./dist/process-globals.d.ts",
       "default": "./src/process-globals.ts"
