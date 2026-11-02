@@ -315,6 +315,8 @@ const monitorCopyInputSchemaDefinition = z
     sourceProjectId: z.string().min(1),
     targetProjectId: z.string().min(1),
     actor: z.object({ id: z.string().min(1) }).strict(),
+    /** The user the replica is recorded as created by; none for an API key or the system. */
+    actorId: z.string().min(1).nullable().optional(),
   })
   .strict();
 export interface MonitorCopyInputSchema extends Named<typeof monitorCopyInputSchemaDefinition> {}

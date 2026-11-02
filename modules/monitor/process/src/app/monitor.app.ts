@@ -297,7 +297,7 @@ export class MonitorModule implements MonitorApi {
         sourceProjectId,
         targetProjectId,
         evaluatorId: newEvaluatorId,
-        actorId: actor.id,
+        actorId: input.actorId ?? null,
       });
     } catch (createError) {
       await this.#replication.rollback({

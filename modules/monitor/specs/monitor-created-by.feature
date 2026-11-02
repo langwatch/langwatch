@@ -9,6 +9,12 @@ Feature: Monitors record who created and last changed them
     Then the monitor records that user as its creator and last updater
 
   @unit
+  Scenario: Copying a monitor records the user who copied it as the replica's creator
+    When a user copies a monitor into another project
+    Then the replica records that user as its creator
+    And a replica copied with an API key records no creator
+
+  @unit
   Scenario: Updating a monitor records the last updater
     Given a monitor created by "Ada"
     When "Grace" changes its sampling

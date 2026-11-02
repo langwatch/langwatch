@@ -56,6 +56,7 @@ export const monitorTrpcTransport: TrpcRouterDeclaration<MonitorApi, typeof moni
         sourceProjectId: input.sourceProjectId,
         targetProjectId: input.projectId,
         actor: { id: actor.id },
+        ...monitorWriterOf(actor),
       }),
     )
     .build();
