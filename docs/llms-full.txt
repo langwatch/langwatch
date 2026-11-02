@@ -39438,12 +39438,22 @@ Open the agent, then open the **Hooks** tab.
 
 | Field | What it does |
 |---|---|
-| **Hooks URL** | Where LangWatch POSTs both hooks. Leave it empty for no hooks. It must use `https://`. Plain `http://` is allowed only on a deployment that allows local addresses, such as a self-hosted install, and only to a local address or to a host on the deployment's allowlist. LangWatch checks this when a hook runs, not when you save, and checks it again after the URL templates render. A hook whose URL is refused fails before any request is sent. LangWatch does not follow redirects. A deployment that blocks local addresses, as the hosted one does, always refuses plain `http://`. The URL can read run parameters, project secrets and `{{ state }}`, as the agent's own URL does. The scheme, user and host must be fixed text: templates are allowed only in the path, the query and the fragment. LangWatch refuses a template that could change the scheme, user or host when you save, with `agent_hooks_url_templated_origin`. This includes a template that is the whole base, such as `{{ params.base }}/hooks`. When a hook runs, the rendered URL must still have the same origin as the saved URL. If it does not, the hook fails and no request is sent. |
+| **Hooks URL** | Where LangWatch POSTs both hooks. Leave it empty for no hooks. It must use `https://`. See [Which hooks URLs are allowed](#which-hooks-urls-are-allowed). |
 | **Call setup** | Tick it to call setup before the first turn. |
 | **Call teardown** | Tick it to call teardown after the last turn. |
 | **Signing secret** | Signs every hook call. LangWatch shows it once, when you first type the hooks URL. Copy it before you save. After that, the form shows only that a secret is set. **Rotate** makes a new one and shows it once. A secret you set through the API needs only 16 characters. See [Rotate the signing secret](#rotate-the-signing-secret). |
 
-LangWatch calls only the hooks you tick. The signing secret is saved as a project secret. A hook is never sent unsigned: with no signing secret, the hook fails and no request goes out.
+LangWatch calls only the hooks you tick, and signs every call with the signing secret, which it saves as a project secret. If no signing secret is set, the hook fails and no request goes out.
+
+#### Which hooks URLs are allowed
+
+Plain `http://` is allowed only on a deployment that allows local addresses, such as a self-hosted install, and only to a local address or to a host on the deployment's allowlist. A deployment that blocks local addresses, as the hosted one does, always refuses plain `http://`.
+
+LangWatch checks the URL when a hook runs, not when you save, and checks it again after the URL templates render. If the URL is refused, the hook fails before any request is sent. LangWatch does not follow redirects.
+
+The URL can read run parameters, project secrets and `{{ state }}`, as the agent's own URL does. The scheme, user and host must be fixed text: templates are allowed only in the path, the query and the fragment. LangWatch refuses a template that could change the scheme, user or host when you save, with `agent_hooks_url_templated_origin`. This includes a template that is the whole base, such as `{{ params.base }}/hooks`.
+
+When a hook runs, the rendered URL must still have the same origin as the saved URL. If it does not, the hook fails and no request is sent.
 
 To remove the hooks, clear the hooks URL and save. The Hooks tab says that saving deletes the signing secret. LangWatch deletes the current secret and the previous one from the project secrets when you save. It deletes only a secret stored under the name LangWatch gives to this agent's signing secret, and only when no other agent uses it. A secret that you picked yourself stays.
 
@@ -39451,13 +39461,13 @@ To remove the hooks, clear the hooks URL and save. The Hooks tab says that savin
 
 When you rotate on the same origin, the old secret stays valid for **24 hours**. For that time LangWatch signs every hook call with both secrets, so you can deploy the new value when you are ready. A second rotation inside the 24 hours drops the oldest secret at once. A secret that has expired is never used to sign. LangWatch deletes it the next time you save the agent.
 
-A rotation that moves the hooks URL to another origin keeps no old secret. Only the new secret signs. See [A hooks URL on another origin](#a-hooks-url-on-another-origin).
+If you rotate while moving the hooks URL to another origin, LangWatch keeps no old secret and signs only with the new one. See [A hooks URL on another origin](#a-hooks-url-on-another-origin).
 
 #### A hooks URL on another origin
 
 LangWatch sends saved credentials (the auth token, credential headers and the signing secret) only to the origin they were saved for: the same scheme, host and port as the saved hooks URL or, for an agent that has no hooks URL yet, as the agent's own URL. For example, an agent at `https://api.example.com` that gets its first hooks URL at `https://hooks.example.com` moves to another origin.
 
-When you type a hooks URL on another origin, the Hooks tab says so and names what to type again: the auth token on the **Auth** tab and any credential headers on the **Headers** tab. The form makes a new signing secret by itself and shows it once, so copy it before you save.
+When you type a hooks URL on another origin, the Hooks tab shows a notice: type the auth token again on the **Auth** tab and any credential headers on the **Headers** tab. The form makes a new signing secret by itself and shows it once, so copy it before you save.
 
 There is no overlap: the old secret does not sign calls to the new origin. If you change the URL back to the saved origin, the saved signing secret stays.
 
@@ -39494,7 +39504,7 @@ Each hook is a `POST` with a JSON body:
 | `state` | Teardown only, and only when setup returned a state. It is what setup answered. Setup's body has no `state`. |
 
 <Warning>
-  The body sends the run's plain parameters to the hooks URL, together with the agent's own headers and auth. Never put a secret-like value in a plain parameter. Use a [secret parameter](/agent-testing/run-parameters#secret-parameters) instead.
+  LangWatch sends the run's plain parameters to the hooks URL in the body, together with the agent's own headers and auth. Never put a secret-like value in a plain parameter. Use a [secret parameter](/agent-testing/run-parameters#secret-parameters) instead.
 </Warning>
 
 LangWatch sends these headers:
@@ -39503,7 +39513,7 @@ LangWatch sends these headers:
 |---|---|
 | The agent's own headers and auth | The same ones the agent sends on a turn, such as a bearer token. An agent header named `X-LangWatch-Signature` or `Idempotency-Key`, in any letter case, is not sent. |
 | `X-LangWatch-Signature` | `t=<unix seconds>,v1=<signature>[,v1=<signature>]`. The same scheme as [webhooks](/features/webhooks#verifying-signatures). Each `v1` is the lower-case hex HMAC-SHA256 of `<t>.<raw request body>`, made with one valid signing secret. The HMAC key is the whole stored secret. A secret that LangWatch makes starts with `whsec_`, and that prefix is part of the key. There is one `v1` for each valid secret, newest first. |
-| `Idempotency-Key` | `<scenarioRunId>:<attemptId>:<kind>`, for example `scenariorun_abc:hookattempt_def:setup`. Every hook call has one. It is the same for every call of one hook in one attempt of a run, so a repeated call carries the same key. |
+| `Idempotency-Key` | `<scenarioRunId>:<attemptId>:<kind>`, for example `scenariorun_abc:hookattempt_def:setup`. Every hook call has one. It is the same for every call of one hook in one attempt of a run, so a repeated call has the same key. |
 
 ### The answer
 
@@ -39514,9 +39524,9 @@ LangWatch sends these headers:
 
 Anything else fails the hook. For a status that is not 2xx, or a body that is not a JSON object, the run records the HTTP status and the answer. LangWatch cuts the whole recorded error to 1,000 characters. A body over 64 KiB (65,536 bytes) fails too: LangWatch stops reading the answer at the cap, and the error gives the size in bytes, for example "The setup hook answered more than 65536 bytes, over the 65536-byte cap."
 
-A hook that does not answer in 60 seconds ends as `timed_out`. The 60 seconds are fixed. You cannot change them.
+If a hook does not answer in 60 seconds, it ends as `timed_out`; this limit is fixed and you cannot change it.
 
-A failed setup runs no turn. The run shows **Not scored**, and LangWatch still calls teardown. A failed teardown does not change the score. See [What happens when a hook fails](#what-happens-when-a-hook-fails).
+If setup fails, LangWatch runs no turn, shows the run as **Not scored**, and still calls teardown. A failed teardown does not change the score. See [What happens when a hook fails](#what-happens-when-a-hook-fails).
 
 ### Read the state in a turn
 
@@ -39536,7 +39546,7 @@ Check the signature before you change any data. Anyone who knows the URL can cal
 
 The signature is the same as the [webhook signature](/features/webhooks#verifying-signatures). The header is `X-LangWatch-Signature: t=<unix seconds>,v1=<hex>`. During a rotation it has one `v1` for each valid secret, newest first. Accept the call when any `v1` matches your secret.
 
-The package `@langwatch/webhook-verify` is not yet published to npm, so check the signature by hand. The steps and the code below match the signer LangWatch uses.
+Check the signature with the steps and code below, which match the signer LangWatch uses.
 
 #### Check it by hand
 
@@ -39650,7 +39660,7 @@ LangWatch does not retry a hook, but a call can still arrive more than once, for
 
 Read the key from the body's `idempotencyKey`. The signature covers the body, so the key there is the one LangWatch sent. The `Idempotency-Key` header is a copy for proxies and logs, and is not signed.
 
-LangWatch can run a scenario run again under the same `scenarioRunId`, for example when a worker stops partway. That is a new attempt, with a new key, and its setup makes new data. Do not use `scenarioRunId` alone as the key: the first attempt's teardown may already have deleted the data it names.
+LangWatch can run a scenario run again under the same `scenarioRunId`, for example when a worker stops partway. That is a new attempt, with a new key, and its setup makes new data. Do not use `scenarioRunId` alone as the key: the first attempt's teardown may already have deleted the data made under that id.
 
 ## What do the simulated user and the judge see
 
