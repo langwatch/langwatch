@@ -1,7 +1,8 @@
 Feature: The insights inbox
   Langy writes short findings about a project for one person. An insight has one owner,
   the person whose Langy made it. Only the owner reads it, marks it done or keeps it; to
-  everyone else it does not exist.
+  everyone else it does not exist. Until a share action exists, an owner shares it by selecting
+  and pasting its text.
 
   Background:
     Given the release_insights flag is on for the project
@@ -418,3 +419,6 @@ Feature: The insights inbox
       Given an insight the reader kept
       When the line under its title is written
       Then it reads "Kept as still relevant"
+
+  Rule: Sharing an insight
+    Until a share action exists, an owner shares an insight by selecting and pasting its text.

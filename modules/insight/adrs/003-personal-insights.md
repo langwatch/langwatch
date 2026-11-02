@@ -3,7 +3,7 @@
 **Status:** Accepted
 
 **Behavioural contract:** [Insights inbox](../specs/insight-inbox.feature), rules
-"An insight belongs to one person", "Filing an insight" and "Copying an insight".
+"An insight belongs to one person", "Filing an insight" and "Sharing an insight".
 
 ## Context
 
@@ -12,7 +12,8 @@ same inbox, and only seen, done and kept were personal. The owner of the product
 decided otherwise. An insight is tied to the Langy that made it, and each person
 steers their own Langy: what it looks at, when it runs, whether it runs at all. Two
 people may get the same finding twice. That is accepted, because each of them stays
-in control of their own inbox. Sharing is copying the text, for now.
+in control of their own inbox. Until a share action exists, an owner shares an insight by
+selecting and pasting its text.
 
 ## Decision
 
@@ -46,10 +47,6 @@ filed it. The event version stays `2026-10-09`, as in ADR-002. The column is
 nullable and nothing is backfilled: a row folded before it, or by an image that does
 not know it, holds NULL, and the read treats that row as owned by `filedByUserId`.
 
-**Copy is the sharing.** The row's Copy action writes plain text to the clipboard:
-the title, the body, the fixed period with its values, and the board and widget as
-filed. There is no link and no forward.
-
 ## Consequences
 
 - `InsightReaderProjection` now holds one row per insight, its owner's. It stays a
@@ -58,9 +55,6 @@ filed. There is no link and no forward.
   and are never read.
 - Until a scheduled run files insights, an owner has always seen their own: saving
   an answer marks it seen. The bell and the sidebar count stay at zero until then.
-- The numbers in a copied insight are the ones Langy wrote into the body. Nothing is
-  replayed for the copy, because an insight keeps what to run and never a result
-  (ADR-002), and the replayed values live in the chart analytics lends.
 - A read hint still goes to every member's open tab in the project when any insight
   event commits. It carries the procedure path and no data, and the refetch answers
   each caller their own insights. Scoping it to the owner is a contract change:
