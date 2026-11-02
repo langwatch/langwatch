@@ -92,9 +92,10 @@ export interface LwqlPostgresGap {
 }
 
 /**
- * What the check found absent in each store (or, for an engine table, built on stale credentials);
- * both empty means converged. Columns are the deploy's, so an older worker never rewrites a newer
- * object. `unknown`: PostgreSQL could not be read, so it is neither converged nor cleared.
+ * What the check found absent in each store (or, for an engine table, built on stale credentials,
+ * or, for a view, lacking a catalog column); both empty means converged. Extra columns are left to
+ * the newer deploy that added them. `unknown`: PostgreSQL could not be read, so it is neither
+ * converged nor cleared.
  */
 export interface LwqlAppOwnedDrift {
   readonly clickHouse: readonly string[];
