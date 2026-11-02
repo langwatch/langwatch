@@ -6,11 +6,8 @@
 import type { MemberType } from "@langwatch/entitlement-contract";
 import type { ProcessStore } from "@langwatch/eventing";
 
-import type {
-  RecordSeatChangedCommandData,
-  SeatHolder,
-  SeatKind,
-} from "../eventing/seat-peak.events.ts";
+import type { RecordSeatChangedCommandData } from "../eventing/seat-peak.events.ts";
+import type { SeatHolder, SeatKind } from "./seat-holder.rules.ts";
 
 export const SEAT_PEAK_PROCESS_NAME = "organizationSeatPeak" as const;
 export const SEAT_PEAK_RECORD_INTENT = "recordSeatChange" as const;

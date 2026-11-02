@@ -2,13 +2,14 @@ import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { SeatChangeCause, SeatHolder, SeatKind } from "../../eventing/seat-peak.events.ts";
+import type { SeatChangeCause } from "../../eventing/seat-peak.events.ts";
 import {
   movesAnInvitationExpiry,
   movesASeat,
   seatChangeAppend,
   seatKindOf,
 } from "../../rules/seat-change.rules.ts";
+import type { SeatHolder, SeatKind } from "../../rules/seat-holder.rules.ts";
 import { PrismaOrganizationSeatRepository } from "./prisma.organization-seat.repository.ts";
 
 /** One holder's seat on each side of a write, as the repository that made it knows them. */

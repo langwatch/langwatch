@@ -33,10 +33,13 @@ counts, because the cap counts it.
    seat with the same rule the cap counts by (`classifyMemberType`), so the peak and the cap cannot
    disagree about what a seat is. The change is committed with the write through the outbox the
    audit intents use, never sent after it: a lost change would skew every later count.
+   A directory (SCIM) create is the one path organization does not write: SCIM records its
+   `lw.scim.member_created` fact with the membership write, and organization subscribes to it and
+   records the seat change.
 2. **A projection folds them.** `organization_seat_peak` runs in the worker, per organization, in
-   order. It keeps the running count of each kind of seat and, per calendar month (UTC), the highest
-   count and when it was first reached. It adds the seat a change moves to and takes away the seat it
-   moves from; it never reads the memberships table.
+   the order the changes arrive (§7). It keeps the running count of each kind of seat and, per
+   calendar month (UTC), the highest count and when it was first reached. It adds the seat a change
+   moves to and takes away the seat it moves from; it never reads the memberships table.
 3. **An invitation's expiry is folded by event time.** An invitation stops holding its seat when it
    expires, and no event says so. The fold keeps each pending invitation's expiry and, before applying
    a change, gives back the seats of invitations that expired before the change happened. It uses the
@@ -50,6 +53,14 @@ counts, because the cap counts it.
 6. **A custom role flips a seat across modules.** Whether a Lite Member holds a full seat depends on
    their custom role, which authz owns. Organization subscribes to authz's grant events, classifies
    the member again and records a seat change when the seat moved.
+7. **Changes are folded in the order they arrive** (accepted by the user, 2026-11-02). The outbox
+   does not deliver in time order: a retried delivery can be overtaken by the next one, and two
+   transactions on one organization can commit out of the order of their stamps. The fold applies
+   each change on top of the stored state as it comes and does not hold changes back to replay them
+   in time order. Each change still lands in the month of its own time and expires invitations by
+   its own time. The running count is exact in any order when the crossed changes move different
+   holders. A month's peak can be one seat out when two changes cross. Two changes to one holder that
+   arrive swapped leave the holder on the earlier change's seat and each count as a mismatch.
 
 ## Rationale / Trade-offs
 

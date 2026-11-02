@@ -4,9 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { RecordSeatChangedCommandData, SeatKind } from "../../eventing/seat-peak.events.ts";
+import type { RecordSeatChangedCommandData } from "../../eventing/seat-peak.events.ts";
 import type { SeatPeakFoldState } from "../../repositories/organization-seat-peak.repository.ts";
 import type { OrganizationSeatHolding } from "../../repositories/organization-seat.repository.ts";
+import type { SeatKind } from "../../rules/seat-holder.rules.ts";
 import {
   emptySeatPeak,
   foldSeatPeak,

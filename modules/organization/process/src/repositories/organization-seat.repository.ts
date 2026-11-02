@@ -1,6 +1,6 @@
 import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
 
-import type { SeatHolder, SeatKind } from "../eventing/seat-peak.events.ts";
+import type { SeatHolder, SeatKind } from "../rules/seat-holder.rules.ts";
 
 /** One holder and the seat it takes, classified as the counts above classify it. */
 export type OrganizationSeatHolding = Readonly<{ holder: SeatHolder; seat: SeatKind }>;

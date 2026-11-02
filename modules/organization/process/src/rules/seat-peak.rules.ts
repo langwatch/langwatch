@@ -5,24 +5,14 @@
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import {
-  type RecordSeatChangedCommandData,
-  recordSeatChangedCommandDataSchema,
-  type RecordSeatSnapshotCommandData,
-  type SeatHolder,
-  type SeatKind,
-  seatKindSchema,
+import type {
+  RecordSeatChangedCommandData,
+  RecordSeatSnapshotCommandData,
 } from "../eventing/seat-peak.events.ts";
+import { type SeatHolder, type SeatKind, seatKindSchema } from "./seat-holder.rules.ts";
 
 /** How many recent change ids the fold remembers, so a redelivered change counts once. */
 export const SEAT_PEAK_RECENT_CHANGE_IDS = 1000;
-/**
- * How far behind the newest change a late one may be dated and still be replayed in time order.
- * The outbox delivers unordered and retries for minutes (maxAttempts 12, backoff capped at 60s).
- */
-export const SEAT_PEAK_REORDER_WINDOW_MS = 60 * 60 * 1000;
-/** The most changes kept for a replay; a burst beyond it settles its oldest early. */
-export const SEAT_PEAK_REORDER_LIMIT = 1000;
 
 export const seatCountsSchema = z.object({
   full: z.number().int().nonnegative(),
@@ -48,8 +38,7 @@ const seatPeakInvitationSchema = z.object({
 });
 export type SeatPeakInvitation = z.infer<typeof seatPeakInvitationSchema>;
 
-/** The counted part of the state: everything a change moves. */
-const seatPeakCountSchema = z.object({
+export const seatPeakStateSchema = z.object({
   /** When the opening snapshot was taken; null until one is, and nothing is folded before it. */
   openedAt: z.number().nullable(),
   counts: seatCountsSchema,
@@ -59,22 +48,10 @@ const seatPeakCountSchema = z.object({
   invitations: z.record(z.string(), seatPeakInvitationSchema),
   /** Keyed `YYYY-MM`, only the months an event touched; a read fills the gaps. */
   months: z.record(z.string(), seatPeakMonthSchema),
-  /** Changes whose `from` disagreed with the seat the fold held, or that came too late. */
+  /** Changes whose `from` disagreed with the seat the fold held: drift made visible. */
   mismatches: z.number().int().nonnegative(),
-});
-type SeatPeakCount = z.infer<typeof seatPeakCountSchema>;
-
-export const seatPeakStateSchema = z.object({
-  ...seatPeakCountSchema.shape,
   /** The last change ids folded, oldest first, bounded by SEAT_PEAK_RECENT_CHANGE_IDS. */
   recentChangeIds: z.array(z.string()),
-  /** The count before `pending`, as of `through`: what a late change is replayed from. */
-  settled: z
-    .object({ ...seatPeakCountSchema.shape, through: z.number() })
-    .nullable()
-    .default(null),
-  /** The changes folded within the reorder window, in time order. */
-  pending: z.array(recordSeatChangedCommandDataSchema).default([]),
 });
 export type SeatPeakState = z.infer<typeof seatPeakStateSchema>;
 
@@ -91,8 +68,6 @@ export function emptySeatPeak(): SeatPeakState {
     months: {},
     mismatches: 0,
     recentChangeIds: [],
-    settled: null,
-    pending: [],
   };
 }
 
@@ -120,8 +95,8 @@ export function seatPeakNextMonth(month: string): string {
 }
 
 /**
- * Folds one fact. A change before the opening snapshot, or one already folded, changes nothing.
- * Delivery is unordered, so a change dated before one already folded is replayed in time order.
+ * Folds one fact in the order it arrives (ADR-002 §7). A change before the opening snapshot, or
+ * one already folded, changes nothing; invitations expired by the change's time give back first.
  */
 export function foldSeatPeak({
   state,
@@ -130,105 +105,27 @@ export function foldSeatPeak({
   state: SeatPeakState;
   fact: SeatPeakFact;
 }): SeatPeakState {
-  if (fact.type === "seat_snapshot_taken") return foldSnapshot({ state, snapshot: fact.data });
+  if (fact.type === "seat_snapshot_taken") return openSnapshot({ state, snapshot: fact.data });
   if (state.openedAt === null) return state;
   if (state.recentChangeIds.includes(fact.data.changeId)) return state;
-  const recentChangeIds = [...state.recentChangeIds, fact.data.changeId].slice(
-    -SEAT_PEAK_RECENT_CHANGE_IDS,
-  );
-  return settle({ ...foldChange({ state, change: fact.data }), recentChangeIds });
-}
-
-function foldChange({
-  state,
-  change,
-}: {
-  state: SeatPeakState;
-  change: RecordSeatChangedCommandData;
-}): SeatPeakState {
-  const settled = state.settled ?? { ...countOf(state), through: state.openedAt ?? 0 };
-  const newest = state.pending.at(-1)?.occurredAt ?? settled.through;
-  if (change.occurredAt >= newest) {
-    return {
-      ...state,
-      ...applyChange({ count: state, change }),
-      settled,
-      pending: [...state.pending, change],
-    };
-  }
-  if (change.occurredAt < settled.through) {
-    // Older than the window: applied where it lands; after the opening it is counted as drift.
-    const late = applyChange({ count: settled, change });
-    const drift = change.occurredAt >= (state.openedAt ?? 0) ? 1 : 0;
-    return replay({
-      state,
-      settled: { ...late, mismatches: late.mismatches + drift, through: settled.through },
-      pending: state.pending,
-    });
-  }
-  const pending = [...state.pending, change].toSorted((a, b) => a.occurredAt - b.occurredAt);
-  return replay({ state, settled, pending });
-}
-
-function replay({
-  state,
-  settled,
-  pending,
-}: {
-  state: SeatPeakState;
-  settled: NonNullable<SeatPeakState["settled"]>;
-  pending: RecordSeatChangedCommandData[];
-}): SeatPeakState {
-  const count = pending.reduce<SeatPeakCount>(
-    (current, change) => applyChange({ count: current, change }),
-    countOf(settled),
-  );
-  return { ...state, ...count, settled, pending };
-}
-
-/** Moves the changes older than the window, or beyond its limit, into the settled count. */
-function settle(state: SeatPeakState): SeatPeakState {
-  const newest = state.pending.at(-1)?.occurredAt;
-  if (newest === undefined || state.settled === null) return state;
-  let settled = state.settled;
-  let pending = state.pending;
-  while (
-    pending[0] &&
-    (pending[0].occurredAt < newest - SEAT_PEAK_REORDER_WINDOW_MS ||
-      pending.length > SEAT_PEAK_REORDER_LIMIT)
-  ) {
-    const [oldest, ...rest] = pending;
-    settled = { ...applyChange({ count: settled, change: oldest }), through: oldest.occurredAt };
-    pending = rest;
-  }
-  return settled === state.settled ? state : { ...state, settled, pending };
-}
-
-function countOf(state: SeatPeakCount): SeatPeakCount {
-  const { openedAt, counts, members, invitations, months, mismatches } = state;
-  return { openedAt, counts, members, invitations, months, mismatches };
-}
-
-/** One change on the count: invitations expired by its time give back first. */
-function applyChange({
-  count,
-  change,
-}: {
-  count: SeatPeakCount;
-  change: RecordSeatChangedCommandData;
-}): SeatPeakCount {
-  const expired = expireInvitations({ state: countOf(count), until: change.occurredAt });
-  return moveHolder({ state: expired, change });
+  const expired = expireInvitations({ state, until: fact.data.occurredAt });
+  const moved = moveHolder({ state: expired, change: fact.data });
+  return {
+    ...moved,
+    recentChangeIds: [...moved.recentChangeIds, fact.data.changeId].slice(
+      -SEAT_PEAK_RECENT_CHANGE_IDS,
+    ),
+  };
 }
 
 /** Gives back the seats of invitations that expired strictly before `until`, in expiry order. */
-export function expireInvitations<State extends SeatPeakCount>({
+export function expireInvitations({
   state,
   until,
 }: {
-  state: State;
+  state: SeatPeakState;
   until: number;
-}): State {
+}): SeatPeakState {
   const expired = Object.entries(state.invitations)
     .filter(([, invitation]) => invitation.expiresAt !== null && invitation.expiresAt < until)
     .toSorted(([, a], [, b]) => (a.expiresAt ?? 0) - (b.expiresAt ?? 0));
@@ -243,18 +140,6 @@ export function expireInvitations<State extends SeatPeakCount>({
     });
   }
   return next;
-}
-
-function foldSnapshot({
-  state,
-  snapshot,
-}: {
-  state: SeatPeakState;
-  snapshot: RecordSeatSnapshotCommandData;
-}): SeatPeakState {
-  const opened = openSnapshot({ state, snapshot });
-  // A snapshot replaces the holders: the replay window starts again from it.
-  return { ...opened, settled: { ...countOf(opened), through: snapshot.occurredAt }, pending: [] };
 }
 
 function openSnapshot({
@@ -293,9 +178,9 @@ function moveHolder({
   state,
   change,
 }: {
-  state: SeatPeakCount;
+  state: SeatPeakState;
   change: RecordSeatChangedCommandData;
-}): SeatPeakCount {
+}): SeatPeakState {
   const held = heldSeat({ state, holder: change.holder });
   if (change.from === change.to && held === change.to && change.holder.kind === "invitation") {
     // An extended invitation keeps its seat; only its expiry moves.
@@ -316,20 +201,20 @@ function moveHolder({
   });
 }
 
-function heldSeat({ state, holder }: { state: SeatPeakCount; holder: SeatHolder }): SeatKind {
+function heldSeat({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): SeatKind {
   if (holder.kind === "member") return state.members[holder.userId] ?? "none";
   return state.invitations[holder.inviteId]?.seat ?? "none";
 }
 
-function withHolder<State extends SeatPeakCount>({
+function withHolder({
   state,
   holder,
   seat,
 }: {
-  state: State;
+  state: SeatPeakState;
   holder: SeatHolder;
   seat: SeatKind;
-}): State {
+}): SeatPeakState {
   if (holder.kind === "member") {
     const { [holder.userId]: _previous, ...members } = state.members;
     return { ...state, members: seat === "none" ? members : { ...members, [holder.userId]: seat } };
@@ -361,15 +246,15 @@ function adjust({
  * Sets the running counts at `at` and raises its month's peaks. A month first touched opens at
  * the count carried into it, so its peak is never below the count it began with.
  */
-function record<State extends SeatPeakCount>({
+function record({
   state,
   counts,
   at,
 }: {
-  state: State;
+  state: SeatPeakState;
   counts: SeatCounts;
   at: number;
-}): State {
+}): SeatPeakState {
   const month = seatPeakMonthOf(at);
   const opened = state.months[month] ?? openMonth({ state, month, at });
   const raisesFull = counts.full > opened.fullPeak;
@@ -396,7 +281,7 @@ function openMonth({
   month,
   at,
 }: {
-  state: SeatPeakCount;
+  state: SeatPeakState;
   month: string;
   at: number;
 }): SeatPeakMonth {

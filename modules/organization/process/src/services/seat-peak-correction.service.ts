@@ -3,12 +3,11 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import type {
   RecordSeatChangedCommandData,
   SeatChangeCause,
-  SeatHolder,
-  SeatKind,
 } from "../eventing/seat-peak.events.ts";
 import type { OrganizationSeatPeakRepository } from "../repositories/organization-seat-peak.repository.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import { memberSeatCorrections, movesASeat } from "../rules/seat-change.rules.ts";
+import type { SeatHolder, SeatKind } from "../rules/seat-holder.rules.ts";
 
 type SeatChangeSender = Pick<EventingCommandSender<RecordSeatChangedCommandData>, "send">;
 

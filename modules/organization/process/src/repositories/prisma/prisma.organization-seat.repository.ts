@@ -14,7 +14,7 @@ import {
 import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
-import type { SeatKind } from "../../eventing/seat-peak.events.ts";
+import type { SeatKind } from "../../rules/seat-holder.rules.ts";
 import {
   type OrganizationSeatHolding,
   OrganizationSeatRepository,
