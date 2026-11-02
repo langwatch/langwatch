@@ -84,10 +84,21 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
     it("carries the key cap of each kind of key", () => {
       const table = section("extraction-functions.mdx", "lwql-key-caps");
       const caps = LWQL_APP_FUNCTION_KEY_CAPS;
+      const rows = table
+        .split("\n")
+        .filter((line) => line.startsWith("| ") && line.includes("("))
+        .map((line) => line.split("|").map((cell) => cell.trim()));
+      const seen = new Set<string>();
 
-      expect(table).toContain(`| ${format(caps.thread)} conversations |`);
-      expect(table).toContain(`| ${format(caps.trace)} traces |`);
-      expect(table).toContain(`| ${format(caps.span)} spans |`);
+      for (const [, , functions = "", keys = ""] of rows) {
+        let kind: "thread" | "trace" | "span" = "thread";
+        if (functions.includes("span_id")) kind = "span";
+        else if (functions.includes("(trace_id")) kind = "trace";
+        const noun = { thread: "conversations", trace: "traces", span: "spans" }[kind];
+        seen.add(kind);
+        expect(keys, `row ${functions}`).toBe(`${format(caps[kind])} ${noun}`);
+      }
+      expect([...seen].toSorted()).toEqual(["span", "thread", "trace"]);
     });
 
     /** @scenario "The guide's extraction function page carries the key cap of each kind of key" */
@@ -148,6 +159,22 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
       const registered = new Set<string>(APP_ERROR_CODES);
 
       expect(codes.length).toBeGreaterThan(10);
+      for (const code of codes) {
+        expect(registered.has(code ?? ""), `${code} is registered`).toBe(true);
+      }
+    });
+
+    /** @scenario "The guide's error messages and error codes are the ones the code returns" */
+    it("lists only registered codes in the limits table's over-the-limit column", () => {
+      const table = section("limits-and-cost.mdx", "lwql-limits");
+      const registered = new Set<string>(APP_ERROR_CODES);
+      const codes = table
+        .split("\n")
+        .filter((line) => line.startsWith("| "))
+        .flatMap((line) => [...(line.split("|")[3] ?? "").matchAll(/`([a-z_]+)`/g)])
+        .map((m) => m[1]);
+
+      expect(codes.length).toBeGreaterThan(5);
       for (const code of codes) {
         expect(registered.has(code ?? ""), `${code} is registered`).toBe(true);
       }

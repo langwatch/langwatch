@@ -53,14 +53,14 @@ LIMIT 50
 
 ## Evaluations: pass rate per evaluator
 
-`evaluations` has one row per evaluator result, and its time column is `ScheduledAt`. Filter on `Status = 'processed'`, because scheduled, skipped and errored rows have no verdict and would lower the rate.
+`evaluations` has one row per evaluator result, and its time column is `ScheduledAt`. Filter on `Status = 'processed'` to leave out scheduled, skipped and errored rows. `Passed` is also empty for evaluators that return only a score, so the rate divides by the rows that have a verdict, `countIf(Passed IS NOT NULL)`, not by `count()`.
 
 ```sql
 SELECT
   EvaluatorName,
   count() AS evaluations,
   countIf(Passed = 1) AS passed,
-  countIf(Passed = 1) / count() AS pass_rate
+  countIf(Passed = 1) / countIf(Passed IS NOT NULL) AS pass_rate
 FROM langwatch.evaluations
 WHERE ScheduledAt >= subtractDays(now(), 7)
   AND Status = 'processed'
@@ -84,7 +84,7 @@ LIMIT 50
 
 ## Rollups: traffic per hour and cost per model
 
-`trace_metrics_by_minute` and `model_usage_by_minute` hold one row per minute that is already summed, so a count or a sum over time reads far less here than over `traces`. Every measure is a sum, so divide by `TraceCount` when you want an average. Their time column is `BucketStart`.
+`trace_metrics_by_minute` and `model_usage_by_minute` hold one row per minute that is already summed, so a count or a sum over time reads far less here than over `traces`. Every measure is a sum, so divide by a count when you want an average: `TraceCount` on `trace_metrics_by_minute`, `SpanCount` on `model_usage_by_minute`, which has no `TraceCount`. Their time column is `BucketStart`.
 
 ```sql
 SELECT
@@ -123,7 +123,7 @@ SELECT
   max(OccurredAt) AS last_turn
 FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7)
-  AND ConversationId IS NOT NULL
+  AND ConversationId != ''
 GROUP BY ConversationId
 ORDER BY turns DESC
 LIMIT 50

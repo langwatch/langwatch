@@ -29,7 +29,7 @@ Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On 
 The field "<c>" is not available to you. Remove it from the query.
 ```
 
-The column needs a permission your key does not have: `input` or `output` for message text, `cost:view` for cost columns. Remove the column, or use a key with that permission. The error lists the columns you can read in `availableColumns`.
+The column is gated. Message text (`input` and `output` columns such as `CapturedInput`) follows the project's [data privacy policy](/platform/data-privacy): if **Input** or **Output** content is **Restricted** to an audience you are not in, or **Dropped**, you cannot read it. Cost columns need the `cost:view` permission on your key. Remove the column, ask an admin to change **Settings > Data Privacy** or your access, or use a key with the permission. The error lists the columns you can read in `availableColumns`.
 
 ## A wildcard cannot be used here
 
@@ -83,6 +83,14 @@ The query names a column that does not exist: X.
 ```
 
 Check the column against `langwatch query schema`. Columns differ between views: for example, `HasError` is on `trace_metrics`, while `traces` has `ContainsErrorStatus`.
+
+## The query declares parameters the request did not supply
+
+```text
+The query declares bound parameters the request did not supply values for.
+```
+
+`meta.parameters` lists the missing names. Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`.
 
 ## The query timed out or read too much data
 

@@ -44226,7 +44226,7 @@ Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On 
 The field "<c>" is not available to you. Remove it from the query.
 ```
 
-The column needs a permission your key does not have: `input` or `output` for message text, `cost:view` for cost columns. Remove the column, or use a key with that permission. The error lists the columns you can read in `availableColumns`.
+The column is gated. Message text (`input` and `output` columns such as `CapturedInput`) follows the project's [data privacy policy](/platform/data-privacy): if **Input** or **Output** content is **Restricted** to an audience you are not in, or **Dropped**, you cannot read it. Cost columns need the `cost:view` permission on your key. Remove the column, ask an admin to change **Settings > Data Privacy** or your access, or use a key with the permission. The error lists the columns you can read in `availableColumns`.
 
 ## A wildcard cannot be used here
 
@@ -44281,6 +44281,14 @@ The query names a column that does not exist: X.
 
 Check the column against `langwatch query schema`. Columns differ between views: for example, `HasError` is on `trace_metrics`, while `traces` has `ContainsErrorStatus`.
 
+## The query declares parameters the request did not supply
+
+```text
+The query declares bound parameters the request did not supply values for.
+```
+
+`meta.parameters` lists the missing names. Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`.
+
 ## The query timed out or read too much data
 
 ```text
@@ -44334,7 +44342,7 @@ Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). 
 
 The cap counts distinct conversations, traces or spans, not rows. A row that repeats a key does not count again, so a query grouping ten thousand rows onto 50 conversations reads 50. A query that needs more keys than the cap is refused with `lwql_app_function_key_cap`.
 
-These functions return message content, so your key needs both the `input` and the `output` permission. Two exceptions: `llm_input_messages` needs only `input`, and `thread_traces` returns only ids and needs neither.
+These functions return message content, so the project's [data privacy policy](/platform/data-privacy) must let you see both **Input** and **Output**. Two exceptions: `llm_input_messages` needs only **Input**, and `thread_traces` returns only ids and needs neither. Content set to **Restricted** is shown only to the audience of the rule, and **Dropped** content is never stored.
 
 ## Export a week of conversations
 
@@ -44431,14 +44439,14 @@ LIMIT 50
 
 ## Evaluations: pass rate per evaluator
 
-`evaluations` has one row per evaluator result, and its time column is `ScheduledAt`. Filter on `Status = 'processed'`, because scheduled, skipped and errored rows have no verdict and would lower the rate.
+`evaluations` has one row per evaluator result, and its time column is `ScheduledAt`. Filter on `Status = 'processed'` to leave out scheduled, skipped and errored rows. `Passed` is also empty for evaluators that return only a score, so the rate divides by the rows that have a verdict, `countIf(Passed IS NOT NULL)`, not by `count()`.
 
 ```sql
 SELECT
   EvaluatorName,
   count() AS evaluations,
   countIf(Passed = 1) AS passed,
-  countIf(Passed = 1) / count() AS pass_rate
+  countIf(Passed = 1) / countIf(Passed IS NOT NULL) AS pass_rate
 FROM langwatch.evaluations
 WHERE ScheduledAt >= subtractDays(now(), 7)
   AND Status = 'processed'
@@ -44462,7 +44470,7 @@ LIMIT 50
 
 ## Rollups: traffic per hour and cost per model
 
-`trace_metrics_by_minute` and `model_usage_by_minute` hold one row per minute that is already summed, so a count or a sum over time reads far less here than over `traces`. Every measure is a sum, so divide by `TraceCount` when you want an average. Their time column is `BucketStart`.
+`trace_metrics_by_minute` and `model_usage_by_minute` hold one row per minute that is already summed, so a count or a sum over time reads far less here than over `traces`. Every measure is a sum, so divide by a count when you want an average: `TraceCount` on `trace_metrics_by_minute`, `SpanCount` on `model_usage_by_minute`, which has no `TraceCount`. Their time column is `BucketStart`.
 
 ```sql
 SELECT
@@ -44501,7 +44509,7 @@ SELECT
   max(OccurredAt) AS last_turn
 FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7)
-  AND ConversationId IS NOT NULL
+  AND ConversationId != ''
 GROUP BY ConversationId
 ORDER BY turns DESC
 LIMIT 50
@@ -44560,7 +44568,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 {/* lwql-limits-start */}
 | What | Limit | Over the limit |
 | --- | --- | --- |
-| Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added at the end. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
+| Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added: after the last clause, or before its `OFFSET` if it has one. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
 | Result size | About 8,000,000 bytes | 413 `lwql_result_too_large`. You never get a cut result. |
 | Statement length | 50,000 characters | The request is refused |
 | Run time | 10 seconds | 504 `query_timeout` |
@@ -44616,15 +44624,22 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 | 400 | `lwql_unparseable` | The statement is not valid ClickHouse SQL |
 | 400 | `lwql_not_permitted` | The statement uses something LangWatchQL does not allow, such as a second statement, a view or a function |
 | 400 | `lwql_unknown_identifier` | The statement uses a column that does not exist |
+| 400 | `lwql_parameter_missing` | The statement declares a parameter the request has no value for. `meta.parameters` lists them: send each under `parameters` |
+| 400 | `lwql_parameter_invalid` | A parameter value does not match its declared type. `meta.parameter` names it: send a `DateTime` as `YYYY-MM-DD HH:MM:SS` in UTC |
 | 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
 | 403 | `api_key_permission_denied` | The key does not have `analytics:view` |
+| 403 | `lwql_not_enabled` | LangWatchQL is not enabled for this project. Ask an administrator to enable it |
 | 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
 | 413 | `lwql_result_too_large` | The result is over the result size limit in [Limits](#limits) |
+| 422 | `projects_required` | The key reaches several projects. Send `projects`, a list of project ids, or `"all"` |
+| 422 | `projects_unreadable` | The key reads no project. Ask an admin to grant it `analytics:view` on one |
 | 422 | `query_scan_limit_exceeded`, `query_memory_exceeded` | The query reads too much data or uses too much memory |
 | 422 | `lwql_app_function_key_cap` | An extraction function needs more distinct keys than its cap |
 | 422 | `instant_eval_query_budget_exceeded` | The eval functions in the query are over their token budget |
 | 429 | `lwql_rate_limited` | Too many queries this minute for this project |
 | 503 | `lwql_busy` | Too many queries are running at once |
+| 503 | `lwql_unavailable` | LangWatchQL is not set up on this deployment. Contact support, or your administrator if you self-host |
+| 503 | `clickhouse_unavailable` | The database is down for a moment. Retry in a few seconds |
 | 504 | `query_timeout` | The query ran past the run time limit in [Limits](#limits) |
 {/* lwql-error-codes-end */}
 
