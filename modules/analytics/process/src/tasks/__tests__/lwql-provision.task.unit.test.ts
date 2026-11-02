@@ -148,11 +148,14 @@ function clickHouseThat({
             if (columns && sql.includes("system.functions")) {
               return lwqlAppFunctionNames().map((name) => ({ name }));
             }
+            // As ClickHouse does: an inventory read returns only the relations it names.
+            const named = params?.relations;
+            const asked = present.filter((name) => !Array.isArray(named) || named.includes(name));
             if (columns && sql.includes("system.columns")) {
-              return present.map((table) => ({ table, columns }));
+              return asked.map((table) => ({ table, columns }));
             }
             if (sql.includes("system.tables")) {
-              return present.map((name) => ({ name, comment: "" }));
+              return asked.map((name) => ({ name, comment: "" }));
             }
             return [];
           },
