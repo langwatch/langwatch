@@ -429,6 +429,7 @@ describe("convergeLwqlAccessModel", () => {
         endpoint: { host: "postgres", port: 5432, database: "langwatch" },
         readerPassword: READER_PASSWORD,
       },
+      schema: "public",
     });
     const check = (clickHouse: ReturnType<typeof clickHouseThat>) =>
       convergeLwqlAccessModel({
@@ -612,6 +613,7 @@ describe("findLwqlAppOwnedDrift", () => {
       fingerprint: selfProvisioning.credentialFingerprint({
         names: NAMES,
         postgres: { endpoint: request.endpoint, readerPassword },
+        schema: "public",
       }),
     });
 

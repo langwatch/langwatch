@@ -205,9 +205,11 @@ export class LangWatchQLSelfProvisioningService {
   credentialFingerprint({
     names,
     postgres,
+    schema,
   }: {
     names: LangWatchQLNames;
     postgres: LwqlPostgresSettings;
+    schema: string;
   }): string {
     const { host, port, database, user, password } = this.namedCollectionValues({
       names,
@@ -215,6 +217,7 @@ export class LangWatchQLSelfProvisioningService {
     });
     return postgresMapping.credentialFingerprint({
       connection: { host, port, database, user, password },
+      schema,
     });
   }
 
@@ -251,6 +254,7 @@ export class LangWatchQLSelfProvisioningService {
     restrictedPassword,
     sourceDatabase,
     postgres,
+    schema,
     includeAppFunctions = true,
     mode = "sql",
     only,
@@ -260,6 +264,8 @@ export class LangWatchQLSelfProvisioningService {
     restrictedPassword: string;
     sourceDatabase: string;
     postgres: LwqlPostgresSettings;
+    /** The app PostgreSQL schema the engine tables read from. */
+    schema: string;
     /** Off where a `CREATE FUNCTION` would reach one replica of several. */
     includeAppFunctions?: boolean;
     /** `rendered` leaves the config-store-owned entities to the config files. */
@@ -276,13 +282,14 @@ export class LangWatchQLSelfProvisioningService {
     }
     const collection = this.namedCollection({ names });
     const credentialFingerprint = collectionLoaded
-      ? this.credentialFingerprint({ names, postgres })
+      ? this.credentialFingerprint({ names, postgres, schema })
       : undefined;
     if (only !== undefined) {
       return this.#driftedStatements({
         names,
         sourceDatabase,
         collection,
+        schema,
         includeAppFunctions,
         only,
         credentialFingerprint,
@@ -298,6 +305,7 @@ export class LangWatchQLSelfProvisioningService {
     const engineTables = postgresViews.engineTableStatements({
       names,
       collection,
+      schema,
       ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
     });
     const views = viewProvisioning.setupStatements({
@@ -320,6 +328,7 @@ export class LangWatchQLSelfProvisioningService {
     names,
     sourceDatabase,
     collection,
+    schema,
     includeAppFunctions,
     only,
     credentialFingerprint,
@@ -327,6 +336,7 @@ export class LangWatchQLSelfProvisioningService {
     names: LangWatchQLNames;
     sourceDatabase: string;
     collection: string;
+    schema: string;
     includeAppFunctions: boolean;
     only: readonly string[];
     credentialFingerprint: string | undefined;
@@ -352,6 +362,7 @@ export class LangWatchQLSelfProvisioningService {
       ...postgresViews.engineTableStatements({
         names,
         collection,
+        schema,
         views: engineTables,
         ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
       }),

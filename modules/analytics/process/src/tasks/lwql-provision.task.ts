@@ -380,6 +380,7 @@ async function convergeClickHouse({
       restrictedPassword: request.connection.password,
       sourceDatabase,
       postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+      schema,
       includeAppFunctions,
       mode,
       collectionLoaded,
@@ -650,6 +651,7 @@ export async function findLwqlAppOwnedDrift({
   const credentialFingerprint = selfProvisioning.credentialFingerprint({
     names,
     postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+    schema: plan.schema,
   });
   const clickHouse = await withProvisioningRepository({
     open: plan.openRepository,

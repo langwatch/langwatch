@@ -21,6 +21,7 @@ const POSTGRES = {
   endpoint: { host: "pg", port: 5432, database: "langwatch" },
   readerPassword: "reader-secret",
 };
+const SCHEMA = "langwatch_db";
 const SELF_PROVISION_SOURCE = {
   CLICKHOUSE_URL: "http://admin:admin-secret@clickhouse:8123/langwatch",
   LWQL_CLICKHOUSE_PASSWORD: "restricted-secret",
@@ -34,6 +35,7 @@ function statementsWith({ includeAppFunctions }: { includeAppFunctions?: boolean
     restrictedPassword: "restricted-secret",
     sourceDatabase: SOURCE_DATABASE,
     postgres: POSTGRES,
+    schema: SCHEMA,
     ...(includeAppFunctions === undefined ? {} : { includeAppFunctions }),
   });
 }
@@ -75,6 +77,7 @@ describe("the self-provisioned ClickHouse statements", () => {
         restrictedPassword: "pw",
         sourceDatabase: SOURCE_DATABASE,
         postgres: POSTGRES,
+        schema: SCHEMA,
       }),
     ).toThrow(/application's own ClickHouse database/);
   });
@@ -245,6 +248,7 @@ describe("given the rendered-mode statements a converge runs", () => {
       restrictedPassword: "restricted-secret",
       sourceDatabase: SOURCE_DATABASE,
       postgres: POSTGRES,
+      schema: SCHEMA,
       mode: "rendered",
     });
     const engineTables = statements.filter((s) => s.includes("ENGINE = PostgreSQL"));
@@ -257,7 +261,11 @@ describe("given the rendered-mode statements a converge runs", () => {
 
 describe("given what the reconvergence check finds in ClickHouse", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
-  const fingerprint = selfProvisioning.credentialFingerprint({ names: NAMES, postgres: POSTGRES });
+  const fingerprint = selfProvisioning.credentialFingerprint({
+    names: NAMES,
+    postgres: POSTGRES,
+    schema: SCHEMA,
+  });
   const current = postgresMapping.credentialComment({ fingerprint });
   const drift = (
     found: string[],
@@ -299,6 +307,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
       fingerprint: selfProvisioning.credentialFingerprint({
         names: NAMES,
         postgres: { ...POSTGRES, readerPassword: "the-password-before-rotation" },
+        schema: SCHEMA,
       }),
     });
 
@@ -313,6 +322,21 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
         objects: [rotated, unstamped],
         isKeyMapMissing: false,
       });
+    });
+
+    /** @scenario "The reconvergence check rebuilds an engine table built before the schema was pinned" */
+    it("names an engine table stamped by a fingerprint that lacked this schema", () => {
+      const [beforeSchema] = engineTables;
+      if (!beforeSchema) throw new Error("the catalog maps no PostgreSQL dataset");
+      const withoutSchema = selfProvisioning.credentialFingerprint({
+        names: NAMES,
+        postgres: POSTGRES,
+        schema: "",
+      });
+      const comments = Object.fromEntries(relations.map((name) => [name, current]));
+      comments[beforeSchema] = postgresMapping.credentialComment({ fingerprint: withoutSchema });
+
+      expect(drift(relations, ["lwql_trace"], comments).objects).toEqual([beforeSchema]);
     });
 
     /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
@@ -330,7 +354,11 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
 describe("given whether ClickHouse holds the app's collection values", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
   const [engineTable] = relations.filter((name) => name.endsWith("_pg"));
-  const fingerprint = selfProvisioning.credentialFingerprint({ names: NAMES, postgres: POSTGRES });
+  const fingerprint = selfProvisioning.credentialFingerprint({
+    names: NAMES,
+    postgres: POSTGRES,
+    schema: SCHEMA,
+  });
   const engineTablesOf = (statements: string[]) =>
     statements.filter((s) => s.includes("ENGINE = PostgreSQL"));
   const statementsWithCollection = ({
@@ -347,6 +375,7 @@ describe("given whether ClickHouse holds the app's collection values", () => {
       restrictedPassword: "restricted-secret",
       sourceDatabase: SOURCE_DATABASE,
       postgres: POSTGRES,
+      schema: SCHEMA,
       mode,
       collectionLoaded,
       ...(only === undefined ? {} : { only }),
@@ -371,6 +400,16 @@ describe("given whether ClickHouse holds the app's collection values", () => {
   });
 
   describe("when no probe showed it", () => {
+    /** @scenario "Engine tables read the app's PostgreSQL schema" */
+    it("pins the plan's schema in every engine table's DDL", () => {
+      const deploy = engineTablesOf(
+        statementsWithCollection({ collectionLoaded: false, mode: "rendered" }),
+      );
+
+      expect(deploy.length).toBeGreaterThan(0);
+      for (const statement of deploy) expect(statement).toContain("schema='langwatch_db'");
+    });
+
     /** @scenario "No engine table is rebuilt until ClickHouse holds the app's collection values" */
     it("replaces a rendered deploy's engine tables unstamped, so a later check rebuilds them", () => {
       const deploy = engineTablesOf(
@@ -402,6 +441,7 @@ describe("given the drift a reconvergence check converges", () => {
       restrictedPassword: "restricted-secret",
       sourceDatabase: SOURCE_DATABASE,
       postgres: POSTGRES,
+      schema: SCHEMA,
       mode: "rendered",
       only,
     });

@@ -200,11 +200,14 @@ export class LangWatchQLPostgresMappingService {
    */
   credentialFingerprint({
     connection,
+    schema,
   }: {
     connection: Omit<PostgresNamedCollection, "collection">;
+    /** Part of the digest: a table built before the schema was pinned reads as stale. */
+    schema: string;
   }): string {
     const { host, port, database, user, password } = connection;
-    const material = JSON.stringify([host, port, database, user, password]);
+    const material = JSON.stringify([host, port, database, user, password, schema]);
 
     return scryptSync(material, CREDENTIAL_FINGERPRINT_SALT, 8).toString("hex");
   }
@@ -225,6 +228,7 @@ export class LangWatchQLPostgresMappingService {
     columns,
     collection,
     postgresRelation,
+    schema,
     connectionPoolSize = DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
     credentialFingerprint,
   }: {
@@ -233,6 +237,8 @@ export class LangWatchQLPostgresMappingService {
     columns: LangWatchQLColumn[];
     collection: string;
     postgresRelation: string;
+    /** The app PostgreSQL schema; the reader role's search_path may not include it. */
+    schema: string;
     /** Connections this one mapped table may hold open. See the constant. */
     connectionPoolSize?: number;
     /** Stamped once ClickHouse is shown to hold these values; absent reads as stale (#8858). */
@@ -241,6 +247,7 @@ export class LangWatchQLPostgresMappingService {
     accessModel.assertNames(names);
     sqlText.assertIdentifier(collection, "named collection");
     sqlText.assertIdentifier(postgresRelation, "postgresRelation");
+    sqlText.assertIdentifier(schema, "schema");
     if (columns.length === 0) {
       throw new Error(
         `lwql provisioning: PostgreSQL-engine table "${table}" needs at least one column`,
@@ -263,7 +270,7 @@ export class LangWatchQLPostgresMappingService {
 
     return (
       `CREATE OR REPLACE TABLE ${accessModel.qualified(names, table)} (${columnList}) ` +
-      `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}) ` +
+      `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}, schema=${clickHouseLiteral(schema)}) ` +
       `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}` +
       comment
     );
