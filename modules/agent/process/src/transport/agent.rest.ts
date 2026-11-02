@@ -251,7 +251,10 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withParams(agentVersionsRestParamsSchema)
       .withPermission("project:view")
       .withOutput(agentVersionListResponseSchema)
-      .withDocs({ summary: "List an agent's versions, newest first, with the labels on each" })
+      .withDocs({
+        summary: "List an agent's versions",
+        description: "Every version of the agent, newest first, with the labels on each.",
+      })
       .handle(async ({ app, input, scope }) => {
         const versions = agentVersionsWithoutSecrets(
           await app.listVersions({ projectId: scope.id, agentId: input.agentId }),
@@ -272,7 +275,8 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withPermission("agents:deploy")
       .withOutput(agentLabelResponseSchema)
       .withDocs({
-        summary: "Point a deploy label, such as production, at one of the agent's versions",
+        summary: "Point a deploy label at an agent version",
+        description: "Points a deploy label, such as production, at one of the agent's versions.",
       })
       .handle(async ({ app, input, scope, actor, key }) => {
         const label = await app.assignLabel({

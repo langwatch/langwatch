@@ -52,7 +52,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List an agent's versions, newest first, with the labels on each */
+        /**
+         * List an agent's versions
+         * @description Every version of the agent, newest first, with the labels on each.
+         */
         get: operations["listAgentVersions"];
         put?: never;
         post?: never;
@@ -70,7 +73,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Point a deploy label, such as production, at one of the agent's versions */
+        /**
+         * Point a deploy label at an agent version
+         * @description Points a deploy label, such as production, at one of the agent's versions.
+         */
         put: operations["assignAgentLabel"];
         post?: never;
         /** Remove a deploy label from an agent */

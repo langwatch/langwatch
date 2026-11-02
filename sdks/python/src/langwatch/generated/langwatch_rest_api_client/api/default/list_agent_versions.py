@@ -56,7 +56,9 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ListAgentVersionsResponse200]:
-    """List an agent's versions, newest first, with the labels on each
+    """List an agent's versions
+
+     Every version of the agent, newest first, with the labels on each.
 
     Args:
         agent_id (str):
@@ -85,7 +87,9 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> ListAgentVersionsResponse200 | None:
-    """List an agent's versions, newest first, with the labels on each
+    """List an agent's versions
+
+     Every version of the agent, newest first, with the labels on each.
 
     Args:
         agent_id (str):
@@ -109,7 +113,9 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ListAgentVersionsResponse200]:
-    """List an agent's versions, newest first, with the labels on each
+    """List an agent's versions
+
+     Every version of the agent, newest first, with the labels on each.
 
     Args:
         agent_id (str):
@@ -136,7 +142,9 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> ListAgentVersionsResponse200 | None:
-    """List an agent's versions, newest first, with the labels on each
+    """List an agent's versions
+
+     Every version of the agent, newest first, with the labels on each.
 
     Args:
         agent_id (str):

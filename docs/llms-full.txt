@@ -73221,10 +73221,10 @@ openapi: "GET /api/v1/agents"
 
 ---
 
-# FILE: ./api-reference/agents/list-an-agent-s-versions-newest-first-wi.mdx
+# FILE: ./api-reference/agents/list-an-agent-s-versions.mdx
 
 ---
-title: "List an agent's versions, newest first, with the labels on each"
+title: "List an agent's versions"
 openapi: "GET /api/v1/agents/{agentId}/versions"
 ---
 
@@ -73252,10 +73252,10 @@ Manage AI agent configurations. Create, update, and organize agents that are tra
 
 ---
 
-# FILE: ./api-reference/agents/point-a-deploy-label-such-as-production.mdx
+# FILE: ./api-reference/agents/point-a-deploy-label-at-an-agent-version.mdx
 
 ---
-title: "Point a deploy label, such as production, at one of the agent's versions"
+title: "Point a deploy label at an agent version"
 openapi: "PUT /api/v1/agents/{agentId}/labels/{label}"
 ---
 

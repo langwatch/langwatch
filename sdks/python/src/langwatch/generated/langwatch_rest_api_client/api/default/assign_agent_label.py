@@ -69,7 +69,9 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: AssignAgentLabelBody,
 ) -> Response[AssignAgentLabelResponse200]:
-    """Point a deploy label, such as production, at one of the agent's versions
+    """Point a deploy label at an agent version
+
+     Points a deploy label, such as production, at one of the agent's versions.
 
     Args:
         agent_id (str):
@@ -104,7 +106,9 @@ def sync(
     client: AuthenticatedClient,
     body: AssignAgentLabelBody,
 ) -> AssignAgentLabelResponse200 | None:
-    """Point a deploy label, such as production, at one of the agent's versions
+    """Point a deploy label at an agent version
+
+     Points a deploy label, such as production, at one of the agent's versions.
 
     Args:
         agent_id (str):
@@ -134,7 +138,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: AssignAgentLabelBody,
 ) -> Response[AssignAgentLabelResponse200]:
-    """Point a deploy label, such as production, at one of the agent's versions
+    """Point a deploy label at an agent version
+
+     Points a deploy label, such as production, at one of the agent's versions.
 
     Args:
         agent_id (str):
@@ -167,7 +173,9 @@ async def asyncio(
     client: AuthenticatedClient,
     body: AssignAgentLabelBody,
 ) -> AssignAgentLabelResponse200 | None:
-    """Point a deploy label, such as production, at one of the agent's versions
+    """Point a deploy label at an agent version
+
+     Points a deploy label, such as production, at one of the agent's versions.
 
     Args:
         agent_id (str):
