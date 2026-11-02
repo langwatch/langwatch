@@ -6579,8 +6579,8 @@ importers:
         specifier: ^26.0.1
         version: 26.2.0
       '@types/sanitize-html':
-        specifier: ^2.16.0
-        version: 2.16.1
+        specifier: ^2.16.2
+        version: 2.16.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -23951,8 +23951,8 @@ packages:
   '@types/retry@0.12.0':
     resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
 
-  '@types/sanitize-html@2.16.1':
-    resolution: {integrity: sha512-n9wjs8bCOTyN/ynwD8s/nTcTreIHB1vf31vhLMGqUPNHaweKC4/fAl4Dj+hUlCTKYgm4P3k83fmiFfzkZ6sgMA==}
+  '@types/sanitize-html@2.16.2':
+    resolution: {integrity: sha512-kuAbgDCFv418flrp3z4o/4ufLA/5ovmXRH0L419iZCPGO7w00znjeDI5Wy/KZWNIBpDQc7hucCK+J5almB6FyA==}
 
   '@types/send@1.2.1':
     resolution: {integrity: sha512-arsCikDvlU99zl1g69TcAB3mzZPpxgw0UQnaHeC1Nwb015xp8bknZv5rIfri9xTOcMuaVgvabfIRA7PSZVuZIQ==}
@@ -25898,10 +25898,6 @@ packages:
     resolution: {integrity: sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw==}
     engines: {node: '>=0.12'}
 
-  entities@7.0.1:
-    resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
-    engines: {node: '>=0.12'}
-
   entities@8.0.0:
     resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
     engines: {node: '>=20.19.0'}
@@ -26525,9 +26521,6 @@ packages:
 
   html-void-elements@3.0.0:
     resolution: {integrity: sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==}
-
-  htmlparser2@10.1.0:
-    resolution: {integrity: sha512-VTZkM9GWRAtEpveh7MSF6SjjrpNVNNVJfFup7xTY3UpFtm67foy9HDVXneLtFVt4pMz5kZtgNcvCniNFb1hlEQ==}
 
   htmlparser2@12.0.0:
     resolution: {integrity: sha512-Tz7u1i95/g2x2jz81+x0FBVhBhY5aRTvD3tXXdFaljuNdzDLJ8UGNRrTcj2cgQvAg3iW/h77Fz15nLW0L0CrZw==}
@@ -31846,7 +31839,7 @@ snapshots:
 
   '@better-auth/utils@0.5.0':
     dependencies:
-      '@noble/hashes': 2.2.0
+      '@noble/hashes': 2.4.0
 
   '@better-fetch/fetch@1.3.1': {}
 
@@ -35623,9 +35616,9 @@ snapshots:
 
   '@types/retry@0.12.0': {}
 
-  '@types/sanitize-html@2.16.1':
+  '@types/sanitize-html@2.16.2':
     dependencies:
-      htmlparser2: 10.1.0
+      htmlparser2: 12.0.0
 
   '@types/send@1.2.1':
     dependencies:
@@ -36015,7 +36008,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.1
       vitest: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-      ws: 8.21.3(bufferutil@4.1.0)
+      ws: 8.22.0(bufferutil@4.1.0)
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -36034,7 +36027,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.1
       vitest: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-      ws: 8.21.3(bufferutil@4.1.0)
+      ws: 8.22.0(bufferutil@4.1.0)
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -37989,8 +37982,6 @@ snapshots:
 
   entities@4.5.0: {}
 
-  entities@7.0.1: {}
-
   entities@8.0.0: {}
 
   env-paths@2.2.1: {}
@@ -38787,13 +38778,6 @@ snapshots:
   html-url-attributes@3.0.1: {}
 
   html-void-elements@3.0.0: {}
-
-  htmlparser2@10.1.0:
-    dependencies:
-      domelementtype: 2.3.0
-      domhandler: 5.0.3
-      domutils: 3.2.2
-      entities: 7.0.1
 
   htmlparser2@12.0.0:
     dependencies:
