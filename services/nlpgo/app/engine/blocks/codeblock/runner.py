@@ -103,6 +103,7 @@ Wire shape (result file):
 
 from __future__ import annotations
 
+import errno
 import os
 import sys
 
@@ -122,8 +123,11 @@ def _hide_from_other_executions() -> None:
     import ctypes
 
     libc = ctypes.CDLL(None, use_errno=True)
-    if libc.prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) != 0 and not best_effort:
-        raise OSError(ctypes.get_errno(), "prctl(PR_SET_DUMPABLE) failed")
+    if libc.prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) != 0:
+        err = ctypes.get_errno()
+        # Best effort covers only the refusal the engine detected (EPERM).
+        if not (best_effort and err == errno.EPERM):
+            raise OSError(err, "prctl(PR_SET_DUMPABLE) failed")
 
 
 _hide_from_other_executions()

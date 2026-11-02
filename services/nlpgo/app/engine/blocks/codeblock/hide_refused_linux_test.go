@@ -153,6 +153,7 @@ func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
 	runChild(t, "refused-unset")
 }
 
+// @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode"
 func TestHideRefused_RunnerHideStep(t *testing.T) {
 	t.Run("given prctl is refused and NLPGO_CODE_BLOCK_HIDE is unset", func(t *testing.T) {
 		t.Run("the runner exits 1 with the prctl message", func(t *testing.T) {
