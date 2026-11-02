@@ -137,11 +137,11 @@ func TestWithStderrTail_WindowStartingInsideAMarkerSkipsTheFragment(t *testing.T
 }
 
 func TestWithStderrTail_AWindowStartingAtALineStartKeepsThatLine(t *testing.T) {
-	text := strings.Repeat("x", 100) + "\n" + "L" + strings.Repeat("y", codeblock.MaxStderrInMessage-1)
+	text := strings.Repeat("x", 100) + "\nL" + strings.Repeat("y", 5) + "\n" + strings.Repeat("y", codeblock.MaxStderrInMessage-7)
 
 	got := codeblock.WithStderrTail("exit status 1", text)
 
-	assert.True(t, strings.HasPrefix(tailOf(got), "… Lyyy"), got[:min(40, len(got))])
+	assert.True(t, strings.HasPrefix(tailOf(got), "… Lyyyyy\nyyy"), got[:min(40, len(got))])
 }
 
 func TestWithStderrTail_BlankStderrLeavesTheMessageUnchanged(t *testing.T) {
@@ -353,10 +353,36 @@ func TestReadRunnerStderr_ASecretSplitByAnInvalidByteIsNotJoinedAfterwards(t *te
 
 // @scenario "A secret cut off at the end of the stderr is never partly shown"
 func TestReadRunnerStderr_AStderrEndingInAPartOfASecretShowsNoFragmentOfIt(t *testing.T) {
-	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "Traceback\nBoom key=sk-abcd", map[string]string{"K": "sk-abcdef"})
-	require.NoError(t, err)
+	secret := "sk-\"\u00e9-abcdef"
+	forms := []string{secret, `sk-\"\u00e9-abcdef`, `sk-\"é-abcdef`}
+	dir := t.TempDir()
+	for _, form := range forms {
+		for n := 1; n < len(form); n++ {
+			got, err := codeblock.ReadRunnerStderr(dir, "Traceback\nBoom key="+form[:n], map[string]string{"K": secret})
+			require.NoError(t, err)
+			assert.True(t, strings.HasPrefix(got, "Traceback\nBoom key="), got)
+			for i := 0; i+4 <= n && i+4 <= len(form); i++ {
+				require.NotContains(t, got, form[i:i+4], "form %q cut at %d", form, n)
+			}
+		}
+	}
+}
 
-	assert.Equal(t, "Traceback\nBoom key=", got)
+// @scenario "A secret cut off at the end of the stderr is never partly shown"
+func TestReadRunnerStderr_ACharacterCutAtTheEndOfAStderrTakesNoPartOfTheSecretWithIt(t *testing.T) {
+	cases := map[string]struct{ stderr, secret string }{
+		"two bytes":   {"boom key=sk-live-abc\xc3", "sk-live-abc\u00e9"},
+		"three bytes": {"boom key=sk-live-abc\xe2\x82", "sk-live-abc\u20ac"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := codeblock.ReadRunnerStderr(t.TempDir(), c.stderr, map[string]string{"K": c.secret})
+			require.NoError(t, err)
+
+			assert.Equal(t, "boom key=", got)
+			assert.NotContains(t, codeblock.WithStderrTail("exit status 1", got), "sk-live")
+		})
+	}
 }
 
 // @scenario "A secret cut off at the end of the stderr is never partly shown"
@@ -385,10 +411,10 @@ func TestReadRunnerStderr_ATrimmedPartialTakesAWholeSecretItOverlapsWithIt(t *te
 
 // @scenario "A runner error carries the end of the interpreter stderr"
 func TestReadRunnerStderr_AFinalErrorLineSurvivesSecretsThatMatchItsLetters(t *testing.T) {
-	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "Traceback\nFinalError: boom\n", map[string]string{"a": "rabc", "b": "orz", "c": "Exy"})
+	got, err := codeblock.ReadRunnerStderr(t.TempDir(), "Traceback\nFinalError: boom", map[string]string{"a": "rabc", "b": "orz", "c": "Exy"})
 	require.NoError(t, err)
 
-	assert.Equal(t, "Traceback\nFinalError: boom\n", got)
+	assert.Equal(t, "Traceback\nFinalError: boom", got)
 }
 
 func assertNoFragments(t *testing.T, text, secret string, minLen int) {

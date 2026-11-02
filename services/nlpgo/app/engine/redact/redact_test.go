@@ -152,14 +152,14 @@ func TestRedactor_SafeStartWithoutSecretsStillAlignsAndKeepsStrayBytes(t *testin
 }
 
 func TestRedactor_SafeStartStaysOutOfASecretWhenRuneAlignmentWouldStepIntoIt(t *testing.T) {
-	r := redact.New(map[string]string{"k": "\x80SECRET12"})
-	raw := strings.Repeat(".", 11) + "\x80SECRET12" + "tail"
-	assert.Equal(t, 20, r.SafeStart(raw, 11))
+	r := redact.New(map[string]string{"k": "\uFFFDSECRET12"})
+	raw := strings.Repeat(".", 11) + "\uFFFDSECRET12" + "tail"
+	assert.Equal(t, 22, r.SafeStart(raw, 12))
 }
 
 func TestRedactor_SafeStartWithAStartingContinuationByteInsideASecretLeavesNoPart(t *testing.T) {
-	r := redact.New(map[string]string{"k": "SECRET\xc3"})
-	raw := strings.Repeat(".", 12) + "SECRET\xc3\xa9tail"
+	r := redact.New(map[string]string{"k": "SECRET\u00e9"})
+	raw := strings.Repeat(".", 12) + "SECRET\u00e9tail"
 	start := r.SafeStart(raw, 15)
 	assert.NotContains(t, strings.ReplaceAll(strings.ToValidUTF8(r.Redact(raw[start:]), ""), "[redacted]", ""), "ECRET")
 }
@@ -233,4 +233,11 @@ func TestRedactor_MarkerIsTheTextARedactionLeaves(t *testing.T) {
 
 func TestRedactor_TrimPartialTailLeavesTextWithoutSecretsAlone(t *testing.T) {
 	assert.Equal(t, "abc", redact.New(nil).TrimPartialTail("abc"))
+}
+
+func TestRedactor_ASecretHoldingInvalidBytesMatchesTheSanitizedTextAndLeavesValidUTF8(t *testing.T) {
+	got := redactAll("a \uFFFD b", map[string]string{"K": "\xef\xbf"})
+
+	assert.True(t, utf8.ValidString(got), "%q", got)
+	assert.Equal(t, "a [redacted] b", got)
 }

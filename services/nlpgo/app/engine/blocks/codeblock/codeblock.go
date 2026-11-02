@@ -52,6 +52,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	_ "embed"
 
@@ -756,7 +757,7 @@ func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
 	}
 	// Invalid bytes go before any matching: dropped later they would join the
 	// bytes around them into a secret the redactor never saw.
-	raw := strings.ToValidUTF8(string(buf), "\uFFFD")
+	raw := strings.ToValidUTF8(string(dropCutRune(buf)), "\uFFFD")
 	capStart := max(0, len(raw)-maxRunnerStderr)
 	raw = redactor.TrimPartialTail(raw)
 	if offset == 0 && capStart == 0 {
@@ -766,6 +767,20 @@ func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
 	// inside the buffer, so SafeStart sees it whole and the cut lands in none.
 	start := redactor.SafeStart(raw, min(capStart, len(raw)))
 	return truncatedPrefix + redactor.Redact(raw[start:])
+}
+
+// dropCutRune removes a rune the stream stopped in the middle of, so the
+// partial secret before it is still the end of the text TrimPartialTail sees.
+func dropCutRune(b []byte) []byte {
+	for i := len(b) - 1; i >= 0 && i >= len(b)-utf8.UTFMax; i-- {
+		if utf8.RuneStart(b[i]) {
+			if !utf8.FullRune(b[i:]) {
+				return b[:i]
+			}
+			break
+		}
+	}
+	return b
 }
 
 // newRunToken mints the value every process in one execution carries in its

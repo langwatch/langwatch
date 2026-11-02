@@ -33,6 +33,8 @@ func New(secrets map[string]string, extra ...string) *Redactor {
 		if value == "" {
 			continue
 		}
+		// Callers match against text with invalid bytes already replaced.
+		value = strings.ToValidUTF8(value, "\uFFFD")
 		for _, form := range secretForms(value) {
 			seen[form] = struct{}{}
 		}
@@ -151,11 +153,11 @@ func (r *Redactor) partialTailLen(raw string) int {
 	return longest
 }
 
-// failureTable is the KMP table: for each prefix of form, the length of its
-// longest proper prefix that is also its suffix.
-func failureTable(form string) []int {
-	fail := make([]int, len(form))
-	for i, k := 1, 0; i < len(form); i++ {
+// failureTable is the KMP table for the first n bytes of form: for each
+// prefix, the length of its longest proper prefix that is also its suffix.
+func failureTable(form string, n int) []int {
+	fail := make([]int, n)
+	for i, k := 1, 0; i < n; i++ {
 		for k > 0 && form[i] != form[k] {
 			k = fail[k-1]
 		}
@@ -167,9 +169,11 @@ func failureTable(form string) []int {
 	return fail
 }
 
-// prefixSuffixLen is the length of the longest prefix of form that ends window.
+// prefixSuffixLen is the length of the longest prefix of form that ends
+// window; window must be shorter than form. The table needs only as many
+// entries as the window has bytes, so a huge secret costs nothing per call.
 func prefixSuffixLen(form, window string) int {
-	fail := failureTable(form)
+	fail := failureTable(form, len(window))
 	k := 0
 	for i := 0; i < len(window); i++ {
 		for k > 0 && window[i] != form[k] {
