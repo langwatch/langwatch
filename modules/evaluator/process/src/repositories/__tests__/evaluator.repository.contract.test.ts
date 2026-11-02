@@ -369,7 +369,7 @@ function contractCases(backend: Backend): void {
 }
 
 describe("given the memory evaluator repository", () => {
-  let repository: EvaluatorRepository;
+  let repository: MemoryEvaluatorRepository;
 
   beforeEach(() => {
     repository = MemoryEvaluatorRepository.create();
@@ -397,7 +397,7 @@ describe("given the memory evaluator repository", () => {
         createdById: null,
         updatedById: null,
       };
-      repository = MemoryEvaluatorRepository.create({ unversioned: [row] });
+      repository.seedUnversioned(row);
       return row;
     },
   });

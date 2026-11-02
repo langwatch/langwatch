@@ -39,7 +39,7 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
   /** `unversioned` seeds rows as an older release wrote them, with no versions and no creator. */
   static create(input: { unversioned?: Evaluator[] } = {}): MemoryEvaluatorRepository {
     const repository = new MemoryEvaluatorRepository();
-    for (const row of input.unversioned ?? []) repository.#seedUnversioned(row);
+    for (const row of input.unversioned ?? []) repository.seedUnversioned(row);
     return repository;
   }
 
@@ -327,7 +327,8 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
     return true;
   }
 
-  #seedUnversioned(evaluator: Evaluator): void {
+  /** Adds a row as an older release wrote it, with no versions and no creator. */
+  seedUnversioned(evaluator: Evaluator): void {
     this.#rows.set(evaluator.id, structuredClone(evaluator));
   }
 
