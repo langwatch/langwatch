@@ -19,6 +19,10 @@ import {
   SEAT_PEAK_PRUNE_INTENT,
   SEAT_PEAK_RECORD_INTENT,
 } from "../rules/seat-change.rules.ts";
+import {
+  type SeatPeakCorrections,
+  withSeatCorrections,
+} from "./seat-peak-correction.subscriber.ts";
 import { RecordSeatChangedCommand, RecordSeatSnapshotCommand } from "./seat-peak.commands.ts";
 import {
   SEAT_PEAK_AGGREGATE_TYPE,
@@ -53,6 +57,7 @@ type SeatPeakPipelineDependencies = Readonly<{
   /** The seat-change sender; it throws until this pipeline registers, so a delivery retries. */
   sender: () => SeatPeakSender;
   retention: Pick<ProcessStore, "deleteDispatchedBefore">;
+  corrections: SeatPeakCorrections;
 }>;
 
 function seatPeakCommands({
@@ -95,14 +100,18 @@ export function buildSeatPeakPipeline({
   opener,
   sender,
   retention,
+  corrections,
 }: SeatPeakPipelineDependencies): SeatPeakDefinition {
-  return seatPeakCommands({ store, sender, retention })
-    .withPeerSubscriber("seatPeakOrganizationCreated", {
+  const pipeline = seatPeakCommands({ store, sender, retention }).withPeerSubscriber(
+    "seatPeakOrganizationCreated",
+    {
       eventType: ORGANIZATION_CREATED_EVENT_TYPE,
       data: organizationCreatedEventDataSchema.pick({ organizationId: true, occurredAt: true }),
       handle: ({ organizationId, occurredAt }) => opener.open({ organizationId, occurredAt }),
-    })
-    .build();
+    },
+  );
+  // Seats moved by writes organization does not make (ADR-002 §6).
+  return withSeatCorrections({ pipeline, corrections }).build();
 }
 
 export const seatPeakEventing = defineEventingModule({

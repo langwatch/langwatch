@@ -197,6 +197,7 @@ import type { OrganizationDemoProject } from "../services/organization-visibilit
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import { PrivateDataplaneRecordService } from "../services/private-dataplane-record.service.ts";
 import { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
+import { SeatPeakCorrectionService } from "../services/seat-peak-correction.service.ts";
 import { SeatPeakService } from "../services/seat-peak.service.ts";
 import { SignUpPolicyService } from "../services/sign-up-policy.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -413,6 +414,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizations: setup.repositories.organization,
       plans: setup.dependencies.entitlement,
     });
+    // --- seat-peak corrections (ADR-002 §6): seats moved outside organization's writes ---
+    application.#seatPeakCorrections = SeatPeakCorrectionService.create({
+      seats: setup.repositories.seats,
+      peaks: setup.repositories.seatPeak,
+      organizationIdsForMember: (input) => application.organizationIdsForMember(input),
+      changes: () => application.getSeatChangeSender(),
+    });
+    // --- end seat-peak corrections ---
     application.#signUpPolicy = SignUpPolicyService.create({
       settings: setup.config.signUp,
       repository: setup.repositories.signUpPolicy,
@@ -525,6 +534,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #privateDataplanes!: PrivateDataplaneRecordService;
   #seatPeakStore!: OrganizationSetup["repositories"]["seatPeak"];
   #seatPeak!: SeatPeakService;
+  #seatPeakCorrections!: SeatPeakCorrectionService;
   /** Who may sign up and found an organization; absent only in a test's app, which is open. */
   #signUpPolicy: SignUpPolicyService | null = null;
   /** organization_audit's sender, once registration answers with it. */
@@ -1640,6 +1650,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       opener: this.#seatPeak,
       sender: () => this.getSeatChangeSender(),
       retention: processStore,
+      corrections: this.#seatPeakCorrections,
     });
   }
 
