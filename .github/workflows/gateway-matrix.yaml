@@ -319,8 +319,6 @@ jobs:
         id: seed
         env:
           VERTEX_SERVICE_ACCOUNT_JSON: ${{ secrets.MATRIX_VERTEX_SERVICE_ACCOUNT_JSON }}
-          # Empty is allowed: the gateway then uses its default api version.
-          AZURE_OPENAI_API_VERSION: ${{ vars.MATRIX_AZURE_OPENAI_API_VERSION }}
           ELEVENLABS_API_KEY: ${{ secrets.MATRIX_ELEVENLABS_API_KEY }}
         run: go run ./cmd/matrixseed -base-url "$LW_BASE_URL"
 

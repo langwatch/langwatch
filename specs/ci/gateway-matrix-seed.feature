@@ -74,13 +74,6 @@ Feature: The live gateway matrix seeds its own control plane
     And any other request's snippet has the submitted secrets removed, raw and JSON-escaped
 
   @unit
-  Scenario: The Azure api version is stored when the job sets it
-    Given the job holds Azure credentials and an api version
-    When the seed runs
-    Then the Azure model provider carries AZURE_OPENAI_API_VERSION
-    And an empty api version is not stored
-
-  @unit
   Scenario: The gateway and matrix run only once the seed has bootstrapped
     Given the seed provisions the organisation and the project
     When it has written the project's exports

@@ -33,7 +33,7 @@ The `gateway-matrix` job runs a cell only when its provider's secret is set; the
 
 - **Bedrock:** no stored key. The job assumes `MATRIX_AWS_ROLE_ARN` by OIDC and the gateway signs with that session.
 - **Vertex:** `MATRIX_VERTEX_SERVICE_ACCOUNT_JSON`. The seed stores it on the model provider, and also exchanges it for `VERTEX_ACCESS_TOKEN` (exported masked) for the cache cell, which calls Vertex directly.
-- **Azure:** `MATRIX_AZURE_OPENAI_API_KEY` and `MATRIX_AZURE_OPENAI_ENDPOINT`; the optional variable `MATRIX_AZURE_OPENAI_API_VERSION` pins the api version.
+- **Azure:** `MATRIX_AZURE_OPENAI_API_KEY` and `MATRIX_AZURE_OPENAI_ENDPOINT`.
 - **Refusals:** a refused model-provider request prints its status only, never the body; other refusals print a snippet with every submitted value removed.
 
 ## Running one cell
