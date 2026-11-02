@@ -371,7 +371,7 @@ Feature: Scenario run hooks: setup and teardown
       When the run is prepared and the step is called
       Then the step receives both rows
 
-    @unit
+    @integration
     Scenario: Run-scoped secrets stay out of the record, the simulated user, the judge and every error
       Given a setup step that returns a run-scoped secret and puts the same value in its state
       When the run records setup and a turn fails echoing the value
@@ -412,18 +412,18 @@ Feature: Scenario run hooks: setup and teardown
       Then the code runner is not called
       And setup records "failed" naming the cap
 
-    @unit
+    @integration
     Scenario: A secret in a Connector step's error is scrubbed
       Given a teardown step whose traceback prints a secret it was given
       Then the teardown error holds "[redacted]" in its place
 
-    @unit
+    @integration
     Scenario: A failed Connector teardown leaves the verdict unchanged
       Given a passing run whose teardown step raises
       Then the run verdict is still success
       And teardown records "failed"
 
-    @unit
+    @integration
     Scenario: Rerun and keep data skips a Connector teardown
       Given a run started with "Rerun and keep data" against an HTTP agent with a Connector
       Then the teardown step is not called
