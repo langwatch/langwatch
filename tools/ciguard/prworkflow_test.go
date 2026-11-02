@@ -58,7 +58,7 @@ func prTree(t *testing.T, edit func(name, content string) string) string {
 	}
 	write(NightlyWorkflowFile, "name: nightly\njobs:\n  main-checks:\n    uses: ./.github/workflows/pr.yml\n")
 	write(PRWorkflowFile, "name: pr\non:\n  pull_request:\njobs:\n  changes:\n    outputs:\n"+outputs.String()+
-		"    steps:\n      - run: gh api labels | grep -qx 'ci:now'\n"+
+		"    steps:\n      - run: gh api labels | grep -qxE 'ci:now|firefighting'\n"+
 		"  settle:\n    needs: changes\n    if: needs.changes.outputs.wait == 'true'\n    environment: settle\n"+
 		"  checks:\n    runs-on: ubuntu-latest\n    steps:\n"+
 		"      - run: ./.github/scripts/check-added-images.sh\n      - run: go run ./cmd/linkcheck README.md\n"+
@@ -209,7 +209,7 @@ func TestPRWorkflowReportsASettleJobThatHoldsNothing(t *testing.T) {
 func TestPRWorkflowReportsAWaitTheLabelCannotSkip(t *testing.T) {
 	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
 		if name == PRWorkflowFile {
-			return strings.Replace(content, "'ci:now'", "'ci:full'", 1)
+			return strings.Replace(content, "ci:now|", "ci:full|", 1)
 		}
 
 		return content
@@ -259,6 +259,32 @@ func TestPRWorkflowReportsAppChecksOffMain(t *testing.T) {
 	}))
 	require.NoError(t, err)
 	require.Contains(t, problems, ".github/workflows/langwatch-app-ci.yml: does not run on a push to main")
+}
+
+// @scenario "A merge to main runs only the app checks"
+func TestPRWorkflowReportsAppChecksPushedOnAnotherBranch(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if strings.HasSuffix(name, "langwatch-app-ci.yml") {
+			return strings.Replace(content, "branches: [main]", "branches: [develop]", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, ".github/workflows/langwatch-app-ci.yml: does not run on a push to main")
+}
+
+// @scenario "The ci:now label skips the wait"
+func TestPRWorkflowReportsAWaitTheFirefightingLabelCannotSkip(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "|firefighting", "", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": the changes job does not read the firefighting label")
 }
 
 // @scenario "The cheap checks run at once"

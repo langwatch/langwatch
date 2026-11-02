@@ -136,10 +136,10 @@ jobs:
           cache-dependency-path: "*/go.sum"
       - name: README links
         run: go run ./cmd/linkcheck README.md
-      # The token usage comment never gates a merge (specs/ci/pr-token-usage.feature).
+      # Posting the comment never gates a merge (specs/ci/pr-token-usage.feature);
+      # its builder's tests do.
       - name: Test the token usage comment builder
         if: github.event.pull_request.head.repo.full_name == github.repository
-        continue-on-error: true
         run: node --test --experimental-strip-types .github/scripts/pr-token-usage.test.ts
       - name: Token usage comment
         if: github.event.pull_request.head.repo.full_name == github.repository

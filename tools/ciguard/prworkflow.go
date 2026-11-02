@@ -278,12 +278,10 @@ func settleProblems(pr *prFile) []string {
 	if pr.Jobs[settleJob].Environment != settleJob {
 		problems = append(problems, PRWorkflowFile+": settle does not declare environment: settle, so nothing waits")
 	}
-	readsLabel := false
-	for _, step := range pr.Jobs["changes"].Steps {
-		readsLabel = readsLabel || strings.Contains(step.Run, "ci:now")
-	}
-	if !readsLabel {
-		problems = append(problems, PRWorkflowFile+": the changes job does not read the ci:now label")
+	for _, label := range []string{"ci:now", "firefighting"} {
+		if !slices.ContainsFunc(pr.Jobs["changes"].Steps, func(step prStep) bool { return strings.Contains(step.Run, label) }) {
+			problems = append(problems, PRWorkflowFile+": the changes job does not read the "+label+" label")
+		}
 	}
 
 	return append(problems, cheapChecksProblems(pr)...)
@@ -311,6 +309,20 @@ func cheapChecksProblems(pr *prFile) []string {
 	return problems
 }
 
+// pushesMain reports whether a `push:` trigger fires on main: bare, unfiltered, or naming main.
+func pushesMain(push any) bool {
+	filter, ok := push.(map[string]any)
+	if !ok {
+		return push == nil
+	}
+	branches, ok := filter["branches"].([]any)
+	if !ok {
+		return filter["branches"] == nil
+	}
+
+	return slices.Contains(branches, any("main"))
+}
+
 // mainProblems: a merge to main runs only the app checks of the ones pr.yml
 // calls, and the nightly suite runs pr.yml for the rest.
 func mainProblems(repoRoot string) ([]string, error) {
@@ -321,7 +333,8 @@ func mainProblems(repoRoot string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, onPush := called.On["push"]
+		push, onPush := called.On["push"]
+		onPush = onPush && pushesMain(push)
 		switch {
 		case onPush && !call.OnMainPush:
 			problems = append(problems, rel+": runs on a push to main; the nightly suite runs it")
