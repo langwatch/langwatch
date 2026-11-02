@@ -565,7 +565,7 @@ type Response = z.infer<typeof archiveResultSchema>; // ../contract/src/agent-re
 
 #### `GET /:agentId/versions` · `listAgentVersions`
 
-List an agent's versions, newest first, with the labels on each
+List an agent's versions
 
 Permission `project:view`. Declared at `src/transport/agent.rest.ts:250`.
 
@@ -581,9 +581,9 @@ type Response = z.infer<typeof agentVersionListResponseSchema>; // ../contract/s
 
 #### `PUT /:agentId/labels/:label` · `assignAgentLabel`
 
-Point a deploy label, such as production, at one of the agent's versions
+Point a deploy label at an agent version
 
-Permission `agents:deploy`. Credential `project`. Declared at `src/transport/agent.rest.ts:266`.
+Permission `agents:deploy`. Credential `project`. Declared at `src/transport/agent.rest.ts:269`.
 
 Answers at `/api/v1/agents/:agentId/labels/:label`.
 
@@ -609,13 +609,13 @@ interface Response {
 
 Remove a deploy label from an agent
 
-Permission `agents:deploy`. Declared at `src/transport/agent.rest.ts:289`.
+Permission `agents:deploy`. Declared at `src/transport/agent.rest.ts:293`.
 
 Answers at `/api/v1/agents/:agentId/labels/:label`.
 
 ```typescript
 type Params = z.infer<typeof agentLabelRestParamsSchema>; // ../contract/src/agent-version.ts:175
-// Response: inline, src/transport/agent.rest.ts:299
+// Response: inline, src/transport/agent.rest.ts:303
 interface Response {
   label: string;
   removed: true;
@@ -626,7 +626,7 @@ interface Response {
 
 Send one conversation turn to an online connected agent
 
-Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:307`.
+Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:311`.
 
 Answers at `/api/v1/agents/:id/call`.
 
