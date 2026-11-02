@@ -1113,6 +1113,14 @@ Feature: The daily insights run
       And after a run it says calmly that Langy cannot read From LangWatch boards yet
 
     @integration
+    Scenario: Turning on a From LangWatch board says no run reads it yet
+      Given a From LangWatch board that a member never turned on
+      When they turn it on from the quiet control
+      Then the message says Langy cannot read From LangWatch boards yet and a run files nothing for now
+      And it does not say Langy reads the board every day
+      And turning on a stored board still says Langy reads it every day
+
+    @integration
     Scenario: A From LangWatch board's settings say no run reads it yet
       Given a From LangWatch board that a member turned on
       When they open Settings from the dropdown

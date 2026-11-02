@@ -67,11 +67,14 @@ function Board({
   kind = "dashboard",
   id = "board-1",
   widgets,
+  witness = false,
 }: {
   kind?: "dashboard" | "template";
   id?: string;
   /** "loading" while a stored board's widgets have not answered. */
   widgets: number | "loading";
+  /** A second header for the same board with one widget: it draws once the shared read lands. */
+  witness?: boolean;
 }) {
   const [added, setAdded] = useState(0);
   return (
@@ -85,6 +88,16 @@ function Board({
         boardName="Checkout health"
         widgetCount={widgets === "loading" ? void 0 : widgets + added}
       />
+      {witness && (
+        <section aria-label="Witness">
+          <BoardDailyInsights
+            boardKind={kind}
+            boardId={id}
+            boardName="Checkout health"
+            widgetCount={1}
+          />
+        </section>
+      )}
     </>
   );
 }
@@ -105,6 +118,7 @@ function openBoard({
   host?: StubInsightHostOptions;
   kind?: "dashboard" | "template";
   id?: string;
+  witness?: boolean;
 } = {}) {
   const calls: UiProcedureCall[] = [];
   const { host } = renderWithInsightHost({
@@ -182,13 +196,18 @@ describe("given a board with no widgets and a member who never answered for it",
   describe("when they open the board", () => {
     /** @scenario "A board with no widgets shows no control" */
     it("opens no dialog and draws no control until its first widget lands", async () => {
-      const board = openBoard({ widgets: 0 });
-      await waitFor(() => expect(board.reads()).toHaveLength(1));
+      const board = openBoard({ widgets: 0, witness: true });
+      const witness = within(screen.getByRole("region", { name: "Witness" }));
+      // Both headers draw from one read, so the witness's switch means the read has landed.
+      await witness.findByLabelText("Turn on daily insights");
+      expect(screen.getAllByLabelText("Turn on daily insights")).toHaveLength(1);
 
       // The control shows once the board has something to read; the board opened without.
       await board.user.click(screen.getByRole("button", { name: "Add a widget" }));
 
-      await waitFor(() => expect(quietControl()).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getAllByLabelText("Turn on daily insights")).toHaveLength(2),
+      );
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(board.writes()).toEqual([]);
     });
@@ -501,6 +520,38 @@ describe("given a From LangWatch board", () => {
       expect(board.reads()).toEqual([
         { projectId: "project-1", board: { kind: "template", id: "release" } },
       ]);
+    });
+  });
+
+  describe("when a member turns it on from the quiet control", () => {
+    /** @scenario "Turning on a From LangWatch board says no run reads it yet" */
+    it("says that a run on this board files nothing for now, and promises no daily read", async () => {
+      const board = openBoard({ kind: "template", id: "release" });
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
+
+      await board.user.click(quietControl()!);
+
+      await waitFor(() =>
+        expect(board.host.successes).toEqual([
+          {
+            title:
+              "Daily insights on. Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.",
+          },
+        ]),
+      );
+    });
+
+    /** @scenario "Turning on a From LangWatch board says no run reads it yet" */
+    it("promises the daily read on a stored board", async () => {
+      const board = openBoard();
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
+
+      await board.user.click(quietControl()!);
+
+      await waitFor(() => expect(board.host.successes).toHaveLength(1));
+      expect(board.host.successes[0]?.title).toMatch(
+        /^Daily insights on\. Langy reads this board every day /,
+      );
     });
   });
 
