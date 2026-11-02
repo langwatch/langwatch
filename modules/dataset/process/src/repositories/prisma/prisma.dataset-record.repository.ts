@@ -179,6 +179,7 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<void> {
     const { datasetId, projectId } = input;
+    const writtenAt = Date.now();
     await this.database.$transaction(
       async (tx) => {
         await tx.datasetRecord.deleteMany({ where: { datasetId, projectId } });
@@ -186,18 +187,31 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
           await tx.datasetRecord.createMany({
             data: input.entries
               .slice(start, start + REPLACE_BATCH_SIZE)
-              .map(({ id, ...entry }) => ({
-                id,
-                datasetId,
-                projectId,
-                entry: entry as Prisma.InputJsonValue,
-              })),
+              .map(({ id, ...entry }, offset) => {
+                const createdAt = replacedAt({ writtenAt, position: start + offset });
+                return {
+                  id,
+                  datasetId,
+                  projectId,
+                  entry: entry as Prisma.InputJsonValue,
+                  createdAt,
+                  updatedAt: createdAt,
+                };
+              }),
           });
         }
       },
       { timeout: REPLACE_TXN_TIMEOUT_MS },
     );
   }
+}
+
+/**
+ * Reads order entries by `createdAt`, so a replacement stamps each entry one millisecond after
+ * the one before it, keeping the order it was given whatever the ids sort to.
+ */
+function replacedAt({ writtenAt, position }: { writtenAt: number; position: number }): Date {
+  return new Date(writtenAt + position);
 }
 
 function toDatasetRecord(row: unknown): DatasetRecord {

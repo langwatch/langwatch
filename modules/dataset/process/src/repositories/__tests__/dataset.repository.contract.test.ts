@@ -313,6 +313,30 @@ function contractCases(backend: Backend): void {
       expect(await ids(other.id)).toEqual(["other-1"]);
     });
 
+    /** @scenario "Restoring a version keeps the version's row order" */
+    it("keeps the given order of the entries, whatever their ids", async () => {
+      const dataset = await create("replaced-in-order");
+      const projectId = backend.mine();
+
+      await backend.records().replaceAll({
+        datasetId: dataset.id,
+        projectId,
+        entries: [
+          { id: "row-c", input: "first" },
+          { id: "row-a", input: "second" },
+          { id: "row-b", input: "third" },
+        ],
+      });
+
+      const page = await backend.records().listAll({
+        datasetId: dataset.id,
+        projectId,
+        page: 1,
+        limit: 50,
+      });
+      expect(page.records.map((record) => record.id)).toEqual(["row-c", "row-a", "row-b"]);
+    });
+
     it("keeps the old entries when a later batch of the replacement fails", async () => {
       const dataset = await create("replace-failed");
       const projectId = backend.mine();

@@ -167,6 +167,12 @@ Feature: Dataset version history
     When a user restores one of its versions
     Then it is refused with code "dataset_version_restore_unsupported"
 
+  @integration
+  Scenario: Restoring a version keeps the version's row order
+    Given a dataset kept as entries whose version holds rows in an order their ids do not sort to
+    When the version is restored
+    Then the dataset's rows read back in the version's order
+
   # --- Experiments ---
 
   @unit
