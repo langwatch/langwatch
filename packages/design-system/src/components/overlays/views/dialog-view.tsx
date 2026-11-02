@@ -66,7 +66,6 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
   ) {
     const portalTarget = React.useRef<HTMLDivElement | null>(null);
     const { open } = useDialogContext();
-    const inset = useDrawerEndInset();
     React.useEffect(() => (open ? registerOpenModal() : undefined), [open]);
     const guarded = withErrorBoundary;
     return (
@@ -81,10 +80,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
         )}
         <FieldLayoutProvider value="stacked">
           <OverlayPortalTargetProvider value={portalTarget}>
-            <ChakraDialog.Positioner
-              paddingEnd={inset > 0 ? { base: 0, md: `${inset}px` } : undefined}
-              {...positionerProps}
-            >
+            <ChakraDialog.Positioner {...positionerProps}>
               <ChakraDialog.Content
                 ref={contentProps.asChild ? mergeRefs(ref, portalTarget) : ref}
                 {...contentProps}

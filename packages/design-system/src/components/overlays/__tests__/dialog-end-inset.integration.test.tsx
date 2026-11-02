@@ -26,17 +26,20 @@ function rulesFor(element: HTMLElement) {
     .join("\n");
 }
 
+/**
+ * Only drawers yield the docked side panel's room; a dialog stays centred in the whole window.
+ */
 describe("given a docked side panel keeps room on the right edge", () => {
   afterEach(() => {
     setDrawerEndInset(0);
     cleanup();
   });
 
-  it("centres the dialog in the space left of the panel, from the md breakpoint up", () => {
+  it("keeps the dialog centred in the whole window, since only drawers make room for the panel", () => {
     setDrawerEndInset(412);
     const css = rulesFor(renderOpenDialog());
-    expect(css).toContain("412px");
-    expect(css).toMatch(/@media[^{]*min-width[^{]*\{[^}]*padding-inline-end:\s*412px/);
+    expect(css).not.toContain("412px");
+    expect(css).not.toContain("padding-inline-end");
   });
 
   it("keeps the full window when no panel is docked", () => {
