@@ -23,6 +23,9 @@
 //     payload over a socket answered by the pid the kernel reports for the
 //     process connecting (see payloadchannel_linux.go).
 //
+// The one exception is visible-process mode, AWS Lambda only: the hide step is
+// skipped and /proc stays readable between invocations (contract.md §7).
+//
 // What this does not do is give an execution its own UID, PID namespace or
 // cgroup. All three would be stronger: a per-execution UID would make the
 // filesystem and /proc barriers kernel-enforced rather than a matter of

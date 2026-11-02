@@ -378,3 +378,9 @@ func TestAllowVisibleProcess_HonoredOnlyOnLambdaAndWarnsWhenIgnored(t *testing.T
 		})
 	}
 }
+
+func TestAllowVisibleProcess_NilLoggerIgnoresSettingOffLambda(t *testing.T) {
+	assert.NotPanics(t, func() {
+		assert.False(t, allowVisibleProcess(true, func(string) string { return "" }, nil))
+	})
+}
