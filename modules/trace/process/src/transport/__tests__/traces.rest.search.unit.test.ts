@@ -29,11 +29,7 @@ import {
 } from "#rules/trace-filter-hidden-origins.rules";
 
 import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import {
-  SEARCH_WITH_SPANS_PAGE_SIZE_MAX,
-  tracesRestCredential,
-  tracesRest,
-} from "../traces.rest.ts";
+import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
 vi.mock("#features/projection/rules/trace-projection-compile.rules", async (importOriginal) => {
   const actual = await importOriginal<typeof projectionCompileRules>();
@@ -243,66 +239,34 @@ describe("POST /search", () => {
     });
   });
 
-  describe("when includeSpans asks for a page larger than a spans page may be", () => {
+  describe("when includeSpans names a page size", () => {
     /** @scenario "Public trace search with spans refuses a page above 100 traces" */
-    it("refuses with 422 naming the spans page bound, reading nothing", async () => {
+    it("hands the size to the app to refuse above the spans page bound", async () => {
       const { send, listTraces } = mount();
-      const res = await send({
-        startDate: 1000,
-        endDate: 5000,
-        includeSpans: true,
-        pageSize: 4000,
-      });
-      expect(res.status).toBe(422);
-      const body = (await res.json()) as { code?: string; meta?: { maxPageSize?: number } };
-      expect(body.code).toBe("trace_page_size_too_large");
-      expect(body.meta?.maxPageSize).toBe(SEARCH_WITH_SPANS_PAGE_SIZE_MAX);
-      expect(listTraces).not.toHaveBeenCalled();
-    });
-
-    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
-    it("accepts a page exactly at the spans page bound", async () => {
-      const { send, listTraces } = mount();
-      await send({
-        startDate: 1000,
-        endDate: 5000,
-        includeSpans: true,
-        pageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX,
-      });
+      await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 4000 });
       expect(listTraces).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.objectContaining({ pageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX }),
+          query: expect.objectContaining({ pageSize: 4000 }),
+          options: expect.objectContaining({ refuseAbove: "tracesWithSpansPageSizeMax" }),
         }),
       );
     });
 
     /** @scenario "Public trace search with spans refuses a page above 100 traces" */
-    it("answers pages of the spans page bound when no pageSize is named", async () => {
+    it("names no size when the caller named none, so the app answers the bound", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, includeSpans: true });
-      expect(listTraces).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({ pageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX }),
-        }),
-      );
+      const query = vi.mocked(listTraces).mock.calls[0]?.[0]?.query as { pageSize?: number };
+      expect(query.pageSize).toBeUndefined();
     });
 
     /** @scenario "Public trace search with spans refuses a page above 100 traces" */
-    it("keeps a smaller requested page as it is", async () => {
-      const { send, listTraces } = mount();
-      await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 20 });
-      expect(listTraces).toHaveBeenCalledWith(
-        expect.objectContaining({ query: expect.objectContaining({ pageSize: 20 }) }),
-      );
-    });
-
-    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
-    it("leaves a search without spans at the requested size", async () => {
+    it("leaves a search without spans to the list bound's clamp", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, pageSize: 4000 });
-      expect(listTraces).toHaveBeenCalledWith(
-        expect.objectContaining({ query: expect.objectContaining({ pageSize: 4000 }) }),
-      );
+      const input = vi.mocked(listTraces).mock.calls[0]?.[0];
+      expect(input?.query).toMatchObject({ pageSize: 4000 });
+      expect(input?.options).not.toHaveProperty("refuseAbove");
     });
   });
 

@@ -1690,7 +1690,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       },
     });
   }
-  /** The tRPC reads refuse above their named plan bound; every other caller clamps. */
+  /** The tRPC reads and a spans search refuse above their named plan bound; others clamp. */
   async #boundedPageSize({
     projectId,
     pageSize,
@@ -1698,8 +1698,11 @@ export class TraceModule implements TraceApi, CollectorApp {
   }: {
     projectId: string;
     pageSize: number | undefined;
-    refuseAbove: "tracesPageSizeMax" | "tracesDownloadPageSizeMax" | undefined;
+    refuseAbove: traceContractModule.TracePageSizeBound | undefined;
   }): Promise<number | undefined> {
+    if (refuseAbove === "tracesWithSpansPageSizeMax") {
+      return this.#readBounds.spansPageSize({ projectId, pageSize });
+    }
     if (pageSize === undefined) return undefined;
     if (refuseAbove === undefined) return this.#readBounds.clampPageSize(projectId, pageSize);
     await this.#readBounds.assertPageSizeWithinBound({ projectId, pageSize, bound: refuseAbove });

@@ -51,8 +51,16 @@ Feature: Trace list page size cap
   Scenario: Public trace search with spans refuses a page above 100 traces
     When the public trace search asks for spans with pageSize 4000
     Then the request is refused with 422 "trace_page_size_too_large" naming the bound 100
-    And a page of 100 or fewer, or a search without spans, keeps the size it asked for
+    And a page of 100 or fewer keeps the size it asked for
     And a search with spans that names no pageSize answers pages of 100
+    And a search without spans is never refused, only clamped to the caller's plan bound
+
+  @unit
+  Scenario: An operator's spans page bound is the one a spans search answers by
+    Given an operator has set the spans page bound to 10
+    When the public trace search asks for spans with pageSize 11
+    Then the request is refused with "trace_page_size_too_large" naming the bound 10
+    And a search with spans that names no pageSize answers pages of 10
 
   @integration
   Scenario: The filtered annotations list walks trace pages at the cap

@@ -34,7 +34,6 @@ import {
   type Trace,
   type TraceSearchBody,
   type TraceSharedFiltersInput,
-  TracePageSizeTooLargeError,
 } from "@langwatch/trace-contract";
 import type { z } from "zod";
 
@@ -59,16 +58,6 @@ const logger = createLogger("langwatch:api:traces");
  * is clamped to the caller's tier by the application, not here.
  */
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
-
-/**
- * The most traces one `includeSpans` search page answers, and its default: a page with spans is
- * buffered whole (an api pod OOM). A larger pageSize is refused, not clamped, so no caller reads
- * a short page as the end of the export.
- */
-export const SEARCH_WITH_SPANS_PAGE_SIZE_MAX = resolveRequestBound(
-  "tracesWithSpansPageSizeMax",
-  "FREE",
-);
 
 /** The credential a route reads: an API key's own id, and the member it acts as. */
 export const tracesRestCredential = defineMiddlewareContext(
@@ -253,14 +242,9 @@ async function searchTraces({
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 
-  if (includeSpans && rawPageSize !== undefined && rawPageSize > SEARCH_WITH_SPANS_PAGE_SIZE_MAX) {
-    throw new TracePageSizeTooLargeError({
-      maxPageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX,
-      bound: "tracesWithSpansPageSizeMax",
-    });
-  }
-  const pageSize =
-    rawPageSize ?? (includeSpans ? SEARCH_WITH_SPANS_PAGE_SIZE_MAX : DEFAULT_TRACES_PAGE_SIZE);
+  // A spans page is buffered whole (an api pod OOM): the app refuses above the plan's spans
+  // bound, never clamps, so no caller reads a short page as the end of an export.
+  const pageSize = includeSpans ? rawPageSize : (rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE);
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
     principal: caller.principal,
@@ -295,6 +279,7 @@ async function searchTraces({
       dateField,
       filterWhere,
       authorization,
+      ...(includeSpans ? { refuseAbove: "tracesWithSpansPageSizeMax" as const } : {}),
       ...(projection ? { projection: projection.plan } : {}),
     },
   });
