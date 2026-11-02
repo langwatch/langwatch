@@ -65,7 +65,7 @@ var PRAlways = []string{PRWorkflowFile, PRFiltersFile}
 var PRRequired = []string{
 	"langwatch-app-complete", "typecheck", "build", "e2e-complete", "langwatch-nlp-complete",
 	"langevals-complete", "mcp-javascript-complete", "sdk-go-complete", "sdk-javascript-complete",
-	"docs-complete", "codeql-complete", "clickhouse-serverless-complete",
+	"docs-complete", "codeql-complete", "clickhouse-serverless-complete", "review",
 }
 
 type prFile struct {

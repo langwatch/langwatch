@@ -19,7 +19,7 @@ Feature: Pull request checks wait for a quiet branch, and main runs them once a 
 
   @unit
   Scenario: The cheap checks run at once
-    Given the checks that used to be a workflow each: screenshots, README links, impact map and token usage
+    Given the checks that used to be a workflow each: screenshots, README links and token usage (the impact map lives in pr-conventions.yml)
     When pr.yml runs
     Then they run as steps of one job that does not wait for settle
 

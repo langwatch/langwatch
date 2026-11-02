@@ -147,11 +147,6 @@ jobs:
       - name: README links
         if: steps.readme.outputs.changed == 'true'
         run: go run ./cmd/linkcheck README.md
-      - name: PR impact map
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: await require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-impact-map.cjs`)({ github, context, core })
       - name: Test the token usage comment builder
         if: github.event.pull_request.head.repo.full_name == github.repository
         run: node --test --experimental-strip-types .github/scripts/pr-token-usage.test.ts
@@ -242,6 +237,10 @@ jobs:
     if: ${{ !cancelled() && needs.changes.outputs.go == 'true' && needs.settle.result != 'failure' }}
     uses: ./.github/workflows/go-ci.yaml
     secrets: inherit
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: read
 
   sdk-python:
     needs: [changes, settle]
@@ -312,6 +311,7 @@ jobs:
             docs-complete=${{ needs.docs.result }}
             codeql-complete=${{ needs.codeql.result }}
             clickhouse-serverless-complete=${{ needs['clickhouse-serverless'].result }}
+            review=${{ needs.review.result }}
         run: |
           for pair in $RESULTS; do
             context="${pair%%=*}" result="${pair#*=}"

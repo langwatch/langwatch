@@ -162,6 +162,9 @@ go:
   - "cmd/prfilters/**"
   - "tools/ciguard/**"
   - "pkg/ciscan/**"
+  - ".github/actions/**"
+  - "charts/*/Chart.yaml"
+  - "infra/docker/Dockerfile.*.lambda"
   - ".github/workflows/pr.yml"
 sdk-python:
   - "sdks/python/**"
