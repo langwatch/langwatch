@@ -1,4 +1,7 @@
-/** @see specs/auth/signin-callback-url-unsupported-characters.feature */
+/**
+ * @see specs/auth/signin-callback-url-unsupported-characters.feature
+ * @see specs/auth/sso-wrong-provider-recovery.feature
+ */
 import { describe, expect, it } from "vitest";
 
 import { betterAuthLogLevel } from "../http.better-auth.channel.ts";
@@ -26,6 +29,13 @@ describe("betterAuthLogLevel", () => {
         );
       },
     );
+  });
+
+  describe("when better-auth refuses to link an account to the address's existing one", () => {
+    /** @scenario "The library's own refused-link line is written down as a warning, not an error" */
+    it("writes it down as a warning", () => {
+      expect(betterAuthLogLevel({ level: "error", message: "account_not_linked" })).toBe("warn");
+    });
   });
 
   describe("when reading a sign-in's state back fails for a reason of ours", () => {

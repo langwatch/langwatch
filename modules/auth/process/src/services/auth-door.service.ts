@@ -12,7 +12,9 @@ import { z } from "zod";
 
 import {
   accountNotLinkedRedirectOf,
+  emailDomainOf,
   isAccountNotLinkedRedirect,
+  signInMethodOfPath,
 } from "../rules/account-not-linked.rules.ts";
 import { isAllowedAuthOrigin, parseOrigin } from "../rules/auth-origin.rules.ts";
 import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
@@ -144,14 +146,30 @@ export class AuthDoorService {
 
   /** A refused link, answered with the connection that governs the provider's address
    *  (specs/auth/sso-wrong-provider-recovery.feature). */
-  private async nameGoverningConnection(response: Response): Promise<Response> {
+  private async nameGoverningConnection({
+    request,
+    response,
+  }: {
+    request: Request;
+    response: Response;
+  }): Promise<Response> {
     const location = response.headers.get("location");
     if (!isAccountNotLinkedRedirect({ location })) return response;
     const email = this.deps.oauthProfileEmails.findEmail();
-    if (email === undefined) return response;
-    const [connectionId] = await this.deps.governingConnections.findGoverningConnections({
-      email,
-    });
+    const [connectionId] =
+      email === undefined
+        ? []
+        : await this.deps.governingConnections.findGoverningConnections({ email });
+    // Better Auth's own line says only "account_not_linked"; this one says who, without the
+    // address itself.
+    logger.warn(
+      {
+        provider: signInMethodOfPath({ url: request.url }),
+        emailDomain: emailDomainOf({ email }),
+        governingConnectionId: connectionId ?? null,
+      },
+      "sign-in refused: the address already has an account under another sign-in method",
+    );
     const redirect = accountNotLinkedRedirectOf({ location, connectionId });
     if (redirect.kind === "pass") return response;
     const headers = new Headers(response.headers);
@@ -198,9 +216,13 @@ export class AuthDoorService {
 
     const answered = await this.deps.oauthProfileEmails.runWithScope(async () =>
       this.deps.idTokenIssuerRefusals.runWithScope(async () =>
-        this.nameGoverningConnection(
-          await this.nameIssuerMismatch({ request, response: await betterAuth.handler(stated) }),
-        ),
+        this.nameGoverningConnection({
+          request,
+          response: await this.nameIssuerMismatch({
+            request,
+            response: await betterAuth.handler(stated),
+          }),
+        }),
       ),
     );
     // Each acts on a different status (a 3xx to the error page, a 5xx on a callback).
