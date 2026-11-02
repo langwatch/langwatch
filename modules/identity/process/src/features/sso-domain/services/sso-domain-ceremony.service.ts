@@ -21,6 +21,7 @@ import {
 
 import type { SsoDomainProofFileChannel } from "../../../channels/sso-domain-proof-file.channel.ts";
 import type { SsoDomainProofChannel } from "../../../channels/sso-domain-proof.channel.ts";
+import { PROXY_MISCONFIGURED_REASON } from "../../../channels/sso-issuer-discovery.channel.ts";
 import { mintVerificationToken, safeEqual, sha256Hex } from "../../../rules/pkce.rules.ts";
 import type { SsoConnectionReadRepository } from "../../sso-connection/repositories/sso-connection.repository.ts";
 import { newSsoConnectionCommandId } from "../../sso-connection/rules/sso-connection-id.rules.ts";
@@ -279,7 +280,7 @@ export class SsoDomainCeremonyService {
     const fetched = await this.deps.files.fetchVerificationFile({ domain, url });
     if (fetched.outcome === "unreachable") {
       throw new SsoDomainLookupFailedError(
-        fetched.reason === "proxy_misconfigured"
+        fetched.reason === PROXY_MISCONFIGURED_REASON
           ? `connection ${connectionId}: the outbound proxy setting is not a valid proxy URL, so ${url} was not fetched`
           : `connection ${connectionId}: ${url} could not be fetched (${fetched.reason})`,
       );

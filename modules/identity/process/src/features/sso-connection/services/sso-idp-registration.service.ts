@@ -14,7 +14,10 @@ import {
 import { Extractor } from "samlify";
 import { z } from "zod";
 
-import type { SsoIssuerDiscoveryChannel } from "../../../channels/sso-issuer-discovery.channel.ts";
+import {
+  PROXY_MISCONFIGURED_REASON,
+  type SsoIssuerDiscoveryChannel,
+} from "../../../channels/sso-issuer-discovery.channel.ts";
 import {
   looksLikeCertificate,
   looksLikeSamlDescriptor,
@@ -63,7 +66,7 @@ export class SsoIdpRegistrationService {
     const answer = await this.deps.discovery.discover({ issuer: registration.issuer });
     if (!answer.reachable) {
       throw new SsoIssuerUnreachableError(
-        answer.reason === "proxy_misconfigured"
+        answer.reason === PROXY_MISCONFIGURED_REASON
           ? `the outbound proxy setting is not a valid proxy URL, so discovery at ${registration.issuer} was not attempted`
           : `discovery at ${registration.issuer} did not answer: ${answer.reason}`,
       );

@@ -27,6 +27,7 @@ import type {
   SsoDomainProofChannel,
   SsoDomainTxtLookup,
 } from "../channels/sso-domain-proof.channel.ts";
+import { PROXY_MISCONFIGURED_REASON } from "../channels/sso-issuer-discovery.channel.ts";
 import type {
   SsoConnectionRegistrationRepository,
   SsoConnectionRegistrationSlot,
@@ -524,6 +525,25 @@ describe("checking what the domain publishes", () => {
         }),
       ),
     ).toBe("sso_domain_lookup_failed");
+  });
+
+  it("blames the outbound proxy setting, not the domain, when the proxy is misconfigured", async () => {
+    await issue();
+    files.answer = { outcome: "unreachable", reason: PROXY_MISCONFIGURED_REASON };
+
+    await expect(
+      ceremony.checkDomainFile({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: DOMAIN,
+        actor: ANA,
+      }),
+    ).rejects.toMatchObject({
+      code: "sso_domain_lookup_failed",
+      reasons: [
+        { message: expect.stringMatching(/outbound proxy setting is not a valid proxy URL/) },
+      ],
+    });
   });
 
   it("refuses a check for a domain no record is outstanding for", async () => {

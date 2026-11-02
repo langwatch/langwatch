@@ -15,6 +15,7 @@ import type {
   SsoDomainFileFetch,
   SsoDomainProofFileChannel,
 } from "../sso-domain-proof-file.channel.ts";
+import { PROXY_MISCONFIGURED_REASON } from "../sso-issuer-discovery.channel.ts";
 
 const logger = createLogger("langwatch:identity:sso-domain-file");
 
@@ -185,7 +186,7 @@ export class HttpsSsoDomainProofFileChannel implements SsoDomainProofFileChannel
 function reasonFor({ error, aborted }: { error: unknown; aborted: boolean }): string {
   if (error instanceof ProofFileDowngradedError) return "not_https";
   if (error instanceof RedirectRefusedError) return "redirect_refused";
-  if (error instanceof OutboundProxyMisconfiguredError) return "proxy_misconfigured";
+  if (error instanceof OutboundProxyMisconfiguredError) return PROXY_MISCONFIGURED_REASON;
   if (aborted) return "timeout";
   const code =
     typeof error === "object" &&

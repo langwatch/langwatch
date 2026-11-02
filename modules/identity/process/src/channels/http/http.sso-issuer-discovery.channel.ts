@@ -19,9 +19,10 @@ import {
   discoveryEndpointFor,
   looksLikeDiscoveryDocument,
 } from "../../features/sso-connection/rules/sso-idp-registration.rules.ts";
-import type {
-  SsoIssuerDiscovery,
-  SsoIssuerDiscoveryChannel,
+import {
+  PROXY_MISCONFIGURED_REASON,
+  type SsoIssuerDiscovery,
+  type SsoIssuerDiscoveryChannel,
 } from "../sso-issuer-discovery.channel.ts";
 import type { SsoDomainProofEgressPolicy } from "./http.sso-domain-proof-file.channel.ts";
 
@@ -248,7 +249,7 @@ function reasonFor({ error, aborted }: { error: unknown; aborted: boolean }): st
   if (error instanceof DiscoveryDowngradedError) return "not_https";
   if (error instanceof VouchedOriginUnresolvableError) return "unresolvable";
   if (error instanceof RedirectRefusedError) return "redirect_refused";
-  if (error instanceof OutboundProxyMisconfiguredError) return "proxy_misconfigured";
+  if (error instanceof OutboundProxyMisconfiguredError) return PROXY_MISCONFIGURED_REASON;
   if (aborted) return "timeout";
   const code =
     typeof error === "object" &&
