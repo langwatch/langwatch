@@ -59,7 +59,7 @@ Feature: A federated callback's session claims come only from verified evidence
     When the application initializes
     Then initialization completes with Okta not mounted
 
-  @unit
+  @integration
   Scenario: Auth0 with no signing keys to verify with is refused at startup, and only Auth0
     Given Auth0's discovery document publishes no signing key set
     When the application initializes

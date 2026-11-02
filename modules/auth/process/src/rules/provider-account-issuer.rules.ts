@@ -67,7 +67,7 @@ export function hasRecordedIssuer({
   account: unknown;
   assertedIssuers: readonly string[];
 }): boolean {
-  return assertedIssuers.length > 0 || statedIssuerSchema.validate(account);
+  return assertedIssuers.some(Boolean) || statedIssuerSchema.validate(account);
 }
 
 /** The `iss` a Microsoft ID token states: one entry, or none for an unreadable token. */

@@ -7,7 +7,7 @@ const withoutTrailingSlash = (issuer: string): string =>
  * would sign in as that row's person (ADR-189). Every connection row is stamped with its real
  * issuer, so a row with no issuer, or any `local:` namespace, names another one too.
  */
-export function isStoredUnderAnotherIssuer({
+function isStoredUnderAnotherIssuer({
   storedIssuers,
   issuer: assertedIssuer,
 }: {

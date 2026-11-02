@@ -146,9 +146,10 @@ const byIssuerSubject: AccountQueryShape = (where) => {
 
 // `userId` is a refinement, not decoration: the pair is unique, but answering a query that
 // named a user with another user's row is the cross-tenant miss this module refuses to make.
-// 1.7.3 dropped the `issuer` clause from it (ADR-189).
+// 1.7.3 dropped the `issuer` clause from it (ADR-189); both forms are served.
 const byUserProviderSubject: AccountQueryShape = (where) => {
-  if (!only(where, "accountId", "providerId", "userId")) return [];
+  const withoutIssuer = only(where, "accountId", "providerId", "userId");
+  if (!withoutIssuer && !only(where, "accountId", "issuer", "providerId", "userId")) return [];
   const accountId = valueOf(where, "accountId");
   const providerId = valueOf(where, "providerId");
   const userId = valueOf(where, "userId");
