@@ -120,9 +120,9 @@ def sync_detailed(
     | GetApiDashboardsByDashboardIdWidgetsResponse404
     | GetApiDashboardsByDashboardIdWidgetsResponse500
 ]:
-    """List a board's widgets
+    """List a dashboard's widgets
 
-     Lists the widgets on one board, each with its React source and named queries.
+     Lists the widgets on one dashboard, each with its React source and named queries.
 
     Args:
         dashboard_id (str):
@@ -159,9 +159,9 @@ def sync(
     | GetApiDashboardsByDashboardIdWidgetsResponse500
     | None
 ):
-    """List a board's widgets
+    """List a dashboard's widgets
 
-     Lists the widgets on one board, each with its React source and named queries.
+     Lists the widgets on one dashboard, each with its React source and named queries.
 
     Args:
         dashboard_id (str):
@@ -192,9 +192,9 @@ async def asyncio_detailed(
     | GetApiDashboardsByDashboardIdWidgetsResponse404
     | GetApiDashboardsByDashboardIdWidgetsResponse500
 ]:
-    """List a board's widgets
+    """List a dashboard's widgets
 
-     Lists the widgets on one board, each with its React source and named queries.
+     Lists the widgets on one dashboard, each with its React source and named queries.
 
     Args:
         dashboard_id (str):
@@ -229,9 +229,9 @@ async def asyncio(
     | GetApiDashboardsByDashboardIdWidgetsResponse500
     | None
 ):
-    """List a board's widgets
+    """List a dashboard's widgets
 
-     Lists the widgets on one board, each with its React source and named queries.
+     Lists the widgets on one dashboard, each with its React source and named queries.
 
     Args:
         dashboard_id (str):

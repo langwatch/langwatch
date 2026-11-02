@@ -20,6 +20,7 @@ import {
   ExperimentRunFailedError,
 } from "./platformErrors";
 import type {
+  ExperimentConcurrencyOptions,
   ExperimentRunResult,
   RunExperimentOptions,
   RunWithResultsOptions,
@@ -83,7 +84,10 @@ export class ExperimentsFacade {
    * summary and exits with code 1 on failure, unless `exitOnFailure: false`.
    * @param slug - The slug of the experiment (found in the experiment URL)
    */
-  async run(slug: string, options?: RunExperimentOptions): Promise<ExperimentRunResult> {
+  async run(
+    slug: string,
+    options?: RunExperimentOptions & ExperimentConcurrencyOptions,
+  ): Promise<ExperimentRunResult> {
     this.config.logger.info(`Running platform experiment: ${slug}`);
     const result = await this.runWithPolling(slug, options);
     return result;
@@ -96,7 +100,7 @@ export class ExperimentsFacade {
    */
   async runWithResults(
     slug: string,
-    options: RunWithResultsOptions = {},
+    options: RunWithResultsOptions & ExperimentConcurrencyOptions = {},
   ): Promise<ExperimentRunWithResults> {
     this.config.logger.info(`Running platform experiment with results: ${slug}`);
 
@@ -105,6 +109,7 @@ export class ExperimentsFacade {
       datasetId: options.datasetId,
       parameters: options.parameters,
       rowIndices: options.rowIndices,
+      concurrency: options.concurrency,
     });
 
     const startResponse = await this.apiService.startV3Run({ slug, body });
@@ -150,13 +155,13 @@ export class ExperimentsFacade {
    */
   private async runWithPolling(
     slug: string,
-    options: RunExperimentOptions = {},
+    options: RunExperimentOptions & ExperimentConcurrencyOptions = {},
   ): Promise<ExperimentRunResult> {
     const pollInterval = options.pollInterval ?? DEFAULT_POLL_INTERVAL;
     const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
     // Start the run
-    const startResponse = await this.startRun(slug);
+    const startResponse = await this.startRun(slug, options.concurrency);
     const { runId } = startResponse;
 
     // Use the run URL from API but replace domain with configured endpoint
@@ -233,13 +238,15 @@ export class ExperimentsFacade {
   /**
    * Start an experiment run
    */
-  private async startRun(slug: string): Promise<ExperimentRunStartResponse> {
+  private async startRun(slug: string, concurrency?: number): Promise<ExperimentRunStartResponse> {
+    const body = toRunStartRequest({ concurrency });
     let response;
     try {
       response = await this.config.langwatchApiClient.POST("/api/v1/experiments/{slug}/run", {
         params: {
           path: { slug },
         },
+        ...(body !== undefined ? { body } : {}),
       });
     } catch (error) {
       if (isLangWatchHandledError(error)) {

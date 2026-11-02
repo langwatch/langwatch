@@ -94,7 +94,7 @@ export class ExperimentWorkbenchRunService {
       const plan = ExperimentRunPlanService.create().buildPlan({
         request: { state: saved.state, scope: saved.scope },
         data: saved.data,
-        concurrency: runs.concurrency,
+        concurrency: saved.runInputs.concurrency ?? runs.concurrency,
         origin: "saved",
         actor: workbenchActorFrom({ credential: input.credential }),
         experimentSlug: slug,

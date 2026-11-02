@@ -20,7 +20,7 @@ async def main(message: cl.Message):
     )
 
     completion = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",
@@ -45,7 +45,7 @@ async def main(message: cl.Message):
 @langwatch.span(type="evaluation")
 def useful_message_evaluation(question: str, answer: str):
     completion = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",
@@ -82,6 +82,9 @@ def useful_message_evaluation(question: str, answer: str):
                 "name": "useful_message_evaluation",
             },
         },
+        # gpt-6-luna takes function tools on Chat Completions only with
+        # reasoning turned off.
+        reasoning_effort="none",
     )
 
     tool_message = completion.choices[0].message.tool_calls[0]  # type: ignore

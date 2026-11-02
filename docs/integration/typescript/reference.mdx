@@ -17,14 +17,13 @@ Initializes the LangWatch observability system for Node.js environments, enablin
 import { setupObservability } from "langwatch/observability/node";
 
 setupObservability({
-langwatch: {
-apiKey: process.env.LANGWATCH_API_KEY,
-endpoint: process.env.LANGWATCH_ENDPOINT_URL
-},
-serviceName: "my-service"
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    endpoint: process.env.LANGWATCH_ENDPOINT_URL
+  },
+  serviceName: "my-service"
 });
-
-````
+```
 
 ```typescript Advanced Setup
 import { setupObservability } from "langwatch/observability/node";
@@ -47,7 +46,7 @@ setupObservability({
     logLevel: "debug"
   }
 });
-````
+```
 
 ```typescript Custom Configuration
 import { setupObservability } from "langwatch/observability/node";
@@ -273,7 +272,7 @@ The `LangWatchSpan` extends the standard OpenTelemetry `Span` with additional me
 
 <ParamField path="setRequestModel" type="(model: string) => this">
   Set the request model name for the span. This is typically the model name sent in the API request
-  (e.g., 'gpt-5', 'claude-sonnet-5').
+  (e.g., 'gpt-6-luna', 'claude-sonnet-5').
 </ParamField>
 
 <ParamField path="setResponseModel" type="(model: string) => this">
@@ -380,6 +379,10 @@ const prompt = await langwatch.prompts.get("prompt-id");
 Creates a new prompt in the LangWatch platform.
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Create a basic prompt
 const prompt = await langwatch.prompts.create({
   handle: "customer-support-bot",
@@ -404,6 +407,10 @@ const prompt = await langwatch.prompts.create({
 Updates an existing prompt, creating a new version automatically.
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Update prompt content
 const updatedPrompt = await langwatch.prompts.update("customer-support-bot", {
   prompt: "You are a helpful and friendly customer support assistant.",
@@ -993,11 +1000,11 @@ const tracer = getLangWatchTracer("my-service");
 
 await tracer.withActiveSpan("process-request", async (span) => {
   span.setType("llm");
-  span.setRequestModel("gpt-5");
+  span.setRequestModel("gpt-6-luna");
 
   // Your LLM call here
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-6-luna",
     messages: [{ role: "user", content: "Hello!" }],
   });
 
@@ -1089,7 +1096,7 @@ setupObservability();
 const handler = new LangWatchCallbackHandler();
 const llm = new ChatOpenAI({
   callbacks: [handler],
-  model: "gpt-5-mini",
+  model: "gpt-6-luna",
 });
 
 // All operations are automatically traced

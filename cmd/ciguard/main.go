@@ -46,10 +46,17 @@ func main() {
 		{name: "pr-workflow", run: ciguard.PRWorkflow},
 		{name: "static-cloud-keys", run: ciguard.StaticCloudKeys},
 		{name: "lambda-workdir", run: ciguard.LambdaWorkdir},
+		{name: "publish-shape", run: ciguard.PublishShape},
+		{name: "ecr-skip-gates", run: ciguard.ECRSkipGates},
+		{name: "ecr-dispatch-tags", run: ciguard.ECRDispatchTags},
+		{name: "ecr-diff-base", run: ciguard.ECRDiffBase},
+		{name: "transform-cache", run: ciguard.TransformCacheProblems},
+		{name: "vitest-transform-flag", run: ciguard.UncachedVitestScripts},
+		{name: "main-suites", run: ciguard.MainSuites},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature and specs/ci/publish-ecr-images.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature and specs/ci/package-suites-transform-cache.feature")
 		os.Exit(1)
 	}
 }

@@ -108,9 +108,9 @@ def sync_detailed(
     | GetApiDashboardsByDashboardIdResponse404
     | GetApiDashboardsByDashboardIdResponse500
 ]:
-    """Get a board
+    """Get a dashboard
 
-     Returns one Dashboards board.
+     Returns one dashboard.
 
     Args:
         dashboard_id (str):
@@ -147,9 +147,9 @@ def sync(
     | GetApiDashboardsByDashboardIdResponse500
     | None
 ):
-    """Get a board
+    """Get a dashboard
 
-     Returns one Dashboards board.
+     Returns one dashboard.
 
     Args:
         dashboard_id (str):
@@ -180,9 +180,9 @@ async def asyncio_detailed(
     | GetApiDashboardsByDashboardIdResponse404
     | GetApiDashboardsByDashboardIdResponse500
 ]:
-    """Get a board
+    """Get a dashboard
 
-     Returns one Dashboards board.
+     Returns one dashboard.
 
     Args:
         dashboard_id (str):
@@ -217,9 +217,9 @@ async def asyncio(
     | GetApiDashboardsByDashboardIdResponse500
     | None
 ):
-    """Get a board
+    """Get a dashboard
 
-     Returns one Dashboards board.
+     Returns one dashboard.
 
     Args:
         dashboard_id (str):

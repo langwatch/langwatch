@@ -118,9 +118,9 @@ def sync_detailed(
     | PatchApiDashboardsByDashboardIdResponse404
     | PatchApiDashboardsByDashboardIdResponse500
 ]:
-    """Update a board
+    """Update a dashboard
 
-     Changes a board's name or description; a field the body leaves out keeps its value, and a null
+     Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null
     description clears it.
 
     Args:
@@ -161,9 +161,9 @@ def sync(
     | PatchApiDashboardsByDashboardIdResponse500
     | None
 ):
-    """Update a board
+    """Update a dashboard
 
-     Changes a board's name or description; a field the body leaves out keeps its value, and a null
+     Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null
     description clears it.
 
     Args:
@@ -198,9 +198,9 @@ async def asyncio_detailed(
     | PatchApiDashboardsByDashboardIdResponse404
     | PatchApiDashboardsByDashboardIdResponse500
 ]:
-    """Update a board
+    """Update a dashboard
 
-     Changes a board's name or description; a field the body leaves out keeps its value, and a null
+     Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null
     description clears it.
 
     Args:
@@ -239,9 +239,9 @@ async def asyncio(
     | PatchApiDashboardsByDashboardIdResponse500
     | None
 ):
-    """Update a board
+    """Update a dashboard
 
-     Changes a board's name or description; a field the body leaves out keeps its value, and a null
+     Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null
     description clears it.
 
     Args:

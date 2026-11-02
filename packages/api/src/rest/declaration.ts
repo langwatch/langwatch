@@ -662,14 +662,11 @@ export type RestTransportDeclaration<
   /** The family's own path segment: `/api/<namespace>`. */
   readonly namespace: string;
   readonly version: DateVersion;
-  /**
-   * The date a newer family of the same namespace took over from: this one answers only the
-   * dates from `version` up to the day before, and leaves `latest` and the bare path to it.
-   */
-  readonly supersededAt?: DateVersion;
   readonly addressing: RestAddressing;
   /** Whether the family's `dated` addresses also answer under `/api/v1`. */
   readonly v1Twin: boolean;
+  /** Every answer at the bare `/api/<namespace>` path names the `/api/v1` twin as successor. */
+  readonly bareDeprecated?: true;
   /** The generation a `v1-in-path` family names in its own path. */
   readonly generation: string;
   /**
@@ -1981,7 +1978,7 @@ class RestTransportRouter<
   private root = false;
   private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
-  private supersededAt: DateVersion | undefined;
+  private bareDeprecated = false;
 
   private readonly api: FeatureApiWitness<Api>;
   readonly namespace: string;
@@ -2035,7 +2032,7 @@ class RestTransportRouter<
     router.root = this.root;
     router.generation = this.generation;
     router.deprecated = this.deprecated;
-    router.supersededAt = this.supersededAt;
+    router.bareDeprecated = this.bareDeprecated;
 
     return router;
   }
@@ -2059,27 +2056,7 @@ class RestTransportRouter<
     this.v1Twin = options.v1Twin ?? true;
     this.root = options.root ?? false;
     this.generation = options.generation ?? DEFAULT_GENERATION;
-
-    return this;
-  }
-
-  /**
-   * Hands `latest` and the bare path to a newer family of this namespace registered at
-   * `version`: this one keeps answering a caller who pins an earlier date.
-   */
-  withSupersededAt(
-    version: DateVersion,
-  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs> {
-    assertVersionLabel(version);
-
-    if (this.addressing !== "dated" || version <= this.version) {
-      throw new Error(
-        `REST "${this.namespace}" can only be superseded as a dated family, at a date after ` +
-          `its own ${this.version}`,
-      );
-    }
-
-    this.supersededAt = version;
+    this.bareDeprecated = options.bareDeprecated ?? false;
 
     return this;
   }
@@ -2104,9 +2081,9 @@ class RestTransportRouter<
       api: this.api,
       namespace: this.namespace,
       version: this.version,
-      ...(this.supersededAt ? { supersededAt: this.supersededAt } : {}),
       addressing: this.addressing,
       v1Twin: this.v1Twin,
+      ...(this.bareDeprecated ? { bareDeprecated: true as const } : {}),
       generation: this.generation,
       credential: this.credential,
       ...(this.deprecated ? { deprecated: this.deprecated } : {}),

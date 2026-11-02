@@ -58,7 +58,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiV1AnalyticsReportsByReportIdResponse200]:
-    """Get a dashboard by its id, including its graphs
+    """Get a dashboard by its id, including its graphs. The Analytics Reports dashboards API is deprecated;
+    use the Dashboards API at /api/v1/dashboards.
 
     Args:
         report_id (str):
@@ -87,7 +88,8 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> GetApiV1AnalyticsReportsByReportIdResponse200 | None:
-    """Get a dashboard by its id, including its graphs
+    """Get a dashboard by its id, including its graphs. The Analytics Reports dashboards API is deprecated;
+    use the Dashboards API at /api/v1/dashboards.
 
     Args:
         report_id (str):
@@ -111,7 +113,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiV1AnalyticsReportsByReportIdResponse200]:
-    """Get a dashboard by its id, including its graphs
+    """Get a dashboard by its id, including its graphs. The Analytics Reports dashboards API is deprecated;
+    use the Dashboards API at /api/v1/dashboards.
 
     Args:
         report_id (str):
@@ -138,7 +141,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> GetApiV1AnalyticsReportsByReportIdResponse200 | None:
-    """Get a dashboard by its id, including its graphs
+    """Get a dashboard by its id, including its graphs. The Analytics Reports dashboards API is deprecated;
+    use the Dashboards API at /api/v1/dashboards.
 
     Args:
         report_id (str):

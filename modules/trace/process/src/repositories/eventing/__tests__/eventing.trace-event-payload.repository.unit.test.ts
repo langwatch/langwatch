@@ -6,6 +6,7 @@ import { type Event, EventNotFoundError, type EventReadSeat } from "@langwatch/e
 import { instantiateRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
+import { offloadedFieldKey } from "../../../rules/trace-offload-recall.rules.ts";
 import { TraceEventPayloadFieldNotFoundError } from "../../trace-payload-reader.repository.ts";
 import { traceRepositories } from "../../trace-repositories.registry.ts";
 import { EventingTraceEventPayloadRepository } from "../eventing.trace-event-payload.repository.ts";
@@ -28,13 +29,18 @@ class RecordingSeat implements Pick<EventReadSeat, "getEvent"> {
 
 const FULL_INPUT = "x".repeat(70_000);
 
-const recall = (seat: RecordingSeat, field = "langwatch.input") =>
-  EventingTraceEventPayloadRepository.create({ eventReadSeat: seat }).read({
-    tenantId: "project-1",
-    traceId: "trace-1",
-    eventId: "event-1",
-    field,
-  });
+/** The field recalled through the real `recall`: its value, or the error that kept its preview. */
+const recall = async (seat: RecordingSeat, field = "langwatch.input"): Promise<string> => {
+  const reference = { traceId: "trace-1", eventId: "event-1", field };
+  const outcomes = await EventingTraceEventPayloadRepository.create({
+    eventReadSeat: seat,
+  }).recall({ tenantId: "project-1", references: [reference] });
+  const outcome = outcomes.get(offloadedFieldKey(reference));
+  if (!outcome) throw new Error("recall answered no outcome for the reference");
+  if (!outcome.ok) throw outcome.error;
+
+  return outcome.value;
+};
 
 describe("given a span attribute offloaded under an event of trace trace-1", () => {
   describe("when the trace read recalls that field", () => {
@@ -71,6 +77,36 @@ describe("given a span attribute offloaded under an event of trace trace-1", () 
   });
 });
 
+describe("given two fields offloaded under one event", () => {
+  describe("when the trace read recalls both", () => {
+    it("asks the seat for the event once and serves both values", async () => {
+      const seat = new RecordingSeat({
+        span: {
+          attributes: [
+            { key: "langwatch.input", value: { stringValue: "full input" } },
+            { key: "langwatch.output", value: { stringValue: "full output" } },
+          ],
+        },
+      });
+
+      const values = await EventingTraceEventPayloadRepository.create({
+        eventReadSeat: seat,
+      }).readFields({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        eventId: "event-1",
+        fields: ["langwatch.input", "langwatch.output", "langwatch.missing"],
+      });
+
+      expect(seat.reads).toHaveLength(1);
+      expect([...values]).toEqual([
+        ["langwatch.input", "full input"],
+        ["langwatch.output", "full output"],
+      ]);
+    });
+  });
+});
+
 describe("given a log record whose body was offloaded", () => {
   /** @scenario "A log record's body is recalled from the top of the payload" */
   it("reads it from the payload root rather than from span attributes", async () => {
@@ -94,19 +130,19 @@ describe("given the field cannot be served", () => {
 
 describe("given the trace repositories selected on the memory tier", () => {
   /** @scenario "A process on memory stores keeps the preview" */
-  it("raises on every recall, so the caller serves the preview", async () => {
+  it("fails every recalled field, so the caller serves the preview", async () => {
     const { eventPayloads } = instantiateRepositories(traceRepositories, {
       tier: "memory",
       members: {},
     });
 
-    await expect(
-      eventPayloads.read({
-        tenantId: "project-1",
-        traceId: "trace-1",
-        eventId: "event-1",
-        field: "langwatch.input",
-      }),
-    ).rejects.toThrow("the memory trace repositories hold no offloaded payloads");
+    const reference = { traceId: "trace-1", eventId: "event-1", field: "langwatch.input" };
+    const outcomes = await eventPayloads.recall({ tenantId: "project-1", references: [reference] });
+
+    const outcome = outcomes.get(offloadedFieldKey(reference));
+    expect(outcome?.ok).toBe(false);
+    expect(outcome && !outcome.ok && String(outcome.error)).toContain(
+      "the memory trace repositories hold no offloaded payloads",
+    );
   });
 });

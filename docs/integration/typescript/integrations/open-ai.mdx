@@ -55,7 +55,7 @@ async function main(message: string): Promise<string> {
     span.setInput(message);
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-6-luna",
       messages: [{ role: "user", content: message }],
     });
 
@@ -73,6 +73,12 @@ The `withActiveSpan` method automatically creates the span, handles errors, and 
 import TypeScriptSharedSpanExcepEval from "/snippets/typescript-shared-span-excep-eval.mdx";
 
 <TypeScriptSharedSpanExcepEval />
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `main` span with the OpenAI call nested inside it.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 

@@ -23,6 +23,12 @@ const WRITE_KEYS: Record<UiScopeSelectionWrite["key"], string> = {
   projectSlug: UI_SELECTED_PROJECT_SLUG_KEY,
 };
 
+const SELECTION_FIELDS: Readonly<Record<string, UiScopeSelectionWrite["key"]>> = {
+  [UI_SELECTED_ORGANIZATION_ID_KEY]: "organizationId",
+  [UI_SELECTED_TEAM_ID_KEY]: "teamId",
+  [UI_SELECTED_PROJECT_SLUG_KEY]: "projectSlug",
+};
+
 /** Everything one page remembers about where it was working. */
 export type UiScopeMemory = {
   readonly selection: UiScopeSelection;
@@ -103,46 +109,56 @@ export function broadcastUiScopeWrite(key: string): void {
 }
 
 /**
- * The remembered scope, re-read on every document write — cached against
- * the raw strings so React sees a stable value; a fresh object every
- * read would make `useSyncExternalStore` re-render forever.
+ * The remembered scope as this document last read it: read when its first reader mounts, then
+ * only the key this document writes. Another tab's write is ignored, even on a later render or
+ * a write of another key, so two tabs in two scopes never take each other's (tasks#987).
  */
 class UiScopeMemoryStore {
-  private raw = "";
   private cached: UiScopeMemory = NOTHING_REMEMBERED;
-  private read = false;
+  private stale = true;
+  private readers = 0;
 
   constructor(private readonly storage: Storage) {}
 
   snapshot = (): UiScopeMemory => {
-    const raw = [
-      this.storage.getItem(UI_SELECTED_ORGANIZATION_ID_KEY),
-      this.storage.getItem(UI_SELECTED_TEAM_ID_KEY),
-      this.storage.getItem(UI_SELECTED_PROJECT_SLUG_KEY),
-    ].join(" ");
-    if (this.read && raw === this.raw) return this.cached;
-    this.raw = raw;
-    this.read = true;
+    if (!this.stale) return this.cached;
+    this.stale = false;
     this.cached = readUiScopeMemory(this.storage);
     return this.cached;
   };
 
+  /** Re-reads the one key this document wrote; the rest stays as this document saw it. */
+  private refresh(key: string | null): void {
+    const field = SELECTION_FIELDS[key ?? ""];
+    if (this.stale || !field) return;
+    const value = readUiScopeMemory(this.storage).selection[field];
+    if (value === this.cached.selection[field]) return;
+    this.cached = { selection: { ...this.cached.selection, [field]: value } };
+  }
+
   subscribe = (listener: () => void): (() => void) => {
-    window.addEventListener("storage", listener);
-    window.addEventListener(SAME_DOCUMENT_STORAGE_EVENT, listener);
+    const onWrite = (event: Event) => {
+      this.refresh(event instanceof StorageEvent ? event.key : null);
+      listener();
+    };
+    if (this.readers === 0) this.stale = true;
+    this.readers += 1;
+    window.addEventListener(SAME_DOCUMENT_STORAGE_EVENT, onWrite);
     return () => {
-      window.removeEventListener("storage", listener);
-      window.removeEventListener(SAME_DOCUMENT_STORAGE_EVENT, listener);
+      this.readers -= 1;
+      window.removeEventListener(SAME_DOCUMENT_STORAGE_EVENT, onWrite);
     };
   };
 }
 
-let sharedStore: UiScopeMemoryStore | undefined;
+const stores = new WeakMap<Storage, UiScopeMemoryStore>();
 
 function storeFor(storage: Storage): UiScopeMemoryStore {
-  if (storage !== window.localStorage) return new UiScopeMemoryStore(storage);
-  sharedStore ??= new UiScopeMemoryStore(storage);
-  return sharedStore;
+  const known = stores.get(storage);
+  if (known) return known;
+  const store = new UiScopeMemoryStore(storage);
+  stores.set(storage, store);
+  return store;
 }
 
 /** What the last page left behind, kept current for this render. */

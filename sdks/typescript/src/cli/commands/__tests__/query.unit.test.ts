@@ -121,11 +121,11 @@ describe("given a QueryApiService that returns rows", () => {
     });
 
     /** @scenario "langwatch query -o json prints the rows and exits 0" */
-    it("prints exactly one JSON array of the returned rows", async () => {
+    it("prints exactly one JSON object holding the returned rows", async () => {
       await runQuery(["SELECT count(*) AS count", "-o", "json"]);
 
       expect(stdout).toHaveLength(1);
-      expect(JSON.parse(stdout[0]!)).toEqual(RUN_RESULT.rows);
+      expect(JSON.parse(stdout[0]!)).toMatchObject({ rows: RUN_RESULT.rows });
     });
 
     /** @scenario "langwatch query -o json prints the rows and exits 0" */

@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 // Plain on purpose: clickhouse-client depends on this package, which takes no workspace config.
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     environment: "node",
     pool: "forks",
     isolate: false,

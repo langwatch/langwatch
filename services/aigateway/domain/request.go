@@ -193,6 +193,14 @@ func GeminiSurface() Surface {
 	return Surface{Name: "/v1beta", Providers: []ProviderID{ProviderGemini, ProviderVertex}}
 }
 
+// DecisionsSurface is POST /v1/decisions: OpenAI's Decisions API, relayed
+// to the provider as the caller wrote it apart from the resolved model. No
+// other vendor serves this wire, so only an OpenAI credential may receive
+// the body.
+func DecisionsSurface() Surface {
+	return Surface{Name: "/v1/decisions", Providers: []ProviderID{ProviderOpenAI}}
+}
+
 // RequestMetadata holds extracted fields for policy evaluation (guardrails, blocked patterns).
 type RequestMetadata struct {
 	ToolNames          []string

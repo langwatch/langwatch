@@ -18,6 +18,7 @@ export const CAPABILITY_SURFACES = [
   "datasets",
   "prompts",
   "dashboards",
+  "analyticsReports",
   "simulations",
   "scenarios",
   "agents",
@@ -197,28 +198,23 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "dataset", plural: "datasets" },
   },
-  dashboard: {
-    surface: "dashboards",
+  "analytics-report": {
+    surface: "analyticsReports",
     digestStrategy: "id-ref",
-    noun: { singular: "dashboard", plural: "dashboards" },
+    noun: { singular: "analytics report", plural: "analytics reports" },
   },
   graph: {
-    surface: "dashboards",
+    surface: "analyticsReports",
     digestStrategy: "id-ref",
     noun: { singular: "graph", plural: "graphs" },
   },
   chart: {
-    surface: "dashboards",
+    surface: "analyticsReports",
     digestStrategy: "id-ref",
     noun: { singular: "chart", plural: "charts" },
   },
-  "dashboard-widget": {
-    surface: "dashboards",
-    digestStrategy: "id-ref",
-    noun: { singular: "dashboard widget", plural: "dashboard widgets" },
-  },
-  // `langwatch dashboards`: the Dashboards area's boards; `dashboard` above is Analytics Reports.
-  dashboards: {
+  // `langwatch dashboard`: the Dashboards area's dashboards and, under `widget`, their widgets.
+  dashboard: {
     surface: "dashboards",
     digestStrategy: "id-ref",
     noun: { singular: "dashboard", plural: "dashboards" },
