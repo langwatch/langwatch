@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,11 +36,14 @@ type fake struct {
 	legs map[string]string
 	// refuse is a leg name whose post Slack rejects.
 	refuse string
+	// slow delays every GitHub read, to use up the caller's deadline.
+	slow time.Duration
 }
 
 func (f *fake) start(t *testing.T) slacknotify.Notifier {
 	t.Helper()
 	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(f.slow)
 		if f.broken {
 			http.Error(w, "boom", http.StatusBadGateway)
 			return
@@ -296,4 +300,17 @@ func TestAFailedFallbackPostNamesTheFailedLookup(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "jobs lookup failed")
+}
+
+// @scenario "A red package-suites run on main posts to Slack"
+func TestALookupThatUsesUpTheDeadlineStillPosts(t *testing.T) {
+	f := &fake{previous: "success", slow: 200 * time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	result, err := f.start(t).Notify(ctx, failing)
+
+	require.NoError(t, err)
+	assert.True(t, result.Posted, result.Reason)
+	require.Len(t, f.raw, 1)
 }
