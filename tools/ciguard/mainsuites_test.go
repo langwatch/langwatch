@@ -130,6 +130,10 @@ func TestBrowserSuitesRunOnALegOfTheirOwn(t *testing.T) {
 			"          - shard: browser\n            lanes: browser\n",
 			"          - shard: extra\n",
 		},
+		"numbered legs that run browser suites too": {
+			"        lanes: [no-browser]\n",
+			"",
+		},
 		"a leg that runs every lane": {
 			"          PACKAGE_SUITES_LANES: ${{ matrix.lanes }}\n",
 			"",

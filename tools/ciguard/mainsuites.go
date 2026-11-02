@@ -152,6 +152,10 @@ func browserLegProblems(job suitesJob) []string {
 	if !hasBrowserLeg(mappingNode(job.Strategy.Matrix, "include")) {
 		problems = append(problems, "package-suites must include a leg with lanes: browser")
 	}
+	// Without it the numbered legs get no lanes, run every lane and start Chromium beside containers again.
+	if lanes := mappingNode(job.Strategy.Matrix, "lanes"); lanes == nil || lanes.Kind != yaml.SequenceNode || len(lanes.Content) != 1 || lanes.Content[0].Value != "no-browser" {
+		problems = append(problems, "package-suites numbered legs must set lanes: [no-browser]")
+	}
 	if !slices.ContainsFunc(job.Steps, func(step suitesStep) bool { return step.Env["PACKAGE_SUITES_LANES"] == lanesFromLeg }) {
 		problems = append(problems, "the package suites step must set PACKAGE_SUITES_LANES: "+lanesFromLeg)
 	}
