@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * A directory create records one member-created fact, naming the seat its admission gave.
+ * A directory create records one member-created fact naming the member; the seat is organization's.
  * @see modules/organization/specs/seat-peak.feature
  */
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -48,7 +48,8 @@ class TenSeatPlan implements Pick<EntitlementApi, "getActivePlan"> {
   }
 }
 
-function directoryOver({ fullMembers, liteMembers }: { fullMembers: number; liteMembers: number }) {
+/** A directory with a full seat free, so the create is admitted rather than held. */
+function directoryOver() {
   const repository = MemoryScimRepository.create();
   repository.users.set(person.id, person);
   let created = false;
@@ -72,7 +73,7 @@ function directoryOver({ fullMembers, liteMembers }: { fullMembers: number; lite
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
-    seats: { countMemberSeats: async () => ({ fullMembers, liteMembers, developers: 0 }) },
+    seats: { countMemberSeats: async () => ({ fullMembers: 9, liteMembers: 0, developers: 0 }) },
   });
   const push = () =>
     service.createUser({
@@ -89,7 +90,7 @@ describe("the member-created fact a directory create records", () => {
   describe("given a full seat free", () => {
     /** @scenario "A seat taken on any path is counted" */
     it("records one fact naming the member and the organization", async () => {
-      const { repository, push } = directoryOver({ fullMembers: 9, liteMembers: 0 });
+      const { repository, push } = directoryOver();
 
       await push();
 
@@ -103,7 +104,7 @@ describe("the member-created fact a directory create records", () => {
     });
 
     it("records no second fact when the directory retries the create", async () => {
-      const { repository, push } = directoryOver({ fullMembers: 9, liteMembers: 0 });
+      const { repository, push } = directoryOver();
 
       await push();
       await push().catch(() => undefined);

@@ -149,7 +149,7 @@ describe("organization's count of a seat SCIM's directory create took", () => {
       expect(Object.values(peaks())[0]?.fullPeak).toBe(10);
     });
 
-    it("counts the seat organization's own rule gives, not the one the fact names", async () => {
+    it("counts the seat organization's own rule gives the member", async () => {
       const { lane, sent, peaks } = setup({ live: "LiteMember" });
 
       await lane.handle(memberCreated(), context);
