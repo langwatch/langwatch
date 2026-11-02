@@ -51,7 +51,10 @@ function recordingSenders() {
   };
 }
 
-function setup({ organizationIds = [ORG] }: { organizationIds?: string[] } = {}) {
+function setup({
+  organizationIds = [ORG],
+  activePlan = plan,
+}: { organizationIds?: string[]; activePlan?: Plan } = {}) {
   const memory = MemoryOrganizationDatabase.create();
   memory.organizationUsers.push({
     userId: "founder",
@@ -71,7 +74,10 @@ function setup({ organizationIds = [ORG] }: { organizationIds?: string[] } = {})
         next: null,
       }),
     },
-    plans: createApiFixture<EntitlementApi>({ getActivePlan: async () => plan }, "EntitlementApi"),
+    plans: createApiFixture<EntitlementApi>(
+      { getActivePlan: async () => activePlan },
+      "EntitlementApi",
+    ),
   });
   const sent = recordingSenders();
   service.connect(sent.senders);
@@ -143,6 +149,19 @@ describe("SeatPeakService", () => {
       await expect(
         service.read({ organizationId: ORG, now: CREATED_AT.epochMilliseconds }),
       ).resolves.toEqual({ counted: false, caps: { fullSeats: 50, liteSeats: 10 } });
+    });
+  });
+
+  describe("given an uncapped plan", () => {
+    /** @scenario "The ops console reads an unlimited licence's seats as unlimited" */
+    it("answers its uncapped seats as null and a finite cap as the number", async () => {
+      const { service } = setup({
+        activePlan: { ...plan, maxMembers: Number.MAX_SAFE_INTEGER, maxMembersLite: 1_000_000 },
+      });
+
+      await expect(
+        service.read({ organizationId: ORG, now: CREATED_AT.epochMilliseconds }),
+      ).resolves.toMatchObject({ caps: { fullSeats: null, liteSeats: 1_000_000 } });
     });
   });
 
