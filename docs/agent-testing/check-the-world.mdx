@@ -9,9 +9,9 @@ This page covers checking state: parameters as the case, seeding the world and c
 
 ## Why the reply is not enough
 
-An agent that changes data, such as a refund, a booking or a dashboard edit, replies "Done, I refunded 49.95". That reply passes a criterion even when the refund went wrong, ran twice, or never happened.
+If your agent changes data (a refund, a booking, a dashboard edit), a reply such as "Done, I refunded 49.95" passes a criterion even when the refund went wrong, ran twice, or never happened.
 
-A tool call span shows what the agent tried. It does not show what happened. To test the result, the test has to see the data after the agent acted.
+The tool call span shows what the agent tried, not what changed, so to test the result you need to report the data after the agent acts.
 
 This page shows two levels. Both work with a [connected agent](/agent-testing/connect-your-agent) today, with no extra setup on the platform.
 
@@ -168,9 +168,9 @@ Exact Match compares two numbers as numbers, so `49.95` and `49.950` both pass. 
 }
 ```
 
-Set this mapping by hand. The platform never infers a tool call mapping. The last `refund_total` call wins, by start time. That is the value after the last turn.
+Set this mapping by hand, because the platform never infers a tool call mapping. If the span fires more than once, the latest call by start time wins, which is the value after the last turn.
 
-Compare one fact, not the whole `state_of_world` object. One fact is safer.
+Compare one fact, not the whole `state_of_world` object, because a whole-object comparison fails on any change to the other fields.
 
 ## Caveats
 

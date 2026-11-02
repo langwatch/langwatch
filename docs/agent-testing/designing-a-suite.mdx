@@ -5,13 +5,13 @@ keywords: langwatch, agent testing, test suite design, scenario suite, test desi
 description: Define what correct means for your agent as a test suite in the LangWatch app, with no code. Pick the case types, fill a coverage matrix, check actions exactly with evaluators, and repeat by severity. Tests in code are an advanced option.
 ---
 
-A test suite is the runnable definition of "correct" for your agent: what it must do, where its limits are, and how you prove it from what the agent did, not from what it said. This page is about correctness. Attacks and abuse are a separate discipline with their own method. See [Red Teaming](/agent-testing/red-teaming).
+A test suite holds the scenarios that state what your agent must do, where its limits are, and how you prove it from what the agent did, not from what it said. This page is about correctness. Attacks and abuse are a separate discipline with their own method. See [Red Teaming](/agent-testing/red-teaming).
 
 This page covers design: which cases to write and when the suite is complete. To organise, run and maintain the suite, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite). To check the data the agent changed, see [Check the World, Not the Words](/agent-testing/check-the-world).
 
 Every example on this page tests one support agent with two tools, `lookup_order` and `issue_refund`. To write a single scenario first, see [Scenarios](/agent-testing/scenarios).
 
-Everything on this page is done in the LangWatch app, with no code. Once your agent is set up as a [target](/agent-testing/targets), a product person can define "correct" without a developer. Tests in code are an advanced option, see [Advanced: tests in code](#advanced-tests-in-code).
+Once your agent is set up as a [target](/agent-testing/targets), a product person can define "correct" without a developer. For tests in code, see [Advanced: tests in code](#advanced-tests-in-code).
 
 ## Should a check be a scenario, a unit test or an eval
 
@@ -53,7 +53,7 @@ Start with ten to twenty scenarios that cover the risky flows, and grow from the
 
 ## How to build the coverage matrix
 
-Put the jobs in the rows and the case types that carry risk in the columns. Each cell is one short scenario:
+Put the jobs in the rows and the risky case types in the columns. Each cell is one short scenario:
 
 | Job | Happy path | Rule edge | Unclear facts | Tool or data error | Claim without evidence |
 |---|---|---|---|---|---|
@@ -97,7 +97,7 @@ The judge reads the agent's [linked traces](/agent-testing/linking-your-traces),
 
 ## How to seed test data for a scenario
 
-The data a scenario needs lives in the test environment the target points at. Seed it there before the run, put the exact values in scenario fields such as `order_id` and `expected_amount`, and compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
+Put the data a scenario needs in the test environment the target points at. Seed it there before the run, put the exact values in scenario fields such as `order_id` and `expected_amount`, and compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
 
 For how to build the data and report its state, see [Check the World, Not the Words](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
 
@@ -159,7 +159,7 @@ In production, the same PII scanner runs as an [online evaluation](/evaluations/
 
 Use code only when a developer needs what the app cannot do: checks against your own database, seed data created inside the test, or a job with no user turn, such as a nightly review. Keep each agent's tests in one place, and do not copy app scenarios into code.
 
-Code runs show on [Results](/agent-testing/results). The `set_id` (`setId` in TypeScript) shows as the test suite and the run plan name, and a `batch_id` (`batchId`) groups each CI run, such as `GITHUB_RUN_ID`. See [Write Scenarios in Code](/agent-testing/scenarios-in-code#4-grouping-your-scenarios-into-test-suites-and-batches). Your CI decides the scope, the repeats and the pass rule.
+Code runs show on [Results](/agent-testing/results). The `set_id` (`setId` in TypeScript) shows as the test suite and the run plan name, and a `batch_id` (`batchId`) groups each CI run, such as `GITHUB_RUN_ID`. See [Write Scenarios in Code](/agent-testing/scenarios-in-code#4-grouping-your-scenarios-into-test-suites-and-batches). You set the scope, the repeats and the pass rule in your CI job.
 
 ### How to check state with code before the judge
 
