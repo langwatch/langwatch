@@ -1,4 +1,8 @@
-import { countMemberSeats } from "@langwatch/entitlement-contract";
+import {
+  classifyMemberType,
+  countMemberSeats,
+  type MemberType,
+} from "@langwatch/entitlement-contract";
 import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
 import {
   INVITE_STATUS,
@@ -7,9 +11,21 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
-import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
+import type { SeatKind } from "../../eventing/seat-peak.events.ts";
+import {
+  type OrganizationSeatHolding,
+  OrganizationSeatRepository,
+} from "../organization-seat.repository.ts";
+
+/** The seat a classified holder takes, in the seat peak's terms. */
+const SEAT_OF_MEMBER_TYPE: Record<MemberType, SeatKind> = {
+  FullMember: "full",
+  LiteMember: "lite",
+  Developer: "developer",
+};
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
 type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
@@ -35,6 +51,8 @@ interface MemberClassificationContext {
   customRoleMap: Map<string, string[]>;
   userPermissionsMap: Map<string, string[]>;
   pendingInvites: {
+    id: string;
+    expiresAt: number | null;
     role: OrganizationUserRole;
     teamAssignments: TeamAssignment[] | null;
   }[];
@@ -90,6 +108,28 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     ]);
   }
 
+  /** Every holder classified by the rule the counts above use, so the two cannot disagree. */
+  async findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    return [
+      ...context.users.map((user) => ({
+        holder: { kind: "member" as const, userId: user.userId },
+        seat: SEAT_OF_MEMBER_TYPE[
+          classifyMemberType(user.role, context.userPermissionsMap.get(user.userId))
+        ],
+      })),
+      ...context.pendingInvites.map((invite) => ({
+        holder: { kind: "invitation" as const, inviteId: invite.id, expiresAt: invite.expiresAt },
+        seat: SEAT_OF_MEMBER_TYPE[
+          classifyMemberType(
+            invite.role,
+            this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+          )
+        ],
+      })),
+    ];
+  }
+
   /**
    * Fetches all data needed for member classification.
    * Shared between getMemberCount and getMembersLiteCount.
@@ -118,7 +158,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
         status: INVITE_STATUS.PENDING,
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
-      select: { role: true, teamAssignments: true },
+      select: { id: true, expiration: true, role: true, teamAssignments: true },
     });
 
     return {
@@ -126,6 +166,8 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       customRoleMap,
       userPermissionsMap,
       pendingInvites: pendingInvites.map((i) => ({
+        id: i.id,
+        expiresAt: i.expiration ? fromDate(i.expiration).epochMilliseconds : null,
         role: i.role,
         teamAssignments: teamAssignmentsSchema.safeParse(i.teamAssignments).data ?? null,
       })),

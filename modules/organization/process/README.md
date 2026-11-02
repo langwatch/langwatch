@@ -6,13 +6,13 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:29`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, seatPeakTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(seatPeakEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:34`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:241`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:242`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -844,6 +844,14 @@ The seats an organization holds: full and lite members, live invitations include
 
 ```typescript
 countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
+```
+
+#### `getSeatPeak`
+
+The most full and Lite Member seats held at once in each month, beside the plan's caps (ADR-002). For our own team on the ops console; `counted: false` until counting opened.
+
+```typescript
+getSeatPeak(input: Readonly<{ organizationId: string }>): Promise<OrganizationSeatPeak>;
 ```
 
 #### `checkLimit`
@@ -2132,6 +2140,23 @@ type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contrac
 type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:101
 ```
 
+### `organizationSeatPeak`
+
+Contract `../contract/src/seat-peak.ts:60`, router `src/transport/seat-peak.trpc.ts:14`.
+
+| Procedure                  | Kind  | Gate                             | Input  | Output                       |
+| -------------------------- | ----- | -------------------------------- | ------ | ---------------------------- |
+| `organizationSeatPeak.get` | query | Platform permission `ops:manage` | inline | `organizationSeatPeakSchema` |
+
+```typescript
+// organizationSeatPeak.get
+// Input: inline, ../contract/src/seat-peak.ts:62
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof organizationSeatPeakSchema>; // ../contract/src/seat-peak.ts:56
+```
+
 ### `team`
 
 Contract `../contract/src/features/team/team.trpc.ts:25`, router `src/transport/team.trpc.ts:9`.
@@ -2286,11 +2311,21 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 | ------- | ------------------------ | ------- | ---------------------------------------- |
 | command | `recordSeatLimitReached` | –       | `src/eventing/seat-limit.pipeline.ts:23` |
 
+### Pipeline `organization_seat_peak` (aggregate `organization_seat_peak`)
+
+Declared at `src/eventing/seat-peak.pipeline.ts:36`. Events: `seatChangedEventSchema`, `seatSnapshotTakenEventSchema`.
+
+| Kind                | Name                                         | Handles | Declared at                             |
+| ------------------- | -------------------------------------------- | ------- | --------------------------------------- |
+| command             | `recordSeatChanged`                          | –       | `src/eventing/seat-peak.pipeline.ts:41` |
+| command             | `recordSeatSnapshot`                         | –       | `src/eventing/seat-peak.pipeline.ts:42` |
+| Postgres projection | `≈ SeatPeakFoldProjection.create({ store })` | –       | `src/eventing/seat-peak.pipeline.ts:43` |
+
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:301`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:308`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

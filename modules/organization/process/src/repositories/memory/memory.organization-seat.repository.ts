@@ -1,4 +1,10 @@
-import { isDeveloper, isFullMember, isLiteMember } from "@langwatch/entitlement-contract";
+import {
+  classifyMemberType,
+  isDeveloper,
+  isFullMember,
+  isLiteMember,
+  type MemberType,
+} from "@langwatch/entitlement-contract";
 import {
   type OrganizationMemberSeats,
   OrganizationUserRole,
@@ -6,7 +12,11 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
+import type { SeatKind } from "../../eventing/seat-peak.events.ts";
+import {
+  type OrganizationSeatHolding,
+  OrganizationSeatRepository,
+} from "../organization-seat.repository.ts";
 import type {
   MemoryOrganizationDatabase,
   MemoryOrganizationInviteRow,
@@ -35,18 +45,40 @@ function isLive(invite: MemoryOrganizationInviteRow, now: Instant): boolean {
   );
 }
 
-/** Whether a live invitation holds this seat: its assignments' roles merged, none if empty. */
+/** A live invitation's permissions: its assignments' roles merged; empty when it names none. */
+function mergedInvitePermissions(
+  invite: MemoryOrganizationInviteRow,
+  permissionsOf: PermissionsOf,
+): string[] {
+  const assignments = teamAssignmentsSchema.safeParse(invite.teamAssignments).data;
+  return defined((assignments ?? []).map((entry) => permissionsOf(entry.customRoleId))).flat();
+}
+
+/** The seat a live invitation takes: its merged permissions, none if it names no role. */
+function inviteMemberType(
+  invite: MemoryOrganizationInviteRow,
+  permissionsOf: PermissionsOf,
+): MemberType {
+  const merged = mergedInvitePermissions(invite, permissionsOf);
+  return classifyMemberType(invite.role, merged.length > 0 ? merged : undefined);
+}
+
+/** Whether a live invitation holds this seat. */
 function inviteHoldsSeat(
   invite: MemoryOrganizationInviteRow,
   permissionsOf: PermissionsOf,
   predicate: SeatPredicate,
 ): boolean {
-  const assignments = teamAssignmentsSchema.safeParse(invite.teamAssignments).data;
-  const merged = defined(
-    (assignments ?? []).map((entry) => permissionsOf(entry.customRoleId)),
-  ).flat();
+  const merged = mergedInvitePermissions(invite, permissionsOf);
   return predicate(invite.role, merged.length > 0 ? merged : undefined);
 }
+
+/** The seat a classified holder takes, in the seat peak's terms. */
+const SEAT_OF_MEMBER_TYPE: Record<MemberType, SeatKind> = {
+  FullMember: "full",
+  LiteMember: "lite",
+  Developer: "developer",
+};
 
 /**
  * Seat counts over the memory tables, classified as the Postgres repository classifies them.
@@ -81,12 +113,46 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     };
   }
 
-  #count(organizationId: string, predicate: SeatPredicate): number {
-    const permissionsOf: PermissionsOf = (customRoleId) => {
+  async findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
+    const permissionsOf = this.#permissionsOf(organizationId);
+    const now = nowInstant();
+    return [
+      ...this.memory.organizationUsers
+        .filter(
+          (member) =>
+            member.organizationId === organizationId &&
+            member.disabledAt === null &&
+            (this.memory.users.get(member.userId)?.deactivatedAt ?? null) === null,
+        )
+        .map((member) => ({
+          holder: { kind: "member" as const, userId: member.userId },
+          seat: SEAT_OF_MEMBER_TYPE[
+            classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf))
+          ],
+        })),
+      ...[...this.memory.invites.values()]
+        .filter((invite) => invite.organizationId === organizationId && isLive(invite, now))
+        .map((invite) => ({
+          holder: {
+            kind: "invitation" as const,
+            inviteId: invite.id,
+            expiresAt: invite.expiration?.epochMilliseconds ?? null,
+          },
+          seat: SEAT_OF_MEMBER_TYPE[inviteMemberType(invite, permissionsOf)],
+        })),
+    ];
+  }
+
+  #permissionsOf(organizationId: string): PermissionsOf {
+    return (customRoleId) => {
       const role = customRoleId ? this.memory.customRoles.get(customRoleId) : undefined;
       if (role?.organizationId !== organizationId) return undefined;
       return permissionsSchema.safeParse(role.permissions).data ?? [];
     };
+  }
+
+  #count(organizationId: string, predicate: SeatPredicate): number {
+    const permissionsOf = this.#permissionsOf(organizationId);
     // Disabled memberships and deactivated people hold no seat (seat-reconciliation.feature).
     const memberSeats = this.memory.organizationUsers.filter(
       (member) =>

@@ -9,6 +9,7 @@ import { organizationAuditEventing } from "./eventing/organization-audit.pipelin
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { privateDataplaneRecorderEventing } from "./eventing/organization-private-dataplane.pipeline.ts";
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
+import { seatPeakEventing } from "./eventing/seat-peak.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { OrganizationPresenceSettingBackfillService } from "./services/organization-presence-setting-backfill.service.ts";
 import { groupsRest } from "./transport/group.rest.ts";
@@ -19,8 +20,12 @@ import { organizationManagementRest } from "./transport/organization-management.
 import { organizationTrpcTransport } from "./transport/organization.trpc.ts";
 import { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
+import { seatPeakTrpcTransport } from "./transport/seat-peak.trpc.ts";
 import { teamsRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
+
+/** How many organizations one opening-snapshot page reads; each reads its holders. */
+const SEAT_PEAK_OPENING_PAGE = 200;
 
 export const organizationProcessModule: PublishedProcessModule<
   "organization",
@@ -37,6 +42,7 @@ export const organizationProcessModule: PublishedProcessModule<
     groupTrpcTransport,
     licenseEnforcementTrpcTransport,
     personalWorkspaceFeaturesTrpcTransport,
+    seatPeakTrpcTransport,
     organizationManagementRest,
     organizationsProvisioningRest,
     groupsRest,
@@ -49,6 +55,7 @@ export const organizationProcessModule: PublishedProcessModule<
     }),
   })
   .withEventing(seatLimitEventing)
+  .withEventing(seatPeakEventing)
   .withEventing(organizationLifecycleEventing)
   .withEventing(organizationAuditEventing)
   .withEventing(privateDataplaneRecorderEventing)
@@ -71,6 +78,34 @@ export const organizationProcessModule: PublishedProcessModule<
           onPage: (page) => checkpoint.save({ report: page }),
         });
         return { ...report, dryRun };
+      },
+    }),
+    // Seat changes are recorded from ADR-002 on; this opens every organization's count once.
+    defineMigrationStep({
+      id: "organization:record-seat-peak-opening-snapshots",
+      kind: "data",
+      mode: "background",
+      needsOldWritersGone: false,
+      description:
+        "Records every organization's seat holders as they stand, to open its seat peak.",
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+        let cursor: string | null = typeof resumed === "string" ? resumed : null;
+        let organizations = 0;
+        let opened = 0;
+        while (!signal.aborted) {
+          const page = await app.openSeatPeakPage({
+            afterOrganizationId: cursor,
+            limit: SEAT_PEAK_OPENING_PAGE,
+            dryRun,
+          });
+          if (page.lastOrganizationId === null) break;
+          organizations += page.organizations;
+          opened += page.opened;
+          cursor = page.lastOrganizationId;
+          if (!dryRun) await checkpoint.save({ report: { afterOrganizationId: cursor } });
+        }
+        return { afterOrganizationId: cursor, organizations, opened, dryRun };
       },
     }),
   ]);

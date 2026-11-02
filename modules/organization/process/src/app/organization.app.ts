@@ -105,6 +105,7 @@ import {
   type OrganizationInvitedMemberIds,
   type OrganizationFounding,
   type OrganizationMemberSeats,
+  type OrganizationSeatPeak,
   type LimitCheckResult,
   type LimitType,
   type ScopeGraphOrganization,
@@ -126,7 +127,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { projectKindsHiddenFrom } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
-import type { Instant } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { OrganizationChannels } from "../channels/organization.channels.ts";
 import type { RecordAuditCommandData } from "../eventing/organization-audit.commands.ts";
@@ -144,6 +145,11 @@ import {
   buildSeatLimitPipeline,
   type SeatLimitDefinition,
 } from "../eventing/seat-limit.pipeline.ts";
+import type {
+  RecordSeatChangedCommandData,
+  RecordSeatSnapshotCommandData,
+} from "../eventing/seat-peak.events.ts";
+import { buildSeatPeakPipeline, type SeatPeakDefinition } from "../eventing/seat-peak.pipeline.ts";
 import { GroupIdentityService } from "../features/group/services/group-identity.service.ts";
 import type { GroupIdentity } from "../features/group/services/group-identity.service.ts";
 import { OrganizationGroupScopeService } from "../features/group/services/organization-group-scope.service.ts";
@@ -191,6 +197,7 @@ import type { OrganizationDemoProject } from "../services/organization-visibilit
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import { PrivateDataplaneRecordService } from "../services/private-dataplane-record.service.ts";
 import { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
+import { SeatPeakService } from "../services/seat-peak.service.ts";
 import { SignUpPolicyService } from "../services/sign-up-policy.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import { TeamIdentityService } from "../services/team-identity.service.ts";
@@ -398,6 +405,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       accounts: setup.repositories.privateS3Accounts,
       organizations: setup.repositories.organization,
     });
+    // The monthly seat peak (ADR-002): its fold's store, and the service that opens and reads it.
+    application.#seatPeakStore = setup.repositories.seatPeak;
+    application.#seatPeak = SeatPeakService.create({
+      seats: setup.repositories.seats,
+      peaks: setup.repositories.seatPeak,
+      organizations: setup.repositories.organization,
+      plans: setup.dependencies.entitlement,
+    });
     application.#signUpPolicy = SignUpPolicyService.create({
       settings: setup.config.signUp,
       repository: setup.repositories.signUpPolicy,
@@ -508,6 +523,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #joinRequests!: OrganizationJoinRequests;
   #initialization!: OrganizationInitializationService;
   #privateDataplanes!: PrivateDataplaneRecordService;
+  #seatPeakStore!: OrganizationSetup["repositories"]["seatPeak"];
+  #seatPeak!: SeatPeakService;
   /** Who may sign up and found an organization; absent only in a test's app, which is open. */
   #signUpPolicy: SignUpPolicyService | null = null;
   /** organization_audit's sender, once registration answers with it. */
@@ -1613,6 +1630,48 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   ): void {
     this.#infrastructure.seatLimits.connect(commands.recordSeatLimitReached);
   }
+
+  // --- organization_seat_peak (ADR-002) ---
+
+  /** organization_seat_peak: seat changes and the opening count, folded per organization. */
+  seatPeakPipeline(): SeatPeakDefinition {
+    return buildSeatPeakPipeline({ store: this.#seatPeakStore, opener: this.#seatPeak });
+  }
+
+  connectSeatPeak(
+    commands: Readonly<{
+      recordSeatChanged: EventingCommandSender<RecordSeatChangedCommandData>;
+      recordSeatSnapshot: EventingCommandSender<RecordSeatSnapshotCommandData>;
+    }>,
+  ): void {
+    this.#seatPeak.connect(commands);
+  }
+
+  /** The seat-change sender for the outbox that commits changes; throws before registration. */
+  getSeatChangeSender(): Pick<
+    EventingCommandSender<RecordSeatChangedCommandData>,
+    "send" | "sendBatch"
+  > {
+    return this.#seatPeak.getChangeSender();
+  }
+
+  async getSeatPeak(input: Readonly<{ organizationId: string }>): Promise<OrganizationSeatPeak> {
+    return this.#seatPeak.read({
+      organizationId: input.organizationId,
+      now: nowInstant().epochMilliseconds,
+    });
+  }
+
+  /** Opens one page of organizations' seat counts, for the opening-snapshot step. */
+  openSeatPeakPage(input: {
+    afterOrganizationId: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<{ lastOrganizationId: string | null; organizations: number; opened: number }> {
+    return this.#seatPeak.openPage({ ...input, occurredAt: nowInstant().epochMilliseconds });
+  }
+
+  // --- end organization_seat_peak ---
 
   async checkLimit(
     input: Readonly<{ organizationId: string; limitType: LimitType }>,

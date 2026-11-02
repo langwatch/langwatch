@@ -35,6 +35,7 @@ import { Currency, PRICING_MODEL_LABELS, PricingModel } from "../../model/admin-
 import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 import { LegacySsoDomainNotice } from "./legacy-sso-domain-notice.tsx";
+import { SeatPeakSummary } from "./seat-peak-summary.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
  * admin Hono route strips them from every list/getOne response; the edit
@@ -377,6 +378,8 @@ export function OrganizationEditDrawer({
           <IdentityFields form={form} setField={setField} />
           <BillingFields form={form} setField={setField} />
           <LimitFields form={form} setField={setField} error={fieldErrors.datasetAttachmentMaxMb} />
+          <SectionHeading>Seats</SectionHeading>
+          <SeatPeakSummary organizationId={organization.id} />
           <AuthenticationSection organization={organization} />
           <LicenseFields form={form} setField={setField} />
           <CustomS3Fields form={form} setField={setField} />

@@ -1800,6 +1800,22 @@ model ScimSsoConnectionView {
   @@index([organizationId, createdAt])
 }
 
+/// Organization's monthly seat peak, folded from its seat changes (modules/organization, ADR-002).
+/// A read model, one row per organization: rebuildable by replaying the event log, so no relation.
+/// Epochs in milliseconds.
+model OrganizationSeatPeakProjection {
+  /// The organization, which is also the aggregate id.
+  organizationId    String @id
+  /// The fold's state: running counts, each holder's seat, and each touched month's peaks.
+  folded            Json
+  createdAt         Float
+  updatedAt         Float
+  occurredAt        Float
+  acceptedAt        Float
+  lastEventId       String
+  projectionVersion String
+}
+
 enum PlanTypes {
   FREE
   PRO
