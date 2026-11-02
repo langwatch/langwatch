@@ -125,10 +125,11 @@ func usesLineComment(mapping *yaml.Node) string {
 // Permissions is the job's own `permissions:` block, which GitHub uses to
 // replace (not merge with) the workflow-level block when present.
 type Job struct {
-	Name        string      `yaml:"name"`
-	If          string      `yaml:"if"`
-	Permissions Permissions `yaml:"permissions"`
-	Steps       []Step      `yaml:"steps"`
+	Name        string            `yaml:"name"`
+	If          string            `yaml:"if"`
+	Permissions Permissions       `yaml:"permissions"`
+	Env         map[string]string `yaml:"env"`
+	Steps       []Step            `yaml:"steps"`
 }
 
 // PullRequest is the `on.pull_request` trigger and the event types that fire
