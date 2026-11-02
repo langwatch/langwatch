@@ -204,8 +204,9 @@ objects that are missing (engine tables, views, key map, app functions, approved
 and grants the reader SELECT on an approved view that lacks it. It also replaces a view that lacks
 a column its catalog declares (an extra column is left alone), so a view a deploy left on an older
 definition is repaired within 5 minutes. It never revokes and never creates the reader role, so a
-missing role or a changed column type converges only on a deploy: use Ops > Upgrades Retry. Alert on `level=error` with the message "lwql provisioning failed
-creating ClickHouse objects" or "lwql provisioning failed creating PostgreSQL objects". The check runs
+missing role or a changed column type converges only on a deploy: use Ops > Upgrades Retry. Alert
+on `level=error` with the message "lwql provisioning failed creating ClickHouse objects" or "lwql
+provisioning failed creating PostgreSQL objects". The check runs
 every 5 minutes and logs each failed statement at warn as "lwql reconvergence statement failed",
 which this alert filter does not match.
 

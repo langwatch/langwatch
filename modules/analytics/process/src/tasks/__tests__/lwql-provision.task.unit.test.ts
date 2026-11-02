@@ -547,7 +547,7 @@ describe("convergeLwqlAccessModel", () => {
         names: NAMES,
         relations: [stale],
         functions: [],
-        found: { relations: [stale], functions: [], comments: clickHouse.comments() },
+        found: { relations: [stale], functions: [], comments: clickHouse.comments(), columns: {} },
         credentialFingerprint: fingerprint,
       });
       expect(next.objects).toEqual([]);
