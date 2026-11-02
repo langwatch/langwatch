@@ -327,32 +327,8 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 	}
 }
 
-func TestAllowVisibleProcess_OnlyOnLambda(t *testing.T) {
-	lambda := map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn", "AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}
-	for _, tc := range []struct {
-		name    string
-		setting bool
-		env     map[string]string
-		want    bool
-	}{
-		{"setting off, on Lambda", false, lambda, false},
-		{"setting on, on Lambda", true, lambda, true},
-		{"setting on, no Lambda variables", true, nil, false},
-		{"setting on, function name only", true, map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn"}, false},
-		{"setting on, runtime API only", true, map[string]string{"AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}, false},
-		{"setting off, no Lambda variables", false, nil, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got := allowVisibleProcess(tc.setting, func(k string) string { return tc.env[k] }, zap.NewNop())
-			if got != tc.want {
-				t.Errorf("allowVisibleProcess = %v; want %v", got, tc.want)
-			}
-		})
-	}
-}
-
 // @scenario "the engine warns when the visible-process setting is ignored off Lambda"
-func TestAllowVisibleProcess_WarnsWhenTheSettingIsIgnoredOffLambda(t *testing.T) {
+func TestAllowVisibleProcess_HonoredOnlyOnLambdaAndWarnsWhenIgnored(t *testing.T) {
 	lambdaEnv := map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn", "AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}
 	cases := []struct {
 		name    string
@@ -363,7 +339,9 @@ func TestAllowVisibleProcess_WarnsWhenTheSettingIsIgnoredOffLambda(t *testing.T)
 	}{
 		{"on, off Lambda", true, nil, false, true},
 		{"on, only the function name", true, map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn"}, false, true},
+		{"on, only the runtime API", true, map[string]string{"AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}, false, true},
 		{"on, on Lambda", true, lambdaEnv, true, false},
+		{"off, on Lambda", false, lambdaEnv, false, false},
 		{"off, off Lambda", false, nil, false, false},
 	}
 	for _, tc := range cases {

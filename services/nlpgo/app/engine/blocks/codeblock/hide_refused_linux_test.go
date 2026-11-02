@@ -50,7 +50,9 @@ func seccompNumbers() (seccompNr, prctlNr, auditArch uint32, ok bool) {
 }
 
 // refusePrSetDumpable makes every thread of this process answer EPERM to
-// prctl(PR_SET_DUMPABLE) and nothing else, as Lambda's filter does.
+// prctl(PR_SET_DUMPABLE) and nothing else: the one Lambda refusal the engine
+// depends on (Lambda also refuses PR_SET_CHILD_SUBREAPER and PR_SET_PDEATHSIG,
+// which the engine tolerates or does not use).
 func refusePrSetDumpable() error {
 	seccompNr, prctlNr, arch, ok := seccompNumbers()
 	if !ok {
@@ -110,9 +112,7 @@ func childEnvFor(name string, extra ...string) []string {
 // parent with the child's output when the child's assertions fail.
 func runChild(t *testing.T, name string, extra ...string) {
 	t.Helper()
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not installed; the case runs a real code block")
-	}
+	requirePython(t)
 	ctx, cancel := context.WithTimeout(context.Background(), childTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHideRefusedChild$", "-test.v", "-test.timeout=80s") //nolint:gosec // re-executes this test binary, no external input
