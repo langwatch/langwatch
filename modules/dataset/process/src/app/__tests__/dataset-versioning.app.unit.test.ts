@@ -186,6 +186,30 @@ describe("given a dataset whose import is still processing", () => {
   });
 });
 
+describe("given a version whose rows are larger than one response", () => {
+  /** @scenario "A page of a version larger than one response is refused with a smaller limit" */
+  it("refuses the page with dataset_page_too_large and a smaller limit", async () => {
+    boot(createDatasetTestProjects(), createDatasetTestEntitlementWith({ inlineReadBytes: 20 }));
+    const datasetId = await createDataset([
+      { id: "a", input: "a row value long enough" },
+      { id: "b", input: "another long row value" },
+    ]);
+    await save(datasetId);
+
+    await expect(
+      app.getVersionPage({ projectId: PROJECT, datasetId, version: 1, limit: 2 }),
+    ).rejects.toMatchObject({ code: "dataset_page_too_large", meta: { suggestedLimit: 1 } });
+
+    const single = await app.getVersionPage({
+      projectId: PROJECT,
+      datasetId,
+      version: 1,
+      limit: 1,
+    });
+    expect(single.rows.map((row) => row.id)).toEqual(["a"]);
+  });
+});
+
 describe("given a version larger than one whole read", () => {
   /** @scenario "A version larger than one whole read is refused before it is read" */
   it("refuses to read, compare or restore it with dataset_version_too_large", async () => {

@@ -80,6 +80,12 @@ Feature: Dataset version history
     Then it is refused with code "dataset_not_found"
 
   @unit
+  Scenario: A page of a version larger than one response is refused with a smaller limit
+    Given a version whose rows together are larger than one response carries
+    When a page of more than one of its rows is read
+    Then it is refused with code "dataset_page_too_large" naming a smaller limit to ask again with
+
+  @unit
   Scenario: A version larger than one whole read is refused before it is read
     Given a version with more rows than one whole read allows
     When it is read, compared or restored

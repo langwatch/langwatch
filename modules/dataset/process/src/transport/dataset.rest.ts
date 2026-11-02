@@ -50,6 +50,7 @@ import {
   datasetRestSaveVersionSchema,
   datasetRestVersionListSchema,
   datasetRestNoBodySchema,
+  datasetRestVersionPageQuerySchema,
   datasetRestVersionParamsSchema,
   datasetVersionPageSchema,
   datasetVersionRestoredSchema,
@@ -621,7 +622,7 @@ export function createDatasetRest(): Readonly<{
 
       .get("/:slugOrId/versions/:version", "getApiDatasetBySlugOrIdVersionsByVersion")
       .withParams(datasetRestVersionParamsSchema)
-      .withQuery(datasetRestPaginationQuerySchema)
+      .withQuery(datasetRestVersionPageQuerySchema)
       .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
       .withOutput(datasetVersionPageSchema)
       .withDocs({

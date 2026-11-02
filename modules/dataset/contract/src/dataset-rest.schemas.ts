@@ -12,7 +12,7 @@ import {
 } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
-import { datasetVersionListItemSchema } from "./dataset-version.ts";
+import { DATASET_VERSION_PAGE_LIMIT_MAX, datasetVersionListItemSchema } from "./dataset-version.ts";
 import {
   appendStoredObjectToDatasetInputSchema,
   createDatasetFromStoredObjectInputSchema,
@@ -315,6 +315,22 @@ export interface DatasetRestVersionParamsSchema extends Named<
 > {}
 export const datasetRestVersionParamsSchema: DatasetRestVersionParamsSchema =
   datasetRestVersionParamsSchemaDefinition;
+
+const datasetRestVersionPageQuerySchemaDefinition = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(DATASET_VERSION_PAGE_LIMIT_MAX)
+    .optional()
+    .default(50),
+});
+export interface DatasetRestVersionPageQuerySchema extends Named<
+  typeof datasetRestVersionPageQuerySchemaDefinition
+> {}
+export const datasetRestVersionPageQuerySchema: DatasetRestVersionPageQuerySchema =
+  datasetRestVersionPageQuerySchemaDefinition;
 
 const datasetRestSaveVersionSchemaDefinition = z.object({
   name: z.string().trim().min(1).max(120).optional(),

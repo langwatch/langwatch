@@ -15,6 +15,7 @@ import {
   type DatasetVersionComparison,
   type DatasetVersionPage,
   type DatasetVersionPageInput,
+  datasetVersionPageInputSchema,
   type DatasetVersionRestored,
   type DatasetVersionRow,
   type DatasetVersionSavedEventData,
@@ -30,6 +31,7 @@ import {
   DatasetVersionNumberTakenError,
   type DatasetVersionRepository,
 } from "../repositories/dataset-version.repository.ts";
+import { assertPageWithinLimit } from "../rules/dataset-row-limits.rules.ts";
 import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import {
   assertWithinWholeRead,
@@ -61,6 +63,8 @@ export type DatasetVersionServiceDeps = {
   readSingleFile: (dataset: Dataset) => Promise<DatasetVersionRow[]>;
   /** The most rows and bytes one whole read may hold, as the project's plan answers them. */
   wholeReadBounds: (projectId: string) => Promise<{ maxRows: number; maxBytes: number }>;
+  /** The most bytes of row values one page answers, as the project's plan answers it. */
+  pageMaxBytes: (projectId: string) => Promise<number>;
   generateId: () => string;
 };
 
@@ -143,9 +147,8 @@ export class DatasetVersionService {
   }
 
   async page(input: DatasetVersionPageInput): Promise<DatasetVersionPage> {
-    const version = await this.get(input);
-    const page = input.page ?? 1;
-    const limit = input.limit ?? 50;
+    const { page, limit, ...lookup } = datasetVersionPageInputSchema.parse(input);
+    const version = await this.get(lookup);
     const { indexes, start, end } = versionChunksOfPage({
       page,
       limit,
@@ -159,6 +162,8 @@ export class DatasetVersionService {
         if (position >= start && position < end) rows.push(versionRowOf(line, position));
       });
     }
+    const maxBytes = await this.deps.pageMaxBytes(input.projectId);
+    assertPageWithinLimit({ records: rows, page, limit, maxBytes });
     return { version, rows, pagination: { page, limit, total: version.rowCount } };
   }
 
@@ -337,11 +342,8 @@ export class DatasetVersionService {
       hasher.push(row);
       buffer.push(row);
       if (buffer.length === DATASET_VERSION_ROWS_PER_CHUNK) {
-        await this.deps.versionContent.writeChunk({
-          ...address,
-          index: chunkCount++,
-          rows: buffer,
-        });
+        const chunk = { ...address, index: chunkCount++, rows: buffer };
+        await this.deps.versionContent.writeChunk(chunk);
         buffer = [];
       }
     }

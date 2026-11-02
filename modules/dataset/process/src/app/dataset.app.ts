@@ -292,6 +292,7 @@ export class DatasetModule implements DatasetApi {
         const limits = await this.#requestBounds.limits(projectId);
         return { maxRows: limits.rowsMax, maxBytes: limits.wholeReadBytes };
       },
+      pageMaxBytes: (projectId) => this.#requestBounds.limit(projectId, "inlineReadBytes"),
       generateId: () => generate(DATASET_VERSION_KSUID_RESOURCE).toString(),
     });
     this.#versionRetention = DatasetVersionRetentionService.create({

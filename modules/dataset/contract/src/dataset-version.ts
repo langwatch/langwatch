@@ -138,10 +138,13 @@ export const saveDatasetVersionInputSchema: SaveDatasetVersionInputSchema =
   saveDatasetVersionInputSchemaDefinition;
 export type SaveDatasetVersionInput = z.infer<typeof saveDatasetVersionInputSchema>;
 
+/** The most rows one page of a version answers. */
+export const DATASET_VERSION_PAGE_LIMIT_MAX = 500;
+
 const datasetVersionPageInputSchemaDefinition = z.object({
   ...datasetVersionLookupInputSchema.shape,
   page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().max(500).default(50),
+  limit: z.number().int().positive().max(DATASET_VERSION_PAGE_LIMIT_MAX).default(50),
 });
 export interface DatasetVersionPageInputSchema extends Named<
   typeof datasetVersionPageInputSchemaDefinition
