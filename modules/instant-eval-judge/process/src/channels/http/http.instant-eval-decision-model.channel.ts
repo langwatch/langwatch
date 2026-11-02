@@ -132,6 +132,8 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     try {
       const response = await undiciFetch(endpoint, {
         method: "POST",
+        // A redirect would carry the key to another host; undici keeps `api-key` cross-origin.
+        redirect: "error",
         headers: { ...authorization, "content-type": "application/json" },
         body,
         signal: requestSignal(signal),
