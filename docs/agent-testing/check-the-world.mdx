@@ -102,7 +102,11 @@ async def support_agent(
     reply = await SupportAgent(customer_id=session["customer_id"]).run(messages)
 
     state_of_world(thread_id, session["charge_id"])  # after this turn
-    return langwatch.AgentReply(reply, session=session)
+    return langwatch.AgentReply(
+        reply,
+        session=session,
+        state={"customer_id": session["customer_id"], "charge_id": session["charge_id"]},
+    )
 ```
 
 Seeding is keyed by `thread_id`, so a retried first turn reuses the data and completes a partial seed.

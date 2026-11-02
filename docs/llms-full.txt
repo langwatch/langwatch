@@ -35801,10 +35801,6 @@ A scenario suite is the full set of scenarios that tells you whether your agent 
 
 This page covers how to organise, run and maintain that set. For which cases to write and when the suite is complete, see [Scenario Suite Design](/agent-testing/designing-a-suite). For checking the data the agent changed, see [Check the World, Not the Words](/agent-testing/check-the-world). The single pieces have their own pages: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Run parameters](/agent-testing/run-parameters), [Run from CI](/agent-testing/run-from-ci) and [Results](/agent-testing/results).
 
-## What to test first and how big
-
-Which cases to write and how many to start with is covered in [Which cases to write](/agent-testing/designing-a-suite#which-cases-to-write). For example, a suite for a support agent can start with ten scenarios: seven about looking up orders and issuing refunds, one for a customer who gives no order number, one for an order with no items and one for a question about refund cost. Give each scenario its matrix row in the name, its labels, and the run parameter its setup reads.
-
 ## How to organise scenarios
 
 Use test suites for the groups that ship together and labels for the cuts that cross them. A scenario belongs to exactly one test suite, and it can have any number of labels, so a test suite works as the folder and a label as the tag.
@@ -35842,7 +35838,7 @@ A run plan is a name and a configuration: the scope (test suites, labels or spec
 | Run plan | Scope | Target | Repeats | When | Pass bar |
 |---|---|---|---|---|---|
 | **PR smoke** | Label `smoke` | Staging | 1 | Every PR that changes the prompt or tools. | All pass. |
-| **Refunds nightly** | Suite `Refunds` | Staging | 1 | On a cron schedule. | All pass, or a failure you can explain. |
+| **Refunds nightly** | Suite `Refunds` | Staging | 3 | On a cron schedule. | All pass, or a failure you can explain. |
 | **Critical** | Label `critical` | Staging | 5 | Before a release. | Every repetition passes, strong judge. |
 | **Refunds pre-release** | Suite `Refunds` | Staging | 3 | Before a release. | Happy paths and critical scenarios pass every repetition, the rest a majority. |
 | **Production canary** | Label `smoke` | Production | 1 | After each deploy. | All pass. |
@@ -36038,7 +36034,11 @@ async def support_agent(
     reply = await SupportAgent(customer_id=session["customer_id"]).run(messages)
 
     state_of_world(thread_id, session["charge_id"])  # after this turn
-    return langwatch.AgentReply(reply, session=session)
+    return langwatch.AgentReply(
+        reply,
+        session=session,
+        state={"customer_id": session["customer_id"], "charge_id": session["charge_id"]},
+    )
 ```
 
 Seeding is keyed by `thread_id`, so a retried first turn reuses the data and completes a partial seed.
@@ -37328,13 +37328,7 @@ The same evaluator can also run as an [online evaluation](/evaluations/online-ev
 
 ## How many times to repeat a scenario
 
-The user simulator and the agent answer differently from run to run, so one pass is weak evidence. Set the repeat count on the [run plan](/agent-testing/run-plans), from 1 to 5, and set the bar by severity:
-
-| Severity | Repeats | Pass bar |
-|---|---|---|
-| **Critical**: moves money, cannot be undone, or checks permissions. | 5, with a strong judge. | Every repetition passes. |
-| **Happy paths** | 1 on a pull request, 3 or more before a release. | Every repetition passes. |
-| **Other cases** | 3 to 5. | A majority, for example 4 of 5. |
+The user simulator and the agent answer differently from run to run, so one pass is weak evidence. Set the repeat count on the [run plan](/agent-testing/run-plans), from 1 to 5. Critical cases (they move money, cannot be undone or check permissions) warrant more repeats and a stricter pass bar than the rest.
 
 LangWatch does not apply a majority rule for you. Every repetition is its own row on [Results](/agent-testing/results). For what the exit code means, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule).
 
@@ -37384,6 +37378,7 @@ In code, each scenario checks in two layers:
 For the same idea in the app, see [Check the World, Not the Words](/agent-testing/check-the-world). Run the code checks first. A code check that the refund row exists with the right amount gives the same answer on every run. Check state and parsed output, never the reply text with a string match or a regular expression.
 
 ```python
+import json
 from decimal import Decimal
 
 import pytest
@@ -37391,9 +37386,15 @@ import scenario
 
 # RefundAgent and refunds_for_order stand in for your own agent adapter and database read.
 def one_refund_for_the_double_charge(state: scenario.ScenarioState) -> None:
-    calls = state.tool_calls("issue_refund")
+    calls = [
+        call
+        for message in state.messages
+        if message["role"] == "assistant"
+        for call in (message.get("tool_calls") or [])
+        if call["function"]["name"] == "issue_refund"
+    ]
     assert len(calls) == 1
-    assert calls.last.input["order_id"] == "A-1042"
+    assert json.loads(calls[0]["function"]["arguments"])["order_id"] == "A-1042"
     # Your own read of the database, not of the reply.
     assert refunds_for_order("A-1042") == [Decimal("49.90")]
 

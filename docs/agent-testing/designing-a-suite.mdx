@@ -117,13 +117,7 @@ The same evaluator can also run as an [online evaluation](/evaluations/online-ev
 
 ## How many times to repeat a scenario
 
-The user simulator and the agent answer differently from run to run, so one pass is weak evidence. Set the repeat count on the [run plan](/agent-testing/run-plans), from 1 to 5, and set the bar by severity:
-
-| Severity | Repeats | Pass bar |
-|---|---|---|
-| **Critical**: moves money, cannot be undone, or checks permissions. | 5, with a strong judge. | Every repetition passes. |
-| **Happy paths** | 1 on a pull request, 3 or more before a release. | Every repetition passes. |
-| **Other cases** | 3 to 5. | A majority, for example 4 of 5. |
+The user simulator and the agent answer differently from run to run, so one pass is weak evidence. Set the repeat count on the [run plan](/agent-testing/run-plans), from 1 to 5. Critical cases (they move money, cannot be undone or check permissions) warrant more repeats and a stricter pass bar than the rest.
 
 LangWatch does not apply a majority rule for you. Every repetition is its own row on [Results](/agent-testing/results). For what the exit code means, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule).
 
@@ -173,6 +167,7 @@ In code, each scenario checks in two layers:
 For the same idea in the app, see [Check the World, Not the Words](/agent-testing/check-the-world). Run the code checks first. A code check that the refund row exists with the right amount gives the same answer on every run. Check state and parsed output, never the reply text with a string match or a regular expression.
 
 ```python
+import json
 from decimal import Decimal
 
 import pytest
@@ -180,9 +175,15 @@ import scenario
 
 # RefundAgent and refunds_for_order stand in for your own agent adapter and database read.
 def one_refund_for_the_double_charge(state: scenario.ScenarioState) -> None:
-    calls = state.tool_calls("issue_refund")
+    calls = [
+        call
+        for message in state.messages
+        if message["role"] == "assistant"
+        for call in (message.get("tool_calls") or [])
+        if call["function"]["name"] == "issue_refund"
+    ]
     assert len(calls) == 1
-    assert calls.last.input["order_id"] == "A-1042"
+    assert json.loads(calls[0]["function"]["arguments"])["order_id"] == "A-1042"
     # Your own read of the database, not of the reply.
     assert refunds_for_order("A-1042") == [Decimal("49.90")]
 
