@@ -66,6 +66,11 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     And it names the connection that governs that address, if one does
     And it never contains the full email address
 
+  @unit
+  Scenario: The library's own refused-link line is written down as a warning, not an error
+    When the sign-in library logs that it refused to link the account
+    Then that line is written at warning level, since the person chose another sign-in method
+
   # A member can be left carrying a stale "you still need to link SSO" flag:
   # it is set at sign-in and only ever cleared by a LATER sign-in that
   # happens to match the organization's required method. The dashboard
