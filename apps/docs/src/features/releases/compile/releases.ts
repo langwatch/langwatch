@@ -8,8 +8,11 @@ import { releaseSchema, type Release } from "../model/release.ts";
 export const RELEASES_SLUG = "changelog";
 const PUBLISHED = 5;
 const WHATS_NEW = 3;
+const LEFT_OUT_HEADING = "## Releases left out of this copy";
 const LEFT_OUT_NOTE =
-  "Earlier recent releases are left out of this Markdown copy to keep it short.";
+  "Earlier recent releases are left out of this Markdown copy to keep it short. " +
+  "All published releases are on the [changelog page](/changelog) and in the " +
+  "[repository CHANGELOG](https://github.com/langwatch/langwatch/blob/main/CHANGELOG.md).";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
 const cache = new Map<string, { modified: number; entries: Release[] }>();
@@ -132,7 +135,7 @@ export function withReleaseNotes({
     ({ version, label, body, compare }) =>
       `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
   );
-  if (kept.length < entries.length) sections.push(`${LEFT_OUT_NOTE}\n`);
+  if (kept.length < entries.length) sections.push(`${LEFT_OUT_HEADING}\n\n${LEFT_OUT_NOTE}\n`);
   const notes = sections.join("\n");
   if (NOTES_TAG.test(source)) return source.replace(NOTES_TAG, () => notes);
   const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/)?.[0] ?? "";

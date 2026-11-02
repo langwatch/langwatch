@@ -5,7 +5,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { approximateTokens } from "../../../lib/page-tokens.ts";
-import { PAGE_TOKENS } from "../../../site/audit/budgets.ts";
 import { pageMarkdown } from "../../discovery/compile.ts";
 import { parseReleases, readReleases, withReleaseNotes } from "../compile/releases.ts";
 
@@ -42,7 +41,7 @@ describe("when a release note links both its pull request and its commit", () =>
   });
 });
 
-const leftOut = "Earlier recent releases are left out of this Markdown copy";
+const leftOut = "## Releases left out of this copy";
 
 function changelogProject({ changelog }: { changelog: string }) {
   const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-budget-"));
@@ -113,7 +112,7 @@ describe("when the repository publishes release notes", () => {
 });
 
 describe("when the newest releases are longer than the page token budget", () => {
-  const pageTokens = PAGE_TOKENS;
+  const pageTokens = 2000;
   const note = "* **traces:** a long note\n";
   const notesOf = ({ share }: { share: number }) =>
     note.repeat(Math.ceil((pageTokens * 4 * share) / note.length));

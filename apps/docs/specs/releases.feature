@@ -17,7 +17,7 @@ Feature: Useful release updates in the documentation
     When the changelog's Markdown export is built
     Then it always keeps the newest release, even when that release alone is over the budget
     And it keeps each older release only while the built export stays within the budget
-    And a short note under the kept releases says the others are left out
+    And a short headed note under the kept releases says the others are left out and links to every release
     But the changelog page still shows every published release
 
   @unit
