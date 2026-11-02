@@ -77,8 +77,8 @@ counts, because the cap counts it.
    extension restores the seat with its new expiry, which is expired again by event time if it
    too is already past. So the running count is exact in any order, and only a momentary peak can be one
    seat out when two changes cross. A holder who leaves is kept with no seat, so a late change
-   cannot bring them back; an invitation holding no seat is dropped 30 days after its last change
-   or expiry, once no change to it can still be on its way.
+   cannot bring them back; a member or invitation holding no seat is dropped 30 days after its
+   last change (an invitation, after its expiry), once no change to it can still be on its way.
 
 ## Rationale / Trade-offs
 

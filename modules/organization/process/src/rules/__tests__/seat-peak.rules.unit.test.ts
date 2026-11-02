@@ -6,7 +6,7 @@ import {
   emptySeatPeak,
   foldSeatPeak,
   SEAT_PEAK_RECENT_CHANGE_IDS,
-  SEAT_PEAK_SETTLED_INVITATION_MS,
+  SEAT_PEAK_SETTLED_HOLDER_MS,
   type SeatPeakFact,
   type SeatPeakState,
   seatPeakAsOf,
@@ -730,13 +730,13 @@ describe("foldSeatPeak's settled members", () => {
       holder: member("joiner"),
       from: "none",
       to: "lite",
-      occurredAt: NOV_3 + SEAT_PEAK_SETTLED_INVITATION_MS + 1,
+      occurredAt: NOV_3 + SEAT_PEAK_SETTLED_HOLDER_MS + 1,
     });
     const readded = change({
       holder: member("leaver"),
       from: "none",
       to: "full",
-      occurredAt: NOV_3 + SEAT_PEAK_SETTLED_INVITATION_MS + 2,
+      occurredAt: NOV_3 + SEAT_PEAK_SETTLED_HOLDER_MS + 2,
     });
     const settled = foldAll([
       snapshot({ occurredAt: NOV_1, extra: [{ holder: member("leaver"), seat: "full" }] }),
@@ -777,7 +777,7 @@ describe("foldSeatPeak's settled invitations", () => {
     holder: member("joiner"),
     from: "none",
     to: "full",
-    occurredAt: NOV_3 + SEAT_PEAK_SETTLED_INVITATION_MS + 1,
+    occurredAt: NOV_3 + SEAT_PEAK_SETTLED_HOLDER_MS + 1,
   });
 
   it("drops a revoked invitation once the settled window has passed, counting the same", () => {

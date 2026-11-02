@@ -14,8 +14,8 @@ import { type SeatHolder, type SeatKind, seatKindSchema } from "./seat-holder.ru
 /** How many recent change ids the fold remembers, so a redelivered change counts once. */
 export const SEAT_PEAK_RECENT_CHANGE_IDS = 1000;
 
-/** How long a settled invitation is kept, so a late change to it is still known to be stale. */
-export const SEAT_PEAK_SETTLED_INVITATION_MS = 30 * 24 * 60 * 60 * 1000;
+/** How long a holder with no seat is kept, so a late change to it is still known to be stale. */
+export const SEAT_PEAK_SETTLED_HOLDER_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const seatCountsSchema = z.object({
   full: z.number().int().nonnegative(),
@@ -163,7 +163,7 @@ function isStale({
  * cannot move again, and a later change finds no stored seat and moves from none.
  */
 function forgetSettledHolders({ state, at }: { state: SeatPeakState; at: number }): SeatPeakState {
-  const horizon = at - SEAT_PEAK_SETTLED_INVITATION_MS;
+  const horizon = at - SEAT_PEAK_SETTLED_HOLDER_MS;
   const entries = Object.entries(state.invitations);
   const kept = entries.filter(([, invitation]) => {
     if (invitation.seat !== "none") return true;

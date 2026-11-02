@@ -2,18 +2,16 @@
  * Our team's view of the most seats an organization held at once each month, beside what its
  * licence sells (ADR-002). Renewal reads it here; the customer's own pages never show it.
  */
-import { Heading, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Table, Text, VStack } from "@langwatch/design-system/primitives";
 import type { OrganizationSeatPeakMonth } from "@langwatch/organization-contract";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { formatDateUtc } from "../elements/admin-cells.tsx";
+import { formatDateUtc, SectionHeading } from "../elements/admin-cells.tsx";
 
 export function SeatPeakSummary({ organizationId }: { organizationId: string }) {
   return (
     <VStack align="stretch" gap={2}>
-      <Heading as="h3" size="xs" color="fg.muted" textTransform="none" letterSpacing="wider" pt={2}>
-        Seats
-      </Heading>
+      <SectionHeading>Seats</SectionHeading>
       <SeatPeakBody organizationId={organizationId} />
     </VStack>
   );
