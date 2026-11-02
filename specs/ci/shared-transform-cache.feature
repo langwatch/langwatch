@@ -9,7 +9,7 @@ Feature: Vitest's transform cache is shared across checkouts
 
   Background:
     Given two checkouts of the same files
-    And both run Vitest with fsModuleCache against the same cache directory
+    And both run Vitest with fsModuleCache against the same cache directory, unless a scenario says otherwise
 
   @integration
   Scenario: A second checkout's first run reads what the first checkout transformed
