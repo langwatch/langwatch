@@ -4606,9 +4606,6 @@ importers:
 
   mcp/typescript:
     dependencies:
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../modules/evaluator/contract
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.32.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.7)
@@ -4625,6 +4622,9 @@ importers:
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../packages/egress
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../modules/evaluator/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../packages/handled-error
@@ -5958,6 +5958,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -10309,6 +10312,12 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../agent/contract
+      '@langwatch/annotation-contract':
+        specifier: workspace:*
+        version: link:../../annotation/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -10330,6 +10339,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -10363,6 +10375,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/monitor-contract':
+        specifier: workspace:*
+        version: link:../../monitor/contract
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../notification/contract
@@ -10381,12 +10396,18 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/secret-contract':
         specifier: workspace:*
         version: link:../../secret/contract
       '@langwatch/slack-contract':
         specifier: workspace:*
         version: link:../../slack/contract
+      '@langwatch/suite-contract':
+        specifier: workspace:*
+        version: link:../../suite/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -10396,6 +10417,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../workflow/contract
       '@tanstack/react-virtual':
         specifier: 'catalog:'
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
