@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Dataset application.
 
-Peers call these through the token, declared at `../contract/src/dataset.api.ts:97`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/dataset.api.ts:96`; nothing else in this package is public.
 
 #### `upsertDataset`
 
@@ -323,7 +323,7 @@ getVersionPage(input: DatasetVersionPageInput): Promise<DatasetVersionPage>;
 #### `compareVersion`
 
 ```typescript
-compareVersion(input: CompareDatasetVersionInput): Promise<DatasetVersionComparison>;
+compareVersion(input: DatasetVersionLookupInput): Promise<DatasetVersionComparison>;
 ```
 
 #### `restoreVersion`
@@ -762,7 +762,7 @@ Answers at `/api/dataset/:slugOrId/versions/:version/restore`, `/api/v1/dataset/
 type Params = z.infer<typeof datasetRestVersionParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:317
 // Body: datasetRestNoBodySchema, ../contract/src/dataset-rest.schemas.ts:347
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:219
+type Response = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:209
 ```
 
 ## tRPC transport
@@ -864,7 +864,7 @@ interface Output {
 
 ### `dataset`
 
-Contract `../contract/src/dataset.trpc.ts:61`, router `src/transport/dataset.trpc.ts:13`.
+Contract `../contract/src/dataset.trpc.ts:60`, router `src/transport/dataset.trpc.ts:13`.
 
 | Procedure                        | Kind     | Gate                         | Input                                      | Output                           |
 | -------------------------------- | -------- | ---------------------------- | ------------------------------------------ | -------------------------------- |
@@ -885,13 +885,13 @@ Contract `../contract/src/dataset.trpc.ts:61`, router `src/transport/dataset.trp
 | `dataset.versions`               | query    | Permission `datasets:view`   | `listDatasetVersionsInputSchema`           | `datasetVersionHistorySchema`    |
 | `dataset.saveVersion`            | mutation | Permission `datasets:update` | `saveDatasetVersionInputSchema`            | `datasetVersionSchema`           |
 | `dataset.versionPage`            | query    | Permission `datasets:view`   | `datasetVersionPageInputSchema`            | `datasetVersionPageSchema`       |
-| `dataset.compareVersion`         | query    | Permission `datasets:view`   | `compareDatasetVersionInputSchema`         | `datasetVersionComparisonSchema` |
+| `dataset.compareVersion`         | query    | Permission `datasets:view`   | `datasetVersionLookupInputSchema`          | `datasetVersionComparisonSchema` |
 | `dataset.restoreVersion`         | mutation | Permission `datasets:manage` | `datasetVersionLookupInputSchema`          | `datasetVersionRestoredSchema`   |
 | `dataset.runVersions`            | query    | Permission `datasets:view`   | `findRunDatasetVersionsInputSchema`        | inline                           |
 
 ```typescript
 // dataset.upsert
-// Input: z.object({ ...datasetApiUpsertBaseInputSchema.shape, ...datasetApiUpsertTargetInputSchema… (inline, ../contract/src/dataset.trpc.ts:65)
+// Input: z.object({ ...datasetApiUpsertBaseInputSchema.shape, ...datasetApiUpsertTargetInputSchema… (inline, ../contract/src/dataset.trpc.ts:64)
 type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:206
 
 // dataset.validateDatasetName
@@ -913,7 +913,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: z.array(datasetSummaryWireSchema) (inline, ../contract/src/dataset.trpc.ts:80)
+// Output: z.array(datasetSummaryWireSchema) (inline, ../contract/src/dataset.trpc.ts:79)
 
 // dataset.recordCounts
 // Input: countDatasetRecordsInputSchema, ../contract/src/dataset.ts:259
@@ -921,7 +921,7 @@ interface Input {
   projectId: string;
   datasetIds: string[];
 }
-// Output: inline, ../contract/src/dataset.trpc.ts:85
+// Output: inline, ../contract/src/dataset.trpc.ts:84
 type Output = {
   datasetId: string;
   recordCount: number;
@@ -933,7 +933,7 @@ interface Input {
   projectId: string;
   datasetId: string;
 }
-// Output: datasetWireSchema.nullable() (inline, ../contract/src/dataset.trpc.ts:92)
+// Output: datasetWireSchema.nullable() (inline, ../contract/src/dataset.trpc.ts:91)
 
 // dataset.deleteById
 // Input: datasetApiDeleteInputSchema, ../contract/src/dataset.schemas.ts:89
@@ -942,7 +942,7 @@ interface Input {
   datasetId: string;
   undo?: boolean;
 }
-// Output: datasetDeletedSchema, ../contract/src/dataset.trpc.ts:59
+// Output: datasetDeletedSchema, ../contract/src/dataset.trpc.ts:58
 interface Output {
   success: true;
 }
@@ -968,7 +968,7 @@ interface Input {
   projectId: string;
   proposedName: string;
 }
-// Output: inline, ../contract/src/dataset.trpc.ts:107
+// Output: inline, ../contract/src/dataset.trpc.ts:106
 type Output = string;
 
 // dataset.copy
@@ -1057,30 +1057,25 @@ interface Input {
 type Output = z.infer<typeof datasetVersionPageSchema>; // ../contract/src/dataset-version.ts:169
 
 // dataset.compareVersion
-// Input: compareDatasetVersionInputSchema, ../contract/src/dataset-version.ts:179
-interface Input {
-  projectId: string;
-  datasetId: string;
-  version: number;
-}
-type Output = z.infer<typeof datasetVersionComparisonSchema>; // ../contract/src/dataset-version.ts:207
-
-// dataset.restoreVersion
 // Input: datasetVersionLookupInputSchema, ../contract/src/dataset-version.ts:115
 interface Input {
   projectId: string;
   datasetId: string;
   version: number;
 }
-type Output = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:219
+type Output = z.infer<typeof datasetVersionComparisonSchema>; // ../contract/src/dataset-version.ts:197
+
+// dataset.restoreVersion
+type Input = z.infer<typeof datasetVersionLookupInputSchema>; // ../contract/src/dataset-version.ts:115
+type Output = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:209
 
 // dataset.runVersions
-// Input: findRunDatasetVersionsInputSchema, ../contract/src/dataset-version.ts:244
+// Input: findRunDatasetVersionsInputSchema, ../contract/src/dataset-version.ts:234
 interface Input {
   projectId: string;
   runIds: string[];
 }
-// Output: inline, ../contract/src/dataset.trpc.ts:175
+// Output: inline, ../contract/src/dataset.trpc.ts:174
 type Output = {
   runId: string;
   datasetId: string;

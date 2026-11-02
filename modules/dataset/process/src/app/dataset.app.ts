@@ -54,7 +54,6 @@ import {
   type UpdateDatasetRecordInput,
   type UploadExistingDatasetInput,
   type UpsertDatasetInput,
-  type CompareDatasetVersionInput,
   type DatasetVersion,
   type DatasetVersionAuthor,
   type DatasetVersionComparison,
@@ -690,7 +689,7 @@ export class DatasetModule implements DatasetApi {
     return this.#versions.page(input);
   }
 
-  compareVersion(input: CompareDatasetVersionInput): Promise<DatasetVersionComparison> {
+  compareVersion(input: DatasetVersionLookupInput): Promise<DatasetVersionComparison> {
     return this.#versions.compare(input);
   }
 

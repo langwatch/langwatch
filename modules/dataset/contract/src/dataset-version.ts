@@ -169,16 +169,6 @@ export const datasetVersionPageSchema: DatasetVersionPageSchema =
   datasetVersionPageSchemaDefinition;
 export type DatasetVersionPage = z.infer<typeof datasetVersionPageSchema>;
 
-const compareDatasetVersionInputSchemaDefinition = z.object({
-  ...datasetVersionLookupInputSchema.shape,
-});
-export interface CompareDatasetVersionInputSchema extends Named<
-  typeof compareDatasetVersionInputSchemaDefinition
-> {}
-export const compareDatasetVersionInputSchema: CompareDatasetVersionInputSchema =
-  compareDatasetVersionInputSchemaDefinition;
-export type CompareDatasetVersionInput = z.infer<typeof compareDatasetVersionInputSchema>;
-
 const datasetVersionComparisonSchemaDefinition = z.object({
   version: z.number().int().positive(),
   columns: z.object({ added: z.array(z.string()), removed: z.array(z.string()) }),

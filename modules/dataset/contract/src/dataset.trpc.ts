@@ -13,7 +13,6 @@ import {
   DATASET_VERSION_RESTORED_EVENT_TYPE,
   DATASET_VERSION_SAVED_EVENT_TYPE,
   datasetVersionHistorySchema,
-  compareDatasetVersionInputSchema,
   datasetVersionComparisonSchema,
   datasetVersionLookupInputSchema,
   datasetVersionPageInputSchema,
@@ -161,7 +160,7 @@ export const datasetTrpc = defineTrpcContract("dataset")
       DATASET_VERSION_RESTORED_EVENT_TYPE,
     ],
   })
-  .withInput(compareDatasetVersionInputSchema)
+  .withInput(datasetVersionLookupInputSchema)
   .withOutput(datasetVersionComparisonSchema)
 
   /** A version's content written back as a new version. */

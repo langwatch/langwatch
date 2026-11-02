@@ -7,13 +7,13 @@ import {
   DatasetNotReadyError,
   DatasetVersionNotFoundError,
   DatasetVersionRestoreUnsupportedError,
-  type CompareDatasetVersionInput,
   type Dataset,
   type DatasetColumns,
   type DatasetVersion,
   type DatasetVersionAuthor,
   type DatasetVersionComparison,
   type DatasetVersionPage,
+  type DatasetVersionLookupInput,
   type DatasetVersionPageInput,
   datasetVersionPageInputSchema,
   type DatasetVersionRestored,
@@ -31,13 +31,12 @@ import {
   DatasetVersionNumberTakenError,
   type DatasetVersionRepository,
 } from "../repositories/dataset-version.repository.ts";
-import { assertPageWithinLimit } from "../rules/dataset-row-limits.rules.ts";
+import { assertPageWithinLimit, entryBytesOf } from "../rules/dataset-row-limits.rules.ts";
 import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import {
   assertWithinWholeRead,
   compareDatasetContents,
   DATASET_VERSION_ROWS_PER_CHUNK,
-  stableStringify,
   versionChunksOfPage,
   versionRowOf,
 } from "../rules/dataset-version.rules.ts";
@@ -187,7 +186,7 @@ export class DatasetVersionService {
     return rows;
   }
 
-  async compare(input: CompareDatasetVersionInput): Promise<DatasetVersionComparison> {
+  async compare(input: DatasetVersionLookupInput): Promise<DatasetVersionComparison> {
     const version = await this.get(input);
     const before = { columns: version.columnTypes, rows: await this.readWhole(version) };
     const dataset = await this.#readyDataset(input);
@@ -196,7 +195,7 @@ export class DatasetVersionService {
     let bytes = 0;
     // Bounded as the rows stream: a postgres-layout dataset records no counts.
     for await (const row of this.#currentRows(dataset)) {
-      bytes += Buffer.byteLength(stableStringify({ id: row.id, entry: row.entry })) + 1;
+      bytes += entryBytesOf(row.entry);
       current.push(row);
       assertWithinWholeRead({ rows: current.length, bytes, ...bounds });
     }

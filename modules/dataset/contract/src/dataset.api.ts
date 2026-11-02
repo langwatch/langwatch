@@ -4,7 +4,6 @@ import type { StoredObjectsCreateUploadOutput } from "@langwatch/stored-object-c
 import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-evaluation.schemas.ts";
 import type { DatasetLimits } from "./dataset-limits.ts";
 import type {
-  CompareDatasetVersionInput,
   DatasetVersion,
   DatasetVersionHistory,
   DatasetVersionAuthor,
@@ -211,7 +210,7 @@ export interface DatasetApi {
   /** The current content saved by hand, optionally named; unchanged content names the latest. */
   saveVersion(input: SaveDatasetVersionInput & EditedBy): Promise<DatasetVersion>;
   getVersionPage(input: DatasetVersionPageInput): Promise<DatasetVersionPage>;
-  compareVersion(input: CompareDatasetVersionInput): Promise<DatasetVersionComparison>;
+  compareVersion(input: DatasetVersionLookupInput): Promise<DatasetVersionComparison>;
   /** Writes a version's content back as a new version; history is never rewritten. */
   restoreVersion(input: DatasetVersionLookupInput & EditedBy): Promise<DatasetVersionRestored>;
   /** Keeps a version out of retention because an experiment names it. */
