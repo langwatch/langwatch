@@ -88,7 +88,7 @@ function directoryOver({ fullMembers, liteMembers }: { fullMembers: number; lite
 describe("the member-created fact a directory create records", () => {
   describe("given a full seat free", () => {
     /** @scenario "A seat taken on any path is counted" */
-    it("records one fact naming the full seat", async () => {
+    it("records one fact naming the member and the organization", async () => {
       const { repository, push } = directoryOver({ fullMembers: 9, liteMembers: 0 });
 
       await push();
@@ -98,7 +98,6 @@ describe("the member-created fact a directory create records", () => {
           tenantId: "org-1",
           organizationId: "org-1",
           userId: "user-1",
-          seat: "full",
         }),
       ]);
     });
@@ -110,26 +109,6 @@ describe("the member-created fact a directory create records", () => {
       await push().catch(() => undefined);
 
       expect(repository.memberCreatedFacts).toHaveLength(1);
-    });
-  });
-
-  describe("given no full seat free and a Lite Member seat free", () => {
-    it("records the Lite Member seat the person entered on", async () => {
-      const { repository, push } = directoryOver({ fullMembers: 10, liteMembers: 0 });
-
-      await push();
-
-      expect(repository.memberCreatedFacts).toEqual([expect.objectContaining({ seat: "lite" })]);
-    });
-  });
-
-  describe("given no seat free", () => {
-    it("records the held member as taking no seat", async () => {
-      const { repository, push } = directoryOver({ fullMembers: 10, liteMembers: 10 });
-
-      await push();
-
-      expect(repository.memberCreatedFacts).toEqual([expect.objectContaining({ seat: "none" })]);
     });
   });
 });

@@ -56,12 +56,12 @@ export function formatDate(value: TimeInput | null | undefined): string {
   return toDate(moment).toLocaleDateString();
 }
 
-/** Calendar date in UTC, for instants that are UTC by definition (seat peak months). */
+/** Calendar date in UTC as `YYYY-MM-DD`, for instants that are UTC by definition (seat peaks). */
 export function formatDateUtc(value: TimeInput | null | undefined): string {
   if (!value) return "—";
   const moment = readableMoment(value);
   if (moment === null) return "—";
-  return toDate(moment).toLocaleDateString(undefined, { timeZone: "UTC" });
+  return toDate(moment).toISOString().slice(0, 10);
 }
 
 export function formatDateTime(value: TimeInput | null | undefined): string {

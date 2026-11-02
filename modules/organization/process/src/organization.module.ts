@@ -12,6 +12,7 @@ import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { seatPeakEventing } from "./eventing/seat-peak.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { OrganizationPresenceSettingBackfillService } from "./services/organization-presence-setting-backfill.service.ts";
+import { SeatPeakOpeningBackfillService } from "./services/seat-peak-opening-backfill.service.ts";
 import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
@@ -23,9 +24,6 @@ import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-wor
 import { seatPeakTrpcTransport } from "./transport/seat-peak.trpc.ts";
 import { teamsRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
-
-/** How many organizations one opening-snapshot page reads; each reads its holders. */
-const SEAT_PEAK_OPENING_PAGE = 200;
 
 export const organizationProcessModule: PublishedProcessModule<
   "organization",
@@ -91,22 +89,15 @@ export const organizationProcessModule: PublishedProcessModule<
         "Records every organization's seat holders as they stand, to open its seat peak.",
       run: async ({ checkpoint, dryRun, signal }) => {
         const resumed = checkpoint.resumeFrom?.afterOrganizationId;
-        let cursor: string | null = typeof resumed === "string" ? resumed : null;
-        let organizations = 0;
-        let opened = 0;
-        while (!signal.aborted) {
-          const page = await app.openSeatPeakPage({
-            afterOrganizationId: cursor,
-            limit: SEAT_PEAK_OPENING_PAGE,
-            dryRun,
-          });
-          if (page.lastOrganizationId === null) break;
-          organizations += page.organizations;
-          opened += page.opened;
-          cursor = page.lastOrganizationId;
-          if (!dryRun) await checkpoint.save({ report: { afterOrganizationId: cursor } });
-        }
-        return { afterOrganizationId: cursor, organizations, opened, dryRun };
+        const report = await SeatPeakOpeningBackfillService.create({
+          peers: { openPage: (input) => app.openSeatPeakPage(input) },
+        }).backfill({
+          after: typeof resumed === "string" ? resumed : undefined,
+          dryRun,
+          signal,
+          onPage: (page) => checkpoint.save({ report: page }),
+        });
+        return { ...report, dryRun };
       },
     }),
   ]);

@@ -10,7 +10,6 @@ import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeOpsHost, renderWithOpsHost } from "../../../testing.tsx";
-import { formatDateUtc } from "../ui/elements/admin-cells.tsx";
 import { OrganizationEditDrawer } from "../ui/sections/organizations-view.tsx";
 
 const peakState = vi.hoisted(() => ({
@@ -58,7 +57,8 @@ function at(iso: string): number {
   return Temporal.Instant.from(iso).epochMilliseconds;
 }
 
-const PEAK_REACHED = at("2026-11-12T15:00:00Z");
+// Late in the UTC day, so a date read in a local time zone would show the 13th.
+const PEAK_REACHED = at("2026-11-12T23:30:00Z");
 
 const counted: OrganizationSeatPeak = {
   counted: true,
@@ -115,7 +115,7 @@ describe("Feature: our team sees the seat peak at renewal", () => {
       const summary = screen.getByTestId("ops-seat-peak");
       expect(peakState.askedFor).toContainEqual({ organizationId: "org-acme" });
       expect(summary).toHaveTextContent(
-        `Full seats: 48 of 50 in use, peak this month 57 (${formatDateUtc(PEAK_REACHED)})`,
+        "Full seats: 48 of 50 in use, peak this month 57 (2026-11-12)",
       );
       expect(summary).toHaveTextContent(/Lite Member seats: 3 of 10 in use, peak this month 4/);
       const earlier = within(screen.getByRole("table", { name: "Seat peaks of earlier months" }));
@@ -126,6 +126,7 @@ describe("Feature: our team sees the seat peak at renewal", () => {
   });
 
   describe("given some seat changes disagreed with the count", () => {
+    /** @scenario "The ops console says how many seat changes disagreed with the count" */
     it("shows the mismatch count only when it is above zero", () => {
       peakState.answer = { ...counted, mismatches: 3 };
       const { unmount } = renderWithOpsHost(

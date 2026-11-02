@@ -1,7 +1,6 @@
 import {
   scimRefusalReasonSchema,
   type DirectoryIdentityRow,
-  type ScimMemberSeat,
   type ScimDirectoryOwnership,
   type ScimRequestLogEntry,
   type ScimRequestRecord,
@@ -345,7 +344,6 @@ export class PrismaScimRepository extends ScimRepository {
     userId: string;
     role: string;
     pending?: boolean;
-    seat: ScimMemberSeat;
   }): Promise<void> => {
     // The fact commits or rolls back with the row (precedent: organization's seat-change store).
     const createId = generate("scimmember");
@@ -366,7 +364,6 @@ export class PrismaScimRepository extends ScimRepository {
             tenantId: input.organizationId,
             organizationId: input.organizationId,
             userId: input.userId,
-            seat: input.seat,
             occurredAt: nowInstant().epochMilliseconds,
             createId: createId.toString(),
           },

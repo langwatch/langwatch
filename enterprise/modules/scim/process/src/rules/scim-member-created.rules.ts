@@ -4,10 +4,7 @@
  * in the membership write's own transaction, and scim_membership records it as an event.
  * Spec: modules/organization/specs/seat-peak.feature
  */
-import type {
-  ScimMemberCreatedEventData,
-  ScimMemberSeat,
-} from "@langwatch/enterprise-scim-contract";
+import type { ScimMemberCreatedEventData } from "@langwatch/enterprise-scim-contract";
 import type { ProcessStore } from "@langwatch/eventing";
 
 export const SCIM_MEMBERSHIP_PROCESS_NAME = "scimMembership" as const;
@@ -15,21 +12,6 @@ export const SCIM_MEMBER_CREATED_INTENT = "recordMemberCreated" as const;
 export const SCIM_MEMBERSHIP_PRUNE_INTENT = "pruneMemberCreated" as const;
 /** The tenant's one member-created outbox instance. */
 const SCIM_MEMBERSHIP_PROCESS_KEY = "members";
-
-/**
- * The seat SCIM's admission gave the row, informational on the fact: organization counts the
- * seat by its own rule, read when the fact arrives (ADR-002 §6).
- */
-export function directorySeatOf({
-  role,
-  pending,
-}: {
-  role: string;
-  pending: boolean;
-}): ScimMemberSeat {
-  if (pending) return "none";
-  return role === "EXTERNAL" ? "lite" : "full";
-}
 
 type MemberCreatedAppend = Omit<Parameters<ProcessStore["appendIntents"]>[0], "transaction">;
 

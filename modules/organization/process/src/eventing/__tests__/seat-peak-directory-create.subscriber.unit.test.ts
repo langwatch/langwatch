@@ -7,7 +7,6 @@ import {
   SCIM_MEMBER_CREATED_EVENT_TYPE,
   SCIM_MEMBER_CREATED_EVENT_VERSION,
   SCIM_MEMBERSHIP_AGGREGATE_TYPE,
-  type ScimMemberSeat,
 } from "@langwatch/enterprise-scim-contract";
 import type { MemberType } from "@langwatch/entitlement-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
@@ -90,7 +89,7 @@ function setup({
   return { lane, sent, peaks: () => state.months };
 }
 
-function memberCreated(seat: ScimMemberSeat): Event {
+function memberCreated(): Event {
   return {
     id: "evt-member-created",
     aggregateId: "pushed",
@@ -104,7 +103,6 @@ function memberCreated(seat: ScimMemberSeat): Event {
       tenantId: ORG,
       organizationId: ORG,
       userId: "pushed",
-      seat,
       occurredAt: CREATED_AT,
       createId: "scimmember_1",
     },
@@ -118,7 +116,7 @@ describe("organization's count of a seat SCIM's directory create took", () => {
     it("raises the month's full seat peak to 11 when somebody is created by the directory", async () => {
       const { lane, sent, peaks } = setup();
 
-      await lane.handle(memberCreated("full"), context);
+      await lane.handle(memberCreated(), context);
 
       expect(sent).toEqual([
         expect.objectContaining({
@@ -135,8 +133,8 @@ describe("organization's count of a seat SCIM's directory create took", () => {
     it("keys the change on the create, so a redelivered fact is counted once", async () => {
       const { lane, sent, peaks } = setup();
 
-      await lane.handle(memberCreated("full"), context);
-      await lane.handle(memberCreated("full"), context);
+      await lane.handle(memberCreated(), context);
+      await lane.handle(memberCreated(), context);
 
       expect(new Set(sent.map(({ changeId }) => changeId)).size).toBe(1);
       expect(Object.values(peaks())[0]?.fullPeak).toBe(11);
@@ -145,7 +143,7 @@ describe("organization's count of a seat SCIM's directory create took", () => {
     it("counts no seat for a create held until a seat frees", async () => {
       const { lane, sent, peaks } = setup({ live: null });
 
-      await lane.handle(memberCreated("none"), context);
+      await lane.handle(memberCreated(), context);
 
       expect(sent).toMatchObject([{ from: "none", to: "none", cause: "directory_created" }]);
       expect(Object.values(peaks())[0]?.fullPeak).toBe(10);
@@ -154,7 +152,7 @@ describe("organization's count of a seat SCIM's directory create took", () => {
     it("counts the seat organization's own rule gives, not the one the fact names", async () => {
       const { lane, sent, peaks } = setup({ live: "LiteMember" });
 
-      await lane.handle(memberCreated("full"), context);
+      await lane.handle(memberCreated(), context);
 
       expect(sent).toMatchObject([{ from: "none", to: "lite" }]);
       expect(Object.values(peaks())[0]).toMatchObject({ fullPeak: 10, litePeak: 1 });
@@ -165,7 +163,7 @@ describe("organization's count of a seat SCIM's directory create took", () => {
     it("records nothing, since the opening snapshot reads the seat as it stands", async () => {
       const { lane, sent } = setup({ countingStarted: false });
 
-      await lane.handle(memberCreated("full"), context);
+      await lane.handle(memberCreated(), context);
 
       expect(sent).toEqual([]);
     });

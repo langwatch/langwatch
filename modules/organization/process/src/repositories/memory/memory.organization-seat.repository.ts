@@ -12,7 +12,7 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { SeatKind } from "../../rules/seat-holder.rules.ts";
+import { seatKindOf } from "../../rules/seat-change.rules.ts";
 import {
   type OrganizationSeatHolding,
   OrganizationSeatRepository,
@@ -73,13 +73,6 @@ function inviteHoldsSeat(
   return predicate(invite.role, merged.length > 0 ? merged : undefined);
 }
 
-/** The seat a classified holder takes, in the seat peak's terms. */
-const SEAT_OF_MEMBER_TYPE: Record<MemberType, SeatKind> = {
-  FullMember: "full",
-  LiteMember: "lite",
-  Developer: "developer",
-};
-
 /**
  * Seat counts over the memory tables, classified as the Postgres repository classifies them.
  * With no grant ledger here, a team membership's custom role stands in for the TEAM binding.
@@ -126,9 +119,9 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
         )
         .map((member) => ({
           holder: { kind: "member" as const, userId: member.userId },
-          seat: SEAT_OF_MEMBER_TYPE[
-            classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf))
-          ],
+          seat: seatKindOf(
+            classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf)),
+          ),
         })),
       ...[...this.memory.invites.values()]
         .filter((invite) => invite.organizationId === organizationId && isLive(invite, now))
@@ -138,7 +131,7 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
             inviteId: invite.id,
             expiresAt: invite.expiration?.epochMilliseconds ?? null,
           },
-          seat: SEAT_OF_MEMBER_TYPE[inviteMemberType(invite, permissionsOf)],
+          seat: seatKindOf(inviteMemberType(invite, permissionsOf)),
         })),
     ];
   }
@@ -160,6 +153,20 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     if (!member) return null;
     const permissionsOf = this.#permissionsOf(organizationId);
     return classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf));
+  }
+
+  async findInvitationSeat({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<MemberType | null> {
+    const invite = this.memory.invites.get(inviteId);
+    if (!invite || invite.organizationId !== organizationId || !isLive(invite, nowInstant())) {
+      return null;
+    }
+    return inviteMemberType(invite, this.#permissionsOf(organizationId));
   }
 
   #permissionsOf(organizationId: string): PermissionsOf {

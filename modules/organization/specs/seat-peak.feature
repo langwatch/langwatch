@@ -137,6 +137,27 @@ Feature: The most seats an organization held at once in a month
       When the count is rebuilt from those changes
       Then every month's peaks are the same as before
 
+  Rule: counting opens once for every organization that existed before it
+
+    @unit
+    Scenario: The opening snapshot step opens every organization not yet counted, a page at a time
+      Given three organizations, one of them counted already
+      When the opening snapshot step runs
+      Then the two not yet counted are opened
+      And the step saves where it got to after each page
+
+    @unit
+    Scenario: The opening snapshot step resumes after the last page it saved
+      Given the opening snapshot step saved its place after the second organization
+      When the step runs again
+      Then only the organizations after the second are opened
+
+    @unit
+    Scenario: A dry run of the opening snapshot step opens nothing and saves no checkpoint
+      When the opening snapshot step runs as a dry run
+      Then no organization is opened
+      And no checkpoint is saved
+
   Rule: our team sees the peak at renewal; the customer does not
 
     @integration
@@ -147,6 +168,12 @@ Feature: The most seats an organization held at once in a month
       Then they see 57 as this month's full seat peak beside the 50 the licence covers
       And they see when the peak was reached
       And they see the peak of each earlier month
+
+    @integration
+    Scenario: The ops console says how many seat changes disagreed with the count
+      Given seat changes for the organization named a seat its count did not hold
+      When somebody on our team opens the organization on the ops console
+      Then they see how many seat changes disagreed with the count
 
     @integration
     Scenario: The ops console says when counting has not started for an organization

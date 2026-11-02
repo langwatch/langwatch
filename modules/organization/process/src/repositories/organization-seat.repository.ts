@@ -27,4 +27,9 @@ export abstract class OrganizationSeatRepository {
     organizationId: string;
     userId: string;
   }): Promise<MemberType | null>;
+  /** One live invitation's seat by the rule the counts use; null when it holds none. */
+  abstract findInvitationSeat(input: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<MemberType | null>;
 }

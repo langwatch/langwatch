@@ -5,7 +5,6 @@ import type { UserProfile } from "@langwatch/user-contract";
 
 import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
-import { directorySeatOf } from "../rules/scim-member-created.rules.ts";
 import { isUniqueViolation } from "../rules/scim-user.rules.ts";
 import type { ScimHeldConnections } from "./scim-directory-identity.service.ts";
 import type { ScimGrantsService } from "./scim-grants.service.ts";
@@ -66,8 +65,7 @@ export class ScimAdmissionService {
     ]);
     const { role, pending } = admissionSeat({ requested: asserted, ...seatsFree({ plan, seats }) });
     try {
-      const seat = directorySeatOf({ role, pending });
-      await this.options.prisma.addMembership({ userId, organizationId, role, pending, seat });
+      await this.options.prisma.addMembership({ userId, organizationId, role, pending });
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
     }

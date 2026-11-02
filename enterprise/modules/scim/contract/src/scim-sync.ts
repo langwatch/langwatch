@@ -486,18 +486,15 @@ export const SCIM_MEMBERSHIP_PIPELINE_NAME = "scim_membership" as const;
 export const SCIM_MEMBERSHIP_AGGREGATE_TYPE = "scim_membership" as const;
 export const SCIM_MEMBER_CREATED_EVENT_TYPE = "lw.scim.member_created" as const;
 export const SCIM_MEMBER_CREATED_EVENT_VERSION = "2026-11-02" as const;
-export const scimMemberSeatSchema = z.enum(["full", "lite", "none"]);
-export type ScimMemberSeat = z.infer<typeof scimMemberSeatSchema>;
 
 /**
- * `createId` is minted with the membership row, so a redelivered fact records nothing new.
- * `seat` is informational: organization classifies the member's seat by its own rule.
+ * `createId` is minted with the membership row, so a redelivered fact records nothing new. It
+ * names no seat: organization classifies the member's seat by its own rule (its ADR-002 §6).
  */
 const scimMemberCreatedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   userId: z.string().min(1),
-  seat: scimMemberSeatSchema,
   occurredAt: z.number().int().nonnegative(),
   createId: z.string().min(1),
 });

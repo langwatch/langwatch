@@ -14,18 +14,11 @@ import {
 import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
-import type { SeatKind } from "../../rules/seat-holder.rules.ts";
+import { seatKindOf } from "../../rules/seat-change.rules.ts";
 import {
   type OrganizationSeatHolding,
   OrganizationSeatRepository,
 } from "../organization-seat.repository.ts";
-
-/** The seat a classified holder takes, in the seat peak's terms. */
-const SEAT_OF_MEMBER_TYPE: Record<MemberType, SeatKind> = {
-  FullMember: "full",
-  LiteMember: "lite",
-  Developer: "developer",
-};
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
 type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
@@ -129,18 +122,18 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     return [
       ...context.users.map((user) => ({
         holder: { kind: "member" as const, userId: user.userId },
-        seat: SEAT_OF_MEMBER_TYPE[
-          classifyMemberType(user.role, context.userPermissionsMap.get(user.userId))
-        ],
+        seat: seatKindOf(
+          classifyMemberType(user.role, context.userPermissionsMap.get(user.userId)),
+        ),
       })),
       ...context.pendingInvites.map((invite) => ({
         holder: { kind: "invitation" as const, inviteId: invite.id, expiresAt: invite.expiresAt },
-        seat: SEAT_OF_MEMBER_TYPE[
+        seat: seatKindOf(
           classifyMemberType(
             invite.role,
             this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
-          )
-        ],
+          ),
+        ),
       })),
     ];
   }

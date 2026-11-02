@@ -62,14 +62,13 @@ describe.skipIf(!DB_URL)("SCIM's member-created fact (Postgres)", () => {
     it("commits one member-created fact with the membership row", async () => {
       const { organizationId, userId } = await directoryPerson();
 
-      await repository.addMembership({ organizationId, userId, role: "MEMBER", seat: "full" });
+      await repository.addMembership({ organizationId, userId, role: "MEMBER" });
 
       expect(await facts(organizationId)).toEqual([
         expect.objectContaining({
           intentType: "recordMemberCreated",
           organizationId,
           userId,
-          seat: "full",
           createId: expect.any(String),
         }),
       ]);
@@ -79,10 +78,10 @@ describe.skipIf(!DB_URL)("SCIM's member-created fact (Postgres)", () => {
   describe("when a retried create loses to the membership already written", () => {
     it("rolls its fact back with the refused row", async () => {
       const { organizationId, userId } = await directoryPerson();
-      await repository.addMembership({ organizationId, userId, role: "MEMBER", seat: "full" });
+      await repository.addMembership({ organizationId, userId, role: "MEMBER" });
 
       await expect(
-        repository.addMembership({ organizationId, userId, role: "MEMBER", seat: "full" }),
+        repository.addMembership({ organizationId, userId, role: "MEMBER" }),
       ).rejects.toMatchObject({ code: "P2002" });
 
       expect(await facts(organizationId)).toHaveLength(1);
@@ -90,7 +89,7 @@ describe.skipIf(!DB_URL)("SCIM's member-created fact (Postgres)", () => {
   });
 
   describe("when the directory create is held for a seat", () => {
-    it("records the held member as taking no seat", async () => {
+    it("still commits the fact, leaving the seat to organization's own rule", async () => {
       const { organizationId, userId } = await directoryPerson();
 
       await repository.addMembership({
@@ -98,10 +97,11 @@ describe.skipIf(!DB_URL)("SCIM's member-created fact (Postgres)", () => {
         userId,
         role: "EXTERNAL",
         pending: true,
-        seat: "none",
       });
 
-      expect(await facts(organizationId)).toEqual([expect.objectContaining({ seat: "none" })]);
+      expect(await facts(organizationId)).toEqual([
+        expect.objectContaining({ organizationId, userId }),
+      ]);
     });
   });
 });
