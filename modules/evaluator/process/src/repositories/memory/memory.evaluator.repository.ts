@@ -143,7 +143,8 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
       updatedAt: toDate(nowInstant()),
     });
     if (!evaluatorVersionChanged({ before: existing, after: updated })) {
-      return structuredClone(existing);
+      this.#rows.set(updated.id, updated);
+      return structuredClone(updated);
     }
     const written = evaluatorSchema.parse({
       ...updated,
@@ -191,7 +192,10 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
       config: evaluatorConfigSchema.parse(input.config),
       updatedAt: toDate(nowInstant()),
     });
-    if (!evaluatorVersionChanged({ before: existing, after: updated })) return;
+    if (!evaluatorVersionChanged({ before: existing, after: updated })) {
+      this.#rows.set(updated.id, updated);
+      return;
+    }
 
     await this.backfillFirstVersion({
       evaluator: existing,
@@ -212,15 +216,12 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
   }
 
   async findVersion(input: EvaluatorVersionLookup): Promise<EvaluatorVersionRecord | undefined> {
-    const row = this.#versions.find(
-      (candidate) =>
-        candidate.projectId === input.projectId &&
-        candidate.evaluatorId === input.evaluatorId &&
-        (input.version === void 0 || candidate.version === input.version) &&
-        (input.versionId === void 0 || candidate.id === input.versionId),
+    const [found] = (await this.findVersions(input)).filter(
+      (row) =>
+        (input.version === void 0 || row.version === input.version) &&
+        (input.versionId === void 0 || row.id === input.versionId),
     );
-    // Instants are immutable and lose their prototype in structuredClone, so only config is copied.
-    return row ? { ...row, config: structuredClone(row.config) } : void 0;
+    return found;
   }
 
   async latestVersionNumbers(input: EvaluatorIdsInput): Promise<Map<string, number>> {
