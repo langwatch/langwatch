@@ -247,7 +247,12 @@ export function DeployLabelsDialog({
       primaryAction={{
         label: "Save",
         loading: state.isSaving,
-        onClick: () => void state.save().then((saved) => saved && onClose()),
+        onClick: () =>
+          void state.save().then((saved) => {
+            if (!saved) return;
+            setNewLabel(null);
+            onClose();
+          }),
         "data-testid": `${testIdPrefix}-save`,
       }}
     >

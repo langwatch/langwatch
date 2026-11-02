@@ -156,6 +156,26 @@ describe("the evaluator history drawer", () => {
     );
   });
 
+  /** @scenario "The deploy dialog adds a custom label and refuses a reserved one" */
+  it("drops a label name left half typed once the dialog saves", async () => {
+    renderWithEvaluatorHost(
+      <EvaluatorHistoryPanel evaluatorId="eval_1" evaluatorName="Answer relevancy" />,
+    );
+    await screen.findByTestId("evaluator-versions");
+    await userEvent.click(screen.getByRole("button", { name: "Deploy" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "+ Add label" }));
+    await userEvent.type(within(dialog).getByPlaceholderText(/label name/i), "half");
+    await userEvent.click(screen.getByTestId("evaluator-deploy-save"));
+
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText(/label name/i)).not.toBeInTheDocument(),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Deploy" }));
+    await screen.findByTestId("evaluator-deploy-save");
+    expect(screen.queryByPlaceholderText(/label name/i)).not.toBeInTheDocument();
+  });
+
   /** @scenario "A failed label save shows the registered error and reads the labels again" */
   it("shows the registered copy for a refused label and reads the labels again", async () => {
     calls.assignLabel.mockRejectedValueOnce({
