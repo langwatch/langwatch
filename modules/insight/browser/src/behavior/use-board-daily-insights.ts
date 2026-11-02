@@ -112,11 +112,5 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
         done: "Daily insights off. What Langy filed stays in your inbox.",
         fallbackTitle: "Couldn't turn off daily insights",
       }),
-    /** "No thanks" on the offer: an off, so the board never asks again. */
-    decline: () =>
-      turnOffWith({
-        done: "OK. Langy will not ask again for this board.",
-        fallbackTitle: "Couldn't save your answer",
-      }),
   };
 }

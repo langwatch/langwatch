@@ -1,13 +1,11 @@
 /**
- * A board's daily run in words: its choices, when it runs, how the last run ended and when
- * a board offers it.
+ * A board's daily run in words: its choices, when it runs and how the last run ended.
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
 import {
   INSIGHT_RUN_SKIP_REASONS,
   INSIGHT_SCHEDULE_OFF_REASONS,
-  INSIGHT_SCHEDULE_STATES,
   type InsightRunReason,
 } from "@langwatch/insight-contract";
 import { describe, expect, it } from "vitest";
@@ -23,7 +21,6 @@ import {
   runMaximum,
   runTimeWords,
   scheduleWords,
-  shouldOfferDailyInsights,
   SKIP_REASON_WORDS,
   zoneChoices,
   zoneLabel,
@@ -205,37 +202,6 @@ describe("given a board that is on", () => {
       expect(words({ outcome: "filed", filedCount: 1, at: NOW - 2 * DAY_MS })).toBe(
         "Ran Jul 7 · filed 1 new",
       );
-    });
-  });
-});
-
-describe("given a board that opened with widgets, without widgets, or while its widgets load", () => {
-  describe("when the person is undecided, said no or turned it on", () => {
-    /** @scenario "A board offers once per visit and never after an answer" */
-    it("offers only to an undecided person on a board that opened with a widget", () => {
-      const offered = INSIGHT_SCHEDULE_STATES.flatMap((state) =>
-        [void 0, 0, 1, 4].map((widgetCountAtOpen) => ({
-          state,
-          widgetCountAtOpen,
-          offers: shouldOfferDailyInsights({ state, widgetCountAtOpen, closedThisVisit: false }),
-        })),
-      ).filter(({ offers }) => offers);
-
-      expect(offered.map(({ state, widgetCountAtOpen }) => [state, widgetCountAtOpen])).toEqual([
-        ["undecided", 1],
-        ["undecided", 4],
-      ]);
-    });
-
-    /** @scenario "A board offers once per visit and never after an answer" */
-    it("does not offer again in a visit where the offer was closed", () => {
-      expect(
-        shouldOfferDailyInsights({
-          state: "undecided",
-          widgetCountAtOpen: 4,
-          closedThisVisit: true,
-        }),
-      ).toBe(false);
     });
   });
 });
