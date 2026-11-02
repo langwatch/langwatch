@@ -1,4 +1,4 @@
-# ADR-187: The egress fence carries a request through the outbound proxy
+# ADR-195: The egress fence carries a request through the outbound proxy
 
 **Date:** 2026-10-22
 
