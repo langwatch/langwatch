@@ -9813,6 +9813,36 @@ func (e CreateAgentJSONBody3ConfigBehaveAs) Valid() bool {
 	}
 }
 
+// Defines values for CreateAgentJSONBody3ConfigConnectorSetupLanguage.
+const (
+	CreateAgentJSONBody3ConfigConnectorSetupLanguagePython CreateAgentJSONBody3ConfigConnectorSetupLanguage = "python"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody3ConfigConnectorSetupLanguage enum.
+func (e CreateAgentJSONBody3ConfigConnectorSetupLanguage) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody3ConfigConnectorSetupLanguagePython:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody3ConfigConnectorTeardownLanguage.
+const (
+	CreateAgentJSONBody3ConfigConnectorTeardownLanguagePython CreateAgentJSONBody3ConfigConnectorTeardownLanguage = "python"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody3ConfigConnectorTeardownLanguage enum.
+func (e CreateAgentJSONBody3ConfigConnectorTeardownLanguage) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody3ConfigConnectorTeardownLanguagePython:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateAgentJSONBody3ConfigInputsType.
 const (
 	CreateAgentJSONBody3ConfigInputsTypeBool               CreateAgentJSONBody3ConfigInputsType = "bool"
@@ -41654,8 +41684,22 @@ type CreateAgentJSONBody3 struct {
 		BehaveAs             *CreateAgentJSONBody3ConfigBehaveAs `json:"behave_as,omitempty"`
 		BodyTemplate         *string                             `json:"bodyTemplate,omitempty"`
 		Cls                  *string                             `json:"cls,omitempty"`
-		Description          *string                             `json:"description,omitempty"`
-		DevTunnel            *struct {
+		Connector            *struct {
+			Setup *struct {
+				Code        string                                           `json:"code"`
+				DatasetId   *string                                          `json:"datasetId,omitempty"`
+				Language    CreateAgentJSONBody3ConfigConnectorSetupLanguage `json:"language"`
+				SecretNames *[]string                                        `json:"secretNames,omitempty"`
+			} `json:"setup,omitempty"`
+			Teardown *struct {
+				Code        string                                              `json:"code"`
+				DatasetId   *string                                             `json:"datasetId,omitempty"`
+				Language    CreateAgentJSONBody3ConfigConnectorTeardownLanguage `json:"language"`
+				SecretNames *[]string                                           `json:"secretNames,omitempty"`
+			} `json:"teardown,omitempty"`
+		} `json:"connector,omitempty"`
+		Description *string `json:"description,omitempty"`
+		DevTunnel   *struct {
 			ConnectedAt *string `json:"connectedAt,omitempty"`
 			HeartbeatAt *string `json:"heartbeatAt,omitempty"`
 			PreviousUrl *string `json:"previousUrl,omitempty"`
@@ -41753,6 +41797,12 @@ type CreateAgentJSONBody_3_Config_Auth struct {
 
 // CreateAgentJSONBody3ConfigBehaveAs defines parameters for CreateAgent.
 type CreateAgentJSONBody3ConfigBehaveAs string
+
+// CreateAgentJSONBody3ConfigConnectorSetupLanguage defines parameters for CreateAgent.
+type CreateAgentJSONBody3ConfigConnectorSetupLanguage string
+
+// CreateAgentJSONBody3ConfigConnectorTeardownLanguage defines parameters for CreateAgent.
+type CreateAgentJSONBody3ConfigConnectorTeardownLanguage string
 
 // CreateAgentJSONBody3ConfigInputsType defines parameters for CreateAgent.
 type CreateAgentJSONBody3ConfigInputsType string

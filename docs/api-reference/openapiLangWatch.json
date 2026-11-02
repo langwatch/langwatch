@@ -7512,6 +7512,73 @@
                                 "type": "string"
                               }
                             }
+                          },
+                          "connector": {
+                            "type": "object",
+                            "properties": {
+                              "setup": {
+                                "type": "object",
+                                "properties": {
+                                  "language": {
+                                    "type": "string",
+                                    "enum": [
+                                      "python"
+                                    ]
+                                  },
+                                  "code": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "secretNames": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                    }
+                                  },
+                                  "datasetId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "language",
+                                  "code"
+                                ]
+                              },
+                              "teardown": {
+                                "type": "object",
+                                "properties": {
+                                  "language": {
+                                    "type": "string",
+                                    "enum": [
+                                      "python"
+                                    ]
+                                  },
+                                  "code": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "secretNames": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                    }
+                                  },
+                                  "datasetId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "language",
+                                  "code"
+                                ]
+                              }
+                            }
                           }
                         },
                         "required": [

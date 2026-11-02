@@ -139,6 +139,13 @@ from .create_agent_body_type_3_config_auth_type_0 import CreateAgentBodyType3Con
 from .create_agent_body_type_3_config_auth_type_1 import CreateAgentBodyType3ConfigAuthType1
 from .create_agent_body_type_3_config_auth_type_2 import CreateAgentBodyType3ConfigAuthType2
 from .create_agent_body_type_3_config_auth_type_3 import CreateAgentBodyType3ConfigAuthType3
+from .create_agent_body_type_3_config_connector import CreateAgentBodyType3ConfigConnector
+from .create_agent_body_type_3_config_connector_setup import CreateAgentBodyType3ConfigConnectorSetup
+from .create_agent_body_type_3_config_connector_setup_language import CreateAgentBodyType3ConfigConnectorSetupLanguage
+from .create_agent_body_type_3_config_connector_teardown import CreateAgentBodyType3ConfigConnectorTeardown
+from .create_agent_body_type_3_config_connector_teardown_language import (
+    CreateAgentBodyType3ConfigConnectorTeardownLanguage,
+)
 from .create_agent_body_type_3_config_dev_tunnel import CreateAgentBodyType3ConfigDevTunnel
 from .create_agent_body_type_3_config_headers_item import CreateAgentBodyType3ConfigHeadersItem
 from .create_agent_body_type_3_config_inputs_item import CreateAgentBodyType3ConfigInputsItem
@@ -9331,6 +9338,11 @@ __all__ = (
     "CreateAgentBodyType3ConfigAuthType1",
     "CreateAgentBodyType3ConfigAuthType2",
     "CreateAgentBodyType3ConfigAuthType3",
+    "CreateAgentBodyType3ConfigConnector",
+    "CreateAgentBodyType3ConfigConnectorSetup",
+    "CreateAgentBodyType3ConfigConnectorSetupLanguage",
+    "CreateAgentBodyType3ConfigConnectorTeardown",
+    "CreateAgentBodyType3ConfigConnectorTeardownLanguage",
     "CreateAgentBodyType3ConfigDevTunnel",
     "CreateAgentBodyType3ConfigHeadersItem",
     "CreateAgentBodyType3ConfigInputsItem",
