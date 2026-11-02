@@ -13,6 +13,7 @@ import { ScimModule } from "./app/scim.app.ts";
 import { scimChannels } from "./channels/scim-channels.registry.ts";
 import { scimCostCenterEventing } from "./eventing/scim-cost-center.pipeline.ts";
 import { scimDirectoryEventing } from "./eventing/scim-directory.pipeline.ts";
+import { scimMembershipEventing } from "./eventing/scim-membership.pipeline.ts";
 import {
   SCIM_SSO_CONNECTION_PIPELINE_NAME,
   scimSsoConnectionEventing,
@@ -68,6 +69,7 @@ export const scimProcessModule: PublishedProcessModule<"scim", ScimApi, ScimServ
     .withEventing(scimDirectoryEventing)
     .withEventing(scimSyncEventing)
     .withEventing(scimCostCenterEventing)
+    .withEventing(scimMembershipEventing)
     .withEventing(scimSsoConnectionEventing)
     .withMigrations(({ replayer }) => [
       defineProjectionReplayStep({

@@ -5,6 +5,7 @@ import type { UserProfile } from "@langwatch/user-contract";
 
 import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
+import { directorySeatOf } from "../rules/scim-member-created.rules.ts";
 import { isUniqueViolation } from "../rules/scim-user.rules.ts";
 import type { ScimHeldConnections } from "./scim-directory-identity.service.ts";
 import type { ScimGrantsService } from "./scim-grants.service.ts";
@@ -47,7 +48,10 @@ export class ScimAdmissionService {
     );
   }
 
-  /** A retried create still repairs the grant beside an existing membership. */
+  /**
+   * A retried create still repairs the grant beside an existing membership; its losing write
+   * rolls back, so only the first create records the member-created fact.
+   */
   async admit({
     userId,
     organizationId,
@@ -62,7 +66,8 @@ export class ScimAdmissionService {
     ]);
     const { role, pending } = admissionSeat({ requested: asserted, ...seatsFree({ plan, seats }) });
     try {
-      await this.options.prisma.addMembership({ userId, organizationId, role, pending });
+      const seat = directorySeatOf({ role, pending });
+      await this.options.prisma.addMembership({ userId, organizationId, role, pending, seat });
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
     }

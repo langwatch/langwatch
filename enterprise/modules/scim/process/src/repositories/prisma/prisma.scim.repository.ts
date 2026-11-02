@@ -1,10 +1,13 @@
 import {
   scimRefusalReasonSchema,
   type DirectoryIdentityRow,
+  type ScimMemberSeat,
   type ScimDirectoryOwnership,
   type ScimRequestLogEntry,
   type ScimRequestRecord,
 } from "@langwatch/enterprise-scim-contract";
+import { PrismaProcessStore } from "@langwatch/eventing/server";
+import { generate } from "@langwatch/ksuid";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   OrganizationUserRole,
@@ -13,6 +16,7 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 
+import { memberCreatedAppend } from "../../rules/scim-member-created.rules.ts";
 import type { ScimTokenHashScheme } from "../../rules/scim-token-digest.rules.ts";
 import {
   ScimRepository,
@@ -92,6 +96,8 @@ function isScimDatabase(value: object): value is ScimDatabase {
 
 /** Strict generated-Prisma implementation of the SCIM persistence port. */
 export class PrismaScimRepository extends ScimRepository {
+  #outbox: PrismaProcessStore | undefined;
+
   private constructor(private readonly prisma: ScimDatabase) {
     super();
   }
@@ -339,14 +345,34 @@ export class PrismaScimRepository extends ScimRepository {
     userId: string;
     role: string;
     pending?: boolean;
+    seat: ScimMemberSeat;
   }): Promise<void> => {
-    await this.prisma.organizationUser.create({
-      data: {
-        organizationId: input.organizationId,
-        userId: input.userId,
-        role: organizationUserRole(input.role),
-        disabledAt: input.pending ? toDate(nowInstant()) : null,
-      },
+    // The fact commits or rolls back with the row (precedent: organization's seat-change store).
+    const createId = generate("scimmember");
+    this.#outbox ??= PrismaProcessStore.create({ database: this.prisma });
+    const outbox = this.#outbox;
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.organizationUser.create({
+        data: {
+          organizationId: input.organizationId,
+          userId: input.userId,
+          role: organizationUserRole(input.role),
+          disabledAt: input.pending ? toDate(nowInstant()) : null,
+        },
+      });
+      await outbox.appendIntents({
+        ...memberCreatedAppend({
+          fact: {
+            tenantId: input.organizationId,
+            organizationId: input.organizationId,
+            userId: input.userId,
+            seat: input.seat,
+            occurredAt: createId.date.getTime(),
+            createId: createId.toString(),
+          },
+        }),
+        transaction,
+      });
     });
   };
   async findDirectoryGroupIds(input: {

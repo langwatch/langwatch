@@ -2,6 +2,8 @@
 import type {
   DirectoryIdentityRow,
   ScimDirectoryOwnership,
+  ScimMemberCreatedEventData,
+  ScimMemberSeat,
   ScimRequestLogEntry,
   ScimRequestRecord,
 } from "@langwatch/enterprise-scim-contract";
@@ -42,6 +44,8 @@ export class MemoryScimRepository extends ScimRepository {
   readonly organizations = new Map<string, StoredOrganization>();
   readonly connections: { organizationId: string; connectionId: string }[] = [];
   readonly memberships: StoredMembership[] = [];
+  /** The member-created facts each membership write committed, as the outbox would hold them. */
+  readonly memberCreatedFacts: ScimMemberCreatedEventData[] = [];
   readonly resources: ScimUserResourceRecord[] = [];
   readonly groups: ScimGroupRecord[] = [];
   readonly groupMembers: StoredGroupMember[] = [];
@@ -270,12 +274,22 @@ export class MemoryScimRepository extends ScimRepository {
     userId: string;
     role: string;
     pending?: boolean;
+    seat: ScimMemberSeat;
   }): Promise<void> => {
     if (this.#isMember(input)) throw new Error("The membership already exists");
     this.memberships.push({
       organizationId: input.organizationId,
       userId: input.userId,
       role: input.role,
+    });
+    const occurredAt = nowInstant().epochMilliseconds;
+    this.memberCreatedFacts.push({
+      tenantId: input.organizationId,
+      organizationId: input.organizationId,
+      userId: input.userId,
+      seat: input.seat,
+      occurredAt,
+      createId: `${input.organizationId}:${input.userId}:${this.memberCreatedFacts.length}`,
     });
   };
 

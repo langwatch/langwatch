@@ -3,6 +3,7 @@ import type {
   DirectoryIdentityRow,
   ScimDirectoryOwnership,
   ScimRequestLogEntry,
+  ScimMemberSeat,
   ScimRequestRecord,
   ScimTokenRecord,
 } from "@langwatch/enterprise-scim-contract";
@@ -182,6 +183,8 @@ export abstract class ScimRepository {
     role: string;
     /** Held without access until a seat frees: written disabled, as seat reconciliation does. */
     pending?: boolean;
+    /** The seat the admission gave; committed with the row as SCIM's member-created fact. */
+    seat: ScimMemberSeat;
   }) => Promise<void>;
   /** This organization's SCIM-pushed groups this person belongs to. */
   abstract findDirectoryGroupIds(input: {

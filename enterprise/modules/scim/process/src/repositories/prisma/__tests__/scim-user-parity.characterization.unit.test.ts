@@ -165,6 +165,7 @@ describe("SCIM user parity", () => {
       organizationId: "org-1",
       role: "MEMBER",
       pending: false,
+      seat: "full",
     });
   });
 
@@ -204,6 +205,7 @@ describe("SCIM user parity", () => {
       organizationId: "org-2",
       role: "MEMBER",
       pending: false,
+      seat: "full",
     });
   });
 

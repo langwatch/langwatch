@@ -163,6 +163,7 @@ describe("the membership role a SCIM push writes", () => {
         organizationId: "org-1",
         role: "ADMIN",
         pending: false,
+        seat: "full",
       });
     });
   });
