@@ -638,7 +638,7 @@ export function assertOwnedSessionHookFile({ tool }: { tool: string }): void {
   if (hooks.action === "not_ours") {
     console.error(
       chalk.yellow(
-        `  ! ${hookFileNotOursNotice({ displayPath: hooks.displayPath, command: tool })}`,
+        `  ! ${hookFileNotOursNotice({ displayPath: hooks.displayPath, agentId: hooks.tool, command: tool })}`,
       ),
     );
     return;

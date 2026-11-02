@@ -2,6 +2,7 @@
  * Every scope, service, event and metric name here is one grok 1.0.70 sent on the wire.
  * @see specs/coding-agent/grok-sessions.feature
  * @see specs/coding-agent/grok-model-calls.feature
+ * @see specs/ai-governance/ingestion-sources/grok-cli-otlp.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -35,10 +36,20 @@ describe("the Grok coding-agent definition", () => {
   });
 
   describe("when a signal is detected", () => {
-    it("names Grok from its scope, its service or its event prefix", () => {
+    /** @scenario A record whose service is grok-cli is recognised as Grok */
+    it("names Grok from its service and scope", () => {
+      expect(detectCodingAgent({ serviceName: "grok-cli", scopeName: "ai.xai.grok_code" })).toBe(
+        "grok",
+      );
       expect(detectCodingAgent({ scopeName: "ai.xai.grok_code" })).toBe("grok");
       expect(detectCodingAgent({ serviceName: "grok-cli" })).toBe("grok");
-      expect(detectCodingAgent({ recordName: "grok_code.api_request" })).toBe("grok");
+    });
+
+    /** @scenario A record carrying only Grok's event prefix is still recognised */
+    it("names Grok from its event prefix when service and scope are empty", () => {
+      expect(
+        detectCodingAgent({ serviceName: "", scopeName: "", recordName: "grok_code.api_request" }),
+      ).toBe("grok");
       expect(detectCodingAgent({ recordName: "grok_code.token.usage" })).toBe("grok");
     });
 
@@ -47,7 +58,8 @@ describe("the Grok coding-agent definition", () => {
       expect(detectCodingAgent({ serviceName: "my-grok-proxy" })).toBe("unknown");
     });
 
-    it("leaves Claude Code's records to Claude Code", () => {
+    /** @scenario A Claude Code record that called a Grok model stays Claude Code's */
+    it("leaves Claude Code's records to Claude Code, whatever model they called", () => {
       expect(
         detectCodingAgent({
           scopeName: "com.anthropic.claude_code.events",
@@ -175,11 +187,22 @@ describe("a Grok trace's transcript", () => {
           decision: "deny",
           source: "user",
         }),
+        grokLog({
+          "event.name": "grok_code.tool_decision",
+          tool_name: "edit_file",
+          decision: "cancelled",
+          source: "user",
+        }),
       ],
     });
 
     expect(transcript.entries).toEqual([
-      expect.objectContaining({ kind: "tool_rejected", name: "run_terminal_command" }),
+      expect.objectContaining({
+        kind: "tool_rejected",
+        name: "run_terminal_command",
+        outcome: "denied",
+      }),
+      expect.objectContaining({ kind: "tool_rejected", name: "edit_file", outcome: "aborted" }),
     ]);
   });
 

@@ -347,10 +347,11 @@ function renderHumanReport(report: InstallReport): void {
 }
 
 function renderSessionHooks(report: InstallReport): void {
-  if (report.session_hooks_action === "not_ours") {
+  const hooked = sessionContextAgentByKeySourceType(report.tool);
+  if (report.session_hooks_action === "not_ours" && hooked) {
     const displayPath = report.session_hooks_path ?? "";
     const command = TOOL_BY_SOURCE_TYPE[report.tool] ?? report.tool;
-    const notice = hookFileNotOursNotice({ displayPath, command });
+    const notice = hookFileNotOursNotice({ displayPath, agentId: hooked.id, command });
     process.stdout.write(`${chalk.yellow("!")} ${notice}\n`);
   } else if (report.session_hooks_action === "user_file_runs_hook") {
     process.stdout.write(

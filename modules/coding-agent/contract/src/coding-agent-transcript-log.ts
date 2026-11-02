@@ -128,7 +128,7 @@ function buildToolResultEntry({
 
   const decision = pickString(attrs, "decision");
   if (decision === "reject") {
-    return { kind: "tool_rejected", atMs, name, reason: decision };
+    return { kind: "tool_rejected", atMs, name, reason: decision, outcome: "denied" };
   }
 
   return {
@@ -223,5 +223,6 @@ function buildToolDecisionEntry(
     atMs,
     name: pickString(attrs, "tool_name"),
     reason: pickString(attrs, "source") ?? decision,
+    outcome,
   };
 }

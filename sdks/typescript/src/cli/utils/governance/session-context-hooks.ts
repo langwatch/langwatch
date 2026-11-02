@@ -16,8 +16,10 @@ import {
   HOOK_TIMEOUT_SECONDS,
   type HookedTool,
   type HooksTarget,
+  type OwnedHookFileTool,
   ownedHookFileToolForCommand,
   SESSION_CONTEXT_AGENTS,
+  type SessionContextAgentId,
 } from "./session-context-agents";
 
 export type { HookedTool } from "./session-context-agents";
@@ -135,13 +137,14 @@ export function ownedHookFilePathHeldByUser({ command }: { command: string }): H
 /** What the user reads when their own file holds our hook file's path. */
 export function hookFileNotOursNotice({
   displayPath,
+  agentId,
   command,
 }: {
   displayPath: string;
+  agentId: SessionContextAgentId;
   command: string;
 }): string {
-  const tool = ownedHookFileToolForCommand(command);
-  const agent = tool ? SESSION_CONTEXT_AGENTS[tool].displayName : "The agent's";
+  const agent = SESSION_CONTEXT_AGENTS[agentId].displayName;
   return (
     `${displayPath} is not a LangWatch file, so it was left alone, and ${agent} ` +
     `sessions will not report their repository or branch. ${agent} loads every .json file ` +
@@ -158,11 +161,11 @@ export function assertOwnedHookFileFor({
   command,
 }: {
   command: string;
-}): SessionContextHooksInstallResult | null {
+}): (SessionContextHooksInstallResult & { tool: OwnedHookFileTool }) | null {
   const tool = ownedHookFileToolForCommand(command);
   if (!tool) return null;
   try {
-    return installSessionContextHooks({ tool });
+    return { ...installSessionContextHooks({ tool }), tool };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     console.error(

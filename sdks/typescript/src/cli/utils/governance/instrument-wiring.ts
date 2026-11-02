@@ -219,5 +219,11 @@ export function installTelemetryWiring({
 function assertOwnedHookFile(tool: string): string[] {
   const hookFile = assertOwnedHookFileFor({ command: tool });
   if (hookFile?.action !== "not_ours") return [];
-  return [hookFileNotOursNotice({ displayPath: hookFile.displayPath, command: tool })];
+  return [
+    hookFileNotOursNotice({
+      displayPath: hookFile.displayPath,
+      agentId: hookFile.tool,
+      command: tool,
+    }),
+  ];
 }

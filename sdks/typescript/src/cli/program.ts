@@ -13,6 +13,7 @@ import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
+import { SOURCE_TYPE_BY_TOOL } from "./utils/governance/otel-env-block";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
 import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
 import { trustLocalDevCa } from "./utils/localDevCa";
@@ -664,7 +665,7 @@ function registerInstrumentCommands(program: Command): void {
     .description(
       "Write persistent telemetry wiring for a coding agent without launching it, so a plain `<tool>` run captures. Scope with --project (team project), --key (pasted ingest key, no login), or the default personal workspace.",
     )
-    .argument("<tool>", "claude|codex|gemini|opencode|copilot|code")
+    .argument("<tool>", Object.keys(SOURCE_TYPE_BY_TOOL).join("|"))
     .option(
       "--project <idOrSlug>",
       "scope telemetry to a team project (mints a project ingest key; needs login)",

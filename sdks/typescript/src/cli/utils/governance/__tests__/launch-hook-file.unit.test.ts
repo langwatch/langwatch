@@ -52,20 +52,24 @@ describe("assertLaunchHookFile", () => {
   });
 
   describe("when the hooks folder cannot be written", () => {
-    const isRoot = process.getuid?.() === 0;
+    // chmod cannot make a folder read-only on Windows, and root writes through it.
+    const isUnwritableUnsupported = process.platform === "win32" || process.getuid?.() === 0;
 
-    it.skipIf(isRoot)("warns on stderr that sessions lose their repository", () => {
-      fs.chmodSync(grokHome, 0o500);
-      const stderr = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    it.skipIf(isUnwritableUnsupported)(
+      "warns on stderr that sessions lose their repository",
+      () => {
+        fs.chmodSync(grokHome, 0o500);
+        const stderr = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-      try {
-        assertLaunchHookFile({ tool: "grok" });
-      } finally {
-        fs.chmodSync(grokHome, 0o700);
-      }
+        try {
+          assertLaunchHookFile({ tool: "grok" });
+        } finally {
+          fs.chmodSync(grokHome, 0o700);
+        }
 
-      expect(String(stderr.mock.calls[0]?.[0])).toContain("will not report their repository");
-    });
+        expect(String(stderr.mock.calls[0]?.[0])).toContain("will not report their repository");
+      },
+    );
   });
 
   describe("when the wrapper prepares a launch of an agent without a launch-written hook", () => {

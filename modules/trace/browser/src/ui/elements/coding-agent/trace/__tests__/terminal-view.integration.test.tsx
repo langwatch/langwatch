@@ -162,10 +162,29 @@ describe("TerminalView", () => {
           atMs: 1200,
           name: "Bash",
           reason: "user_reject",
+          outcome: "denied",
         },
       ];
       renderView({ entries: withDenial });
       expect(screen.getByText(/denied by the user, never ran/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given a tool call the user cancelled", () => {
+    it("shows it as aborted, not denied", () => {
+      const withCancel: TranscriptEntry[] = [
+        entries[0]!,
+        {
+          kind: "tool_rejected",
+          atMs: 1200,
+          name: "run_terminal_command",
+          reason: "cancelled",
+          outcome: "aborted",
+        },
+      ];
+      renderView({ entries: withCancel });
+      expect(screen.getByText(/aborted by the user, never ran/)).toBeInTheDocument();
+      expect(screen.queryByText(/denied by the user/)).not.toBeInTheDocument();
     });
   });
 

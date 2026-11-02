@@ -92,5 +92,20 @@ describe("parseOtlpLogs", () => {
         parsed.ok && parsed.request.resourceLogs?.[0]?.scopeLogs?.[0]?.logRecords?.[0],
       ).toEqual({ eventName: "grok_code.session_start" });
     });
+
+    // The field walk cannot read JSON bytes; it must give up without failing the parse.
+    it("still parses it when the request labels it protobuf", () => {
+      const json = {
+        resourceLogs: [{ scopeLogs: [{ logRecords: [{ severityText: "INFO" }] }] }],
+      };
+      const body = new TextEncoder().encode(JSON.stringify(json)).buffer as ArrayBuffer;
+
+      const parsed = parseOtlpLogs(body, "application/x-protobuf");
+
+      expect(parsed.ok).toBe(true);
+      expect(
+        parsed.ok && parsed.request.resourceLogs?.[0]?.scopeLogs?.[0]?.logRecords?.[0],
+      ).toMatchObject({ severityText: "INFO" });
+    });
   });
 });

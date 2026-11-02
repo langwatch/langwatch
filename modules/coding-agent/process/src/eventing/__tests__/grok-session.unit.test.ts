@@ -4,6 +4,7 @@
  * flattened to a string. Ids and figures are the captures' own, with the identity scrubbed.
  * @see specs/coding-agent/grok-sessions.feature
  * @see specs/coding-agent/grok-model-calls.feature
+ * @see specs/ai-governance/ingestion-sources/grok-cli-otlp.feature
  */
 
 import {
@@ -442,6 +443,14 @@ describe("Grok sessions", () => {
 
       expect(state.userId).toBe(USER_ID);
       expect(JSON.stringify(state)).not.toContain(EMAIL);
+    });
+
+    /** @scenario The user's email Grok stamps on every record is never stored as a session field */
+    it("stores no email on the row, though every record carries one", () => {
+      const records = [...turn(PARENT), ...turn(PARENT)];
+
+      expect(records.every((stored) => stored.attributesFlatJson.includes(EMAIL))).toBe(true);
+      expect(JSON.stringify(foldOne(records))).not.toContain(EMAIL);
     });
   });
 

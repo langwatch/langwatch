@@ -1206,7 +1206,7 @@ function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: To
     case "tool":
       return <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
     case "tool_rejected":
-      return <RejectedLine name={entry.name} reason={entry.reason} />;
+      return <RejectedLine name={entry.name} outcome={entry.outcome} />;
     case "note":
       return <NoteLine level={entry.level} text={entry.text} />;
     default:
@@ -1478,13 +1478,12 @@ function ToolResultBody({
  * A tool the human turned down. It never ran, so there is no span and no
  * output — only that it was asked for and refused.
  */
-function RejectedLine({ name, reason }: { name: string | null; reason: string | null }) {
-  const verb = reason === "user_abort" ? "aborted" : "denied";
+function RejectedLine({ name, outcome }: { name: string | null; outcome: "denied" | "aborted" }) {
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={GLYPH.denied} color={TERMINAL_TOKENS.red} />
       <Text {...CELL} color={TERMINAL_TOKENS.red} flex={1} minWidth={0}>
-        {`${name ?? "A tool call"} — ${verb} by the user, never ran`}
+        {`${name ?? "A tool call"} — ${outcome} by the user, never ran`}
       </Text>
     </HStack>
   );
