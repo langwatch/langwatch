@@ -1,5 +1,4 @@
 import { datasetClient } from "@langwatch/dataset-client";
-import { useMemo } from "react";
 
 /** One version a saved dataset can be pinned to, as the pin select lists it. */
 export type DatasetVersionOption = { version: number; name: string | null };
@@ -20,13 +19,9 @@ export function useDatasetVersionOptions({
     { enabled: Boolean(projectId) && Boolean(datasetId) },
   );
 
-  const versions = useMemo(
-    () =>
-      (query.data?.versions ?? [])
-        .map(({ version, name }) => ({ version, name }))
-        .toSorted((a, b) => b.version - a.version),
-    [query.data],
-  );
+  const versions = (query.data?.versions ?? [])
+    .map(({ version, name }) => ({ version, name }))
+    .toSorted((a, b) => b.version - a.version);
 
   return { versions };
 }
