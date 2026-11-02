@@ -111,21 +111,28 @@ def has_name_shaped_rewrite(*, original: str, normalised: str) -> bool:
 def could_hold_a_rewritten_name(*, original: str, normalised: str) -> bool:
     """Whether some span of the text could pass `normalisation_justifies_span`.
 
-    That takes a rewritten word beside another word of the same name. A capital
-    word fenced off as its own field ("POST") never makes one, so it is skipped.
+    That takes a rewritten word of 4+ letters beside another word, or two
+    rewritten words with only whitespace between them (AMY LEE, not TCP/IP).
+    A capital word fenced off as its own field ("POST") never makes one.
     """
-    rewritten = set(_rewritten_runs(original=original, normalised=normalised))
+    runs = _word_runs(original)
+    rewritten = {
+        (start, end)
+        for start, end in runs
+        if original[start:end] != normalised[start:end]
+    }
     if not rewritten:
         return False
 
     def rewritten_length(run: tuple[int, int]) -> int:
         return run[1] - run[0] if run in rewritten else 0
 
-    for left, right in pairwise(_word_runs(original)):
-        if FIELD_END.search(original[left[1] : right[0]]):
+    for left, right in pairwise(runs):
+        gap = original[left[1] : right[0]]
+        if FIELD_END.search(gap):
             continue
         left_length, right_length = rewritten_length(left), rewritten_length(right)
-        if left_length and right_length:
+        if left_length and right_length and gap.isspace():
             return True
         if max(left_length, right_length) >= MIN_NORMALISED_TOKEN_LENGTH:
             return True

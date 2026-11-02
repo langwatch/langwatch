@@ -168,11 +168,15 @@ def test_second_pass_asks_for_places_when_location_is_on():
 
 
 # @scenario "The second pass is skipped when the only capitals are short words"
-def test_no_second_pass_when_only_short_words_are_capitalised():
-    calls = analyze_calls(
-        entities=PresidioEntities(person=True),
-        text="Marcus Whitfield said OK, the ID is on the USD invoice from the CFO.",
-    )
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Marcus Whitfield said OK, the ID is on the USD invoice from the CFO.",
+        "Marcus Whitfield restarted the TCP/IP stack on the VM.",
+    ],
+)
+def test_no_second_pass_when_only_short_words_are_capitalised(text: str):
+    calls = analyze_calls(entities=PresidioEntities(person=True), text=text)
     assert len(calls) == 1, f"expected one pass, got {len(calls)}: {calls}"
 
 

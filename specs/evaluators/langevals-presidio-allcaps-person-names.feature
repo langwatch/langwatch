@@ -175,7 +175,8 @@ Feature: A name written in capitals is still redacted
 
     @unit
     Scenario: The second pass is skipped when the only capitals are short words
-      Given content whose only wholly capitalised words are short and stand apart
+      Given content whose only wholly capitalised words are short
+      And no two of them are separated by whitespace alone
       When the content is analysed for personal information
       Then the content is analysed once and not twice
 
