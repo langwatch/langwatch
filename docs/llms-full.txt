@@ -44304,7 +44304,7 @@ The first is the per-minute rate limit (429): wait the number of seconds in `met
 # FILE: ./features/langwatchql/extraction-functions.mdx
 
 ---
-title: "LangWatchQL extraction and eval functions: read and judge conversations"
+title: "LangWatchQL extraction and eval functions"
 sidebarTitle: Extraction and eval functions
 keywords: langwatch, langwatchql, lwql, conversation, transcript, llm_messages, trace_json, eval, eval_passed, eval_score, eval_category, judge in sql
 description: Pull conversation transcripts, model calls and whole traces into a query result, and ask a question of each one with an eval function.
