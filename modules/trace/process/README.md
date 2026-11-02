@@ -166,7 +166,7 @@ findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
 #### `listTraces`
 
 ```typescript
-listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */ authorization?: Authorization; /** Refuse above this plan bound instead of clamping; the spans bound is also the default. */ refuseAbove?: TracePageSizeBound; }; }): Promise<TracesForProjectResult>;
+listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */ authorization?: Authorization; /** Refuse above this plan bound instead of clamping; a spans read takes the spans bound. */ refuseAbove?: TracePageSizeBound; }; }): Promise<TracesForProjectResult>;
 ```
 
 #### `listTraceSummaries`
@@ -1184,7 +1184,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:310`   |
+| Declared at | `src/transport/traces.rest.ts:308`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1194,13 +1194,13 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:314`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:312`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:131
-// Response: inline, src/transport/traces.rest.ts:319
+// Response: inline, src/transport/traces.rest.ts:317
 type Response = unknown;
 ```
 
@@ -1208,7 +1208,7 @@ type Response = unknown;
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:341`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:339`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1230,7 +1230,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:374`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:372`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1246,7 +1246,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:413`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:411`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1266,7 +1266,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:439`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:437`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 

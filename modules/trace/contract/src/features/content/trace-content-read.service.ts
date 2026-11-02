@@ -28,7 +28,7 @@ export type TraceListTracesInput = {
     filterWhere?: { sql: string; params: Record<string, unknown> };
     /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
     authorization?: Authorization;
-    /** Refuse above this plan bound instead of clamping; the spans bound is also the default. */
+    /** Refuse above this plan bound instead of clamping; a spans read takes the spans bound. */
     refuseAbove?: TracePageSizeBound;
   };
 };

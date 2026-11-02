@@ -242,8 +242,7 @@ async function searchTraces({
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 
-  // A spans page is buffered whole (an api pod OOM): the app refuses above the plan's spans
-  // bound, never clamps, so no caller reads a short page as the end of an export.
+  // With spans the app picks the page size: it refuses above its spans bound, never clamps.
   const pageSize = includeSpans ? rawPageSize : (rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE);
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
@@ -279,7 +278,6 @@ async function searchTraces({
       dateField,
       filterWhere,
       authorization,
-      ...(includeSpans ? { refuseAbove: "tracesWithSpansPageSizeMax" as const } : {}),
       ...(projection ? { projection: projection.plan } : {}),
     },
   });

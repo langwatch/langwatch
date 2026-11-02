@@ -56,6 +56,13 @@ Feature: Trace list page size cap
     And a search without spans is never refused, only clamped to the caller's plan bound
 
   @unit
+  Scenario: Every trace read with spans is held to the spans page bound
+    Given a trace download asks for spans with pageSize 10 000
+    When it is read
+    Then it is refused with "trace_page_size_too_large" naming the spans bound 100
+    And a spans download that names no pageSize answers pages of 100
+
+  @unit
   Scenario: An operator's spans page bound is the one a spans search answers by
     Given an operator has set the spans page bound to 10
     When the public trace search asks for spans with pageSize 11

@@ -241,13 +241,13 @@ describe("POST /search", () => {
 
   describe("when includeSpans names a page size", () => {
     /** @scenario "Public trace search with spans refuses a page above 100 traces" */
-    it("hands the size to the app to refuse above the spans page bound", async () => {
+    it("hands the size to the app with spans asked, for it to refuse above the spans bound", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 4000 });
       expect(listTraces).toHaveBeenCalledWith(
         expect.objectContaining({
           query: expect.objectContaining({ pageSize: 4000 }),
-          options: expect.objectContaining({ refuseAbove: "tracesWithSpansPageSizeMax" }),
+          options: expect.objectContaining({ includeSpans: true }),
         }),
       );
     });

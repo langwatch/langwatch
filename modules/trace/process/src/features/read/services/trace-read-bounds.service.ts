@@ -59,9 +59,8 @@ export class TraceReadBoundsService {
     pageSize: number | undefined;
   }): Promise<number> {
     const bound = "tracesWithSpansPageSizeMax";
-    const max = await this.resolve(projectId, bound);
-    if (pageSize === undefined) return max;
-    if (pageSize > max) throw new TracePageSizeTooLargeError({ maxPageSize: max, bound });
+    if (pageSize === undefined) return this.resolve(projectId, bound);
+    await this.assertPageSizeWithinBound({ projectId, pageSize, bound });
 
     return pageSize;
   }

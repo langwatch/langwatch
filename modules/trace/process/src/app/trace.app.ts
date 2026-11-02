@@ -1675,7 +1675,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     const pageSize = await this.#boundedPageSize({
       projectId: input.query.projectId,
       pageSize: input.query.pageSize,
-      refuseAbove: input.options?.refuseAbove,
+      // A page with spans is buffered whole (an api pod OOM), so every spans read takes its bound.
+      refuseAbove: input.options?.includeSpans
+        ? "tracesWithSpansPageSizeMax"
+        : input.options?.refuseAbove,
     });
 
     return this.#contentReader.listTraces({
@@ -1690,7 +1693,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       },
     });
   }
-  /** The tRPC reads and a spans search refuse above their named plan bound; others clamp. */
+  /** The tRPC reads and every spans read refuse above their plan bound; others clamp. */
   async #boundedPageSize({
     projectId,
     pageSize,

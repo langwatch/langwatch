@@ -219,7 +219,7 @@ describe("trace read bounds", () => {
       app.listTraces({
         query: { ...QUERY, ...(pageSize === undefined ? {} : { pageSize }) },
         protections: PROTECTIONS,
-        options: { includeSpans: true, refuseAbove: "tracesWithSpansPageSizeMax" },
+        options: { includeSpans: true },
       });
 
     /** @scenario "Public trace search with spans refuses a page above 100 traces" */
@@ -239,6 +239,28 @@ describe("trace read bounds", () => {
       const { app, getAllTracesForProject } = harness("free");
 
       await search(app);
+
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 100 });
+    });
+
+    /** @scenario "Every trace read with spans is held to the spans page bound" */
+    it("refuses a spans download above the spans bound, whatever bound it names", async () => {
+      const { app, getAllTracesForProject } = harness("free");
+      const download = (pageSize?: number) =>
+        app.listTraces({
+          query: { ...QUERY, ...(pageSize === undefined ? {} : { pageSize }) },
+          protections: PROTECTIONS,
+          options: {
+            downloadMode: true,
+            includeSpans: true,
+            refuseAbove: "tracesDownloadPageSizeMax",
+          },
+        });
+
+      await expect(download(10_000)).rejects.toMatchObject(
+        refused({ maxPageSize: 100, bound: "tracesWithSpansPageSizeMax" }),
+      );
+      await download();
 
       expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 100 });
     });
