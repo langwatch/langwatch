@@ -13,6 +13,7 @@ from langevals_core.base_evaluator import (
 from pydantic import BaseModel, Field
 import spacy
 import spacy.cli
+from spacy.strings import hash_string
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 from presidio_analyzer.nlp_engine import SpacyNlpEngine
@@ -28,11 +29,22 @@ logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)
 
 
 PERSON_ENTITY = "PERSON"
+LOCATION_ENTITY = "LOCATION"
+
+# The entities spaCy's NER finds, and so the ones that read capitals as a cue.
+# LOCATION is here because the model splits a name across both: in Titlecase
+# it reads Maria Fernanda as a person and Costa Pereira as a place.
+CASE_SENSITIVE_ENTITIES = (PERSON_ENTITY, LOCATION_ENTITY)
 
 # The shape a harvested span needs to be a name and not a titlecased acronym.
 # Measured bounds and their trade-offs: specs/evaluators/langevals-presidio-allcaps-person-names.feature
 MIN_SPAN_WORDS = 2
 MIN_NORMALISED_TOKEN_LENGTH = 4
+
+# A word reads as a name when the model's corpus writes it in Titlecase this
+# many times more often than in lowercase or in capitals. Pro (Titlecase
+# 1.2x) is not one; Lee (19x) is. Measured: same feature file.
+NAME_FORM_DOMINANCE = 1.5
 
 
 def _is_upper_letter(character: str) -> bool:
@@ -113,18 +125,50 @@ def _has_name_shaped_rewrite(*, original: str, normalised: str) -> bool:
     )
 
 
-def _normalisation_justifies_span(
-    *, original: str, normalised: str, start: int, end: int
-) -> bool:
-    """Whether a span found only after normalisation has the shape of a name.
+def _frequency_rank(vectors: Any, form: str) -> float:
+    """The form's row in the frequency-sorted vector table, or infinity if absent.
 
-    Titlecasing restores the cue on WHITFIELD and invents one on CEO. Measured
-    bounds: specs/evaluators/langevals-presidio-allcaps-person-names.feature
+    Looked up by hash so an unseen word is not added to the shared vocab.
+    """
+    row = vectors.key2row.get(hash_string(form), -1)
+    return float("inf") if row < 0 else float(row)
+
+
+def _reads_as_name(word: str, vectors: Any) -> bool:
+    """Whether the model's corpus writes `word` mostly in Titlecase.
+
+    Names are; product words (WIDGET), acronyms (SEPA, API) and everyday
+    words (KEY) are not. A word in no form at all is rare, so most likely a
+    name, and is kept.
+    """
+    title = _frequency_rank(vectors, word[:1].upper() + word[1:].lower())
+    other = min(
+        _frequency_rank(vectors, word.lower()),
+        _frequency_rank(vectors, word.upper()),
+    )
+    if title == other == float("inf"):
+        return True
+    return title * NAME_FORM_DOMINANCE < other
+
+
+def _normalisation_justifies_span(
+    *, original: str, normalised: str, start: int, end: int, vectors: Any
+) -> bool:
+    """Whether a span found only after normalisation is shaped and worded like a name.
+
+    Titlecasing restores the cue on WHITFIELD and invents one on CEO and on
+    WIDGET PRO. Measured bounds: specs/evaluators/langevals-presidio-allcaps-person-names.feature
     """
     span = original[start:end]
     if len(span.split()) < MIN_SPAN_WORDS:
         return False
-    return _has_name_shaped_rewrite(original=span, normalised=normalised[start:end])
+    if not _has_name_shaped_rewrite(original=span, normalised=normalised[start:end]):
+        return False
+    return any(
+        _reads_as_name(span[word_start:word_end], vectors)
+        for word_start, word_end in _word_runs(span)
+        if span[word_start:word_end].isalpha()
+    )
 
 
 def _covers(outer: Any, inner: Any) -> bool:
@@ -231,73 +275,76 @@ class PresidioPIIDetectionEvaluator(
             nlp = spacy.load("en_core_web_lg")
             nlp.to_disk(os.path.join(cache_dir, "en_core_web_lg"))
 
-        cls.analyzer = AnalyzerEngine(
-            nlp_engine=SpacyNlpEngine(
-                models=[{"lang_code": "en", "model_name": "en_core_web_lg"}]
-            )
+        nlp_engine = SpacyNlpEngine(
+            models=[{"lang_code": "en", "model_name": "en_core_web_lg"}]
         )
+        cls.analyzer = AnalyzerEngine(nlp_engine=nlp_engine)
+        cls.word_vectors = nlp_engine.nlp["en"].vocab.vectors
 
         super().preload()
 
-    def _person_results_from_normalised_casing(
-        self, *, content: str, already_found: list[Any]
+    def _results_from_normalised_casing(
+        self, *, content: str, entities: list[str], already_found: list[Any]
     ) -> list[Any]:
-        """The PERSON spans only a case-normalised copy of `content` sees.
+        """The `entities` spans only a case-normalised copy of `content` sees.
 
-        PERSON only: no other recogniser has a casing problem to fix. Skipped
-        when the text has no name-shaped rewrite, since no span could pass without one.
+        `entities` is case-sensitive only: the code, currency and identifier
+        recognisers need the capitals. Skipped when the text has no name-shaped
+        rewrite, since no span could pass without one.
         """
         normalised = normalise_allcaps_runs(content)
         if not _has_name_shaped_rewrite(original=content, normalised=normalised):
             return []
 
         placed = {
-            (result.start, result.end)
+            (result.entity_type, result.start, result.end)
             for result in already_found
-            if result.entity_type == PERSON_ENTITY
         }
         return [
             result
             for result in self.analyzer.analyze(
-                text=normalised, entities=[PERSON_ENTITY], language="en"
+                text=normalised, entities=entities, language="en"
             )
             if result.score >= self.settings.min_threshold
-            and (result.start, result.end) not in placed
+            and (result.entity_type, result.start, result.end) not in placed
             and _normalisation_justifies_span(
                 original=content,
                 normalised=normalised,
                 start=result.start,
                 end=result.end,
+                vectors=self.word_vectors,
             )
         ]
 
-    def _merge_person_results(
-        self, *, content: str, results: list[Any]
+    def _merge_normalised_results(
+        self, *, content: str, entities: list[str], results: list[Any]
     ) -> list[Any]:
-        """`results` with the normalised copy's PERSON spans folded in.
+        """`results` with the normalised copy's case-sensitive spans folded in.
 
-        Where two PERSON spans overlap by cover, only the wider survives, so
-        `score` counts distinct names and redaction reaches the whole name.
+        Where two case-sensitive spans overlap by cover, only the wider
+        survives, so `score` counts each name or place once and redaction
+        reaches the whole of it.
         """
-        additions = self._person_results_from_normalised_casing(
-            content=content, already_found=results
+        additions = self._results_from_normalised_casing(
+            content=content, entities=entities, already_found=results
         )
         if not additions:
             return results
 
+        case_sensitive = [
+            result
+            for result in results
+            if result.entity_type in CASE_SENSITIVE_ENTITIES
+        ]
         kept_additions = [
             addition
             for addition in additions
-            if not any(
-                result.entity_type == PERSON_ENTITY and _covers(result, addition)
-                for result in results
-            )
+            if not any(_covers(result, addition) for result in case_sensitive)
         ]
         superseded = {
             id(result)
-            for result in results
-            if result.entity_type == PERSON_ENTITY
-            and any(_covers(addition, result) for addition in kept_additions)
+            for result in case_sensitive
+            if any(_covers(addition, result) for addition in kept_additions)
         }
         return [
             result for result in results if id(result) not in superseded
@@ -334,8 +381,13 @@ class PresidioPIIDetectionEvaluator(
             result for result in results if result.score >= self.settings.min_threshold
         ]
 
-        if PERSON_ENTITY in entities:
-            results = self._merge_person_results(content=content, results=results)
+        case_sensitive = [
+            entity for entity in CASE_SENSITIVE_ENTITIES if entity in entities
+        ]
+        if case_sensitive:
+            results = self._merge_normalised_results(
+                content=content, entities=case_sensitive, results=results
+            )
 
         findings = [
             f"{result.entity_type} (likelihood: {result.score})" for result in results

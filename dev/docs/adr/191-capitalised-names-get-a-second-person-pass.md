@@ -32,24 +32,37 @@ person spans that copy reveals into the first pass's findings.
    or more words, and either a rewritten word of four or more letters or two
    rewritten words side by side. A short capitalised word on its own (CFO,
    ROI) is the acronym shape and is refused.
-3. The second pass is skipped when person detection is off or when the text
+3. The span must also hold one name word: a word the model's frequency table
+   holds in ordinary case at least 1.5 times as often as in lowercase or in
+   capitals, or does not hold at all. This refuses WIDGET PRO, SEPA ACH and
+   API KEY, which pass the shape rule.
+4. The second pass is skipped when person detection is off or when the text
    holds no such shape, so prose with OK, ID or USD costs one pass.
-4. Only PERSON spans come out of the second pass. Where two person spans
-   overlap by cover, the wider survives, so a name is counted and redacted
-   once, whole.
+5. Only PERSON spans, and LOCATION spans when location is redacted, come out
+   of the second pass. LOCATION is there because the model reads some
+   surnames as places (Costa Pereira), so a person-only pass left them in
+   clear when written in capitals. Where two such spans overlap by cover, the
+   wider survives, so a name is counted and redacted once, whole.
 
 ## Rationale / Trade-offs
 
 Titlecasing restores the name cue on WHITFIELD and invents the same cue on
-ERP. The shape rule is what prices that: a 46-string corpus of capitalised
-non-names (merchants, carriers, departments, SKUs, codes, headings, acronym
-prose, particle-shaped places) keeps three known false positives, one of
-which predates the second pass. The other two, a product line named after
-its founder and SEPA ACH in a list of payment rails, are the price of the
-side-by-side clause. That clause lifted wholly capitalised names with a
-short word (AMY LEE) from 5 of 24 to 24 of 24 and particle surnames (VAN DER
-BERG) from 2 of 24 to 21 of 24, the control's own ceiling. Without it,
-whether a name is protected would depend on how long it is.
+ERP. The shape and name-word rules are what price that: a 46-string corpus
+of capitalised non-names (merchants, carriers, departments, SKUs, codes,
+headings, acronym prose, particle-shaped places) keeps two known false
+positives. One predates the second pass, and the other is a product line
+named after its founder, which holds a name. The side-by-side clause lifted
+wholly capitalised names with a short word (AMY LEE) from 5 of 24 to 24 of
+24 and particle surnames (VAN DER BERG) from 2 of 24 to 21 of 24, the
+control's own ceiling. Without it, whether a name is protected would depend
+on how long it is.
+
+The name-word rule has its own price. Of 51,072 pairings of common forenames
+and surnames in capitals, 1.3% hold only everyday words (ROSE WHITE, WILL
+YOUNG) and are refused, which leaves them as they were before the second
+pass. In return, false hits on a fresh set of capitalised non-names in eight
+trace shapes fell from 7 of 96 to 1 of 96, the rate before the second pass,
+with no loss of recall on any corpus.
 
 Alternatives rejected:
 

@@ -15,9 +15,10 @@ from presidio_person_name_support import (
     person_spans,
 )
 
-# Every false positive accepted, by reference code; a fourth fails the build.
-# M-8802 predates the second pass. The other two price the side-by-side clause.
-KNOWN_FALSE_POSITIVES = frozenset({"M-8802", "P-9920", "L-3303"})
+# Every false positive accepted, by reference code; a third fails the build.
+# M-8802 predates the second pass. P-9920 is a product line named after its
+# founder, so it reads as a name because it holds one.
+KNOWN_FALSE_POSITIVES = frozenset({"M-8802", "P-9920"})
 
 # Normalisation deliberately leaves these alone, so they cannot carry the
 # second pass. They are controls for that, not gaps in the corpus.

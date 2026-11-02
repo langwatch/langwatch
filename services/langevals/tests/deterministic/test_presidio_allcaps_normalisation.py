@@ -1,11 +1,13 @@
 """The invariants of the ALL-CAPS second pass, apart from how well it scores.
 
-Same length, skip when it cannot help, PERSON only, the name-shape rule, one
-entry per name. Why each holds: specs/evaluators/langevals-presidio-allcaps-person-names.feature
+Same length, skip when it cannot help, PERSON and LOCATION only, the name-shape
+and name-word rules, one entry per name. Why each holds:
+specs/evaluators/langevals-presidio-allcaps-person-names.feature
 """
 
 import sys
 import unicodedata
+from functools import lru_cache
 from typing import Any
 
 import pytest
@@ -60,13 +62,34 @@ def analyze_calls(*, entities: PresidioEntities, text: str) -> list[dict[str, An
     return counting.calls
 
 
-def findings(text: str) -> list[tuple[str, str]]:
+@lru_cache(maxsize=1)
+def name_and_place_evaluator() -> PresidioPIIDetectionEvaluator:
+    """The default entities plus person and location, as strict redaction asks."""
+    return PresidioPIIDetectionEvaluator(
+        settings=PresidioPIIDetectionSettings(
+            entities=PresidioEntities(person=True, location=True),
+            min_threshold=MIN_THRESHOLD,
+        )
+    )
+
+
+def findings(
+    text: str, subject: PresidioPIIDetectionEvaluator | None = None
+) -> list[tuple[str, str]]:
     """(entity type, covered text) for every finding, in the order reported."""
-    result = evaluator().evaluate(PresidioPIIDetectionEntry(input=text))
+    result = (subject or evaluator()).evaluate(PresidioPIIDetectionEntry(input=text))
     assert result.status == "processed", f"evaluator did not run: {result}"
     return [
         (f["entity_type"], text[f["start"]:f["end"]])
         for f in result.raw_response["results"]
+    ]
+
+
+def names_and_places(text: str) -> list[tuple[str, str]]:
+    return [
+        (entity, covered)
+        for entity, covered in findings(text, name_and_place_evaluator())
+        if entity in ("PERSON", "LOCATION")
     ]
 
 
@@ -173,6 +196,16 @@ def test_second_pass_runs_once_with_an_allcaps_run():
     assert calls[1]["text"] == "Marcus Whitfield asked about the renewal of his annual plan."
 
 
+# @scenario "The second pass also looks for places when places are redacted"
+def test_second_pass_asks_for_places_when_location_is_on():
+    calls = analyze_calls(
+        entities=PresidioEntities(person=True, location=True),
+        text="MARCUS WHITFIELD asked about the renewal of his annual plan.",
+    )
+    assert len(calls) == 2, f"expected two passes, got {len(calls)}: {calls}"
+    assert calls[1]["entities"] == ["PERSON", "LOCATION"]
+
+
 # @scenario "The second pass is skipped when the only capitals are short words"
 def test_no_second_pass_when_only_short_words_are_capitalised():
     calls = analyze_calls(
@@ -193,7 +226,7 @@ def test_no_second_pass_when_person_is_disabled():
 
 
 # ---------------------------------------------------------------------------
-# 3. PERSON only, union only
+# 3. PERSON and LOCATION only, union only
 # ---------------------------------------------------------------------------
 
 # Every other entity is in ALL-CAPS context; only the second pass finds the name.
@@ -203,29 +236,48 @@ MIXED_ENTITY_TEXT = (
 )
 
 
-# @scenario "Only person spans come out of the second pass"
+# @scenario "Only name and place spans come out of the second pass"
 def test_the_second_pass_adds_a_name_and_changes_nothing_else():
-    """Non-person spans are compared against the analyzer in the next test."""
+    """Other spans are compared against the analyzer in the next test."""
     assert person_names(MIXED_ENTITY_TEXT) == ["Tobias OKONKWO"]
 
 
-# @scenario "Only person spans come out of the second pass"
-def test_non_person_entities_match_the_first_pass_exactly():
+# @scenario "Only name and place spans come out of the second pass"
+def test_other_entities_match_the_first_pass_exactly():
     """Against the analyzer called directly, not a copy with the second pass removed."""
+    subject = name_and_place_evaluator()
     entities = [
         name.upper()
-        for name, enabled in evaluator().settings.entities.model_dump().items()
+        for name, enabled in subject.settings.entities.model_dump().items()
         if enabled
     ]
     first_pass = [
         (result.entity_type, MIXED_ENTITY_TEXT[result.start:result.end])
-        for result in evaluator().analyzer.analyze(
+        for result in subject.analyzer.analyze(
             text=MIXED_ENTITY_TEXT, entities=entities, language="en"
         )
-        if result.score >= MIN_THRESHOLD and result.entity_type != "PERSON"
+        if result.score >= MIN_THRESHOLD
+        and result.entity_type not in ("PERSON", "LOCATION")
     ]
-    assert first_pass, "the text must carry a non-PERSON entity to measure"
-    assert [f for f in findings(MIXED_ENTITY_TEXT) if f[0] != "PERSON"] == first_pass
+    assert first_pass, "the text must carry another entity to measure"
+    assert [
+        f
+        for f in findings(MIXED_ENTITY_TEXT, subject)
+        if f[0] not in ("PERSON", "LOCATION")
+    ] == first_pass
+
+
+# @scenario "A surname the model reads as a place is still redacted in capitals"
+def test_a_capitalised_surname_read_as_a_place_is_redacted():
+    """Titlecase Costa Pereira is a LOCATION to the model, so a PERSON-only
+    second pass left it in clear when written in capitals."""
+    titlecase = "Account holder Maria Fernanda Costa Pereira asked to close the account."
+    capitals = "Account holder Maria Fernanda COSTA PEREIRA asked to close the account."
+    assert ("LOCATION", "Costa Pereira") in names_and_places(titlecase)
+    assert names_and_places(capitals) == [
+        ("PERSON", "Maria Fernanda"),
+        ("LOCATION", "COSTA PEREIRA"),
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -290,6 +342,42 @@ def test_a_capitalised_name_of_short_words_is_harvested():
 )
 def test_short_titlecased_tokens_are_not_harvested(text: str, acronym: str):
     assert person_names(text) == [], f"a name was invented around {acronym}"
+
+
+# @scenario "Capitalised words that are not name words are not harvested"
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "WIDGET PRO",  # a long product word: the 4+ letter clause alone let it through
+        "SEPA ACH",  # two acronyms side by side
+        "API KEY",  # an acronym and an everyday word, read as a place
+    ],
+)
+@pytest.mark.parametrize(
+    "template",
+    [
+        "Hi, this is {phrase}, my parcel has not arrived and the tracking page shows no update.",
+        "Thanks for waiting. I checked the order history for {phrase} and it ships tomorrow.",
+    ],
+)
+def test_capitalised_non_name_words_are_not_harvested(template: str, phrase: str):
+    text = template.format(phrase=phrase)
+    assert names_and_places(text) == [], f"a name or place was invented in {phrase}"
+
+
+# @scenario "A name made only of everyday words is not harvested in capitals"
+@pytest.mark.parametrize("name", ["ROSE WHITE", "WILL YOUNG"])
+def test_a_name_of_everyday_words_is_the_accepted_price(name: str):
+    """The measured cost of the name-word rule, pinned so a change shows.
+
+    The model's corpus writes both words more often in lowercase, so nothing
+    tells them from WIDGET PRO. One name word is enough: Marcus GREEN is kept.
+    """
+    text = f"Please confirm whether {name} should stay on the current plan."
+    assert person_names(text) == []
+    assert person_names("Please confirm whether Marcus GREEN should stay on the plan.") == [
+        "Marcus GREEN"
+    ]
 
 
 # ---------------------------------------------------------------------------

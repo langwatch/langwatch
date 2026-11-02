@@ -23,8 +23,12 @@ Feature: A name written in capitals is still redacted
   offsets are used against the original. The second analysis may not run when
   it has nothing to normalise or when person detection is off, because it
   costs a second pass on a service that already throttles. And it may harvest
-  person spans only: capitals mean something to the code, currency and
-  identifier recognisers, and none of them has a casing problem to fix.
+  person and place spans only: capitals mean something to the code, currency
+  and identifier recognisers, and none of them has a casing problem to fix.
+  Places are in because the model splits some names across both. In ordinary
+  case it reads Maria Fernanda as a person and Costa Pereira as a place, so a
+  person-only pass left COSTA PEREIRA in clear. A place is asked for only
+  when places are being redacted at all.
 
   Titlecasing restores the name cue on WHITFIELD and invents the same cue on
   CEO, so a span the second pass finds is kept only if it has the shape of a
@@ -39,27 +43,47 @@ Feature: A name written in capitals is still redacted
   text holds neither shape, so OK, ID or USD scattered through prose cost
   nothing.
 
+  Shape alone is not enough. WIDGET PRO has a rewritten word of four letters
+  and SEPA ACH has two rewritten words side by side, and both were redacted
+  as people. So a span the second pass finds must also hold one name word: a
+  word the model's own corpus writes in ordinary case at least one and a half
+  times as often as in lowercase or in capitals. Lee, Whitfield and Okonkwo
+  are name words. Widget and Key are written mostly in lowercase, SEPA and API
+  mostly in capitals, and Pro only slightly more often in ordinary case. A
+  word the corpus does not hold in any form is rare, so most likely a name,
+  and counts as one. The lookup reads the model's frequency table and adds
+  nothing to it.
+
+  The name-word rule has a measured price. Over 51,072 pairings of common
+  forenames and surnames written wholly in capitals, 1.3% hold no name word,
+  because both words are everyday words as well (ROSE WHITE, WILL YOUNG). The
+  second pass refuses those, which leaves them where they were before it
+  existed. One name word is enough, so Marcus GREEN is still found. A
+  stricter margin of two refuses 1.7% and buys only WIDGET PRO MAX, which
+  stays redacted at any margin because Max is a name. On the trace-shaped
+  recall corpora below the rule changes nothing, and on a fresh set of twelve
+  capitalised non-names in eight trace shapes it takes the false hits from 7
+  of 96 back to 1 of 96, the same as before the second pass.
+
   Precision is held over capitalised strings that are not people (merchants,
   carriers, departments, SKUs, codes, headings, acronym-heavy prose and
   particle-shaped places and products). Before the second pass existed 37 of
   38 were clean. The first build of the second pass dropped that to 33 of 38,
   because ERP, SOW or CFO turned into Erp, Sow or Cfo and were read as
   surnames, and the shape rule above is what brought it back to 37 of 38. The
-  corpus is now 46 strings with three known false positives, named one by one
-  in the test: one predates the second pass, and two are the price of the
-  side-by-side clause, described next. A fourth fails the build. If it does,
-  the second pass is inventing people on a shape nobody has priced. Fix the
-  rule. Do not loosen the corpus or the list.
+  corpus is now 46 strings with two known false positives, named one by one
+  in the test: one predates the second pass, and one is a product line named
+  after its founder, which has the shape and the words of a name because it
+  holds one. A third fails the build. If it does, the second pass is
+  inventing people on a shape nobody has priced. Fix the rule. Do not loosen
+  the corpus or the list.
 
   Against a rule that demanded every rewritten word be four letters or more,
   the side-by-side clause lifted wholly capitalised names with a short word
   (AMY WHITFIELD, MARCUS LEE, AMY LEE; 24 names) from 5 of 24 to 24 of 24, and
   the particle corpus (24 names per class) from 8.3% to 87.5%, that corpus's
-  own control ceiling. It costs two false positives: a product line named
-  after its founder, and SEPA ACH in a list of payment rails. The first
-  cannot be removed, since such a name has the shape of a name because it is
-  one. Both are accepted because the alternative leaks short and particle
-  names, so whether a name is protected would depend on how long it is.
+  own control ceiling. It used to cost SEPA ACH in a list of payment rails as
+  well; the name-word rule removed that.
 
   A lowercase name is a different defect and is not in scope here. There is
   no cue in a lowercase word that separates a name from any other word, so
@@ -117,21 +141,35 @@ Feature: A name written in capitals is still redacted
       Then the content is analysed once and not twice
 
     @unit
+    Scenario: The second pass also looks for places when places are redacted
+      Given content carrying a wholly capitalised name
+      And person and location detection are both switched on
+      When the content is analysed for personal information
+      Then the second analysis asks for persons and places
+
+    @unit
     Scenario: The second pass is skipped when person detection is off
       Given content carrying a wholly capitalised word
       And person detection is switched off
       When the content is analysed for personal information
       Then the content is analysed once and not twice
 
-  Rule: The second pass changes nothing but person spans
+  Rule: The second pass changes nothing but name and place spans
 
     @unit
-    Scenario: Only person spans come out of the second pass
+    Scenario: Only name and place spans come out of the second pass
       Given content holding a name only the second pass finds
       And an email address, a bank account and a card number in capitals
       When the content is analysed for personal information
       Then the name is reported as a person
-      And every span that is not a person is reported exactly as the first pass found it
+      And every span that is not a person or a place is reported exactly as the first pass found it
+
+    @unit
+    Scenario: A surname the model reads as a place is still redacted in capitals
+      Given a name whose two-word surname the model reads as a place in ordinary case
+      And the surname is written wholly in capitals
+      When the content is analysed for personal information
+      Then the surname is reported as it is in ordinary case
 
   Rule: A name is not read into a string that is not one
 
@@ -146,6 +184,19 @@ Feature: A name written in capitals is still redacted
       Given prose in which a three-letter acronym stands alone in capitals
       When the content is analysed for personal information
       Then no person span is reported
+
+    @unit
+    Scenario: Capitalised words that are not name words are not harvested
+      Given a product word, a pair of acronyms or an acronym beside an everyday word, in capitals
+      When the content is analysed for personal information
+      Then no person or place span is reported over it
+
+    @unit
+    Scenario: A name made only of everyday words is not harvested in capitals
+      Given a name written wholly in capitals whose every word is also an everyday word
+      When the content is analysed for personal information
+      Then no person span is reported, as before the second pass existed
+      And a name with one name word beside a capitalised everyday word is still reported
 
     @unit
     Scenario: A name with one capitalised word is still harvested
