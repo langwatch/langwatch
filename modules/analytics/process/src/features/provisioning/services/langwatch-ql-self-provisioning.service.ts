@@ -92,10 +92,9 @@ export interface LwqlPostgresGap {
 }
 
 /**
- * What the check found absent in each store (or, for an engine table, built on stale credentials,
- * or, for a view, lacking a catalog column); both empty means converged. Extra columns are left to
- * the newer deploy that added them. `unknown`: PostgreSQL could not be read, so it is neither
- * converged nor cleared.
+ * What the check found absent in each store, or stale (an engine table on old credentials, a view
+ * lacking a catalog column; extra columns are never drift). Both empty means converged.
+ * `unknown`: PostgreSQL could not be read, so it is neither converged nor cleared.
  */
 export interface LwqlAppOwnedDrift {
   readonly clickHouse: readonly string[];
@@ -431,7 +430,7 @@ export class LangWatchQLSelfProvisioningService {
     const current = postgresMapping.credentialComment({ fingerprint: credentialFingerprint });
     const isStale = (name: string) =>
       engineTables.includes(name) && found.comments[name] !== current;
-    // Only a missing column is drift, never an extra one; see specs/lwql/api.feature (rolling deploys).
+    // Only a missing column is drift, never an extra one (specs/lwql/api.feature, rolling deploys).
     const lacksColumns = (name: string) => {
       const view = LWQL_VIEW_CATALOG.find((entry) => entry.name === name);
       const held = found.columns[name] ?? [];
