@@ -604,18 +604,14 @@ targetRules = ["generic-api-key"]
 paths = ['''apps/docs/src/features/shell/browser/posthog\.ts''']
 regexes = ['''^phc_oOlj3H19T2JlGbFXmrGrjSLbDPDNyPKYdIFaTdrkXOY$''']
 
-# The code-block redaction tests plant made-up secret values (`CAPSECRET-…`,
-# `sk-PROOF-…`, a fake PEM block) in a runner's stderr and assert they come
-# out as `[redacted]`. A redaction test needs a value shaped like a secret to
-# prove anything; none of these values is a credential anywhere.
-#
-# Scoped to `generic-api-key` only, so a real provider token pasted into these
-# files is still caught by its own rule. Scoped by path so a new fixture case
-# does not need a config change.
+# `runner_stderr_test.go` plants the made-up value `CAPSECRET-0123456789` in a
+# runner's stderr and asserts it comes out as `[redacted]`; a redaction test
+# needs a secret-shaped value to prove anything, and this one is a credential
+# nowhere. Scoped to that value in that file (`condition = "AND"`, so the path
+# alone allows nothing) and to `generic-api-key` only.
 [[allowlists]]
-description = "Made-up secret values in the code-block stderr redaction tests"
+description = "Made-up CAPSECRET value in the code-block stderr redaction test"
+condition = "AND"
 targetRules = ["generic-api-key"]
-paths = [
-  '''services/nlpgo/app/engine/blocks/codeblock/runner_stderr_test\.go''',
-  '''services/nlpgo/app/engine/redact/redact_test\.go''',
-]
+paths = ['''^services/nlpgo/app/engine/blocks/codeblock/runner_stderr_test\.go$''']
+regexes = ['''^CAPSECRET-0123456789$''']
