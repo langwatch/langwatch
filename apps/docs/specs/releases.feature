@@ -54,4 +54,3 @@ Feature: Useful release updates in the documentation
     When the changelog page and its Markdown export are built
     Then the note keeps the pull request link and drops the commit link beside it
     But a note whose only link is its commit keeps that link
-    And the changelog's Markdown export fits the page token budget agents read within

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { fitsPageTokens } from "../../../lib/page-tokens.ts";
+import { approximateTokens } from "../../../lib/page-tokens.ts";
 import { canonicalUrl, docsUrl } from "../../../lib/site-path.ts";
 import { resolveOperation } from "../../api-reference/compile.ts";
 import {
@@ -259,22 +259,22 @@ export function pageMarkdown({
   docsRoot,
   slug,
   instructions = agentInstructions({ docsRoot }),
-  fitPageTokens = false,
+  pageTokens,
 }: {
   docsRoot: string;
   slug: string;
   /** Pass "" where pages are concatenated, so the block appears once rather than per page. */
   instructions?: string;
-  /** The page's own export: the changelog keeps its newest release, older ones while they fit. */
-  fitPageTokens?: boolean;
+  /** The changelog export keeps its newest release, older ones while they fit this many tokens. */
+  pageTokens?: number;
 }) {
   const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
   const exportOf = (releaseCount?: number) =>
     exportMarkdown({ docsRoot, slug, instructions, source, releaseCount });
-  if (slug !== RELEASES_SLUG || !fitPageTokens) return exportOf();
+  if (slug !== RELEASES_SLUG || pageTokens === undefined) return exportOf();
   for (let count = readReleases({ docsRoot }).length; count > 1; count--) {
     const markdown = exportOf(count);
-    if (fitsPageTokens({ markdown })) return markdown;
+    if (approximateTokens({ text: markdown }) <= pageTokens) return markdown;
   }
   return exportOf(1);
 }

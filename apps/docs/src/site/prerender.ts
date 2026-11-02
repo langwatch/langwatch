@@ -33,6 +33,7 @@ import { publishSearchIndex, searchEntry } from "../features/search/compile.ts";
 import { publicSlug, withBasePath } from "../lib/site-path.ts";
 import { appRoot, cacheRoot, docsRoot, readBuildOptions } from "../paths.ts";
 import { writeVersionedPages } from "./build-version.ts";
+import { PAGE_TOKENS } from "./audit/budgets.ts";
 import { compressedSearchIndex } from "./compressed-index.ts";
 import { inlinePageStyles } from "./css/page-styles.ts";
 import {
@@ -254,7 +255,7 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
 /** A page's Markdown exports; the home page is also exported at the root. */
 function exportsOf({ slug }: { slug: string }): [string, string][] {
   if (slug === "404") return [];
-  const markdown = pageMarkdown({ docsRoot, slug, fitPageTokens: true });
+  const markdown = pageMarkdown({ docsRoot, slug, pageTokens: PAGE_TOKENS });
   const names =
     slug === "introduction" ? [slug, "index"] : [...new Set([slug, publicSlug({ slug })])];
   return names.flatMap((name) =>

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { z } from "zod";
 
+import budgetsFile from "./budgets.json" with { type: "json" };
 import { pageTokensSchema } from "../../lib/page-tokens.ts";
 
 export const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"] as const;
@@ -66,6 +67,12 @@ export const DEFAULT_BUDGETS_FILE = new URL("./budgets.json", import.meta.url);
 export function readBudgets({ file = DEFAULT_BUDGETS_FILE }: { file?: URL | string } = {}) {
   return budgetsSchema.parse(JSON.parse(readFileSync(file, "utf8")));
 }
+
+/**
+ * The page token budget, read through a static import: the bundled prerender cannot read
+ * budgets.json beside its own module. A bad value fails the build.
+ */
+export const PAGE_TOKENS = budgetsSchema.parse(budgetsFile).agentReadiness.pageTokens;
 
 const failingAudit = z.object({ id: z.string(), category, title: z.string(), score: z.number() });
 

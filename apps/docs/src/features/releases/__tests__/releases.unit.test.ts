@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { approximateTokens, PAGE_TOKENS } from "../../../lib/page-tokens.ts";
-import { readBudgets } from "../../../site/audit/budgets.ts";
+import { approximateTokens } from "../../../lib/page-tokens.ts";
+import { PAGE_TOKENS, readBudgets } from "../../../site/audit/budgets.ts";
 import { pageMarkdown } from "../../discovery/compile.ts";
 import { parseReleases, readReleases, withReleaseNotes } from "../compile/releases.ts";
 
@@ -130,7 +130,7 @@ describe("when the newest releases are longer than the page token budget", () =>
       const markdown = pageMarkdown({
         docsRoot,
         slug: "changelog",
-        fitPageTokens: true,
+        pageTokens,
       });
       expect(approximateTokens({ text: markdown })).toBeLessThanOrEqual(pageTokens);
       expect(pageTokens).toBe(readBudgets().agentReadiness.pageTokens);
@@ -164,7 +164,7 @@ describe("when the newest releases are longer than the page token budget", () =>
       const markdown = pageMarkdown({
         docsRoot,
         slug: "changelog",
-        fitPageTokens: true,
+        pageTokens,
       });
       expect(markdown).toContain("## Release v3.0.0");
       expect(markdown).not.toContain("## Release v2.9.0");
