@@ -132,6 +132,14 @@ Feature: Agent versions and deploy labels
     Then it is refused with code "agent_deployed_label_protected" naming the label
     And the agent is not archived
 
+  @integration
+  Scenario: The deprecated agents REST alias names its caller like the v1 routes
+    Given a caller without "agents:deploy"
+    When they create an agent through "/api/agents"
+    Then they are recorded as its creator
+    When they archive an agent a label points at through "/api/agents"
+    Then it is refused with code "agent_deployed_label_protected" and the agent stays
+
   @unit
   Scenario: Archiving an unlabelled agent needs no deploy permission
     Given an agent with no labels
@@ -219,6 +227,13 @@ Feature: Agent versions and deploy labels
     When the agent is saved
     Then the save is tried three times
     And it fails with the version number race, never as a duplicate agent
+
+  @unit
+  Scenario: A version listing never carries an HTTP credential
+    Given HTTP agent versions whose configs hold header values and an auth token
+    When the versions are listed
+    Then every literal credential value is blank and secret references are kept
+    And a version config that no longer parses is served without its headers and auth
 
   @unit
   Scenario: The backfill dry run writes nothing
