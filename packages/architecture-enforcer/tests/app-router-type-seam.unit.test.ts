@@ -15,10 +15,8 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * 1,540 with `pnpm ensure:built` (#8795); 1,561 with ADR-185 (docs consent reads api-key config).
- * 1,562 with ADR-190: instant-eval-judge's api, config and pricing read its route contract.
- * 1,563 with the agent contract's config/connector.ts (scenario connector setup and teardown steps).
- * A ceiling, not a target. Lower it when earned; never raise it without saying why.
+ * 1,540 with `pnpm ensure:built`; 1,561 with ADR-185; 1,562 with ADR-190; 1,563 with the
+ * agent contract's config/connector.ts. A ceiling, not a target: say why before raising it.
  */
 const CEILING = 1_564;
 
