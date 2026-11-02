@@ -1,9 +1,11 @@
 package ciguard
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -93,6 +95,7 @@ func oneJobProblems(job suitesJob) []string {
 	if total := mappingValue(job.Strategy.Matrix, "total"); !strings.Contains(total, oneJobFlag+" && '[1]'") {
 		problems = append(problems, "package-suites must count one shard when suites-one-job is true")
 	}
+	problems = append(problems, shardCountProblems(job.Strategy.Matrix)...)
 	if !strings.Contains(job.Name, shardTotal) {
 		problems = append(problems, "package-suites must name its shard count from "+shardTotal)
 	}
@@ -110,6 +113,32 @@ func oneJobProblems(job suitesJob) []string {
 	}
 	if cached != 2 {
 		problems = append(problems, fmt.Sprintf("both suite-result caches must fall back to %s, %d do", sharedCacheKey, cached))
+	}
+
+	return problems
+}
+
+// quotedList is a JSON list quoted inside a fromJSON(... && '[..]' || '[..]') expression.
+var quotedList = regexp.MustCompile(`'(\[[^']*\])'`)
+
+// shardCountProblems wants each total, one-job and sharded, to count its shard
+// list: a total above the list leaves whole shards' packages unrun while green.
+func shardCountProblems(matrix yaml.Node) []string {
+	shards := quotedList.FindAllStringSubmatch(mappingValue(matrix, "shard"), -1)
+	totals := quotedList.FindAllStringSubmatch(mappingValue(matrix, "total"), -1)
+	if len(shards) != 2 || len(totals) != 2 {
+		return []string{"package-suites must list its shards and their total for one job and for a pull request"}
+	}
+	var problems []string
+	for i := range shards {
+		var list, total []int
+		if json.Unmarshal([]byte(shards[i][1]), &list) != nil || json.Unmarshal([]byte(totals[i][1]), &total) != nil || len(total) != 1 {
+			problems = append(problems, "package-suites shard lists and totals must be JSON lists of numbers")
+			continue
+		}
+		if total[0] != len(list) {
+			problems = append(problems, fmt.Sprintf("package-suites total %d must count its %d shards", total[0], len(list)))
+		}
 	}
 
 	return problems
@@ -147,6 +176,12 @@ func notifyProblems(jobs map[string]suitesJob) []string {
 			continue
 		}
 		var problems []string
+		// One post per red leg; a failed jobs lookup falls back to the one-job leg instead of posting nothing.
+		for _, want := range []string{`-job "$leg"`, ` || legs=""`, `${legs:-package-suites (1/1)}`} {
+			if !runsScript(job.Steps, want) {
+				problems = append(problems, "the package-suites Slack step must run "+want)
+			}
+		}
 		for _, want := range []string{"always()", "refs/heads/main", "needs.package-suites.result == 'failure'", "needs.package-suites.result == 'cancelled'"} {
 			if !strings.Contains(job.If, want) {
 				problems = append(problems, "the package-suites Slack job's if must include "+want)

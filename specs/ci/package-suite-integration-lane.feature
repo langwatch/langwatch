@@ -259,6 +259,13 @@ Feature: A package's integration suite runs in CI when it declares one
       Then Slack gets the job, the commit and a link to the run
 
     @unit
+    Scenario: A red main posts once per red package-suites leg
+      Given the one-job leg, the browser leg or both fail or time out on main
+      When the run reaches its Slack job
+      Then Slack gets one post per red leg, named as that leg
+      And a failed lookup of the run's jobs still posts, as the one-job leg
+
+    @unit
     Scenario: A repeat failure or timeout on main posts once
       Given package-suites failed or was cancelled in the previous finished run on main
       When it is red again

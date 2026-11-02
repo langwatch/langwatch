@@ -69,6 +69,14 @@ func TestMainRunsThePackageSuitesAsOneQueuedJob(t *testing.T) {
 			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
 			"timeout-minutes: 45",
 		},
+		"a shard list shorter than its total": {
+			"'[1, 2, 3, 4, 5, 6, 7, 8]'",
+			"'[1, 2, 3, 4, 5, 6, 7]'",
+		},
+		"a total that miscounts the shards": {
+			"'[1]' || '[8]'",
+			"'[1]' || '[9]'",
+		},
 		"a fixed shard total": {
 			"format('{0}/{1}', matrix.shard, matrix.total) || ''",
 			"format('{0}/8', matrix.shard) || ''",
@@ -145,6 +153,24 @@ func TestARedOrTimedOutMainSuitesRunPostsToSlack(t *testing.T) {
 		"a Slack job that runs only on success": {
 			"if: always() && github.event_name == 'push'",
 			"if: github.event_name == 'push'",
+		},
+	})
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestARedMainPostsOncePerRedLeg(t *testing.T) {
+	breakEach(t, realAppCI(t), map[string][2]string{
+		"one fixed leg name": {
+			`go run ./cmd/slacknotify -job "$leg"`,
+			`go run ./cmd/slacknotify -job "package-suites (1/1)"`,
+		},
+		"a jobs lookup whose failure stops the post": {
+			` || legs=""`,
+			"",
+		},
+		"no fallback when the lookup finds no leg": {
+			`${legs:-package-suites (1/1)}`,
+			`$legs`,
 		},
 	})
 }
