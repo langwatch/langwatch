@@ -617,7 +617,7 @@
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
-    "@chakra-ui/charts": "^3.36.0",
+    "@chakra-ui/charts": "^3.37.0",
     "@langwatch/time": "workspace:*",
     "@paper-design/shaders": "catalog:",
     "@paper-design/shaders-react": "catalog:",
@@ -640,9 +640,9 @@
     "@emotion/react": "catalog:",
     "@langwatch/design-system-internal": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
-    "@storybook/addon-a11y": "^10.6.2",
-    "@storybook/addon-docs": "^10.6.2",
-    "@storybook/react-vite": "^10.6.2",
+    "@storybook/addon-a11y": "^10.6.3",
+    "@storybook/addon-docs": "^10.6.3",
+    "@storybook/react-vite": "^10.6.3",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/lodash-es": "catalog:",
@@ -655,7 +655,7 @@
     "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "storybook": "^10.6.2",
+    "storybook": "^10.6.3",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

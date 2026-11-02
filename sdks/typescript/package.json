@@ -87,7 +87,7 @@
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@opentelemetry/sdk-trace-node": "catalog:",
     "liquidjs": "catalog:",
-    "open": "^11.0.0",
+    "open": "^11.0.4",
     "openapi-fetch": "^0.17.0",
     "ws": "catalog:",
     "xksuid": "^0.0.4",
@@ -109,7 +109,7 @@
     "@types/node": "catalog:",
     "@types/prompts": "catalog:",
     "@types/ws": "catalog:",
-    "@typescript-eslint/parser": "^8.58.1",
+    "@typescript-eslint/parser": "^8.72.0",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^5.0.1",
     "chalk": "catalog:",
@@ -118,7 +118,7 @@
     "dotenv-cli": "^11.0.0",
     "esbuild": "catalog:",
     "eslint": "^9.32.0",
-    "fets": "^0.8.5",
+    "fets": "^0.8.12",
     "fishery": "^2.3.1",
     "js-yaml": "catalog:",
     "jsonc-parser": "^3.3.1",
@@ -134,7 +134,7 @@
     "typescript-eslint": "catalog:",
     "vitest": "catalog:",
     "vitest-mock-extended": "^5.1.1",
-    "yaml": "^2.8.1"
+    "yaml": "^2.9.1"
   },
   "peerDependencies": {
     "@ai-sdk/openai": ">=2.0.0 <5.0.0",
