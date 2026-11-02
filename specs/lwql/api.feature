@@ -1704,8 +1704,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 
     @unit
     Scenario: The guide's per-plan rate table carries each plan's queries per minute
-      Then its rate table states the lwqlPerMinute bound of each tier, with Launch on the free bound and self-hosted open source on the enterprise bound
-      Then its rate table states the lwqlPerMinute bound of the Free, Paid and Enterprise plans
+      Given docs/features/langwatchql/limits-and-cost.mdx
+      Then its rate table states the lwqlPerMinute bound of each tier, with monthly Launch on the free bound, annual Launch on the paid bound and self-hosted open source on the enterprise bound
 
     @unit
     Scenario: The guide's extraction function page carries the key cap of each kind of key
