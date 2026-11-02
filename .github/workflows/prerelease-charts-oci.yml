@@ -148,7 +148,7 @@ jobs:
       # transparency log, and this registry's host is kept out of the public
       # record (see publish-docker-ecr.yml). The deploy pins the digest instead.
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
