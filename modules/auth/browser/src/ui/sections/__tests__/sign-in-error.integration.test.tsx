@@ -8,8 +8,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { UI_SIGN_OUT_PATH } from "../../../behavior/ui-session-client.ts";
 import { WithTestAuthHost } from "../../../testing.tsx";
-import ErrorScreen, { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx";
+import ErrorScreen, { SignInError } from "../sign-in-error-screen.tsx";
 
 function renderError(error: string, extra: Record<string, string> = {}) {
   return render(
@@ -44,7 +45,7 @@ describe("<SignInError/>", () => {
       const recovery = screen.getByRole("link", {
         name: /sign out.*try again/i,
       });
-      expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+      expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
       // The old behaviour linked straight to /auth/signin, which re-auths the
       // still-live IdP session and re-triggers the same failure (the loop).
       expect(recovery.getAttribute("href")).not.toContain("/auth/signin");
@@ -82,7 +83,18 @@ describe("<SignInError/>", () => {
       const recovery = screen.getByRole("link", {
         name: /sign out.*try again/i,
       });
-      expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+      expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
+    });
+
+    /** @scenario "A person refused for using a social button is told who to ask if their company turns them away" */
+    it("says who to ask when their company's sign-in turns them away", () => {
+      renderError("SSO_PROVIDER_NOT_ALLOWED");
+      expect(screen.getByText(/entering your\s+company email address/i)).toBeTruthy();
+      expect(
+        screen.getByText(
+          "If your company's sign-in turns you away, your company may not have given you access to LangWatch yet. Ask your IT administrator to check.",
+        ),
+      ).toBeTruthy();
     });
   });
 
@@ -96,7 +108,7 @@ describe("<SignInError/>", () => {
         ),
       ).toBeTruthy();
       expect(screen.getByRole("link", { name: "Sign out" }).getAttribute("href")).toBe(
-        FEDERATED_LOGOUT_PATH,
+        UI_SIGN_OUT_PATH,
       );
     });
   });
@@ -202,7 +214,7 @@ describe("given a sign-in method refused until an administrator approves the lin
     expect(screen.getByText("This sign-in method needs approval")).toBeTruthy();
     expect(screen.getByText(/administrator in your organization can review/i)).toBeTruthy();
     const recovery = screen.getByRole("link", { name: /sign out.*try again/i });
-    expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+    expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });

@@ -100,7 +100,7 @@ describe("given a reader who widened a persisted panel", () => {
     await loadPageAs("user-jane");
     panel().setState({ width: 480 });
 
-    await signOutUi(signedInAs("user-jane"));
+    await signOutUi();
     await loadPageAs("user-jane");
 
     expect(panel().getState().width).toBe(200);
@@ -115,7 +115,7 @@ describe("given a tab that kept drafts, a verifier and attribution in session st
     window.sessionStorage.setItem("lw.identity.address-verifier.identifier_1", "verifier");
     window.sessionStorage.setItem("lw_attrib.leadSource", "docs");
 
-    await signOutUi(signedInAs("user-jane"));
+    await signOutUi();
 
     expect(window.sessionStorage.length).toBe(0);
   });
