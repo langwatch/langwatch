@@ -80,7 +80,7 @@ export function betterAuthTransportFor(
     /** No organization claims any domain, and nobody belongs to one. */
     organizations: {
       findBySsoDomain: async () => null,
-      createSsoDomainMembership: async () => "created",
+      createMembership: async () => ({ outcome: "created", seat: "MEMBER", pending: false }),
       countMembershipsForUser: async () => 0,
     },
     announcements: {

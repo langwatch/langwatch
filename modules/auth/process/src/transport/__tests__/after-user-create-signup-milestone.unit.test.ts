@@ -195,9 +195,9 @@ function domainOrganizations(organization: SsoDomainOrganization | null): SsoDom
     findBySsoDomain: vi
       .fn<SsoDomainOrganizations["findBySsoDomain"]>()
       .mockResolvedValue(organization),
-    createSsoDomainMembership: vi
-      .fn<SsoDomainOrganizations["createSsoDomainMembership"]>()
-      .mockResolvedValue("created"),
+    createMembership: vi
+      .fn<SsoDomainOrganizations["createMembership"]>()
+      .mockResolvedValue({ outcome: "created", seat: "MEMBER", pending: false }),
   });
 }
 
@@ -289,12 +289,12 @@ describe("afterUserCreate", () => {
     /** @scenario PostHog signed_up still fires when the signup is unverified */
     it("records the sign-up fact even when the verified-email gate skips org admission", async () => {
       const { announcements, facts } = composedAnnouncements();
-      const createSsoDomainMembership = vi
-        .fn<SsoDomainOrganizations["createSsoDomainMembership"]>()
-        .mockResolvedValue("created");
+      const createMembership = vi
+        .fn<SsoDomainOrganizations["createMembership"]>()
+        .mockResolvedValue({ outcome: "created", seat: "MEMBER", pending: false });
       const organizations = organizationsOver({
         findBySsoDomain: async () => ({ id: "org_1", name: "Acme", ssoProvider: null }),
-        createSsoDomainMembership,
+        createMembership,
       });
 
       await afterUserCreate({
@@ -303,7 +303,7 @@ describe("afterUserCreate", () => {
       });
 
       expectSignUpOf(await onlySignUpFact(facts), "user_4");
-      expect(createSsoDomainMembership).not.toHaveBeenCalled();
+      expect(createMembership).not.toHaveBeenCalled();
     });
   });
 });

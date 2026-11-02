@@ -69,7 +69,6 @@ describe("OrganizationMembershipService", () => {
     getMembership: vi.fn(),
     listAllMembers: vi.fn(),
     findMemberTeamBindings: vi.fn(),
-    createSsoDomainMembership: vi.fn(),
     countMembershipsForUser: vi.fn(),
     deleteMember: vi.fn(),
     setMemberDisabled: vi.fn(),

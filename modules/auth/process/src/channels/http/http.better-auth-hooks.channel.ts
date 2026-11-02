@@ -64,7 +64,7 @@ export type BetterAuthHookCollaborators = Readonly<{
 /** Organization reads and writes the hooks make through organization's own Api. */
 export type SsoDomainOrganizations = Pick<
   OrganizationApi,
-  "findBySsoDomain" | "createSsoDomainMembership" | "countMembershipsForUser"
+  "findBySsoDomain" | "createMembership" | "countMembershipsForUser"
 >;
 
 /** The one identity ledger write the account hook makes: a link proposal. */
@@ -142,10 +142,12 @@ const grantDefaultOrgMembership = ({
   writer,
   organizationId,
   userId,
+  role,
 }: {
   writer: AuthzGrantsService;
   organizationId: string;
   userId: string;
+  role: typeof TeamUserRole.MEMBER | typeof TeamUserRole.VIEWER;
 }) =>
   writer.attachBindings({
     organizationId,
@@ -153,7 +155,7 @@ const grantDefaultOrgMembership = ({
       {
         bindingId: newAuthzGrantId(),
         principal: { userId },
-        role: TeamUserRole.MEMBER,
+        role,
         customRoleId: null,
         scopeType: GrantScopeTier.ORGANIZATION,
         scopeId: organizationId,
@@ -185,7 +187,7 @@ const announceSsoAutoJoin = ({
     { userId: user.id, organizationId: org.id, inviteId },
     inviteId
       ? "Applied pending invite on SSO signup"
-      : "Auto-added new user to SSO organization (default MEMBER)",
+      : "Auto-added new user to SSO organization",
   );
 
   announcements.announceSignup({
@@ -205,8 +207,10 @@ const announceSsoAutoJoin = ({
 
 /**
  * Membership + grant for one domain-matched organization. A pending invite wins when one
- * exists (its role and team assignments carry their own grants); otherwise the default
- * MEMBER membership plus the organization- scoped grant beside it.
+ * exists (its role and team assignments carry their own grants); otherwise the organization
+ * admits them on the seat its licence leaves free, as a connection arrival or a SCIM create is
+ * (specs/licensing/seat-limit-at-provisioning.feature): a full member while a full seat is free,
+ * else a Lite Member, else held pending with no grant.
  */
 const joinSsoOrganization = async ({
   collaborators,
@@ -229,35 +233,40 @@ const joinSsoOrganization = async ({
     return;
   }
 
-  // The membership row is not a grant fact and keeps its imperative
-  // write; the organization-scoped grant that comes with it is a ledger
-  // command, emitted once the membership exists (ADR-092).
-  const outcome = await collaborators.organizations.createSsoDomainMembership({
+  // The organization decides the seat and writes the grant that matches it, audited to the
+  // domain rule: the signup is the product acting, not an administrator granting access.
+  const admission = await collaborators.organizations.createMembership({
     userId: user.id,
     organizationId: org.id,
+    admittedBy: {
+      actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
+      commandId: `sso-auto-join:${org.id}:${user.id}`,
+    },
   });
-  if (outcome === "already-present") {
+  if (admission.outcome === "already-present") {
     logger.info(
       { userId: user.id, organizationId: org.id },
       "Auto-add SSO membership was already present (P2002) — treating as success",
     );
-    // The membership row existing says nothing about the grant beside it:
-    // the concurrent callback that created it may have died in between,
-    // and the two writes no longer share a transaction. Re-assert, which
-    // is a no-op when the other attempt finished.
+    // The membership row existing says nothing about the grant beside it: the concurrent
+    // callback that created it may have died in between. Re-assert the grant its seat is
+    // worth, which is a no-op when the other attempt finished.
+    if (admission.pending || admission.seat === "DEVELOPER") return;
     await grantDefaultOrgMembership({
       writer,
       organizationId: org.id,
       userId: user.id,
+      role: admission.seat === "EXTERNAL" ? TeamUserRole.VIEWER : TeamUserRole.MEMBER,
     });
     return;
   }
 
-  await grantDefaultOrgMembership({
-    writer,
-    organizationId: org.id,
-    userId: user.id,
-  });
+  if (admission.seat !== "MEMBER" || admission.pending) {
+    logger.info(
+      { userId: user.id, organizationId: org.id, seat: admission.seat, pending: admission.pending },
+      "Auto-added new user to SSO organization without a full seat: the licence has none free",
+    );
+  }
   announceSsoAutoJoin({ announcements, user, org, inviteId: null });
 };
 

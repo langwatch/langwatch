@@ -1628,7 +1628,7 @@ type BuildBetterAuthOptions = Readonly<{
     OrganizationApi,
     | "applyPendingInvite"
     | "findBySsoDomain"
-    | "createSsoDomainMembership"
+    | "createMembership"
     | "countMembershipsForUser"
   >;
   /** Who the installation lets create an account: the app's composed sign-up verdict. */
