@@ -90,8 +90,8 @@ func secretForms(value string) []string {
 	if err := enc.Encode(value); err != nil {
 		return forms
 	}
-	marshalled := bytes.TrimSpace(buf.Bytes())
-	escaped := string(marshalled[1 : len(marshalled)-1])
+	marshaled := bytes.TrimSpace(buf.Bytes())
+	escaped := string(marshaled[1 : len(marshaled)-1])
 	forms = append(forms, escaped)
 	var ascii strings.Builder
 	for _, r := range escaped {
