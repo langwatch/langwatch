@@ -44577,9 +44577,9 @@ Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The s
 {/* lwql-rates-start */}
 | Plan | Queries per minute, per project |
 | --- | --- |
-| Free | 30 |
-| Paid | 60 |
-| Enterprise | 120 |
+| Free and Launch | 30 |
+| Other paid plans | 60 |
+| Enterprise, and self-hosted open source | 120 |
 {/* lwql-rates-end */}
 
 The window is a fixed 60 seconds. Over the limit the answer is 429 `lwql_rate_limited`, and `meta.retryAfterSeconds` in the error tells you how long to wait.

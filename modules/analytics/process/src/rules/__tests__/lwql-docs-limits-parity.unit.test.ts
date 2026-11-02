@@ -66,11 +66,16 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
     it("carries the lwqlPerMinute bound of each plan", () => {
       const table = section("limits-and-cost.mdx", "lwql-rates");
 
-      expect(table).toContain(`| Free | ${resolveRequestBound("lwqlPerMinute", "FREE")} |`);
-      expect(table).toContain(`| Paid | ${resolveRequestBound("lwqlPerMinute", "PRO")} |`);
+      const free = resolveRequestBound("lwqlPerMinute", "FREE");
+      const enterprise = resolveRequestBound("lwqlPerMinute", "ENTERPRISE");
+
+      expect(resolveRequestBound("lwqlPerMinute", "LAUNCH")).toBe(free);
+      expect(resolveRequestBound("lwqlPerMinute", "OPEN_SOURCE")).toBe(enterprise);
+      expect(table).toContain(`| Free and Launch | ${free} |`);
       expect(table).toContain(
-        `| Enterprise | ${resolveRequestBound("lwqlPerMinute", "ENTERPRISE")} |`,
+        `| Other paid plans | ${resolveRequestBound("lwqlPerMinute", "PRO")} |`,
       );
+      expect(table).toContain(`| Enterprise, and self-hosted open source | ${enterprise} |`);
     });
   });
 
