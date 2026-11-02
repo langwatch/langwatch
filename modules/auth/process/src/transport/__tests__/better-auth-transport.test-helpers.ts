@@ -107,7 +107,7 @@ export function betterAuthTransportFor(
       resolveUser: async () => ({ action: "continue" }),
     }),
     /** Nothing registered: a test that needs an origin trusted says so. */
-    ssoIssuers: { issuersForRequest: async () => [] },
+    ssoIssuers: { issuersForRequest: async () => [], isConnection: async () => false },
     /** No routing directory, so no organization connection governs a
      *  credential sign-in; a test that needs one supplies its own guard. */
     /** No organization has set a threshold, so nothing is ever locked out. */

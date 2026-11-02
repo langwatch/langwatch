@@ -57,7 +57,10 @@ function transportOver({
         const engine = memoryAdapter(database)(options);
         return opening ? openingSsoProviderConfigs({ adapter: engine, cipher }) : engine;
       },
-      ssoIssuers: { issuersForRequest: async () => registeredIssuers },
+      ssoIssuers: {
+        issuersForRequest: async () => registeredIssuers,
+        isConnection: async () => registeredIssuers.length > 0,
+      },
     },
   );
 }

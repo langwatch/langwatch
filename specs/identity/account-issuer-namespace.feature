@@ -61,3 +61,13 @@ Feature: An account row keeps the issuer namespace of whoever asserted its subje
       issuer, with or without a trailing slash
     When the connection's issuer asserts that subject
     Then the sign-in is not refused for its issuer
+
+  @unit
+  Scenario: A connection account row with no recorded issuer is refused when written
+    Given a connection's account row is about to be written for a subject
+    And no single sign-on assertion recorded an issuer for that subject
+    And the row states no issuer of its own
+    When the row is written
+    Then it is refused as not linked
+    And no row stamped with a `local:` namespace is left to refuse the subject's later sign-ins
+    And a row for a provider that is not a connection is written as before

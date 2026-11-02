@@ -33,6 +33,7 @@ import type {
   BetterAuthHooksRepository,
 } from "../../repositories/better-auth-hooks.repository.ts";
 import { assertedAddressOf, linkVerdictFor } from "../../rules/link-evidence.rules.ts";
+import { hasRecordedIssuer } from "../../rules/provider-account-issuer.rules.ts";
 import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-auth.channel.ts";
 import type {
   AcceptedCallbackAccount,
@@ -1036,4 +1037,29 @@ function skipOn(code: string): (error: unknown) => undefined {
     if (HandledError.isHandled(error) && error.code === code) return undefined;
     throw error;
   };
+}
+
+/**
+ * A connection account row with no issuer stated or asserted would be stamped `local:oauth:`
+ * and refused at every later sign-in, so it is refused when written instead (ADR-189).
+ */
+export async function refuseConnectionAccountWithoutIssuer({
+  account,
+  assertedIssuers,
+  isConnection,
+}: {
+  account: { providerId: string };
+  assertedIssuers: readonly string[];
+  isConnection: (args: { providerId: string }) => Promise<boolean>;
+}): Promise<void> {
+  if (hasRecordedIssuer({ account, assertedIssuers })) return;
+  if (!(await isConnection({ providerId: account.providerId }))) return;
+  logger.warn(
+    { providerId: account.providerId },
+    "Refused a connection account row with no recorded issuer",
+  );
+  throw APIError.from("FORBIDDEN", {
+    code: "OAuthAccountNotLinked",
+    message: "OAuthAccountNotLinked",
+  });
 }

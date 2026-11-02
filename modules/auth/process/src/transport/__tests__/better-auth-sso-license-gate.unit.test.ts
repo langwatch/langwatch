@@ -100,7 +100,7 @@ function buildOptions(
     shadow: new StubShadow(),
     hooks: {} as never,
     sessionClaims: {} as never,
-    ssoIssuers: { issuersForRequest: async () => [] },
+    ssoIssuers: { issuersForRequest: async () => [], isConnection: async () => false },
     /** No organization has set a threshold, so nothing is ever locked out. */
     signInLockout: signInSecurityFixture({ now: nowInstant }).lockout,
     findGoverningConnections,

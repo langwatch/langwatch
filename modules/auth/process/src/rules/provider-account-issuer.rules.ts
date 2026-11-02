@@ -55,6 +55,21 @@ export function accountIssuerOf({
   return providerAccountIssuer({ connectionIssuer: tenantIssuer, provider: providerId });
 }
 
+/**
+ * Whether the row states an issuer or a single sign-on assertion recorded one for it. A
+ * connection row without either would be stamped `local:oauth:` and refused at every later
+ * sign-in, so it is refused when written instead (ADR-189).
+ */
+export function hasRecordedIssuer({
+  account,
+  assertedIssuers,
+}: {
+  account: unknown;
+  assertedIssuers: readonly string[];
+}): boolean {
+  return assertedIssuers.length > 0 || statedIssuerSchema.validate(account);
+}
+
 /** The `iss` a Microsoft ID token states: one entry, or none for an unreadable token. */
 function tenantIssuersOf({ idToken }: { idToken: unknown }): string[] {
   if (typeof idToken !== "string") return [];

@@ -66,6 +66,7 @@ import {
   type BetterAuthHookCollaborators,
   type FindGoverningConnections,
   PASSWORD_RESET_REQUIRED_CODE,
+  refuseConnectionAccountWithoutIssuer,
   type SessionMintClaims,
   type SignUpPolicy,
   toConcretePath,
@@ -730,12 +731,18 @@ export const createAuthOptions = ({
           })(account, context);
           recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
           // ADR-189: Better Auth keys the row by (providerId, accountId) and writes no issuer.
+          const assertedIssuers = sessionClaims.evidence.findAssertedIssuers({
+            providerId: account.providerId,
+            providerAccountId: account.accountId,
+          });
+          await refuseConnectionAccountWithoutIssuer({
+            account,
+            assertedIssuers,
+            isConnection: (args) => ssoIssuers.isConnection(args),
+          });
           const issuer = accountIssuerOf({
             account,
-            assertedIssuers: sessionClaims.evidence.findAssertedIssuers({
-              providerId: account.providerId,
-              providerAccountId: account.accountId,
-            }),
+            assertedIssuers,
             providerId: account.providerId,
             idToken: account.idToken,
           });
@@ -1029,6 +1036,8 @@ export async function resolveSsoUser({
  */
 interface BetterAuthSsoIssuers {
   issuersForRequest(request: Request | undefined): Promise<string[]>;
+  /** Whether a customer registered this provider id as a connection. */
+  isConnection(args: { providerId: string }): Promise<boolean>;
   /** The public origins those issuers' discovery documents serve endpoints
    *  from. Absent, only the issuers' own origins are trusted. */
   endpointOriginsFor?(issuers: readonly string[]): Promise<string[]>;
