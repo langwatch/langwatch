@@ -217,7 +217,7 @@ func TestARedMainPostsOncePerRedLeg(t *testing.T) {
 			legs: map[string]string{job: "failure", "package-suites (browser)": "cancelled", "lint": "failure"},
 			want: []string{job, "package-suites (browser)"},
 		},
-		"a green leg posts nothing": {
+		"only the red one of two legs posts": {
 			legs: map[string]string{job: "success", "package-suites (browser)": "failure"},
 			want: []string{"package-suites (browser)"},
 		},
@@ -257,4 +257,21 @@ func TestOneRejectedPostStillPostsTheOtherLegs(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "package-suites (browser)")
 	assert.ElementsMatch(t, []string{job, "package-suites (2/8)"}, f.posted())
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestAFailedLegLookupStillPostsAndSaysWhy(t *testing.T) {
+	for name, attempt := range map[string]int64{"a jobs lookup that fails": 2, "no run attempt": 0} {
+		t.Run(name, func(t *testing.T) {
+			f := &fake{}
+			noAttempt := legs
+			noAttempt.Attempt = attempt
+			results, err := f.start(t).NotifyRedLegs(context.Background(), failing, noAttempt)
+
+			require.NoError(t, err)
+			assert.Equal(t, []string{job}, f.posted())
+			require.Len(t, results, 1)
+			assert.Contains(t, results[0].Reason, "jobs lookup failed")
+		})
+	}
 }

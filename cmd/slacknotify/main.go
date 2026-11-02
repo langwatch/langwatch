@@ -48,10 +48,8 @@ func main() {
 	}
 	legs := slacknotify.Legs{Prefix: *prefix, Fallback: *fallback}
 	if legs.Prefix != "" {
-		if legs.Attempt, err = strconv.ParseInt(os.Getenv("GITHUB_RUN_ATTEMPT"), 10, 64); err != nil {
-			fmt.Fprintln(os.Stderr, "slacknotify: GITHUB_RUN_ATTEMPT is not a run attempt")
-			os.Exit(2)
-		}
+		// A bad attempt leaves 0: the lookup fails and the fallback leg still posts.
+		legs.Attempt, _ = strconv.ParseInt(os.Getenv("GITHUB_RUN_ATTEMPT"), 10, 64)
 	}
 	n := slacknotify.Notifier{
 		API:     "https://api.github.com",
@@ -65,8 +63,9 @@ func main() {
 		Repository: os.Getenv("GITHUB_REPOSITORY"), Workflow: *workflow, RunID: runID, Job: *job,
 		SHA: os.Getenv("GITHUB_SHA"), Subject: subject, Author: slacknotify.Checkout{Dir: "."}.Or(ctx, os.Getenv("COMMIT_AUTHOR"), "%an"),
 	}
-	results, err := notify(ctx, n, run, legs)
 	cancel()
+	// NotifyRedLegs times each leg itself; one -job keeps the one minute.
+	results, err := notify(n, run, legs)
 	for _, result := range results {
 		fmt.Printf("slacknotify: %s posted=%t (%s)\n", result.Job, result.Posted, result.Reason)
 	}
@@ -77,10 +76,12 @@ func main() {
 }
 
 // notify posts for run.Job, or with legs.Prefix set for each red leg.
-func notify(ctx context.Context, n slacknotify.Notifier, run slacknotify.Run, legs slacknotify.Legs) ([]slacknotify.Result, error) {
+func notify(n slacknotify.Notifier, run slacknotify.Run, legs slacknotify.Legs) ([]slacknotify.Result, error) {
 	if legs.Prefix != "" {
-		return n.NotifyRedLegs(ctx, run, legs)
+		return n.NotifyRedLegs(context.Background(), run, legs)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
 	result, err := n.Notify(ctx, run)
 	if err != nil {
 		return nil, err

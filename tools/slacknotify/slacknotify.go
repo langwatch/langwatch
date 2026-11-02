@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Run is the failing run and job.
@@ -71,8 +72,8 @@ type Legs struct {
 // or one that finds no red leg, reports Fallback: a red main never posts nothing.
 // One post failing does not stop the others; the error names every failed one.
 func (n Notifier) NotifyRedLegs(ctx context.Context, run Run, legs Legs) ([]Result, error) {
-	names, err := n.redLegs(ctx, run, legs)
-	if err != nil || len(names) == 0 {
+	names, lookup := n.redLegs(ctx, run, legs)
+	if lookup != nil || len(names) == 0 {
 		names = []string{legs.Fallback}
 	}
 	var results []Result
@@ -80,10 +81,16 @@ func (n Notifier) NotifyRedLegs(ctx context.Context, run Run, legs Legs) ([]Resu
 	for _, name := range names {
 		leg := run
 		leg.Job = name
-		result, err := n.Notify(ctx, leg)
+		// Each leg gets its own minute, so a slow first leg cannot starve the next.
+		legCtx, cancel := context.WithTimeout(ctx, time.Minute)
+		result, err := n.Notify(legCtx, leg)
+		cancel()
 		if err != nil {
 			failed = append(failed, fmt.Errorf("%s: %w", name, err))
 			continue
+		}
+		if lookup != nil {
+			result.Reason += fmt.Sprintf("; jobs lookup failed: %v", lookup)
 		}
 		results = append(results, result)
 	}
@@ -93,6 +100,9 @@ func (n Notifier) NotifyRedLegs(ctx context.Context, run Run, legs Legs) ([]Resu
 
 // redLegs are the jobs of this run attempt named with legs.Prefix that failed or were cancelled.
 func (n Notifier) redLegs(ctx context.Context, run Run, legs Legs) ([]string, error) {
+	if legs.Attempt < 1 {
+		return nil, errors.New("no run attempt")
+	}
 	var jobs jobsPage
 	if err := n.get(ctx, fmt.Sprintf("/repos/%s/actions/runs/%d/attempts/%d/jobs?per_page=100", run.Repository, run.RunID, legs.Attempt), &jobs); err != nil {
 		return nil, err
