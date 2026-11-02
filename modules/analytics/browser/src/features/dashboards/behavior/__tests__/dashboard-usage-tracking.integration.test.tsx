@@ -438,6 +438,20 @@ describe("given a member changing a board's period", () => {
       { range: "live", grain: "auto" },
     ]);
   });
+
+  /** @scenario "Telemetry: picking a board period sends dashboards.changed.period" */
+  it("sends the grain going back to auto when the range in use is picked again", () => {
+    // An address kept from an old link: Live with a fixed grain, which Live cannot carry.
+    const { latest } = mount(useBoardRange, {
+      route: { params: {}, query: { range: "live", grain: "1h" } },
+    });
+
+    act(() => latest().setRange("live"));
+
+    expect(tracked.events.map(({ attributes }) => attributes)).toEqual([
+      { range: "live", grain: "auto" },
+    ]);
+  });
 });
 
 describe("given a member editing a board itself", () => {

@@ -6,6 +6,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC200
  */
 
+import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { act, cleanup, screen, within } from "@testing-library/react";
@@ -39,6 +40,7 @@ import {
 } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import { curatedBoardById } from "../model/curated-boards.ts";
+import { catalogueSource } from "../model/widget-source.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -71,7 +73,7 @@ const GRAPH: {
   version: 1;
   code: string;
   queries: StoredQuery[];
-  source?: { kind: "catalogue"; catalogueId: string };
+  source?: DashboardWidgetSource;
 } = {
   version: 1,
   code: "export default function Widget() { return null; }",
@@ -372,7 +374,7 @@ describe("given a widget placed on a board", () => {
     it("also sends the catalogue widget it came from as the template", async () => {
       const fromCatalogue = {
         ...WIDGET,
-        graph: { ...GRAPH, source: { kind: "catalogue" as const, catalogueId: "traffic" } },
+        graph: { ...GRAPH, source: catalogueSource("traffic") },
       };
       const server = openBoard({ widgets: [fromCatalogue] });
       await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });

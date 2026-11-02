@@ -379,14 +379,17 @@ type AnalyticsSetup = FeatureSetup<
  * CREDENTIALS_SECRET, NEXTAUTH_SECRET, as api-key peppers keys. None refuses the boot rather
  * than logging a hash anyone can recompute.
  */
-async function queryHashSecret(secrets: ScopedSecrets): Promise<string> {
-  const secret = await intoKeyPepper(secrets, (pepper) => pepper);
-  if (secret === void 0) {
+async function queryHashKey(secrets: ScopedSecrets): Promise<Buffer> {
+  // The key is built inside the closure; the secret itself never leaves it.
+  const key = await intoKeyPepper(secrets, (pepper) =>
+    pepper === void 0 ? void 0 : langWatchQLQueryHashKey(pepper),
+  );
+  if (key === void 0) {
     throw new ConfigParseError([
       "analytics.queryHashKey ← API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET: none is set",
     ]);
   }
-  return secret;
+  return key;
 }
 
 /**
@@ -527,7 +530,7 @@ export class AnalyticsModule
       runner: { executeLangWatchQLPass: (input) => app.executeLangWatchQLPass(input) },
     });
     const runTelemetry = LangWatchQLRunTelemetryService.create({
-      queryHashKey: langWatchQLQueryHashKey(await queryHashSecret(setup.secrets)),
+      queryHashKey: await queryHashKey(setup.secrets),
     });
     const langWatchQL = LangWatchQLServiceClass.create({
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,

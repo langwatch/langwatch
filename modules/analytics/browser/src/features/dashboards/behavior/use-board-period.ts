@@ -39,7 +39,7 @@ export function useBoardRange() {
         grain !== "auto" && (next === "live" || !boardGrainFits({ range: next, grain }));
       host.setQuery(resets ? { ...query, range: next, grain: "auto" } : { ...query, range: next });
       // The address is written either way; only a new period is an event.
-      if (next !== range) {
+      if (next !== range || resets) {
         analytics.track(periodChanged({ range: next, grain: resets ? "auto" : grain }));
       }
     },

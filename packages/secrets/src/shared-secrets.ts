@@ -2,15 +2,7 @@
  * Secrets more than one owner holds: one handle each, claimed by instance, so a
  * double claim passes only for this very handle (ARCHITECTURE.md §6, layer 3).
  */
-import { Secret, type SecretHandle } from "./secret.ts";
-
-/** What intoKeyPepper needs of an owner's ScopedSecrets, so this file stays clear of the resolver. */
-interface SecretsInto {
-  into<Value, Out>(
-    handle: SecretHandle<Value>,
-    build: (value: Value) => Out | Promise<Out>,
-  ): Promise<Out>;
-}
+import { Secret, type Into } from "./secret.ts";
 
 /** The browser-session key: auth builds sessions from it, automation signs unsubscribe links. */
 export const sessionSecret = Secret.load("NEXTAUTH_SECRET", { optional: true });
@@ -30,13 +22,17 @@ export const apiKeyPepper = Secret.load("API_KEY_PEPPER", { optional: true });
  * derives its query-hash key from it; each owner says itself what none means for it.
  */
 export function intoKeyPepper<Out>(
-  secrets: SecretsInto,
-  build: (pepper: string | undefined) => Out | Promise<Out>,
+  // Only `into`, so this file stays clear of the resolver: ADR-130's type-seam ceiling counts it.
+  secrets: { into: Into },
+  build: (pepper: string | undefined, fromApiKeyPepper: boolean) => Out | Promise<Out>,
 ): Promise<Out> {
   return secrets.into(apiKeyPepper, (primary) =>
     secrets.into(credentialsSecret, (credentials) =>
       secrets.into(sessionSecret, (session) =>
-        build([primary, credentials, session].find((value) => value !== void 0 && value !== "")),
+        build(
+          [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
+          primary !== void 0 && primary !== "",
+        ),
       ),
     ),
   );

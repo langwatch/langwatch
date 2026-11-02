@@ -151,14 +151,11 @@ function scopeNames(
 async function apiKeyPeppers(
   secrets: ScopedSecrets,
 ): Promise<{ pepper: string; previousPepper: string | undefined }> {
-  const { pepper, pepperPrevious } = ApiKeyModule.secrets;
-  const answered = await intoKeyPepper(secrets, (chosen) =>
-    secrets.into(pepper, (primary) =>
-      secrets.into(pepperPrevious, (previous) => ({
-        pepper: chosen,
-        previousPepper: primary ? void 0 : previous || void 0,
-      })),
-    ),
+  const answered = await intoKeyPepper(secrets, (chosen, fromApiKeyPepper) =>
+    secrets.into(ApiKeyModule.secrets.pepperPrevious, (previous) => ({
+      pepper: chosen,
+      previousPepper: fromApiKeyPepper ? void 0 : previous || void 0,
+    })),
   );
   if (answered.pepper === void 0) {
     throw new ConfigParseError([

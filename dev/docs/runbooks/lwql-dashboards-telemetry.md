@@ -36,12 +36,12 @@ change. Each event also carries `projectId`.
 | Event                                                | Sent when                                                                        | Why                                            |
 | ---------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `dashboards.viewed.dashboard`                        | a board opens (`dashboardKind`, `widgetCount`, `dashboardKey`)                   | are boards opened, and which kinds             |
-| `dashboards.created.dashboard` / `deleted.dashboard` | the server accepts it                                                            | do people make their own boards, and keep them |
+| `dashboards.created.dashboard` / `deleted.dashboard` | the server accepts it (on create: `createdFrom`, `templateId` when from one)     | do people make their own boards, and keep them |
 | `dashboards.added.widget`                            | the server accepts it (`addedFrom`, `widgetCount`)                               | do people build widgets, and from what         |
 | `dashboards.edited.widget` / `deleted.widget`        | the server accepts it                                                            | do people keep their widgets up to date        |
-| `dashboards.viewed.widget`                           | half a card first shows on screen, once per card per board view                  | which widgets are looked at, not only loaded   |
-| `dashboards.changed.period`                          | a new period is picked (`range`, `grain`)                                        | which periods people need                      |
-| `dashboards.exported.widget`                         | a CSV download finishes                                                          | do people take data out                        |
+| `dashboards.viewed.widget`                           | half a card first shows on screen, once per card per board view (`widgetSource`) | which widgets are looked at, not only loaded   |
+| `dashboards.changed.period`                          | the period changes (`range`, `grain`)                                            | which periods people need                      |
+| `dashboards.exported.widget`                         | a CSV download finishes (`format`)                                               | do people take data out                        |
 | `dashboards.edited.dashboard`                        | a rename is saved or a drop changes the layout (`change`)                        | do people shape their boards                   |
 | `dashboards.favourited.dashboard`                    | a pin is added or removed (`starred`)                                            | which boards people come back to               |
 | `dashboards.toggled.langy_traces`                    | a saved widget starts or stops counting Langy's traces (`included`)              | do people want Langy's own traces counted      |
