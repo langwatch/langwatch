@@ -157,7 +157,7 @@ func (c *client) call(ctx context.Context, r route, out any) error {
 	if resp.StatusCode != r.want {
 		refused := &RefusedError{Call: name, Status: resp.StatusCode, Withheld: r.hasSensitiveRequestBody}
 		if !r.hasSensitiveRequestBody {
-			refused.Body = snippet(raw, append([]string{c.token}, stringValues(r.body)...))
+			refused.Body = snippet(raw, c.token, stringValues(r.body))
 		}
 		return refused
 	}
@@ -190,24 +190,33 @@ func stringValues(v any) []string {
 	return nil
 }
 
-// minSecretLen is the shortest submitted string treated as a secret: no key is
+// minSecretLen is the shortest body string treated as a secret: no key is
 // shorter, and redacting "other" would garble the control plane's message.
+// The bearer token is always removed, whatever its length.
 const minSecretLen = 8
 
-// snippet keeps a refusal readable in the log. It first removes every secret
-// the request submitted, raw and JSON-escaped, then truncates.
-func snippet(raw []byte, secrets []string) string {
-	s := strings.TrimSpace(string(raw))
-	for _, secret := range secrets {
-		if len(secret) < minSecretLen {
-			continue
-		}
-		for _, form := range secretForms(secret) {
-			s = strings.ReplaceAll(s, form, "[redacted]")
+// snippet keeps a refusal readable in the log. It first removes the bearer
+// token and every secret the body submitted, raw and JSON-escaped, then truncates.
+func snippet(raw []byte, token string, submitted []string) string {
+	s := redact(strings.TrimSpace(string(raw)), token)
+	for _, secret := range submitted {
+		if len(secret) >= minSecretLen {
+			s = redact(s, secret)
 		}
 	}
 	if len(s) > 300 {
 		return s[:300] + "..."
+	}
+	return s
+}
+
+// redact removes every form of secret from s; an empty secret removes nothing.
+func redact(s, secret string) string {
+	if secret == "" {
+		return s
+	}
+	for _, form := range secretForms(secret) {
+		s = strings.ReplaceAll(s, form, "[redacted]")
 	}
 	return s
 }

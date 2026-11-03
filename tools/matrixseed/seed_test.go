@@ -57,9 +57,13 @@ func TestRunProvisionsOneOrganizationAndProject(t *testing.T) {
 /** @scenario "A seed create carries no Idempotency-Key" */
 func TestSeedCreatesCarryNoIdempotencyKey(t *testing.T) {
 	stub, server := newStub(t, nil)
-	run(t, server.URL, nil)
-	for _, path := range []string{"/api/v1/organizations", "/api/v1/projects"} {
-		for _, c := range stub.calls(http.MethodPost, path) {
+	run(t, server.URL, allCredentials)
+	for _, path := range []string{"/api/v1/organizations", "/api/v1/projects", "/api/gateway/v1/virtual-keys"} {
+		calls := stub.calls(http.MethodPost, path)
+		if len(calls) == 0 {
+			t.Fatalf("the seed made no POST %s, so this test would prove nothing", path)
+		}
+		for _, c := range calls {
 			if c.IdempotencyKey != "" {
 				t.Fatalf("POST %s carried an Idempotency-Key: the seed never retries, so it dedupes nothing", path)
 			}

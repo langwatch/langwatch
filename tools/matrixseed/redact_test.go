@@ -63,7 +63,7 @@ func TestRefusedOtherCallRedactsSubmittedSecrets(t *testing.T) {
 
 /** @scenario "A refused request never prints a submitted secret" */
 func TestSnippetRemovesJSONEscapedForms(t *testing.T) {
-	got := snippet([]byte(`{"k":"-----BEGIN\nMIIE\"x\""}`), []string{"-----BEGIN\nMIIE\"x\""})
+	got := snippet([]byte(`{"k":"-----BEGIN\nMIIE\"x\""}`), "", []string{"-----BEGIN\nMIIE\"x\""})
 	if strings.Contains(got, "MIIE") {
 		t.Fatalf("snippet kept the escaped secret: %s", got)
 	}
@@ -73,8 +73,8 @@ func TestSnippetRemovesJSONEscapedForms(t *testing.T) {
 // control plane's "another field" into "an[redacted] field".
 /** @scenario "A refused request never prints a submitted secret" */
 func TestSnippetKeepsShortNonSecretWords(t *testing.T) {
-	got := snippet([]byte(`another field is wrong; key sk-longsecret`), []string{"other", "sk-longsecret"})
-	if !strings.Contains(got, "another field") || strings.Contains(got, "sk-longsecret") {
+	got := snippet([]byte(`another field is wrong; key sk-longsecret; bearer adm`), "adm", []string{"other", "sk-longsecret"})
+	if !strings.Contains(got, "another field") || strings.Contains(got, "sk-longsecret") || strings.Contains(got, "adm") {
 		t.Fatalf("snippet = %q", got)
 	}
 }
