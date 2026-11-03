@@ -1246,9 +1246,9 @@ func usageFromRawJSON(body []byte, reqType domain.RequestType) domain.Usage {
 	}
 	u := domain.Usage{
 		WebSearchRequests: webSearchRequestsFromRawJSON(body),
-		PromptTokens:     firstInt(usage, "input_tokens", "prompt_tokens"),
-		CompletionTokens: firstInt(usage, "output_tokens", "completion_tokens"),
-		TotalTokens:      int(usage.Get("total_tokens").Int()),
+		PromptTokens:      firstInt(usage, "input_tokens", "prompt_tokens"),
+		CompletionTokens:  firstInt(usage, "output_tokens", "completion_tokens"),
+		TotalTokens:       int(usage.Get("total_tokens").Int()),
 		CacheReadTokens: firstInt(usage,
 			"input_tokens_details.cached_tokens", "prompt_tokens_details.cached_tokens"),
 		ReasoningTokens: firstInt(usage,
