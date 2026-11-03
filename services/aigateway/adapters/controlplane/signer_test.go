@@ -62,3 +62,36 @@ func TestSign_DeterministicMAC(t *testing.T) {
 	assert.NotEmpty(t, sig1)
 	assert.NotEmpty(t, sig2)
 }
+
+// Signature is what the hop signs with and Signer is what the control plane
+// client signs with. Both feed one verifier, so they must agree byte for byte.
+// The Signer stamps time.Now, so the test reads its timestamp header back and
+// rebuilds the signature from that.
+//
+// @scenario "A signature built from parts equals the one the signer stamps"
+func TestSignature_EqualsWhatSignerStamps(t *testing.T) {
+	const secret = "parity-secret"
+	s, err := NewSigner(secret, "node-1")
+	require.NoError(t, err)
+	for name, body := range map[string][]byte{
+		"an empty body":     nil,
+		"a non-empty body":  []byte(`{"model":"gpt-4"}`),
+		"a binary body":     {0x00, 0xff, '\n', 0x10},
+		"an empty, non-nil": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, "http://localhost/api/internal/path", nil)
+			require.NoError(t, err)
+
+			s.Sign(req, body)
+
+			want := Signature(secret, Canonical{
+				Method:    http.MethodPost,
+				Path:      "/api/internal/path",
+				Timestamp: req.Header.Get("X-LangWatch-Gateway-Timestamp"),
+				Body:      body,
+			})
+			assert.Equal(t, want, req.Header.Get("X-LangWatch-Gateway-Signature"))
+		})
+	}
+}

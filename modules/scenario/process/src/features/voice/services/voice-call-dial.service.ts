@@ -26,13 +26,15 @@ export class VoiceCallDialService {
     private readonly callControl: TwilioCallControlChannel,
   ) {}
 
+  /** Dials the run's call; `streamUrl` sends its media to a gateway relay instead of the door. */
   async dial(input: {
     projectId: string;
     scenarioRunId: string;
     nonce: string;
     to: string;
+    streamUrl?: string;
   }): Promise<VoiceCallDialResult> {
-    const { projectId, scenarioRunId, nonce, to } = input;
+    const { projectId, scenarioRunId, nonce, to, streamUrl } = input;
 
     // `put` overwrites a still-pending call, so it only refuses a retry once the call is claimed.
     const existing = await this.pending.peek({ scenarioRunId, nonce });
@@ -49,7 +51,12 @@ export class VoiceCallDialService {
       };
     }
 
-    const { callSid } = await this.callControl.placeCall({ projectId, to, nonce });
+    const { callSid } = await this.callControl.placeCall({
+      projectId,
+      to,
+      nonce,
+      ...(streamUrl === undefined ? {} : { streamUrl }),
+    });
     const attached = await this.pending.attachCallSid({ scenarioRunId, callSid });
     if (!attached.attached) {
       // The cancel or the lapse came while dialling and could not see this SID: hang up here.

@@ -98,6 +98,10 @@ secrets:
   # Opt-in previous-key accept for the rotation window. Leave empty to
   # disable (strict single-key mode; production steady state).
   jwtSecretPreviousKey: ""
+  # Optional key in the same Secret holding LW_GATEWAY_VOICE_RELAY_ID_KEY
+  # (32 bytes or more). It keys Twilio relay ids apart from the internal
+  # secret, so a worker that holds the internal secret cannot mint an id.
+  relayIdKey: ""
 
 cache:
   lruSize: 50000
@@ -142,6 +146,12 @@ metrics:
   apiKey:
     existingSecretName: ""
     secretKey: METRICS_API_KEY
+
+# Cross-pod Twilio relay hop (langwatch#8397). A pod Twilio reaches dials the
+# pod that opened the relay on this port. Only the gateway's own pods can reach
+# it (NetworkPolicy), and no Service publishes it.
+relayHop:
+  port: 5564
 
 logging:
   level: info # debug|info|warn|error

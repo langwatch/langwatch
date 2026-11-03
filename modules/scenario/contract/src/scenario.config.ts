@@ -102,6 +102,11 @@ export const scenarioConfig = Config.define((c) => ({
   isSaas,
   /** The deployment's environment name (the shared leaf); a child is started under it too. */
   nodeEnvironment,
+  /**
+   * Phone media goes through a relay on the LangWatch gateway, opened with the install's Connect
+   * license token, so Twilio never has to reach this deployment. Off unless "true".
+   */
+  voiceMediaRelay: c.env("VOICE_MEDIA_RELAY", offUnlessTrue),
   /** A voice-only worker refuses to boot without a public https origin. */
   voiceWorkerOnly: c.env("VOICE_WORKER_ONLY", offUnlessTrue),
   /** The runtime classes this worker admits; a refused job retries on a worker that consumes it. */

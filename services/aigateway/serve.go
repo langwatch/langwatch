@@ -1,6 +1,7 @@
 package aigateway
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/http"
@@ -25,6 +26,9 @@ import (
 func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) error {
 	deps.Logger.Info("aigateway_starting", zap.String("addr", cfg.Server.Addr))
 	warnIfGracefulShutdownTooShort(deps.Logger, cfg)
+	for _, warning := range cfg.Warnings {
+		deps.Logger.Warn("aigateway_config_warning", zap.String("warning", warning))
+	}
 	if !cfg.ControlPlane.BaseURLExplicit {
 		deps.Logger.Warn("aigateway_control_plane_base_url_not_explicit",
 			zap.String("control_plane_base_url", cfg.ControlPlane.BaseURL),
@@ -62,6 +66,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		CORSAllowedOrigins:    cfg.CORS.AllowedOriginList(),
 		WebhookRelay:          deps.ControlPlane,
 		VoiceRelay:            deps.Voice,
+		MediaRelay:            deps.MediaRelay,
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}
@@ -74,6 +79,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 	addManagedServices(g, deps, ownServices{
 		Status:  statusMon,
 		HTTP:    srv,
+		Hop:     hopServer(deps, cfg),
 		Metrics: metricsDoor(deps.Logger, cfg, deps.Metrics),
 	})
 	return g.Run(ctx)
@@ -85,6 +91,8 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 type ownServices struct {
 	Status *statusprobe.Monitor
 	HTTP   *http.Server
+	// Hop is the relay hop listener, nil without a media relay.
+	Hop *http.Server
 	// Metrics is the Prometheus pull door, nil while it stays shut.
 	Metrics *http.Server
 }
@@ -121,10 +129,35 @@ func addManagedServices(g *lifecycle.Group, deps *Deps, own ownServices) {
 	if deps.Voice != nil {
 		g.Add(deps.Voice)
 	}
+	// Registered before the hub and the public listener, so it stops after
+	// both: a Twilio socket landing on another pod while this one drains
+	// still hops here.
+	if own.Hop != nil {
+		g.Add(lifecycle.ListenServer("relay-hop", own.Hop))
+	}
+	// Beside the voice drain: paired relays run through the same budget.
+	if deps.MediaRelay != nil {
+		g.Add(deps.MediaRelay)
+	}
 	if own.Metrics != nil {
 		g.Add(lifecycle.ListenServer("metrics", own.Metrics))
 	}
 	g.Add(lifecycle.ListenServer("http", own.HTTP))
+}
+
+// hopServer is the listener for the owner side of a cross-pod relay hop. It
+// exists only with a media relay, which is what a hop reaches, and a pod
+// address, without which no id names this pod and no hop can arrive.
+func hopServer(deps *Deps, cfg Config) *http.Server {
+	if deps.MediaRelay == nil || cfg.PodIP == "" {
+		return nil
+	}
+	handler := httpapi.NewHopRouter(httpapi.HopRouterDeps{
+		Logger:         deps.Logger,
+		InternalSecret: cfg.ControlPlane.InternalSecret,
+		MediaRelay:     deps.MediaRelay,
+	})
+	return &http.Server{Handler: handler, Addr: cmp.Or(cfg.RelayHopAddr, defaultConfig().RelayHopAddr), ReadHeaderTimeout: 10 * time.Second}
 }
 
 // metricsDoor is the pull door on its own listener (ADR-175 point 3), opened

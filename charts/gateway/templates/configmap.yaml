@@ -12,6 +12,7 @@ data:
   # appear here are aspirational (forward-compat for v1.1) — silently dropping
   # them avoids misleading operators into thinking they're tuning behavior.
   SERVER_ADDR: ":5563"
+  GATEWAY_RELAY_HOP_ADDR: ":{{ .Values.relayHop.port }}"
   LOG_LEVEL: {{ .Values.logging.level | quote }}
   {{- if .Values.metrics.enabled }}
   OTEL_METRICS_EXPORTER: "otlp,prometheus"

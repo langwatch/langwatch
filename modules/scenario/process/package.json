@@ -80,6 +80,7 @@
     "liquidjs": "catalog:",
     "nanoid": "catalog:",
     "papaparse": "catalog:",
+    "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -95,7 +96,6 @@
     "@types/papaparse": "catalog:",
     "@types/ws": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "ws": "catalog:"
+    "vitest": "catalog:"
   }
 }

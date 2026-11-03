@@ -50,14 +50,34 @@ export class VoiceCallClaimService {
     await unsubscribe?.();
   }
 
+  /** Claims an upgrade Twilio sent to this deployment's door, which Twilio signed as such. */
   accept(upgrade: VoiceMediaUpgrade): void {
+    const base = this.input.publicBaseUrl.replace(/\/$/, "");
+    this.start({ upgrade, signedUrlFor: (pathname) => `${base}${pathname}` });
+  }
+
+  /**
+   * Claims an upgrade the worker's relay bridge made for a stream Twilio sent to the LangWatch
+   * gateway: Twilio signed `signedUrl`, the relay's stream URL, not this deployment's door.
+   */
+  acceptRelayed(input: { upgrade: VoiceMediaUpgrade; signedUrl: string }): void {
+    this.start({ upgrade: input.upgrade, signedUrlFor: () => input.signedUrl });
+  }
+
+  private start({
+    upgrade,
+    signedUrlFor,
+  }: {
+    upgrade: VoiceMediaUpgrade;
+    signedUrlFor: (pathname: string) => string;
+  }): void {
     const { socket } = upgrade;
     if (!(socket instanceof Socket)) {
       logger.error({ url: upgrade.url }, "voice media upgrade arrived without a TCP socket");
       (socket as { destroy?: () => void }).destroy?.();
       return;
     }
-    this.claim({ upgrade, socket }).catch((error: unknown) => {
+    this.claim({ upgrade, socket, signedUrlFor }).catch((error: unknown) => {
       logger.error({ error, nonce: upgrade.nonce }, "voice media upgrade could not be claimed");
       socket.destroy();
     });
@@ -71,9 +91,11 @@ export class VoiceCallClaimService {
   private async claim({
     upgrade,
     socket,
+    signedUrlFor,
   }: {
     upgrade: VoiceMediaUpgrade;
     socket: Socket;
+    signedUrlFor: (pathname: string) => string;
   }): Promise<void> {
     const { url } = upgrade;
     const pathname = new URL(url, "http://door.invalid").pathname;
@@ -87,7 +109,7 @@ export class VoiceCallClaimService {
 
     const header = upgrade.headers["x-twilio-signature"];
     const authToken = await this.input.authTokenFor({ projectId: peeked.call.projectId });
-    const signed = `${this.input.publicBaseUrl.replace(/\/$/, "")}${pathname}`;
+    const signed = signedUrlFor(pathname);
     if (
       typeof header !== "string" ||
       !isValidTwilioSignature({ authToken, url: signed, signature: header })
