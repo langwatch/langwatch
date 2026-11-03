@@ -1,3 +1,5 @@
+import { scryptSync } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-model.service.ts";
@@ -329,11 +331,16 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
     it("names an engine table stamped by a fingerprint for another schema", () => {
       const [beforeSchema] = engineTables;
       if (!beforeSchema) throw new Error("the catalog maps no PostgreSQL dataset");
-      const withoutSchema = selfProvisioning.credentialFingerprint({
+      // The stamp before #9263: five-element material, same salt and scrypt cost (salt is private).
+      const { host, port, database, user, password } = selfProvisioning.namedCollectionValues({
         names: NAMES,
         postgres: POSTGRES,
-        schema: "",
       });
+      const withoutSchema = scryptSync(
+        JSON.stringify([host, port, database, user, password]),
+        "lwql-postgres-named-collection",
+        8,
+      ).toString("hex");
       const comments = Object.fromEntries(relations.map((name) => [name, current]));
       comments[beforeSchema] = postgresMapping.credentialComment({ fingerprint: withoutSchema });
 

@@ -422,8 +422,13 @@ describe("convergeLwqlAccessModel", () => {
 
   describe("when engine tables are to be rebuilt on the app's collection values", () => {
     const engineTables = selfProvisioning.engineTablesIn({ only: undefined });
-    const [stale = "", absent = ""] = engineTables;
-    if (!stale || !absent) throw new Error("the catalog maps too few PostgreSQL datasets");
+    const [staleTable, absentTable] = engineTables;
+    const tables = () => {
+      if (!staleTable || !absentTable) {
+        throw new Error("the catalog maps too few PostgreSQL datasets");
+      }
+      return { stale: staleTable, absent: absentTable };
+    };
     const fingerprint = selfProvisioning.credentialFingerprint({
       names: NAMES,
       postgres: {
@@ -432,18 +437,21 @@ describe("convergeLwqlAccessModel", () => {
       },
       schema: "public",
     });
-    const check = (clickHouse: ReturnType<typeof clickHouseThat>) =>
-      convergeLwqlAccessModel({
+    const check = (clickHouse: ReturnType<typeof clickHouseThat>) => {
+      const { stale, absent } = tables();
+      return convergeLwqlAccessModel({
         database: postgresThat({ refuses: false }).database,
         plan: clickHouse.plan,
         failOnError: true,
         only: { clickHouse: [stale, absent], postgres: [], isKeyMapMissing: false },
       });
+    };
     const rebuilt = (clickHouse: ReturnType<typeof clickHouseThat>, table: string) =>
       clickHouse.ran.filter((s) => s.includes(`.${table} (`) && s.includes("ENGINE = PostgreSQL"));
 
     /** @scenario "The collection probe reads the approved view in the app's PostgreSQL schema" */
     it("binds the app's PostgreSQL schema into both probe reads", async () => {
+      const { stale } = tables();
       const clickHouse = clickHouseThat({ present: [stale], schema: "langwatch_db" });
 
       await check(clickHouse);
@@ -462,6 +470,7 @@ describe("convergeLwqlAccessModel", () => {
 
     /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
     it("reads through the collection and with the app's own values, then rebuilds each stamped", async () => {
+      const { stale, absent } = tables();
       const clickHouse = clickHouseThat({ present: [stale] });
 
       await check(clickHouse);
@@ -483,6 +492,7 @@ describe("convergeLwqlAccessModel", () => {
     it.each(["collection", "appCredentials"] as const)(
       "leaves a present engine table in place when the %s read fails, and still creates an absent one unstamped",
       async (failingProbe) => {
+        const { stale, absent } = tables();
         const clickHouse = clickHouseThat({ present: [stale], failingProbe });
 
         await expect(check(clickHouse)).rejects.toMatchObject({
@@ -558,6 +568,7 @@ describe("convergeLwqlAccessModel", () => {
 
     /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
     it("probes on a sql-mode check too, so the next check finds its rebuilt table converged", async () => {
+      const { stale } = tables();
       const clickHouse = clickHouseThat({ present: [stale], mode: "sql" });
 
       await check(clickHouse);
@@ -575,6 +586,7 @@ describe("convergeLwqlAccessModel", () => {
 
     /** @scenario "The credential reads cover every replica of a cluster" */
     it("runs each read on every replica of the named cluster, reading no row", async () => {
+      const { stale } = tables();
       const clickHouse = clickHouseThat({ present: [stale], cluster: "langwatch" });
 
       await check(clickHouse);
@@ -592,6 +604,7 @@ describe("convergeLwqlAccessModel", () => {
 
     /** @scenario "The credential reads cover every replica of a cluster" */
     it("leaves the tables in place when a replica fails either read", async () => {
+      const { stale } = tables();
       const clickHouse = clickHouseThat({
         present: [stale],
         cluster: "langwatch",
