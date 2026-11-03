@@ -397,8 +397,8 @@ export class DatasetRecordService {
       return content.batchCreateRecords({ dataset, input: parsed });
     }
 
-    return this.lockedRecords({ dataset, columns }, (records) =>
-      records.createMany({
+    return this.lockedRecords({ dataset, columns }, async (records) => {
+      const written = await records.createMany({
         datasetId: dataset.id,
         projectId: parsed.projectId,
         entries: parsed.entries.map((entry) => ({
@@ -406,8 +406,27 @@ export class DatasetRecordService {
           ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
         })),
         skipDuplicates: parsed.skipDuplicates ?? false,
-      }),
-    );
+      });
+      if (!parsed.readBackExisting) {
+        return written;
+      }
+
+      // The caller supplied deterministic ids so it can compare a row an earlier
+      // attempt stored with the row this attempt would write; skipDuplicates
+      // returns only the rows this batch created, so read the landed ones back.
+      const requestedIds = parsed.entries.flatMap((entry) =>
+        entry.id === undefined ? [] : [entry.id],
+      );
+      if (requestedIds.length !== parsed.entries.length) {
+        return written;
+      }
+
+      return records.findByIds({
+        datasetId: dataset.id,
+        projectId: parsed.projectId,
+        ids: requestedIds,
+      });
+    });
   }
 
   async createRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {

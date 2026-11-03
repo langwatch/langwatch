@@ -58,6 +58,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
     projectId: string;
     datasetRecords: DatasetRecordEntry[];
     triggerId: string;
+    traceId: string;
   }): Promise<void> {
     const dataset = await this.peers.datasets.findBySlugOrId({
       slugOrId: input.datasetId,
@@ -102,18 +103,49 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         // Record ids are deterministic per trigger, trace and row, so a page retry that
         // re-runs a trace whose rows already landed is already done, not a failure.
         skipDuplicates: true,
+        // Also return rows an earlier attempt stored, so the retry can compare their
+        // content with the row this mapping produces now instead of trusting the id.
+        readBackExisting: true,
       });
       // DatasetRecord.id is globally unique, but the readback is scoped to this dataset:
       // an id that already belongs to a different dataset is skipped by skipDuplicates and
       // never comes back, so the automation would report a row it never added.
       const requested = new Set(entries.map((entry) => entry.id));
-      const stored = new Set(written.map((record) => record.id));
-      const missing = [...requested].filter((id) => !stored.has(id));
+      const storedById = new Map(written.map((record) => [record.id, record]));
+      const missing = [...requested].filter((id) => !storedById.has(id));
       if (missing.length > 0) {
         throw new DispatchError({
           message:
             `The dataset write skipped ${missing.length} row(s) whose id already belongs to another ` +
             `dataset (${missing.slice(0, 3).join(", ")}); retarget this automation's dataset or clear those ids.`,
+          retryable: false,
+        });
+      }
+
+      // A deterministic id only identifies a row while the mapping and expansions that
+      // produced it stay the same. If the trigger was edited between the first write and
+      // this retry, skipDuplicates would keep the old row and silently drop the new
+      // content, so compare the stored row with what this attempt would write and fail
+      // terminally instead of claiming a row that does not hold the new mapping.
+      const mappedColumns = [
+        ...new Set(input.datasetRecords.flatMap((record) => Object.keys(record))),
+      ].filter((column) => column !== "id");
+      const changed = entries.find((entry) => {
+        const storedRecord = storedById.get(entry.id as string);
+        if (storedRecord === undefined) {
+          return false;
+        }
+
+        return (
+          canonicalEntry(entry, mappedColumns) !== canonicalEntry(storedRecord.entry, mappedColumns)
+        );
+      });
+      if (changed !== undefined) {
+        throw new DispatchError({
+          message:
+            `The mapping for trigger ${input.triggerId} changed after trace ${input.traceId}'s rows ` +
+            `were first written; row ${String(changed.id)} now maps to different content. Restore the ` +
+            "mapping that wrote it, or clear those rows, before retrying.",
           retryable: false,
         });
       }
@@ -164,4 +196,14 @@ function readCode(error: unknown): unknown {
 
 function holdsOnlyId(entry: Record<string, unknown>): boolean {
   return Object.keys(entry).every((key) => key === "id");
+}
+
+/** One comparable form of a mapped row: every dataset column, null when absent. */
+function canonicalEntry(entry: Record<string, unknown>, columns: readonly string[]): string {
+  const normalized: Record<string, unknown> = {};
+  for (const column of [...columns].toSorted()) {
+    normalized[column] = entry[column] ?? null;
+  }
+
+  return JSON.stringify(normalized);
 }

@@ -44,6 +44,7 @@ const write = {
   datasetId: "dataset-1",
   projectId: "project-1",
   triggerId: "trigger-1",
+  traceId: "trace-1",
   datasetRecords: [{ id: "trigger-1-trace-1-0", question: "why", input: "secret value" }],
 };
 
@@ -102,7 +103,7 @@ describe("PersistActionWriterService.addToDataset", () => {
       expect(warnings()).toEqual([]);
     });
 
-    it("asks the dataset to skip ids an earlier attempt already wrote", async () => {
+    it("asks the dataset to skip ids an earlier attempt already wrote and read them back", async () => {
       const appended: Parameters<DatasetApi["batchCreateRecords"]>[0][] = [];
       const { writer } = writerOver({
         findBySlugOrId: async () => datasetWith(["question", "input"]),
@@ -114,7 +115,48 @@ describe("PersistActionWriterService.addToDataset", () => {
 
       await writer.addToDataset(write);
 
-      expect(appended).toEqual([expect.objectContaining({ skipDuplicates: true })]);
+      expect(appended).toEqual([
+        expect.objectContaining({ skipDuplicates: true, readBackExisting: true }),
+      ]);
+    });
+
+    it("accepts a retry when the stored row still matches the mapping", async () => {
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        batchCreateRecords: async (input) => recordsWritten(input),
+      });
+
+      await expect(writer.addToDataset(write)).resolves.toBeUndefined();
+    });
+
+    it("fails terminally when a stored row no longer matches what the retry would write", async () => {
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        // The first attempt stored this id against an older mapping; skipDuplicates
+        // keeps it, so the id check alone would report the new row as written.
+        batchCreateRecords: async (input) =>
+          input.entries.map(
+            ({ id }) =>
+              ({
+                id: id ?? "generated-id",
+                datasetId: input.slugOrId,
+                projectId: input.projectId,
+                entry: { question: "an earlier mapping", input: "secret value" },
+                createdAt: new Date(0),
+                updatedAt: new Date(0),
+              }) as DatasetRecord,
+          ),
+      });
+
+      const refusal = await refusalOf(writer.addToDataset(write));
+
+      expect(refusal).toEqual(
+        expect.objectContaining({
+          retryable: false,
+          message: expect.stringContaining("mapping"),
+        }),
+      );
+      expect(refusesRetry(refusal)).toBe(true);
     });
   });
 
