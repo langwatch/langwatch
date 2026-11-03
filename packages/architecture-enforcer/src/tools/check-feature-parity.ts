@@ -271,6 +271,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The ECR chart push: which package it pushes and which digest it reports
   // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
   "tools/chartpush",
+  // The Python SDK release keeps uv.lock in step (specs/ci/release-lock.feature).
+  "tools/releaselock",
   // The main-red Slack post (specs/ci/package-suite-integration-lane.feature).
   "tools/slacknotify",
   // Whether an immutable ECR tag may be skipped, and the Lambda re-tag
