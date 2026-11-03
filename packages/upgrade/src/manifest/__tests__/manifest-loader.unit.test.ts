@@ -9,6 +9,9 @@ import { ManifestLoadError } from "../manifest.ts";
 import { releaseManifestGaps } from "../stamp.ts";
 
 const CHANGELOG = fileURLToPath(new URL("../../../../../CHANGELOG.md", import.meta.url));
+const RELEASE_PLEASE_MANIFEST = fileURLToPath(
+  new URL("../../../../../.github/.release-please-manifest.json", import.meta.url),
+);
 
 /** The platform releases the root changelog names. */
 function changelogReleases(): string[] {
@@ -108,10 +111,14 @@ describe("the shipped manifests against the changelog", () => {
     /** @scenario "Every release in the changelog after the baseline has a manifest" */
     it("finds a manifest for each, following the release before it", () => {
       const { manifests } = loadReleases();
+      const released = changelogReleases();
+      const current = JSON.parse(readFileSync(RELEASE_PLEASE_MANIFEST, "utf8"))["."] as string;
 
+      expect(released).toContain(current);
+      expect(released.length).toBeGreaterThan(50);
       expect(
         releaseManifestGaps({
-          released: changelogReleases(),
+          released,
           baseline: loadReleaseBaseline().release,
           manifests,
         }),

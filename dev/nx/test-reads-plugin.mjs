@@ -56,7 +56,12 @@ export const reads = {
   "@langwatch/internal-slack": ["modules/automation/**/*", ".oxlintrc.native.jsonc"],
   "@langwatch/identity-process": ["modules/auth/**/*"],
   "@langwatch/clickhouse-client": ["packages/clickhouse-migrations/**/*"],
-  "@langwatch/upgrade": ["packages/clickhouse-migrations/**/*", "apps/tasks/**/*", "CHANGELOG.md"],
+  "@langwatch/upgrade": [
+    "packages/clickhouse-migrations/**/*",
+    "apps/tasks/**/*",
+    "CHANGELOG.md",
+    ".github/.release-please-manifest.json",
+  ],
   "@langwatch/evaluator-contract": [
     "skills/**/*",
     "feature-map.json",
