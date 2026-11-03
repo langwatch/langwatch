@@ -70,6 +70,7 @@ var (
 		"tools/chartheap",
 		"tools/suiteweights",
 		"tools/matrixseed",
+		"cmd/matrixseed",
 		"cmd/linkcheck",
 		"tools/docscheck",
 		"cmd/service",

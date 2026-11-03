@@ -52,8 +52,22 @@ func TestRunProvisionsOneOrganizationAndProject(t *testing.T) {
 	if got := exported(result)["LW_PROJECT_API_KEY"]; got != serviceKey {
 		t.Fatalf("LW_PROJECT_API_KEY = %q, want the project's service key", got)
 	}
-	if orgs[0].IdempotencyKey == "" || projects[0].IdempotencyKey == "" {
-		t.Fatal("every create must carry an Idempotency-Key")
+}
+
+/** @scenario "A seed create carries no Idempotency-Key" */
+func TestSeedCreatesCarryNoIdempotencyKey(t *testing.T) {
+	stub, server := newStub(t, nil)
+	run(t, server.URL, allCredentials)
+	for _, path := range []string{"/api/v1/organizations", "/api/v1/projects", "/api/gateway/v1/virtual-keys"} {
+		calls := stub.calls(http.MethodPost, path)
+		if len(calls) == 0 {
+			t.Fatalf("the seed made no POST %s, so this test would prove nothing", path)
+		}
+		for _, c := range calls {
+			if c.IdempotencyKey != "" {
+				t.Fatalf("POST %s carried an Idempotency-Key: the seed never retries, so it dedupes nothing", path)
+			}
+		}
 	}
 }
 
@@ -183,12 +197,13 @@ func TestRefusalForOneProviderStillSeedsTheOthers(t *testing.T) {
 	if err == nil || !errors.As(err, &refused) || refused.Status != http.StatusUnprocessableEntity {
 		t.Fatalf("want the refusal surfaced, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "anthropic") || !strings.Contains(err.Error(), "refused by the stub") {
-		t.Fatalf("want the error to name the provider and the answer, got %q", err)
+	if !strings.Contains(err.Error(), "anthropic") || !strings.Contains(err.Error(), "answered 422") {
+		t.Fatalf("want the error to name the provider and the status, got %q", err)
 	}
 }
 
 /** @scenario "A failed bootstrap exports nothing" */
+/** @scenario "The gateway and matrix run only once the seed has bootstrapped" */
 func TestFailedBootstrapExportsNothing(t *testing.T) {
 	_, server := newStub(t, map[string]int{"/api/v1/organizations": http.StatusUnauthorized})
 	result, err := Run(context.Background(), Options{BaseURL: server.URL, InstanceAdminKey: instanceKey, Env: envOf(allCredentials)})
