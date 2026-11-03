@@ -25,13 +25,13 @@ import type {
   IngestionSourceLifecycleChannel,
 } from "../../features/ingestion-source/services/ingestion-source.service.ts";
 import { IngestionSourceService } from "../../features/ingestion-source/services/ingestion-source.service.ts";
-import { MemoryIngestionPullRunRepository } from "../../repositories/memory/memory.ingestion-pull-run.repository.ts";
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
   type UpdateIngestionSourceRecord,
 } from "../../repositories/ingestion-source.repository.ts";
+import { MemoryIngestionPullRunRepository } from "../../repositories/memory/memory.ingestion-pull-run.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
 
 const NOW = Date.parse("2026-08-24T10:00:00.000Z");
@@ -930,7 +930,9 @@ describe("IngestionSourceService", () => {
           code: "validation_error",
           meta: {
             formErrors: [
-              expect.stringMatching(/App registration: .*missing tenant ID, client ID and client secret/),
+              expect.stringMatching(
+                /App registration: .*missing tenant ID, client ID and client secret/,
+              ),
             ],
           },
         });

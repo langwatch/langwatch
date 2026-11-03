@@ -28,8 +28,8 @@ const PULL_CONFIG_SCHEMAS: ReadonlyMap<string, z.ZodType> = new Map<string, z.Zo
  * The credentials an adapter cannot sign in without, by the form's name for each. The config
  * schemas leave `credentials` out because the stored form is sealed, so this is checked apart.
  */
-const REQUIRED_CREDENTIALS: ReadonlyMap<string, ReadonlyArray<readonly [string, string]>> =
-  new Map([
+const REQUIRED_CREDENTIALS: ReadonlyMap<string, ReadonlyArray<readonly [string, string]>> = new Map(
+  [
     [
       COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
       [
@@ -38,7 +38,8 @@ const REQUIRED_CREDENTIALS: ReadonlyMap<string, ReadonlyArray<readonly [string, 
         ["clientSecret", "client secret"],
       ],
     ],
-  ]);
+  ],
+);
 
 /** The form's names for the fields an adapter can refuse, so a refusal points at what to fix. */
 const FIELD_LABELS: Readonly<Record<string, string>> = {

@@ -8,11 +8,11 @@ import { createTenantId } from "@langwatch/eventing";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
 import type { IngestionPullRunRepository } from "../../../repositories/ingestion-pull-run.repository.ts";
+import { findPullConfigComplaints } from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
 import {
   type PullRunSummary,
   sourcePullStatus,
 } from "../../ingestion-pull/rules/source-pull-status.rules.ts";
-import { findPullConfigComplaints } from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
 import { IngestionSourceService } from "./ingestion-source.service.ts";
 
 /**

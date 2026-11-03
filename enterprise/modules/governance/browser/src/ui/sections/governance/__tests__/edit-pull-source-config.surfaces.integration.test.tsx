@@ -144,7 +144,10 @@ const sourceItsAdapterRefuses = sourceRow({
   id: "src_copilot",
   name: "Copilot Studio",
   sourceType: "copilot_studio_dataverse",
-  parserConfig: { adapter: "copilot_studio_dataverse", environmentUrl: "org12345.crm.dynamics.com" },
+  parserConfig: {
+    adapter: "copilot_studio_dataverse",
+    environmentUrl: "org12345.crm.dynamics.com",
+  },
   pullSchedule: "*/15 * * * *",
   status: "awaiting_first_event",
   errorCount: 4,

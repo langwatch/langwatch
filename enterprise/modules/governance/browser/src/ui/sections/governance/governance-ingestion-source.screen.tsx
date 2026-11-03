@@ -209,8 +209,7 @@ function SourcePullStatus({ source }: { source: Source }) {
         )}
         {pull?.error && (
           <Text fontSize="sm" color="red.fg">
-            {pull.error} {pullErrorFollowUp({ retrying, isLive })} Saved records may be
-            incomplete.
+            {pull.error} {pullErrorFollowUp({ retrying, isLive })} Saved records may be incomplete.
           </Text>
         )}
         {pull?.backfillThrough && (
