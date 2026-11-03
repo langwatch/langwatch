@@ -212,6 +212,7 @@
                   "features/instant-evals/targets",
                   "features/instant-evals/results",
                   "features/instant-evals/limits-and-cost",
+                  "features/instant-evals/own-model",
                   "features/instant-evals/cli"
                 ]
               },
