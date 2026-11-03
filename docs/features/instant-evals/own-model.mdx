@@ -7,7 +7,11 @@ description: Point Instant Evals at a decision model on your own provider accoun
 
 ## LangWatch Instant Preview or your own model
 
-By default Instant Evals are answered by **LangWatch Instant Preview**, the decision model LangWatch hosts and bills as described in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model on your own provider account instead, per organization, team or project. The provider then bills your account for every row judged, and LangWatch charges nothing for those rows.
+By default Instant Evals are answered by **LangWatch Instant Preview**, the decision model LangWatch hosts and bills as described in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model on your own provider account instead, per organization, team or project. The provider then bills your account for every row judged, and LangWatch does not charge for those rows.
+
+<Note>
+  Your own decision model is off by default. Ask LangWatch to turn it on for your organization. Until then, the **Instant Evals** column offers LangWatch Instant Preview only and a save that picks another model is refused.
+</Note>
 
 ## The models you can pick
 
@@ -27,7 +31,7 @@ By default Instant Evals are answered by **LangWatch Instant Preview**, the deci
 | Liquid d1.1 (OpenRouter)          | OpenRouter            | API key                                                                       |
 | Fireworks Rune                    | Fireworks             | API key                                                                       |
 
-Each model runs only on the model it names. Picking OpenAI Decisions API or Azure OpenAI Decisions API needs `gpt-6-luna` on that account; the other rows need nothing from OpenAI.
+Each model runs only on the model it names. Picking OpenAI Decisions API or Azure OpenAI Decisions API needs `gpt-6-luna` on that account; the other rows do not need an OpenAI account.
 
 ## Set it up
 
@@ -83,7 +87,7 @@ A refused key and a missing model are not retried. A rate limit and an outage ar
 
 ## What changes on your own model
 
-- **Cost.** The provider bills your account. LangWatch charges nothing for the rows and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
+- **Cost.** The provider bills your account. LangWatch does not charge for the rows and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
 - **Limits.** The row, question and text limits in [Limits and cost](/features/instant-evals/limits-and-cost#limits) still apply.
-- **Where the judged text goes.** The text of each row and your questions go straight to your provider, under your own agreement with it, instead of to LangWatch's judge.
+- **Where the judged text goes.** LangWatch sends the text of each row and your questions to your provider with your key, under your own agreement with it. LangWatch Instant Preview is not called for those rows.
 - **The search bar.** The search bar still runs on LangWatch Instant Preview.
