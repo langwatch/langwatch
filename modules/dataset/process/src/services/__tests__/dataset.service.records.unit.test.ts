@@ -204,6 +204,25 @@ describe("DatasetService", () => {
         expect(page.records.map((record) => record.id)).toEqual(["trigger-1-trace-1-0"]);
       });
 
+      it("returns the row an earlier attempt stored when the caller reads existing rows back", async () => {
+        const { service: subject } = service({ realRecords: true });
+        const first = {
+          slugOrId: "feedback",
+          projectId: PROJECT_ID,
+          entries: [{ id: "trigger-1-trace-1-0", input: "first" }],
+          skipDuplicates: true,
+          readBackExisting: true,
+        };
+
+        await subject.batchCreateRecords(first);
+        const retried = await subject.batchCreateRecords({
+          ...first,
+          entries: [{ id: "trigger-1-trace-1-0", input: "different mapping" }],
+        });
+
+        expect(retried.map((record) => record.entry)).toEqual([{ input: "first", output: null }]);
+      });
+
       it("still rejects a duplicate id when skipDuplicates is false", async () => {
         const { service: subject, records } = service({ realRecords: true });
         const input = {

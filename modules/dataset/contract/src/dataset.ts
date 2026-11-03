@@ -463,12 +463,17 @@ export type DatasetPageInput = z.input<typeof datasetPageInputSchema>;
 const createDatasetRecordsInputSchemaDefinition = datasetRecordLookupInputSchema.safeExtend({
   entries: z.array(datasetRecordInputSchema),
   /**
-   * Treat a row whose id already exists as already written instead of failing
-   * the batch, for callers that write deterministic ids and may safely retry a
-   * page. The inline Postgres layout honours it; object-storage layouts append
-   * without de-duplicating and ignore it.
+   * Treat a row whose id already exists as already written instead of failing the
+   * batch, for callers that write deterministic ids and may safely retry a page.
+   * The inline Postgres layout honours it; object-storage layouts ignore it.
    */
   skipDuplicates: z.boolean().optional(),
+  /**
+   * Return every requested row this dataset holds after the write, not just the
+   * rows this batch created, so a retrying caller can compare stored content.
+   * The inline Postgres layout honours it; object-storage layouts ignore it.
+   */
+  readBackExisting: z.boolean().optional(),
 });
 export interface CreateDatasetRecordsInputSchema extends Named<
   typeof createDatasetRecordsInputSchemaDefinition

@@ -197,6 +197,7 @@ export class AutomationPersistActionService {
       datasetId: parsed.data.datasetId,
       projectId: input.tenantId,
       triggerId: input.trigger.id,
+      traceId: input.traceId,
       datasetRecords,
     });
 
