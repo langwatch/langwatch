@@ -5,6 +5,7 @@
  */
 import { createTenantId, type TenantId } from "@langwatch/eventing";
 import type { LangyConversationStateData } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { processingEvent } from "../../../../eventing/__tests__/support/langy-processing-events.ts";
@@ -20,11 +21,7 @@ const AT = Date.UTC(2026, 9, 14, 9, 0);
 const RUN_TITLE = "Daily insights - Costs - 2026-10-14";
 
 /** No command is sent by a read; any that were would throw by name. */
-const noCommands = new Proxy({} as LangyConversationCommands, {
-  get: (_target, name) => () => {
-    throw new Error(`A history read sent ${String(name)}`);
-  },
-});
+const noCommands = createApiFixture<LangyConversationCommands>({}, "LangyConversationCommands");
 
 /** The accept an unattended turn sends for a new conversation: a run, titled for the person. */
 function acceptUnattendedTurn({ conversationId }: { conversationId: string }) {
