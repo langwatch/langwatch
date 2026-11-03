@@ -25,7 +25,6 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { AgentRepository, AgentVersionRecord } from "../repositories/agent.repository.ts";
 import { versionMayCopy } from "../rules/agent-version-snapshot.rules.ts";
 
-/** An agent as one of its versions holds it; `version` is null for a connected agent. */
 /** `pinned` is the version a label or number selected; null when the head was read. */
 type ResolvedAgentVersion = { agent: Agent; pinned: number | null };
 
