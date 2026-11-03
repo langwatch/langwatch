@@ -12,7 +12,7 @@ const WHATS_NEW = 3;
 const LEFT_OUT_HEADING = "## About this copy";
 const LEFT_OUT_NOTE =
   "This copy leaves out releases, to keep it short. " +
-  `The full [changelog page](/${RELEASES_SLUG}) lists the ${PUBLISHED} most recent releases, and the ` +
+  `The full [changelog page](/${RELEASES_SLUG}) lists the most recent releases, and the ` +
   `[repository CHANGELOG](${REPOSITORY_URL}/blob/main/CHANGELOG.md) ` +
   "holds every release.";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;

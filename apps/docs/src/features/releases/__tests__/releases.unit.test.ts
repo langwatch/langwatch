@@ -178,9 +178,10 @@ describe("when only some of the older releases fit the page token budget", () =>
   const long = "* **traces:** a long note\n".repeat(200);
   const release = ({ version, day }: { version: string; day: string }) =>
     `## [${version}](${compare}) (2026-10-${day})\n### Features\n${long}`;
-  const newestTwo =
-    release({ version: "3.0.0", day: "21" }) + release({ version: "2.9.0", day: "11" });
-  const all = newestTwo + release({ version: "2.8.0", day: "01" });
+  const all =
+    release({ version: "3.0.0", day: "21" }) +
+    release({ version: "2.9.0", day: "11" }) +
+    release({ version: "2.8.0", day: "01" });
 
   function exportOf({ changelog, pageTokens }: { changelog: string; pageTokens: number }) {
     const { docsRoot, dispose } = changelogProject({ changelog });
