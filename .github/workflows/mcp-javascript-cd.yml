@@ -34,6 +34,10 @@ jobs:
           install: "@langwatch/mcp-server..."
           registry-url: "https://registry.npmjs.org"
 
+      - name: Build and smoke-test the package as users install it
+        working-directory: mcp/typescript
+        run: pnpm run build && pnpm run smoke
+
       - name: Build and publish
         working-directory: mcp/typescript
         run: pnpm publish --provenance --access public --no-git-checks
