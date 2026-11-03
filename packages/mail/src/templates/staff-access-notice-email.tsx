@@ -27,7 +27,7 @@ export const StaffAccessNoticeEmail = ({
     </Paragraph>
     <DetailTable rows={[{ label: "Operator", value: operatorName }, ...details]} />
     <FinePrint>
-      If you did not expect this, end every staff access session from Ops, Staff access.
+      If you did not expect this, end every session from Ops, Agent access.
     </FinePrint>
   </EmailLayout>
 );
