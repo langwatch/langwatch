@@ -26,6 +26,29 @@ function rulesFor(element: HTMLElement) {
     .join("\n");
 }
 
+/** Splits css into the text inside `@media` blocks and everything outside them. */
+function splitMedia(css: string) {
+  let base = "";
+  let media = "";
+  let index = 0;
+  while (index < css.length) {
+    const start = css.indexOf("@media", index);
+    if (start === -1) break;
+    const open = css.indexOf("{", start);
+    let depth = 1;
+    let end = open + 1;
+    while (depth > 0 && end < css.length) {
+      if (css[end] === "{") depth += 1;
+      if (css[end] === "}") depth -= 1;
+      end += 1;
+    }
+    base += css.slice(index, start);
+    media += css.slice(start, end);
+    index = end;
+  }
+  return { base: base + css.slice(index), media };
+}
+
 /**
  * Only drawers yield the docked side panel's room; a dialog stays centred in the whole window.
  */
@@ -39,6 +62,8 @@ describe("given a docked side panel reserves no room from a dialog", () => {
   it("adds no end padding to the dialog positioner", () => {
     setDrawerEndInset(412);
     const css = rulesFor(renderOpenDialog().parentElement as HTMLElement);
+    // Anchor: the positioner's own rule must be found, or the negatives below pass vacuously.
+    expect(css).toMatch(/justify-content:\s*center/);
     expect(css).not.toContain("412px");
     expect(css).not.toContain("padding-inline-end");
   });
@@ -47,6 +72,10 @@ describe("given a docked side panel reserves no room from a dialog", () => {
   it("reduces the dialog's maximum width by the panel's width from md up", () => {
     setDrawerEndInset(412);
     const css = rulesFor(renderOpenDialog());
-    expect(css).toContain("- 412px");
+    const { base, media } = splitMedia(css);
+    expect(media).toMatch(/min-width/);
+    expect(media).toMatch(/max-width:\s*min\([^;]*calc\(100vw - 2rem - 412px\)/);
+    expect(base).toMatch(/max-width:\s*min\([^;]*calc\(100vw - 2rem\)/);
+    expect(base).not.toContain("412px");
   });
 });
