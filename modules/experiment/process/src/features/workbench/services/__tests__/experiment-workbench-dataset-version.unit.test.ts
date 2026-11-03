@@ -22,6 +22,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ExperimentWorkflowDsl } from "../../../../services/experiment-execution-data.service.ts";
 import type { ExperimentService } from "../../../../services/experiment.service.ts";
+import { ExperimentSavedRunPreparationService } from "../experiment-saved-run-preparation.service.ts";
 import type { ExperimentWorkbenchObserver } from "../experiment-workbench-observer.service.ts";
 import type { WorkbenchRunPipeline } from "../experiment-workbench-pipeline-run.service.ts";
 import { ExperimentWorkbenchRunService } from "../experiment-workbench-run.service.ts";
@@ -33,6 +34,14 @@ const SLUG = "support-eval";
 const AT = new Date(0);
 
 type Row = Record<string, unknown>;
+
+/** Saved board results as the workbench state stores them, in JSON. */
+type SavedResults = {
+  targetOutputs: Record<string, string[]>;
+  targetMetadata: Record<string, never[]>;
+  evaluatorResults: Record<string, never>;
+  errors: Record<string, (string | null)[]>;
+};
 
 const DATASET: Dataset = {
   id: DATASET_ID,
@@ -166,7 +175,10 @@ class VersionedDataset {
   }
 }
 
-const savedExperiment = ({ datasetVersion }: { datasetVersion?: number } = {}): Experiment => ({
+const savedExperiment = ({
+  datasetVersion,
+  results,
+}: { datasetVersion?: number; results?: SavedResults } = {}): Experiment => ({
   id: EXPERIMENT_ID,
   projectId: PROJECT_ID,
   slug: SLUG,
@@ -192,15 +204,19 @@ const savedExperiment = ({ datasetVersion }: { datasetVersion?: number } = {}): 
     activeDatasetId: "ds-ref",
     evaluators: [],
     targets: [],
+    ...(results ? { results } : {}),
   },
 });
 
 function harness({
   dataset,
   datasetVersion,
+  results,
 }: {
   dataset: VersionedDataset;
   datasetVersion?: number;
+  /** The board's saved results, keyed by the board's rows. */
+  results?: SavedResults;
 }) {
   const started: { runId: string; total: number }[] = [];
   const plans: ExperimentRunPlan[] = [];
@@ -231,7 +247,10 @@ function harness({
   };
   const experiments = createApiFixture<ExperimentService>({
     findBySlugAndType: async () =>
-      savedExperiment(datasetVersion !== undefined ? { datasetVersion } : {}),
+      savedExperiment({
+        ...(datasetVersion !== undefined ? { datasetVersion } : {}),
+        ...(results ? { results } : {}),
+      }),
   });
   const service = ExperimentWorkbenchRunService.create({
     experiments,
@@ -249,6 +268,19 @@ function harness({
       body,
       acceptsEvents: false,
       credential,
+    });
+
+  const prepare = ({ body = "" }: { body?: string } = {}) =>
+    ExperimentSavedRunPreparationService.create({ experiments }).prepare({
+      input: {
+        projectId: PROJECT_ID,
+        projectSlug: "project",
+        slug: SLUG,
+        body,
+        acceptsEvents: false,
+        credential: { kind: "apiKey", userId: "user-1" },
+      },
+      runs,
     });
 
   const executeOnPage = ({ datasetVersion: pinned }: { datasetVersion?: number }) =>
@@ -272,7 +304,7 @@ function harness({
       { id: "user-1" },
     );
 
-  return { run, started, plans, executeOnPage };
+  return { run, started, plans, executeOnPage, prepare };
 }
 
 const questions = (...names: string[]): Row[] => names.map((question) => ({ question }));
@@ -408,6 +440,37 @@ describe("given a saved experiment over a saved dataset", () => {
       await run({ body: JSON.stringify({ dataset_version: 1 }) });
 
       expect(plans[0]?.boardRowIndices).toEqual([null, 0]);
+    });
+  });
+
+  describe("when the board holds results and the run reads version 1, whose rows have moved", () => {
+    /** @scenario "A pinned run carries the board's results on the run's own rows" */
+    it("carries each board cell at the run row with its id, leaving out board rows the version lacks", async () => {
+      const dataset = new VersionedDataset(questions("c", "b", "a"), ["row-c", "row-b", "row-a"]);
+      dataset.save({ rows: questions("a", "b"), trigger: "manual", ids: ["row-a", "row-b"] });
+      const { prepare } = harness({
+        dataset,
+        results: {
+          targetOutputs: { target_a: ["board c", "board b", "board a"] },
+          targetMetadata: {},
+          evaluatorResults: {},
+          errors: { target_a: [null, null, "board a failed"] },
+        },
+      });
+
+      const prepared = await prepare({ body: JSON.stringify({ dataset_version: 1 }) });
+
+      expect(prepared.boardRowIndices).toEqual([2, 1]);
+      expect(
+        prepared.carriedOverCells.map(({ rowIndex, output, error }) => ({
+          rowIndex,
+          output,
+          error,
+        })),
+      ).toEqual([
+        { rowIndex: 0, output: "board a", error: "board a failed" },
+        { rowIndex: 1, output: "board b", error: undefined },
+      ]);
     });
   });
 

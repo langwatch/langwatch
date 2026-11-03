@@ -91,6 +91,13 @@ Feature: An experiment can pin the saved dataset version its runs read
     And every other cell lands on the board row with the same row id
 
   @unit
+  Scenario: A pinned run carries the board's results on the run's own rows
+    Given a board with saved results and dataset rows that changed order since version 1
+    When a run over version 1 is prepared
+    Then each carried cell sits at the run row with the same row id
+    And a board row version 1 does not hold carries nothing
+
+  @unit
   Scenario: A pinned run keeps the results of board rows the version does not hold
     Given a board row was added to the dataset after version 1
     And the board holds that row's results from an earlier run
