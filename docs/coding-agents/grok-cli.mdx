@@ -156,7 +156,7 @@ grok
 
 The header takes an ingest key (`ik-lw-…`), which can create telemetry and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
-For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Leave out any of the four `OTEL_LOG_*` lines to keep that kind of content on your machine.
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Set any of the four `OTEL_LOG_*` lines to `0` to keep that kind of content on your machine. Leaving `OTEL_LOG_ASSISTANT_RESPONSES` out is not enough: it then follows `OTEL_LOG_USER_PROMPTS`.
 
 The hook file runs the LangWatch command-line tool, so a manual setup reports no repository or branch.
 
