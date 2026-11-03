@@ -236,6 +236,7 @@ export type RestDoorCredential = Extract<
   | "cli_token"
   | "otlp_ingest"
   | "licence_token"
+  | "staff_access"
   | "browser"
 >;
 
@@ -256,6 +257,9 @@ export const DOOR_SCOPE_TIER = {
   cli_token: "organization",
   otlp_ingest: "project",
   licence_token: "organization",
+  // ADR-193: an approved staff agent's ops token. It reads across organizations, so it resolves
+  // no tenant; its routes ask only platform-tier permissions, which the door answers.
+  staff_access: null,
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
@@ -614,6 +618,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly mintsCredential?: AuthzPermission;
   /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
   readonly refusedOnAggregate?: true;
+  /** Present exactly when the route starts a run that spends the organization's money. */
+  readonly spends?: true;
   /** Present exactly when operator flags open the route to a legacy project key. */
   readonly legacyKeyScopes?: readonly [string, ...string[]];
   /** Present exactly when the route's create is replayable under a caller key. */
@@ -702,6 +708,7 @@ type RouteState = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   refusedOnAggregate?: true;
+  spends?: true;
   legacyKeyScopes?: readonly [string, ...string[]];
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
@@ -1124,6 +1131,22 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
       path: this.path,
       operation: this.operation,
       state: { ...this.state, refusedOnAggregate: true },
+    });
+  }
+
+  /**
+   * The route starts a run that spends the organization's money (models, evaluators). A staff
+   * key approved without spend is refused here (ADR-193); every new run route declares this.
+   */
+  spends(): RouteBuilder<Api, S> {
+    if (this.state.spends) throw new Error("REST route already declared spends()");
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, spends: true },
     });
   }
 
@@ -1916,6 +1939,7 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
+    ...(state.spends ? { spends: state.spends } : {}),
     ...(state.legacyKeyScopes ? { legacyKeyScopes: state.legacyKeyScopes } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),

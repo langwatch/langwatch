@@ -36,6 +36,8 @@ import {
   type SignUpEnrollment,
   type SignUpVerificationRequest,
   type PriorSession,
+  type PasskeyAssertionOptions,
+  type PasskeyAssertionResponse,
   isEmailPasswordEnabled,
   type SocialProviderBases,
 } from "@langwatch/auth-contract";
@@ -148,6 +150,7 @@ import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CredentialRegistrationService } from "../services/credential-registration.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
+import { ImpersonationExpiryService } from "../services/impersonation-expiry.service.ts";
 import {
   LegacySsoAccessService,
   type LegacySsoAccessConnections,
@@ -159,6 +162,7 @@ import {
   type PasswordResetMarks,
 } from "../services/own-password.service.ts";
 import { OwnSignInMethodService } from "../services/own-sign-in-method.service.ts";
+import { PasskeyAssertionService } from "../services/passkey-assertion.service.ts";
 import { PriorSessionService } from "../services/prior-session.service.ts";
 import { ProjectAuthTokenService } from "../services/project-auth-token.service.ts";
 import {
@@ -386,6 +390,44 @@ export class AuthModule implements AuthApiContract {
 
   stopImpersonation(input: { sessionId: string }): Promise<void> {
     return this.#sessions.stopImpersonation(input);
+  }
+
+  /** Set by {@link AuthModule.create}; the scheduled sweep calls it in the worker. */
+  #impersonationExpiry: ImpersonationExpiryService | null = null;
+
+  /** Audits and clears every impersonation whose window passed without a stop; idempotent. */
+  async expireLapsedImpersonations(): Promise<{ expired: number }> {
+    if (!this.#impersonationExpiry) return { expired: 0 };
+    return { expired: await this.#impersonationExpiry.sweep() };
+  }
+
+  /** Set by {@link AuthModule.create} over auth's own passkey rows. */
+  #passkeyAssertions: PasskeyAssertionService | null = null;
+
+  private passkeyAssertions(): PasskeyAssertionService {
+    if (!this.#passkeyAssertions) {
+      throw new AuthUnavailableError({ capability: "passkeys", processName: this.#processName });
+    }
+    return this.#passkeyAssertions;
+  }
+
+  hasPasskey(input: { userId: string }): Promise<boolean> {
+    return this.passkeyAssertions().hasPasskey(input);
+  }
+
+  passkeyAssertionOptions(input: {
+    userId: string;
+    challenge: string;
+  }): Promise<PasskeyAssertionOptions> {
+    return this.passkeyAssertions().options(input);
+  }
+
+  verifyPasskeyAssertion(input: {
+    userId: string;
+    challenge: string;
+    response: PasskeyAssertionResponse;
+  }): Promise<{ credentialId: string }> {
+    return this.passkeyAssertions().verify(input);
   }
 
   private constructor({
@@ -661,6 +703,20 @@ export class AuthModule implements AuthApiContract {
     });
 
     app.#offersPasskeys = config.passkeysEnabled;
+    app.#passkeyAssertions = PasskeyAssertionService.create({
+      passkeys: repositories.passkeys,
+      relyingParty: () =>
+        PasskeyAssertionService.relyingPartyFor({
+          sessionUrl: config.sessionUrl,
+          publicBaseUrl: config.publicBaseUrl,
+        }),
+    });
+    app.#impersonationExpiry = ImpersonationExpiryService.create({
+      sessions: repositories.sessions,
+      memberships: dependencies.organizations,
+      auditLog: dependencies.auditLog,
+      now,
+    });
     app.#offersTwoStepVerification = config.mfaEnrollmentOpen;
     app.#issuesOwnPasswords = config.localPasswords;
     app.#dialableIdentityProviderOrigins = resolveDialableIdentityProviderOrigins({

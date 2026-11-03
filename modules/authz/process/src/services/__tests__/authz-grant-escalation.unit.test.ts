@@ -144,7 +144,7 @@ describe("given a caller's own permissions bound what they may grant", () => {
         permissions: [...ALL_PERMISSIONS],
       });
 
-      expect(missing.toSorted()).toEqual(["ops:manage", "ops:view"]);
+      expect(missing.toSorted()).toEqual(["ops:manage", "ops:view", "opsRead:view"]);
     });
   });
 

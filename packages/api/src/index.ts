@@ -36,6 +36,13 @@ export {
   retryAfterOf,
   ScopeInputMismatchError,
   setLedgerCurrent,
+  StaffAccessAuditUnavailableError,
+  StaffAccessExpiredError,
+  StaffAccessIpMismatchError,
+  StaffAccessOperatorLostError,
+  StaffAccessRevokedError,
+  StaffAccessUnavailableError,
+  StaffSpendNotApprovedError,
   setOrganizationsCatchingUp,
   UnsupportedMediaTypeError,
 } from "./errors.ts";

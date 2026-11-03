@@ -86,6 +86,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
   .post("/:slug/run", "postApiExperimentsBySlugRun")
+  .spends()
   .keepsRecords()
   .withParams(slugParamsSchema)
   // The body is read unparsed under any Content-Type, as main read it: an

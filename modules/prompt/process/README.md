@@ -557,7 +557,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Sync/upsert a prompt with local content
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:381`.
+Permission `prompts:create or prompts:update`. Declared at `src/transport/prompt.rest.ts:381`.
 
 Answers at `/api/prompts/:id{.+?}/sync`, `/api/v1/prompts/:id{.+?}/sync`.
 
@@ -571,7 +571,7 @@ type Response = z.infer<typeof promptSyncResultSchema>; // ../contract/src/promp
 
 Update a prompt
 
-Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:411`.
+Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:413`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
@@ -585,7 +585,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Delete a prompt
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:448`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:450`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 

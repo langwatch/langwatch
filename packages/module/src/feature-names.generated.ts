@@ -47,6 +47,7 @@ export const FEATURE_NAMES = [
   "secret",
   "share",
   "slack",
+  "staff-access",
   "stored-object",
   "suite",
   "topic",

@@ -14,6 +14,7 @@ import {
   CLI_LOGIN_KEY_NAME_PREFIX,
   LANGY_SESSION_API_KEY_NAME,
   WORKFLOW_RUN_API_KEY_NAME,
+  isStaffAccessApiKey,
 } from "@langwatch/api-key-contract";
 import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
@@ -274,6 +275,7 @@ export class ApiKeyTokenResolutionService {
             userId: apiKey.userId,
             organizationId: apiKey.organizationId,
             ...(apiKey.name === LANGY_SESSION_API_KEY_NAME ? { isLangySessionKey: true } : {}),
+            ...(isStaffAccessApiKey(apiKey) ? { isStaffAccessKey: true } : {}),
           },
         });
       }
@@ -367,6 +369,7 @@ export class ApiKeyTokenResolutionService {
         apiKey.userId === null &&
         !apiKey.parentApiKeyId &&
         apiKey.name === WORKFLOW_RUN_API_KEY_NAME,
+      ...(isStaffAccessApiKey(apiKey) ? { isStaffAccessKey: true } : {}),
       project,
     });
   }

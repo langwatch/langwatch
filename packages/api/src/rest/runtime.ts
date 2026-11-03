@@ -5,6 +5,7 @@ import {
   type AuthzDeclaredScopeId,
   type AuthzPermission,
   internalActor,
+  type PlatformTierPermission,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
@@ -32,6 +33,7 @@ import {
   chosenPermission,
   decide,
   decideEntitlement,
+  decideDoorPlatform,
   decidePlatform,
   gatedDecision,
   mintAuthorization,
@@ -80,6 +82,7 @@ import {
 import { doorCredentialOf } from "./credential-census.ts";
 import {
   admittedOwnerlessProjectKeyFor,
+  admittedOwnerlessStaffKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
   recordRouteTemplate,
 } from "./credential.ts";
@@ -155,6 +158,12 @@ import {
   ROUTE_TEMPLATE,
   withRetryAfter,
 } from "./response.ts";
+import {
+  admitStaffRequest,
+  admittedStaffOf,
+  finishingStaffRequest,
+  type RestStaffAccessGate,
+} from "./staff-access.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
@@ -222,6 +231,11 @@ export type RestRuntimeMembers = Readonly<{
   servedDoors?: true;
   /** Told when a failed route could not give back its clicks. Defaults to a warning log. */
   confirmationLog?: RestConfirmationLog;
+  /**
+   * Where every request by an approved staff agent's key is recorded before its handler
+   * (ADR-193). Absent, a staff key is refused on every route rather than run unrecorded.
+   */
+  staffAccess?: RestStaffAccessGate;
 }>;
 
 /** Where a failed give-back of confirmation clicks is reported, beside the route's own fault. */
@@ -1572,78 +1586,152 @@ function handlerMiddleware<Api>({
 
     await countCall(capabilities);
 
-    // After the door, never before it: a caller who may not read this cannot
-    // be handed the bytes an entitled one left behind.
-    const stored = await storedAnswer(capabilities);
-
-    if (stored) return stored;
-
-    const actor = doorActorOf({ credential, actor: decision.actor });
-    const authorization = await mintAuthorization({
-      permission: route.permission,
-      actor: actor ?? ownerlessKeyProofActor({ credential, request: context.req.raw, resolved }),
+    // After every permission check and before any answer, a stored one included: a staff key's
+    // request is recorded before it is served, or refused.
+    const admitted = await admitStaffRequest({
+      gate: ports.staffAccess,
+      servedDoors: ports.servedDoors === true,
+      credential,
+      request: context.req.raw,
+      operation: `${family}.${route.operation}`,
+      permissions: routePermissions(route),
       scope: resolved,
-      authorize,
-      route: `${family}.${route.operation}`,
+      spends: route.spends === true,
     });
 
-    const run = async (): Promise<Response | undefined> => {
-      const result = await auditing({
-        route,
-        ports,
-        actor,
-        credential,
-        scope: resolved,
-        context,
-        run: async () => {
-          // Before the click, so a context that refuses never shows a card or spends a click.
-          const resolvedContexts = await resolveContexts({ route, contexts, context, input });
-          // After every permission check and inside the trail, so a refusal is recorded too.
-          const receipt = await confirmMarkedRequest({
-            mark: route.confirmation,
-            gate: ports.confirmations,
-            servedDoors: ports.servedDoors === true,
-            credential,
-            request: context.req.raw,
-            input,
-            scope: resolved,
-            app: options.app,
-          });
-
-          return refundingOnFault({
-            receipt,
-            log: ports.confirmationLog ?? loggedConfirmations,
-            run: async () =>
-              route.handler(
-                handlerArguments({
-                  context,
-                  route,
-                  options,
-                  input,
-                  actor,
-                  scope: handlerScopeOf({ route, credential, caller }),
-                  target,
-                  authorization,
-                  session: sessionOf({ route, credential, caller }),
-                  key: keyOf({ route, credential, request: context.req.raw }),
-                }),
-                ...resolvedContexts,
-              ),
-          });
-        },
-      });
-
-      caller.markUsed?.();
-
-      return answerWith({ context, next, route, result });
-    };
-
-    const answer = route.idempotency
-      ? await replayable({ route, ports, context, input, scope: resolved, family, run })
-      : await run();
-
-    return keepAnswer({ ...capabilities, answer });
+    return finishingStaffRequest({
+      admitted,
+      statusOf: () => context.res.status,
+      run: () =>
+        servedAnswer({
+          route,
+          credential,
+          ports,
+          options,
+          contexts,
+          family,
+          capabilities,
+          caller,
+          decisionActor: decision.actor,
+          resolved,
+          target,
+          authorize,
+          next,
+        }),
+    });
   };
+}
+
+/** The stored answer, or the handler's under its proof, confirmation and audit. */
+async function servedAnswer<Api>({
+  route,
+  credential,
+  ports,
+  options,
+  contexts,
+  family,
+  capabilities,
+  caller,
+  decisionActor,
+  resolved,
+  target,
+  authorize,
+  next,
+}: {
+  route: RestTransportRoute<Api>;
+  credential: RestDoorCredential;
+  ports: RestRuntimeMembers;
+  options: RestMountOptions<Api>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
+  family: string;
+  capabilities: Readonly<{
+    route: RestTransportRoute<unknown>;
+    ports: RestRuntimeMembers;
+    context: Context;
+    family: string;
+    version: string;
+    caller: RestCaller;
+    input: unknown;
+  }>;
+  caller: RestCaller;
+  decisionActor: Actor | null;
+  resolved: AuthzDeclaredScopeId | null;
+  target: AuthzDeclaredScopeId | null;
+  authorize: Authorize;
+  next: () => Promise<void>;
+}): Promise<Response | undefined> {
+  const { context, input } = capabilities;
+  // After the door, never before it: a caller who may not read this cannot
+  // be handed the bytes an entitled one left behind.
+  const stored = await storedAnswer(capabilities);
+
+  if (stored) return stored;
+
+  const actor = doorActorOf({ credential, actor: decisionActor });
+  const authorization = await mintAuthorization({
+    permission: route.permission,
+    actor: actor ?? ownerlessKeyProofActor({ credential, request: context.req.raw, resolved }),
+    scope: resolved,
+    authorize,
+    route: `${family}.${route.operation}`,
+  });
+
+  const run = async (): Promise<Response | undefined> => {
+    const result = await auditing({
+      route,
+      ports,
+      actor,
+      credential,
+      scope: resolved,
+      context,
+      run: async () => {
+        // Before the click, so a context that refuses never shows a card or spends a click.
+        const resolvedContexts = await resolveContexts({ route, contexts, context, input });
+        // After every permission check and inside the trail, so a refusal is recorded too.
+        const receipt = await confirmMarkedRequest({
+          mark: route.confirmation,
+          gate: ports.confirmations,
+          servedDoors: ports.servedDoors === true,
+          credential,
+          request: context.req.raw,
+          input,
+          scope: resolved,
+          app: options.app,
+        });
+
+        return refundingOnFault({
+          receipt,
+          log: ports.confirmationLog ?? loggedConfirmations,
+          run: async () =>
+            route.handler(
+              handlerArguments({
+                context,
+                route,
+                options,
+                input,
+                actor,
+                scope: handlerScopeOf({ route, credential, caller }),
+                target,
+                authorization,
+                session: sessionOf({ route, credential, caller }),
+                key: keyOf({ route, credential, request: context.req.raw }),
+              }),
+              ...resolvedContexts,
+            ),
+        });
+      },
+    });
+
+    caller.markUsed?.();
+
+    return answerWith({ context, next, route, result });
+  };
+
+  const answer = route.idempotency
+    ? await replayable({ route, ports, context, input, scope: resolved, family, run })
+    : await run();
+
+  return keepAnswer({ ...capabilities, answer });
 }
 
 /**
@@ -1747,10 +1835,12 @@ function auditCaller({
   const apiKeyId = named?.type === "api_key" ? named.id : doorKeyId;
   const ipAddress = ClientAddress.resolvedFor(request);
   const userAgent = request.headers.get("user-agent");
+  const staffAccess = admittedStaffOf(request);
 
   return {
     actorId: named?.type === "user" ? named.id : null,
     ...(impersonatorId ? { impersonatorId } : {}),
+    ...(staffAccess ? { staffAccess } : {}),
     ...(apiKeyId ? { apiKeyId } : {}),
     ...(ipAddress ? { ipAddress } : {}),
     ...(userAgent ? { userAgent } : {}),
@@ -2302,7 +2392,7 @@ async function callerOf({
   const kind = route.access?.kind;
 
   if (route.permissionPlatform) {
-    return platformCallerOf({ door, request, platform: route.permissionPlatform });
+    return platformCallerOf({ door, credential, request, platform: route.permissionPlatform });
   }
 
   if (credential === "browser" && route.permissionTarget) return requireIdentify(door)({ request });
@@ -2365,10 +2455,12 @@ async function anonymousCallerOf({
  */
 async function platformCallerOf({
   door,
+  credential,
   request,
   platform,
 }: {
   door: RestIdentity;
+  credential: RestDoorCredential;
   request: Request;
   platform: PlatformPermissionDeclaration;
 }): Promise<RestCaller> {
@@ -2379,11 +2471,14 @@ async function platformCallerOf({
     },
   );
 
-  await decidePlatform({
-    declaration: platform,
-    actor: caller.actor,
-    ask: ({ permission }) => requireAuthorizePlatform(door)({ caller, permission }),
-  });
+  const ask = async ({ permission }: { permission: PlatformTierPermission }) =>
+    requireAuthorizePlatform(door)({ caller, permission });
+  // The staff access door's caller is a token, not a person: the door answers for it itself.
+  if (credential === "staff_access") {
+    await decideDoorPlatform({ declaration: platform, ask });
+  } else {
+    await decidePlatform({ declaration: platform, actor: caller.actor, ask });
+  }
 
   return caller;
 }
@@ -2583,8 +2678,9 @@ function doorActorOf({
 }
 
 /**
- * A project key that stands for nobody proves its own project's read as the door's own,
- * as main did; the door already asked the key's access. Nothing else gets an actor here.
+ * A project key that stands for nobody proves its own project's read as the door's own, as main
+ * did, and so does an ownerless staff key at a project its organization or key door asked about;
+ * the door already asked the key's access. Nothing else gets an actor here.
  */
 function ownerlessKeyProofActor({
   credential,
@@ -2595,11 +2691,14 @@ function ownerlessKeyProofActor({
   request: Request;
   resolved: AuthzDeclaredScopeId | null;
 }): Actor | null {
-  if (credential !== "project" || resolved?.tier !== "project") return null;
+  if (resolved?.tier !== "project") return null;
+  const admitted =
+    credential === "project"
+      ? admittedOwnerlessProjectKeyFor({ request, projectId: resolved.id })
+      : (credential === "organization" || credential === "api_key") &&
+        admittedOwnerlessStaffKeyFor({ door: credential, request });
 
-  return admittedOwnerlessProjectKeyFor({ request, projectId: resolved.id })
-    ? internalActor(OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH)
-    : null;
+  return admitted ? internalActor(OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH) : null;
 }
 
 /**
@@ -3338,6 +3437,7 @@ const HANDLER_CREDENTIAL = {
   cli_token: "apiKey",
   otlp_ingest: "apiKey",
   licence_token: "apiKey",
+  staff_access: "apiKey",
   browser: "session",
   internal_secret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;

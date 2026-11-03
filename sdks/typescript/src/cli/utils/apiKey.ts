@@ -16,6 +16,7 @@ import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
 import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./governance/config";
 import { fetchPersonalProject, SessionApiError } from "./governance/session-api";
 import { maybePrintIdentityNotice } from "./identityNotice";
+import { isSameOrigin, pickSessionProject, readOpsSession, removeOpsSession } from "./opsSession";
 import {
   type BoundKeySource,
   projectScopeErrorLines,
@@ -43,10 +44,10 @@ const loadEnvFileScoped = (): void => {
 export interface ResolvedCredentials {
   apiKey: string;
   /**
-   * Where the key came from: an explicit argument, the environment / caller's .env, or the stored
-   * device session's personal project.
+   * Where the key came from: an explicit argument, a live ops session file (ADR-193), the
+   * environment / caller's .env, or the stored device session's personal project.
    */
-  source: "flag" | "env" | "session";
+  source: "flag" | "ops-session" | "env" | "session";
   /** Control-plane endpoint the command targets (4-source resolver). */
   endpoint: string;
   /**
@@ -65,7 +66,7 @@ export interface ResolvedCredentials {
 export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
- * Resolves credentials in priority order: --api-key flag, env, then the
+ * Resolves credentials in priority order: --api-key flag, a live ops session, env, then the
  * device session. Publishes into the request-scoped store, not
  * `process.env`, so concurrent daemon requests never cross identities.
  */
@@ -100,6 +101,9 @@ export const resolveCredentials = async (
     });
     return { apiKey: flagKey, source: "flag", endpoint, projectId };
   }
+
+  const opsSession = resolveFromOpsSession({ project: opts.project, endpoint });
+  if (opsSession) return opsSession;
 
   // Trimmed for use, not just for the emptiness check: a `.env` written as
   // `LANGWATCH_API_KEY=sk-abc ` would otherwise ship `Bearer sk-abc ` and 401
@@ -280,6 +284,60 @@ async function resolveFromSession({
     });
   }
   return { apiKey: session.apiKey, source: "session", endpoint, projectId };
+}
+
+/**
+ * The ops session's key (ADR-193), or nothing when there is no live session with one for this
+ * endpoint. Its project is `--project` matched against the session's projects, else the session
+ * default; `LANGWATCH_PROJECT_ID` is ignored, it names a project of the folder, not the session.
+ */
+function resolveFromOpsSession({
+  project,
+  endpoint,
+}: {
+  project?: string;
+  endpoint: string;
+}): ResolvedCredentials | undefined {
+  const state = readOpsSession();
+  if (state.kind === "none") return undefined;
+  if (state.kind === "invalid") {
+    console.error(chalk.yellow(`Ignoring unreadable ops session file ${state.file}.`));
+    return undefined;
+  }
+  if (state.kind === "expired") {
+    removeOpsSession();
+    console.error(
+      chalk.yellow(
+        `Ops session ${state.session.requestId} expired at ${state.session.expiresAt}; not used, ${state.file} removed.`,
+      ),
+    );
+    return undefined;
+  }
+  const { session } = state;
+  if (!session.apiKey) return undefined;
+  if (!isSameOrigin({ a: session.endpoint, b: endpoint })) {
+    console.error(
+      chalk.yellow(
+        `Ops session ${session.requestId} belongs to ${session.endpoint}; not sent to ${endpoint}.`,
+      ),
+    );
+    return undefined;
+  }
+  const named = (project ?? requestedProject())?.trim();
+  const target = pickSessionProject({ session, selector: named });
+  if (named && !target) {
+    reportProjectScopeError(
+      new ProjectScopeError(
+        "project_not_accessible",
+        `Project "${named}" is not in the ops session ${session.requestId}.`,
+        named,
+        ["Run `langwatch ops access status` to see the projects it covers."],
+      ),
+    );
+  }
+  setResolvedApiKey(session.apiKey);
+  setResolvedProjectId(target?.id);
+  return { apiKey: session.apiKey, source: "ops-session", endpoint, projectId: target?.id };
 }
 
 /** A project the command line or the environment asked this request to run against. */

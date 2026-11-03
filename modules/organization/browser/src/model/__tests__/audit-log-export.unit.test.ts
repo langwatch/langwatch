@@ -46,6 +46,7 @@ function row(overrides: Partial<EnrichedAuditLog> = {}): EnrichedAuditLog {
     actorUser: null,
     channel: "app",
     apiKeyId: null,
+    staffAccess: null,
     ...overrides,
   };
 }

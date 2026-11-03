@@ -182,6 +182,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   })
 
   .post("/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate")
+  .spends()
   .keepsRecords()
   .withoutAudit("run, not a change")
   .withSharedPath(EXPERIMENT_NAMESPACE)
@@ -219,6 +220,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     "/api/evaluations/:evaluator/:subpath/evaluate",
     "postApiEvaluationsByEvaluatorBySubpathEvaluate",
   )
+  .spends()
   .keepsRecords()
   .withoutAudit("run, not a change")
   .withSharedPath(EXPERIMENT_NAMESPACE)
@@ -253,6 +255,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   )
 
   .post("/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate")
+  .spends()
   .keepsRecords()
   .withoutAudit("run, not a change")
   .withParams(evaluatorParamsSchema)

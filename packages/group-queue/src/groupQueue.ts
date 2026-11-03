@@ -640,9 +640,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     );
     this.adaptiveSlots = new AdaptiveSlots({
       floor: this.globalConcurrency,
-      busy: () => this.processingQueue.running() + this.processingQueue.length(),
+      // During a backlog a slot waiting on its next claim still has work queued for it.
+      busy: () =>
+        this.dispatcher?.hasBacklog()
+          ? this.adaptiveSlots.current()
+          : this.processingQueue.running() + this.processingQueue.length(),
       onChange: (slots) => {
         this.processingQueue.concurrency = slots;
+        this.dispatcher?.slotsChanged();
       },
     });
     this.processingQueue.saturated = () => {

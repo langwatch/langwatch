@@ -49,6 +49,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .withAddressing("v1-in-path", { generation: "v3" })
 
   .post("/:evaluationSlug/run", "postApiEvaluationsV3BySlugRun")
+  .spends()
   .keepsRecords()
   .withParams(evaluationSlugParamsSchema)
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
@@ -165,6 +166,7 @@ export const experimentWorkbenchRunLegacyRest = defineRestRouter(ExperimentV3Res
   .withCredential("browser")
 
   .post("/execute", "executeEvaluationsV3Experiment")
+  .spends()
   .keepsRecords()
   .withInput(executionRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })

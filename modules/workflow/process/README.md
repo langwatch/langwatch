@@ -400,7 +400,7 @@ Answers at `/api/scenario/execute-sync`.
 ```typescript
 // Body: executeSyncRelayEventSchema, ../contract/src/workflow-rest.schemas.ts:210
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/workflow-execute-sync.rest.ts:28
+// Response: inline, src/transport/workflow-execute-sync.rest.ts:29
 type Response = unknown;
 ```
 
@@ -453,7 +453,7 @@ type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/work
 
 Run a specific workflow version
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:113`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:114`.
 
 Answers at `/api/workflows/:workflowId/:versionId/run`, `/api/v1/workflows/:workflowId/:versionId/run`.
 

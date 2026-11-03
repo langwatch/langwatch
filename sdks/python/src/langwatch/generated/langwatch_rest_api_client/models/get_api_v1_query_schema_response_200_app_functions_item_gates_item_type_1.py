@@ -76,6 +76,7 @@ class GetApiV1QuerySchemaResponse200AppFunctionsItemGatesItemType1(str, Enum):
     LANGYUPDATE = "langy:update"
     LANGYVIEW = "langy:view"
     OPSMANAGE = "ops:manage"
+    OPSREADVIEW = "opsRead:view"
     OPSVIEW = "ops:view"
     ORGANIZATIONDELETE = "organization:delete"
     ORGANIZATIONMANAGE = "organization:manage"

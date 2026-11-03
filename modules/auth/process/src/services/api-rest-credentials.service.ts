@@ -316,7 +316,8 @@ export class ApiRestCredentialsService {
 
     const organization = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
     if (!organization.ok) throw new ProjectInvalidCredentialsError();
-    const { apiKeyId, userId, organizationId, isLangySessionKey } = organization.resolved;
+    const { apiKeyId, userId, organizationId, isLangySessionKey, isStaffAccessKey } =
+      organization.resolved;
 
     return {
       principal: {
@@ -325,6 +326,7 @@ export class ApiRestCredentialsService {
         userId,
         organizationId,
         ...(isLangySessionKey ? { isLangySessionKey: true } : {}),
+        ...(isStaffAccessKey ? { isStaffAccessKey: true } : {}),
       },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),

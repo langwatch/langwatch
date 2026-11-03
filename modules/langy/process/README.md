@@ -886,7 +886,7 @@ interface Body {
   adoptConversationId?: boolean;
 }
 type BodySchema0 = string | number | boolean | null | BodySchema0[] | Record<string, BodySchema0>;
-// Response: inline, src/transport/langy-turns.rest.ts:171
+// Response: inline, src/transport/langy-turns.rest.ts:172
 type Response = unknown;
 ```
 
@@ -894,7 +894,7 @@ type Response = unknown;
 
 Continue one Langy conversation with a turn. The turn surface answers 202 with the accepted turn, 200 with the settled reply under Prefer: wait, and a plain 404 when the rollout is dark for the project.
 
-Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:185`.
+Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:186`.
 
 Answers at `/api/langy/conversations/:conversationId/messages`, `/api/v1/langy/conversations/:conversationId/messages`.
 
@@ -915,7 +915,7 @@ interface Body {
   adoptConversationId?: boolean;
 }
 type BodySchema0 = string | number | boolean | null | BodySchema0[] | Record<string, BodySchema0>;
-// Response: inline, src/transport/langy-turns.rest.ts:191
+// Response: inline, src/transport/langy-turns.rest.ts:193
 type Response = unknown;
 ```
 

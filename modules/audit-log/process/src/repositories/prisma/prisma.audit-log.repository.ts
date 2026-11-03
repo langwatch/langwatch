@@ -97,6 +97,7 @@ export class PrismaAuditLogRepository
         targetKind: input.targetKind,
         targetId: input.targetId,
         createdAt: { gte: new Date(input.sinceMs) },
+        ...(input.organizationId ? { organizationId: input.organizationId } : {}),
       },
       select: { id: true },
     });

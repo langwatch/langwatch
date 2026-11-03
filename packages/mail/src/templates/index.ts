@@ -27,6 +27,7 @@ import {
   ssoDomainProofLapsedTemplate,
   ssoDomainProofWaveringTemplate,
 } from "./sso-domain-proof-emails.tsx";
+import { staffAccessNoticeEmailTemplate } from "./staff-access-notice-email.tsx";
 import { triggerDigestEmailTemplate } from "./trigger-digest-email.tsx";
 import { upgradeAlertEmailTemplate } from "./upgrade-alert-email.tsx";
 import { usageLimitEmailTemplate } from "./usage-limit-email.tsx";
@@ -52,6 +53,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   organizationMfaRequirementEmailTemplate,
   licenseEmailTemplate,
   upgradeAlertEmailTemplate,
+  staffAccessNoticeEmailTemplate,
   connectedStatementEmailTemplate,
   budgetIncreaseRequestEmailTemplate,
   usageLimitEmailTemplate,

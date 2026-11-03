@@ -329,6 +329,13 @@
       "restNamespaces": ["slack-connections"]
     },
     {
+      "id": "staff-access",
+      "root": "modules/staff-access",
+      "classification": "core",
+      "subjects": ["staff-access"],
+      "restNamespaces": ["staff-access"]
+    },
+    {
       "id": "stored-object",
       "root": "modules/stored-object",
       "classification": "core",

@@ -107,6 +107,7 @@ Reusable framework decisions live with their packages:
 | [190](./190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md) | A routed Instant Evals judgement is priced from the summed cost of its calls, at the one published markup                  | Proposed                  |
 | [191](./191-capitalised-names-get-a-second-person-pass.md)                     | A name written in capitals gets a second person pass                                                                       | Proposed                  |
 | [192](./192-grok-as-a-natively-instrumented-coding-agent.md)                   | Grok is a natively instrumented coding agent, read from its own OTLP logs and metrics                                      | Proposed                  |
+| [193](./193-ops-agent-access.md)                                               | The ops agent reaches a customer organization only through a passkey-approved, one-hour key                                | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

@@ -82,6 +82,7 @@ export function credentialPrincipalOfToken(
     ...(resolved.isLangySessionKey === undefined
       ? {}
       : { isLangySessionKey: resolved.isLangySessionKey }),
+    ...(resolved.isStaffAccessKey ? { isStaffAccessKey: true } : {}),
   };
 }
 
@@ -101,6 +102,7 @@ export function keyPrincipalOfApiKey(
     organizationId: resolved.organizationId,
     resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
     ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
+    ...(resolved.isStaffAccessKey ? { isStaffAccessKey: true } : {}),
   };
 }
 
@@ -306,6 +308,31 @@ export function admittedOwnerlessProjectKeyFor({
 
   return (
     credential.type === "apiKey" && credential.userId === null && !credential.isUnattendedRunKey
+  );
+}
+
+/**
+ * Whether an organization or key door admitted an ownerless staff access key (ADR-193). Such a
+ * door asked the key's own grant at any project a route named, so that project's proof is the
+ * door's; other ownerless keys there stay refused, as before.
+ */
+export function admittedOwnerlessStaffKeyFor({
+  door,
+  request,
+}: {
+  door: "organization" | "api_key";
+  request: Request;
+}): boolean {
+  if (door === "organization") {
+    const credential = organizationCredentials.get(request);
+    return credential?.userId === null && credential.isStaffAccessKey === true;
+  }
+  const credential = keyCredentials.get(request);
+
+  return (
+    credential?.kind === "apiKey" &&
+    credential.userId === null &&
+    credential.isStaffAccessKey === true
   );
 }
 

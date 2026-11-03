@@ -15,6 +15,7 @@ export class AdminAuditService extends AdminAuditSink {
 
   async record(entry: {
     userId: string;
+    organizationId?: string | undefined;
     action: string;
     args: Record<string, unknown>;
     req: AdminAuditRequest;
@@ -22,6 +23,7 @@ export class AdminAuditService extends AdminAuditSink {
     const userAgent = AdminAuditService.firstHeader(entry.req.headers["user-agent"]);
     await this.auditLog.record({
       userId: entry.userId,
+      ...(entry.organizationId ? { organizationId: entry.organizationId } : {}),
       action: entry.action,
       // A JSON round trip turns dates into strings and drops undefined fields.
       args: auditLogJsonValueSchema.parse(JSON.parse(JSON.stringify(entry.args))),
