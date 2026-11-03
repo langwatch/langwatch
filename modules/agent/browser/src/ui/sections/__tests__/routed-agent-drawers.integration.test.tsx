@@ -16,6 +16,7 @@ const opener = vi.hoisted(() => ({
   props: {} as Record<string, unknown>,
   /** The drawer address's `drawer.<key>` values: what openDrawer writes for plain strings. */
   params: {} as Record<string, string | undefined>,
+  paramWrites: [] as { updates: Record<string, string | undefined>; options: unknown }[],
   onInputMappingsChange: undefined as ((...args: unknown[]) => void) | undefined,
   onAgentLabelChange: undefined as ((label: string | undefined) => void) | undefined,
 }));
@@ -36,6 +37,8 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getDrawerStack: () => stack.entries,
   getComplexProps: () => opener.props,
   useDrawerParams: () => opener.params,
+  updateDrawerParams: (updates: Record<string, string | undefined>, options: unknown) =>
+    opener.paramWrites.push({ updates, options }),
   getFlowCallbacks: () =>
     opener.onInputMappingsChange || opener.onAgentLabelChange
       ? {
@@ -261,6 +264,7 @@ afterEach(() => {
   fetched.workflow = undefined;
   opener.props = {};
   opener.params = {};
+  opener.paramWrites = [];
   opener.onInputMappingsChange = undefined;
   opener.onAgentLabelChange = undefined;
   versions.data = { versions: [], labels: [], availableLabels: [] };
@@ -916,6 +920,9 @@ describe("the agent target's deploy label in an evaluation workbench", () => {
 
     expect(picked).toEqual(["production"]);
     expect(trigger).toHaveTextContent("production");
+    expect(opener.paramWrites).toEqual([
+      { updates: { agentLabel: "production" }, options: { push: false } },
+    ]);
   });
 
   /** @scenario "A target pinned to a label opens its agent drawer on that label" */

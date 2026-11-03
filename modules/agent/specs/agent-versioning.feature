@@ -263,6 +263,17 @@ Feature: Agent versions and deploy labels
     When a user changes its URL to "https://new.example.test/chat"
     Then an "agent changed" fact is recorded for that agent in its own project
     And creating, copying, pushing to copies, syncing a copy and moving a label record one too
+    And a workflow's new fields written into its linked agents record one for each agent
+    And a push records one only for the copies it wrote
+    And a copy, push or sync also records one for the source agent, so its copies list refetches
+
+  @unit
+  Scenario: A committed agent write still succeeds when its changed fact cannot be recorded
+    Given an HTTP agent "Support bot"
+    And the "agent changed" fact cannot be sent
+    When a user changes its URL
+    Then the change is saved and returned
+    And the failure is logged instead of failing the save
 
   @unit
   Scenario: Every read of an agent goes stale when the agent changes or is archived
@@ -329,3 +340,4 @@ Feature: Agent versions and deploy labels
     When the user clicks the target's column header
     Then the agent drawer's deploy label picker shows "production", not "latest"
     And the label comes from the drawer address, so a reload of that address shows it too
+    And after a reload the picker still writes to the target, and a change replaces the address
