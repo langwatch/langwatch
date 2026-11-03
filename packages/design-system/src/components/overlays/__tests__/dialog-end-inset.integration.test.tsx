@@ -54,15 +54,16 @@ const cssTextOf = ({ base, media }: ElementRules) =>
 const maxWidths = (rules: CSSStyleRule[]) => rules.map((rule) => rule.style.maxWidth).join("\n");
 
 /**
- * Only drawers yield the docked side panel's room; a dialog stays centred in the whole window.
+ * A docked side panel does not offset the dialog's position; from md up it only narrows the
+ * dialog's maximum width.
  */
-describe("given a docked side panel reserves no room from a dialog", () => {
+describe("given a docked side panel only narrows a dialog's maximum width", () => {
   afterEach(() => {
     setDrawerEndInset(0);
     cleanup();
   });
 
-  /** @scenario "A modal dialog ignores a docked panel's room and stays centred" */
+  /** @scenario "A modal dialog stays centred while a docked panel only narrows it" */
   it("adds no end padding to the dialog positioner", () => {
     setDrawerEndInset(412);
     const css = cssTextOf(rulesFor(renderOpenDialog().parentElement as HTMLElement));
@@ -72,7 +73,7 @@ describe("given a docked side panel reserves no room from a dialog", () => {
     expect(css).not.toContain("padding-inline-end");
   });
 
-  /** @scenario "A modal dialog ignores a docked panel's room and stays centred" */
+  /** @scenario "A modal dialog stays centred while a docked panel only narrows it" */
   it("reduces the dialog's maximum width by the panel's width from md up", () => {
     setDrawerEndInset(412);
     const { base, media } = rulesFor(renderOpenDialog());
@@ -83,5 +84,13 @@ describe("given a docked side panel reserves no room from a dialog", () => {
     );
     expect(maxWidths(base)).toMatch(/min\([^;]*calc\(100vw - 2rem\)/);
     expect(maxWidths(base)).not.toContain("412px");
+  });
+
+  /** @scenario "A modal dialog stays centred while a docked panel only narrows it" */
+  it("leaves the dialog's maximum width alone when no panel is docked", () => {
+    setDrawerEndInset(0);
+    const { base, media } = rulesFor(renderOpenDialog());
+    expect(maxWidths(media.map((entry) => entry.rule))).not.toContain("px)");
+    expect(maxWidths(base)).toMatch(/calc\(100vw - 2rem\)/);
   });
 });
