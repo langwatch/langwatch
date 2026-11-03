@@ -51,6 +51,7 @@ describe("the Connector on an HTTP agent config", () => {
       ["code over 64 KiB", { ...setup, code: "#".repeat(CONNECTOR_CODE_MAX_BYTES + 1) }],
       ["no code", { ...setup, code: "" }],
       ["a secret name that is not an identifier", { ...setup, secretNames: ["NOT-A-NAME"] }],
+      ["a secret name a stored secret cannot have", { ...setup, secretNames: ["shop_key"] }],
     ])("refuses %s", (_case, step) => {
       expect(httpAgentConfigSchema.validate({ url, connector: { setup: step } })).toBe(false);
     });

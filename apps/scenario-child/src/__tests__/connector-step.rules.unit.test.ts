@@ -57,6 +57,11 @@ describe("connectorStepInput()", () => {
     expect(
       connectorStepInput({ ...base, kind: "setup", rows: undefined, state }),
     ).not.toHaveProperty("state");
+    expect(
+      connectorStepInput({ ...base, kind: "teardown", rows: undefined, state: null }),
+    ).toMatchObject({
+      state: {},
+    });
     expect(connectorStepInput({ ...base, kind: "teardown", rows: undefined, state })).toMatchObject(
       {
         kind: "teardown",
@@ -152,6 +157,19 @@ describe("connectorStepOutputs()", () => {
       code: "hook_failed",
       message: expect.stringContaining("boom"),
     });
+  });
+
+  it("keeps internal addresses out of the error a customer reads", () => {
+    const rawBody = JSON.stringify({
+      status: "error",
+      error: { message: "connect ECONNREFUSED 10.4.2.11:5561 via http://nlpgo:5562/x" },
+    });
+
+    const message = (thrownBy(() => connectorStepOutputs({ kind: "setup", rawBody })) as Error)
+      .message;
+
+    expect(message).not.toContain("10.4.2.11:5561");
+    expect(message).not.toContain("http://nlpgo:5562/");
   });
 
   it("reads the code runner stopping the code at its limit as a timeout", () => {

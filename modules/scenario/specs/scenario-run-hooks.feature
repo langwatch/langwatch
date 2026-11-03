@@ -393,6 +393,13 @@ Feature: Scenario run hooks: setup and teardown
       Then setup records "timed_out"
       And the teardown step was called once
 
+    @integration
+    Scenario: A Connector step whose code runner fails records failed without internal addresses
+      Given a setup step and a code runner that answers non-2xx, cannot be reached or answers no JSON
+      When a scenario runs against the agent
+      Then setup records "failed" with the cause
+      And the error holds no internal address
+
     @unit
     Scenario: A Connector setup state over 64 KiB fails setup
       Given a setup step that returns a state over 64 KiB

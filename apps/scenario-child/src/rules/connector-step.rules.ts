@@ -8,6 +8,7 @@ import { STATE_MAX_BYTES } from "@langwatch/agent-contract";
 import type { ConnectorStepData, RunParameterValues } from "@langwatch/scenario-contract";
 import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 
+import { cleanErrorDetail, redactInternalAddresses } from "./execution-error.rules.ts";
 import type { ScenarioCallRun } from "./scenario-call-run.rules.ts";
 import * as ScenarioSecretReferenceAdapter from "./scenario-secret-reference.rules.ts";
 
@@ -79,7 +80,7 @@ export function connectorStepRefusal({
   return step.refusal ?? null;
 }
 
-/** What the step's code is called with. Teardown alone gets the state setup returned. */
+/** What the step's code is called with. Only teardown gets `state` (`{}` if setup failed). */
 export function connectorStepInput({
   kind,
   run,
@@ -101,7 +102,7 @@ export function connectorStepInput({
     idempotencyKey,
     params,
     ...(rows ? { rows } : {}),
-    ...(kind === "teardown" && state ? { state } : {}),
+    ...(kind === "teardown" ? { state: state ?? {} } : {}),
   };
 }
 
@@ -223,7 +224,8 @@ export function connectorStepOutputs({
   if (answer.status === "error") {
     const error = answer.nodes?.[CONNECTOR_STEP_NODE_ID]?.error ?? answer.error;
     const isTimeout = error?.type === CODE_BLOCK_TIMEOUT;
-    const detail = error?.traceback || error?.message || error?.type || "no error detail";
+    const rawDetail = error?.traceback || error?.message || error?.type || "no error detail";
+    const detail = redactInternalAddresses(cleanErrorDetail(rawDetail));
     throw new ConnectorStepError({ message: `The ${kind} step failed: ${detail}`, isTimeout });
   }
   const outputs = answer.nodes?.[CONNECTOR_STEP_NODE_ID]?.outputs;

@@ -15,8 +15,8 @@ export type ConnectorStepLanguage = (typeof CONNECTOR_STEP_LANGUAGES)[number];
 export const CONNECTOR_CODE_MAX_BYTES = 64 * 1024;
 export const CONNECTOR_ROWS_MAX_BYTES = 64 * 1024;
 
-/** The name grammar the secrets UI and the engine use. */
-const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** The grammar a stored project secret must match (SECRET_NAME_PATTERN in secret.ts). */
+const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;
 
 /** UTF-8 size without TextEncoder, which this isomorphic package's lib does not declare. */
 function utf8ByteLength(text: string): number {
@@ -39,7 +39,14 @@ const connectorStepSchemaDefinition = z.object({
     ),
   /** The project secrets this step may read; nothing else travels to it. */
   secretNames: z
-    .array(z.string().regex(SECRET_NAME, "A secret name is letters, digits and underscores."))
+    .array(
+      z
+        .string()
+        .regex(
+          SECRET_NAME,
+          "A secret name is capital letters, digits and underscores, starting with a letter.",
+        ),
+    )
     .default([]),
   /** Fixture rows the step receives as `rows`. */
   datasetId: z.string().min(1).optional(),

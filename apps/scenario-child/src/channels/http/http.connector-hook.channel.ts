@@ -12,6 +12,7 @@ import {
   ConnectorStepError,
   connectorTimeoutMessage,
 } from "../../rules/connector-step.rules.ts";
+import { cleanErrorDetail, redactInternalAddresses } from "../../rules/execution-error.rules.ts";
 import type { ConnectorHookChannel } from "../connector-hook.channel.ts";
 import type { ExecuteSyncTransport } from "../execute-sync.channel.ts";
 
@@ -56,7 +57,7 @@ export class HttpConnectorHookChannel implements ConnectorHookChannel {
       const rawBody = await response.text();
       if (!response.ok) {
         throw new ConnectorStepError({
-          message: `The code runner answered the ${kind} step with HTTP ${response.status}: ${rawBody.slice(0, 500)}`,
+          message: `The code runner answered the ${kind} step with HTTP ${response.status}: ${redactInternalAddresses(cleanErrorDetail(rawBody.slice(0, 500)))}`,
         });
       }
       return rawBody;

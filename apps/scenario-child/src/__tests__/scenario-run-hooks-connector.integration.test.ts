@@ -69,8 +69,17 @@ function engineBody(reply: Exclude<StepReply, "hang">) {
   return { status: "success", nodes: { [CONNECTOR_STEP_NODE_ID]: { outputs: reply.outputs } } };
 }
 
+/** How the transport itself fails, before the engine answers a step. */
+type TransportFailure =
+  | { status: number; body: string }
+  | { rejects: Error }
+  | { ok200Body: string };
+
 /** A code runner that answers each step by kind and records what it was sent. */
-function fakeCodeRunner(replies: Partial<Record<"setup" | "teardown", StepReply>>) {
+function fakeCodeRunner(
+  replies: Partial<Record<"setup" | "teardown", StepReply>>,
+  failure?: TransportFailure,
+) {
   const calls: StepCall[] = [];
   const transport: ExecuteSyncTransport = {
     endpoint: "http://nlp.test/go/studio/execute_sync",
@@ -80,6 +89,11 @@ function fakeCodeRunner(replies: Partial<Record<"setup" | "teardown", StepReply>
       const codeNode = workflow.nodes.find((node) => node.id === CONNECTOR_STEP_NODE_ID);
       const code = codeNode?.data.parameters?.find(({ identifier }) => identifier === "code");
       const kind = String(input.kind);
+      if (failure && "rejects" in failure) throw failure.rejects;
+      if (failure && "status" in failure) {
+        return { ok: false, status: failure.status, text: async () => failure.body };
+      }
+      if (failure) return { ok: true, status: 200, text: async () => failure.ok200Body };
       calls.push({ kind, input, code: String(code?.value), secrets: workflow.secrets });
       const reply = replies[kind as "setup"] ?? { outputs: {} };
       if (reply === "hang") {
@@ -336,6 +350,58 @@ describe("ScenarioRunHooksService over an HTTP agent's Connector", () => {
         error: expect.stringContaining("KeyError 'accounts'"),
       });
       expect(runner.calls.filter((call) => call.kind === "teardown")).toHaveLength(1);
+    });
+  });
+
+  describe("when the code runner itself fails", () => {
+    const failureFor = async (failure: TransportFailure) => {
+      const runner = fakeCodeRunner({}, failure);
+      const { service, turns, agent } = runWith({ connector: { setup: step() }, runner });
+      const caught = (await service
+        .around(turns())
+        .catch((error: unknown) => error)) as ScenarioRunHooksError;
+      return { caught, agent };
+    };
+
+    /** @scenario "A Connector step whose code runner fails records failed without internal addresses" */
+    it("records failed on a non-2xx answer, with no internal address in the error", async () => {
+      const { caught, agent } = await failureFor({
+        status: 502,
+        body: "upstream http://nlpgo:5562/go/studio down at 10.4.2.11:5561",
+      });
+
+      expect(agent.calls).toHaveLength(0);
+      expect(caught.hooks.setup).toMatchObject({
+        status: "failed",
+        error: expect.stringContaining("HTTP 502"),
+      });
+      expect(caught.hooks.setup?.error).not.toContain("10.4.2.11:5561");
+      expect(caught.hooks.setup?.error).not.toContain("http://nlpgo:5562");
+    });
+
+    /** @scenario "A Connector step whose code runner fails records failed without internal addresses" */
+    it("records failed when the code runner cannot be reached", async () => {
+      const { caught } = await failureFor({
+        rejects: Object.assign(new Error("connect ECONNREFUSED 10.4.2.11:5561"), {
+          code: "ECONNREFUSED",
+        }),
+      });
+
+      expect(caught.hooks.setup).toMatchObject({
+        status: "failed",
+        error: expect.stringContaining("ECONNREFUSED"),
+      });
+      expect(caught.hooks.setup?.error).not.toContain("10.4.2.11");
+    });
+
+    /** @scenario "A Connector step whose code runner fails records failed without internal addresses" */
+    it("records failed when a 200 answer is not JSON", async () => {
+      const { caught } = await failureFor({ ok200Body: "<html>gateway</html>" });
+
+      expect(caught.hooks.setup).toMatchObject({
+        status: "failed",
+        error: expect.stringContaining("no JSON"),
+      });
     });
   });
 
