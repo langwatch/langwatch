@@ -133,6 +133,40 @@ describe("ScenarioConnectorService", () => {
     });
   });
 
+  describe("when a block returns a secret in an encoded form", () => {
+    const secret = "s3cret/value+key?=";
+    const forms = [
+      Buffer.from(secret).toString("base64"),
+      Buffer.from(secret).toString("base64url"),
+      Buffer.from(secret).toString("base64").replace(/=+$/, ""),
+      encodeURIComponent(secret),
+    ];
+
+    /** @scenario "A secret is redacted in its encoded forms too" */
+    it("redacts every form in setup's state and in teardown's returned object, keys included", async () => {
+      const echoed = {
+        plain: secret,
+        forms,
+        nested: { [`key-${forms[0]}`]: `x${forms[3]}y` },
+      };
+      const { connector } = connectorWith(
+        {},
+        { setup: { state: echoed, secrets: { TOKEN: secret } }, teardown: echoed },
+      );
+
+      const setup = await connector.callHook({ kind: "setup", timeoutMs: 1000 });
+      const teardown = await connector.callHook({ kind: "teardown", timeoutMs: 1000 });
+
+      for (const answer of [setup, teardown]) {
+        expect(answer.state).toEqual({
+          plain: "[redacted]",
+          forms: ["[redacted]", "[redacted]", "[redacted]", "[redacted]"],
+          nested: { "key-[redacted]": "x[redacted]y" },
+        });
+      }
+    });
+  });
+
   describe("when setup returns a state holding a URL", () => {
     /** @scenario "The state never chooses where a connector block runs" */
     it("posts the call and teardown on the same channel, the URL only inside their input", async () => {

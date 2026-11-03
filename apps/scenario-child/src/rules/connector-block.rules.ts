@@ -280,7 +280,22 @@ export function connectorTeardownAnswer(outputs: ConnectorObject): { state?: Con
   return Object.keys(outputs).length > 0 ? { state: outputs } : {};
 }
 
-/** Text with every known secret value replaced, longest first; a list, as names can shadow. */
+/** Each secret as written, base64 (standard and URL-safe, padded or not) and URL-encoded. */
+export function secretVariants(values: readonly string[]): string[] {
+  const variants = new Set<string>();
+  for (const value of values) {
+    if (value === "") continue;
+    const base64 = Buffer.from(value).toString("base64");
+    const urlSafe = base64.replaceAll("+", "-").replaceAll("/", "_");
+    for (const form of [value, base64, urlSafe, encodeURIComponent(value)]) {
+      variants.add(form);
+      variants.add(form.replace(/=+$/, ""));
+    }
+  }
+  return [...variants];
+}
+
+/** Text with every known secret value, and its encoded forms, replaced, longest first. */
 export function scrubbedText({
   text,
   values,
@@ -288,20 +303,27 @@ export function scrubbedText({
   text: string;
   values: readonly string[];
 }): string {
-  const secrets = Object.fromEntries(values.map((value, index) => [String(index), value]));
+  const secrets = Object.fromEntries(
+    secretVariants(values).map((value, index) => [String(index), value]),
+  );
   return ScenarioSecretReferenceAdapter.redact({ message: text, secrets });
 }
 
-/** A JSON value with every known secret value in its strings replaced by the placeholder. */
+/** A JSON value with every secret value in its strings and keys replaced by the placeholder. */
 export function scrubbedJson<T>({ value, values }: { value: T; values: readonly string[] }): T {
-  if (typeof value === "string") return scrubbedText({ text: value, values }) as T;
-  if (Array.isArray(value)) {
-    return value.map((item: unknown) => scrubbedJson({ value: item, values })) as T;
-  }
-  if (isObject(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, scrubbedJson({ value: item, values })]),
-    ) as T;
-  }
-  return value;
+  const variants = secretVariants(values);
+  const scrub = (item: unknown): unknown => {
+    if (typeof item === "string") return scrubbedText({ text: item, values: variants });
+    if (Array.isArray(item)) return item.map(scrub);
+    if (isObject(item)) {
+      return Object.fromEntries(
+        Object.entries(item).map(([key, inner]) => [
+          scrubbedText({ text: key, values: variants }),
+          scrub(inner),
+        ]),
+      );
+    }
+    return item;
+  };
+  return scrub(value) as T;
 }

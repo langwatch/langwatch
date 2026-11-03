@@ -369,6 +369,12 @@ Feature: Scenario run hooks: setup and teardown
       Then the recorded state holds "[redacted]" in its place
       And the reply holds "[redacted]" in its place
 
+    @unit
+    Scenario: A secret is redacted in its encoded forms too
+      Given a run-scoped secret value
+      When a block returns it in base64, URL-safe base64, URL-encoded form or inside an object key
+      Then every such form reads "[redacted]" in setup's state and in teardown's returned object
+
     @integration
     Scenario: A connector setup that raises leaves the run not scored and still runs teardown
       Given a setup block that raises an error
