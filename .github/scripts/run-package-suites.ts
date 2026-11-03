@@ -250,6 +250,22 @@ export const balanceByWallTime = <T extends { name: string; scripts: readonly st
 export const DEFAULT_WEIGHT_SECONDS = 5;
 
 /**
+ * A script's seconds from the weights file. A script the file does not name, or
+ * a package it does not name at all, costs DEFAULT_WEIGHT_SECONDS, so it still
+ * lands on a shard. An excluded package runs nothing, so it adds nothing.
+ */
+export const scriptSecondsFrom =
+  ({
+    weights,
+    excluded,
+  }: {
+    weights: ReadonlyMap<string, ReadonlyMap<string, number>>;
+    excluded: ReadonlyMap<string, string>;
+  }) =>
+  (pkg: { name: string }, script: string): number =>
+    excluded.has(pkg.name) ? 0 : (weights.get(pkg.name)?.get(script) ?? DEFAULT_WEIGHT_SECONDS);
+
+/**
  * Parses the weights file. A line is `<package>  <script>  <seconds>`, optionally
  * followed by `# note`. A bad line is an error: one that silently parsed to nothing
  * would put the split back to guessing.
@@ -832,11 +848,7 @@ if (isEntrypoint()) {
       console.log(`::warning::'${name}' has a weight but is not a workspace package.`);
     }
   }
-  // An excluded package runs nothing, so it adds nothing to a shard's time.
-  const scriptSeconds = (pkg: DiscoveredPackage, script: string): number =>
-    excluded.has(pkg.name)
-      ? 0
-      : (parsedWeights.weights.get(pkg.name)?.get(script) ?? DEFAULT_WEIGHT_SECONDS);
+  const scriptSeconds = scriptSecondsFrom({ weights: parsedWeights.weights, excluded });
   let concurrency: number;
   try {
     concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);

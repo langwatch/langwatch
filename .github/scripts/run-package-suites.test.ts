@@ -25,6 +25,7 @@ import {
   planShard,
   runJobs,
   workerEnvFor,
+  scriptSecondsFrom,
   scriptsFor,
   staleEntries,
   summarise,
@@ -789,11 +790,14 @@ void describe("given the job is split into shards", () => {
   void describe("when a package is missing from the weights", () => {
     /** @scenario "A package with no recorded weight still lands on a shard" */
     void it("is weighed at the default and assigned like any other", () => {
-      const { weights } = parseWeights("known  100\n", "weights");
-      const weightOf = (p: { name: string }) => weights.get(p.name) ?? DEFAULT_WEIGHT_SECONDS;
+      const { weights, errors } = parseWeights("known  test  100\n", "weights");
+      assert.deepEqual(errors, []);
+      const seconds = scriptSecondsFrom({ weights, excluded: new Map() });
       const items = ["known", "new-a", "new-b"].map((name) => ({ name, scripts: ["test"] }));
-      assert.equal(weightOf(items[1]), DEFAULT_WEIGHT_SECONDS);
-      const placed = balanceByWallTime({ items, scriptSeconds: weightOf, concurrency: 2, total: 2 })
+      assert.equal(seconds(items[0]!, "test"), 100);
+      assert.equal(seconds(items[1]!, "test"), DEFAULT_WEIGHT_SECONDS);
+      assert.equal(seconds(items[0]!, "test:unlisted"), DEFAULT_WEIGHT_SECONDS);
+      const placed = balanceByWallTime({ items, scriptSeconds: seconds, concurrency: 2, total: 2 })
         .groups.flat()
         .map((p) => p.name)
         .toSorted();
