@@ -16,11 +16,6 @@ the 7-day window has elapsed, add a package-specific exception. Keep the
 exception scoped to the affected package, update the lockfile, and remove the
 exception after the patched release is older than 7 days.
 
-The same scoped, dated exception also covers a first-party release that a
-release of ours needs (for example a `langwatch-scenario` release that allows
-the new SDK major). Say why in the comment beside the entry and remove it once
-the date is more than 7 days old.
-
 Do not set the global delay to `0`, comment out the global setting, or run broad
 updates while the exception is active.
 
@@ -87,6 +82,21 @@ Then update only the affected package in the lock root that owns the dependency:
 uv lock --upgrade-package litellm
 uv lock --check
 ```
+
+## First-party Release Unblocks
+
+A release of ours can need a package we publish ourselves before it is 7 days
+old (for example a `langwatch-scenario` release that accepts the new SDK
+major). Use the same dated `exclude-newer-package` or
+`minimumReleaseAgeExclude` entry as above, only when all of these hold:
+
+- The package is one LangWatch publishes (`langwatch-*` on PyPI, `@langwatch/*`
+  on npm).
+- The release came from our own release workflow, and its version matches the
+  tagged commit in our repository. Check this before you add the entry.
+- The comment beside the entry names the blocked release task and the date
+  after which the entry is removed (7 days after the upload).
+- The date admits only the one release: it sits just after that upload.
 
 ## Review Checklist
 
