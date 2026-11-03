@@ -11,6 +11,7 @@ import {
   type DashboardWidgetDefinitionInput,
   type LangWatchQLBudgetOverflowMode,
   type LangWatchQLCaller,
+  type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
@@ -26,7 +27,6 @@ import {
   DashboardApi,
   DashboardsNotEnabledError,
   dashboardConfig,
-  type Board,
   type Dashboard,
   type BoardSummary,
   type DashboardScope,
@@ -423,7 +423,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Board> {
+  }): Promise<Dashboard> {
     return this.#boards.getBoard(input);
   }
 
@@ -432,20 +432,19 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     name: string;
     createdById?: string;
-  }): Promise<Board> {
+  }): Promise<Dashboard> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.createBoard(input);
   }
 
-  /** A board's inline name, description and left-out origins. */
+  /** A board's inline name and description. */
   async updateBoard(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-    excludedOrigins?: readonly string[] | null;
-  }): Promise<Board> {
+  }): Promise<Dashboard> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.updateBoard(input);
   }
@@ -455,7 +454,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Board> {
+  }): Promise<Dashboard> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.deleteBoard(input);
   }
@@ -466,7 +465,7 @@ export class DashboardModule implements DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Board> {
+  }): Promise<Dashboard> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#scopes.setScope(input);
   }
@@ -618,6 +617,7 @@ export class DashboardModule implements DashboardApi {
       dashboardId?: string;
       name: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget> {
     return this.#widgets.createWidget({
@@ -632,6 +632,7 @@ export class DashboardModule implements DashboardApi {
         ...(input.source === undefined ? {} : { source: input.source }),
       },
       viewer: input.viewer,
+      keyReach: input.keyReach,
     });
   }
 
@@ -643,12 +644,14 @@ export class DashboardModule implements DashboardApi {
       onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & Partial<DashboardWidgetDefinitionInput>,
   ): Promise<DashboardWidget> {
     return this.#widgets.updateWidget({
       projectId: input.projectId,
       id: input.id,
       viewer: input.viewer,
+      keyReach: input.keyReach,
       ...(input.onDashboardId === undefined ? {} : { onDashboardId: input.onDashboardId }),
       input: {
         ...(input.name === undefined ? {} : { name: input.name }),

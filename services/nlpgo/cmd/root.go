@@ -79,7 +79,7 @@ func Run(ctx context.Context, opts Options) error {
 	)
 
 	httpExec := newHTTPExecutor(cfg.Engine, ssrfOpts)
-	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv, deps.Logger)
 	if err != nil {
 		return err
 	}
@@ -179,8 +179,14 @@ func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
 // standing up the whole service.
 //
 // `getenv` is injected so tests don't need to mutate process env.
-func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
-	return codeblock.New(codeblock.Options{
+func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) (*codeblock.Executor, error) {
+	return codeblock.New(codeExecutorOptions(engineCfg, getenv, logger))
+}
+
+// codeExecutorOptions maps the operator's engine config to executor options.
+func codeExecutorOptions(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) codeblock.Options {
+	return codeblock.Options{
+		Logger: logger,
 		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
 		// The instance a code node's LangWatch SDK calls. It is the same URL
 		// the evaluator blocks call back on, and it is injected only next to
@@ -189,8 +195,24 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (
 			engineCfg.LangWatchBaseURL,
 			getenv,
 		),
-		DefaultTimeout: resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
-	})
+		DefaultTimeout:      resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
+		AllowVisibleProcess: allowVisibleProcess(engineCfg.CodeBlockAllowVisibleProcess, getenv, logger),
+	}
+}
+
+// allowVisibleProcess honors the setting only on AWS Lambda, the one platform
+// whose seccomp refuses the hide step; elsewhere it is ignored with a warning.
+func allowVisibleProcess(setting bool, getenv func(string) string, logger *zap.Logger) bool {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	onLambda := getenv("AWS_LAMBDA_FUNCTION_NAME") != "" && getenv("AWS_LAMBDA_RUNTIME_API") != ""
+	if setting && !onLambda {
+		logger.Warn("nlpgo_code_block_allow_visible_process_ignored",
+			zap.String("setting", codeblock.AllowVisibleProcessSetting),
+			zap.String("hint", "only honored on AWS Lambda; elsewhere the hide step stays required"))
+	}
+	return setting && onLambda
 }
 
 // newHTTPExecutor builds the HTTP-block executor from the operator-facing

@@ -292,24 +292,15 @@ jobs:
           cat "${tarball}.sha256"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
 
-      # The publisher role trusts this workflow on main only. Setting the
-      # EMBEDS_AWS_ROLE_ARN repository variable switches the upload to it; the
-      # stored-key step below goes once the role has published a release.
+      # The publisher role, named by the EMBEDS_AWS_ROLE_ARN repository
+      # variable, trusts this workflow on main only. No AWS key is stored.
       - name: Configure AWS credentials (OIDC)
-        if: ${{ !inputs.dry_run && vars.EMBEDS_AWS_ROLE_ARN != '' }}
+        if: ${{ !inputs.dry_run }}
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ vars.EMBEDS_AWS_ROLE_ARN }}
           role-session-name: embedded-binaries-${{ github.run_id }}
-
-      - name: Configure AWS credentials (stored key, until EMBEDS_AWS_ROLE_ARN is set)
-        if: ${{ !inputs.dry_run && vars.EMBEDS_AWS_ROLE_ARN == '' }}
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
-        with:
-          aws-region: ${{ env.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.EMBEDS_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}
 
       - name: Upload to S3 (and verify via embeds.langwatch.ai)
         if: ${{ !inputs.dry_run }}

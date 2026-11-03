@@ -28,6 +28,7 @@ function statements(mode: LwqlAccessModelMode): string[] {
     restrictedPassword: "restricted-secret",
     sourceDatabase: "langwatch",
     postgres: POSTGRES,
+    schema: "public",
     includeAppFunctions: false,
     mode,
   });

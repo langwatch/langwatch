@@ -14,6 +14,16 @@ Two settings change: the base URL points at the gateway, and the API key is a vi
 | Anthropic    | `https://gateway.langwatch.ai`    | `apiKey`, sent as `X-Api-Key`             |
 | Google GenAI | `https://gateway.langwatch.ai`    | `apiKey`, sent as `X-Goog-Api-Key`        |
 
+## Install
+
+```bash
+npm install openai
+# add the SDK you use: @anthropic-ai/sdk, ai with @ai-sdk/openai, @langchain/openai
+# and langwatch, to link the gateway span to your trace
+```
+
+The virtual key (`vk-lw-...`) is not your LangWatch API key. `LANGWATCH_API_KEY` is only needed by the LangWatch SDK: to link the gateway span to your own trace, and to manage keys and budgets from code.
+
 ## OpenAI SDK
 
 ```typescript
@@ -80,6 +90,10 @@ const llm = new ChatOpenAI({
   configuration: { baseURL: "https://gateway.langwatch.ai/v1" },
 });
 ```
+
+## Check it worked
+
+Run the OpenAI SDK sample. It prints the model's answer. Then open the project the virtual key traces to in LangWatch: the gateway's `gen_ai.<request type>` span appears in the traces list within a few seconds, as its own trace, with the model, the tokens and the cost.
 
 ## Link the gateway span to your trace
 

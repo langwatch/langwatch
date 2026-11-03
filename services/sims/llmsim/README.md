@@ -110,3 +110,13 @@ PUT    /_sim/api/settings        {"forcedError": 0 | 4xx | 5xx, "seed": "" | "ra
 It is a dev shim: no auth, any key accepted. Never expose it. That includes
 the model-provider credential probe (`GET /models`, Bearer or `?key=`): it is
 always answered 200, and forced errors apply only to generation calls.
+
+### Go clients and the AWS SDK
+
+The AWS SDK for Go closes a request body once the response headers arrive,
+and its body wrapper's `WriteTo` then returns `io.EOF` as an error. llmsim
+answers so fast that Go's transport, still draining that body, closes the
+connection mid-stream ("use of closed network connection"). A Go test that
+points the SDK at llmsim should send through a transport that hides
+`WriterTo` on the body, as `readOnlyBodyTransport` in `bedrock_test.go`
+does (langwatch/tasks#1016).

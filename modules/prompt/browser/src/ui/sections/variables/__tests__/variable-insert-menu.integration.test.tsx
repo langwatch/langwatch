@@ -2,12 +2,12 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { AvailableSource } from "@langwatch/design-system/variable-mapping";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { VariableInsertMenu } from "../variable-insert-menu.tsx";
-import type { AvailableSource } from "../variable-mapping-input.tsx";
 
 const mockSources: AvailableSource[] = [
   {

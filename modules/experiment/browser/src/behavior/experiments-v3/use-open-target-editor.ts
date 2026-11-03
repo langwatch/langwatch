@@ -279,10 +279,13 @@ export const useOpenTargetEditor = () => {
               datasetId: activeDatasetId,
               isDatasetSource,
             }),
+            onAgentLabelChange: (agentLabel: string | undefined) =>
+              updateTarget(target.id, { agentLabel }),
           });
           openDrawer(drawer, {
             availableSources: buildAvailableSources(target.id),
             inputMappings: buildUIMappings(target, activeDatasetId),
+            agentLabel: target.agentLabel,
             urlParams: { targetId: target.id, agentId: target.dbAgentId ?? "" },
           });
           requestAnimationFrame(() => scrollToTargetColumn(target.id));

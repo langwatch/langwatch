@@ -37,16 +37,37 @@ export class TraceEventPayloadFieldNotFoundError extends Error {
   }
 }
 
-/** The field was left at its preview because its trace had spent its recall budget. */
+/** Whose budget ran out: the trace's own, or the whole recall's across its traces. */
+export type OffloadRecallBudgetScope = "trace" | "recall";
+
+/** The field was left at its preview because a recall budget was spent. */
 export class TraceOffloadBudgetExceededError extends Error {
-  constructor(
-    readonly traceId: string,
-    readonly budgetBytes: number,
-  ) {
-    super(`Trace ${traceId} spent its ${budgetBytes}-byte offload recall budget`);
+  readonly traceId: string;
+  readonly budgetBytes: number;
+  readonly scope: OffloadRecallBudgetScope;
+
+  constructor({
+    traceId,
+    budgetBytes,
+    scope,
+  }: {
+    traceId: string;
+    budgetBytes: number;
+    scope: OffloadRecallBudgetScope;
+  }) {
+    super(
+      scope === "trace"
+        ? `Trace ${traceId} spent its ${budgetBytes}-byte offload recall budget`
+        : `The recall spent its ${budgetBytes}-byte budget; trace ${traceId} keeps its previews`,
+    );
     this.name = "TraceOffloadBudgetExceededError";
+    this.traceId = traceId;
+    this.budgetBytes = budgetBytes;
+    this.scope = scope;
   }
 }
+
+type SpentBudget = { scope: OffloadRecallBudgetScope; budgetBytes: number };
 
 type EventRead = { traceId: string; eventId: string; fields: Set<string> };
 
@@ -86,26 +107,29 @@ export abstract class TracePayloadReaderRepository {
     const outcomes = new Map<string, OffloadRecallOutcome>();
     const spentByTrace = new Map<string, number>();
     let spentTotal = 0;
-    const overBudget = new Set<string>();
+    const warned = new Set<string>();
 
     // The budget a trace has run out of, or null while it may still read. Checked before a read
     // starts and again when it lands: reads in flight together all start under budget, so one
     // landing after the budget is spent is dropped rather than kept.
-    const spentBudget = (traceId: string): number | null => {
-      if ((spentByTrace.get(traceId) ?? 0) >= traceBudgetBytes) return traceBudgetBytes;
-      if (spentTotal >= totalBudgetBytes) return totalBudgetBytes;
-      return null;
-    };
-    const keepPreviews = (read: EventRead, budgetBytes: number): void => {
+    const spentBudget = (traceId: string): SpentBudget | null =>
+      TracePayloadReaderRepository.spentBudget({
+        traceBytes: spentByTrace.get(traceId) ?? 0,
+        totalBytes: spentTotal,
+        traceBudgetBytes,
+        totalBudgetBytes,
+      });
+    const keepPreviews = (read: EventRead, spent: SpentBudget): void => {
       TracePayloadReaderRepository.settleAll(read, outcomes, {
         ok: false,
-        error: new TraceOffloadBudgetExceededError(read.traceId, budgetBytes),
+        error: new TraceOffloadBudgetExceededError({ traceId: read.traceId, ...spent }),
       });
-      if (overBudget.has(read.traceId)) return;
-      overBudget.add(read.traceId);
+      const warning = TracePayloadReaderRepository.budgetWarning(read.traceId, spent);
+      if (warned.has(warning.key)) return;
+      warned.add(warning.key);
       logger.warn(
-        { tenantId, traceId: read.traceId, budgetBytes, spentTotalBytes: spentTotal },
-        "Offload recall budget spent; the rest of this trace's offloaded fields keep their previews",
+        { tenantId, traceId: read.traceId, ...spent, spentTotalBytes: spentTotal },
+        warning.message,
       );
     };
 
@@ -178,6 +202,42 @@ export abstract class TracePayloadReaderRepository {
       outcomes.set(key, { ok: true, value });
     }
     return bytes;
+  }
+
+  /** The budget a trace has run out of, its own before the recall's, or null while it may read. */
+  private static spentBudget({
+    traceBytes,
+    totalBytes,
+    traceBudgetBytes,
+    totalBudgetBytes,
+  }: {
+    traceBytes: number;
+    totalBytes: number;
+    traceBudgetBytes: number;
+    totalBudgetBytes: number;
+  }): SpentBudget | null {
+    if (traceBytes >= traceBudgetBytes) return { scope: "trace", budgetBytes: traceBudgetBytes };
+    if (totalBytes >= totalBudgetBytes) return { scope: "recall", budgetBytes: totalBudgetBytes };
+    return null;
+  }
+
+  /** One warning per trace for its own budget, and one per recall once the recall's runs out. */
+  private static budgetWarning(
+    traceId: string,
+    spent: SpentBudget,
+  ): { key: string; message: string } {
+    if (spent.scope === "trace") {
+      return {
+        key: `trace:${traceId}`,
+        message:
+          "Offload recall budget spent; the rest of this trace's offloaded fields keep their previews",
+      };
+    }
+    return {
+      key: "recall",
+      message:
+        "Offload recall budget spent across its traces; the traces not yet read keep their previews",
+    };
   }
 
   private static settleAll(

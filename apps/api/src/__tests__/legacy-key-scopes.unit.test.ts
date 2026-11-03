@@ -56,6 +56,7 @@ describe("the routes each legacy project key scope flag opens", () => {
         ],
         "legacy_project_key_evaluations": [
           "GET evaluators /",
+          "GET evaluators /:evaluatorId/versions",
           "GET evaluators /:idOrSlug",
           "POST evaluations-legacy /api/evaluations/:evaluator/:subpath/evaluate",
           "POST evaluations-legacy /api/evaluations/:evaluator/evaluate",
@@ -66,6 +67,8 @@ describe("the routes each legacy project key scope flag opens", () => {
           "GET dataset /:datasetSlug/entries",
           "GET dataset /:slugOrId",
           "GET dataset /:slugOrId/records",
+          "GET dataset /:slugOrId/versions",
+          "GET dataset /:slugOrId/versions/:version",
           "GET evaluations /:evaluationSlug/versions",
           "GET evaluations /:evaluationSlug/workbench-state",
           "GET evaluations /runs",

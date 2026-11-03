@@ -4,13 +4,17 @@
  * repeated here.
  */
 
-// No procedure declares a permission: `apiKey:*` doesn't exist, because
+// The key-management procedures declare no permission: `apiKey:*` doesn't exist, because
 // a personal key belongs to its owner. The app proves org membership
 // first and asks `isOrgAdmin` on admin-only paths — every procedure states
 // the opt-out WITH the organization id, keeping the declaration sweep honest.
 
 import { ApiKeyApi, apiKeyTrpc } from "@langwatch/api-key-contract";
-import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  browserSessionWindowContext,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 
 /**
  * Nothing here is gated on a permission, because a personal
@@ -107,5 +111,23 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
       allow: MEMBER_ONLY,
     })
     .handle(({ app, input, actor }) => app.listOrganizationMembers(input, { id: actor.id }))
+
+    // ADR-185: the docs consent page's Allow. The member must see the project they hand on;
+    // the key then holds what they hold there, capped by their live grants on every request.
+    // An aggregate is no one project to act in, so the door refuses it there.
+    .procedure("mintDocsSessionKey")
+    .refusedOnAggregate()
+    .withMiddlewareContext(browserSessionWindowContext)
+    .mintsCredential("project:view")
+    .withPermission("project:view", { via: "projectId" })
+    .handle(({ app, input, actor }, browserSession) =>
+      app.mintDocsSessionKey({
+        userId: actor.id,
+        impersonatorId: actor.impersonatorId,
+        browserSession,
+        projectId: input.projectId,
+        docsOrigin: input.docsOrigin,
+      }),
+    )
 
     .build();

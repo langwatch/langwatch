@@ -324,7 +324,8 @@ function looksLikeHostPort(match: string): boolean {
 const URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
 /**
  * Engine's execution-harness frames (internal path, pure noise): engine anonymizes customer's frame
- * to `<code-block>`, wrapper frames stay.
+ * to `<code-block>`, wrapper frames stay. nlpgo now drops its own frames before it reports an
+ * error, and no longer runs the runner from a path at all, so this covers anything older.
  */
 const ENGINE_HARNESS_FRAME =
   /^[ \t]*File "\/tmp\/nlpgo-codeblock-[^"]*",.*$\n?(?:^[ \t]{4,}[^ \t\n].*$\n?|^[ \t]*\^+[ \t]*$\n?)*/gm;

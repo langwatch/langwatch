@@ -81,7 +81,7 @@ async function runClickHouseStatements({
   return { skipped };
 }
 
-/** The named relations and the named SQL functions present, from two `system` tables. */
+/** The named relations, their columns and the named SQL functions present, from `system` tables. */
 async function readClickHouseInventory({
   client,
   database,
@@ -98,6 +98,15 @@ async function readClickHouseInventory({
       "WHERE database = {database:String} AND has({relations:Array(String)}, name)",
     { database, relations: [...relations] },
   );
+  const columns =
+    present.length === 0
+      ? []
+      : await client.rows(
+          "SELECT table, groupArray(name) AS columns FROM system.columns " +
+            "WHERE database = {database:String} AND has({relations:Array(String)}, table) " +
+            "GROUP BY table",
+          { database, relations: [...relations] },
+        );
   const held =
     functions.length === 0
       ? []
@@ -110,6 +119,12 @@ async function readClickHouseInventory({
     relations: present.map((row) => String(row.name)),
     comments: Object.fromEntries(
       present.map((row) => [String(row.name), typeof row.comment === "string" ? row.comment : ""]),
+    ),
+    columns: Object.fromEntries(
+      columns.map((row) => [
+        String(row.table),
+        Array.isArray(row.columns) ? row.columns.map(String) : [],
+      ]),
     ),
     functions: held.map((row) => String(row.name)),
   };
@@ -263,16 +278,18 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   probePostgresCollection({
     collection,
     relation,
+    schema,
     cluster,
   }: {
     collection: string;
     relation: string;
+    schema: string;
     cluster: string | undefined;
   }): Promise<void> {
     return readThroughPostgres({
       client: this.client,
-      source: `${collection}, table = {relation:String}`,
-      params: { relation },
+      source: `${collection}, table = {relation:String}, schema = {schema:String}`,
+      params: { relation, schema },
       cluster,
     });
   }
@@ -280,23 +297,26 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   probePostgresCredentials({
     credentials,
     relation,
+    schema,
     cluster,
   }: {
     credentials: LwqlPostgresCredentials;
     relation: string;
+    schema: string;
     cluster: string | undefined;
   }): Promise<void> {
     return readThroughPostgres({
       client: this.client,
       cluster,
       source:
-        "{address:String}, {database:String}, {relation:String}, {user:String}, {password:String}",
+        "{address:String}, {database:String}, {relation:String}, {user:String}, {password:String}, {schema:String}",
       params: {
         address: `${credentials.host}:${credentials.port}`,
         database: credentials.database,
         relation,
         user: credentials.user,
         password: credentials.password,
+        schema,
       },
     });
   }

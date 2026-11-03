@@ -4,13 +4,12 @@ import { describe, it } from "node:test";
 
 import {
   DEFAULT_WEIGHT_SECONDS,
-  balanceShards,
+  balanceByWallTime,
   commandFor,
   createSuiteRunner,
   discover,
   exclusionNotices,
   failureAnnotations,
-  formatMeasured,
   heaviestFirst,
   isHeavyPackage,
   jobsFor,
@@ -22,10 +21,12 @@ import {
   parseShard,
   parseWeights,
   runJobs,
+  workerEnvFor,
   scriptsFor,
-  shardOf,
   staleEntries,
   summarise,
+  wallTimeOf,
+  withPackage,
   type DiscoveredPackage,
   type SuiteJob,
   type SuiteOutcome,
@@ -314,20 +315,6 @@ void describe("given the runner holds each suite's output until it ends", () => 
     });
   });
 
-  void describe("when a package runs two scripts", () => {
-    void it("adds both durations to the package's measured seconds", async () => {
-      const { runner, processes } = fakeRunner(false);
-      const two = pkg("@fix/a", ["test", "test:integration"]);
-      const unit = runner.run({ pkg: two, script: "test" });
-      processes.get("@fix/a")!.end(0);
-      await unit;
-      const integration = runner.run({ pkg: two, script: "test:integration" });
-      processes.get("@fix/a")!.end(0);
-      await integration;
-      assert.equal(runner.secondsOf.get("@fix/a"), 6);
-    });
-  });
-
   void describe("when the run is cancelled while a suite is still going", () => {
     /** @scenario "A cancelled run prints what its unfinished suites said" */
     void it("prints what that suite said so far as an unfinished group", () => {
@@ -601,6 +588,37 @@ void describe("given the scripts a package declares", () => {
   });
 });
 
+void describe("given a suite the shard is about to start", () => {
+  const job = (name: string, script: string) => ({
+    pkg: { name, dir: `modules/${name}`, scripts: [script] },
+    script,
+  });
+
+  void describe("when it is a heavy package's unit suite on four cores", () => {
+    /** @scenario "A heavy unit suite running alone uses every core" */
+    void it("asks vitest for four workers", () => {
+      assert.deepEqual(workerEnvFor({ job: job("@fix/trace", "test"), heavy: true, cores: 4 }), {
+        VITEST_MAX_WORKERS: "4",
+      });
+    });
+  });
+
+  void describe("when it needs a quiet CPU or shares a datastore", () => {
+    /** @scenario "A heavy suite that needs a quiet CPU keeps the launcher's workers" */
+    void it("adds nothing for design-system, integration, browser or light suites", () => {
+      const cases = [
+        { job: job("@langwatch/design-system", "test"), heavy: true },
+        { job: job("@fix/trace", "test:integration"), heavy: true },
+        { job: job("@fix/trace", "test:browser"), heavy: true },
+        { job: job("@fix/small", "test"), heavy: false },
+      ];
+      for (const { job: suite, heavy } of cases) {
+        assert.deepEqual(workerEnvFor({ job: suite, heavy, cores: 4 }), {});
+      }
+    });
+  });
+});
+
 void describe("given PACKAGE_SUITES_CONCURRENCY", () => {
   void describe("when it is not set", () => {
     /** @scenario "Without a concurrency setting the suites run one at a time" */
@@ -654,10 +672,15 @@ void describe("given the job is split into shards", () => {
   void describe("when every shard of a split takes its share", () => {
     /** @scenario "Every package lands on exactly one shard" */
     void it("runs each package on exactly one shard", () => {
-      const items = ["a", "b", "c", "d", "e", "f", "g"].map((name) => ({ name }));
+      const items = ["a", "b", "c", "d", "e", "f", "g"].map((name) => ({
+        name,
+        scripts: ["test"],
+      }));
       const weightOf = () => 1;
-      const shares = [1, 2, 3].map((index) =>
-        shardOf({ items, weightOf, shard: { index, total: 3 } }),
+      // Each shard computes the split alone and takes its own group.
+      const shares = [1, 2, 3].map(
+        (index) =>
+          balanceByWallTime({ items, weightOf, concurrency: 2, total: 3 }).groups[index - 1]!,
       );
       assert.deepEqual(
         shares
@@ -677,22 +700,80 @@ void describe("given the job is split into shards", () => {
       ["b", 200],
       ["c", 200],
     ]);
-    const items = ["a", "b", "c", "mid", "slow"].map((name) => ({ name }));
+    const items = ["a", "b", "c", "mid", "slow"].map((name) => ({ name, scripts: ["test"] }));
     const weightOf = (p: { name: string }) => weights.get(p.name) ?? DEFAULT_WEIGHT_SECONDS;
 
     /** @scenario "Shards are balanced by measured weight" */
     void it("places the heaviest first, each on the lightest shard", () => {
-      const groups = balanceShards({ items, weightOf, total: 2 }).map((g) => g.map((p) => p.name));
+      const groups = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 }).groups.map(
+        (g) => g.map((p) => p.name),
+      );
       assert.deepEqual(groups, [
         ["c", "slow"],
         ["a", "b", "mid"],
       ]);
     });
 
+    /** @scenario "Shards are balanced by the wall time each package adds" */
+    void it("weighs a heavy package whole and a light one by its share of the concurrency", () => {
+      const seconds = new Map([
+        ["heavy", 200],
+        ["l1", 90],
+        ["l2", 90],
+        ["l3", 90],
+        ["l4", 90],
+      ]);
+      const items = ["heavy", "l1", "l2", "l3", "l4"].map((name) => ({ name, scripts: ["test"] }));
+      const weightOf = (p: { name: string }) => seconds.get(p.name) ?? 0;
+      const { groups, walls } = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 });
+      // By raw seconds l4 joined the heavy package: 200 + 90/2 against 270/2.
+      assert.deepEqual(
+        groups.map((g) => g.map((p) => p.name)),
+        [["heavy"], ["l1", "l2", "l3", "l4"]],
+      );
+      assert.deepEqual(walls, [200, 180]);
+    });
+
+    /** @scenario "Shards are balanced by the wall time each package adds" */
+    void it("counts an integration lane at full weight, since it runs one suite at a time", () => {
+      const seconds = new Map([
+        ["heavy", 150],
+        ["i1", 90],
+        ["i2", 90],
+        ["i3", 90],
+      ]);
+      const items = [
+        { name: "heavy", scripts: ["test"] },
+        ...["i1", "i2", "i3"].map((name) => ({ name, scripts: ["test:integration"] })),
+      ];
+      const weightOf = (p: { name: string }) => seconds.get(p.name) ?? 0;
+      const { groups, walls } = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 });
+      // Counted at half weight, all three joined one shard and ran 270s back to back.
+      assert.deepEqual(
+        groups.map((g) => g.map((p) => p.name)),
+        [
+          ["heavy", "i3"],
+          ["i1", "i2"],
+        ],
+      );
+      assert.deepEqual(walls, [240, 180]);
+    });
+
+    /** @scenario "Shards are balanced by the wall time each package adds" */
+    void it("spreads a light package's weight over its scripts' lanes", () => {
+      const load = withPackage({
+        load: { alone: 0, shared: 0, integration: 0, browser: 0 },
+        weight: 60,
+        scripts: ["test", "test:integration", "test:browser"],
+      });
+      assert.deepEqual(load, { alone: 0, shared: 60, integration: 20, browser: 20 });
+      assert.equal(wallTimeOf({ load, concurrency: 2 }), 30);
+    });
+
     /** @scenario "Every shard computes the same split" */
     void it("gives the same split whatever order the packages arrive in", () => {
       const split = (list: typeof items) =>
-        balanceShards({ items: list, weightOf, total: 3 }).map((g) =>
+        balanceByWallTime({ items: list, weightOf, concurrency: 2, total: 3 }).groups.map((g) =>
           g.map((p) => p.name).toSorted(),
         );
       assert.deepEqual(split(items), split(items.toReversed()));
@@ -704,10 +785,10 @@ void describe("given the job is split into shards", () => {
     void it("is weighed at the default and assigned like any other", () => {
       const { weights } = parseWeights("known  100\n", "weights");
       const weightOf = (p: { name: string }) => weights.get(p.name) ?? DEFAULT_WEIGHT_SECONDS;
-      const items = [{ name: "known" }, { name: "new-a" }, { name: "new-b" }];
+      const items = ["known", "new-a", "new-b"].map((name) => ({ name, scripts: ["test"] }));
       assert.equal(weightOf(items[1]), DEFAULT_WEIGHT_SECONDS);
-      const placed = balanceShards({ items, weightOf, total: 2 })
-        .flat()
+      const placed = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 })
+        .groups.flat()
         .map((p) => p.name)
         .toSorted();
       assert.deepEqual(placed, ["known", "new-a", "new-b"]);
@@ -717,9 +798,9 @@ void describe("given the job is split into shards", () => {
   void describe("when a pull request narrows the packages", () => {
     /** @scenario "A pull request balances over only the packages it reaches" */
     void it("balances over just the packages given, not the whole workspace", () => {
-      const reached = [{ name: "big" }, { name: "small-a" }, { name: "small-b" }];
+      const reached = ["big", "small-a", "small-b"].map((name) => ({ name, scripts: ["test"] }));
       const weightOf = (p: { name: string }) => (p.name === "big" ? 300 : 100);
-      const groups = balanceShards({ items: reached, weightOf, total: 2 });
+      const { groups } = balanceByWallTime({ items: reached, weightOf, concurrency: 2, total: 2 });
       assert.deepEqual(
         groups.map((g) => g.map((p) => p.name)),
         [["big"], ["small-a", "small-b"]],
@@ -749,17 +830,6 @@ void describe("given the job is split into shards", () => {
       for (const bad of ["@fix/a", "@fix/a  0", "@fix/a  slow", infinite, "@fix/a 1\n@fix/a 2"]) {
         assert.equal(parseWeights(bad, "weights").errors.length, 1, bad);
       }
-    });
-
-    void it("prints the slow packages of a run in its own format", () => {
-      assert.deepEqual(
-        formatMeasured([
-          { name: "@fix/quick", seconds: 3 },
-          { name: "@fix/slow", seconds: 120.4 },
-          { name: "@fix/slower", seconds: 640 },
-        ]),
-        ["@fix/slower  640", "@fix/slow  120"],
-      );
     });
   });
 

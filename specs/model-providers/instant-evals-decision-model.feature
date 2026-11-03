@@ -51,12 +51,136 @@ Feature: Instant Evals decision model column in Default models
     Then it resolves as unavailable because the key is missing
 
   @unit
+  Scenario: A project's own key wins over an older organization key
+    Given the organization saved an OpenAI key before the project saved its own
+    When the project's OpenAI row is looked up
+    Then the project's row is answered, as the settings page lists it
+
+  @unit
+  Scenario: A saved decision model or key judges the next run
+    Given the project's decision model was resolved
+    When five seconds have passed
+    Then the next resolve reads the stored column and row again
+
+  # A provider whose host differs per customer (Azure) gets only the resource name from the row;
+  # the catalogue writes the rest of the URL, so a key still goes only to its issuer's domain.
+
+  @unit
+  Scenario: An Azure decision model is sent to the project's own Azure resource
+    Given the flag is on for the organization
+    And the Instant Evals column is "Azure OpenAI Decisions API"
+    And the project's Azure row has a key and the endpoint "https://acme.openai.azure.com/"
+    When the project's decision model is resolved
+    Then it resolves to "https://acme.openai.azure.com/openai/v1/decisions"
+    And the key is sent in the "api-key" header, never as a bearer token
+    And a deployment name stored on the row replaces the model name in the request
+
+  @unit
+  Scenario: An admin can name the Azure deployment of a decision model
+    When an admin edits the project's Azure provider without the API gateway
+    Then the form shows an optional deployment name for each Azure decision model
+    And the deployment names are shown as typed, never masked as a secret
+
+  @unit
+  Scenario: An Azure key is never sent to a host outside Azure
+    Given the flag is on for the organization
+    And the Instant Evals column is "Azure OpenAI Decisions API"
+    And the project's Azure row points at a gateway, a lookalike domain, plain http or a custom port
+    When the project's decision model is resolved
+    Then it resolves as unavailable because the endpoint is not allowed
+    And the call is skipped as a key problem, never sent
+
+  @unit
+  Scenario: Every catalogue entry can be reached with the key it names
+    When the decision model catalogue is read
+    Then every own entry names a registry provider, an https endpoint and a wire format
+    And every placeholder in an endpoint is filled from a field of that provider's row
+    And no two entries share an id
+
+  @unit
   Scenario: With the flag off an own decision model is not run and not moved onto the billed model
     Given the flag is off for the organization
-    And the Instant Evals column is "OpenAI Decisions (gpt-6-luna)"
+    And the Instant Evals column is "OpenAI Decisions API"
     When the project's decision model is resolved
     Then it resolves as unavailable because it is not enabled
     And the call is skipped as not configured
+
+  # --- A caller's own pick ---
+
+  # One judge may ask for a decision model of its own. The pick travels through the resolver as
+  # an override, so the flag guard, the key guard and the skip handling all apply unchanged.
+
+  @unit
+  Scenario: A caller's own decision model pick is resolved instead of the column
+    Given the flag is on for the organization
+    And the Instant Evals column is not set at any scope
+    And the project has an enabled OpenAI row with a key
+    When the decision model is resolved for a caller picking "OpenAI Decisions API"
+    Then it resolves to the own model with its endpoint and key
+    And the project's column is not read
+
+  @unit
+  Scenario: A caller's pick with no key cannot run and is not moved onto the billed model
+    Given the flag is on for the organization
+    And the project has no Inception row
+    When the decision model is resolved for a caller picking "Inception Mercury Decide"
+    Then it resolves as unavailable because the provider is missing
+
+  @unit
+  Scenario: A caller's pick is refused without the flag
+    Given the flag is off for the organization
+    When the decision model is resolved for a caller picking "OpenAI Decisions API"
+    Then it resolves as unavailable because it is not enabled
+
+  @unit
+  Scenario: A caller picking LangWatch Instant Preview runs on the hosted model
+    Given the flag is on for the organization
+    And the Instant Evals column is "Cloudflare Clef"
+    When the decision model is resolved for a caller picking "LangWatch Instant Preview"
+    Then it resolves to LangWatch Instant Preview
+    And no provider row is read
+
+  @unit
+  Scenario: A caller's pick that is not a decision model is ignored
+    Given the flag is on for the organization
+    And the Instant Evals column is "OpenAI Decisions API"
+    And the project has an enabled OpenAI row with a key
+    When the decision model is resolved for a caller picking a chat model
+    Then the project's column is resolved instead
+
+  @unit
+  Scenario: One caller's pick never answers for another caller
+    Given the flag is on for the organization
+    And the Instant Evals column is not set at any scope
+    And the project has an enabled OpenAI row with a key
+    When one caller resolves with a pick and another resolves with none
+    Then the second answers LangWatch Instant Preview, not the first caller's pick
+
+  # --- Offering the models ---
+
+  @unit
+  Scenario: With the flag off only LangWatch Instant Preview is offered
+    Given the flag is off for the organization
+    When the project's pickable decision models are listed
+    Then only "LangWatch Instant Preview" is offered
+
+  @unit
+  Scenario: With the flag on the models that would run are offered
+    Given the flag is on for the organization
+    And the project has an enabled OpenAI row with a key
+    And the project has no Inception row
+    When the project's pickable decision models are listed
+    Then "LangWatch Instant Preview" is offered first
+    And "OpenAI Decisions API" is offered
+    And "Inception Mercury Decide" is not offered
+
+  @unit
+  Scenario: A provider is asked for once however many of its models the catalogue holds
+    Given the flag is on for the organization
+    And the project has an enabled Perplexity row with a key
+    When the project's pickable decision models are listed
+    Then both Perplexity models are offered
+    And the Perplexity row is read once
 
   # --- Writing the column ---
 
@@ -80,7 +204,7 @@ Feature: Instant Evals decision model column in Default models
 
   @unit
   Scenario: A decision model cannot be another role's default
-    When an admin sets the Default column to "OpenAI Decisions (gpt-6-luna)"
+    When an admin sets the Default column to "OpenAI Decisions API"
     Then the write is refused saying it can only be the Instant Evals default
 
   # --- Calling an own decision model ---
@@ -107,6 +231,12 @@ Feature: Instant Evals decision model column in Default models
     When the provider answers 401
     Then the text is skipped as "classifier_key_invalid" after one attempt
     And the provider's error text is not read
+
+  @unit
+  Scenario: A model or deployment the account does not hold is skipped as not configured
+    When the provider answers 404
+    Then the text is skipped as "classifier_not_configured" after one attempt
+    And the run is not failed over it
 
   @unit
   Scenario: A rate limited provider is retried, then named as rate limited
@@ -183,7 +313,15 @@ Feature: Instant Evals decision model column in Default models
     Then I can pick only "LangWatch Instant Preview"
 
   @integration
+  Scenario: The drawer offers only the decision models that would run
+    Given the flag is on for my organization
+    And my project has an OpenAI key and no Inception key
+    When I edit the Instant Evals column
+    Then I can pick "LangWatch Instant Preview" and "OpenAI Decisions API"
+    And "Inception Mercury Decide" is not offered, so every pick I can make runs
+
+  @integration
   Scenario: Each decision model provider draws its own brand mark
     When the icon for a decision model provider is drawn
     Then the LangWatch hosted model draws the LangWatch logo
-    And Inception, Perplexity and Cloudflare each draw a mark of their own, not the generic one
+    And Inception, Perplexity, Cloudflare, TypeSafe, OpenRouter and Fireworks each draw a mark of their own, not the generic one
