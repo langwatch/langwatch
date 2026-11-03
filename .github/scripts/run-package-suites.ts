@@ -294,6 +294,24 @@ export const parseWeights = (
 };
 
 /**
+ * A weights line naming a script its package does not run is stale (renamed or
+ * removed) and would read as measured coverage. Packages the workspace lacks are
+ * left to the caller's own warning.
+ */
+export const undefinedWeightScripts = (
+  weights: ReadonlyMap<string, ReadonlyMap<string, number>>,
+  discovered: readonly DiscoveredPackage[],
+): string[] => {
+  const scriptsOf = new Map(discovered.map((pkg) => [pkg.name, pkg.scripts]));
+  return [...weights].flatMap(([name, scripts]) => {
+    const defined = scriptsOf.get(name);
+    return defined
+      ? [...scripts.keys()].filter((s) => !defined.includes(s)).map((s) => `${name}  ${s}`)
+      : [];
+  });
+};
+
+/**
  * The nightly flaky-test hunt names each package suite's JSON report after the
  * package and script, so the report alone says what to rerun. `:` is not allowed
  * in an artifact path, so a script's colon is written as `~`.
@@ -847,6 +865,13 @@ if (isEntrypoint()) {
       console.log(`::warning::'${name}' has a weight but is not a workspace package.`);
     }
   }
+  const staleScripts = undefinedWeightScripts(parsedWeights.weights, discovered);
+  for (const line of staleScripts) {
+    console.error(
+      `::error::'${line}' has a weight but the package does not run that script. Delete the line, or fix the script name if it was renamed.`,
+    );
+  }
+  if (staleScripts.length > 0) process.exit(1);
   const scriptSeconds = scriptSecondsFrom({ weights: parsedWeights.weights, excluded });
   let concurrency: number;
   try {

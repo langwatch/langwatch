@@ -15,8 +15,9 @@ type ScriptKey struct{ Package, Script string }
 // Weigh turns the measurements of several runs into one weight per script:
 // the median of its measured seconds. A replay from the Nx cache counts only
 // when no run executed that script for real. A script no run executed keeps its
-// `previous` (committed) weight, if its package was measured in some run.
-func Weigh(runs [][]Measurement, previous map[ScriptKey]float64) map[ScriptKey]float64 {
+// `previous` (committed) weight, if its package was measured in some run and
+// still `defined` the script (a renamed or removed one must not live on).
+func Weigh(runs [][]Measurement, previous map[ScriptKey]float64, defined func(ScriptKey) bool) map[ScriptKey]float64 {
 	ran, replayed := byScript(runs)
 	measured := map[string]bool{}
 	weights := map[ScriptKey]float64{}
@@ -31,7 +32,7 @@ func Weigh(runs [][]Measurement, previous map[ScriptKey]float64) map[ScriptKey]f
 		}
 	}
 	for key, seconds := range previous {
-		if _, ranForReal := ran[key]; measured[key.Package] && !ranForReal {
+		if _, ranForReal := ran[key]; measured[key.Package] && !ranForReal && defined(key) {
 			weights[key] = seconds
 		}
 	}

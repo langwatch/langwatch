@@ -50,7 +50,11 @@ func run(runs int, src suiteweights.Source) error {
 	// Absent on a first run; then every package is weighed from the runs alone.
 	committed, _ := os.ReadFile(path)
 	previous := suiteweights.ParseWeights(string(committed))
-	content := suiteweights.Render(suiteweights.Weigh(measured, previous), ids)
+	defined, err := suiteweights.DefinedScripts(root)
+	if err != nil {
+		return err
+	}
+	content := suiteweights.Render(suiteweights.Weigh(measured, previous, defined), ids)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil { //nolint:gosec // G306: a checked-in file everyone reads
 		return err
 	}

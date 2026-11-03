@@ -36,20 +36,22 @@ func m(pkg, script string, seconds float64, cached bool) Measurement {
 
 func k(pkg, script string) ScriptKey { return ScriptKey{Package: pkg, Script: script} }
 
+func allDefined(ScriptKey) bool { return true }
+
 // @scenario "A suite Nx replayed from its cache does not make it look cheap"
 func TestWeighIgnoresCacheReplaysWhenARealRunExists(t *testing.T) {
 	weights := Weigh([][]Measurement{
 		{m("a", "test", 2, true)},
 		{m("a", "test", 90, false)},
 		{m("a", "test", 3, true)},
-	}, nil)
+	}, nil, allDefined)
 
 	assert.InDelta(t, 90.0, weights[k("a", "test")], 0.001)
 }
 
 // @scenario "A suite only ever replayed from the cache still has a weight"
 func TestWeighFallsBackToReplaysWhenNothingRanForReal(t *testing.T) {
-	weights := Weigh([][]Measurement{{m("a", "test", 4, true)}, {m("a", "test", 6, true)}}, nil)
+	weights := Weigh([][]Measurement{{m("a", "test", 4, true)}, {m("a", "test", 6, true)}}, nil, allDefined)
 
 	assert.InDelta(t, 5.0, weights[k("a", "test")], 0.001)
 }
@@ -61,7 +63,7 @@ func TestWeighKeepsTheCommittedWeightOfAPackageNoRunExecuted(t *testing.T) {
 	weights := Weigh([][]Measurement{
 		{m("@x/sims", "test", 2, true), m("@x/ran", "test", 40, false)},
 		{m("@x/sims", "test", 3, true), m("@x/ran", "test", 50, false)},
-	}, previous)
+	}, previous, allDefined)
 
 	assert.InDelta(t, 28.0, weights[k("@x/sims", "test")], 0.001)
 	assert.InDelta(t, 12.0, weights[k("@x/sims", "test:browser")], 0.001)
@@ -72,11 +74,21 @@ func TestWeighKeepsTheCommittedWeightOfAPackageNoRunExecuted(t *testing.T) {
 func TestWeighKeepsAScriptNoRunExecutedWhenItsPackageRan(t *testing.T) {
 	previous := ParseWeights("@x/app  test  30\n@x/app  test:browser  70\n@x/gone  test  20\n")
 
-	weights := Weigh([][]Measurement{{m("@x/app", "test", 40, false)}}, previous)
+	weights := Weigh([][]Measurement{{m("@x/app", "test", 40, false)}}, previous, allDefined)
 
 	assert.InDelta(t, 40.0, weights[k("@x/app", "test")], 0.001)
 	assert.InDelta(t, 70.0, weights[k("@x/app", "test:browser")], 0.001)
 	assert.NotContains(t, weights, k("@x/gone", "test"))
+}
+
+// @scenario "A committed script its package no longer defines is dropped"
+func TestWeighDropsAScriptItsPackageNoLongerDefines(t *testing.T) {
+	previous := ParseWeights("@x/app  test  30\n@x/app  test:browser  70\n")
+	defined := func(key ScriptKey) bool { return key == k("@x/app", "test") }
+
+	weights := Weigh([][]Measurement{{m("@x/app", "test", 40, false)}}, previous, defined)
+
+	assert.NotContains(t, weights, k("@x/app", "test:browser"))
 }
 
 // @scenario "A package's weight is the median of its runs, kept per script"
@@ -85,7 +97,7 @@ func TestWeighKeepsTheMedianOfEachScriptApart(t *testing.T) {
 		{m("a", "test", 50, false), m("a", "test:integration", 274, false)},
 		{m("a", "test", 40, false), m("a", "test:integration", 404, false)},
 		{m("a", "test", 60, false), m("a", "test:integration", 300, false)},
-	}, nil)
+	}, nil, allDefined)
 
 	assert.InDelta(t, 50.0, weights[k("a", "test")], 0.001)
 	assert.InDelta(t, 300.0, weights[k("a", "test:integration")], 0.001)

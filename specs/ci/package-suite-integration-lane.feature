@@ -102,6 +102,12 @@ Feature: A package's integration suite runs in CI when it declares one
       Then it fails instead of splitting by guesswork
 
     @unit
+    Scenario: A weights line naming a script its package does not run is refused
+      Given a weights line for a script the workspace package does not run
+      When the package suites job starts
+      Then it fails instead of reading a stale weight as measured
+
+    @unit
     Scenario: A malformed shard value is refused
       Given PACKAGE_SUITES_SHARD is not "<index>/<total>"
       When the package suites job starts

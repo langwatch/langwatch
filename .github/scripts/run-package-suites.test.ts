@@ -22,6 +22,7 @@ import {
   parseRegister,
   parseShard,
   parseWeights,
+  undefinedWeightScripts,
   planShard,
   runJobs,
   workerEnvFor,
@@ -870,6 +871,18 @@ void describe("given the job is split into shards", () => {
       for (const line of [...bad, "@fix/a test 1\n@fix/a test 2"]) {
         assert.equal(parseWeights(line, "weights").errors.length, 1, line);
       }
+    });
+  });
+
+  void describe("given a weights line for a script its package does not run", () => {
+    /** @scenario "A weights line naming a script its package does not run is refused" */
+    void it("names the line", () => {
+      const { weights } = parseWeights(
+        "@fix/a  test  9\n@fix/a  test:browser  9\n@fix/gone  test  9\n",
+        "weights",
+      );
+      const discovered = [{ name: "@fix/a", dir: "a", scripts: ["test"] }];
+      assert.deepEqual(undefinedWeightScripts(weights, discovered), ["@fix/a  test:browser"]);
     });
   });
 
