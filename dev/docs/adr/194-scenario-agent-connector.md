@@ -1,19 +1,31 @@
-# ADR-194: Scenario Agent Connector: setup and teardown live in LangWatch
+# ADR-194: Scenario Connector: a new agent type that LangWatch hosts
 
-**Date:** 2026-11-02
+**Date:** 2026-11-03
 
 **Status:** Proposed
 
+## What the owner asked for
+
+On 2026-10-30 the owner asked for a separate, branded agent type. The words:
+
+- "can we create a little demo for this? I think this would reduce a lot of friction for users, right? they just need to build their APIs?"
+- "I think it makes sense to make a custom agent just for this, even though it's technically a code agent maybe, it seems more branded and locked in"
+- "also, then we don't have to break code agents by accident"
+- The pitch: "Proposing to create a custom scenario connector agent in langwatch for users -- we host the the wrappers for them. reduces a lot of friction. They get the setup/teardown and fixtures right there in the platform -- they just need to decide how to hit their own apis"
+- "we already support secrets and all that, so it can be quite secure. But if they want to run it themselves, the sdk are already there."
+
+The earlier draft of this ADR, and https://github.com/langwatch/langwatch/pull/9239 (head 5adee106781), put setup and teardown steps on the HTTP agent. The owner said that "is not what was discussed". This ADR replaces that design.
+
 ## Context
 
-A scenario often needs test data that exists before the first turn and is removed after the last: a throwaway account, an order to refund. Today there are two ways to make it, and both put code in the customer's hands:
+A scenario often needs test data that exists before the first turn and is removed after the last: a throwaway account, an order to refund. Today both ways to make it put code in the customer's hands:
 
 - **Connected agents** (ADR-180, [180-scenario-run-hooks.md](180-scenario-run-hooks.md)): setup and teardown are functions in the customer's process, which must stay online.
 - **HTTP agents** (ADR-188, proposed on https://github.com/langwatch/langwatch/pull/8956, built on https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195; not on main): a hooks URL the customer hosts, signed by LangWatch.
 
-A customer found this too much to maintain. The owner decided on 2026-11-02 to build an in-app **Scenario Agent Connector** (epic https://github.com/langwatch/tasks/issues/1063): setup and teardown are defined in LangWatch from existing parts, and the customer only exposes the agent's HTTP API.
+Epic: https://github.com/langwatch/tasks/issues/1063.
 
-What main already has, and the Connector can reuse:
+What main has, and the Connector reuses:
 
 - **The hook lifecycle is on main and is caller-agnostic.** `ScenarioRunHooksService.around` runs setup, the turns, then teardown in a `finally`, records each hook, and never lets teardown change the score (`apps/scenario-child/src/services/scenario-run-hooks.service.ts:100-115`). It calls hooks through a two-member interface, `ScenarioHookCaller { runState; callHook({ kind, timeoutMs }) }` (`:20-23`). Only the wiring picks connected agents: `hookTargetOf` returns null for any other agent type (`apps/scenario-child/src/services/scenario-child-execution.service.ts:209-222`).
 - **The record is on main.** `ScenarioHookResult` with statuses `ok | failed | timed_out | skipped | not_run`, the 60 s `DEFAULT_HOOK_TIMEOUT_MS`, and "Not scored" when setup is not `ok` (`modules/scenario/contract/src/features/execution/scenario-hooks.ts:11,17,56-59`); the `lw.simulation_run.hooks_recorded` event (`modules/scenario/process/src/eventing/simulation-processing.commands.ts:115`); the Setup and Teardown bands on the run.
@@ -21,136 +33,136 @@ What main already has, and the Connector can reuse:
 - **Code-block isolation.** https://github.com/langwatch/langwatch/pull/9050 (merged) isolates one execution from another inside nlpgo. The app-level rule that a code block gets no network unless its workflow declares it is not built: `specs/security/tenant-aware-egress-isolation.feature` marks "A code block is denied network access by default" as `@unimplemented`. On cloud, the code-block runner's network is already fenced at the infrastructure level: outbound HTTPS (443) and DNS only, plus the private AWS service endpoints, with no database, cache or internal load balancer ports. Self-hosted, the Python subprocess runtime still lets a block open any socket (`specs/nlp-go/code-block.feature:336-340`). https://github.com/langwatch/langwatch/pull/8991 (open, not on main; its ADR-183) adds a WebAssembly runtime for JavaScript and TypeScript code blocks, but keeps Python on the subprocess runtime by default (WebAssembly is opt-in through `NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm`).
 - **Datasets** are read through `DatasetApi.getDatasetPage` (`modules/dataset/contract/src/dataset.api.ts:132`).
 
+How agent types are defined today:
+
+- `agentTypeSchema` is an enum of six types, and `agentConfigSchema` is a discriminated union on `type` (`modules/agent/contract/src/config/index.ts`). Each type has its own config file beside it (`code.ts`, `http.ts`, `connected.ts`, `voice.ts`, `signature.ts`). `modules/agent/contract/src/agent.ts` repeats the `type` literal in its create and read shapes.
+- The scenario child picks a target from one table, `SERIALIZED_AGENT_RUNTIMES` (`apps/scenario-child/src/channels/serialized-agent-channels.registry.ts`). Each row names an input schema, a factory, a resource class and a stop signal. Its header says a new runtime is a new row. The data schemas live in `modules/scenario/contract/src/scenario-execution-data.ts`, the resource classes in `modules/scenario/contract/src/scenario-resource-class.ts`.
+- The UI lists types in `modules/agent/browser/src/ui/sections/agent-type-selector-drawer.tsx`; code and HTTP agents have their own editor drawers beside it.
+
 ## Decision
 
-We will add a **Connector** to the HTTP agent: an optional setup step and teardown step, each a code block that LangWatch stores and runs. A run calls them through the existing ADR-180 lifecycle as one more `ScenarioHookCaller`. The customer writes and hosts nothing.
+We will add a new agent type, **Scenario Connector** (`type: "connector"`), next to `code`, `http` and `connected`. The existing types do not change: no edit to the code or HTTP config schema, editor or runner target.
 
-### Data model and ownership
+### What the user writes
 
-- **The agent module owns the Connector config.** It is a new optional field on the HTTP agent config (`modules/agent/contract/src/config/http.ts:33`), in the existing JSON column. No table, no migration, no catalogue change. Agent copy and sync carry it as they carry the rest of the config.
+Only how to reach their own API, in three places:
+
+- **Call** (required): a code block. It gets the scenario's message and the run state, sends it to the customer's API, and returns the reply.
+- **Setup** and **teardown** (optional): code blocks. Setup makes test data and returns a state, for example the id of a created account. Teardown removes it.
+- **Secrets and fixtures**: the project secrets the blocks may read (from the secrets manager), and an optional fixtures dataset whose rows setup can use.
+
+LangWatch stores the blocks, hosts the wrapper around them, and runs them. The customer hosts nothing. A customer who wants to run it on their own side still has the SDKs (ADR-128).
+
+### Config and ownership
+
+- **The agent module owns the config.** A new file `modules/agent/contract/src/config/connector.ts` beside `http.ts`, a new member of `agentTypeSchema`, `agentConfigSchema` and `parseAgentConfig`, and the matching `type` literals in `agent.ts`. It lives in the agent's existing JSON config column: no table, no migration.
 
   ```text
-  connector?: {
-    setup?: ConnectorStep;
-    teardown?: ConnectorStep;
+  connectorAgentConfig = {
+    ...baseAgentConfig,
+    call: Block;
+    setup?: Block;
+    teardown?: Block;
+    secretNames: string[];   // project secrets the blocks may read; nothing else travels
+    fixturesDatasetId?: string;
+    timeoutMs?: number;
   }
-  ConnectorStep = {
-    language: "python";                // other languages when the code-block runtime offers them
-    code: string;          // Python source; takes the input, returns the output, as a code agent's block does. 64 KiB cap.
-    secretNames: string[]; // project secrets this step may read; nothing else travels
-    datasetId?: string;    // optional fixture rows
-  }
+  Block = { language: "python"; code: string }   // 64 KiB cap
   ```
 
-- **The scenario module owns the run behaviour.** The prefetch reads the step through `AgentApi` (as it reads the agent today), its named secrets through `SecretApi`, and its dataset rows through `DatasetApi`, and puts them on the job's adapter data. `adapterDeclaresHooks` (`modules/scenario/process/src/rules/scenario-run-hooks.rules.ts:14-17`) counts a Connector step as a declared hook, so the run goes to the Node child as hooked connected runs do.
-- **`apps/scenario-child` gains `ConnectorHookCaller`**, a `ScenarioHookCaller` that runs a step through the same `ExecuteSyncTransport` the code agent channel uses. `hookTargetOf` returns it for an HTTP agent with a Connector. `ScenarioRunHooksService` does not change.
-- An HTTP agent has at most one hook source. v1 has only one (see the hooks-chain decision), so there is nothing to choose.
+- **The scenario module owns run behaviour.** The target prefetch (`modules/scenario/process/src/features/prefetch/services/scenario-target-prefetch.service.ts`) reads the agent through `AgentApi`, the named secrets through `SecretApi.getValuesByName`, and the fixture rows through `DatasetApi.getDatasetPage`. It puts them on a new `ConnectorAgentData` in `scenario-execution-data.ts`. `adapterDeclaresHooks` (`modules/scenario/process/src/rules/scenario-run-hooks.rules.ts`) counts a connector agent with a setup or teardown block as hooked.
+- **The child gets its own target.** A new row `connector` in `SERIALIZED_AGENT_RUNTIMES`, a new `TARGET_RESOURCE_CLASS` and stop signal, and a new channel `HttpSerializedConnectorAgentChannel` beside `http.serialized-code-agent.channel.ts`. `hookTargetOf` (`scenario-child-execution.service.ts`) returns the connector's hook caller for this type.
 
-### What a step receives and returns
+### How a run goes
 
-- Input: `{ kind, run: { scenarioRunId, scenarioName, batchRunId }, idempotencyKey, params, secrets, rows?, state? }`.
-  - `params` are the run parameters, as every target reads them.
-  - `secrets` maps each name in `secretNames` to its value, and holds no other secret (code agents today get every listed secret; a step gets less).
-  - `rows` is the bound dataset, capped at 64 KiB in total; over the cap fails the step before it runs. The code picks the row it needs, for example by `params.persona`. One run per row is out of scope.
-  - `idempotencyKey` is `<scenarioRunId>:<attemptId>:<kind>`, the shape ADR-188 settled, so a step can tag the data it makes and a sweep can find leftovers.
-  - `state` is sent to teardown only.
-- Setup returns `{ state, secrets? }`. Any other top-level key fails setup with an error naming the key, so a bare `{"accountId": ...}` cannot record `ok` with an empty state.
-  - `state` (a JSON object, 64 KiB cap) is the run's state, as in ADR-180. HTTP turn templates read it as `{{ state }}` and `{{ state.NAME }}`; the simulated user and the judge see it each turn; teardown receives it; the run records it.
-  - State never chooses where a turn goes: a URL template whose host comes from `state` is refused, so setup cannot point the run's secrets at another host. State may fill the path and query.
-  - `secrets` (name to string) are **run-scoped secrets**: they override a project secret of the same name for this run only, as secret run parameters already do. Turn templates read them as `{{ secrets.NAME }}`, and teardown receives them. They are never recorded, never shown to the simulated user or the judge, and scrubbed from every error and transcript (`scrubKnownSecrets`, which skips values under 8 characters so ordinary text is not mangled; `apps/scenario-child/src/rules/execution-error.rules.ts:349`). A throwaway account's password or token goes here, not in `state`.
-- Teardown returns an optional object, which the run shows. It never changes the score.
-- An HTTP turn cannot change the state, as ADR-188 settled.
+1. Setup (if set) runs as a one-node code workflow on nlpgo's `/go/studio/execute_sync`, the transport a code agent turn uses. It returns `{ state, secrets? }`.
+2. Each turn runs the **call** block the same way, with the message, the history, the run state and the run-scoped secrets. It returns the reply text.
+3. Teardown (if set) runs in a `finally`, with the state setup returned, even when setup failed (with partial state), a turn failed, or the run was stopped.
 
-### Isolation, egress and timeouts
+State and run-scoped secrets follow ADR-180 and the earlier draft of this ADR:
 
-- Steps run only in nlpgo's code-block sandbox, never in the worker or the scenario child.
-- Steps are Python code blocks on today's nlpgo runner, sent by the scenario child as one `execute_sync` POST each, the same transport code agents use in scenarios. Other languages come when the runtime offers them.
-- **There is no app-level network fence for steps, and none is a precondition.** The app-level fence is not built (see Context). Cloud already fences the runner at the infrastructure level: outbound HTTPS and DNS only, plus the private AWS service endpoints. So a step can call public HTTPS APIs, which the Connector needs, and cannot reach platform data stores. A step adds no egress exposure beyond what a code agent already has on cloud. There, code blocks run in per-project NLP Lambdas whose IAM role covers only their own log groups and VPC network interfaces. A fence (code-block egress through the tenant-aware egress service) is follow-up work.
-- **Gate:** the product flag `release_scenario_connector_steps`. Self-hosted: steps always run. Cloud: the flag decides. When it is off, both setup and teardown record "Connector steps are not released for this project yet.", the run ends `ERROR` and Not scored, and no code-runner call is made for either step.
-- **Open question for the owner:** the cloud default of the flag. Proposal: on by default, the flag kept as an off switch. Not decided.
-- Each step has the ADR-180 budget: 60 s. The child aborts the execute call at the budget, and the code block's own `timeout_ms` is set just under it, so nlpgo stops the code first and reports why. The operator's code-block ceiling can lower it, never raise it. A timeout records `timed_out`.
-- No retries, as in ADR-180.
+- Setup returns `state` (a JSON object, 64 KiB cap). Call and teardown receive it. The simulated user and the judge may see it, so it holds ids, not credentials.
+- Setup may also return `secrets` (name to string). They override a project secret of the same name for this run only. Call and teardown receive them. They are never recorded and never shown to the simulated user or the judge, and are scrubbed from every error and transcript.
+- Any other top-level key in setup's answer fails setup with an error naming the key.
+- **State never chooses a host.** The customer's base URL is a config field or a project secret, never read from `state`, so setup cannot point the run's secrets at another host.
+- The input also carries `run`, `params`, `rows` (the fixture rows, 64 KiB cap, over it fails the step) and `idempotencyKey` `<scenarioRunId>:<attemptId>:<kind>`, so a block can tag the data it makes and a sweep can find leftovers.
+- Each block gets only the secrets in `secretNames`, fewer than a code agent gets today.
 
-### Outcomes and records
+### Lifecycle, records and timeouts
 
-These are unchanged from ADR-180:
+This plugs into the lifecycle on main (ADR-180) and does not change it: `ScenarioRunHooksService.around`, the `ScenarioHookResult` record, the `lw.simulation_run.hooks_recorded` event and the Setup and Teardown bands.
 
-- A setup that fails or times out ends the run `ERROR` and Not scored.
-- Teardown runs in the `finally`: after a pass, a failure, and a failed setup (with partial state).
+- Setup that fails or times out ends the run `ERROR` and Not scored. Teardown never changes the score.
+- Each hook has the 60 s budget (`DEFAULT_HOOK_TIMEOUT_MS`). The child aborts the execute call at the budget; the block's own `timeout_ms` is set 5 s under it, so nlpgo reports why. No retries.
 - **Rerun and keep data** skips teardown.
-- Each hook records status, duration, trace id, state or returned object, and the first 1,000 characters of the error. The code block's traceback is the error, with the step's secrets and run-scoped secrets scrubbed.
-- The step's execution runs under the `scenario.setup` or `scenario.teardown` span, so its trace links to the run.
-- The run view says the hooks are "Defined in LangWatch". The hint line from https://github.com/langwatch/langwatch/pull/9199 gains this case.
+- Each hook records status, duration, trace id, state or returned object, and the first 1,000 characters of the error, scrubbed of secrets.
 
-### Fate of the HTTP-agent hooks chain (ADR-188)
+### Isolation and egress
 
-**Superseded, with its run-side pieces kept.** Close https://github.com/langwatch/langwatch/pull/8956 (ADR-188), https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195, and close https://github.com/langwatch/langwatch/issues/8955 with a link here. Phase 1 below ports these parts of https://github.com/langwatch/langwatch/pull/9193, with their tests:
+Blocks run only in nlpgo's code-block sandbox, never in the worker or the child. The Connector adds no egress exposure beyond a code agent on cloud: the runner is fenced at the infrastructure level (outbound HTTPS and DNS only, plus private AWS service endpoints; no database, cache or internal load balancer ports). The app-level fence is not built (`specs/security/tenant-aware-egress-isolation.feature`, `@unimplemented`), and self-hosted Python can still open any socket. A fence is follow-up work. The WebAssembly runtime (https://github.com/langwatch/langwatch/pull/8991) is not a precondition.
 
-- `{{ state }}` and `{{ state.NAME }}` in HTTP turn templates (`modules/scenario/contract/src/http-template-engine.ts`);
-- the HTTP-agent hook fields in the target prefetch;
-- `adapterDeclaresHooks` covering HTTP agents;
-- the `idempotencyKey` shape;
-- the narrowing of the spec scenario "HTTP and code agents never call hooks" (`modules/scenario/specs/scenario-run-hooks.feature:222`).
+**Gate:** the product flag `release_scenario_connector_steps`. Self-hosted: always on. Cloud: the flag decides. When off, the connector agent's hooks and calls record "Connector steps are not released for this project yet.", the run ends `ERROR` and Not scored, and no code-runner call is made.
 
-The hooks URL, the signing secret and its rotation, the origin checks, the `packages/webhook-signing` move, the Hooks tab and the HTTP hooks docs are not built.
+### Open questions for the owner
 
-https://github.com/langwatch/langwatch/pull/9199 (show the hooks a connected agent declares) is about ADR-180 connected agents, not the HTTP transport. It ships on its own.
+Both stay open. This ADR does not decide them.
 
-Why: the code refutes half of the prior lean. The reusable core (when hooks run, the records, timeouts, teardown-always) is real, but it is ADR-180's and **already on main**, so the chain does not need to ship for the Connector to reuse it. What the chain adds that the Connector needs is small: state in turn templates and the prefetch and routing for HTTP agents, about 215 of the 4,210 lines https://github.com/langwatch/langwatch/pull/9193 adds, tests included, plus part of its spec. Most of the rest, about 3,700 lines, is the customer-hosted transport and its security surface: signing, rotation, origin and template checks, generated clients. An optional transport is not free: it is that surface to keep, document and secure, for an option no customer has asked for. The Connector also solves ADR-188's own second motive, Langy in prod, without its open question of where to host a Langy hook service.
+- **The HTTP hooks chain.** Close https://github.com/langwatch/langwatch/pull/8956, https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195, and https://github.com/langwatch/langwatch/issues/8955? The Connector no longer needs them: it does not touch the HTTP agent. The cost of keeping them open is a customer-hosted hooks transport that nobody has asked for.
+- **The cloud default of the flag.** Proposal: on by default, the flag kept as an off switch.
 
-What it costs:
+## What is reused, and from where
 
-- Most of four reviewed PRs is discarded, along with an approved direction.
-- An HTTP agent can no longer make test data that only exists inside the customer's network. A connected agent (ADR-180) remains the way to do that.
+**From https://github.com/langwatch/langwatch/pull/9239** (read only; the HTTP agent change is dropped):
 
-It is reversible: the branches stay, and a hooks URL can come back later as a second `ScenarioHookCaller` if a customer needs it.
+- `apps/scenario-child/src/rules/connector-step.rules.ts`: the `entry -> code -> end` workflow builder, secrets riding `workflow.secrets`, the idempotency key, the missing-secret refusal, the answer shape check, the timeout headroom, `scrubbedJson`. The step input gains `message` and `history` for the call block.
+- `apps/scenario-child/src/services/scenario-connector-hooks.service.ts`: a `ScenarioHookCaller` that runs a step, keeps setup's state and run-scoped secrets, and scrubs every value it hands on. It becomes the caller `hookTargetOf` returns.
+- `apps/scenario-child/src/channels/http/http.connector-hook.channel.ts`: one `execute_flow` POST per step over `ExecuteSyncTransport`, with abort at the budget and every failure mapped to the step's error.
+
+**From the 2026-10-30 prototype 86a56a08640** (`api_agent`, never finished; viewable with `git show 86a56a08640:<path>`):
+
+- `modules/agent/contract/src/config/api-agent.ts`: the right shape for the config (base URL, key, turn, setup, teardown, fixtures dataset). Rename to `connector`; add `secretNames`; the dataset reaches the blocks.
+- `apps/scenario-child/src/channels/http/http.serialized-api-agent.channel.ts` and `rules/api-agent.rules.ts`: the own-channel-for-a-new-type pattern, and the turn running as a block. The prototype's registry row, browser wiring (`agent-card.tsx`, `get-agent-editor-drawer.ts`) and `hookTargetOf` change are the file list for the new type.
+
+Not reused: the HTTP agent `connector` field, the `{{ state }}` turn templates in HTTP agents, and anything in the ADR-188 chain.
 
 ## Rationale / Trade-offs
 
-**Config on the agent, not a new subject.** Setup that makes an account belongs to the agent's API, so every scenario against that agent shares it, as ADR-180's hooks do. Run parameters vary it per scenario. A separate `connector` table in the scenario module would share one Connector across agents, but costs a table, a migration, a link to keep in step, and a second lookup per run, for a need nobody has stated. The field can move into its own table later if that need comes.
+**A separate type, not steps on the HTTP agent.** The owner asked for it: branded, locked in, and code and HTTP agents cannot break by accident. It also makes the call a block too, so the whole thing is one thing the user edits, and the HTTP template engine stays as it is.
 
-**Code blocks, not a declarative request builder.** A list of "POST this, keep that field" steps covers the simple case, but real setup chains calls, reads ids out of answers and branches. A code block already does this, already has an editor with a language service and Langy's propose-and-accept flow (https://github.com/langwatch/langwatch/pull/8991), and already runs in a sandbox. A second, weaker language would be more to build and teach.
+**Code blocks, not a declarative request builder.** Real setup chains calls, reads ids out of answers and branches. A code block already does this, has an editor and Langy's propose-and-accept flow, and runs in a sandbox.
 
-**Run-scoped secrets beside state.** ADR-180 asks setup to return references, because state reaches the model provider in prompts. A throwaway account still needs credentials the turns can send. Splitting the output keeps the credentials out of prompts and records, and reuses the existing rule that a run value overrides a project secret.
+**Run-scoped secrets beside state.** State reaches the model provider in prompts. A throwaway account still needs credentials the calls can send. Splitting the output keeps credentials out of prompts and records.
 
-**Named secrets only.** A step is code that anyone who can edit the agent can write, and it calls out of LangWatch by design. Sending only the secrets it names limits what a careless or hostile step can read. Code agents and Studio code blocks today read every project secret, so this is narrower than what exists.
+**Named secrets only.** A block is code that anyone who can edit the agent can write, and it calls out of LangWatch by design. Sending only the secrets it names limits what a careless or hostile block can read.
 
-**Waiting for the WebAssembly runtime (rejected).** Phase 1 would wait for https://github.com/langwatch/langwatch/pull/8991 and offer JavaScript and TypeScript only. But that PR keeps Python on the subprocess runtime by default, so landing it would not fence Python steps anyway. The app-level fence is not built, but cloud already fences the code-block runner at the infrastructure level, so steps add no exposure beyond code agents on cloud, and the flag gives a way to hold them back per project. Waiting would delay the feature for no gain in safety.
+**It costs:** a sixth agent type to carry through the module, the child, the form and the docs; and a customer's API must be reachable from the code runner (public HTTPS on cloud). Test data that exists only inside a private network still needs a connected agent.
 
 ## Consequences
 
-- The HTTP agent config gains `connector`. Agent save validates the language, the code size, that each secret name exists, and that the dataset exists in the project. The agent form gains a **Connector** tab with two code editors and the secret and dataset pickers.
-- `apps/scenario-child` gains `ConnectorHookCaller`. `hookTargetOf` and `adapterDeclaresHooks` cover HTTP agents with a Connector. The run lifecycle, the record schema and the event do not change.
-- `modules/scenario/specs/scenario-run-hooks.feature` gains a Connector rule. Error paths included: a setup that throws, one that times out, one over the state cap, a missing secret, a dataset over the cap, a teardown that throws, keep-data, and a secret scrubbed from an error.
-- ADR-188 is never accepted on main. ADR-180's "Langy in prod" path becomes a Connector on Langy's HTTP agent.
-- The fallback teardown for a killed child (https://github.com/langwatch/langwatch/issues/8781) becomes possible for the first time, since the worker holds the code. It needs setup's state recorded when setup ends, not when the run ends. That is a follow-up, not part of this ADR.
-- Nothing stops a step from leaving data behind if its own code is wrong. The `idempotencyKey` tag is how a later sweep would find it.
+- New: `connector` in the agent type enum, the config file, the `ConnectorAgentData` schema, the registry row, the channel, and an agent form with its own icon in the type picker.
+- Unchanged: code, HTTP and connected agents (config, editor, target), the hook lifecycle, the record schema and the event.
+- Specs: `modules/scenario/specs/scenario-run-hooks.feature` gains a Connector rule, error paths included (setup throws, times out, state over the cap, missing secret, dataset over the cap, teardown throws, keep-data, secret scrubbed from an error), and a new agent spec under `modules/agent/specs/`.
+- Nothing stops a block leaving data behind if its own code is wrong. The `idempotencyKey` tag is how a later sweep finds it.
+- The fallback teardown for a killed child (https://github.com/langwatch/langwatch/issues/8781) becomes possible, since the worker holds the code. Follow-up.
 
 ### Build plan
 
-1. **Platform, no UI.** Does not wait for the WebAssembly runtime. It adds the `connector` config field and its save rules; the ported pieces of https://github.com/langwatch/langwatch/pull/9193; the prefetch of steps, secrets and rows; `ConnectorHookCaller`; and the spec rule with every scenario bound. Set through the agent REST API.
+1. **Contract and runner, no UI.** Config file, enum, `agent.ts` literals, `ConnectorAgentData`, prefetch, registry row, channel, hook caller (ported from 9239), flag, specs. Create the agent through the agent REST API.
+2. **Form.** Agent type picker card and icon, the editor drawer (call, setup, teardown editors, secret picker, dataset picker), the "Defined in LangWatch" hint on the run view, docs.
+3. **Langy.** Langy proposes connector blocks from the API docs and traces through propose-and-accept; Langy's prod dogfood (`dev/dogfood/langy/src/agent.ts`) moves its setup and teardown into a connector.
 
-   **Proof** (this is the epic's done-when), on a haven stack with the sim model:
-   - A fixture HTTP service stands in for the customer. It has `POST /accounts`, `DELETE /accounts/:id`, `GET /accounts/:id`, and a chat endpoint that answers only for a live account.
-   - An HTTP agent with a Connector: setup creates an account and returns its id as state and its token as a run-scoped secret; turns send `{{ state.accountId }}` and `{{ secrets.ACCOUNT_TOKEN }}`; teardown deletes the account.
-   - Evidence:
-     - the run shows Setup ok and Teardown ok;
-     - the fixture's log shows the account was created before turn 1 and deleted after the last turn;
-     - `GET /accounts/:id` answers 404 after the run;
-     - the token does not appear in the run record or the judge prompt;
-     - a second run whose setup throws shows Not scored, and its teardown still runs.
+## Proof
 
-   No customer code.
+On a haven stack with the sim model, no customer code:
 
-2. **Form.** The Connector tab, the "Defined in LangWatch" hint, and the docs page section, which replaces https://github.com/langwatch/langwatch/pull/9195.
-3. **Langy.**
-   - Langy reads the agent's API docs and recent traces, then proposes Connector steps and scenarios through the propose-and-accept flow, applied only when accepted.
-   - Langy's own prod dogfood moves its setup and teardown worlds (`dev/dogfood/langy/src/agent.ts:121-139`) into a Connector that calls the LangWatch public API with a project API key secret. The prod scenario sync then runs for real.
+- A fixture HTTP service stands in for the customer: `POST /accounts`, `DELETE /accounts/:id`, `GET /accounts/:id`, and a chat endpoint that answers only for a live account.
+- A connector agent: setup creates an account through that API and returns its id as state and its token as a run-scoped secret; call sends the message with the token; teardown deletes the account.
+- Evidence: the run shows Setup ok and Teardown ok; the fixture log shows create before turn 1 and delete after the last turn; `GET /accounts/:id` is 404 afterwards; the token appears in no run record, log, trace or AI prompt (simulated user, judge); a second run whose setup throws shows Not scored and its teardown still runs.
+- A code agent and an HTTP agent scenario run unchanged in the same stack, and their saved configs are byte-identical before and after.
 
 ## References
 
-- Related ADRs: ADR-128 ([128-connected-agents.md](128-connected-agents.md)), ADR-180 ([180-scenario-run-hooks.md](180-scenario-run-hooks.md)), ADR-188 (https://github.com/langwatch/langwatch/pull/8956, superseded here), ADR-183 on https://github.com/langwatch/langwatch/pull/8991 (code blocks in WebAssembly).
-- Epic: https://github.com/langwatch/tasks/issues/1063
-- Hooks chain: https://github.com/langwatch/langwatch/issues/8955, https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194, https://github.com/langwatch/langwatch/pull/9195, https://github.com/langwatch/langwatch/pull/9199
-- Code-block isolation: https://github.com/langwatch/langwatch/pull/9050, `specs/nlp-go/code-block.feature`
-- Specs: `modules/scenario/specs/scenario-run-hooks.feature`, `specs/scenarios/secret-run-parameters.feature`, `specs/scenarios/scenario-run-parameters.feature`
+- Related ADRs: ADR-128 ([128-connected-agents.md](128-connected-agents.md)), ADR-180 ([180-scenario-run-hooks.md](180-scenario-run-hooks.md)), ADR-188 (https://github.com/langwatch/langwatch/pull/8956), ADR-183 on https://github.com/langwatch/langwatch/pull/8991 (code blocks in WebAssembly).
+- Epic: https://github.com/langwatch/tasks/issues/1063. Earlier attempt: https://github.com/langwatch/langwatch/pull/9239.
+- Code-block isolation: https://github.com/langwatch/langwatch/pull/9050, `specs/nlp-go/code-block.feature`.
+- Specs: `modules/scenario/specs/scenario-run-hooks.feature`, `specs/scenarios/secret-run-parameters.feature`, `specs/scenarios/scenario-run-parameters.feature`.
