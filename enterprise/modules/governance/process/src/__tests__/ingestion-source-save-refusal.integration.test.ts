@@ -1,11 +1,7 @@
 /**
  * @vitest-environment node
  */
-/**
- * A pull config its adapter refuses never becomes a row. Spec: edit-pull-source-config.feature
- * Uses the memory twin of the source table; the Prisma half of a write is covered by
- * `ingestion-source-token-at-rest.integration.test.ts`.
- */
+// A pull config its adapter refuses never becomes a row. Spec: edit-pull-source-config.feature
 import type {
   InternalProject,
   InternalProjectQuery,
