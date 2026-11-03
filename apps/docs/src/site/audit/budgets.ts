@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 import { z } from "zod";
 
 import budgetsFile from "./budgets.json" with { type: "json" };
@@ -64,11 +62,9 @@ export type FormFactor = z.infer<typeof formFactor>;
 
 export const DEFAULT_BUDGETS_FILE = new URL("./budgets.json", import.meta.url);
 
-/** The budgets in `file`, or by default the committed ones (the import `PAGE_TOKENS` reads). */
-export function readBudgets({ file }: { file?: URL | string } = {}) {
-  return budgetsSchema.parse(
-    file === undefined ? budgetsFile : JSON.parse(readFileSync(file, "utf8")),
-  );
+/** The committed budgets, validated. Reads the static import, which the bundled prerender needs. */
+export function readBudgets() {
+  return budgetsSchema.parse(budgetsFile);
 }
 
 /**
