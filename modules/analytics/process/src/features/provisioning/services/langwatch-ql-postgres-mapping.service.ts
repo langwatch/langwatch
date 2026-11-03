@@ -238,7 +238,7 @@ export class LangWatchQLPostgresMappingService {
     columns: LangWatchQLColumn[];
     collection: string;
     postgresRelation: string;
-    /** The app PostgreSQL schema; the reader role's search_path may not include it. */
+    /** The app PostgreSQL schema; the role's search_path is never set, so it may omit it. */
     schema: string;
     /** Connections this one mapped table may hold open. See the constant. */
     connectionPoolSize?: number;

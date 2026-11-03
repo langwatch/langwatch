@@ -78,7 +78,8 @@ export abstract class LangWatchQLProvisioningRepository {
     collection: string;
     relation: string;
     /**
-     * The PostgreSQL schema holding the approved view; the table function reads `public` otherwise.
+     * The PostgreSQL schema holding the approved view. An unqualified name resolves through the
+     * role's search_path, which provisioning never sets, so the default can exclude this schema.
      */
     schema: string;
     cluster: string | undefined;

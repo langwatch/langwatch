@@ -113,8 +113,8 @@ export interface LwqlCollectionProbe {
   readonly relation: string;
   readonly connection: Omit<PostgresNamedCollection, "collection">;
   /**
-   * The PostgreSQL schema holding the approved view: the table function does not use the role's
-   * search_path.
+   * The PostgreSQL schema holding the approved view. An unqualified name resolves through the
+   * role's search_path, which provisioning never sets, so the default can exclude this schema.
    */
   readonly schema: string;
 }
