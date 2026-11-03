@@ -103,20 +103,29 @@ func (c *IDCodec) Seal(claims IDClaims) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(c.aead.Seal(nonce, nonce, plain, nil)), nil
 }
 
+// validIDShape rejects an empty id, an oversized one, and one holding a
+// character outside base64url — including CR/LF, which the decoder below
+// would otherwise skip, letting a tampered id through unnoticed.
+func validIDShape(id string) bool {
+	if id == "" || len(id) > maxIDLength {
+		return false
+	}
+	for i := 0; i < len(id); i++ {
+		if !isBase64URL(id[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // Unseal opens an id. It answers ErrIDInvalid for anything not sealed by this
 // key, and ErrIDExpired for a genuine id at or past its expiry, to the second.
 func (c *IDCodec) Unseal(id string, now time.Time) (IDClaims, error) {
 	if c.aead == nil {
 		return IDClaims{}, errNoSecret
 	}
-	if id == "" || len(id) > maxIDLength {
+	if !validIDShape(id) {
 		return IDClaims{}, ErrIDInvalid
-	}
-	// The decoder skips CR and LF, so a genuine id with one inserted would open.
-	for i := 0; i < len(id); i++ {
-		if !isBase64URL(id[i]) {
-			return IDClaims{}, ErrIDInvalid
-		}
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(id)
 	if err != nil || len(raw) <= c.aead.NonceSize() {

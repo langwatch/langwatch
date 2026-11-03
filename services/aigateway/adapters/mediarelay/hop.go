@@ -76,7 +76,11 @@ func (h *Hub) joinViaHop(j joining) error {
 	default:
 		return h.refuse(ctx, id, refusal{OutcomeRefusedHopBusy, "hop_busy"})
 	}
-	hop, refused := h.dialOwner(ctx, id, claims.OwnerPodIP, r.Header.Get(twilioSignatureHeader))
+	hop, refused := h.dialOwner(ctx, hopTarget{
+		id:              id,
+		ownerIP:         claims.OwnerPodIP,
+		twilioSignature: r.Header.Get(twilioSignatureHeader),
+	})
 	<-h.hopSlots
 	if hop == nil && ctx.Err() != nil {
 		// Twilio gave up mid-dial: nothing to answer, and not the owner's fault.
@@ -118,23 +122,31 @@ func (h *Hub) trackPump() bool {
 	return true
 }
 
+// hopTarget is dialOwner's call, bundled into one value so the function
+// stays within the house argument-count limit (revive).
+type hopTarget struct {
+	id              string
+	ownerIP         string
+	twilioSignature string
+}
+
 // dialOwner opens the hop socket, or answers the outcome to count. The dial
 // error is never logged: it wraps the request URL, which carries the id.
-func (h *Hub) dialOwner(parent context.Context, id, ownerIP, twilioSignature string) (*websocket.Conn, string) {
+func (h *Hub) dialOwner(parent context.Context, target hopTarget) (*websocket.Conn, string) {
 	ctx, cancel := context.WithTimeout(parent, h.hopTimeout)
 	defer cancel()
-	path := "/relay-hop/" + id
+	path := "/relay-hop/" + target.id
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	header := http.Header{}
 	header.Set("X-LangWatch-Gateway-Timestamp", timestamp)
 	header.Set("X-LangWatch-Gateway-Signature",
 		controlplane.Signature(h.secret, controlplane.Canonical{Method: http.MethodGet, Path: path, Timestamp: timestamp}))
-	if twilioSignature != "" {
-		header.Set(twilioSignatureHeader, twilioSignature)
+	if target.twilioSignature != "" {
+		header.Set(twilioSignatureHeader, target.twilioSignature)
 	}
-	target := "http://" + net.JoinHostPort(ownerIP, strconv.Itoa(h.hopPort)) + path
+	hopURL := "http://" + net.JoinHostPort(target.ownerIP, strconv.Itoa(h.hopPort)) + path
 	//nolint:bodyclose // websocket.Dial closes the response body itself.
-	conn, resp, err := websocket.Dial(ctx, target, &websocket.DialOptions{
+	conn, resp, err := websocket.Dial(ctx, hopURL, &websocket.DialOptions{
 		HTTPClient: h.hopClient, HTTPHeader: header, CompressionMode: websocket.CompressionDisabled,
 	})
 	if err == nil {
@@ -147,7 +159,7 @@ func (h *Hub) dialOwner(parent context.Context, id, ownerIP, twilioSignature str
 		return nil, ""
 	}
 	h.logger.Warn("relay_owner_unreachable",
-		zap.String("relay", idPrefix(id)), zap.Bool("timeout", errors.Is(err, context.DeadlineExceeded)))
+		zap.String("relay", idPrefix(target.id)), zap.Bool("timeout", errors.Is(err, context.DeadlineExceeded)))
 	return nil, OutcomeRefusedOwnerUnreachable
 }
 
