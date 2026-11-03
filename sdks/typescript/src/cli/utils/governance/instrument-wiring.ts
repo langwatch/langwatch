@@ -12,6 +12,7 @@ import { readClaudePluginState } from "./claude-plugin";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import type { GovernanceConfig } from "./config";
 import { buildOtelEnvBlock } from "./otel-env-block";
+import { installPiTelemetryExtension, piExtensionNotOursNotice } from "./pi-plugin";
 import { runningCodeRestartNotice } from "./running-code";
 import {
   assertOwnedHookFileFor,
@@ -94,6 +95,29 @@ function enableOpencodeTelemetryFlag(): string[] {
     failures.push(`could not enable opencode's OpenTelemetry flag: ${(err as Error).message}`);
   }
   return failures;
+}
+
+// pi ships no exporter, so the scoped function's env reaches nothing
+// until our extension sits in pi's extension directory (ADR-188
+// Decision 4). Without it a plain `pi` run sends no telemetry.
+function installPiExtension(labels: string[]): string[] {
+  try {
+    const result = installPiTelemetryExtension();
+    if (result.action === "not_ours") {
+      return [
+        piExtensionNotOursNotice({
+          displayPath: result.displayPath,
+          command: "langwatch instrument pi",
+        }),
+      ];
+    }
+    labels.push(result.displayPath);
+    return [];
+  } catch (err) {
+    return [
+      `could not write the pi telemetry extension, so pi sessions send no telemetry: ${(err as Error).message}`,
+    ];
+  }
 }
 
 function clearCodeTerminalEnv({
@@ -196,6 +220,9 @@ export function installTelemetryWiring({
   }
   if (tool === "opencode") {
     requiredFailures.push(...enableOpencodeTelemetryFlag());
+  }
+  if (tool === "pi") {
+    requiredFailures.push(...installPiExtension(labels));
   }
   if (tool === "code") {
     const failures = clearCodeTerminalEnv({ shell, vars });

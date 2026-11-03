@@ -19886,15 +19886,12 @@ On that run the wrapper writes the telemetry extension to `~/.pi/agent/extension
 langwatch instrument pi
 ```
 
-The command writes a `pi` function in your shell start file, which applies the LangWatch settings to `pi` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`. The telemetry extension reads the endpoint and the key from that environment, since pi has no configuration file that holds either.
+The command writes two files:
+
+- A `pi` function in your shell start file, which applies the LangWatch settings to `pi` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`.
+- The telemetry extension in pi's extension folder, `~/.pi/agent/extensions/`. It reads the endpoint and the key from the function's environment, since pi has no configuration file that holds either.
 
 Open a new terminal after the command, or read the start file again, so the function is in place.
-
-<Warning>
-  `langwatch instrument pi` does not write the telemetry extension itself, and pi sends no
-  telemetry without it. Write it once on the machine with `langwatch ingest install pi_cli`, or by starting
-  pi once with `langwatch pi`.
-</Warning>
 
 <Note>
   The shell function needs zsh, bash or fish. On Windows, start pi with `langwatch pi` each time
