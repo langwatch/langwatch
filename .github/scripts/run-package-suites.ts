@@ -442,9 +442,8 @@ const withLanes = ({
 
 /**
  * What one shard runs: the lanes this leg admits, split over `shard.total` by wall
- * time, and this shard's share as jobs, heaviest package first. `weightOf` is the
- * sum of the kept scripts' seconds that the split used; the runner judges heaviness
- * by it too.
+ * time, this shard's jobs heaviest first. `weightOf` is the kept scripts' summed
+ * seconds; the runner judges heaviness by it too.
  */
 export const planShard = ({
   packages,
