@@ -1,7 +1,7 @@
 /**
  * "Daily insights" in a board's header, lent through analytics' board-header extension point
- * (§10.1). A personal setting: none yet (a quiet switch and the offer), off (the quiet switch),
- * or on (one dropdown). A run the system turned off keeps the dropdown, which says why.
+ * (§10.1). A personal setting: none yet or off (a quiet switch), or on (one dropdown). The board
+ * never asks by itself. A run the system turned off keeps the dropdown, which says why.
  */
 
 import type { BoardHeaderActionProps } from "@langwatch/analytics-client";
@@ -15,16 +15,11 @@ import { type ReactNode, useState } from "react";
 
 import { useBoardDailyInsights } from "../../behavior/use-board-daily-insights.ts";
 import { useInsightInbox } from "../../behavior/use-insight-inbox.ts";
-import {
-  lastRunWords,
-  OFF_REASON_WORDS,
-  scheduleWords,
-  shouldOfferDailyInsights,
-} from "../../model/daily-run.ts";
+import { lastRunWords, OFF_REASON_WORDS, scheduleWords } from "../../model/daily-run.ts";
 import { useInsightHost } from "../../model/insight-host.ts";
 import { DailyInsightsDialog } from "./daily-insights-dialog.tsx";
 
-/** Keyed by board: a page that moves to another board starts a new visit. */
+/** Keyed by board: moving to another board resets the control's dialog state. */
 export function BoardDailyInsights(props: BoardHeaderActionProps) {
   return <DailyInsightsControl key={`${props.boardKind}:${props.boardId}`} {...props} />;
 }
@@ -37,12 +32,6 @@ function DailyInsightsControl({
 }: BoardHeaderActionProps) {
   const daily = useBoardDailyInsights({ board: { kind: boardKind, id: boardId, name: boardName } });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [offerClosed, setOfferClosed] = useState(false);
-  // The board asks as it opened: not later in the visit, when its first widget lands.
-  const [widgetCountAtOpen, setWidgetCountAtOpen] = useState(widgetCount);
-  if (widgetCountAtOpen === undefined && widgetCount !== undefined) {
-    setWidgetCountAtOpen(widgetCount);
-  }
 
   const { setting, settings } = daily;
   if (!daily.available || !setting) return null;
@@ -51,12 +40,6 @@ function DailyInsightsControl({
   if (!isOn && (widgetCount ?? 0) === 0) return null;
   // Set only while the system turned it off: the person is owed the reason.
   const turnedOff = setting.offReason === null ? undefined : OFF_REASON_WORDS[setting.offReason];
-
-  const offering = shouldOfferDailyInsights({
-    state: setting.state,
-    widgetCountAtOpen,
-    closedThisVisit: offerClosed,
-  });
 
   return (
     <>
@@ -82,16 +65,6 @@ function DailyInsightsControl({
             Daily insights
           </Text>
         </Switch>
-      )}
-      {offering && (
-        <DailyInsightsDialog
-          boardName={boardName}
-          settings={settings}
-          ownTimezone={daily.ownTimezone}
-          offer={{ onDecline: daily.decline }}
-          onSubmit={daily.turnOn}
-          onClose={() => setOfferClosed(true)}
-        />
       )}
       {settingsOpen && (
         <DailyInsightsDialog
