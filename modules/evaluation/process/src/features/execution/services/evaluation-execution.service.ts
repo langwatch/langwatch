@@ -388,6 +388,7 @@ export class EvaluationExecutionService {
       settings: settings ?? {},
       env: evaluatorEnv,
       idempotencyKey,
+      projectId,
       signal,
     });
 

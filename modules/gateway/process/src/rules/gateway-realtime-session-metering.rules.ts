@@ -100,7 +100,7 @@ export function remainingRealtimeUsage({
 }): SpendUsage {
   const remainder: SpendUsage = { ...EMPTY_SPEND_USAGE };
   for (const key of quantityKeys()) {
-    remainder[key] = Math.max(0, (total[key] ?? 0) - reported[key]);
+    remainder[key] = Math.max(0, (total[key] ?? 0) - (reported[key] ?? 0));
   }
 
   return remainder;

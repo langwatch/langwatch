@@ -68,6 +68,7 @@ import { EvaluatorModelEnvService } from "../features/evaluators/services/evalua
 import { LangevalsClusteringService } from "../features/evaluators/services/langevals-clustering.service.ts";
 import { LangevalsEvaluatorService } from "../features/evaluators/services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../features/evaluators/services/langevals-pii-detection.service.ts";
+import { LangevalsProviderSpendService } from "../features/evaluators/services/langevals-provider-spend.service.ts";
 import { WorkflowEvaluationService } from "../features/evaluators/services/workflow-evaluation.service.ts";
 import { EvaluationCostService } from "../features/execution/services/evaluation-cost.service.ts";
 import { EvaluationExecutionIntentService } from "../features/execution/services/evaluation-execution-intent.service.ts";
@@ -396,6 +397,7 @@ export class EvaluationModule implements EvaluationApiContract {
       },
     });
     const { langevals } = channels;
+    const providerSpend = LangevalsProviderSpendService.create({ spend: channels.spend });
     const staging = repositories.langevalsStaging;
     const telemetry = EvaluationExecutionMetricsService.create();
     const unavailable = createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME);
@@ -431,6 +433,7 @@ export class EvaluationModule implements EvaluationApiContract {
           timeoutMs: LANGEVALS_TIMEOUT_MS,
         },
         telemetry,
+        spend: providerSpend,
       }),
       evaluators: dependencies.evaluators,
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
@@ -490,6 +493,7 @@ export class EvaluationModule implements EvaluationApiContract {
         endpoint: config.langevalsEndpoint,
         langevals,
         staging,
+        spend: providerSpend,
       }),
       piiDetection: LangevalsPiiDetectionService.create({
         endpoint: config.langevalsEndpoint,
