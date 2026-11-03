@@ -185,8 +185,3 @@ export function lastRunWords({
   const reason = SKIP_WORDS_REASONS.find((known) => known === lastRun.reason);
   return `Did not run ${when} · ${reason ? SKIP_REASON_WORDS[reason] : "nothing was filed"}`;
 }
-
-/**
- * Said in a From LangWatch board's settings, and in the toast when its run is turned on or saved:
- * no run can read one yet.
- */
