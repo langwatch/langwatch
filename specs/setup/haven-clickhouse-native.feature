@@ -100,6 +100,28 @@ Feature: haven's ClickHouse runs natively on macOS
       When the waiting haven's context ends
       Then it stops waiting and reports why
 
+  Rule: The native server's stdout log never fills the disk
+
+    @unit
+    Scenario: An oversized stdout log is emptied
+      Given the native server's stdout.log has grown past its cap
+      When haven caps the native server's logs
+      Then stdout.log is empty
+      And the server's next write lands at the start of the file
+
+    @unit
+    Scenario: A stdout log under its cap is kept
+      Given the native server's stdout.log is under its cap
+      When haven caps the native server's logs
+      Then stdout.log is unchanged
+
+    @unit
+    Scenario: The daemon caps the managed server's logs
+      Given haven manages a ClickHouse whose adapter can cap its logs
+      When the daemon caps ClickHouse logs
+      Then the adapter's logs are capped
+      And a ClickHouse haven does not manage is left alone
+
   Rule: LangWatchQL reaches Postgres on the host's loopback
 
     @unit

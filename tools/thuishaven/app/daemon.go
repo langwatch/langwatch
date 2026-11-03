@@ -220,6 +220,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			endSamples()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
+			o.capClickHouseLogs()
 			o.stopColimaIfIdle(ctx)
 		}
 	}

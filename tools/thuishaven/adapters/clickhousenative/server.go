@@ -170,6 +170,7 @@ func (s *Server) start(ctx context.Context, bin string) error {
 			return err
 		}
 	}
+	s.CapLogs()
 	out, err := os.OpenFile(s.stdoutPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
@@ -186,6 +187,15 @@ func (s *Server) start(ctx context.Context, bin string) error {
 	}
 	go func() { _ = cmd.Wait() }() // reaps it if it exits while this haven process lives
 	return os.WriteFile(s.pidPath(), []byte(strconv.Itoa(cmd.Process.Pid)), 0o600)
+}
+
+// CapLogs empties stdout.log once it outgrows domain.ClickHouseNativeStdoutLogMax.
+// Emptying it under a running server is safe: the server's descriptor is
+// O_APPEND, so its next write lands at the new end, not past a hole.
+func (s *Server) CapLogs() {
+	if fi, err := os.Stat(s.stdoutPath()); err == nil && fi.Size() > domain.ClickHouseNativeStdoutLogMax {
+		_ = os.Truncate(s.stdoutPath(), 0)
+	}
 }
 
 func (s *Server) runsPinnedVersion(ctx context.Context) bool {
