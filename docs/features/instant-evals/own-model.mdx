@@ -41,11 +41,27 @@ Each model runs only on the model it names. Picking OpenAI Decisions API or Azur
   </Step>
   <Step title="Pick the model">
     In **Default Models** on the same page, click **Add config**, or the edit button of an existing config, and pick its scopes. The **Instant Evals** column offers LangWatch Instant Preview and every decision model that each picked scope holds an enabled key for. Pick yours and save.
+
+    <Frame>
+      <img
+        src="/images/instant-evals/own-model-picker.png"
+        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open on LangWatch Instant Preview and OpenAI Decisions API"
+      />
+    </Frame>
   </Step>
   <Step title="Run">
     Start a run as usual. The pick applies within five seconds, to the next rows judged.
   </Step>
 </Steps>
+
+Once saved, the **Instant Evals** column of the config shows your model.
+
+<Frame>
+  <img
+    src="/images/instant-evals/own-model-default-models.png"
+    alt="Default models table with the ACME config, whose Instant Evals column shows OpenAI Decisions API"
+  />
+</Frame>
 
 A model is offered only when every scope of the config can run it. A config on the organization is offered only the keys saved on the organization, not a key one project holds, and a config on two projects only what both hold. A save that names a model one of its scopes cannot run is refused.
 
@@ -53,11 +69,18 @@ A project config beats a team config, which beats an organization config, as for
 
 ## Azure
 
-Both Azure models run on the Azure OpenAI provider row: its **API Key**, and its **Endpoint** to find your resource.
+Both Azure models run on the Azure OpenAI provider row: its API key (`AZURE_OPENAI_API_KEY`), and its endpoint (`AZURE_OPENAI_ENDPOINT`) to find your resource.
 
-- **Endpoint** is the URL of your resource, such as `https://my-resource.openai.azure.com`. LangWatch reads only the resource name from it and calls `https://my-resource.openai.azure.com/openai/v1/decisions` for Azure OpenAI Decisions API, and `https://my-resource.services.ai.azure.com/providers/microsoft/v1/systemone` for Microsoft Decision 1. An endpoint on `openai.azure.com`, `cognitiveservices.azure.com` or `services.ai.azure.com` works. Any other host, `http`, a custom port, or an Azure API Management gateway does not, so the key never goes outside Azure.
-- **Decisions Deployment** is the name of your `gpt-6-luna` deployment. Leave it empty if the deployment is named `gpt-6-luna`.
-- **Microsoft Decision 1 Deployment** is the name of your Microsoft Decision 1 deployment on Azure AI Foundry. Leave it empty if it keeps the model's name.
+<Frame>
+  <img
+    src="/images/instant-evals/own-model-azure-provider.png"
+    alt="Azure OpenAI provider drawer with Use API Gateway off, the endpoint https://my-resource.openai.azure.com and the decisions deployment gpt-6-luna-eu"
+  />
+</Frame>
+
+- **Endpoint** (`AZURE_OPENAI_ENDPOINT`) is the URL of your resource, such as `https://my-resource.openai.azure.com`. LangWatch reads only the resource name from it and calls `https://my-resource.openai.azure.com/openai/v1/decisions` for Azure OpenAI Decisions API, and `https://my-resource.services.ai.azure.com/providers/microsoft/v1/systemone` for Microsoft Decision 1. An endpoint on `openai.azure.com`, `cognitiveservices.azure.com` or `services.ai.azure.com` works. Any other host, `http`, a custom port, or an Azure API Management gateway does not, so the key never goes outside Azure.
+- **Decisions deployment** (`AZURE_OPENAI_DECISIONS_DEPLOYMENT`) is the name of your `gpt-6-luna` deployment. Leave it empty if the deployment is named `gpt-6-luna`.
+- **Microsoft Decision 1 deployment** (`AZURE_DECISION_1_DEPLOYMENT`) is the name of your Microsoft Decision 1 deployment on Azure AI Foundry. Leave it empty if it keeps the model's name.
 
 Keep **Use API Gateway** off: the key, the endpoint and both deployment fields show only then, and a gateway row has no Azure endpoint to call, so every row would be skipped as `classifier_key_invalid`. The key travels in the `api-key` header.
 
