@@ -48,6 +48,12 @@ Feature: Dataset version history
     Then the save fails and the rows it wrote are removed
 
   @unit
+  Scenario: A save whose version row fails to write removes the rows it wrote
+    Given a save that wrote its rows
+    When writing the version row fails for a reason other than a taken number
+    Then the rows it wrote are removed and the failure is raised
+
+  @unit
   Scenario: Saving unchanged content creates no version
     Given a dataset whose latest version holds its current content
     When a version is saved automatically or by an experiment run
@@ -300,6 +306,12 @@ Feature: Dataset version history
     When the user opens the history
     Then the versions are listed with author and time
     And the user can save a version with an optional name
+
+  @integration
+  Scenario: Naming another member's unchanged latest version keeps its author
+    Given the latest version holds the current content and another member saved it
+    When a user saves a version with a name
+    Then the history still names that member as its author
 
   @integration
   Scenario: The history drawer compares and restores a version

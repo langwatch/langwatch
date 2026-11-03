@@ -58,7 +58,12 @@ export function useSaveDatasetVersion({ projectId, datasetId }: DatasetScope) {
           ? {
               ...current,
               versions: [
-                { ...saved, authorName: null },
+                {
+                  ...saved,
+                  // Naming the unchanged latest version keeps its author, named in the list.
+                  authorName:
+                    current.versions.find((item) => item.id === saved.id)?.authorName ?? null,
+                },
                 ...current.versions.filter((item) => item.id !== saved.id),
               ],
             }

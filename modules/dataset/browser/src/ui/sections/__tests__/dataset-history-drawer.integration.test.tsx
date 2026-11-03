@@ -204,6 +204,23 @@ describe("Dataset history drawer", () => {
       expect(screen.getByRole("textbox", { name: "Version name" })).toHaveValue("");
     });
 
+    /** @scenario "Naming another member's unchanged latest version keeps its author" */
+    it("keeps the author's name when the save names another member's latest version", async () => {
+      const user = userEvent.setup();
+      fake.state.history = { versions: [VERSION_1], restorable: true };
+      fake.saveVersion.mockResolvedValue({ ...VERSION_1, name: "Baseline", authorName: undefined });
+      renderDrawer();
+
+      await waitForDrawerFocus();
+      await user.type(screen.getByRole("textbox", { name: "Version name" }), "Baseline");
+      await user.click(screen.getByRole("button", { name: "Save version" }));
+
+      const first = await screen.findByText("Version 1 · Baseline");
+      const row = first.closest('[data-testid="dataset-version-1"]');
+      expect(row).not.toBeNull();
+      expect(within(row as HTMLElement).getByText("Ada Lovelace")).toBeInTheDocument();
+    });
+
     it("saves without a name when the field is left empty", async () => {
       const user = userEvent.setup();
       fake.saveVersion.mockResolvedValue(makeVersion({ version: 3, trigger: "manual" }));
