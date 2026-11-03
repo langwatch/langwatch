@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, expectTypeOf, beforeEach, afterEach, vi } from "vitest";
 
 import { createLangWatchApiClient } from "@/internal/api/client";
 
@@ -235,5 +235,13 @@ describe("WorkflowsApiService.run", () => {
         expect(result.rows).toHaveLength(1);
       });
     });
+  });
+});
+
+describe("WorkflowsApiService.run options", () => {
+  it("takes no concurrency, which the workflow evaluate endpoint has no field for", () => {
+    type RunOptions = NonNullable<Parameters<WorkflowsApiService["run"]>[1]>;
+
+    expectTypeOf<RunOptions>().not.toHaveProperty("concurrency");
   });
 });

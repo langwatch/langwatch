@@ -9,13 +9,17 @@ import type {
   IntentSpec,
   ProcessEvolution,
   ProcessHandlerContext,
+  ProcessIntent,
   WakeHandler,
 } from "@langwatch/eventing";
 import type { InstantEvalProcessingEvent } from "@langwatch/instant-eval-contract";
+import { pickInstantEvalRoutedSpend } from "@langwatch/instant-eval-judge-contract";
 
 import {
   INSTANT_EVAL_CANCEL_GRACE_MS,
+  INSTANT_EVAL_LATE_PAGE_HOLD_MS,
   INSTANT_EVAL_STALL_THRESHOLD_MS,
+  type instantEvalBillLatePageIntentSchema,
   type instantEvalFinishIntentSchema,
   type instantEvalJudgePageIntentSchema,
   type instantEvalPlanIntentSchema,
@@ -29,6 +33,7 @@ export type InstantEvalIntents = {
   plan: IntentSpec<typeof instantEvalPlanIntentSchema>;
   judgePage: IntentSpec<typeof instantEvalJudgePageIntentSchema>;
   finish: IntentSpec<typeof instantEvalFinishIntentSchema>;
+  billLatePage: IntentSpec<typeof instantEvalBillLatePageIntentSchema>;
 };
 
 type InstantEvalContext = ProcessHandlerContext<InstantEvalIntents>;
@@ -41,6 +46,70 @@ const instantEvalPageIntentKey = ({ runId, page }: { runId: string; page: number
 
 const instantEvalFinishKey = ({ runId, reason }: { runId: string; reason: string }): string =>
   `finish:${runId}:${reason}`;
+
+const instantEvalLatePageKey = ({ runId, page }: { runId: string; page: number }): string =>
+  `late-page:${runId}:${page}`;
+
+type InstantEvalLatePage = InstantEvalProcessState["unbilledLatePages"][number];
+
+function instantEvalBillLatePage({
+  ctx,
+  runId,
+  late,
+  isFinishMissing = false,
+}: {
+  ctx: InstantEvalContext;
+  runId: string;
+  late: InstantEvalLatePage;
+  isFinishMissing?: boolean;
+}): ProcessIntent {
+  return ctx.intent("billLatePage", instantEvalLatePageKey({ runId, page: late.page }), {
+    ...late,
+    runId,
+    projectId: ctx.projectId,
+    ...(isFinishMissing ? { isFinishMissing } : {}),
+  });
+}
+
+/**
+ * A page that reports after the run ended: the finish already summed the run without it. A routed
+ * page is paid for, so it is billed on its own once the finish has landed, never dropped. A page
+ * with no routed spend changes nothing, as before the router (the finish never bills it).
+ */
+function instantEvalLatePageJudged({
+  state,
+  data,
+  ctx,
+}: {
+  state: InstantEvalProcessState;
+  data: InstantEvalProcessEventView;
+  ctx: InstantEvalContext;
+}): ProcessEvolution<InstantEvalProcessState> {
+  if (data.page <= state.page) return instantEvalUnchanged(state);
+  if (!pickInstantEvalRoutedSpend(data)) return instantEvalUnchanged(state);
+  const late: InstantEvalLatePage = {
+    page: data.page,
+    inputTokens: data.inputTokens,
+    requests: data.requests,
+    costNanoUsd: data.costNanoUsd,
+    routedInputTokens: data.routedInputTokens,
+  };
+  const counted = { ...state, page: data.page };
+  if (!state.isFinishRecorded) {
+    // A wake ends the hold, so a finish that never lands cannot strand the page.
+    const lateHoldUntilMs =
+      state.lateHoldUntilMs ?? instantEvalSchedulingRef(ctx) + INSTANT_EVAL_LATE_PAGE_HOLD_MS;
+    return {
+      state: { ...counted, unbilledLatePages: [...state.unbilledLatePages, late], lateHoldUntilMs },
+      nextWakeAt: lateHoldUntilMs,
+    };
+  }
+  return {
+    state: counted,
+    ...instantEvalWakeFor(counted),
+    intents: [instantEvalBillLatePage({ ctx, runId: data.runId, late })],
+  };
+}
 
 /** Schedule from the later of the input's instant and now. */
 function instantEvalSchedulingRef(ctx: InstantEvalContext): number {
@@ -57,6 +126,8 @@ function instantEvalWakeFor(
 ): Pick<ProcessEvolution<InstantEvalProcessState>, "nextWakeAt"> {
   switch (state.phase) {
     case "terminal":
+      // Held late pages keep their hold's wake, so a later no-op cannot strand them.
+      return { nextWakeAt: state.unbilledLatePages.length > 0 ? state.lateHoldUntilMs : null };
     case "idle":
       return { nextWakeAt: null };
     case "cancelling":
@@ -147,6 +218,8 @@ export const handleInstantEvalPlanned: EventHandler<
           errorCode: null,
           inputTokens: state.inputTokens,
           requests: state.requests,
+          costNanoUsd: state.costNanoUsd,
+          routedInputTokens: state.routedInputTokens,
         }),
       ],
     });
@@ -176,6 +249,8 @@ export const handleInstantEvalPlanned: EventHandler<
           errorCode: null,
           inputTokens: state.inputTokens,
           requests: state.requests,
+          costNanoUsd: state.costNanoUsd,
+          routedInputTokens: state.routedInputTokens,
         }),
       ],
     });
@@ -205,7 +280,7 @@ export const handleInstantEvalPageJudged: EventHandler<
   InstantEvalIntents
 > = (state, payload, ctx) => {
   const data = instantEvalProcessEventViewSchema.parse(payload);
-  if (state.phase === "terminal") return instantEvalUnchanged(state);
+  if (state.phase === "terminal") return instantEvalLatePageJudged({ state, data, ctx });
   // A page the run already counted: the inbox dedups an exact redelivery, and
   // this catches the rest, so a page arriving twice cannot advance the cursor
   // twice or spend the run's remaining rows twice.
@@ -220,6 +295,8 @@ export const handleInstantEvalPageJudged: EventHandler<
     remaining: Math.max(0, state.remaining - data.rows),
     inputTokens: state.inputTokens + data.inputTokens,
     requests: state.requests + data.requests,
+    costNanoUsd: state.costNanoUsd + data.costNanoUsd,
+    routedInputTokens: state.routedInputTokens + data.routedInputTokens,
   };
 
   const isCancelling = state.phase === "cancelling";
@@ -242,6 +319,8 @@ export const handleInstantEvalPageJudged: EventHandler<
             errorCode: null,
             inputTokens: advanced.inputTokens,
             requests: advanced.requests,
+            costNanoUsd: advanced.costNanoUsd,
+            routedInputTokens: advanced.routedInputTokens,
           },
         ),
       ],
@@ -288,17 +367,65 @@ export const handleInstantEvalCancelRequested: EventHandler<
   return { state: cancelling, ...instantEvalWakeFor(cancelling) };
 };
 
+/**
+ * The run's outcome landed: nothing more is judged, and routed pages that reported after it ended
+ * are billed now, so their cost lands on the finished row after the finish set its total.
+ */
 export const handleInstantEvalFinished: EventHandler<
   InstantEvalProcessState,
   unknown,
   InstantEvalIntents
-> = (state) => ({ state: { ...state, phase: "terminal" }, nextWakeAt: null });
+> = (state, payload, ctx) => {
+  const finished: InstantEvalProcessState = {
+    ...state,
+    phase: "terminal",
+    isFinishRecorded: true,
+    unbilledLatePages: [],
+    lateHoldUntilMs: null,
+  };
+  if (state.unbilledLatePages.length === 0) return { state: finished, nextWakeAt: null };
+  const { runId } = instantEvalProcessEventViewSchema.parse(payload);
+  return {
+    state: finished,
+    nextWakeAt: null,
+    intents: state.unbilledLatePages.map((late) => instantEvalBillLatePage({ ctx, runId, late })),
+  };
+};
+
+/**
+ * The run's finish never landed within the hold, so its held routed pages are billed without it
+ * rather than stranded. Each keeps its own late-page message key and spend request id, so a finish
+ * that lands after all finds nothing held and bills none of them twice.
+ */
+function instantEvalLatePageHoldEnded({
+  state,
+  ctx,
+  runId,
+}: {
+  state: InstantEvalProcessState;
+  ctx: InstantEvalContext;
+  runId: string;
+}): ProcessEvolution<InstantEvalProcessState> {
+  if (state.lateHoldUntilMs !== null && ctx.now < state.lateHoldUntilMs) {
+    return { state, nextWakeAt: state.lateHoldUntilMs };
+  }
+  return {
+    state: { ...state, unbilledLatePages: [], lateHoldUntilMs: null },
+    nextWakeAt: null,
+    intents: state.unbilledLatePages.map((late) =>
+      instantEvalBillLatePage({ ctx, runId, late, isFinishMissing: true }),
+    ),
+  };
+}
 
 export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIntents> = (
   state,
   ctx,
 ) => {
   const runId = ctx.key;
+  if (state.phase === "terminal" && state.unbilledLatePages.length > 0) {
+    return instantEvalLatePageHoldEnded({ state, ctx, runId });
+  }
   // A wake for a run nothing ever touched has to clear itself, or the wake
   // worker re-finds it for ever.
   if (state.phase === "terminal" || state.phase === "idle") {
@@ -324,6 +451,8 @@ export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIn
           errorCode: null,
           inputTokens: state.inputTokens,
           requests: state.requests,
+          costNanoUsd: state.costNanoUsd,
+          routedInputTokens: state.routedInputTokens,
         }),
       ],
     };
@@ -346,6 +475,8 @@ export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIn
         errorCode: "instant_eval_stalled",
         inputTokens: state.inputTokens,
         requests: state.requests,
+        costNanoUsd: state.costNanoUsd,
+        routedInputTokens: state.routedInputTokens,
       }),
     ],
   };
@@ -375,6 +506,8 @@ export function buildInstantEvalProcessEventView(
     skipped: number("skipped"),
     inputTokens: number("inputTokens"),
     requests: number("requests"),
+    costNanoUsd: number("costNanoUsd"),
+    routedInputTokens: number("routedInputTokens"),
     cursor: typeof data.cursor === "string" ? data.cursor : null,
     cursorSpanId: typeof data.cursorSpanId === "string" ? data.cursorSpanId : null,
     hasNextPage: data.hasNextPage === true,

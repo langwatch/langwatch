@@ -7,7 +7,7 @@ import {
   MY_DASHBOARD_NAME,
   newDashboardScope,
   projectIdSchema,
-  type Board,
+  type Dashboard,
   type BoardSummary,
   type DashboardViewer,
 } from "@langwatch/dashboard-contract";
@@ -70,7 +70,7 @@ export class BoardService {
   }
 
   /** The board the viewer may open here, at home or as the organization's guest. */
-  async getBoard(input: BoardRef): Promise<Board> {
+  async getBoard(input: BoardRef): Promise<Dashboard> {
     const ref = boardRef(input);
     const found = await this.#access.findReadable({ ...ref, viewer: input.viewer });
     if (!found) throw new DashboardNotFoundError(ref.projectId);
@@ -85,7 +85,7 @@ export class BoardService {
     projectId: string;
     name: string;
     createdById?: string;
-  }): Promise<Board> {
+  }): Promise<Dashboard> {
     const { createdById, ...fields } = input;
     const parsed = dashboardCreateInputSchema.parse(fields);
 
@@ -107,23 +107,15 @@ export class BoardService {
     return board;
   }
 
-  /**
-   * The board's name, description and left-out origins; an absent field is left as it is. Only
-   * a member who may edit the board changes them (AC200d).
-   */
+  /** The board's name and description; an absent field is left as it is. */
   async updateBoard(
-    input: BoardRef & {
-      name?: string;
-      description?: string | null;
-      excludedOrigins?: readonly string[] | null;
-    },
-  ): Promise<Board> {
+    input: BoardRef & { name?: string; description?: string | null },
+  ): Promise<Dashboard> {
     const ref = boardRef(input);
     await this.#access.getWritable({ ...ref, viewer: input.viewer });
     const details = dashboardDetailsUpdateSchema.parse({
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
-      ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
     });
 
     return this.#repository.updateBoard({
@@ -137,7 +129,7 @@ export class BoardService {
   }
 
   /** The board, its widgets, every star on it and its stale legacy copy (AC199b). */
-  async deleteBoard(input: BoardRef): Promise<Board> {
+  async deleteBoard(input: BoardRef): Promise<Dashboard> {
     const ref = boardRef(input);
     await this.#access.getWritable({ ...ref, viewer: input.viewer });
     return this.#repository.deleteBoard(ref);

@@ -5,9 +5,19 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
+
+// newCodeExecutorForTest builds the code executor the way Run does, minus the
+// logger: these tests are about which operator knob reaches which option, and
+// the logger only ever reports a teardown that did not finish.
+func newCodeExecutorForTest(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
+	return newCodeExecutor(engineCfg, getenv, zap.NewNop())
+}
 
 // TestResolveLangWatchBaseURL_FallsBackToLangwatchEndpoint pins the
 // fix for the prod regression on 2026-04-29: every evaluator dispatch
@@ -141,7 +151,7 @@ func TestResolveSandboxPython_HonorsTheUnprefixedImageSetting(t *testing.T) {
 func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 	getenv := func(string) string { return "" }
 
-	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+	exec, err := newCodeExecutorForTest(nlpgo.EngineConfig{
 		SandboxPython:           nlpgo.DefaultSandboxPython,
 		CodeBlockTimeoutSeconds: 300,
 	}, getenv)
@@ -159,7 +169,7 @@ func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 func TestNewCodeExecutor_UnsetTimeoutKeepsTheTenMinuteDefault(t *testing.T) {
 	getenv := func(string) string { return "" }
 
-	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+	exec, err := newCodeExecutorForTest(nlpgo.EngineConfig{
 		SandboxPython: nlpgo.DefaultSandboxPython,
 	}, getenv)
 	if err != nil {
@@ -202,7 +212,7 @@ func TestResolveCodeBlockTimeout(t *testing.T) {
 func TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately(t *testing.T) {
 	getenv := func(string) string { return "" }
 
-	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+	exec, err := newCodeExecutorForTest(nlpgo.EngineConfig{
 		SandboxPython:           nlpgo.DefaultSandboxPython,
 		CodeBlockTimeoutSeconds: -30,
 	}, getenv)
@@ -303,7 +313,7 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	exec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	exec, err := newCodeExecutorForTest(cfg.Engine, os.Getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}

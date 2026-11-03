@@ -21,6 +21,7 @@ export const servedConfig = {
     federatedProviders: [],
     signUpMode: "invite_only",
   },
+  "api-key": { docsOrigins: ["https://app.langwatch.test", "https://langwatch.ai"] },
   authz: {},
   billing: {},
   evaluation: { langevals: true },

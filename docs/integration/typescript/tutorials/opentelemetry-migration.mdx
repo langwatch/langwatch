@@ -90,46 +90,45 @@ const handle = setupObservability({
   import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
   import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 
-const sdk = new NodeSDK({
-serviceName: "my-service",
-spanProcessors: [
-new BatchSpanProcessor(new JaegerExporter())
-],
-instrumentations: [new HttpInstrumentation()],
-sampler: new TraceIdRatioBasedSampler(0.1),
-spanLimits: { attributeCountLimit: 128 }
-});
+  const sdk = new NodeSDK({
+    serviceName: "my-service",
+    spanProcessors: [
+      new BatchSpanProcessor(new JaegerExporter())
+    ],
+    instrumentations: [new HttpInstrumentation()],
+    sampler: new TraceIdRatioBasedSampler(0.1),
+    spanLimits: { attributeCountLimit: 128 }
+  });
 
-sdk.start();
-
-````
+  sdk.start();
+  ```
 </Step>
 
 <Step title="After: Using LangWatch with Same Configuration">
-```typescript
-import { setupObservability } from "langwatch/observability/node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  ```typescript
+  import { setupObservability } from "langwatch/observability/node";
+  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 
-const handle = setupObservability({
-  langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
-  },
-  serviceName: "my-service",
-  spanProcessors: [
-    new BatchSpanProcessor(new JaegerExporter())
-  ],
-  instrumentations: [new HttpInstrumentation()],
-  sampler: new TraceIdRatioBasedSampler(0.1),
-  spanLimits: { attributeCountLimit: 128 }
-});
+  const handle = setupObservability({
+    langwatch: {
+      apiKey: process.env.LANGWATCH_API_KEY
+    },
+    serviceName: "my-service",
+    spanProcessors: [
+      new BatchSpanProcessor(new JaegerExporter())
+    ],
+    instrumentations: [new HttpInstrumentation()],
+    sampler: new TraceIdRatioBasedSampler(0.1),
+    spanLimits: { attributeCountLimit: 128 }
+  });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  await handle.shutdown();
-  process.exit(0);
-});
-````
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    await handle.shutdown();
+    process.exit(0);
+  });
+  ```
 
 </Step>
 </Steps>
@@ -139,6 +138,8 @@ process.on('SIGTERM', async () => {
 Implement sophisticated sampling strategies for different use cases:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
 
 // Sample based on trace ID ratio
@@ -167,6 +168,8 @@ const handle = setupObservability({
 Configure custom resource detection for better service identification:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 import { Resource } from "@opentelemetry/resources";
 import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
 
@@ -198,6 +201,8 @@ const handle = setupObservability({
 Add custom instrumentations for specific libraries or frameworks:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
 import { MongoDBInstrumentation } from "@opentelemetry/instrumentation-mongodb";
@@ -223,6 +228,8 @@ const handle = setupObservability({
 Configure custom context propagation for distributed tracing:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 import { W3CTraceContextPropagator, W3CBaggagePropagator } from "@opentelemetry/core";
 import { CompositePropagator } from "@opentelemetry/core";
 
@@ -244,6 +251,8 @@ const handle = setupObservability({
 Create different configurations for different environments:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const getObservabilityConfig = (environment: string) => {
   const baseConfig = {
     serviceName: "my-service",
@@ -307,6 +316,9 @@ const handle = setupObservability(getObservabilityConfig(process.env.NODE_ENV));
 Optimize performance for high-volume applications:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { LangWatch } from "langwatch";
+
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
@@ -412,6 +424,8 @@ const handle = setupObservability({
 Enable detailed logging during migration to identify issues:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 // Enable detailed logging during migration
 const handle = setupObservability({
   langwatch: {

@@ -147,7 +147,7 @@ The client received part of a response and then silence.
 
 **Confirm it:** the gateway never switches providers mid-stream. When an upstream stream fails after the first chunk, the gateway writes one terminal SSE frame and closes:
 
-```
+```text
 data: {"type":"error","error":{"type":"provider_error","message":"..."}}
 ```
 

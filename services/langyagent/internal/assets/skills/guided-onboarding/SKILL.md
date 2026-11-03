@@ -173,6 +173,8 @@ Item 1:
 langwatch scenario create "<title>" --situation "<the user's situation>" --criteria "<criterion one>,<criterion two>" --format json
 ```
 
+Item 1 leaves `--test-suite` out on purpose, so the first scenario lands in `Default`: the project is brand new and has no test suite to pick yet. This is the one exception to the scenarios skill's rule to list the test suites first; every later scenario goes into the suite of items 5 to 8.
+
 Item 2, as its own command, never chained:
 
 ```bash
