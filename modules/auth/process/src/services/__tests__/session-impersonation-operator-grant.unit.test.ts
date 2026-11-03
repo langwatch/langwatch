@@ -35,6 +35,7 @@ async function impersonating({ operatorHoldsGrant }: { operatorHoldsGrant: boole
     }),
   });
   const service = BrowserSessionService.create({
+    docsKeys: { revokeDocsSessionKeys: async () => ({ revoked: true as const }) },
     sessions: MemoryAuthSessionRepository.create({ memory }),
     cache: null,
     identityEmails: void 0,

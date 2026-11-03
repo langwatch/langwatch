@@ -80,7 +80,7 @@ export function betterAuthTransportFor(
     /** No organization claims any domain, and nobody belongs to one. */
     organizations: {
       findBySsoDomain: async () => null,
-      createSsoDomainMembership: async () => "created",
+      createMembership: async () => ({ outcome: "created", seat: "MEMBER", pending: false }),
       countMembershipsForUser: async () => 0,
     },
     announcements: {
@@ -95,7 +95,6 @@ export function betterAuthTransportFor(
       route: async () => undefined,
       resolveAuthProvider: async () => "credential",
     } as never,
-    authzGrants: {} as never,
     arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
     linkProposals: createApiFixture<LinkProposals>(),

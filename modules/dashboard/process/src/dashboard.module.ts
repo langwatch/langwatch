@@ -4,6 +4,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 
 import { DashboardModule } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
+import { keyReachOfCredential } from "./rules/dashboard-widget-key-reach.rules.ts";
 import { widgetSourceOfCredential } from "./rules/dashboard-widget-source.rules.ts";
 import { boardProjectRest } from "./transport/board-project.rest.ts";
 import { boardRest, releasedOrRefused } from "./transport/board.rest.ts";
@@ -68,6 +69,12 @@ export const dashboardProcessModule: PublishedProcessModule<
           projectId: projectCredentialOfRequest(request).project.id,
         }),
       ),
-    dashboardWidgetCallerSource: (request) =>
-      widgetSourceOfCredential({ credential: projectCredentialOfRequest(request) }),
+    dashboardWidgetCaller: (request) => {
+      const credential = projectCredentialOfRequest(request);
+
+      return {
+        source: widgetSourceOfCredential({ credential }),
+        ...keyReachOfCredential({ credential }),
+      };
+    },
   });

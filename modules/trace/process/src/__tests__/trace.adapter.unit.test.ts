@@ -34,7 +34,7 @@ class NullSummaryReaderRepository extends TraceSummaryReaderRepository {
 }
 
 class EmptyPayloads extends TracePayloadReaderRepository {
-  async read(): Promise<string> {
+  async readFields(): Promise<ReadonlyMap<string, string>> {
     throw new Error("no offloaded payloads");
   }
 }

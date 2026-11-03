@@ -58,6 +58,83 @@ Feature: Instant Evals decision model column in Default models
     Then it resolves as unavailable because it is not enabled
     And the call is skipped as not configured
 
+  # --- A caller's own pick ---
+
+  # One judge may ask for a decision model of its own. The pick travels through the resolver as
+  # an override, so the flag guard, the key guard and the skip handling all apply unchanged.
+
+  @unit
+  Scenario: A caller's own decision model pick is resolved instead of the column
+    Given the flag is on for the organization
+    And the Instant Evals column is not set at any scope
+    And the project has an enabled OpenAI row with a key
+    When the decision model is resolved for a caller picking "OpenAI Decisions (gpt-6-luna)"
+    Then it resolves to the own model with its endpoint and key
+    And the project's column is not read
+
+  @unit
+  Scenario: A caller's pick with no key cannot run and is not moved onto the billed model
+    Given the flag is on for the organization
+    And the project has no Inception row
+    When the decision model is resolved for a caller picking "Inception Mercury Decide"
+    Then it resolves as unavailable because the provider is missing
+
+  @unit
+  Scenario: A caller's pick is refused without the flag
+    Given the flag is off for the organization
+    When the decision model is resolved for a caller picking "OpenAI Decisions (gpt-6-luna)"
+    Then it resolves as unavailable because it is not enabled
+
+  @unit
+  Scenario: A caller picking LangWatch Instant Preview runs on the hosted model
+    Given the flag is on for the organization
+    And the Instant Evals column is "Cloudflare Clef"
+    When the decision model is resolved for a caller picking "LangWatch Instant Preview"
+    Then it resolves to LangWatch Instant Preview
+    And no provider row is read
+
+  @unit
+  Scenario: A caller's pick that is not a decision model is ignored
+    Given the flag is on for the organization
+    And the Instant Evals column is "OpenAI Decisions (gpt-6-luna)"
+    And the project has an enabled OpenAI row with a key
+    When the decision model is resolved for a caller picking a chat model
+    Then the project's column is resolved instead
+
+  @unit
+  Scenario: One caller's pick never answers for another caller
+    Given the flag is on for the organization
+    And the Instant Evals column is not set at any scope
+    And the project has an enabled OpenAI row with a key
+    When one caller resolves with a pick and another resolves with none
+    Then the second answers LangWatch Instant Preview, not the first caller's pick
+
+  # --- Offering the models ---
+
+  @unit
+  Scenario: With the flag off only LangWatch Instant Preview is offered
+    Given the flag is off for the organization
+    When the project's pickable decision models are listed
+    Then only "LangWatch Instant Preview" is offered
+
+  @unit
+  Scenario: With the flag on the models that would run are offered
+    Given the flag is on for the organization
+    And the project has an enabled OpenAI row with a key
+    And the project has no Inception row
+    When the project's pickable decision models are listed
+    Then "LangWatch Instant Preview" is offered first
+    And "OpenAI Decisions (gpt-6-luna)" is offered
+    And "Inception Mercury Decide" is not offered
+
+  @unit
+  Scenario: A provider is asked for once however many of its models the catalogue holds
+    Given the flag is on for the organization
+    And the project has an enabled Perplexity row with a key
+    When the project's pickable decision models are listed
+    Then both Perplexity models are offered
+    And the Perplexity row is read once
+
   # --- Writing the column ---
 
   @unit

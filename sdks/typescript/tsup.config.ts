@@ -16,10 +16,7 @@ import packageJson from "./package.json";
 const noExternal = [/^@langwatch\/(langy|handled-error)(\/|$)/, /^zod(\/|$)/];
 
 // Used only under src/cli, so they are devDependencies bundled into the CLI.
-// cloudflared's postinstall would otherwise download a binary on every install.
-const cliOnlyPackages = [
-  /^(chalk|ora|prompts|commander|js-yaml|dotenv|jsonc-parser|cloudflared)(\/|$)/,
-];
+const cliOnlyPackages = [/^(chalk|ora|prompts|commander|js-yaml|dotenv|jsonc-parser)(\/|$)/];
 
 // tsconfig.json is a solution container (no files of its own), so the build reads the
 // package's check config, which carries the same compiler options (ADR-150, 2026-10-10).

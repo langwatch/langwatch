@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-model.service.ts";
 import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../../../app-functions/rules/langwatch-ql-app-function-store.rules.ts";
@@ -255,6 +256,11 @@ describe("given the rendered-mode statements a converge runs", () => {
   });
 });
 
+/** Every catalog view holding exactly the columns its catalog entry declares. */
+const CATALOG_COLUMNS = Object.fromEntries(
+  LWQL_VIEW_CATALOG.map((view) => [view.name, view.columns.map((column) => column.name)]),
+);
+
 describe("given what the reconvergence check finds in ClickHouse", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
   const fingerprint = selfProvisioning.credentialFingerprint({ names: NAMES, postgres: POSTGRES });
@@ -268,7 +274,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
       names: NAMES,
       relations,
       functions: ["lwql_trace"],
-      found: { relations: found, functions, comments },
+      found: { relations: found, functions, comments, columns: CATALOG_COLUMNS },
       credentialFingerprint: fingerprint,
     });
 
@@ -290,6 +296,21 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
       objects: [NAMES.keyMapTable, engineTable, view, "lwql_trace"],
       isKeyMapMissing: true,
     });
+  });
+
+  /** @scenario "The reconvergence check reads a present view with no column data as unknown, not as drift" */
+  it("names no view whose columns the read did not return", () => {
+    const comments = Object.fromEntries(relations.map((name) => [name, current]));
+
+    expect(
+      selfProvisioning.findDrift({
+        names: NAMES,
+        relations,
+        functions: ["lwql_trace"],
+        found: { relations, functions: ["lwql_trace"], comments, columns: {} },
+        credentialFingerprint: fingerprint,
+      }),
+    ).toEqual({ objects: [], isKeyMapMissing: false });
   });
 
   describe("when an engine table was built on other credentials, or before it was stamped", () => {
