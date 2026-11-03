@@ -634,6 +634,8 @@ describe("when a PostgreSQL-backed view lacks a column over a current engine tab
     clickHouse.ran.findIndex(
       (s) => s.includes(`.${view.sourceTable} (`) && s.includes("ENGINE = PostgreSQL"),
     );
+  const replacesView = (statement: string) =>
+    new RegExp(`^CREATE OR REPLACE VIEW [^ .]+\\.${view.name}\\n`).test(statement);
 
   /** @scenario "The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column" */
   it("names the engine table, then rebuilds it stamped before replacing the view", async () => {
@@ -642,18 +644,18 @@ describe("when a PostgreSQL-backed view lacks a column over a current engine tab
 
     await converge(clickHouse);
 
-    const replacesView = new RegExp(`^CREATE OR REPLACE VIEW [^ .]+\\.${view.name}\\n`);
     const engineAt = rebuilt(clickHouse);
     expect(clickHouse.ran[engineAt]).toContain(fingerprint);
-    expect(clickHouse.ran.findIndex((s) => replacesView.test(s))).toBeGreaterThan(engineAt);
+    expect(clickHouse.ran.findIndex(replacesView)).toBeGreaterThan(engineAt);
   });
 
   /** @scenario "The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column" */
-  it("leaves the engine table in place while the named collection cannot be confirmed", async () => {
+  it("leaves the engine table and its view in place while the named collection cannot be confirmed", async () => {
     const clickHouse = clickHouseThat({ present, failingProbe: "collection" });
 
     await expect(converge(clickHouse)).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
     expect(rebuilt(clickHouse)).toBe(-1);
+    expect(clickHouse.ran.some(replacesView)).toBe(false);
   });
 });
 

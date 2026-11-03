@@ -237,6 +237,14 @@ export class LangWatchQLSelfProvisioningService {
     return only === undefined ? engineTables : engineTables.filter((name) => only.includes(name));
   }
 
+  /** The PostgreSQL-backed views that read one of `engineTables`. */
+  viewsOverEngineTables({ engineTables }: { engineTables: readonly string[] }): string[] {
+    return catalogShapes
+      .postgresViews(LWQL_VIEW_CATALOG)
+      .filter((view) => engineTables.includes(view.sourceTable))
+      .map((view) => view.name);
+  }
+
   /**
    * Every ClickHouse statement a self-provisioning boot runs: the access model, the PostgreSQL
    * bridge, then the views. Each app-owned object is created or replaced in one statement,

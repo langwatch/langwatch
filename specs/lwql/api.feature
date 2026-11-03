@@ -1127,6 +1127,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the reconvergence check runs
     Then it names that engine table as drift along with the view
     And the converge rebuilds the engine table before the view, only once the named collection is confirmed
+    And while the collection is unconfirmed it replaces neither, and still raises the unconfirmed collection
 
   @unit
   Scenario: The reconvergence check reads a present view with no column data as unknown, not as drift
