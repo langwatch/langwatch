@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from ..models.read_cli_bootstrap_response_200_tool_policies_opencode import (
         ReadCliBootstrapResponse200ToolPoliciesOpencode,
     )
+    from ..models.read_cli_bootstrap_response_200_tool_policies_pi import ReadCliBootstrapResponse200ToolPoliciesPi
 
 
 T = TypeVar("T", bound="ReadCliBootstrapResponse200ToolPolicies")
@@ -43,6 +44,7 @@ class ReadCliBootstrapResponse200ToolPolicies:
         copilot (ReadCliBootstrapResponse200ToolPoliciesCopilot):
         code (ReadCliBootstrapResponse200ToolPoliciesCode):
         grok (ReadCliBootstrapResponse200ToolPoliciesGrok):
+        pi (ReadCliBootstrapResponse200ToolPoliciesPi):
     """
 
     claude: ReadCliBootstrapResponse200ToolPoliciesClaude
@@ -53,6 +55,7 @@ class ReadCliBootstrapResponse200ToolPolicies:
     copilot: ReadCliBootstrapResponse200ToolPoliciesCopilot
     code: ReadCliBootstrapResponse200ToolPoliciesCode
     grok: ReadCliBootstrapResponse200ToolPoliciesGrok
+    pi: ReadCliBootstrapResponse200ToolPoliciesPi
 
     def to_dict(self) -> dict[str, Any]:
         claude = self.claude.to_dict()
@@ -71,6 +74,8 @@ class ReadCliBootstrapResponse200ToolPolicies:
 
         grok = self.grok.to_dict()
 
+        pi = self.pi.to_dict()
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -83,6 +88,7 @@ class ReadCliBootstrapResponse200ToolPolicies:
                 "copilot": copilot,
                 "code": code,
                 "grok": grok,
+                "pi": pi,
             }
         )
 
@@ -114,6 +120,7 @@ class ReadCliBootstrapResponse200ToolPolicies:
         from ..models.read_cli_bootstrap_response_200_tool_policies_opencode import (
             ReadCliBootstrapResponse200ToolPoliciesOpencode,
         )
+        from ..models.read_cli_bootstrap_response_200_tool_policies_pi import ReadCliBootstrapResponse200ToolPoliciesPi
 
         d = dict(src_dict)
         claude = ReadCliBootstrapResponse200ToolPoliciesClaude.from_dict(d.pop("claude"))
@@ -132,6 +139,8 @@ class ReadCliBootstrapResponse200ToolPolicies:
 
         grok = ReadCliBootstrapResponse200ToolPoliciesGrok.from_dict(d.pop("grok"))
 
+        pi = ReadCliBootstrapResponse200ToolPoliciesPi.from_dict(d.pop("pi"))
+
         read_cli_bootstrap_response_200_tool_policies = cls(
             claude=claude,
             codex=codex,
@@ -141,6 +150,7 @@ class ReadCliBootstrapResponse200ToolPolicies:
             copilot=copilot,
             code=code,
             grok=grok,
+            pi=pi,
         )
 
         return read_cli_bootstrap_response_200_tool_policies

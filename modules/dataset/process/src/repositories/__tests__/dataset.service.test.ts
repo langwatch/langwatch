@@ -72,6 +72,7 @@ class Records implements DatasetRecordRepository {
     throw new Error("unused");
   };
   deleteMany = async () => 0;
+  replaceAll = async () => undefined;
 }
 
 describe("DatasetService", () => {

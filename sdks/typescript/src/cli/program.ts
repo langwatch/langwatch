@@ -13,6 +13,7 @@ import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
+import { parseDatasetVersionFlag } from "./utils/datasetVersionFlag";
 import { SOURCE_TYPE_BY_TOOL } from "./utils/governance/otel-env-block";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
 import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
@@ -48,6 +49,7 @@ export const TOOL_WRAPPER_COMMANDS = [
   "gemini",
   "opencode",
   "grok",
+  "pi",
 ] as const;
 
 /**
@@ -355,6 +357,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerGeminiCommands(program);
   registerOpencodeCommands(program);
   registerGrokCommands(program);
+  registerPiCommands(program);
   registerCodingAssistantHelp(program);
   registerReportCommands(program);
   registerLogoutCommands(program);
@@ -804,6 +807,27 @@ function registerGrokCommands(program: Command): void {
     });
 }
 
+function registerPiCommands(program: Command): void {
+  program
+    .command("pi", { hidden: true })
+    .description(
+      "Run `pi` with LangWatch telemetry (ingestion only: pi pins every model's address in its own build).",
+    )
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapPi } = await import("./commands/wrap.js");
+        await wrapPi(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+}
+
 function registerCodingAssistantHelp(program: Command): void {
   // A wrapper renders no result of its own, in any format: it hands the
   // terminal to the tool it runs. Registered as such so the auto-detected
@@ -829,6 +853,7 @@ function registerCodingAssistantHelp(program: Command): void {
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
       "  grok            Run `grok` (Grok CLI) with LangWatch telemetry",
+      "  pi              Run `pi` with LangWatch telemetry",
       "  copilot-app     Set up capture for the standalone GitHub Copilot app",
       "  instrument      Write persistent telemetry wiring for a tool without launching it",
       "",
@@ -1690,8 +1715,16 @@ function registerExperimentCommands(program: Command): void {
         "--concurrency <n>",
         "Cells (one row against one target) to run at once for this run only, 1 to 24 (default: the server's setting; 1 runs them in order)",
       )
+      .option(
+        "--dataset-version <n>",
+        "Version of the experiment's saved dataset to run, overriding the version the experiment pins",
+        parseDatasetVersionFlag,
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean; param?: string[]; concurrency?: string }) => {
+    async (
+      slug: string,
+      options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+    ) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },

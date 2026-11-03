@@ -50,6 +50,18 @@ Feature: Instant Evals decision model column in Default models
     When the project's decision model is resolved
     Then it resolves as unavailable because the key is missing
 
+  @unit
+  Scenario: A project's own key wins over an older organization key
+    Given the organization saved an OpenAI key before the project saved its own
+    When the project's OpenAI row is looked up
+    Then the project's row is answered, as the settings page lists it
+
+  @unit
+  Scenario: A saved decision model or key judges the next run
+    Given the project's decision model was resolved
+    When five seconds have passed
+    Then the next resolve reads the stored column and row again
+
   # A provider whose host differs per customer (Azure) gets only the resource name from the row;
   # the catalogue writes the rest of the URL, so a key still goes only to its issuer's domain.
 
@@ -219,6 +231,12 @@ Feature: Instant Evals decision model column in Default models
     When the provider answers 401
     Then the text is skipped as "classifier_key_invalid" after one attempt
     And the provider's error text is not read
+
+  @unit
+  Scenario: A model or deployment the account does not hold is skipped as not configured
+    When the provider answers 404
+    Then the text is skipped as "classifier_not_configured" after one attempt
+    And the run is not failed over it
 
   @unit
   Scenario: A rate limited provider is retried, then named as rate limited

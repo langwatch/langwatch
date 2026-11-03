@@ -14,7 +14,7 @@ from langevals_core.base_evaluator import (
     SingleEvaluationResult,
 )
 from langevals_presidio.allcaps_names import (
-    has_name_shaped_rewrite,
+    could_hold_a_rewritten_name,
     normalisation_justifies_span,
     normalise_allcaps_runs,
 )
@@ -154,22 +154,18 @@ class PresidioPIIDetectionEvaluator(
         super().preload()
 
     def _results_from_normalised_casing(
-        self, *, content: str, entities: list[str], already_found: list[Any]
+        self, *, content: str, entities: list[str]
     ) -> list[Any]:
         """The `entities` spans only a case-normalised copy of `content` sees.
 
         `entities` is case-sensitive only: the code, currency and identifier
-        recognisers need the capitals. Skipped when the text has no name-shaped
-        rewrite, since no span could pass without one.
+        recognisers need the capitals. Skipped when no rewritten word sits
+        beside another, since no span could pass without one.
         """
         normalised = normalise_allcaps_runs(content)
-        if not has_name_shaped_rewrite(original=content, normalised=normalised):
+        if not could_hold_a_rewritten_name(original=content, normalised=normalised):
             return []
 
-        placed = {
-            (result.entity_type, result.start, result.end)
-            for result in already_found
-        }
         return [
             result
             for result in self.analyzer.analyze(
@@ -177,7 +173,6 @@ class PresidioPIIDetectionEvaluator(
             )
             if result.score >= self.settings.min_threshold
             and result.entity_type in entities
-            and (result.entity_type, result.start, result.end) not in placed
             and normalisation_justifies_span(
                 original=content,
                 normalised=normalised,
@@ -197,7 +192,7 @@ class PresidioPIIDetectionEvaluator(
         reaches the whole of it.
         """
         additions = self._results_from_normalised_casing(
-            content=content, entities=entities, already_found=results
+            content=content, entities=entities
         )
         if not additions:
             return results

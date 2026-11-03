@@ -15,11 +15,11 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * 1,540 with `pnpm ensure:built`; 1,561 ADR-185; 1,562 ADR-190; 1,565 ADR-192; 1,567 versions.
- * 1,568 with ADR-194 (connector agent type): agent config/connector.ts. A ceiling, not a target:
- * lower it when earned.
- */
-const CEILING = 1_568;
+ * 1,540 with `pnpm ensure:built` (#8795); 1,561 ADR-185; 1,562 ADR-190; 1,565 ADR-192 (Grok OTLP).
+ * 1,567 with agent and evaluator versions; 1,569 with ADR-188 (pi definition, canonicaliser).
+ * 1,570 with the `dataset-version.ts` contract; 1,571 with ADR-194 (agent config/connector.ts).
+ * A ceiling, not a target: lower it when earned. */
+const CEILING = 1_571;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

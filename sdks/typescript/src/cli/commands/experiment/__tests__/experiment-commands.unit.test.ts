@@ -120,6 +120,19 @@ describe("runExperimentCommand()", () => {
     });
   });
 
+  describe("when --dataset-version is given", () => {
+    it("starts the run pinned to that dataset version", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 10 });
+
+      await runExperimentCommand("quality-check", { datasetVersion: 2 });
+
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: undefined,
+        datasetVersion: 2,
+      });
+    });
+  });
+
   describe("when --concurrency is outside 1 to 24", () => {
     for (const value of ["0", "25", "1.5", "many"]) {
       /** @scenario "The experiment run command refuses a concurrency outside 1 to 24" */

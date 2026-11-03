@@ -153,6 +153,8 @@ export type WorkflowEvaluationRequest = Readonly<{
   versionId?: string | undefined;
   data?: Record<string, unknown>[] | undefined;
   datasetId?: string | undefined;
+  /** The saved dataset's version to evaluate; its current content when absent. */
+  datasetVersion?: number | undefined;
   parameters?: Record<string, string | number | boolean> | undefined;
   rowIndices?: number[] | undefined;
 }>;

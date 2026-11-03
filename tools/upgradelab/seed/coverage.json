@@ -77,6 +77,12 @@
       "cells": ["C1", "C3"],
       "note": "heavy creates the dataset by REST with no rows yet; rows in Postgres need a row door (REST rows route)"
     },
+    "dataset:create-first-versions": {
+      "status": "pending",
+      "seed": "product-seeds:dataset",
+      "cells": ["C1", "C3"],
+      "note": "datasets seeded before the step get version 1; needs rows by the REST rows route"
+    },
     "evaluator:backfill-versions": {
       "status": "pending",
       "seed": "unplanned",
