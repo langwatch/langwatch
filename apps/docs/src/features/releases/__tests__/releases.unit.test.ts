@@ -215,6 +215,19 @@ describe("when only some of the older releases fit the page token budget", () =>
       expect(markdown).toContain(`## Release v${version}`);
     expect(markdown).not.toContain(leftOut);
   });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps every release and adds no note when the caller sets no budget", () => {
+    const { docsRoot, dispose } = changelogProject({ changelog: all });
+    try {
+      const markdown = pageMarkdown({ docsRoot, slug: "changelog" });
+      for (const version of ["3.0.0", "2.9.0", "2.8.0"])
+        expect(markdown).toContain(`## Release v${version}`);
+      expect(markdown).not.toContain(leftOut);
+    } finally {
+      dispose();
+    }
+  });
 });
 
 describe("when a page asks for the latest releases", () => {
