@@ -77,6 +77,39 @@ Feature: An invited person without an account gets in by any method
       Then the address bar still carries the token, so a reload can spend it
 
     @integration
+    Scenario: A reload on the create-your-account step stays on it
+      Given a person whose confirmation link brought them to "Create your account"
+      When they reload the page
+      Then the same step shows for the same address
+      And no new confirmation link is asked for
+
+    @integration
+    Scenario: A held proof the server refuses falls back to the address step
+      Given a tab holding a confirmed address whose proof was spent or expired
+      When the sign-up page loads
+      Then it shows the address step
+      And the tab holds the proof no longer
+
+    @integration
+    Scenario: Creating the account lets go of the held proof
+      Given a tab holding a confirmed address
+      When the account is created
+      Then the tab holds the proof no longer
+
+    @unit
+    Scenario: The held proof lasts no longer than the proof itself
+      Given a confirmed address held for this tab only
+      When it is read after the proof's lifetime, or the browser refuses storage
+      Then nothing is held and nothing fails
+
+    @integration
+    Scenario: A reopened link in a browser signed in to that account goes on
+      Given a browser signed in to the account the link's address now holds
+      When the person opens the confirmation link again
+      Then the screen says the person is signed in instead of asking them to log in
+      And the browser goes on to where the link was taking it
+
+    @integration
     Scenario: A dead confirmation link in a browser already signed in goes on
       Given a browser that is already signed in
       When a confirmation link it opens is refused as already used
