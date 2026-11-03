@@ -250,10 +250,10 @@ Feature: Langy conversations are an event-sourced projection
     Then I get that committed turn back instead of an error
 
   @unit
-  Scenario: A send that clashes with a copy still being prepared is held as pending
+  Scenario: A send that clashes with a copy still being prepared is refused as being prepared
     Given a copy of my send raced mine and is still being prepared
     When my send is submitted
-    Then my send is answered as pending instead of failing
+    Then my send is refused as already being prepared, not as a write conflict
 
   @unit
   Scenario: A send that cannot get through a burst of sends is told Langy is unavailable
