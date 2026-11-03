@@ -237,7 +237,7 @@ Feature: Langy conversations are an event-sourced projection
   # Turn admission under concurrent sends
   # ============================================================================
 
-  @unit
+  @regression @unit
   Scenario: A send that races another send is still admitted
     Given another send races mine for the same conversation
     When my send loses the race
