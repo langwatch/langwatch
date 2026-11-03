@@ -250,6 +250,17 @@ describe("given a save racing another save for its version number", () => {
 
     expect(deleteChunks).toHaveBeenCalledWith(expect.objectContaining({ chunkCount: 1 }));
   });
+
+  /** @scenario "A save whose version row fails to write removes the rows it wrote" */
+  it("removes the rows it wrote when the version row fails for another reason", async () => {
+    const datasetId = await editedDataset();
+    vi.spyOn(repositories.versions, "create").mockRejectedValue(new Error("database down"));
+    const deleteChunks = vi.spyOn(repositories.versionContent, "deleteChunks");
+
+    await expect(save(datasetId)).rejects.toThrow("database down");
+
+    expect(deleteChunks).toHaveBeenCalledWith(expect.objectContaining({ chunkCount: 1 }));
+  });
 });
 
 describe("given a version whose rows are larger than one response", () => {

@@ -357,8 +357,9 @@ export class DatasetVersionService {
         await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
         return { version: await this.#keepUnchanged({ latest: previous, input }), created: false };
       }
+      let version: DatasetVersion;
       try {
-        const version = await this.deps.versions.create({
+        version = await this.deps.versions.create({
           id,
           projectId: input.projectId,
           datasetId: dataset.id,
@@ -375,21 +376,25 @@ export class DatasetVersionService {
           authorKind: input.by.kind,
           pinned: input.pinned ?? false,
         });
-        await this.#announce({
-          projectId: input.projectId,
-          datasetId: dataset.id,
-          versionId: version.id,
-          version: version.version,
-          trigger: version.trigger,
-        });
-        return { version, created: true };
       } catch (error) {
-        if (!(error instanceof DatasetVersionNumberTakenError)) throw error;
+        if (!(error instanceof DatasetVersionNumberTakenError)) {
+          await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
+          throw error;
+        }
         previous = await this.deps.versions.findLatest({
           projectId: input.projectId,
           datasetId: dataset.id,
         });
+        continue;
       }
+      await this.#announce({
+        projectId: input.projectId,
+        datasetId: dataset.id,
+        versionId: version.id,
+        version: version.version,
+        trigger: version.trigger,
+      });
+      return { version, created: true };
     }
     await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
     throw new Error(
