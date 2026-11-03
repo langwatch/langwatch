@@ -3,7 +3,11 @@
  * the contract already named. Names, kinds and schemas are not repeated here.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import { evaluatorTrpc, type EvaluatorApi } from "@langwatch/evaluator-contract";
+import {
+  evaluatorTrpc,
+  type EvaluatorApi,
+  type EvaluatorCaller,
+} from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/module";
 
 import { evaluatorCallerOf } from "../rules/evaluator-version-caller.rules.ts";
@@ -18,8 +22,12 @@ export interface EvaluatorBrowserApi {
     projectId: string;
     isEvaluator: boolean;
   }): Promise<void>;
-  /** Clears a workflow's evaluator flag and archives the evaluator that wrapped it. */
-  disableAsEvaluator(input: { workflowId: string; projectId: string }): Promise<void>;
+  /** Clears a workflow's evaluator flag; a deployed evaluator needs the caller's deploy right. */
+  disableAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    caller?: EvaluatorCaller;
+  }): Promise<void>;
 }
 
 export const EvaluatorBrowserApi = moduleApi<EvaluatorBrowserApi>()("evaluator");
@@ -177,8 +185,8 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
   /** Moved from `optimization.*` with its input, answer and permission (round 26, CD-2). */
   .procedure("disableAsEvaluator")
   .withPermission("workflows:update")
-  .handle(async ({ app, input }) => {
-    await app.disableAsEvaluator(input);
+  .handle(async ({ app, input, actor }) => {
+    await app.disableAsEvaluator({ ...input, caller: evaluatorCallerOf({ actor }) });
 
     return { success: true };
   })

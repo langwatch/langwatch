@@ -189,14 +189,14 @@ export class AgentVersionService {
 
   /**
    * Archiving an agent a label points at needs `agents:deploy`; the check depends on the
-   * loaded row, so the service asks it. A peer's cascade names no caller and is not asked.
+   * loaded row, so the service asks it. Only a named system caller skips it: no caller fails.
    */
   async assertArchivable(input: {
     projectId: string;
     agentId: string;
     caller?: AgentCaller;
   }): Promise<void> {
-    if (!input.caller || input.caller.type === "system") return;
+    if (input.caller?.type === "system") return;
     const labels = await this.#repository.findLabels({
       projectId: input.projectId,
       ids: [input.agentId],
@@ -204,6 +204,7 @@ export class AgentVersionService {
     if (labels.length === 0) return;
     const { caller } = input;
     const permitted =
+      caller !== void 0 &&
       caller.type !== "unattributed" &&
       (await this.#permissions.can({
         principal:
@@ -255,9 +256,10 @@ export class AgentVersionService {
   }): Promise<{ written: number; wouldWrite: number }> {
     let written = 0;
     let wouldWrite = 0;
+    const versioned = await this.#versioned(input.page);
     for (const agent of input.page) {
       if (!(await versionMayCopy(agent))) continue;
-      if (await this.#hasVersions(agent)) continue;
+      if (versioned.has(agent.id)) continue;
       if (input.dryRun) {
         wouldWrite += 1;
         continue;
@@ -268,12 +270,18 @@ export class AgentVersionService {
     return { written, wouldWrite };
   }
 
-  async #hasVersions(agent: Agent): Promise<boolean> {
-    const numbers = await this.#repository.latestVersionNumbers({
-      projectId: agent.projectId,
-      ids: [agent.id],
-    });
-    return numbers.has(agent.id);
+  /** The ids on a page that already have a version, one read per project. */
+  async #versioned(page: Agent[]): Promise<Set<string>> {
+    const idsByProject = new Map<string, string[]>();
+    for (const row of page) {
+      idsByProject.set(row.projectId, [...(idsByProject.get(row.projectId) ?? []), row.id]);
+    }
+    const versioned = new Set<string>();
+    for (const [projectId, ids] of idsByProject) {
+      const numbers = await this.#repository.latestVersionNumbers({ projectId, ids });
+      for (const id of numbers.keys()) versioned.add(id);
+    }
+    return versioned;
   }
 
   async #creatorOf(agent: Agent): Promise<string | null> {

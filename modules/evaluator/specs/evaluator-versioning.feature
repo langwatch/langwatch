@@ -84,6 +84,20 @@ Feature: Evaluator versions and deploy labels
     And the evaluator is not archived
 
   @unit
+  Scenario: Deleting a labelled evaluator with no caller is refused
+    Given an evaluator whose "production" label points at version 1
+    When a delete names no caller
+    Then it is refused with code "evaluator_deployed_label_protected"
+    And a named system caller still deletes it
+
+  @unit
+  Scenario: Archiving a workflow leaves its deployed evaluator live
+    Given a workflow backs an evaluator with a "production" label
+    When workflow records the workflow's archive
+    Then the evaluator stays live and no deletion is recorded for it
+    And an evaluator no label points at is archived and recorded as deleted in the same case
+
+  @unit
   Scenario: A caller with the deploy permission deletes a labelled evaluator
     Given an evaluator whose "production" label points at version 1
     And a caller holding "evaluators:deploy"

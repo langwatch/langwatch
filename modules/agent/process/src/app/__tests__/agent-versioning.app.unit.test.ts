@@ -282,6 +282,19 @@ describe("archiving a deployed agent", () => {
     expect((await app.getById({ id: "agent_1", projectId })).archivedAt).toBeNull();
   });
 
+  /** @scenario "Archiving a labelled agent with no caller is refused" */
+  it("refuses an archive that names no caller, and lets a named system caller through", async () => {
+    const { app } = setup({ canDeploy: true });
+    await agentWithVersions(app, 2);
+    await app.assignLabel({ projectId, agentId: "agent_1", label: "production", version: 2 });
+
+    await expect(app.archive({ id: "agent_1", projectId })).rejects.toMatchObject({
+      code: "agent_deployed_label_protected",
+    });
+    const archived = await app.archive({ id: "agent_1", projectId, caller: { type: "system" } });
+    expect(archived.archivedAt).not.toBeNull();
+  });
+
   /** @scenario "Archiving an unlabelled agent needs no deploy permission" */
   it("archives an unlabelled agent for a caller without agents:deploy", async () => {
     const { app } = setup({ canDeploy: false });

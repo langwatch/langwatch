@@ -439,7 +439,7 @@ interface Response {
 
 ### `evaluators`
 
-Contract `../contract/src/evaluator.trpc.ts:39`, router `src/transport/evaluator.trpc.ts:30`.
+Contract `../contract/src/evaluator.trpc.ts:39`, router `src/transport/evaluator.trpc.ts:38`.
 
 | Procedure                          | Kind     | Gate                            | Input                                   | Output                            |
 | ---------------------------------- | -------- | ------------------------------- | --------------------------------------- | --------------------------------- |

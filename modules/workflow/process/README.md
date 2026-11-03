@@ -322,8 +322,10 @@ getRelatedEntities(input: { workflowId: string; projectId: string; }): Promise<W
 
 #### `cascadeArchive`
 
+A deployed agent among those it archives needs `agents:deploy` of `by`.
+
 ```typescript
-cascadeArchive(input: { projectId: string; workflowId: string; unarchive?: boolean; }): Promise<WorkflowCascadeArchive>;
+cascadeArchive(input: { projectId: string; workflowId: string; unarchive?: boolean }, by: WorkflowCaller): Promise<WorkflowCascadeArchive>;
 ```
 
 #### `runPublished`
@@ -877,9 +879,9 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                              |
 | ------ | ---------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:502`            |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:503`            |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:504`            |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:503`            |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:504`            |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:505`            |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:123` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:125` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:126` |

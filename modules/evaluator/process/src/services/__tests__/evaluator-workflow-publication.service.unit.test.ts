@@ -1,4 +1,7 @@
-import type { Evaluator } from "@langwatch/evaluator-contract";
+import {
+  EvaluatorDeployedLabelProtectedError,
+  type Evaluator,
+} from "@langwatch/evaluator-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -30,9 +33,11 @@ const archivedFlags = {
 function serviceWith({
   flags,
   linked,
+  deployed = false,
 }: {
   flags: Awaited<ReturnType<WorkflowApi["findWorkflowFlags"]>>;
   linked: Evaluator[];
+  deployed?: boolean;
 }) {
   const workflows = {
     findWorkflowFlags: vi.fn<WorkflowApi["findWorkflowFlags"]>(async () => flags),
@@ -52,6 +57,13 @@ function serviceWith({
       workflows,
       evaluators,
       creationCaps: { assertCreationAllowed: async () => void 0 },
+      versions: {
+        assertDeletable: async ({ evaluatorId }) => {
+          if (deployed) {
+            throw new EvaluatorDeployedLabelProtectedError({ evaluatorId, labels: ["production"] });
+          }
+        },
+      },
     }),
   };
 }
@@ -155,6 +167,25 @@ describe("the studio's evaluator switch", () => {
 
       await service.disableAsEvaluator({ workflowId: "workflow_archived", projectId: "project_1" });
 
+      expect(evaluators.archive).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Switching off a workflow whose evaluator is deployed needs the deploy permission" */
+    it("refuses before any flag changes when the deploy check refuses", async () => {
+      const { workflows, evaluators, service } = serviceWith({
+        flags: archivedFlags,
+        linked: [existingEvaluator],
+        deployed: true,
+      });
+
+      await expect(
+        service.disableAsEvaluator({
+          workflowId: "workflow_archived",
+          projectId: "project_1",
+          caller: { type: "user", id: "user_grace" },
+        }),
+      ).rejects.toMatchObject({ code: "evaluator_deployed_label_protected" });
+      expect(workflows.setWorkflowFlags).not.toHaveBeenCalled();
       expect(evaluators.archive).not.toHaveBeenCalled();
     });
   });

@@ -130,7 +130,7 @@ export interface AgentApi {
   create(input: CreateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields>;
   /** Appends a version authored by `caller`; the row stays the latest. */
   update(input: UpdateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields>;
-  /** A labelled agent needs `agents:deploy` of `caller`; a peer's cascade names no caller. */
+  /** A labelled agent needs `agents:deploy` of `caller`; with no caller it is refused. */
   archive(input: ArchiveAgentCommand & { caller?: AgentCaller }): Promise<Agent>;
   cascadeArchive(
     input: ArchiveAgentCommand & { caller?: AgentCaller },

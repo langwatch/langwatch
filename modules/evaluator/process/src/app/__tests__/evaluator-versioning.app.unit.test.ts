@@ -245,6 +245,24 @@ describe("deleting a labelled evaluator", () => {
     ).rejects.toMatchObject({ code: "evaluator_deployed_label_protected" });
   });
 
+  /** @scenario "Deleting a labelled evaluator with no caller is refused" */
+  it("refuses a delete that names no caller, and lets a named system caller through", async () => {
+    const { app } = setup({ canDeploy: true });
+    await evaluatorWithVersions(app, 1);
+    await app.assignLabel({
+      projectId,
+      evaluatorId: "evaluator_1",
+      label: "production",
+      version: 1,
+    });
+
+    await expect(app.archive({ id: "evaluator_1", projectId })).rejects.toMatchObject({
+      code: "evaluator_deployed_label_protected",
+    });
+    await app.archive({ id: "evaluator_1", projectId, caller: { type: "system" } });
+    expect(await app.findById({ id: "evaluator_1", projectId })).toBeUndefined();
+  });
+
   /** @scenario "A caller with the deploy permission deletes a labelled evaluator" */
   it("archives the evaluator for a caller with evaluators:deploy", async () => {
     const { app } = setup({ canDeploy: true });

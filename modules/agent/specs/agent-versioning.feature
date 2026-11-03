@@ -148,6 +148,13 @@ Feature: Agent versions and deploy labels
     Then it is refused with code "agent_deployed_label_protected" and the agent stays
 
   @unit
+  Scenario: Archiving a labelled agent with no caller is refused
+    Given an agent whose "production" label points at version 2
+    When an archive names no caller
+    Then it is refused with code "agent_deployed_label_protected"
+    And a named system caller still archives it
+
+  @unit
   Scenario: Archiving an unlabelled agent needs no deploy permission
     Given an agent with no labels
     And a caller without "agents:deploy"

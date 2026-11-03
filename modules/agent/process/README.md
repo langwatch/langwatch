@@ -170,7 +170,7 @@ update(input: UpdateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithF
 
 #### `archive`
 
-A labelled agent needs `agents:deploy` of `caller`; a peer's cascade names no caller.
+A labelled agent needs `agents:deploy` of `caller`; with no caller it is refused.
 
 ```typescript
 archive(input: ArchiveAgentCommand & { caller?: AgentCaller }): Promise<Agent>;

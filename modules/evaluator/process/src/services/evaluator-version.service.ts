@@ -234,14 +234,14 @@ export class EvaluatorVersionService {
 
   /**
    * Deleting an evaluator a label points at needs `evaluators:deploy`; the check depends on
-   * the loaded row, so the service asks it. A peer's cascade names no caller and is not asked.
+   * the loaded row, so the service asks it. Only a named system caller skips it: no caller fails.
    */
   async assertDeletable(input: {
     projectId: string;
     evaluatorId: string;
     caller: EvaluatorCaller | undefined;
   }): Promise<void> {
-    if (!input.caller || input.caller.type === "system") return;
+    if (input.caller?.type === "system") return;
     const labels = await this.#deps.repository.findLabels({
       projectId: input.projectId,
       ids: [input.evaluatorId],
@@ -249,6 +249,7 @@ export class EvaluatorVersionService {
     if (labels.length === 0) return;
     const { caller } = input;
     const permitted =
+      caller !== void 0 &&
       caller.type !== "unattributed" &&
       (await this.#deps.permissions.can({
         principal:
@@ -299,8 +300,9 @@ export class EvaluatorVersionService {
   }): Promise<{ written: number; wouldWrite: number }> {
     let written = 0;
     let wouldWrite = 0;
+    const versioned = await this.#versioned(input.page);
     for (const evaluator of input.page) {
-      if (await this.#hasVersions(evaluator)) continue;
+      if (versioned.has(evaluator.id)) continue;
       if (input.dryRun) {
         wouldWrite += 1;
         continue;
@@ -313,12 +315,18 @@ export class EvaluatorVersionService {
     return { written, wouldWrite };
   }
 
-  async #hasVersions(evaluator: Evaluator): Promise<boolean> {
-    const numbers = await this.#deps.repository.latestVersionNumbers({
-      projectId: evaluator.projectId,
-      ids: [evaluator.id],
-    });
-    return numbers.has(evaluator.id);
+  /** The ids on a page that already have a version, one read per project. */
+  async #versioned(page: Evaluator[]): Promise<Set<string>> {
+    const idsByProject = new Map<string, string[]>();
+    for (const row of page) {
+      idsByProject.set(row.projectId, [...(idsByProject.get(row.projectId) ?? []), row.id]);
+    }
+    const versioned = new Set<string>();
+    for (const [projectId, ids] of idsByProject) {
+      const numbers = await this.#deps.repository.latestVersionNumbers({ projectId, ids });
+      for (const id of numbers.keys()) versioned.add(id);
+    }
+    return versioned;
   }
 
   async #creatorOf(evaluator: Evaluator): Promise<string | null> {

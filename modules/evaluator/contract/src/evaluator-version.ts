@@ -68,7 +68,7 @@ export type EvaluatorWriteAuthor = {
 
 /**
  * Who asks, as the door authenticated them. A version's author and the deploy check on a
- * delete read it; absent on a peer's cascade, which its own owner already authorised.
+ * delete read it; a labelled delete with no caller is refused, only `system` skips the check.
  */
 export type EvaluatorCaller =
   | { type: "user"; id: string }

@@ -191,7 +191,7 @@ export type AgentPersonView = z.infer<typeof agentPersonViewSchema>;
 
 /**
  * Who asks, as the door authenticated them. A version's author and the deploy check on an
- * archive read it; absent on a peer's cascade, which its own owner already authorised.
+ * archive read it; a labelled archive with no caller is refused, only `system` skips the check.
  */
 export type AgentCaller =
   | { type: "user"; id: string }

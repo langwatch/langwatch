@@ -189,6 +189,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
         workflows: dependencies.workflows,
         evaluators,
         creationCaps,
+        versions,
       }),
       publicBaseUrl: config.publicBaseUrl,
     });
@@ -204,6 +205,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     return buildEvaluatorWorkflowArchiveCascadePipeline({
       evaluators: EvaluatorWorkflowArchiveService.create({
         evaluators: this.#dependencies.evaluators,
+        versions: this.#dependencies.versions,
         deletionFacts: this.#dependencies.deletionFacts,
       }),
     });
@@ -230,7 +232,11 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   }
 
   /** Clears a workflow's evaluator flag and archives the evaluator that wrapped it. */
-  disableAsEvaluator(input: { workflowId: string; projectId: string }): Promise<void> {
+  disableAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    caller?: EvaluatorCaller;
+  }): Promise<void> {
     return this.#dependencies.publications.disableAsEvaluator(input);
   }
 
