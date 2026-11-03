@@ -139,12 +139,40 @@ const renderDrawer = (source: Source) =>
     { host: fakeGovernanceHost() },
   );
 
-const renderDetailPage = ({ permissions }: { permissions: readonly string[] }) => {
-  harness.row = pushSource;
+/** A Copilot Studio source stored with a bare host name, before save-time checks existed. */
+const sourceItsAdapterRefuses = sourceRow({
+  id: "src_copilot",
+  name: "Copilot Studio",
+  sourceType: "copilot_studio_dataverse",
+  parserConfig: {
+    adapter: "copilot_studio_dataverse",
+    environmentUrl: "org12345.crm.dynamics.com",
+  },
+  pullSchedule: "*/15 * * * *",
+  status: "awaiting_first_event",
+  errorCount: 4,
+  pullStatus: {
+    lastRunAt: "2026-03-02T00:00:00.000Z",
+    outcome: "failed",
+    error: "The last pull failed.",
+    backfillThrough: null,
+    hasMore: null,
+  },
+  configComplaints: ["Environment URL: Invalid url"],
+});
+
+const renderDetailPage = ({
+  permissions,
+  row = pushSource,
+}: {
+  permissions: readonly string[];
+  row?: Source;
+}) => {
+  harness.row = row;
   return renderWithGovernanceHost(<IngestionSourceDetailPage />, {
     host: fakeGovernanceHost({
       permissions,
-      params: { id: pushSource.id },
+      params: { id: row.id },
       organization: { id: ORG_ID, name: "Acme", slug: "acme", teams: [] },
     }),
   });
@@ -229,6 +257,29 @@ describe("given the source detail page", () => {
 
       expect(screen.getByRole("heading", { name: "Push source" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Edit/ })).toBeNull();
+    });
+  });
+});
+
+describe("given a source holding a configuration its adapter refuses", () => {
+  describe("when the admin opens it after a failed pull", () => {
+    /** @scenario "A source holding a configuration its adapter refuses says to fix the connection" */
+    it("names what the adapter refuses and says to fix the connection, not that a pull will retry", () => {
+      renderDetailPage({
+        permissions: [
+          "governance:view",
+          "ingestionSources:view",
+          "ingestionSources:manage",
+          "activityMonitor:view",
+        ],
+        row: sourceItsAdapterRefuses,
+      });
+
+      const state = screen.getByTestId("source-config-error");
+      expect(state).toHaveTextContent("Environment URL: Invalid url");
+      expect(state).toHaveTextContent(/Use Edit to fix the connection/);
+      expect(screen.getByText("Connection needs fixing")).toBeInTheDocument();
+      expect(screen.queryByText(/next scheduled pull will retry/)).toBeNull();
     });
   });
 });
