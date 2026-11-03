@@ -11,7 +11,8 @@ export type PlatformToolSlug =
   | "opencode"
   | "cursor"
   | "copilot"
-  | "code";
+  | "code"
+  | "grok";
 
 export interface PlatformToolPolicy {
   allowVk: boolean;
@@ -46,6 +47,8 @@ export const PLATFORM_TOOL_POLICIES: Record<PlatformToolSlug, PlatformToolPolicy
   // native OTel export but no BYOK gateway env, so Path A is not meaningful.
   // Inverse of cursor. ADR-039 §Extension #2.
   code: { allowVk: false, allowOtelDirect: true },
+  // grok routes models through config.toml, not env: ingestion only (ADR-192).
+  grok: { allowVk: false, allowOtelDirect: true },
 };
 
 function hardcodedPolicy(toolSlug: string): PlatformToolPolicy {

@@ -43,6 +43,7 @@ describe("Governance product contracts", () => {
         cursor: { allowVk: true, allowOtelDirect: false },
         copilot: { allowVk: true, allowOtelDirect: true },
         code: { allowVk: false, allowOtelDirect: true },
+        grok: { allowVk: false, allowOtelDirect: true },
       },
     });
     expect(JSON.parse(JSON.stringify(bootstrap))).toEqual(bootstrap);
@@ -65,6 +66,7 @@ describe("Governance product contracts", () => {
         cursor: { allowVk: true, allowOtelDirect: false },
         copilot: { allowVk: true, allowOtelDirect: true },
         code: { allowVk: false, allowOtelDirect: true },
+        grok: { allowVk: false, allowOtelDirect: true },
       },
     });
     expect(bootstrap.adminEmail).toBe("not an email");

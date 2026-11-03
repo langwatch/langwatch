@@ -775,3 +775,18 @@ Rule: Copilot reports through one hook file LangWatch owns
     Given the per-agent table that names each agent's tool slug, server agent id, key source types, session id source and hook target
     When the hooks are installed and run for Claude Code, Codex and opencode
     Then their hook files, records and key lookups are the same as before the table
+
+Rule: Grok joins this table with a hook file of its own, Copilot's shape
+  Grok loads every file in ~/.grok/hooks (or $GROK_HOME/hooks) and runs Claude
+  Code-style matcher groups with Claude Code's payload, so its row is an
+  owned file like Copilot's. Its session id variable is GROK_SESSION_ID and its
+  project directory variable GROK_WORKSPACE_ROOT. The rest is
+  specs/ai-governance/cli-wrappers/grok-hook-install.feature.
+
+  @unit
+  Scenario: Grok's row carries an owned hook file, as Copilot's does
+    Given the per-agent table that names each agent's tool slug, server agent id, key source types, session id source and hook target
+    When the table is read
+    Then it holds a row for grok whose hook target is an owned file in Grok's hooks folder
+    And that row's key source type is grok_cli
+    And its session id variable is GROK_SESSION_ID

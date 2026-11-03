@@ -60,6 +60,7 @@ const ASSISTANT_BILLING: Record<string, ToolBilling> = {
   opencode: "consumption",
   cursor: "seat",
   github_copilot: "seat",
+  grok: "subscription",
 };
 
 /**
@@ -77,6 +78,7 @@ const ASSISTANT_VENDOR: Record<string, string> = {
   opencode: "Open source",
   cursor: "Anysphere",
   github_copilot: "GitHub",
+  grok: "xAI",
 };
 
 const PROVIDER_VENDOR: Record<string, string> = {
