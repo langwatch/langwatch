@@ -3,7 +3,11 @@
  */
 
 import { ApiKeyPermissionDeniedError, type ApiKeyApi } from "@langwatch/api-key-contract";
-import { ModelNotConfiguredError, findAliasTarget } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  findAliasTarget,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import type {
   ScenarioChildEnvironment,
   ScenarioExecutionPrefetchInput,
@@ -12,9 +16,11 @@ import type {
   LiteLLMParams,
   TargetConfig,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { VoiceTargetReader } from "../features/prefetch/services/scenario-target-prefetch.service.ts";
+import { ScenarioProcessorService } from "../services/scenario-processor.service.ts";
 import {
   type AgentFetcher,
   createTestScenarioExecutionPrefetcherService,
@@ -2808,6 +2814,58 @@ describe("prefetchWithFixture, when choosing where the child posts a turn", () =
     expect(await routeFor({ perProjectEngines: false })).toEqual({
       mode: "direct",
       nlpServiceUrl: "http://langwatch_nlp:5561",
+    });
+  });
+});
+
+describe("prefetchWithFixture, given a project with no model configured", () => {
+  describe("when the project has no model for the simulator", () => {
+    /** @scenario A project with no model for the simulator gets a run refused with the remediation message, logged as a warning, not an error */
+    it("refuses the run with the remediation message and logs a warning, not an error", async () => {
+      const featureKey = "scenarios.simulator";
+      const { projectId } = defaultContext;
+      const modelProviders = createApiFixture<ModelProviderApi>({
+        findResolvedDefault: async () => null,
+        resolveModelForFeature: async () => {
+          throw new ModelNotConfiguredError({
+            featureKey,
+            role: "DEFAULT",
+            featureDisplayName: "Scenario simulator",
+            projectId,
+          });
+        },
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "prompt", referenceId: "prompt_123" },
+        deps: createMockDeps({
+          promptFetcher: {
+            findByIdOrHandle: vi.fn().mockResolvedValue({
+              id: "prompt_123",
+              prompt: "You are helpful",
+              messages: [],
+              model: "openai/gpt-4",
+            }),
+          },
+          modelProviders,
+        }),
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.reason).toBe("model_not_configured");
+      expect(result.error).toBe(
+        `No model configured for "${featureKey}" (role: DEFAULT, project: ${projectId}).`,
+      );
+
+      const jobLogger = { warn: vi.fn(), error: vi.fn() };
+      ScenarioProcessorService.logPrefetchFailure({ jobLogger, prefetchResult: result });
+      expect(jobLogger.error).not.toHaveBeenCalled();
+      expect(jobLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "model_not_configured" }),
+        expect.stringContaining("blocked by project configuration"),
+      );
     });
   });
 });
