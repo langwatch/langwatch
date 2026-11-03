@@ -65,6 +65,7 @@ describe("CodingAssistantBillingFactService", () => {
         opencode: false,
         cursor: false,
         github_copilot: false,
+        grok: false,
         custom: false,
       });
       expect(sent.every((command) => command.tenantId === "org-1")).toBe(true);
@@ -114,7 +115,7 @@ describe("CodingAssistantBillingFactService", () => {
 
       const totals = await facts.backfill();
 
-      expect(totals).toEqual({ afterOrganizationId: "org-3", organizations: 3, recorded: 21 });
+      expect(totals).toEqual({ afterOrganizationId: "org-3", organizations: 3, recorded: 24 });
       expect(billedBySource(sent, "org-1").codex).toBe(true);
       expect(billedBySource(sent, "org-2").cursor).toBe(false);
     });
