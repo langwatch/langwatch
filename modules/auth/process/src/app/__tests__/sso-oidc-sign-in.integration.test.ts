@@ -225,6 +225,7 @@ describe.skipIf(!DB_URL)("given a verified single sign-on connection", () => {
 
   describe("when somebody signs in through it", () => {
     /** @scenario "A sign-in through a connection completes" */
+    /** @scenario A single sign-on account row carries the issuer its assertion was verified under */
     it("signs them in, and does not refuse the adapter its transactions", async () => {
       const { startedStatus, location, cookie, session } = await signInThroughConnection({ auth });
 
@@ -235,12 +236,13 @@ describe.skipIf(!DB_URL)("given a verified single sign-on connection", () => {
       expect(cookie).not.toBe("");
       expect(decisionsAsked).toEqual([{ providerId: PROVIDER_ID, email: EMAIL }]);
       expect(session?.user.email).toBe(EMAIL);
+      // ADR-189: the issuer the ID token was verified under, stamped by the create hook.
       expect(
         await prisma.account.findFirst({
           where: { provider: PROVIDER_ID, providerAccountId: SUBJECT },
-          select: { providerAccountId: true },
+          select: { providerAccountId: true, issuer: true },
         }),
-      ).not.toBeNull();
+      ).toEqual({ providerAccountId: SUBJECT, issuer: provider.issuer });
     });
   });
 });

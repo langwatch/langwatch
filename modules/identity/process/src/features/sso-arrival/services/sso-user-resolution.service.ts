@@ -26,6 +26,7 @@ import type {
   SsoRegistrantReadRepository,
   SsoResolutionCandidate,
 } from "../../sso-connection/repositories/sso-registrant.repository.ts";
+import { findSubjectIssuerRefusals } from "../rules/sso-subject-issuer.rules.ts";
 
 const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
@@ -63,6 +64,18 @@ export class SsoUserResolutionService {
     const connection = await this.deps.connections.getConnection({
       connectionId: input.providerId,
     });
+    const { providerId, accountKey } = input;
+    const storedIssuers = accountKey.issuer
+      ? await this.deps.people.findSubjectIssuers({
+          connectionId: providerId,
+          accountId: accountKey.accountId,
+        })
+      : [];
+    const [refusal] = findSubjectIssuerRefusals({ storedIssuers, issuer: accountKey.issuer });
+    if (refusal) {
+      logger.warn({ providerId, issuer: accountKey.issuer }, refusal);
+      return REFUSE;
+    }
     const resolution = await this.chooseResolution({ connection, input });
     if (resolution.action === "link") {
       await this.recordLinkAttempt({ connection, input, userId: resolution.userId });

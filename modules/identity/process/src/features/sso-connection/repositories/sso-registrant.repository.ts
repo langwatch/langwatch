@@ -20,6 +20,15 @@ export abstract class SsoRegistrantReadRepository {
     accountId: string;
   }): Promise<string[]>;
 
+  /**
+   * The issuers this exact connection subject was stored under: its `Account` rows and its live
+   * `Identifier` rows, at most two of each. The callback can find either (ADR-189).
+   */
+  abstract findSubjectIssuers(args: {
+    connectionId: string;
+    accountId: string;
+  }): Promise<(string | null)[]>;
+
   // The user resolver's questions; addresses match case-insensitively.
 
   /** At most two: a second is a case-twin, which refuses the link. */

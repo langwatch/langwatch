@@ -83,6 +83,9 @@ const identityAdapterConfig: AdapterFactoryConfig = {
 
 /** Every method wrapped once; a new required adapter method fails to compile here. */
 function surfacingHandledRefusals(adapter: CustomAdapter): CustomAdapter {
+  // Better Auth 1.7.7 makes these two optional on a custom adapter.
+  const consumeOne = adapter.consumeOne?.bind(adapter);
+  const incrementOne = adapter.incrementOne?.bind(adapter);
   return {
     create: (input) => surfaceHandledRefusals(() => adapter.create(input)),
     update: (input) => surfaceHandledRefusals(() => adapter.update(input)),
@@ -91,9 +94,13 @@ function surfacingHandledRefusals(adapter: CustomAdapter): CustomAdapter {
     findMany: (input) => surfaceHandledRefusals(() => adapter.findMany(input)),
     delete: (input) => surfaceHandledRefusals(() => adapter.delete(input)),
     deleteMany: (input) => surfaceHandledRefusals(() => adapter.deleteMany(input)),
-    consumeOne: (input) => surfaceHandledRefusals(() => adapter.consumeOne(input)),
-    incrementOne: (input) => surfaceHandledRefusals(() => adapter.incrementOne(input)),
     count: (input) => surfaceHandledRefusals(() => adapter.count(input)),
+    ...(consumeOne && {
+      consumeOne: (input) => surfaceHandledRefusals(() => consumeOne(input)),
+    }),
+    ...(incrementOne && {
+      incrementOne: (input) => surfaceHandledRefusals(() => incrementOne(input)),
+    }),
   };
 }
 

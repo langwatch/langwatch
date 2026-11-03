@@ -114,6 +114,8 @@ function authOver(
     baseURL: "http://localhost:3000",
     secret: "test-secret-test-secret-test-secret",
     database,
+    // As the auth module declares it: LangWatch's issuer namespace, not the key (ADR-189).
+    account: { additionalFields: { issuer: { type: "string", required: false, input: false } } },
     plugins: [passkeySchemaPlugin, oauthUserInfoProbePlugin],
     emailAndPassword: { enabled: true },
     ...(databaseHooks === undefined ? {} : { databaseHooks }),

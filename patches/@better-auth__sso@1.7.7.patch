@@ -1,7 +1,7 @@
-diff --git a/dist/index-CZytzKv6.d.mts b/dist/index-CZytzKv6.d.mts
-index 3ed18ca..03a9ebc 100644
---- a/dist/index-CZytzKv6.d.mts
-+++ b/dist/index-CZytzKv6.d.mts
+diff --git a/dist/index-sM6JWXeV.d.mts b/dist/index-sM6JWXeV.d.mts
+index 2fe0404..2dd8b44 100644
+--- a/dist/index-sM6JWXeV.d.mts
++++ b/dist/index-sM6JWXeV.d.mts
 @@ -156,6 +156,13 @@ interface SAMLConfig {
     * responses when RelayState has no safe callback, including error redirects.
     */
@@ -50,10 +50,10 @@ index 3ed18ca..03a9ebc 100644
       * TTL for AuthnRequest records in milliseconds.
       * Requests older than this will be rejected.
 diff --git a/dist/index.mjs b/dist/index.mjs
-index a97a99f..c033aea 100644
+index 8b177bb..3acc4a3 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -578,7 +578,9 @@ function assertOIDCAuthorizedParty(payload, clientId) {
+@@ -579,7 +579,9 @@ function assertOIDCAuthorizedParty(payload, clientId) {
  async function validateOIDCIdToken(token, jwksEndpoint, options, isTrustedOrigin) {
  	const verified = await jwtVerify(token, createRemoteJWKSet(new URL(jwksEndpoint), { [customFetch]: (url, init) => fetchOIDCEndpointResponse("jwksEndpoint", url, init, isTrustedOrigin) }), {
  		audience: options.audience,
@@ -64,7 +64,7 @@ index a97a99f..c033aea 100644
  	});
  	if (typeof options.audience === "string") assertOIDCAuthorizedParty(verified.payload, options.audience);
  	return verified;
-@@ -2850,11 +2852,11 @@ async function processSAMLResponse(ctx, params, options) {
+@@ -2851,11 +2853,11 @@ async function processSAMLResponse(ctx, params, options) {
  	if (!parsedSamlConfig) throw new APIError("BAD_REQUEST", { message: "Invalid SAML configuration" });
  	const sp = createSP(parsedSamlConfig, ctx.context.baseURL, providerId, { clockSkew: options?.saml?.clockSkew });
  	const idp = createIdP(parsedSamlConfig);
@@ -79,7 +79,7 @@ index a97a99f..c033aea 100644
  	validateSingleAssertion(SAMLResponse);
  	let parsedResponse;
  	try {
-@@ -2912,10 +2914,24 @@ async function processSAMLResponse(ctx, params, options) {
+@@ -2913,10 +2915,24 @@ async function processSAMLResponse(ctx, params, options) {
  		providerId,
  		options: {
  			enableInResponseToValidation: options?.saml?.enableInResponseToValidation,
@@ -119,8 +119,8 @@ index a97a99f..c033aea 100644
  			return options?.resolveUser ? requireSuccessfulSSOAuthentication(authentication) : authentication;
  		}, { onAfterCommitHookError() {
  			ctx.context.logger.error("Committed SSO authentication after-hook failed");
-@@ -3897,7 +3920,9 @@ async function handleOIDCCallback(ctx, options, providerId, stateData, parsedPro
- 		if (!jwksEndpoint) redirectOIDCError("invalid_provider", "jwks_endpoint_not_found");
+@@ -3895,7 +3918,9 @@ async function handleOIDCCallback(ctx, options, providerId, stateData, parsedPro
+ 		if (!jwksEndpoint) return redirectOIDCError("invalid_provider", "jwks_endpoint_not_found");
  		const verified = await validateOIDCIdToken(tokenResponse.idToken, jwksEndpoint, {
  			audience: config.clientId,
 -			issuer: provider.issuer
@@ -128,5 +128,5 @@ index a97a99f..c033aea 100644
 +			clockTolerance: options?.oidc?.clockTolerance,
 +			maxTokenAge: options?.oidc?.maxTokenAge
  		}, (url) => ctx.context.isTrustedOrigin(url)).catch((error) => {
- 			if (error instanceof DiscoveryError) redirectOIDCError("invalid_provider", error.message);
+ 			if (error instanceof DiscoveryError) return redirectOIDCError("invalid_provider", error.message);
  			ctx.context.logger.error(error);

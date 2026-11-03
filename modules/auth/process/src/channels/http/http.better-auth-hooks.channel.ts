@@ -13,6 +13,7 @@ import {
   type SsoMigrationCallbackApi,
   identifierProviderFor,
   type IdentityLedgerApi,
+  looksLikeSsoConnectionId,
   type LinkProposalReason,
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
@@ -27,6 +28,7 @@ import type {
   BetterAuthHooksRepository,
 } from "../../repositories/better-auth-hooks.repository.ts";
 import { assertedAddressOf, linkVerdictFor } from "../../rules/link-evidence.rules.ts";
+import { hasRecordedIssuer } from "../../rules/provider-account-issuer.rules.ts";
 import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-auth.channel.ts";
 import type {
   AcceptedCallbackAccount,
@@ -855,7 +857,10 @@ export type SessionMintClaims = Readonly<{
   identity: Pick<IdentityApi, "claimsForMint">;
   evidence: Pick<
     SessionCallbackEvidenceChannel,
-    "findAcceptedAccounts" | "recordVerifiedCallbackToken" | "recordAuthenticatedCallbackAccount"
+    | "findAcceptedAccounts"
+    | "findAssertedIssuers"
+    | "recordVerifiedCallbackToken"
+    | "recordAuthenticatedCallbackAccount"
   >;
 }>;
 
@@ -989,4 +994,27 @@ function skipOn(code: string): (error: unknown) => undefined {
     if (HandledError.isHandled(error) && error.code === code) return undefined;
     throw error;
   };
+}
+
+/**
+ * A connection account row with no issuer stated or asserted would be stamped `local:oauth:`
+ * and refused at every later sign-in, so it is refused when written instead (ADR-189).
+ */
+export function refuseConnectionAccountWithoutIssuer({
+  account,
+  assertedIssuers,
+}: {
+  account: Readonly<{ providerId: string; issuer?: unknown }>;
+  assertedIssuers: readonly string[];
+}): void {
+  if (!looksLikeSsoConnectionId(account.providerId)) return;
+  if (hasRecordedIssuer({ account, assertedIssuers })) return;
+  logger.warn(
+    { providerId: account.providerId },
+    "Refused a connection account row with no recorded issuer",
+  );
+  throw APIError.from("FORBIDDEN", {
+    code: "OAuthAccountNotLinked",
+    message: "OAuthAccountNotLinked",
+  });
 }

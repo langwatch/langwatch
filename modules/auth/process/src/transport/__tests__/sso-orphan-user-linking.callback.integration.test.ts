@@ -228,7 +228,11 @@ describe("given a User row left by an invite, with no linked Account", () => {
       expect(response.headers.get("location")).not.toContain("error");
       expect(db.User).toHaveLength(1);
       expect(db.Account).toHaveLength(1);
-      expect(db.Account?.[0]).toMatchObject({ userId: db.User?.[0]?.id });
+      // ADR-189: the create hook stamps the namespace a provider with no issuer of its own keeps.
+      expect(db.Account?.[0]).toMatchObject({
+        userId: db.User?.[0]?.id,
+        issuer: "local:oauth:okta",
+      });
       expect(db.Session).toHaveLength(1);
       expect(response.headers.getSetCookie().join(";")).toContain("session_token");
     });

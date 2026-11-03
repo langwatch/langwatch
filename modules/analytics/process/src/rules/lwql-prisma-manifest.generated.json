@@ -51,7 +51,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "WHO asserted `providerAccountId` — the other half of better-auth 1.7's\naccount key, which it looks up as `(issuer, accountId)`. Nullable only\nso the column could be added to a populated table; every write path\nsupplies it and the migration backfilled every existing row."
+          "documentation": "WHO asserted `providerAccountId`: LangWatch's issuer namespace (ADR-189),\nstamped by the auth module's account create hook. better-auth keys a row\nby `(provider, providerAccountId)` again since 1.7.3 and writes none.\nNullable so it could be added to a populated table; migration backfilled."
         },
         {
           "name": "providerAccountId",

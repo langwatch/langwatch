@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { SessionCallbackEvidenceChannel } from "../http.session-callback-evidence.channel.ts";
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const ISSUER = "https://idp.acme.test";
 
 describe("SessionCallbackEvidenceChannel", () => {
   /** @scenario Simultaneous provider callbacks cannot exchange evidence */
@@ -16,7 +17,7 @@ describe("SessionCallbackEvidenceChannel", () => {
       providerAccountId: string;
     }) =>
       channel.runWithScope(async () => {
-        channel.recordAuthenticatedSsoAccount({ providerId, providerAccountId });
+        channel.recordAuthenticatedSsoAccount({ providerId, providerAccountId, issuer: ISSUER });
         await tick();
         return channel.findAcceptedAccounts({ providerId });
       });
@@ -38,6 +39,7 @@ describe("SessionCallbackEvidenceChannel", () => {
       channel.recordAuthenticatedSsoAccount({
         providerId: "auth0",
         providerAccountId: "auth0|sam",
+        issuer: ISSUER,
       });
 
       expect(channel.findAcceptedAccounts({ providerId: "auth0" })).toEqual([
@@ -52,9 +54,51 @@ describe("SessionCallbackEvidenceChannel", () => {
     });
   });
 
+  describe("when the SSO seam admitted a subject", () => {
+    /** @scenario A single sign-on account row carries the issuer its assertion was verified under */
+    it("keeps the issuer that subject was verified under for its account row", () => {
+      const channel = SessionCallbackEvidenceChannel.create();
+      return channel.runWithScope(async () => {
+        channel.recordAuthenticatedSsoAccount({
+          providerId: "acme-oidc",
+          providerAccountId: "sam-subject",
+          issuer: ISSUER,
+        });
+
+        expect(
+          channel.findAssertedIssuers({
+            providerId: "acme-oidc",
+            providerAccountId: "sam-subject",
+          }),
+        ).toEqual([ISSUER]);
+      });
+    });
+
+    /** @scenario The issuer one subject was verified under is never stamped on another */
+    it.each([
+      ["another subject", { providerId: "acme-oidc", providerAccountId: "other-subject" }],
+      ["another connection", { providerId: "beta-oidc", providerAccountId: "sam-subject" }],
+    ])("finds no issuer for %s", (_name, account) => {
+      const channel = SessionCallbackEvidenceChannel.create();
+      return channel.runWithScope(async () => {
+        channel.recordAuthenticatedSsoAccount({
+          providerId: "acme-oidc",
+          providerAccountId: "sam-subject",
+          issuer: ISSUER,
+        });
+
+        expect(channel.findAssertedIssuers(account)).toEqual([]);
+      });
+    });
+  });
+
   it("finds nothing outside a request scope", () => {
     const channel = SessionCallbackEvidenceChannel.create();
-    channel.recordAuthenticatedSsoAccount({ providerId: "auth0", providerAccountId: "auth0|sam" });
+    channel.recordAuthenticatedSsoAccount({
+      providerId: "auth0",
+      providerAccountId: "auth0|sam",
+      issuer: ISSUER,
+    });
 
     expect(channel.findAcceptedAccounts({ providerId: "auth0" })).toEqual([]);
   });
