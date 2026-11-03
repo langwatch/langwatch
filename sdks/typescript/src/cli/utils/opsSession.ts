@@ -21,7 +21,7 @@ export const OPS_REQUESTER_KEY_ENV = "LANGWATCH_OPS_REQUESTER_KEY";
 /** The CLI config's directory, resolved like `configPath` (and the daemon's eligibility check). */
 const configDir = (): string =>
   path.dirname(
-    process.env.LANGWATCH_CLI_CONFIG || path.join(os.homedir(), ".langwatch", "config.json"),
+    process.env.LANGWATCH_CLI_CONFIG ?? path.join(os.homedir(), ".langwatch", "config.json"),
   );
 
 /** `<config dir>/ops-agent.json`: the requester key. */

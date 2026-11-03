@@ -242,7 +242,7 @@ export function isDaemonDisabledByConfig(env: NodeJS.ProcessEnv): boolean {
 export function hasOpsSessionFile(env: NodeJS.ProcessEnv): boolean {
   const override = env.LANGWATCH_OPS_SESSION?.trim();
   const configFile =
-    env.LANGWATCH_CLI_CONFIG || path.join(os.homedir(), ".langwatch", "config.json");
+    env.LANGWATCH_CLI_CONFIG ?? path.join(os.homedir(), ".langwatch", "config.json");
   const sessionFile = override
     ? path.resolve(override)
     : path.join(path.dirname(configFile), "ops-session.json");
