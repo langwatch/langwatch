@@ -43744,15 +43744,15 @@ The [Questions](/features/instant-evals/questions) page covers criteria, thresho
 title: Run Instant Evals on your own decision model
 sidebarTitle: Your own model
 keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, default models
-description: Point Instant Evals at a decision model on your own provider account instead of LangWatch Instant Preview, which providers and models you can pick, how to set up Azure, and what happens when your model cannot answer.
+description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 ---
 
 ## LangWatch Instant Preview or your own model
 
-By default Instant Evals are answered by **LangWatch Instant Preview**, the decision model LangWatch hosts and bills as described in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model on your own provider account instead, per organization, team or project. The provider then bills your account for every row judged, and LangWatch does not charge for those rows.
+Instant Evals run on **LangWatch Instant Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
 
 <Note>
-  Your own decision model is off by default. Ask LangWatch to turn it on for your organization. Until then, the **Instant Evals** column offers LangWatch Instant Preview only and a save that picks another model is refused.
+  This is off by default. Ask LangWatch to turn it on for your organization. Until then, the **Instant Evals** column offers LangWatch Instant Preview only.
 </Note>
 
 ## The models you can pick
@@ -43773,16 +43773,16 @@ By default Instant Evals are answered by **LangWatch Instant Preview**, the deci
 | Liquid d1.1 (OpenRouter)          | OpenRouter            | API key                                                                       |
 | Fireworks Rune                    | Fireworks             | API key                                                                       |
 
-Each model runs only on the model it names. Picking OpenAI Decisions API or Azure OpenAI Decisions API needs `gpt-6-luna` on that account; the other rows do not need an OpenAI account.
+OpenAI Decisions API and Azure OpenAI Decisions API need `gpt-6-luna` on that account. The other models need no OpenAI account.
 
 ## Set it up
 
 <Steps>
   <Step title="Add the provider">
-    At **Settings > Model Providers**, click **Add Model Provider**, choose the provider from the table above and enter its key. Scope it to every organization, team or project that should run on it. See [Model Providers](/platform/model-providers) for the drawer.
+    In **Settings > Model Providers**, click **Add Model Provider**, pick the provider from the table and enter its key. Scope it to each organization, team or project that should use it. See [Model Providers](/platform/model-providers).
   </Step>
   <Step title="Pick the model">
-    In **Default Models** on the same page, click **Add config**, or the edit button of an existing config, and pick its scopes. The **Instant Evals** column offers LangWatch Instant Preview and every decision model that each picked scope holds an enabled key for. Pick yours and save.
+    In **Default Models** on the same page, add or edit a config and pick its scopes. In the **Instant Evals** picker, choose your model and save.
 
     <Frame>
       <img
@@ -43792,11 +43792,11 @@ Each model runs only on the model it names. Picking OpenAI Decisions API or Azur
     </Frame>
   </Step>
   <Step title="Run">
-    Start a run as usual. The pick applies within five seconds, to the next rows judged.
+    Start a run as usual. The new model judges the next rows within five seconds.
   </Step>
 </Steps>
 
-Once saved, the **Instant Evals** column of the config shows your model.
+The config's **Instant Evals** column then shows your model.
 
 <Frame>
   <img
@@ -43805,13 +43805,13 @@ Once saved, the **Instant Evals** column of the config shows your model.
   />
 </Frame>
 
-A model is offered only when every scope of the config can run it. A config on the organization is offered only the keys saved on the organization, not a key one project holds, and a config on two projects only what both hold. A save that names a model one of its scopes cannot run is refused.
+The picker offers a model only when every scope of the config holds an enabled key for it. An organization config sees only keys saved on the organization, not a key one project holds. A config on two projects sees only what both hold.
 
-A project config beats a team config, which beats an organization config, as for the other [default models](/platform/model-providers#default-models). For the provider row, a key saved on the project beats one saved on its team or organization.
+As for other [default models](/platform/model-providers#default-models), a project config beats a team config, which beats an organization config. A provider key saved on the project beats one on its team or organization.
 
 ## Azure
 
-Both Azure models run on the Azure OpenAI provider row: its API key (`AZURE_OPENAI_API_KEY`), and its endpoint (`AZURE_OPENAI_ENDPOINT`) to find your resource.
+Both Azure models use the Azure OpenAI provider, with its API key (`AZURE_OPENAI_API_KEY`) and endpoint (`AZURE_OPENAI_ENDPOINT`).
 
 <Frame>
   <img
@@ -43820,13 +43820,13 @@ Both Azure models run on the Azure OpenAI provider row: its API key (`AZURE_OPEN
   />
 </Frame>
 
-- **Endpoint** (`AZURE_OPENAI_ENDPOINT`) is the URL of your resource, such as `https://my-resource.openai.azure.com`. LangWatch reads only the resource name from it and calls `https://my-resource.openai.azure.com/openai/v1/decisions` for Azure OpenAI Decisions API, and `https://my-resource.services.ai.azure.com/providers/microsoft/v1/systemone` for Microsoft Decision 1. An endpoint on `openai.azure.com`, `cognitiveservices.azure.com` or `services.ai.azure.com` works. Any other host, `http`, a custom port, or an Azure API Management gateway does not, so the key never goes outside Azure.
-- **Decisions deployment** (`AZURE_OPENAI_DECISIONS_DEPLOYMENT`) is the name of your `gpt-6-luna` deployment. Leave it empty if the deployment is named `gpt-6-luna`.
-- **Microsoft Decision 1 deployment** (`AZURE_DECISION_1_DEPLOYMENT`) is the name of your Microsoft Decision 1 deployment on Azure AI Foundry. Leave it empty if it keeps the model's name.
+- **Endpoint** (`AZURE_OPENAI_ENDPOINT`): your resource URL, such as `https://my-resource.openai.azure.com`. LangWatch takes the resource name from it and calls `https://my-resource.openai.azure.com/openai/v1/decisions` or, for Microsoft Decision 1, `https://my-resource.services.ai.azure.com/providers/microsoft/v1/systemone`. Hosts on `openai.azure.com`, `cognitiveservices.azure.com` and `services.ai.azure.com` work. Other hosts, `http`, custom ports and API Management gateways are refused, so the key stays inside Azure.
+- **Decisions deployment** (`AZURE_OPENAI_DECISIONS_DEPLOYMENT`): your `gpt-6-luna` deployment name. Leave empty if it is `gpt-6-luna`.
+- **Microsoft Decision 1 deployment** (`AZURE_DECISION_1_DEPLOYMENT`): your Microsoft Decision 1 deployment name on Azure AI Foundry. Leave empty if it keeps the model's name.
 
-Keep **Use API Gateway** off: the key, the endpoint and both deployment fields show only then, and a gateway row has no Azure endpoint to call, so every row would be skipped as `classifier_key_invalid`. The key travels in the `api-key` header.
+Keep **Use API Gateway** off. With it on, the endpoint and deployment fields are hidden and every row is skipped as `classifier_key_invalid`.
 
-Deploy the model on the resource before you pick it. In the Azure portal or Azure AI Foundry, open the resource, add a deployment of `gpt-6-luna` (or Microsoft Decision 1), and note its name. With the Azure CLI:
+Deploy the model on your resource before you pick it, in the Azure portal, Azure AI Foundry or the Azure CLI:
 
 ```bash
 az cognitiveservices account deployment create \
@@ -43835,11 +43835,11 @@ az cognitiveservices account deployment create \
   --sku-name GlobalStandard --sku-capacity 50
 ```
 
-Without the deployment, every row is skipped as `classifier_not_configured`, as below.
+Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Instant Preview. The rows it cannot judge are written as `skipped`, with the reason in `error`, and the run goes on. Read them with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Instant Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -43848,14 +43848,14 @@ A run on your own model never falls back to LangWatch Instant Preview. The rows 
 | `classifier_rate_limited`         | The provider answered 429 on every retry                                                                    | Raise the rate limit or quota on your provider account                     |
 | `classifier_provider_unavailable` | The provider answered 5xx on every retry                                                                    | Try again later                                                             |
 
-A refused key and a missing model are not retried. A rate limit and an outage are retried before the row is skipped.
+Rate limits and outages are retried before the row is skipped. Refused keys and missing models are not.
 
 ## What changes on your own model
 
-- **Cost.** The provider bills your account. LangWatch does not charge for the rows and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
-- **Limits.** The row, question and text limits in [Limits and cost](/features/instant-evals/limits-and-cost#limits) still apply.
-- **Where the judged text goes.** LangWatch sends the text of each row and your questions to your provider with your key, under your own agreement with it. LangWatch Instant Preview is not called for those rows.
-- **The search bar.** The search bar still runs on LangWatch Instant Preview.
+- **Cost.** Your provider bills you. LangWatch does not, and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
+- **Limits.** The [row, question and text limits](/features/instant-evals/limits-and-cost#limits) still apply.
+- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Instant Preview never sees them.
+- **Search bar.** Still runs on LangWatch Instant Preview.
 
 ---
 
