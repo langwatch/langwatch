@@ -565,7 +565,8 @@ function isFinishedRecord({
 
 /**
  * A first hold is usually a projection still folding, and the next pass re-proves it, so it is
- * info; a tenant still held from an earlier pass is a warn, unless it waits on a person.
+ * info; a tenant still held from an earlier pass is a debug line (every pass repeats it, ~15k/hour
+ * in prod, and the held record already says why and since when), unless it waits on a person.
  */
 export function heldNoticeLevel({
   existing,
@@ -573,8 +574,8 @@ export function heldNoticeLevel({
 }: {
   existing: TenantMigrationRecord | undefined;
   heldReason?: HeldReason | undefined;
-}): "info" | "warn" {
-  return existing?.status === "migrated" && heldReason !== "person" ? "warn" : "info";
+}): "info" | "debug" {
+  return existing?.status === "migrated" && heldReason !== "person" ? "debug" : "info";
 }
 
 /** Held carries why and since when (the first moment, while still held); else neither. */

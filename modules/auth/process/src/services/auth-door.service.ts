@@ -29,6 +29,14 @@ import { findConnectionIdsInPath } from "../rules/sso-request-target.rules.ts";
 
 const logger = createLogger("langwatch:auth");
 
+/** A provider's refusal code as a log record's cause; a class, so the record's type names it. */
+class SignInRefusal extends Error {
+  constructor(readonly code: string) {
+    super(`sign-in refused with "${code}"`);
+    this.name = "SignInRefusal";
+  }
+}
+
 /** What the sign-in door reads through: the one Better Auth instance and the session reads. */
 export interface AuthDoorDeps {
   betterAuth(): Promise<Readonly<{ handler(request: Request): Promise<Response> }>>;
@@ -259,7 +267,12 @@ function withholdInternalSignInError({
     );
   } else {
     logger.error(
-      { code: redirect.code, description: redirect.description, traceId: traceId ?? null },
+      {
+        error: new SignInRefusal(redirect.code),
+        code: redirect.code,
+        description: redirect.description,
+        traceId: traceId ?? null,
+      },
       "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
     );
   }

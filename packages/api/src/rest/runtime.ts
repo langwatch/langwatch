@@ -125,6 +125,7 @@ import {
   loggerMiddleware,
   multipartMiddleware,
   readRequestBody,
+  recordForwardedFailure,
   refusingMalformedBody,
   requestValidationErrorFrom,
   restCacheKey,
@@ -2102,10 +2103,20 @@ async function answerWith<Api>({
   result: unknown;
 }): Promise<Response | undefined> {
   if (route.response) {
-    if (!isDeclined(result)) return respondProduced({ context, route, result });
+    if (!isDeclined(result)) {
+      const produced = respondProduced({ context, route, result });
+      // A forwarded 5xx is the answer of whatever the route passed through; say so in the log.
+      if (isProducedAnswer(result) && result.body.form === "response") {
+        recordForwardedFailure(context, produced);
+      }
+
+      return produced;
+    }
   } else if (!route.rawResponse) {
     return respond({ context, route, result });
   } else if (!isDeclined(result)) {
+    if (result instanceof Response) recordForwardedFailure(context, result);
+
     return respondRaw({ context, route, result });
   }
 

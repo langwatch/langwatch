@@ -18,6 +18,7 @@ import {
   PayloadTooLargeError,
 } from "../../../channels/langevals.channel.ts";
 import { toLangevalsContexts } from "../../../rules/langevals-contexts.rules.ts";
+import { toLangevalsConversation } from "../../../rules/langevals-conversation.rules.ts";
 import type { EvaluationExecutionMetricsService } from "../../execution/services/evaluation-execution-metrics.service.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
@@ -255,7 +256,7 @@ function evaluationBody({
         contexts: toLangevalsContexts(data.contexts),
         expected_contexts: toLangevalsContexts(data.expected_contexts),
         expected_output: convertTo(data.expected_output, "string"),
-        conversation: convertTo(data.conversation, "array"),
+        conversation: toLangevalsConversation(data.conversation),
       },
     ],
     settings: settings ?? {},

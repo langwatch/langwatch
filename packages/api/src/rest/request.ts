@@ -1050,6 +1050,19 @@ export function recordAnsweredCause(
   c.set(RESOLVED_ERROR, resolved);
 }
 
+/**
+ * Names a 5xx a route forwarded from elsewhere, so the access record says so rather than "failed
+ * without a cause attached". Status only: the forwarded body can quote customer input, and
+ * reading it would hold the request open until the upstream stream ends.
+ */
+export function recordForwardedFailure(c: Context, response: Response): void {
+  if (response.status < 500 || c.get(RESOLVED_ERROR) !== undefined) return;
+
+  const cause = new Error(`forwarded a ${response.status} answer`);
+  cause.name = "ForwardedServerError";
+  recordAnsweredCause(c, { error: cause, status: response.status });
+}
+
 /** Records a declared answer without inventing a cause. */
 function logDeclaredAnswer(logger: Logger, data: RequestLogData): void {
   const { extra, attribution, error: _cause, ...request } = data;

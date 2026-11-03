@@ -17,6 +17,7 @@ Feature: CLI trace export paging and span depth
     Given the search endpoint serves at most 1000 traces per page with a scrollId cursor
     When I run "langwatch trace export --limit 2500"
     Then the CLI requests successive pages passing the scrollId from the previous response
+    And every request asks for the same page size, so the server keeps the cursor
     And the exported output contains 2500 traces
 
   @unit
@@ -38,10 +39,17 @@ Feature: CLI trace export paging and span depth
     Then the CLI makes exactly one search request with pageSize 50
 
   @unit
-  Scenario: export ends the walk on a short page without skipped rows
-    Given a page returns fewer traces than requested and reports no skipped rows
+  Scenario: export reports the match count once, from the first page
+    Given the first page holds only rows the server skipped and the second page holds traces
+    When I run "langwatch trace export --limit 1000"
+    Then the match count is reported once, from the first page
+
+  @unit
+  Scenario: export keeps paging through a page the server answered short
+    Given a page returns fewer traces than requested, reports no skipped rows and carries a cursor
     When I run "langwatch trace export" with a limit above one page
-    Then the CLI treats the result set as exhausted and stops
+    Then the CLI follows the cursor to the next page instead of treating the short page as the end
+    And it stops only on a page with no cursor or no traces
 
   @unit
   Scenario: export rejects a non-numeric limit
@@ -51,7 +59,13 @@ Feature: CLI trace export paging and span depth
   @unit
   Scenario: export with --include-spans requests smaller pages
     When I run "langwatch trace export --include-spans"
-    Then each page request asks for at most 200 traces so span joining stays bounded
+    Then each page request asks for at most 100 traces, the server's cap for a page with spans
+
+  @unit @regression
+  Scenario: export with --include-spans walks past the server's page cap
+    Given the server answers at most 100 traces per page with spans
+    When I run "langwatch trace export --include-spans" with a limit of 250
+    Then the CLI follows the cursor, asking for 100 traces on every page, until 250 are exported
 
   @unit
   Scenario: export with --include-spans requests span data and preserves it in the output

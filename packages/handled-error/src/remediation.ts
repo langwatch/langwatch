@@ -437,6 +437,13 @@ const registry = {
       "Organization slugs are unique across the instance; pick a different slug, or omit it to derive one from the name",
     ],
   },
+  workflow_result_too_large: {
+    tips: [
+      "The workflow ran, but its result is over the 6 MB one synchronous answer can carry",
+      "Return less from the end node: fewer rows, shorter text, or a reference to stored data instead of the data itself",
+    ],
+    docsPath: "/workflows/overview",
+  },
   duplicate_invite: {
     tips: [
       "A pending invite for this email already exists; revoke it first, or treat this as already done",

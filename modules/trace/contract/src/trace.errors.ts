@@ -173,6 +173,12 @@ export class TraceIdsTooManyError extends HandledError {
   }
 }
 
+/** The registry keys a trace page may be refused above. */
+export type TracePageSizeBound =
+  | "tracesPageSizeMax"
+  | "tracesDownloadPageSizeMax"
+  | "tracesWithSpansPageSizeMax";
+
 /**
  * A trace page above the plan's bound, named by its registry key. Refused
  * rather than clamped, so a caller learns its plan's page size instead of
@@ -181,13 +187,7 @@ export class TraceIdsTooManyError extends HandledError {
 export class TracePageSizeTooLargeError extends HandledError {
   declare readonly code: "trace_page_size_too_large";
 
-  constructor({
-    maxPageSize,
-    bound,
-  }: {
-    maxPageSize: number;
-    bound: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
-  }) {
+  constructor({ maxPageSize, bound }: { maxPageSize: number; bound: TracePageSizeBound }) {
     super(
       "trace_page_size_too_large",
       `At most ${maxPageSize} traces can be read in one page under this plan. Ask for a smaller pageSize and page forward with scrollId.`,
