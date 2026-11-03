@@ -126,7 +126,7 @@ override-dependencies = [
   # dnspython: GHSA-45c3-73f7-pv4m, fixed in 2.9.0.
   "dnspython>=2.9.0",
   # pyasn1 decoder DoS on crafted BER/DER input.
-  "pyasn1>=0.6.4",
+  "pyasn1>=0.6.5",  # also the quadratic decoding advisories fixed in 0.6.5 (#3366-#3369)
   # aiohttp request smuggling and header-parsing advisories, then no initial
   # request/header timeout and unbounded memory/CPU use (#2851-#2853).
   "aiohttp>=3.14.4",
