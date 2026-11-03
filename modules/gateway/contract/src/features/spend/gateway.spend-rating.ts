@@ -101,6 +101,7 @@ export function rateSpendNanoUsd({
     rateVersion && rateVersion.length > 0 ? rateVersion : currentRegistryRateVersion();
   const unpriced =
     costNanoUsd === 0 &&
+    Object.keys(measuredQuantities(usage)).length > 0 &&
     findSpendRatingFaults({ model, usage }).some((fault) => Object.keys(fault.measured).length > 0);
   return {
     costNanoUsd,
