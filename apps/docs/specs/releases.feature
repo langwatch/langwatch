@@ -15,8 +15,8 @@ Feature: Useful release updates in the documentation
   Scenario: Keep the changelog Markdown export within the page token budget
     Given the newest published releases are together longer than the agent readiness page token budget
     When the changelog's Markdown export is built
-    Then it always keeps the newest release, even when that release alone is over the budget
-    And it keeps each older release only while the built export stays within the budget
+    Then it keeps the newest releases only while the built export stays within the budget
+    And when even the newest release alone is over the budget, it keeps no release
     And a short headed note under the kept releases says the others are left out and links to every release
     But the changelog page still shows every published release
 

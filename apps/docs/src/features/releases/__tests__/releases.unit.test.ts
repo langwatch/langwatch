@@ -152,7 +152,7 @@ describe("when the newest releases are longer than the page token budget", () =>
   });
 
   /** @scenario "Keep the changelog Markdown export within the page token budget" */
-  it("keeps the newest release whole even when it alone is over the budget", () => {
+  it("keeps no release, only the note, when the newest alone is over the budget", () => {
     const { docsRoot, dispose } = changelogProject({
       changelog:
         `## [3.0.0](${compare}) (2026-11-02)\n### Features\n${notesOf({ share: 1.2 })}` +
@@ -164,10 +164,10 @@ describe("when the newest releases are longer than the page token budget", () =>
         slug: "changelog",
         pageTokens,
       });
-      expect(markdown).toContain("## Release v3.0.0");
-      expect(markdown).not.toContain("## Release v2.9.0");
+      expect(markdown).not.toContain("## Release v");
       expect(markdown).toContain(leftOut);
-      expect(approximateTokens({ text: markdown })).toBeGreaterThan(pageTokens);
+      expect(markdown).toContain("repository CHANGELOG");
+      expect(approximateTokens({ text: markdown })).toBeLessThanOrEqual(pageTokens);
     } finally {
       dispose();
     }

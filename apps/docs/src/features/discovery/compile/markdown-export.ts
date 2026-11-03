@@ -266,18 +266,19 @@ export function pageMarkdown({
   slug: string;
   /** Pass "" where pages are concatenated, so the block appears once rather than per page. */
   instructions?: string;
-  /** The changelog export keeps its newest release, older ones while they fit this many tokens. */
+  /** The changelog export keeps the newest releases that fit this many tokens, maybe none. */
   pageTokens?: number;
 }) {
   const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
   const exportOf = ({ releaseCount }: { releaseCount?: number } = {}) =>
     exportMarkdown({ docsRoot, slug, instructions, source, releaseCount });
   if (slug !== RELEASES_SLUG || pageTokens === undefined) return exportOf();
-  for (let count = readReleases({ docsRoot }).length; count > 1; count--) {
+  for (let count = readReleases({ docsRoot }).length; count > 0; count--) {
     const markdown = exportOf({ releaseCount: count });
     if (approximateTokens({ text: markdown }) <= pageTokens) return markdown;
   }
-  return exportOf({ releaseCount: 1 });
+  // Even the newest release can exceed the budget; the note alone always fits.
+  return exportOf({ releaseCount: 0 });
 }
 
 function exportMarkdown({

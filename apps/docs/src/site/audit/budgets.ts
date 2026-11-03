@@ -62,7 +62,11 @@ export type FormFactor = z.infer<typeof formFactor>;
 
 export const DEFAULT_BUDGETS_FILE = new URL("./budgets.json", import.meta.url);
 
-/** The committed budgets, validated. Reads the static import, which the bundled prerender needs. */
+/**
+ * The committed budgets, validated. A snapshot of budgets.json as imported when this module
+ * loaded (the bundled prerender needs the static import), so a baseline that run.ts writes to
+ * DEFAULT_BUDGETS_FILE in the same process is not seen.
+ */
 export function readBudgets() {
   return budgetsSchema.parse(budgetsFile);
 }

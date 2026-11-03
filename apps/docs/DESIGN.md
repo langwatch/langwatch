@@ -183,9 +183,9 @@ version/date on phones, with no motion in either preference mode. Existing tiny
 controls remember dismissal by version, so another release is visible again.
 There is no fetch or rendering runtime for the strip. Missing or invalid notes
 omit it. The five newest releases are injected into the changelog page at build
-time. Its Markdown export always keeps the newest release and each older one only
-while the export fits the agent readiness page token budget, with a short note
-when some are left out, under an "About this copy" heading. llms-full.txt
+time. Its Markdown export keeps the newest releases only while the export fits the
+agent readiness page token budget (none, if the newest alone is over it), with a
+short note when some are left out, under an "About this copy" heading. llms-full.txt
 carries the changelog untrimmed on purpose, because the page token budget
 applies to per-page exports only. The changelog links on to the self-hosting
 releases and upgrade pages. The home page's `<WhatsNew />` tag becomes a short

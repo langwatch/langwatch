@@ -11,8 +11,8 @@ const PUBLISHED = 5;
 const WHATS_NEW = 3;
 const LEFT_OUT_HEADING = "## About this copy";
 const LEFT_OUT_NOTE =
-  "This copy shows only the newest releases, to keep it short. " +
-  `The [changelog page](/${RELEASES_SLUG}) lists the recent ones, and the ` +
+  "This copy leaves out some releases, to keep it short. " +
+  `The full [changelog page](/${RELEASES_SLUG}) lists the ${PUBLISHED} most recent releases, and the ` +
   `[repository CHANGELOG](${REPOSITORY_URL}/blob/main/CHANGELOG.md) ` +
   "holds every release.";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
@@ -112,7 +112,7 @@ export function readReleases({ docsRoot }: { docsRoot: string }) {
 
 /**
  * Fills the changelog's `<ReleaseNotes />` tag (else its top) and any `<WhatsNew />` tag.
- * `releaseCount` keeps only the newest releases (at least one) and notes that the rest are
+ * `releaseCount` keeps only the newest releases (possibly none) and notes that the rest are
  * left out; the Markdown export passes it to fit the page token budget, the page never does.
  */
 export function withReleaseNotes({
@@ -132,7 +132,7 @@ export function withReleaseNotes({
   }
   const entries = readReleases({ docsRoot });
   if (!entries.length) return source.replace(NOTES_TAG, "");
-  const kept = entries.slice(0, Math.max(1, releaseCount ?? entries.length));
+  const kept = entries.slice(0, Math.max(0, releaseCount ?? entries.length));
   const sections = kept.map(
     ({ version, label, body, compare }) =>
       `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
