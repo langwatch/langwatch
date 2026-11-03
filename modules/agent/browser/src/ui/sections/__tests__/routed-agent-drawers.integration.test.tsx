@@ -14,6 +14,8 @@ const stack = vi.hoisted(() => ({ entries: [] as { drawer: string }[] }));
 const listed = vi.hoisted(() => ({ rows: [] as unknown[] }));
 const opener = vi.hoisted(() => ({
   props: {} as Record<string, unknown>,
+  /** The drawer address's `drawer.<key>` values: what openDrawer writes for plain strings. */
+  params: {} as Record<string, string | undefined>,
   onInputMappingsChange: undefined as ((...args: unknown[]) => void) | undefined,
   onAgentLabelChange: undefined as ((label: string | undefined) => void) | undefined,
 }));
@@ -33,6 +35,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ ...drawer, openDrawer: vi.fn() }),
   getDrawerStack: () => stack.entries,
   getComplexProps: () => opener.props,
+  useDrawerParams: () => opener.params,
   getFlowCallbacks: () =>
     opener.onInputMappingsChange || opener.onAgentLabelChange
       ? {
@@ -257,6 +260,7 @@ afterEach(() => {
   fetched.agent = undefined;
   fetched.workflow = undefined;
   opener.props = {};
+  opener.params = {};
   opener.onInputMappingsChange = undefined;
   opener.onAgentLabelChange = undefined;
   versions.data = { versions: [], labels: [], availableLabels: [] };
@@ -914,19 +918,16 @@ describe("the agent target's deploy label in an evaluation workbench", () => {
     expect(trigger).toHaveTextContent("production");
   });
 
-  /** @scenario "The experiment agent target drawer picks the deploy label" */
-  it("shows the label the target is pinned to", () => {
+  /** @scenario "A target pinned to a label opens its agent drawer on that label" */
+  it("shows the label the target is pinned to, read from the drawer address", () => {
     fetched.agent = storedCodeAgent;
     versions.data = {
       versions: [{ version: 2 }, { version: 1 }],
       labels: [{ label: "production", version: 1 }],
       availableLabels: [],
     };
-    opener.props = {
-      availableSources: datasetSources,
-      inputMappings: {},
-      agentLabel: "production",
-    };
+    opener.props = { availableSources: datasetSources, inputMappings: {} };
+    opener.params = { agentId: "agent_code", agentLabel: "production" };
     opener.onAgentLabelChange = () => undefined;
     render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
 

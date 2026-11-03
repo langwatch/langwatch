@@ -322,3 +322,10 @@ Feature: Agent versions and deploy labels
     When the user opens the target's agent drawer
     Then the deploy label picker shows "latest" by default
     And picking "production" pins the target to "production"
+
+  @integration
+  Scenario: A target pinned to a label opens its agent drawer on that label
+    Given an agent target in the workbench pinned to "production"
+    When the user clicks the target's column header
+    Then the agent drawer's deploy label picker shows "production", not "latest"
+    And the label comes from the drawer address, so a reload of that address shows it too

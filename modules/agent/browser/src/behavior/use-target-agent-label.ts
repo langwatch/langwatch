@@ -1,4 +1,4 @@
-import { getComplexProps, getFlowCallbacks } from "@langwatch/browser-host/drawer";
+import { getFlowCallbacks, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { useState } from "react";
 
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
@@ -14,8 +14,9 @@ type TargetAgentLabel = {
 };
 
 /**
- * The deploy label an experiment target runs its agent at. The opener hands the current label
- * as `agentLabel` and a writer as the `onAgentLabelChange` flow callback; a change shows at once.
+ * The deploy label an experiment target runs its agent at. The opener's `agentLabel` is a
+ * plain string, so it travels in the drawer address; the writer is the `onAgentLabelChange`
+ * flow callback.
  */
 export function useTargetAgentLabel({
   drawer,
@@ -26,7 +27,7 @@ export function useTargetAgentLabel({
 }): TargetAgentLabel | null {
   const host = useAgentManagementHost();
   const projectId = host.project()?.id ?? "";
-  const opened = getComplexProps().agentLabel as string | undefined;
+  const opened = useDrawerParams().agentLabel;
   const [shown, setShown] = useState({ opened, label: opened });
   if (shown.opened !== opened) setShown({ opened, label: opened });
   const write = getFlowCallbacks(drawer)?.onAgentLabelChange as
