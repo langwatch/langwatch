@@ -165,6 +165,7 @@ export function createMonitorsRest(): Readonly<{
       )
 
       .patch("/:id", "patchApiMonitorsById")
+      .spends()
       .withAudit("monitors.update")
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestUpdateInputSchema)
