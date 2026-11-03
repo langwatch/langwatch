@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  * The Instant Evals column offers decision models only, LangWatch Instant Preview first, and
- * only the ones the server says would run for this project (ADR-182).
+ * only the ones the server says would run from the picked scopes, not the page's project (ADR-182).
  * Binds specs/model-providers/instant-evals-decision-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
@@ -43,7 +43,9 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
       getDefaultModelsForProject: { useQuery: () => mockGetDefaultModels() },
       getInheritedValuesForScopes: { useQuery: () => mockGetInheritedValues() },
       listAllForProjectForFrontend: { useQuery: () => mockListAllForProjectForFrontend() },
-      listDecisionModelsForProject: { useQuery: () => mockListDecisionModels() },
+      listDecisionModelsForScopes: {
+        useQuery: (input: unknown, options: unknown) => mockListDecisionModels(input, options),
+      },
       saveDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
@@ -159,6 +161,32 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       const listbox = instantEvalsListbox();
       expect(within(listbox).queryByText("Inception Mercury Decide")).not.toBeInTheDocument();
       expect(within(listbox).queryByText(/key in Model Providers first/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a config row scoped to the organization", () => {
+    /** @scenario "The drawer asks about the picked scopes, not the page's project" */
+    it("asks for the decision models of the organization scope, not the page's project", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const [input, options] = mockListDecisionModels.mock.lastCall ?? [];
+      expect(input).toEqual({
+        projectId: expect.any(String),
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+      });
+      expect(options).toMatchObject({ enabled: true });
+    });
+
+    it("asks nothing and offers only LangWatch Instant Preview with no scope picked", () => {
+      mockListDecisionModels.mockReturnValue({ data: undefined, isLoading: false });
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer />);
+
+      const [input, options] = mockListDecisionModels.mock.lastCall ?? [];
+      expect(input).toMatchObject({ scopes: [] });
+      expect(options).toMatchObject({ enabled: false });
+      const offered = instantEvalsOptions();
+      expect(offered).toHaveLength(1);
+      expect(offered[0]).toHaveTextContent("LangWatch Instant Preview");
     });
   });
 });
