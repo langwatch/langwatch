@@ -30,7 +30,11 @@ import { useInsightActions, useMarkShownSeen } from "../../behavior/use-insight-
 import { useInsightInbox } from "../../behavior/use-insight-inbox.ts";
 import { useRunInsightAction } from "../../behavior/use-run-insight-action.ts";
 import { useInsightHost } from "../../model/insight-host.ts";
-import { ACTIONS_NEED_LANGY, shownInsightActions } from "../../model/insight-presentation.ts";
+import {
+  ACTIONS_NEED_LANGY,
+  actionsDisabledReasonFor,
+  shownInsightActions,
+} from "../../model/insight-presentation.ts";
 import { type FolderCount, FolderRail } from "../blocks/folder-rail.tsx";
 import { InsightActionButtons } from "../blocks/insight-action-buttons.tsx";
 import { type InsightDensity, InsightRow } from "../blocks/insight-row.tsx";
@@ -213,7 +217,11 @@ function FolderView({
                 proposedActions={
                   <InsightActionButtons
                     actions={shownInsightActions({ entry, isEnabled: isActionsEnabled })}
-                    disabledReason={actionsDisabledReason}
+                    disabledReason={actionsDisabledReasonFor({
+                      reason: actionsDisabledReason,
+                      isOtherSending:
+                        runAction.isSending && runAction.pendingActionId(entry.id) === null,
+                    })}
                     pendingActionId={runAction.pendingActionId(entry.id)}
                     onRun={(actionId) => runAction.run({ insightId: entry.id, actionId })}
                   />

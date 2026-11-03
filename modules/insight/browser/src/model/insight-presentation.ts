@@ -19,6 +19,20 @@ import { differenceInCalendarDays, format } from "@langwatch/time";
 /** Why the action buttons are disabled for a reader who may not send Langy a message. */
 export const ACTIONS_NEED_LANGY = "You need permission to use Langy";
 
+/** Why an insight's actions wait while a click on another insight's action is on its way. */
+export const ANOTHER_ACTION_SENDING = "Another action is on its way";
+
+/** Why a card's action buttons are disabled, if they are: the permission first, then a send. */
+export function actionsDisabledReasonFor({
+  reason,
+  isOtherSending,
+}: {
+  reason: string | null;
+  isOtherSending: boolean;
+}): string | null {
+  return reason ?? (isOtherSending ? ANOTHER_ACTION_SENDING : null);
+}
+
 /**
  * The action buttons a card shows: none while `release_insight_actions` is off, and none on an
  * insight a run filed, whatever it holds.

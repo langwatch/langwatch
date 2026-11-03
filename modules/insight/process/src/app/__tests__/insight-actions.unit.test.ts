@@ -401,3 +401,20 @@ describe("given the release_insight_actions flag is off for the project", () => 
     });
   });
 });
+
+describe("given an insight filed with no source conversation", () => {
+  describe("when its owner clicks an action", () => {
+    /** @scenario "A click on an insight filed with no conversation does not say one is gone" */
+    it("starts a new conversation, and does not say an original one is gone", async () => {
+      const { langy, file, click } = await setUp();
+      const { id } = await file();
+
+      const run = await click({ insightId: id });
+
+      expect(run).toMatchObject({ conversationId: "conversation-new-1", sourceGone: false });
+      expect(langy.sent).toEqual([
+        expect.objectContaining({ via: "create", conversationId: null, userId: OWNER }),
+      ]);
+    });
+  });
+});

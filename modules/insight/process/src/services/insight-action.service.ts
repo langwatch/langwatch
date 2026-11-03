@@ -91,7 +91,8 @@ export class InsightActionService {
     };
     if (source === null) {
       const started = await this.langy.createConversationTurn(turn);
-      return { ...started, sourceGone: true };
+      // Gone only when there was one: an insight filed with no conversation lost nothing.
+      return { ...started, sourceGone: insight.source !== null };
     }
     const conversationId = source.isOwn
       ? source.id

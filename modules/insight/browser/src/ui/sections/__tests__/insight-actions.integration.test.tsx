@@ -8,10 +8,11 @@
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import type { InsightActionRun } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { ANOTHER_ACTION_SENDING } from "../../../model/insight-presentation.ts";
 import { insightEntry, renderWithInsightHost, StubInsightHost } from "../../../testing.tsx";
 import InsightsScreen from "../insights.screen.tsx";
 
@@ -100,6 +101,31 @@ describe("given an insight with actions in the inbox", () => {
         actionId: "a0",
         clickId: expect.stringMatching(/^[0-9a-f]{32}$/),
       });
+    });
+  });
+
+  describe("when its owner clicks an action on one insight while another is in the inbox", () => {
+    /** @scenario "While one action is on its way, every insight's actions wait" */
+    it("disables the other insight's actions and says why, until the click answers", async () => {
+      const second = insightEntry({
+        id: "insight-2",
+        title: "Latency rose",
+        seenAt: NOW,
+        actions: [DRAFT_EVALUATOR],
+      });
+      const { answerRun, runs } = renderInbox({ entries: [WITH_ACTIONS, second] });
+
+      await userEvent.click(await screen.findByRole("button", { name: FIND_TRACES.label }));
+      await waitFor(() => expect(runs()).toHaveLength(1));
+      const [, secondCard] = screen.getAllByTestId("insight-actions");
+      const waiting = within(secondCard!).getByRole("button", { name: DRAFT_EVALUATOR.label });
+
+      expect(waiting).toBeDisabled();
+      expect(within(secondCard!).getByText(ANOTHER_ACTION_SENDING)).toBeInTheDocument();
+
+      answerRun({ conversationId: "conversation-1", turnId: "turn-1", sourceGone: false });
+      await waitFor(() => expect(waiting).toBeEnabled());
+      expect(within(secondCard!).queryByText(ANOTHER_ACTION_SENDING)).not.toBeInTheDocument();
     });
   });
 

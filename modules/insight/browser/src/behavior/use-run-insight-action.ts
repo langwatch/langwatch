@@ -21,6 +21,8 @@ export function useRunInsightAction({ projectId }: { projectId: string }) {
   const isSending = useRef(false);
 
   return {
+    /** A click on some insight's action is on its way; every action waits for it. */
+    isSending: runAction.isPending,
     /** The action of this insight whose click is on its way, if any. */
     pendingActionId: (insightId: string): string | null =>
       runAction.isPending && runAction.variables?.insightId === insightId

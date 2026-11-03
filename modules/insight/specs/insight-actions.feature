@@ -119,6 +119,13 @@ Feature: Action buttons on an insight
       And the answer says the original conversation is gone
 
     @unit
+    Scenario: A click on an insight filed with no conversation does not say one is gone
+      Given an insight filed with no source conversation
+      When its owner clicks an action
+      Then Langy starts a new conversation that begins with the insight
+      And the answer does not say an original conversation is gone
+
+    @unit
     Scenario: The same click sent twice sends Langy one message
       Given an owner's click on an action
       When the same click reaches the module twice
@@ -174,6 +181,13 @@ Feature: Action buttons on an insight
       Given an insight with an action in the inbox
       When its owner clicks the action twice while the first click is on its way
       Then the action is sent once
+
+    @integration
+    Scenario: While one action is on its way, every insight's actions wait
+      Given two insights with actions in the inbox
+      When its owner clicks an action on the first
+      Then the second insight's actions are disabled and say another action is on its way
+      And once the first click answers, they are enabled again
 
     @integration
     Scenario: A click opens the conversation in Langy, and says when the original is gone
