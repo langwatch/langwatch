@@ -56,7 +56,8 @@ func suiteJobs(jobs []Job) ([]Job, bool) {
 }
 
 // Collect measures the newest `want` runs on main whose package-suites shards
-// all passed, and returns their ids with every measurement of each.
+// and, when the run has one, package-suites (browser) job all passed, and
+// returns their ids with every measurement of each.
 func Collect(src Source, want int) ([]int64, [][]Measurement, error) {
 	if want < 1 {
 		return nil, nil, fmt.Errorf("asked for %d runs; take the median over at least one", want)
@@ -81,7 +82,7 @@ func Collect(src Source, want int) ([]int64, [][]Measurement, error) {
 		}
 	}
 	if len(ids) < want {
-		return nil, nil, fmt.Errorf("found %d main runs with every package-suites shard green, wanted %d", len(ids), want)
+		return nil, nil, fmt.Errorf("found %d main runs with every package-suites shard and browser job green, wanted %d", len(ids), want)
 	}
 	return ids, measured, nil
 }
