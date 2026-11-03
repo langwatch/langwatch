@@ -23,7 +23,7 @@ type ModelProviderDefaultsWriteOptions = {
   writeAuthorization: ModelProviderWriteAuthorizationService;
   ids: ModelProviderIdService;
   scopes: ModelProviderScopeService;
-  /** Refuses an own decision model without the flag, or on a scope with no key for it (ADR-182 decision 4). */
+  /** Refuses an own decision model without the flag, or on a scope with no key for it (ADR-182). */
   decisionModels: Pick<ModelProviderDecisionModelService, "assertMayStore">;
 };
 

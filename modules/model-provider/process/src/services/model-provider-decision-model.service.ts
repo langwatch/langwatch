@@ -157,7 +157,7 @@ export class ModelProviderDecisionModelService {
     return decisionModelResolutionOf({ model, row: row ?? undefined });
   }
 
-  /** The decision models a config on these scopes may hold: an own one only if every scope runs it. */
+  /** The decision models a config on these scopes may hold: own ones only if all scopes run them. */
   async listPickableForScopes({
     projectId,
     scopes,
@@ -221,7 +221,8 @@ export class ModelProviderDecisionModelService {
       if (await this.runsFromEvery({ model: pick.model, scopes: pick.scopes, rowFor })) continue;
       const label = findDecisionModel(pick.model)?.label ?? pick.model;
       throw new ModelDefaultValidationError(
-        `${label} can't run for every scope of this config: at least one has no enabled key for it. Add the key at that scope or above, or keep LangWatch Instant Preview.`,
+        `${label} can't run for every scope of this config: at least one has no enabled key ` +
+          "for it. Add the key at that scope or above, or keep LangWatch Instant Preview.",
       );
     }
   }

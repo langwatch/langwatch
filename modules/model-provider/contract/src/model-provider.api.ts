@@ -312,7 +312,8 @@ export interface ModelProviderApi {
   listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]>;
   /**
    * The decision models a Default models config on these scopes may hold, hosted first: an own
-   * one only when it runs from every scope's own chain. Scopes outside the project's organization are refused.
+   * one only when it runs from every scope's own chain. Scopes outside the project's
+   * organization are refused.
    */
   listDecisionModelsForScopes(input: {
     projectId: string;
