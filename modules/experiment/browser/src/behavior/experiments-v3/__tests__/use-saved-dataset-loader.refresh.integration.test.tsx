@@ -112,12 +112,19 @@ describe("given a workbench showing a saved dataset", () => {
   });
 
   describe("when the dataset grows past the loaded page and the loaded rows stay the same", () => {
+    let hint: () => Promise<void>;
+    const cutTotal = () => useEvaluationsV3Store.getState().datasets[0]?.savedRecordsCut?.totalRows;
+
+    beforeEach(async () => {
+      server.unloaded = 1;
+      ({ hint } = openWorkbench());
+      await waitFor(() => {
+        if (shown()?.length !== 2) throw new Error("the first read has not loaded yet");
+      });
+    });
+
     /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
     it("updates how many rows the dataset holds", async () => {
-      server.unloaded = 1;
-      const { hint } = openWorkbench();
-      await waitFor(() => expect(shown()).toHaveLength(2));
-
       server.unloaded = 5;
       await hint();
 
@@ -127,6 +134,20 @@ describe("given a workbench showing a saved dataset", () => {
           totalRows: 7,
         }),
       );
+    });
+
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("records no undo step for the new row count", async () => {
+      const history = () => useEvaluationsV3Store.temporal.getState().pastStates.length;
+      // Past the store's 100 ms window that folds rapid changes into one undo step.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const before = history();
+
+      server.unloaded = 5;
+      await hint();
+
+      await waitFor(() => expect(cutTotal()).toBe(7));
+      expect(history()).toBe(before);
     });
   });
 

@@ -143,9 +143,21 @@ function applySavedRead({
   });
   const sameRows = isDeepEqual(refreshed, dataset.savedRecords);
   if (sameRows && isDeepEqual(cut, dataset.savedRecordsCut)) return true;
-  setSavedDatasetRecords(dataset.id, refreshed, cut);
-  // Undo must not step back onto rows the dataset no longer holds.
-  if (!sameRows) useEvaluationsV3Store.temporal.getState().clear();
+  const temporal = useEvaluationsV3Store.temporal.getState();
+  if (!sameRows) {
+    setSavedDatasetRecords(dataset.id, refreshed, cut);
+    // Undo must not step back onto rows the dataset no longer holds.
+    temporal.clear();
+    return true;
+  }
+  // Only the row count changed: that is no edit, so it takes no undo step.
+  const wasTracking = temporal.isTracking;
+  if (wasTracking) temporal.pause();
+  try {
+    setSavedDatasetRecords(dataset.id, refreshed, cut);
+  } finally {
+    if (wasTracking) temporal.resume();
+  }
   return true;
 }
 
