@@ -517,6 +517,90 @@ describe("resolveWrapperMode", () => {
     });
   });
 
+  describe("when grok resolves to ingestion mode", () => {
+    const mintGrok = () => {
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "ik-lw-grok-test-token",
+        prefix: "ik-lw-grok",
+        endpoint: "http://app.example.com/api/otel",
+      });
+    };
+
+    /** @scenario The wrapper mints a grok_cli key and runs Grok with the env block */
+    it("mints under grok_cli and injects Grok's exporter, endpoint and Bearer", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintGrok();
+
+      const out = await resolveWrapperMode(baseCfg(), "grok", {});
+
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "grok_cli");
+      expect(out.mode).toBe("ingestion");
+      expect(out.vars).toMatchObject({
+        GROK_EXTERNAL_OTEL: "1",
+        OTEL_LOGS_EXPORTER: "otlp",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
+        OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ik-lw-grok-test-token",
+      });
+    });
+
+    /** @scenario A cached grok_cli key is reused */
+    it("reuses a live cached grok_cli key instead of minting again", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.listIngestionKeys as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        { sourceType: "grok_cli", lookupId: "cachedgroklookup12" },
+      ]);
+
+      const cfg = baseCfg({
+        default_personal_ingest_keys: {
+          grok_cli: {
+            id: "ik_grok",
+            secret: "ik-lw-cachedgroklookup12_secretpart",
+            prefix: "ik-lw-",
+          },
+        },
+      });
+      const out = await resolveWrapperMode(cfg, "grok", {});
+
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-cachedgroklookup12_secretpart");
+    });
+
+    it("swaps a forced gateway mode for ingestion, saying grok supports ingestion only", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintGrok();
+
+      const out = await resolveWrapperMode(
+        baseCfg({ tool_mode: { grok: "gateway" } }),
+        "grok",
+        {},
+        [],
+        "gateway",
+      );
+
+      expect(out.mode).toBe("ingestion");
+      expect(out.notice).toContain("grok supports direct OTLP ingestion only");
+    });
+
+    /** @scenario An inherited exporter that points elsewhere is overridden for the child */
+    it("overrides a parent shell's logs exporter switch in the child env", async () => {
+      const saved = process.env.OTEL_LOGS_EXPORTER;
+      process.env.OTEL_LOGS_EXPORTER = "none";
+      try {
+        const { resolveWrapperMode } = await import("../wrapper-mode.js");
+        mintGrok();
+
+        const out = await resolveWrapperMode(baseCfg(), "grok", {});
+        // The merge runWrapped performs: the parent env, then ours on top.
+        const child = { ...process.env, ...out.vars };
+
+        expect(child.OTEL_LOGS_EXPORTER).toBe("otlp");
+      } finally {
+        if (saved === undefined) delete process.env.OTEL_LOGS_EXPORTER;
+        else process.env.OTEL_LOGS_EXPORTER = saved;
+      }
+    });
+  });
+
   describe("when code (VS Code Copilot Chat) resolves to ingestion mode", () => {
     const mintVscode = () => {
       (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({

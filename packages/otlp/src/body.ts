@@ -19,6 +19,7 @@ import {
   OtlpBodyUnreadableError,
   OtlpUnsupportedEncodingError,
 } from "./errors.ts";
+import { attachLogEventNames } from "./log-event-name.ts";
 
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
@@ -310,7 +311,29 @@ export function parseOtlpLogs(
   if (body.byteLength === 0) {
     return { ok: true, request: { resourceLogs: [] } };
   }
-  return parseWithFallback<IExportLogsServiceRequest>(body, contentType, logRequestType);
+  const parsed = parseWithFallback<IExportLogsServiceRequest>(body, contentType, logRequestType);
+  if (parsed.ok && contentType !== "application/json") {
+    restoreEventNames({ request: parsed.request, body });
+  }
+  return parsed;
+}
+
+/**
+ * Best effort: the request already decoded, so a body the field walk cannot
+ * read (a JSON fallback, say) keeps what the decoder produced.
+ */
+function restoreEventNames({
+  request,
+  body,
+}: {
+  request: IExportLogsServiceRequest;
+  body: ArrayBuffer;
+}): void {
+  try {
+    attachLogEventNames({ request, bytes: new Uint8Array(body) });
+  } catch {
+    return;
+  }
 }
 
 export function parseOtlpMetrics(

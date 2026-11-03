@@ -60,6 +60,24 @@ type AiToolCatalogCollaborators = {
   diagnostics: { warn(message: string, context: Record<string, unknown>): void };
 };
 
+/** A tile's policy for its tool: on unless the admin turned it off, less what the tool can't do. */
+function tilePolicy({
+  slug,
+  config,
+}: {
+  slug: PlatformToolSlug;
+  config: { allowVk?: unknown; allowOtelDirect?: unknown };
+}): PlatformToolPolicy {
+  // Neither routes model traffic through env, so there is no gateway path (ADR-192).
+  const hasGatewayPath = slug !== "code" && slug !== "grok";
+  return {
+    allowVk: hasGatewayPath && (config.allowVk === undefined || Boolean(config.allowVk)),
+    allowOtelDirect:
+      slug !== "cursor" &&
+      (config.allowOtelDirect === undefined || Boolean(config.allowOtelDirect)),
+  };
+}
+
 export class DefaultGovernanceAiToolCatalogService {
   private readonly repository: AiToolCatalogRepository;
 
@@ -282,18 +300,7 @@ export class DefaultGovernanceAiToolCatalogService {
         continue;
       }
 
-      let allowVk = tile.config.allowVk === undefined ? true : Boolean(tile.config.allowVk);
-      let allowOtelDirect =
-        tile.config.allowOtelDirect === undefined ? true : Boolean(tile.config.allowOtelDirect);
-      if (slug === "code") {
-        allowVk = false;
-      }
-
-      if (slug === "cursor") {
-        allowOtelDirect = false;
-      }
-
-      overrides[slug] = { allowVk, allowOtelDirect };
+      overrides[slug] = tilePolicy({ slug, config: tile.config });
     }
 
     return overrides;

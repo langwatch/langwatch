@@ -9,6 +9,7 @@ export const PLATFORM_TOOL_SLUGS = [
   "cursor",
   "copilot",
   "code",
+  "grok",
 ] as const;
 export const platformToolSlugSchema = z.enum(PLATFORM_TOOL_SLUGS);
 const platformToolPolicySchemaDefinition = z
@@ -31,6 +32,7 @@ export const PLATFORM_TOOL_POLICY_DEFAULTS: PlatformToolPolicyMap = {
   cursor: { allowVk: true, allowOtelDirect: false },
   copilot: { allowVk: true, allowOtelDirect: true },
   code: { allowVk: false, allowOtelDirect: true },
+  grok: { allowVk: false, allowOtelDirect: true },
 };
 export const PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE: Readonly<Record<string, PlatformToolSlug>> = {
   claude_code: "claude",
@@ -39,6 +41,7 @@ export const PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE: Readonly<Record<string, Platform
   opencode: "opencode",
   copilot_cli: "copilot",
   copilot_vscode: "code",
+  grok_cli: "grok",
 };
 
 export function isPlatformToolSlug(value: string): value is PlatformToolSlug {

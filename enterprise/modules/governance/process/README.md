@@ -1221,14 +1221,14 @@ interface Input {
 
 // aiTools.providerAvailability
 type Input = z.infer<typeof organizationScope>; // ../contract/src/ai-tools.trpc.ts:18
-// Output: aiToolProviderAvailabilitySchema, ../contract/src/ai-tool-catalog.ts:353
+// Output: aiToolProviderAvailabilitySchema, ../contract/src/ai-tool-catalog.ts:355
 interface Output {
   configuredProviders: string[];
 }
 
 // aiTools.claudeCodeOtlpEndpoint
 type Input = z.infer<typeof organizationScope>; // ../contract/src/ai-tools.trpc.ts:18
-// Output: aiToolOtlpEndpointSchema, ../contract/src/ai-tool-catalog.ts:365
+// Output: aiToolOtlpEndpointSchema, ../contract/src/ai-tool-catalog.ts:367
 interface Output {
   endpoint: string | null;
 }
@@ -1243,7 +1243,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
 
 // aiTools.create
 // Input: aiToolCreateSchema, ../contract/src/ai-tools.trpc.ts:45
@@ -1256,7 +1256,7 @@ interface Input {
   order?: number;
   config: Record<string, unknown>;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
 
 // aiTools.update
 // Input: aiToolUpdateSchema, ../contract/src/ai-tools.trpc.ts:58
@@ -1271,11 +1271,11 @@ interface Input {
   type?: "coding_assistant" | "model_provider" | "external_tool";
   config?: Record<string, unknown>;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
 
 // aiTools.remove
 type Input = z.infer<typeof entryInOrganization>; // ../contract/src/ai-tools.trpc.ts:19
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
 
 // aiTools.setEnabled
 // Input: inline, ../contract/src/ai-tools.trpc.ts:94
@@ -1284,7 +1284,7 @@ interface Input {
   id: string;
   enabled: boolean;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
 
 // aiTools.importStarterPack
 // Input: inline, ../contract/src/ai-tools.trpc.ts:98
@@ -1292,7 +1292,7 @@ interface Input {
   organizationId: string;
   slugs?: string[];
 }
-// Output: aiToolStarterPackImportSchema, ../contract/src/ai-tool-catalog.ts:399
+// Output: aiToolStarterPackImportSchema, ../contract/src/ai-tool-catalog.ts:401
 interface Output {
   created: number;
   updated: number;
@@ -1773,7 +1773,7 @@ type Output = z.infer<typeof governanceBudgetOverviewForUserSchema>; // ../contr
 
 // governance.cliBootstrap
 type Input = z.infer<typeof organizationScope>; // ../contract/src/governance.trpc.ts:24
-type Output = z.infer<typeof cliBootstrapResultSchema>; // ../contract/src/features/cli/cli-bootstrap.ts:55
+type Output = z.infer<typeof cliBootstrapResultSchema>; // ../contract/src/features/cli/cli-bootstrap.ts:56
 ```
 
 ### `ingestionKey`

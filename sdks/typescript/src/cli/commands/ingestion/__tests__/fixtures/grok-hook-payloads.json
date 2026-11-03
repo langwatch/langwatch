@@ -1,0 +1,59 @@
+{
+  "grok": {
+    "vendorVersion": "1.0.70",
+    "envNames": [
+      "GROK_HOOK_EVENT",
+      "GROK_HOOK_NAME",
+      "GROK_SESSION_ID",
+      "GROK_WORKSPACE_ROOT",
+      "CLAUDE_PROJECT_DIR"
+    ],
+    "sessionStart": {
+      "hookEventName": "session_start",
+      "sessionId": "01a196aa-560b-7e32-91ca-000000000001",
+      "cwd": "/home/dev/work/repo-a",
+      "workspaceRoot": "/home/dev/work/repo-a",
+      "timestamp": "2026-11-01T10:31:48.139705+00:00",
+      "permissionMode": "bypassPermissions",
+      "hook_event_name": "SessionStart",
+      "session_id": "01a196aa-560b-7e32-91ca-000000000001",
+      "permission_mode": "bypassPermissions",
+      "source": "new"
+    },
+    "stop": {
+      "hookEventName": "stop",
+      "sessionId": "01a196aa-560b-7e32-91ca-000000000001",
+      "cwd": "/home/dev/work/repo-a",
+      "workspaceRoot": "/home/dev/work/repo-a",
+      "timestamp": "2026-11-01T10:31:48.139705+00:00",
+      "permissionMode": "bypassPermissions",
+      "hook_event_name": "Stop",
+      "session_id": "01a196aa-560b-7e32-91ca-000000000001",
+      "permission_mode": "bypassPermissions",
+      "transcriptPath": "/home/dev/.grok/sessions/<redacted>/updates.jsonl",
+      "promptId": "00000000-0000-4000-8000-0000000000aa",
+      "reason": "end_turn",
+      "stopHookActive": false,
+      "lastAssistantMessage": "<redacted>",
+      "transcript_path": "/home/dev/.grok/sessions/<redacted>/updates.jsonl",
+      "stop_hook_active": false,
+      "last_assistant_message": "<redacted>"
+    },
+    "subagentStart": {
+      "hookEventName": "subagent_start",
+      "sessionId": "01a196aa-560b-7e32-91ca-000000000001",
+      "cwd": "/home/dev/work/repo-a",
+      "workspaceRoot": "/home/dev/work/repo-a",
+      "timestamp": "2026-11-01T10:31:48.139705+00:00",
+      "permissionMode": "bypassPermissions",
+      "hook_event_name": "SubagentStart",
+      "session_id": "01a196aa-560b-7e32-91ca-000000000001",
+      "permission_mode": "bypassPermissions",
+      "transcriptPath": "/home/dev/.grok/sessions/<redacted>/updates.jsonl",
+      "subagentId": "01a196aa-69d7-71b0-9280-000000000002",
+      "subagentType": "general-purpose",
+      "description": "<redacted>",
+      "transcript_path": "/home/dev/.grok/sessions/<redacted>/updates.jsonl"
+    }
+  }
+}

@@ -974,6 +974,11 @@ const AGENT_BANNERS: Record<SessionBanner["agent"], { name: string; mark: MarkSp
     name: "GitHub Copilot",
     mark: flatMark(["▗▛▀▀▀▜▖", "▐ ▐▌▐▌▌", "▝▙▄▄▄▟▘"], TERMINAL_TOKENS.blue),
   },
+  // A plain mark, not Grok's own startup art, which no capture has recorded.
+  grok: {
+    name: "Grok",
+    mark: flatMark(["▗▄▄▄▖", "▐ ▞ ▌", "▝▀▀▀▘"], TERMINAL_TOKENS.screenFg),
+  },
   unknown: {
     name: "Coding agent",
     mark: flatMark(["▛███▜", "█████", "▘▘ ▝▝"], TERMINAL_TOKENS.faint),
@@ -1201,7 +1206,7 @@ function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: To
     case "tool":
       return <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
     case "tool_rejected":
-      return <RejectedLine name={entry.name} reason={entry.reason} />;
+      return <RejectedLine name={entry.name} outcome={entry.outcome} />;
     case "note":
       return <NoteLine level={entry.level} text={entry.text} />;
     default:
@@ -1470,16 +1475,16 @@ function ToolResultBody({
 }
 
 /**
- * A tool the human turned down. It never ran, so there is no span and no
- * output — only that it was asked for and refused.
+ * A tool that never ran: the human denied it, or it was aborted (cancelled or
+ * timed out). An abort may not be the user's doing, so only a denial names them.
  */
-function RejectedLine({ name, reason }: { name: string | null; reason: string | null }) {
-  const verb = reason === "user_abort" ? "aborted" : "denied";
+function RejectedLine({ name, outcome }: { name: string | null; outcome: "denied" | "aborted" }) {
+  const verdict = outcome === "denied" ? "denied by the user" : "aborted";
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={GLYPH.denied} color={TERMINAL_TOKENS.red} />
       <Text {...CELL} color={TERMINAL_TOKENS.red} flex={1} minWidth={0}>
-        {`${name ?? "A tool call"} — ${verb} by the user, never ran`}
+        {`${name ?? "A tool call"} — ${verdict}, never ran`}
       </Text>
     </HStack>
   );

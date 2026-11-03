@@ -8,6 +8,7 @@ export const ASSISTANT_KINDS = [
   "opencode",
   "cursor",
   "github_copilot",
+  "grok",
   "custom",
 ] as const;
 
@@ -60,6 +61,11 @@ export const ASSISTANT_PRESETS: Record<Exclude<AssistantKind, "custom">, Assista
   github_copilot: {
     label: "GitHub Copilot",
     iconUrl: "/images/external-icons/github-copilot.svg",
+    darkModeInvert: true,
+  },
+  grok: {
+    label: "Grok",
+    iconUrl: "/images/external-icons/grok-lighttheme.svg",
     darkModeInvert: true,
   },
 };
