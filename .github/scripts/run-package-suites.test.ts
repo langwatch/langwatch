@@ -942,6 +942,26 @@ void describe("given the lanes a leg of the job runs", () => {
     });
   });
 
+  void describe("when a leg keeps only some of a package's suites", () => {
+    /** @scenario "Browser suites run on their own runner, never beside a suite that starts containers" */
+    void it("weighs the package by the share of its suites the leg keeps", () => {
+      const seconds = (packages: DiscoveredPackage[], weight: number) =>
+        planShard({
+          packages,
+          lanes: "browser",
+          shard: { index: 1, total: 1 },
+          weightOf: () => weight,
+          concurrency: 2,
+          excluded: new Map(),
+        }).seconds;
+      // A third of a 300s package is the same work as a 100s package of one browser suite.
+      assert.equal(
+        seconds([pkg("@fix/web", ["test", "test:integration", "test:browser"])], 300),
+        seconds([pkg("@fix/web", ["test:browser"])], 100),
+      );
+    });
+  });
+
   void describe("when no lane filter is set", () => {
     /** @scenario "Without a lane filter every lane runs" */
     void it("schedules every lane, as a local run always has", () => {

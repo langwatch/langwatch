@@ -404,7 +404,7 @@ export const parseLanes = (value: string | undefined): LaneFilter => {
 };
 
 /** The packages with only the scripts `lanes` admits; a package left with none is dropped. */
-export const withLanes = ({
+const withLanes = ({
   packages,
   lanes,
 }: {
@@ -440,12 +440,21 @@ export const planShard = ({
   excluded: Map<string, string>;
 }): { assigned: DiscoveredPackage[]; seconds: number; jobs: SuiteJob[] } => {
   const items = withLanes({ packages, lanes });
-  const split = balanceByWallTime({ items, weightOf, concurrency, total: shard.total });
+  // The weights file records whole packages, so a leg that keeps some suites pays their share.
+  const scriptCount = new Map(packages.map((pkg) => [pkg.name, pkg.scripts.length]));
+  const laneWeightOf = (pkg: DiscoveredPackage): number =>
+    (weightOf(pkg) * pkg.scripts.length) / (scriptCount.get(pkg.name) ?? pkg.scripts.length);
+  const split = balanceByWallTime({
+    items,
+    weightOf: laneWeightOf,
+    concurrency,
+    total: shard.total,
+  });
   const assigned = split.groups[shard.index - 1] ?? [];
   return {
     assigned,
     seconds: split.walls[shard.index - 1] ?? 0,
-    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
+    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf: laneWeightOf }), excluded),
   };
 };
 
