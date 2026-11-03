@@ -5597,8 +5597,9 @@ const presentations = {
     describe: () => "Remove or replace it to run the workflow.",
   },
   jsonpath_no_match: {
-    title: "A field didn't match anything",
-    describe: () => "Check the field path against your data.",
+    // The endpoint answered; only the output path missed. Copy about reaching it would be wrong.
+    title: "The reply has no value at the output path",
+    describe: () => "The request went through. Check the output path against the response.",
   },
   code_block_timeout: {
     title: "A code step took too long",
