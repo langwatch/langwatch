@@ -1569,7 +1569,7 @@ export interface operations {
                              * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                              * @enum {string}
                              */
-                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                             config: {
                                 [key: string]: unknown;
                             } | null;
@@ -2051,6 +2051,79 @@ export interface operations {
                          */
                         callDirection?: "inbound" | "outbound";
                     };
+                } | {
+                    name: string;
+                    workflowId?: string;
+                    copiedFromAgentId?: string;
+                    /** @constant */
+                    type: "connector";
+                    config: {
+                        _library_ref?: string;
+                        name?: string;
+                        description?: string;
+                        cls?: string;
+                        parameters?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "file" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        inputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "file" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        outputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "file" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        isCustom?: boolean;
+                        /** @constant */
+                        behave_as?: "evaluator";
+                        call: {
+                            /** @enum {string} */
+                            language: "python";
+                            code: string;
+                        };
+                        setup?: {
+                            /** @enum {string} */
+                            language: "python";
+                            code: string;
+                        };
+                        teardown?: {
+                            /** @enum {string} */
+                            language: "python";
+                            code: string;
+                        };
+                        /** @default [] */
+                        secretNames?: string[];
+                        fixturesDatasetId?: string;
+                        timeoutMs?: number;
+                    };
                 };
             };
         };
@@ -2068,7 +2141,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -2158,7 +2231,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -2238,7 +2311,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -2260,7 +2333,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -2347,7 +2420,7 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         archivedAt: string | null;
                     };
                 };
@@ -2369,7 +2442,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -2391,7 +2464,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         config: {
                             [key: string]: unknown;
                         } | null;

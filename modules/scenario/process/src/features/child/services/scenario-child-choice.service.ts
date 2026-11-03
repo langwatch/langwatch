@@ -71,7 +71,8 @@ export class ScenarioChildChoiceService implements ScenarioChildBootstrap {
     jobData: ExecutionJobData;
     environment: ScenarioChildEnvironment;
   }): Promise<ScenarioChildChannel | undefined> {
-    if (jobData.target.type === "voice") return void 0;
+    // The Go runner has no voice or connector target (ADR-194).
+    if (jobData.target.type === "voice" || jobData.target.type === "connector") return void 0;
     // Go parity for hooks comes later (ADR-180).
     if (environment.callsHooks) return void 0;
     if (!(await this.#flagOn(jobData.projectId))) return void 0;

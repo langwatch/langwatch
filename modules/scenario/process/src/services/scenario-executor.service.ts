@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -18,6 +19,7 @@ import type {
   ScenarioGoChildChannel,
 } from "../channels/scenario-child.channel.ts";
 import { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
+import { ScenarioConnectorTargetService } from "../features/prefetch/services/scenario-connector-target.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
@@ -37,6 +39,8 @@ type ScenarioExecutorPeers = Readonly<{
   agents: AgentApi;
   prompts: PromptApi;
   secrets: SecretApi;
+  /** A connector agent's fixture rows (ADR-194). */
+  datasets: Pick<DatasetApi, "findDatasetPage">;
   traces: TraceApi;
   workflows: WorkflowApi;
   projects: ProjectApi;
@@ -135,6 +139,12 @@ export class ScenarioExecutorService {
         modelProviders: peers.modelProviders,
         gateway: peers.gateway,
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,
+      }),
+      connectorTargets: ScenarioConnectorTargetService.create({
+        agents: peers.agents,
+        secrets: peers.secrets,
+        datasets: peers.datasets,
+        featureFlags: peers.featureFlags,
       }),
     });
     const execution = ScenarioExecutionService.create({

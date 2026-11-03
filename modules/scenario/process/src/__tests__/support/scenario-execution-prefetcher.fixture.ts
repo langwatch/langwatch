@@ -26,6 +26,7 @@ import {
 import { vi } from "vitest";
 
 import { type ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import type { ConnectorTargetReader } from "../../features/prefetch/services/scenario-connector-target.service.ts";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
@@ -118,6 +119,7 @@ export interface ScenarioPrefetchFixture {
    */
   modelProviders?: ModelProviderApi;
   voiceTargets?: VoiceTargetReader;
+  connectorTargets?: ConnectorTargetReader;
   /** The project's organization; absent, it is "organization_1". */
   organizationId?: string;
   /** The run-key mint; unconfigured, every key is "run-key". */
@@ -435,5 +437,6 @@ export function createTestScenarioExecutionPrefetcherService(
         maxCallSeconds: 300,
       }),
     },
+    connectorTargets: deps.connectorTargets ?? null,
   });
 }

@@ -26,6 +26,7 @@ import { ScenarioRunSecretsService } from "../../../services/scenario-run-secret
 import { ScenarioWorkflowHydratorService } from "../../../services/scenario-workflow-hydrator.service.ts";
 import type { ScenarioService } from "../../../services/scenario.service.ts";
 import { AgentTestPrefetchService } from "./agent-test-prefetch.service.ts";
+import type { ConnectorTargetReader } from "./scenario-connector-target.service.ts";
 import {
   ScenarioPrefetchCompletionService,
   type ScenarioPrefetchLookups,
@@ -61,6 +62,7 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   /** Mints the run's keys: the child's, and a code agent's sandbox key. */
   apiKeys: Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">;
   voiceTargets: VoiceTargetReader | null;
+  connectorTargets: ConnectorTargetReader | null;
 };
 
 type DecryptedRunSecrets =
@@ -87,6 +89,7 @@ export class ScenarioExecutionPrefetcherService {
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,
       voiceTargets: options.voiceTargets,
+      connectorTargets: options.connectorTargets,
     });
     const runKeys = ScenarioRunKeyService.create({ apiKeys: options.apiKeys });
     const completion = ScenarioPrefetchCompletionService.create({

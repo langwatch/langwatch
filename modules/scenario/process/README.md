@@ -1414,7 +1414,7 @@ interface Output {
 }
 
 // scenarios.testHttpAgent
-type Input = z.infer<typeof httpAgentTestInputSchema>; // ../../agent/contract/src/agent.commands.ts:32
+type Input = z.infer<typeof httpAgentTestInputSchema>; // ../../agent/contract/src/agent.commands.ts:33
 type Output = z.infer<typeof httpProxyResultSchema>; // ../../agent/contract/src/agent.queries.ts:271
 ```
 
@@ -1465,9 +1465,9 @@ Declared at `src/eventing/simulation-processing.pipeline.ts:117`. Events: `Simul
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
 | ------ | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:271`            |
-| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:272`            |
-| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:274`            |
+| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:275`            |
+| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:276`            |
+| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:278`            |
 | config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:96`  |
 | config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:98`  |
 | config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:100` |

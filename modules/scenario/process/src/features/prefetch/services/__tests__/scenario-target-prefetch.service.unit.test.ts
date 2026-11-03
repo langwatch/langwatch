@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { ScenarioModelParametersService } from "../../../../services/scenario-model-parameters.service.ts";
 import { ScenarioWorkflowHydratorService } from "../../../../services/scenario-workflow-hydrator.service.ts";
+import type { ConnectorTargetReader } from "../scenario-connector-target.service.ts";
 import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service.ts";
 
 const PROJECT_ID = "project-1";
@@ -23,6 +24,7 @@ type Answers = {
   prompt?: Record<string, unknown> | null;
   projectSecrets?: Record<string, string>;
   secretReads?: string[][];
+  connectorTargets?: ConnectorTargetReader;
 };
 
 function serviceAnswering(answers: Answers = {}) {
@@ -121,6 +123,7 @@ function serviceAnswering(answers: Answers = {}) {
     legacyDefaultModel: "openai/gpt-5-mini",
     langwatchEndpoint: "https://app.langwatch.test",
     voiceTargets: null,
+    connectorTargets: answers.connectorTargets ?? null,
   });
 }
 
@@ -323,6 +326,40 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
         endpoint: "https://app.langwatch.test",
         timeoutMs: 300_000,
       });
+    });
+  });
+
+  describe("given a connector target", () => {
+    it("reads it through the connector reader with the run's secret values", async () => {
+      const reads: unknown[] = [];
+      const service = serviceAnswering({
+        connectorTargets: {
+          getConnectorTarget: async (input) => {
+            reads.push(input);
+            return {
+              type: "connector",
+              agentId: input.agentId,
+              call: { language: "python", code: "def execute(input): ..." },
+              secrets: {},
+              timeoutMs: 60_000,
+            };
+          },
+        },
+      });
+
+      await expect(fetchFor(service, "connector", { RUN_TOKEN: "t" })).resolves.toMatchObject({
+        type: "connector",
+        agentId: "agent-1",
+      });
+      expect(reads).toEqual([
+        { projectId: PROJECT_ID, agentId: "agent-1", runSecretValues: { RUN_TOKEN: "t" } },
+      ]);
+    });
+
+    it("throws when no connector reader is installed", async () => {
+      await expect(fetchFor(serviceAnswering(), "connector")).rejects.toThrow(
+        "Connector target prefetch is not installed",
+      );
     });
   });
 

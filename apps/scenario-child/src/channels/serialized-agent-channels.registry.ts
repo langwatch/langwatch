@@ -8,6 +8,7 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import {
   CodeAgentDataSchema,
   ConnectedAgentDataSchema,
+  ConnectorAgentDataSchema,
   type ExecuteSyncRoute,
   HttpAgentDataSchema,
   type LiteLLMParams,
@@ -24,13 +25,16 @@ import {
 } from "@langwatch/scenario-contract";
 import type { z } from "zod";
 
+import { ScenarioConnectorService } from "../services/scenario-connector.service.ts";
 import type { ExecuteSyncTransport } from "./execute-sync.channel.ts";
+import { HttpConnectorBlockChannel } from "./http/http.connector-block.channel.ts";
 import { childExecuteSyncTransport } from "./http/http.execute-sync.channel.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
 import {
   type ConnectedCallRun,
   HttpSerializedConnectedAgentChannel,
 } from "./http/http.serialized-connected-agent.channel.ts";
+import { HttpSerializedConnectorAgentChannel } from "./http/http.serialized-connector-agent.channel.ts";
 import {
   HttpSerializedHttpAgentChannel,
   type ScenarioHttp,
@@ -211,12 +215,33 @@ export const SERIALIZED_AGENT_RUNTIMES = {
     // missing credential fails the run with the transport's own message.
     factory: ({ data, voiceAgents }) => voiceAgents(data),
   }),
+  connector: runtime({
+    schema: ConnectorAgentDataSchema,
+    resourceClass: TARGET_RESOURCE_CLASS.connector,
+    stopSignal: TARGET_STOP_SIGNAL.connector,
+    // Every block runs in the code runner, over the transport a code agent's turn uses (ADR-194).
+    factory: ({ data, input }) => {
+      if (!input.projectApiKey) {
+        throw new Error("Connector adapter requires projectApiKey");
+      }
+      const transport = executeSyncTransportOf({ input, projectApiKey: input.projectApiKey });
+      return HttpSerializedConnectorAgentChannel.create({
+        connector: ScenarioConnectorService.create({
+          config: data,
+          channel: HttpConnectorBlockChannel.create({ transport }),
+          projectApiKey: input.projectApiKey,
+          parameters: input.parameters,
+          run: input.run,
+        }),
+      });
+    },
+  }),
 } as const satisfies Record<TargetAdapterData["type"], RuntimeRow>;
 
 /**
  * Creates an adapter from serialized data through the runtime table. @throws Error if the resolved
  * factory is missing the credential it needs (modelParams for prompt, projectApiKey for
- * workflow/code/connected).
+ * workflow/code/connected/connector).
  */
 export class SerializedAgentChannelRegistry {
   /**

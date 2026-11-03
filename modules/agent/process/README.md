@@ -351,12 +351,12 @@ Permission `project:update`. Hidden from the OpenAPI document. Declared at `src/
 Answers at `/api/agents`; also, undocumented, `/api/agents/2026-08-07`, `/api/agents/latest`.
 
 ```typescript
-type Body = z.infer<typeof createAgentRequestSchema>; // ../contract/src/agent.commands.ts:81
+type Body = z.infer<typeof createAgentRequestSchema>; // ../contract/src/agent.commands.ts:87
 // Response: legacyResponse, src/transport/agent-legacy.rest.ts:26
 interface Response {
   id: string;
   name: string;
-  type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+  type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
   config: Record<string, unknown> | null;
   createdAt: unknown;
   updatedAt: unknown;
@@ -390,10 +390,10 @@ Answers at `/api/agents/:id`; also, undocumented, `/api/agents/2026-08-07/:id`, 
 
 ```typescript
 type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-rest.schemas.ts:13
-// Body: updateAgentRequestSchema, ../contract/src/agent.commands.ts:131
+// Body: updateAgentRequestSchema, ../contract/src/agent.commands.ts:141
 interface Body {
   name?: string;
-  type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+  type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
   config?: Record<string, unknown>;
   workflowId?: string | null;
 }
@@ -410,7 +410,7 @@ Answers at `/api/agents/:id`; also, undocumented, `/api/agents/2026-08-07/:id`, 
 
 ```typescript
 type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-rest.schemas.ts:13
-type Body = z.infer<typeof updateAgentRequestSchema>; // ../contract/src/agent.commands.ts:131
+type Body = z.infer<typeof updateAgentRequestSchema>; // ../contract/src/agent.commands.ts:141
 type Response = z.infer<typeof legacyResponse>; // src/transport/agent-legacy.rest.ts:26
 ```
 
@@ -428,7 +428,7 @@ type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-re
 interface Response {
   id: string;
   name: string;
-  type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+  type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
   archivedAt: unknown | null;
 }
 ```
@@ -464,12 +464,12 @@ Permission `project:update`. Declared at `src/transport/agent.rest.ts:124`.
 Answers at `/api/v1/agents`.
 
 ```typescript
-type Body = z.infer<typeof createAgentRequestSchema>; // ../contract/src/agent.commands.ts:81
+type Body = z.infer<typeof createAgentRequestSchema>; // ../contract/src/agent.commands.ts:87
 // Response: agentResponseSchema, ../contract/src/agent-rest.schemas.ts:88
 interface Response {
   id: string;
   name: string;
-  type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+  type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
   config: Record<string, unknown> | null;
   createdAt: unknown;
   updatedAt: unknown;
@@ -500,7 +500,7 @@ Answers at `/api/v1/agents/:id`.
 
 ```typescript
 type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-rest.schemas.ts:13
-type Body = z.infer<typeof updateAgentRequestSchema>; // ../contract/src/agent.commands.ts:131
+type Body = z.infer<typeof updateAgentRequestSchema>; // ../contract/src/agent.commands.ts:141
 type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-rest.schemas.ts:88
 ```
 
@@ -514,7 +514,7 @@ Answers at `/api/v1/agents/:id`.
 
 ```typescript
 type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-rest.schemas.ts:13
-type Body = z.infer<typeof updateAgentRequestSchema>; // ../contract/src/agent.commands.ts:131
+type Body = z.infer<typeof updateAgentRequestSchema>; // ../contract/src/agent.commands.ts:141
 type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-rest.schemas.ts:88
 ```
 
@@ -581,20 +581,20 @@ interface Input {
 type Output = z.infer<typeof agentWithLegacyCopyCountSchema>; // ../contract/src/agent.queries.ts:181
 
 // agents.create
-type Input = z.infer<typeof createAgentCommandSchema>; // ../contract/src/agent.commands.ts:119
-type Output = z.infer<typeof agentWithFieldsSchema>; // ../contract/src/agent.ts:121
+type Input = z.infer<typeof createAgentCommandSchema>; // ../contract/src/agent.commands.ts:129
+type Output = z.infer<typeof agentWithFieldsSchema>; // ../contract/src/agent.ts:132
 
 // agents.update
-// Input: updateAgentCommandSchema, ../contract/src/agent.commands.ts:142
+// Input: updateAgentCommandSchema, ../contract/src/agent.commands.ts:152
 interface Input {
   name?: string;
-  type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+  type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
   config?: Record<string, unknown>;
   workflowId?: string | null;
   id: string;
   projectId: string;
 }
-type Output = z.infer<typeof agentWithFieldsSchema>; // ../contract/src/agent.ts:121
+type Output = z.infer<typeof agentWithFieldsSchema>; // ../contract/src/agent.ts:132
 
 // agents.cascadeArchive
 type Input = z.infer<typeof agentApiAgentInputSchema>; // ../contract/src/agent.schemas.ts:23
@@ -602,7 +602,7 @@ type Output = z.infer<typeof agentCascadeArchiveSchema>; // ../contract/src/agen
 
 // agents.delete
 type Input = z.infer<typeof agentApiAgentInputSchema>; // ../contract/src/agent.schemas.ts:23
-type Output = z.infer<typeof agentSchema>; // ../contract/src/agent.ts:74
+type Output = z.infer<typeof agentSchema>; // ../contract/src/agent.ts:80
 
 // agents.getCopies
 // Input: agentApiAgentReferenceInputSchema, ../contract/src/agent.schemas.ts:38

@@ -408,7 +408,7 @@ export type SimulationStreamFrame = z.infer<typeof simulationStreamFrameSchema>;
  */
 
 const simulationTargetSchemaDefinition = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice", "connector"]),
   referenceId: z.string(),
 });
 export interface SimulationTargetSchema extends Named<typeof simulationTargetSchemaDefinition> {}

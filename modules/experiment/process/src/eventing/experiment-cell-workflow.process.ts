@@ -381,6 +381,11 @@ const buildTargetNode = ({
           throw new Error(
             `Voice agent target ${targetConfig.id} cannot run inside an experiment workflow`,
           );
+        case "connector":
+          // A Scenario Connector's blocks run around a scenario run (ADR-194), not as a cell.
+          throw new Error(
+            `Scenario Connector agent target ${targetConfig.id} cannot run inside an experiment workflow`,
+          );
         default: {
           // Every declared agent type is handled above, so the narrowing has
           // nothing left here and `loadedData.agent` is itself `never`. The

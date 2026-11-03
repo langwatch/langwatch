@@ -137,6 +137,19 @@ describe("ScenarioChildChoiceService", () => {
     });
   });
 
+  describe("given the flag is on and the run targets a connector agent with only a call block", () => {
+    /** @scenario "A run of a connector agent goes to the Node child" */
+    it("starts the run on the Node child without reading the flag", async () => {
+      const { choice, nodeStart, goStart, isEnabled } = harness({ flag: true });
+
+      await choice.start({ jobData: job("connector"), environment });
+
+      expect(nodeStart).toHaveBeenCalledTimes(1);
+      expect(goStart).not.toHaveBeenCalled();
+      expect(isEnabled).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the flag cannot be read", () => {
     /** @scenario "A flag read that fails keeps the run on the Node child" */
     it("starts the run on the Node child", async () => {
