@@ -75780,6 +75780,22 @@
                             "allowOtelDirect"
                           ],
                           "additionalProperties": false
+                        },
+                        "pi": {
+                          "type": "object",
+                          "properties": {
+                            "allowVk": {
+                              "type": "boolean"
+                            },
+                            "allowOtelDirect": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "allowVk",
+                            "allowOtelDirect"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -75790,7 +75806,8 @@
                         "cursor",
                         "copilot",
                         "code",
-                        "grok"
+                        "grok",
+                        "pi"
                       ],
                       "additionalProperties": false
                     }

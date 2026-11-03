@@ -12,7 +12,8 @@ export type PlatformToolSlug =
   | "cursor"
   | "copilot"
   | "code"
-  | "grok";
+  | "grok"
+  | "pi";
 
 export interface PlatformToolPolicy {
   allowVk: boolean;
@@ -49,6 +50,9 @@ export const PLATFORM_TOOL_POLICIES: Record<PlatformToolSlug, PlatformToolPolicy
   code: { allowVk: false, allowOtelDirect: true },
   // grok routes models through config.toml, not env: ingestion only (ADR-192).
   grok: { allowVk: false, allowOtelDirect: true },
+  // pi is ingestion-only: every model's address is fixed in pi's own build,
+  // so there is no base URL a gateway could swap. ADR-188 Decision 1.
+  pi: { allowVk: false, allowOtelDirect: true },
 };
 
 function hardcodedPolicy(toolSlug: string): PlatformToolPolicy {

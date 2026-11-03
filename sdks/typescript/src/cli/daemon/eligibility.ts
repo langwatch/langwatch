@@ -29,6 +29,7 @@ const DENIED_COMMANDS = new Set([
   "copilot",
   "code",
   "grok",
+  "pi",
   "instrument",
   "report",
   "push",

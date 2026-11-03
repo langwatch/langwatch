@@ -7,7 +7,8 @@ export type KnownAssistantKind =
   | "opencode"
   | "cursor"
   | "github_copilot"
-  | "grok";
+  | "grok"
+  | "pi";
 
 // Maps agent registry ids (detected from wire) to tile assistant kinds;
 // most agree except gemini_cli→gemini and copilot→github_copilot.
@@ -22,6 +23,7 @@ const ASSISTANT_KIND_BY_AGENT: Readonly<Record<string, KnownAssistantKind>> = {
   github_copilot: "github_copilot",
   copilot: "github_copilot",
   grok: "grok",
+  pi: "pi",
 };
 
 /**

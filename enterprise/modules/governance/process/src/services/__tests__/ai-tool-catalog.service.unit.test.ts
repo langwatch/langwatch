@@ -81,6 +81,26 @@ describe("DefaultGovernanceAiToolCatalogService", () => {
 
       expect(policy.allowOtelDirect).toBe(false);
     });
+
+    /** @scenario "A stored pi tile that allows a virtual key still resolves without one" */
+    it("keeps the pi virtual key disabled even when a stored tile allows it", async () => {
+      const { catalogue } = world();
+      await catalogue.create({
+        organizationId: ORG,
+        departmentIds: [],
+        type: "coding_assistant",
+        displayName: "pi",
+        config: { assistantKind: "pi", setupCommand: "langwatch pi", allowVk: true },
+      });
+
+      const policy = await catalogue.resolveToolPolicy({
+        organizationId: ORG,
+        userId: "user",
+        slug: "pi",
+      });
+
+      expect(policy.allowVk).toBe(false);
+    });
   });
 
   describe("given a Grok tile that stores allowVk true", () => {

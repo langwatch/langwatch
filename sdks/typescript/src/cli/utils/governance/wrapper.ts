@@ -20,6 +20,7 @@ import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import { copilotGatewayModelPreflight, copilotPrespawnWarnings } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
+import { ensurePiTelemetryExtension } from "./pi-plugin";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import {
   assertLaunchHookFile,
@@ -566,6 +567,9 @@ async function reportIngestionSetup({
     process.stderr.write(
       `${lwTag()} wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
     );
+  }
+  if (tool === "pi") {
+    ensurePiTelemetryExtension({ notify: (line) => process.stderr.write(`${lwTag()} ${line}\n`) });
   }
 
   // Path B only: offer to persist the OTLP telemetry exports so a future

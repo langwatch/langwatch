@@ -326,6 +326,13 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "ttft_ms",
   "type",
   "request_id",
+
+  // pi names every attribute under its own prefix and this lookup is exact, so
+  // an unlisted pi key is dropped on arrival (ADR-188). The fold reads pi's
+  // model, usage and tool facts through the `gen_ai.*` mirrors above, and the
+  // session key off the raw span, so pi's reported cost is the only pi key
+  // read here. Add one when a reader needs it.
+  "pi.ai.usage.cost",
 ];
 
 /**

@@ -49,6 +49,11 @@ import {
 } from "./opencode-plugin";
 import { telemetryEnvVarNames } from "./otel-env-block";
 import {
+  hasPiTelemetryExtension,
+  piExtensionTarget,
+  removePiTelemetryExtension,
+} from "./pi-plugin";
+import {
   hasSessionContextHooks,
   removeSessionContextHooks,
   sessionContextHooksTarget,
@@ -231,6 +236,15 @@ export function scanTelemetryTargets({
     label: `opencode session plugin (${opencodePluginTarget().displayPath})`,
     present: hasOpencodeSessionContextPlugin(),
     remove: () => removeOpencodeSessionContextPlugin(),
+  });
+
+  // pi, the telemetry extension. It is both the exporter and the session
+  // context seam, so one target covers both. Ownership is the marker on its
+  // first line (ADR-188).
+  targets.push({
+    label: `pi telemetry extension (${piExtensionTarget().displayPath})`,
+    present: hasPiTelemetryExtension(),
+    remove: () => removePiTelemetryExtension(),
   });
 
   // copilot, LangWatch's own file in the hook folder the Copilot CLI and VS

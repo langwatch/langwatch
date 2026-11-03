@@ -162742,6 +162742,10 @@ type ReadCliBootstrapResponse struct {
 				AllowOtelDirect bool `json:"allowOtelDirect"`
 				AllowVk         bool `json:"allowVk"`
 			} `json:"opencode"`
+			Pi struct {
+				AllowOtelDirect bool `json:"allowOtelDirect"`
+				AllowVk         bool `json:"allowVk"`
+			} `json:"pi"`
 		} `json:"toolPolicies"`
 		Tools []struct {
 			DisplayName string `json:"displayName"`
@@ -194896,6 +194900,10 @@ func ParseReadCliBootstrapResponse(rsp *http.Response) (*ReadCliBootstrapRespons
 					AllowOtelDirect bool `json:"allowOtelDirect"`
 					AllowVk         bool `json:"allowVk"`
 				} `json:"opencode"`
+				Pi struct {
+					AllowOtelDirect bool `json:"allowOtelDirect"`
+					AllowVk         bool `json:"allowVk"`
+				} `json:"pi"`
 			} `json:"toolPolicies"`
 			Tools []struct {
 				DisplayName string `json:"displayName"`

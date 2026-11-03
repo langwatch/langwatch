@@ -92,6 +92,7 @@ const DEFAULT_TOOLS: LoginCeremonyTool[] = [
   { slug: "gemini", displayName: "Gemini CLI" },
   { slug: "opencode", displayName: "opencode" },
   { slug: "grok", displayName: "Grok CLI" },
+  { slug: "pi", displayName: "pi" },
 ];
 
 function padRight(s: string, width: number): string {
