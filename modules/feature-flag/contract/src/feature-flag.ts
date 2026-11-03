@@ -161,6 +161,13 @@ export const FEATURE_FLAGS = [
       "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). Off by default; enable per organization via a targeting rule. Off, the column offers LangWatch Instant Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
   },
   {
+    key: "release_instant_evals_judge_router",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. Off by default; enable per organization via a targeting rule. Off, no caller sends a route and every judgement is the single hosted classifier call it is today. On LangWatch Cloud only; the route table and prices are deploy-time configuration.",
+  },
+  {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,

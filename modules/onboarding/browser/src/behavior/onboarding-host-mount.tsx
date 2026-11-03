@@ -110,6 +110,8 @@ class HostServiceOnboardingHost extends OnboardingHostApi {
         options?: { replace?: boolean },
       ) => void;
       featureFlag: (flag: ReleaseFlagToken) => boolean | undefined;
+      /** Whoever owns sign-out ends the session and takes the reader off this page. */
+      signOut: () => Promise<void>;
       succeeded: (notice: OnboardingSuccessNotice) => void;
       failed: (failure: OnboardingFailureNotice) => void;
       langy: OnboardingLangyCapability;
@@ -163,7 +165,7 @@ class HostServiceOnboardingHost extends OnboardingHostApi {
   }
 
   signOut(): void {
-    if (typeof window !== "undefined") window.location.assign("/api/auth/logout");
+    void this.deps.signOut();
   }
 
   succeeded(notice: OnboardingSuccessNotice): void {
@@ -273,6 +275,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
         replace: (to) => navigation.replace(to),
         setQuery: (next, options) => route.setQuery(next, options),
         featureFlag: (flag) => flags.flag(flag),
+        signOut: () => session.signOut(),
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
         langy,

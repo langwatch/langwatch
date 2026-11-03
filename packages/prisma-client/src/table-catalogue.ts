@@ -2225,6 +2225,7 @@ export const prismaModelFieldCatalogue = {
     "ingestionTemplateId",
     "createdByDeviceLabel",
     "isSystemManaged",
+    "createdByBrowserSessionId",
     "createdAt",
     "updatedAt"
   ],

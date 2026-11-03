@@ -3,6 +3,12 @@ import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { CreateIngestionKeyInput } from "./api-key-rest.schemas.ts";
+import type {
+  DocsSessionKeyMinted,
+  DocsSessionRevoked,
+  MintDocsSessionKeyInput,
+  RevokeDocsSessionKeysInput,
+} from "./api-key.docs-session.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
 import type { CliSessionRevocationCause } from "./api-key.revocation-cause.ts";
 import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "./api-key.run-key.ts";
@@ -125,6 +131,17 @@ export interface ApiKeyApi {
    * twelve hours, shared for eight. Nobody's in a shared project, the owner's in a personal one.
    */
   mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string>;
+  /**
+   * A docs session key (ADR-185): the member in one project, for at most five minutes and never
+   * past their browser session or the organization's session ceiling. Refuses an operator acting
+   * as the member and a docs origin this deployment does not register.
+   */
+  mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted>;
+  /**
+   * Revokes the one docs key named, or every docs key the named browser sessions minted.
+   * Idempotent, and silent about any key that is not a live docs session key.
+   */
+  revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

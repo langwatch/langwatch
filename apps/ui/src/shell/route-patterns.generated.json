@@ -20,6 +20,7 @@
   "/cli/auth",
   "/authorize",
   "/mcp/authorize",
+  "/connect/docs",
   "/:project/chat/:workflow",
   "/:project/studio/:workflow",
   "/",

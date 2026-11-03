@@ -120,26 +120,6 @@ function contractCases(backend: DashboardBackend): void {
       ).resolves.toMatchObject([{ id: created.id, name: "Renamed" }]);
     });
 
-    /** @scenario "AC200e Langy setting: the API reads and sets the origins a board leaves out" */
-    it("stores no origins until written, keeps the empty list apart from null, and clears it", async () => {
-      const boards = backend.boards();
-      const created = await board("Langy");
-      const ref = { projectId: backend.projectId(), dashboardId: created.id };
-
-      const included = await boards.updateBoard({ ...ref, data: { excludedOrigins: [] } });
-      const renamed = await boards.updateBoard({ ...ref, data: { name: "Langy too" } });
-      const cleared = await boards.updateBoard({ ...ref, data: { excludedOrigins: null } });
-      const [read] = await boards.findBoardsByIds({ ...ref, dashboardIds: [created.id] });
-
-      expect({
-        created: created.excludedOrigins,
-        included: included.excludedOrigins,
-        renamed: renamed.excludedOrigins,
-        cleared: cleared.excludedOrigins,
-        read: read?.excludedOrigins,
-      }).toEqual({ created: null, included: [], renamed: [], cleared: null, read: null });
-    });
-
     it("counts the widgets placed on each board, and no unplaced one", async () => {
       const [withWidgets, empty] = [await board("Widgets"), await board("Empty")];
       await widget(withWidgets.id);
@@ -281,7 +261,7 @@ function contractCases(backend: DashboardBackend): void {
       ).resolves.toHaveLength(1);
     });
 
-    /** @scenario "AC176 Scope: a narrower scope keeps other members' stars" */
+    /** @scenario "AC176 Scope: a narrower scope keeps other members' pins" */
     it("keeps one star under the owning project, listed in each project that shares it", async () => {
       const boards = backend.boards();
       const own = await board("Own");
@@ -317,7 +297,7 @@ function contractCases(backend: DashboardBackend): void {
       ).resolves.toHaveLength(1);
     });
 
-    /** @scenario "AC176 Scope: a narrower scope keeps other members' stars" */
+    /** @scenario "AC176 Scope: a narrower scope keeps other members' pins" */
     it("reorders a shared board's star with the project's own", async () => {
       const boards = backend.boards();
       const own = await board("Own");

@@ -24,10 +24,14 @@ interface EvaluationStatusResponse {
   };
 }
 
-export async function handleRunExperiment(params: { slug: string }): Promise<string> {
+export async function handleRunExperiment(params: {
+  slug: string;
+  concurrency?: number;
+}): Promise<string> {
   const result = (await makeRequest(
     "POST",
     `/api/v1/experiments/${encodeURIComponent(params.slug)}/run`,
+    params.concurrency !== undefined ? { concurrency: params.concurrency } : undefined,
   )) as EvaluationRunResponse;
 
   const lines: string[] = [];

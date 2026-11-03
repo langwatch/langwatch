@@ -39,7 +39,7 @@ import {
   isEmailPasswordEnabled,
   type SocialProviderBases,
 } from "@langwatch/auth-contract";
-import { AuthzApi, type AuthzGrantsService } from "@langwatch/authz-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
@@ -528,6 +528,7 @@ export class AuthModule implements AuthApiContract {
         now,
       }),
       operators: dependencies.authz,
+      docsKeys: dependencies.apiKeys,
       now,
     });
 
@@ -734,7 +735,6 @@ export class AuthModule implements AuthApiContract {
             repositories,
             sharedStorage: repositories.sessionCache !== null,
             auth: app,
-            grants: dependencies.authz,
             organizations: dependencies.organizations,
             signUpPolicy: { checkSignUp },
             sendResetPassword: AuthModule.passwordResetSender({
@@ -1618,17 +1618,12 @@ type BuildBetterAuthOptions = Readonly<{
   sharedStorage: boolean;
   /** The Auth application whose sessions this instance mints and revokes. */
   auth: AuthApiContract;
-  /** The grants ledger an SSO domain auto-join writes its organization binding to. */
-  grants: AuthzGrantsService;
   /**
    * Where a domain auto-join applies the pending invite an address already holds.
    */
   organizations: Pick<
     OrganizationApi,
-    | "applyPendingInvite"
-    | "findBySsoDomain"
-    | "createSsoDomainMembership"
-    | "countMembershipsForUser"
+    "applyPendingInvite" | "findBySsoDomain" | "createMembership" | "countMembershipsForUser"
   >;
   /** Who the installation lets create an account: the app's composed sign-up verdict. */
   signUpPolicy: SignUpPolicy;
@@ -1752,7 +1747,6 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
       lifecycle: options.lifecycle,
     }),
     shadow: OffSignInRouterShadow.create(),
-    authzGrants: options.grants,
     arrivals: IdentitySsoArrivals.create(options.identityApi),
     ssoActivity: {
       record: (args) => options.identityApi.ssoActivity().record(args),
