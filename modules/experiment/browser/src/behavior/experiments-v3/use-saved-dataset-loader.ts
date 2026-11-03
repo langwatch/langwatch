@@ -158,7 +158,26 @@ function applySavedRead({
   } finally {
     if (wasTracking) temporal.resume();
   }
+  carryCutThroughHistory({ tabId: dataset.id, cut });
   return true;
+}
+
+/** Undo and Redo restore edits, never a row count the dataset has since moved past. */
+function carryCutThroughHistory({ tabId, cut }: { tabId: string; cut?: SavedRecordsCut }) {
+  const withCut = <T extends { datasets?: DatasetReference[] }>(snapshot: T): T =>
+    snapshot.datasets
+      ? {
+          ...snapshot,
+          datasets: snapshot.datasets.map((d) =>
+            d.id === tabId && d.savedRecords ? { ...d, savedRecordsCut: cut } : d,
+          ),
+        }
+      : snapshot;
+  const { pastStates, futureStates } = useEvaluationsV3Store.temporal.getState();
+  useEvaluationsV3Store.temporal.setState({
+    pastStates: pastStates.map(withCut),
+    futureStates: futureStates.map(withCut),
+  });
 }
 
 /**

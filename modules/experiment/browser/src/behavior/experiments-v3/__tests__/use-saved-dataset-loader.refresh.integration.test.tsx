@@ -9,7 +9,7 @@ import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialState } from "../../../model/experiments-v3/types.ts";
-import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
+import { performRedo, performUndo, useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
 import { useSavedDatasetRecords } from "../use-saved-dataset-loader.ts";
 
 const { server } = vi.hoisted(() => ({
@@ -148,6 +148,23 @@ describe("given a workbench showing a saved dataset", () => {
 
       await waitFor(() => expect(cutTotal()).toBe(7));
       expect(history()).toBe(before);
+    });
+
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("keeps the new row count when an earlier edit is undone", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      useEvaluationsV3Store.getState().setName("renamed");
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      server.unloaded = 5;
+      await hint();
+      await waitFor(() => expect(cutTotal()).toBe(7));
+      act(() => performUndo());
+
+      expect(useEvaluationsV3Store.getState().name).not.toBe("renamed");
+      expect(cutTotal()).toBe(7);
+      act(() => performRedo());
+      expect(cutTotal()).toBe(7);
     });
   });
 
