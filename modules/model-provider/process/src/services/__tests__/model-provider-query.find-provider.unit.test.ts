@@ -24,22 +24,18 @@ function rowOf({
   id,
   scope,
   createdAt,
-  enabled = true,
-  provider = "openai",
 }: {
   id: string;
   scope: ModelDefaultScope;
   createdAt: string;
-  enabled?: boolean;
-  provider?: string;
 }): ModelProvider {
   const at = new Date(createdAt);
   return {
     id,
     organizationId: "org_1",
-    provider,
-    name: provider,
-    enabled,
+    provider: "openai",
+    name: "OpenAI",
+    enabled: true,
     routingHandle: null,
     scopes: [scope],
     customKeys: { OPENAI_API_KEY: `${id}-key` },

@@ -1,8 +1,7 @@
 /**
  * The Instant Evals column: which decision model a project runs on, and whether an organization
- * may store one on its own key (ADR-182 decisions 4 and 5). The answer is kept five seconds per
- * project: a page of rows or a busy monitor asks the scope chain once, and a saved model or key
- * is what the next run is judged on.
+ * may store one on its own key (ADR-182 decisions 4 and 5). Kept five seconds per project: a
+ * page of rows asks once, and a saved model or key judges the next run.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 
