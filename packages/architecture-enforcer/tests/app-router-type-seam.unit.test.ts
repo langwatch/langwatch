@@ -16,10 +16,10 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 
 /**
  * 1,540 with `pnpm ensure:built`; 1,561 ADR-185; 1,562 ADR-190; 1,565 ADR-192; 1,567 versions.
- * 1,569 with ADR-194 (connector agent type): agent config/connector.ts and feature-flag
- * scenario-connector-steps.ts. A ceiling, not a target: lower it when earned.
+ * 1,568 with ADR-194 (connector agent type): agent config/connector.ts. A ceiling, not a target:
+ * lower it when earned.
  */
-const CEILING = 1_569;
+const CEILING = 1_568;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {
