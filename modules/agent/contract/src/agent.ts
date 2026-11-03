@@ -165,6 +165,8 @@ export const AGENT_READ_HINTS = [AGENT_CHANGED_EVENT_TYPE, AGENT_ARCHIVED_EVENT_
 const agentChangedEventDataSchemaDefinition = z.object({
   agentId: z.string(),
   projectId: z.string(),
+  /** One write's id: two writes in the same millisecond stay two facts, a redelivery stays one. */
+  changeId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
 });
 export interface AgentChangedEventDataSchema extends Named<

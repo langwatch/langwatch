@@ -75,27 +75,6 @@ export const withoutMappingsToMissingColumns = ({
       mapping.type === "source" && !columnNames.has(mapping.sourceField) ? "remove" : mapping,
   });
 
-/** The wiring with dataset mappings that read `from` reading `to` instead. */
-export const withRenamedColumnMappings = ({
-  wiring,
-  datasetId,
-  from,
-  to,
-}: {
-  wiring: Wiring;
-  datasetId: string;
-  from: string;
-  to: string;
-}): Wiring =>
-  editWiring({
-    wiring,
-    datasetId,
-    edit: (mapping) =>
-      mapping.type === "source" && mapping.sourceField === from
-        ? { ...mapping, sourceField: to }
-        : mapping,
-  });
-
 /** The wiring with each dataset mapping reading a renamed column reading its new name. */
 export const withRenamedColumnsMappings = ({
   wiring,

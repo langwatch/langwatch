@@ -79,7 +79,7 @@ export class RecordAgentArchivedCommand implements CommandHandler<
 const recordAgentChangedCommandDataSchema = withCommandEnvelope(agentChangedEventDataSchema);
 export type RecordAgentChangedCommandData = z.infer<typeof recordAgentChangedCommandDataSchema>;
 
-/** Records that an agent was written; each write is its own fact, keyed by when it happened. */
+/** Records that an agent was written; each write is its own fact, keyed by its change id. */
 export class RecordAgentChangedCommand implements CommandHandler<
   Command<RecordAgentChangedCommandData>,
   AgentChangedEvent
@@ -101,7 +101,7 @@ export class RecordAgentChangedCommand implements CommandHandler<
         version: AGENT_CHANGED_EVENT_VERSION,
         data: { ...data, occurredAt: command.data.occurredAt },
         occurredAt: command.data.occurredAt,
-        idempotencyKey: `${command.tenantId}:${data.agentId}:changed:${command.data.occurredAt}`,
+        idempotencyKey: `${command.tenantId}:${data.agentId}:changed:${data.changeId}`,
       }),
     ];
   }

@@ -150,7 +150,7 @@ const datasetRecordApiUpdateInputSchemaDefinition = z.object({
   datasetId: z.string(),
   recordId: z.string(),
   updatedRecord: z.record(z.string(), z.any()),
-  /** The column names the record is keyed by; a removed one refuses the write as stale. */
+  /** The column names in order as last read; one gone or out of order refuses the write. */
   columns: z.array(z.string()).optional(),
 });
 export interface DatasetRecordApiUpdateInputSchema extends Named<

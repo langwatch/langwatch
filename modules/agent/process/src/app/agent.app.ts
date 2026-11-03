@@ -105,6 +105,9 @@ import { ConnectedAgentService } from "../services/connected-agent.service.ts";
  */
 const THREAD_KSUID_RESOURCE = "thread";
 
+/** The KSUID resource for one agent write's change id, minted once per write. */
+const AGENT_CHANGE_KSUID_RESOURCE = "agentchange";
+
 const logger = createLogger("langwatch:agent:read-hints");
 
 /**
@@ -378,6 +381,7 @@ export class AgentModule implements AgentApi {
         occurredAt: nowInstant().epochMilliseconds,
         agentId: agent.id,
         projectId: agent.projectId,
+        changeId: generate(AGENT_CHANGE_KSUID_RESOURCE).toString(),
       });
     } catch (error) {
       logger.warn(

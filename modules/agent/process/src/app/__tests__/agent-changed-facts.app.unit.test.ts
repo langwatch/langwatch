@@ -2,6 +2,7 @@
  * Every write to an agent records that it changed, so its reads go stale in every open tab.
  * Spec: modules/agent/specs/agent-versioning.feature
  */
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +10,10 @@ import {
   lanesOf,
   versionSavedEvent,
 } from "../../eventing/__tests__/agent-workflow-fields.fixture.ts";
+import {
+  RecordAgentChangedCommand,
+  type RecordAgentChangedCommandData,
+} from "../../eventing/agent-lifecycle.commands.ts";
 import { createAgentAppFixture } from "./agent.fixture.ts";
 
 const reference = { id: "agent_1", projectId: "project_1" };
@@ -128,6 +133,36 @@ describe("the agent changed fact", () => {
       { agentId: kept.id, projectId: "project_2", tenantId: "project_2" },
       { agentId: "agent_1", projectId: "project_1", tenantId: "project_1" },
     ]);
+  });
+});
+
+describe("two writes in the same millisecond", () => {
+  const keyOf = (fact: RecordAgentChangedCommandData, occurredAt: number) => {
+    const [event] = new RecordAgentChangedCommand().handle({
+      tenantId: createTenantId(fact.tenantId),
+      aggregateId: fact.agentId,
+      type: "record",
+      data: { ...fact, occurredAt },
+    });
+    return event?.idempotencyKey;
+  };
+  /** @scenario "Two writes to an agent in the same millisecond stay two changed facts" */
+  it("key two facts apart and a redelivered one alike", async () => {
+    const { app, changedFacts } = await httpAgent();
+    changedFacts.length = 0;
+    for (const url of ["https://a.example.test/chat", "https://b.example.test/chat"]) {
+      await app.update({
+        ...reference,
+        config: { name: "Support bot", url, method: "POST" },
+        caller: ada,
+      });
+    }
+    const [first, second] = changedFacts;
+    if (!first || !second) throw new Error("two writes recorded fewer than two facts");
+    const sameMillisecond = 1_790_000_000_000;
+
+    expect(keyOf(first, sameMillisecond)).not.toBe(keyOf(second, sameMillisecond));
+    expect(keyOf(first, sameMillisecond)).toBe(keyOf(first, sameMillisecond));
   });
 });
 

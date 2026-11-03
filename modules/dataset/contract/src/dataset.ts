@@ -505,8 +505,8 @@ const updateDatasetRecordInputSchemaDefinition = datasetRecordLookupInputSchema.
   recordId: z.string().min(1),
   updatedRecord: z.record(z.string(), z.unknown()),
   /**
-   * The column names the record is keyed by, as the caller last read them. Sent, a write
-   * naming a column the dataset no longer has is refused with `dataset_stale_columns`.
+   * The dataset's column names in order, as the caller last read them. Sent, a write is refused
+   * with `dataset_stale_columns` when one is gone or they no longer stand in that order.
    */
   columns: z.array(z.string()).optional(),
 });

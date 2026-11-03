@@ -268,6 +268,13 @@ Feature: Agent versions and deploy labels
     And a copy, push or sync also records one for the source agent, so its copies list refetches
 
   @unit
+  Scenario: Two writes to an agent in the same millisecond stay two changed facts
+    Given an HTTP agent "Support bot"
+    When two writes to it land in the same millisecond
+    Then each records its own "agent changed" fact
+    And a redelivery of one of them is still that one fact
+
+  @unit
   Scenario: A committed agent write still succeeds when its changed fact cannot be recorded
     Given an HTTP agent "Support bot"
     And the "agent changed" fact cannot be sent

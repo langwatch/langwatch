@@ -23,7 +23,7 @@ import { create, type StateCreator, type StoreApi } from "zustand";
 
 import {
   withoutMappingsToMissingColumns,
-  withRenamedColumnMappings,
+  withRenamedColumnsMappings,
 } from "../../model/experiments-v3/stale-column-mappings.ts";
 import {
   createInitialState,
@@ -365,7 +365,11 @@ const datasetCellsSlice = (set: StoreSet, get: StoreGet): DatasetCellsActions =>
       if (from === undefined || from === newName) return edited;
       return {
         ...edited,
-        ...withRenamedColumnMappings({ wiring: state, datasetId, from, to: newName }),
+        ...withRenamedColumnsMappings({
+          wiring: state,
+          datasetId,
+          renames: new Map([[from, newName]]),
+        }),
       };
     });
   },

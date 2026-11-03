@@ -47,6 +47,8 @@ export type DatasetRecordSyncProps = {
     dbDatasetId: string,
     recordId: string,
   ) => ({ id: string } & Record<string, unknown>) | undefined;
+  /** The dataset's column names in order as the screen holds them; undefined skips the check. */
+  resolveColumns: (dbDatasetId: string) => string[] | undefined;
   clearPendingChange: (dbDatasetId: string, recordId: string) => void;
   onStatus: (state: "idle" | "saving" | "saved" | "error", error?: string) => void;
 };

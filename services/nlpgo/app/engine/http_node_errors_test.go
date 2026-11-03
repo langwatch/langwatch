@@ -153,4 +153,6 @@ func TestRunHTTP_OutputPathMatchingNothingReportsItsOwnCode(t *testing.T) {
 		"an output path the author set is theirs to fix, not a platform fault")
 	require.NotNil(t, ns.HTTP, "the reply the path was read against still reaches the author")
 	assert.Equal(t, 200, ns.HTTP.StatusCode)
+	assert.JSONEq(t, `{"present":"value"}`, ns.HTTP.ResponseBody,
+		"the body the path missed is what the author reads to correct it")
 }

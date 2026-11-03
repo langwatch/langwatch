@@ -5,9 +5,11 @@ import {
   type Dataset,
   type UpsertDatasetInput,
 } from "@langwatch/dataset-contract";
+import { ValidationError } from "@langwatch/handled-error";
 
 import type { DatasetUpdateInput } from "../repositories/dataset.repository.ts";
 import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
+import { columnEditMovesValues, columnRenameProblems } from "../rules/dataset-columns.rules.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
 import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
@@ -66,6 +68,18 @@ export class DatasetUpsertService {
     };
     const columnsChanged =
       JSON.stringify(existing.columnTypes) !== JSON.stringify(parsed.columnTypes);
+    const columnEdit = {
+      previousColumns: existing.columnTypes,
+      newColumns: parsed.columnTypes,
+      renames: parsed.columnRenames,
+    };
+    const renameProblems = columnRenameProblems(columnEdit);
+    if (renameProblems.length > 0) {
+      throw new ValidationError(`Invalid column renames: ${renameProblems.join("; ")}.`, {
+        fault: "customer",
+        meta: { fieldErrors: { columnRenames: renameProblems } },
+      });
+    }
     if (existing.contentLayout === "s3_jsonl" && options.content && columnsChanged) {
       return options.content.updateColumns({
         dataset: existing,
@@ -83,7 +97,7 @@ export class DatasetUpsertService {
         columnTypes: parsed.columnTypes,
         columnRenames: parsed.columnRenames,
       });
-    } else if (existing.contentLayout === "postgres" && columnsChanged) {
+    } else if (existing.contentLayout === "postgres" && columnEditMovesValues(columnEdit)) {
       await this.migrateRecordColumns({ dataset: existing, parsed });
     }
     return options.repository.update(update);

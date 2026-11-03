@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  * A cell edit sent before a column rename lands is refused as stale by the server; the
- * rename re-keyed the queued edit, which then syncs again under the new column name.
+ * rename re-keyed the queued edit, which then syncs again under the new column name. A refusal
+ * after a reorder sends the same record once more under the new column order.
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,26 +34,36 @@ const records: Record<string, Record<string, string>> = {
   after: { id: "rec-1", input: "question one", test2: "edited" },
 };
 
-function renderSync() {
+function renderSync(pending: PendingSavedChanges = { "ds-1": { "rec-1": { test: "edited" } } }) {
   const onStatus = vi.fn();
   const clearPendingChange = vi.fn();
   const hook = renderHook(
-    ({ pending, record }: { pending: PendingSavedChanges; record: Record<string, string> }) =>
+    ({
+      pending,
+      record,
+      columns,
+    }: {
+      pending: PendingSavedChanges;
+      record: Record<string, string>;
+      columns: string[] | undefined;
+    }) =>
       useDatasetRecordSync({
         projectId: "project-1",
         pendingSavedChanges: pending,
         resolveFullRecord: () => ({ id: "rec-1", ...record }),
+        resolveColumns: () => columns ?? Object.keys(record).filter((key) => key !== "id"),
         clearPendingChange,
         onStatus,
       }),
     {
       initialProps: {
-        pending: { "ds-1": { "rec-1": { test: "edited" } } } as PendingSavedChanges,
+        pending,
         record: records.before!,
+        columns: undefined as string[] | undefined,
       },
     },
   );
-  return { ...hook, onStatus };
+  return { ...hook, onStatus, clearPendingChange };
 }
 
 beforeEach(() => {
@@ -72,7 +83,11 @@ describe("given a cell edit synced under a column a rename then removed", () => 
       });
       expect(updates[0]?.input).toMatchObject({ columns: ["input", "test"] });
 
-      rerender({ pending: { "ds-1": { "rec-1": { test2: "edited" } } }, record: records.after! });
+      rerender({
+        pending: { "ds-1": { "rec-1": { test2: "edited" } } },
+        record: records.after!,
+        columns: undefined,
+      });
       act(() => {
         updates[0]?.handlers.onError({ message: "dataset_stale_columns" });
       });
@@ -85,6 +100,29 @@ describe("given a cell edit synced under a column a rename then removed", () => 
         updatedRecord: { input: "question one", test2: "edited" },
         columns: ["input", "test2"],
       });
+    });
+  });
+
+  describe("when the server refuses it as stale after a reorder of the same columns", () => {
+    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+    it("sends the same record once more under the new order and reports no error", () => {
+      const pending = { "ds-1": { "rec-1": { test: "edited" } } } as PendingSavedChanges;
+      const { rerender, onStatus, clearPendingChange } = renderSync(pending);
+      act(() => {
+        vi.advanceTimersByTime(DATASET_SYNC_DEBOUNCE_MS);
+      });
+
+      rerender({ pending, record: records.before!, columns: ["test", "input"] });
+      act(() => {
+        updates[0]?.handlers.onError({ message: "dataset_stale_columns" });
+      });
+      expect(updates[1]?.input).toMatchObject({ columns: ["test", "input"] });
+      act(() => {
+        updates[1]?.handlers.onSuccess();
+      });
+
+      expect(onStatus).not.toHaveBeenCalledWith("error", expect.anything());
+      expect(clearPendingChange).toHaveBeenCalledWith("ds-1", "rec-1");
     });
   });
 
