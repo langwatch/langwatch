@@ -701,7 +701,6 @@ export class PrismaAgentRepository
   }
 
   #writeError(error: unknown, input: GetAgentInput): never {
-    if (error instanceof AgentVersionNotFoundError) throw error;
     if (isRecordNotFoundError(error)) throw new AgentNotFoundError(input.id, input.projectId);
     if (isUniqueConstraintError(error))
       throw new AgentAlreadyExistsError(input.id, input.projectId);

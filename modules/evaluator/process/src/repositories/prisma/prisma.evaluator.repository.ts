@@ -537,7 +537,10 @@ export class PrismaEvaluatorRepository
     if (!before) throw new EvaluatorNotFoundError(input.id);
     const updated = await transaction.evaluator.update({
       where: { id: input.id, projectId: input.projectId },
-      data: input.data,
+      data: {
+        ...input.data,
+        ...(input.author ? { updatedById: input.author.authorId } : {}),
+      },
     });
     const changed = evaluatorVersionChanged({ before: mapRow(before), after: mapRow(updated) });
     if (!changed) return updated;
@@ -549,11 +552,7 @@ export class PrismaEvaluatorRepository
       author: input.author,
       commitMessage: input.commitMessage,
     });
-    if (!input.author) return updated;
-    return transaction.evaluator.update({
-      where: { id: input.id, projectId: input.projectId },
-      data: { updatedById: input.author.authorId },
-    });
+    return updated;
   }
 
   async #appendVersion(input: {

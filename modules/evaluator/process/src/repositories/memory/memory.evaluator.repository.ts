@@ -141,28 +141,24 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
         ? { config: evaluatorConfigSchema.parse(input.data.config) }
         : {}),
       updatedAt: toDate(nowInstant()),
+      ...(input.author ? { updatedById: input.author.authorId } : {}),
     });
     if (!evaluatorVersionChanged({ before: existing, after: updated })) {
       this.#rows.set(updated.id, updated);
       return structuredClone(updated);
     }
-    const written = evaluatorSchema.parse({
-      ...updated,
-      ...(input.author ? { updatedById: input.author.authorId } : {}),
-    });
-
     await this.backfillFirstVersion({
       evaluator: existing,
       createdById: existing.createdById ?? null,
     });
-    this.#rows.set(written.id, written);
+    this.#rows.set(updated.id, updated);
     this.#appendVersion({
-      evaluator: written,
+      evaluator: updated,
       author: input.author,
       commitMessage: input.commitMessage,
     });
 
-    return structuredClone(written);
+    return structuredClone(updated);
   }
 
   async archive(input: { id: string; projectId: string }): Promise<Evaluator> {
