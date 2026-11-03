@@ -611,6 +611,46 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
   });
 
   describe("when Dashboards is switched on", () => {
+    /** @scenario "A From LangWatch widget cannot be changed under its own board's path" */
+    it("raises no card for a From LangWatch widget under its own board, and still names a stored one", async () => {
+      const [curated] = CURATED_BOARD_DEFINITIONS;
+      const [template] = curated?.widgets ?? [];
+      if (!curated || !template)
+        throw new Error("A From LangWatch board with a widget is expected");
+      const { board, widget, send, cards } = await projectWithBothBoards({
+        langy: true,
+        actor: MEMBER,
+      });
+      const templatePath = `${BOARDS}/${encodeURIComponent(curated.templateId)}/widgets/${encodeURIComponent(templateWidgetId({ templateId: curated.templateId, key: template.key }))}`;
+
+      const deletedTemplate = await send("dashboards", templatePath, { method: "DELETE" });
+      const patchedTemplate = await send("dashboards", templatePath, {
+        method: "PATCH",
+        body: { name: "Renamed" },
+      });
+      const templateCards = [...cards];
+      const deletedStored = await send("dashboards", `${BOARDS}/${board.id}/widgets/${widget.id}`, {
+        method: "DELETE",
+      });
+      const readAfter = await send("dashboards", `${BOARDS}/${board.id}/widgets/${widget.id}`);
+
+      expect({
+        deletedTemplate: refusal(deletedTemplate),
+        patchedTemplate: refusal(patchedTemplate),
+        templateCards,
+        deletedStored: deletedStored.status,
+        readAfter: refusal(readAfter),
+        cards,
+      }).toEqual({
+        deletedTemplate: { status: 404, code: "dashboard_widget_not_found" },
+        patchedTemplate: { status: 404, code: "dashboard_widget_not_found" },
+        templateCards: [],
+        deletedStored: 204,
+        readAfter: { status: 404, code: "dashboard_widget_not_found" },
+        cards: [{ resource: "dashboard widget", names: ["Traces"] }],
+      });
+    });
+
     it("asks for the click on a card naming the board, then deletes it", async () => {
       const { board, send, cards } = await projectWithBothBoards({ langy: true, actor: MEMBER });
 
