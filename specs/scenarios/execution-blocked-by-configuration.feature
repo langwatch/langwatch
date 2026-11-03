@@ -33,6 +33,15 @@ Feature: A simulation blocked by the project's own configuration says so
     And the record names the reason the run could not start
 
   @unit @scenario-prefetch
+  Scenario: A project with no model for the simulator gets a run refused with the remediation message, logged as a warning, not an error
+    Given a project with no model for the simulator
+    When the run's models are resolved
+    Then the run is refused with the model-not-configured remediation message
+    And the record names the reason "model_not_configured"
+    And the record is logged at warn level
+    And nothing is logged at error level
+
+  @unit @scenario-prefetch
   Scenario: A failure we do not recognise stays ours
     Given a prefetch that fails while preparing the run
     When the run's data is prefetched
