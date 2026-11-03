@@ -550,3 +550,4 @@ Feature: Dataset editor
     And every row of "renamed" holds the values "second" held
     And the values of "first" are gone
     And a save that names no renames pairs leftover columns by position, as before
+    And this holds whether the rows are stored in Postgres or in chunked files

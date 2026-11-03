@@ -6,8 +6,10 @@ import {
 } from "@langwatch/dataset-contract";
 
 import type { DatasetUpdateInput } from "../repositories/dataset.repository.ts";
+import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
+import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
 type DatasetUpsertDeps = {
@@ -18,6 +20,8 @@ type DatasetUpsertDeps = {
 };
 
 type ParsedUpsert = ReturnType<typeof upsertDatasetInputSchema.parse>;
+
+const RECORD_PAGE_SIZE = 1000;
 
 /** Creates a dataset, with its first records, or renames and retypes an existing one. */
 export class DatasetUpsertService {
@@ -59,11 +63,9 @@ export class DatasetUpsertService {
       slug: existing.slug,
       columnTypes: parsed.columnTypes,
     };
-    if (
-      existing.contentLayout === "s3_jsonl" &&
-      options.content &&
-      JSON.stringify(existing.columnTypes) !== JSON.stringify(parsed.columnTypes)
-    ) {
+    const columnsChanged =
+      JSON.stringify(existing.columnTypes) !== JSON.stringify(parsed.columnTypes);
+    if (existing.contentLayout === "s3_jsonl" && options.content && columnsChanged) {
       return options.content.updateColumns({
         dataset: existing,
         projectId: parsed.projectId,
@@ -74,7 +76,40 @@ export class DatasetUpsertService {
       });
     }
 
+    if (existing.contentLayout === "postgres" && !isSingleFileDataset(existing) && columnsChanged) {
+      await this.migrateRecordColumns({ dataset: existing, parsed });
+    }
     return options.repository.update(update);
+  }
+
+  /** Re-keys every Postgres record to the new columns, by the rule the chunked layout uses. */
+  private async migrateRecordColumns({
+    dataset,
+    parsed,
+  }: {
+    dataset: Dataset;
+    parsed: ParsedUpsert;
+  }): Promise<void> {
+    const { records } = this.deps.options;
+    const key = { datasetId: dataset.id, projectId: dataset.projectId };
+    const stored: Awaited<ReturnType<typeof records.findPage>> = [];
+    let page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE });
+    stored.push(...page);
+    while (page.length === RECORD_PAGE_SIZE) {
+      page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE, cursorId: page.at(-1)!.id });
+      stored.push(...page);
+    }
+    if (stored.length === 0) return;
+    const remapped = mapPreviousColumnsToNewColumns({
+      records: stored.map((record) => record.entry),
+      previousColumns: dataset.columnTypes,
+      newColumns: parsed.columnTypes,
+      renames: parsed.columnRenames,
+    });
+    await records.replaceAll({
+      ...key,
+      entries: stored.map((record, index) => ({ ...remapped[index], id: record.id })),
+    });
   }
 
   private async create({ parsed, name }: { parsed: ParsedUpsert; name: string }): Promise<Dataset> {
