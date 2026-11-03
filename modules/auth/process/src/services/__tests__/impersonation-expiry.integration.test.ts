@@ -35,21 +35,28 @@ const LAPSED_AT = Temporal.Instant.from("2001-01-01T11:55:00.000Z");
 const LIVE_UNTIL = Temporal.Instant.from("2001-01-01T12:30:00.000Z");
 
 /** The audit log as the sweep sees it: rows kept in order, the recorded-since check answered. */
-function recordingAuditLog() {
+function recordingAuditLog({ failOnceFor }: { failOnceFor?: string } = {}) {
   const rows: RecordAuditLogCommand[] = [];
+  let failing = failOnceFor;
   const auditLog = createApiFixture<AuditLogApi>({
     record: async (command) => {
+      if (failing && command.organizationId === failing) {
+        failing = undefined;
+        throw new Error("audit write failed");
+      }
       rows.push(command);
       return { id: `audit-${rows.length}`, occurredAt: NOW.epochMilliseconds };
     },
-    hasRecordedSince: async ({ userId, action, targetKind, targetId }) =>
-      rows.some(
-        (row) =>
+    hasRecordedSince: async ({ userId, action, targetKind, targetId, organizationId }) =>
+      rows.some((row) => {
+        if (organizationId && row.organizationId !== organizationId) return false;
+        return (
           row.userId === userId &&
           row.action === action &&
           row.targetKind === targetKind &&
-          row.targetId === targetId,
-      ),
+          row.targetId === targetId
+        );
+      }),
   });
   return { rows, auditLog };
 }
@@ -187,6 +194,21 @@ describe.skipIf(!databaseUrl)("ImpersonationExpiryService over Postgres", () => 
       await service.sweep();
 
       expect(rows.filter((row) => row.targetId === lapsedSessionId)).toHaveLength(2);
+      await expect(sessionRow(lapsedSessionId)).resolves.toMatchObject({ actorUserId: null });
+    });
+  });
+
+  describe("when the row for one organization failed and the sweep runs again", () => {
+    /** @scenario "An expired impersonation is recorded once" */
+    it("writes only the missing organization's row", async () => {
+      const { rows, auditLog } = recordingAuditLog({ failOnceFor: "org_globex" });
+      const service = serviceWith(auditLog);
+      await expect(service.sweep()).rejects.toThrow("audit write failed");
+
+      await service.sweep();
+
+      const ours = rows.filter((row) => row.targetId === lapsedSessionId);
+      expect(ours.map((row) => row.organizationId)).toEqual(["org_acme", "org_globex"]);
       await expect(sessionRow(lapsedSessionId)).resolves.toMatchObject({ actorUserId: null });
     });
   });

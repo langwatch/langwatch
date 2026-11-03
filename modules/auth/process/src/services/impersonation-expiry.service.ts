@@ -47,37 +47,33 @@ export class ImpersonationExpiryService {
     return expired;
   }
 
-  /** A retry after a failed clear finds its rows written and writes none again. */
+  /** A retry after a failed clear finds each organization's row written and writes it once. */
   private async audit(window: LapsedImpersonation): Promise<void> {
     const { actorUserId, subjectUserId } = window;
     if (!actorUserId || !subjectUserId) return;
-    const alreadyAudited = await this.deps.auditLog.hasRecordedSince({
+    const organizationIds = await this.deps.memberships.organizationIdsForMember({
+      userId: subjectUserId,
+    });
+    const target = {
       userId: actorUserId,
       action: IMPERSONATION_EXPIRED_ACTION,
       targetKind: "session",
       targetId: window.sessionId,
-      sinceMs: window.expiresAt.epochMilliseconds,
-    });
-    if (alreadyAudited) return;
-
-    const organizationIds = await this.deps.memberships.organizationIdsForMember({
-      userId: subjectUserId,
-    });
+    };
     const args = {
       userIdImpersonated: subjectUserId,
       reason: window.reason,
       expiredAt: window.expiresAt.toString(),
     };
     for (const organizationId of organizationIds.length > 0 ? organizationIds : [undefined]) {
-      await this.deps.auditLog.record({
-        userId: actorUserId,
-        actorUserId,
-        ...(organizationId ? { organizationId } : {}),
-        action: IMPERSONATION_EXPIRED_ACTION,
-        targetKind: "session",
-        targetId: window.sessionId,
-        args,
+      const scope = organizationId ? { organizationId } : {};
+      const alreadyAudited = await this.deps.auditLog.hasRecordedSince({
+        ...target,
+        ...scope,
+        sinceMs: window.expiresAt.epochMilliseconds,
       });
+      if (alreadyAudited) continue;
+      await this.deps.auditLog.record({ ...target, actorUserId, ...scope, args });
     }
   }
 }
