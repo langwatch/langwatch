@@ -25,6 +25,7 @@ class GetStoredObjectAudience(str, Enum):
     GOVERNANCEVIEW = "governance:view"
     INGESTIONSOURCESVIEW = "ingestionSources:view"
     LANGYVIEW = "langy:view"
+    OPSREADVIEW = "opsRead:view"
     OPSVIEW = "ops:view"
     ORGANIZATIONVIEW = "organization:view"
     PLAYGROUNDVIEW = "playground:view"

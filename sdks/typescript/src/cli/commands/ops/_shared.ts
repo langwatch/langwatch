@@ -1,3 +1,5 @@
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
 import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 import { handledErrorFrom } from "../../../internal/api/errors";
 import { getEndpoint } from "../../utils/endpoint";
@@ -50,7 +52,7 @@ export const staffAccessFetch = async <T>({
   endpoint?: string;
 }): Promise<T> => {
   const url = `${endpoint.replace(/\/+$/, "")}${path}`;
-  const response = await fetch(url, {
+  const response = await langwatchFetch(url, {
     method,
     headers: {
       authorization: `Bearer ${bearer}`,
