@@ -26,8 +26,8 @@ import type {
   EvaluatorVersionRecord,
 } from "../repositories/evaluator.repository.ts";
 
-/** An evaluator as one of its versions holds it, and that version's number. */
-type ResolvedEvaluatorVersion = { evaluator: Evaluator; version: number | null };
+/** An evaluator as a version holds it; `pinned` is the version selected, null for the head. */
+type ResolvedEvaluatorVersion = { evaluator: Evaluator; pinned: number | null };
 
 const BACKFILL_PAGE = 200;
 
@@ -109,13 +109,7 @@ export class EvaluatorVersionService {
     // `latest` names the newest version, never a stored label, as the address suffix does.
     const label = address.label ?? (input.label === EVALUATOR_LATEST_LABEL ? void 0 : input.label);
     const version = address.version ?? input.version;
-    if (label === void 0 && version === void 0) {
-      const latest = await this.#deps.repository.latestVersionNumbers({
-        projectId: input.projectId,
-        ids: [evaluator.id],
-      });
-      return { evaluator, version: latest.get(evaluator.id) ?? null };
-    }
+    if (label === void 0 && version === void 0) return { evaluator, pinned: null };
 
     const row = await this.#versionAt({ evaluator, label, version });
     return {
@@ -126,7 +120,7 @@ export class EvaluatorVersionService {
         config: row.config,
         workflowId: row.workflowId,
       }),
-      version: row.version,
+      pinned: row.version,
     };
   }
 

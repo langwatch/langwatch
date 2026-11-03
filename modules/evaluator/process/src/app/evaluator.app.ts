@@ -288,7 +288,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   async getById(
     input: { id: string; projectId: string } & EvaluatorVersionSelector,
   ): Promise<Evaluator> {
-    const { evaluator, version } = await this.#dependencies.versions.resolve({
+    const { evaluator, pinned } = await this.#dependencies.versions.resolve({
       projectId: input.projectId,
       address: input.id,
       bySlug: false,
@@ -296,7 +296,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       version: input.version,
     });
     const [enriched] = await this.#enrich({ projectId: input.projectId, evaluators: [evaluator] });
-    return { ...enriched!, version };
+    return { ...enriched!, version: pinned ?? enriched!.version };
   }
 
   /** Every version of the evaluator, newest first, with the labels on each. */
@@ -387,7 +387,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   async #atVersionWithFields(
     input: { address: string; projectId: string } & EvaluatorVersionSelector,
   ): Promise<EvaluatorWithFields> {
-    const { evaluator, version } = await this.#dependencies.versions.resolve({
+    const { evaluator, pinned } = await this.#dependencies.versions.resolve({
       projectId: input.projectId,
       address: input.address,
       bySlug: true,
@@ -396,7 +396,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     });
     const withFields = await this.#dependencies.evaluators.enrichWithFields(evaluator);
     const [enriched] = await this.#enrich({ projectId: input.projectId, evaluators: [withFields] });
-    return { ...enriched!, version };
+    return { ...enriched!, version: pinned ?? enriched!.version };
   }
 
   /** The evaluator already assigned to this workflow, if there is one. */
