@@ -114,7 +114,7 @@ func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string)
 	if err != nil {
 		return StepInput{}, err
 	}
-	reader := fileReader{repo: r, ctx: ctx, cache: map[string]*string{}}
+	reader := fileReader{repo: r, ctx: ctx, cache: map[string]string{}}
 	var headDeclared []declaration
 	headSearched := false
 	for _, id := range ids {
@@ -124,7 +124,11 @@ func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string)
 		}
 		for _, step := range bases {
 			step.Release = releaseOf[id]
-			step.HeadPath, step.Head = step.Path, blockAt(reader.read("HEAD", step.Path), id, step.wholeFile)
+			head, err := reader.read("HEAD", step.Path)
+			if err != nil {
+				return StepInput{}, err
+			}
+			step.HeadPath, step.Head = step.Path, blockAt(head, id, step.wholeFile)
 			if step.Head == "" {
 				if !headSearched {
 					if headDeclared, err = r.declaringFiles(ctx, "HEAD", ids); err != nil {
@@ -132,7 +136,9 @@ func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string)
 					}
 					headSearched = true
 				}
-				step.HeadPath, step.Head = reader.findBlock("HEAD", id, headDeclared)
+				if step.HeadPath, step.Head, err = reader.findBlock("HEAD", id, headDeclared); err != nil {
+					return StepInput{}, err
+				}
 			}
 			in.Released = append(in.Released, step)
 		}
@@ -148,9 +154,9 @@ func (reader *fileReader) baseDeclarations(ref, id string, declared []declaratio
 		if d.id != id {
 			continue
 		}
-		content := reader.read(ref, d.path)
-		if reader.err != nil {
-			return nil, reader.err
+		content, err := reader.read(ref, d.path)
+		if err != nil {
+			return nil, err
 		}
 		wholeFiles = append(wholeFiles, ReleasedStep{ID: id, Path: d.path, Base: content, wholeFile: true})
 		if block := stepBlock(content, id); block != "" {
@@ -165,16 +171,20 @@ func (reader *fileReader) baseDeclarations(ref, id string, declared []declaratio
 
 // findBlock returns the first file on ref, by path, that declares id in a
 // defineMigrationStep call, and that call.
-func (reader *fileReader) findBlock(ref, id string, declared []declaration) (string, string) {
+func (reader *fileReader) findBlock(ref, id string, declared []declaration) (string, string, error) {
 	for _, d := range declared {
 		if d.id != id {
 			continue
 		}
-		if block := stepBlock(reader.read(ref, d.path), id); block != "" {
-			return d.path, block
+		content, err := reader.read(ref, d.path)
+		if err != nil {
+			return "", "", err
+		}
+		if block := stepBlock(content, id); block != "" {
+			return d.path, block, nil
 		}
 	}
-	return "", ""
+	return "", "", nil
 }
 
 // blockAt returns id's defineMigrationStep call in content, or the whole
@@ -186,29 +196,31 @@ func blockAt(content, id string, wholeFile bool) string {
 	return stepBlock(content, id)
 }
 
-// fileReader reads files at a ref once each; a file missing there reads empty.
+// fileReader reads files at a ref once each. A file the ref's tree does not
+// list reads empty; any other git failure is an error, never a missing file.
 type fileReader struct {
 	repo  Repo
 	ctx   context.Context
-	cache map[string]*string
-	err   error
+	cache map[string]string
 }
 
-func (reader *fileReader) read(ref, file string) string {
+func (reader *fileReader) read(ref, file string) (string, error) {
 	key := ref + ":" + file
 	if cached, ok := reader.cache[key]; ok {
-		return *cached
+		return cached, nil
 	}
-	content, err := reader.repo.git(reader.ctx, "show", key)
-	var exit *exec.ExitError
-	if err != nil && !errors.As(err, &exit) {
-		reader.err = err
-	}
+	listed, err := reader.repo.git(reader.ctx, "ls-tree", "--name-only", "--full-name", ref, "--", file)
 	if err != nil {
-		content = ""
+		return "", err
 	}
-	reader.cache[key] = &content
-	return content
+	content := ""
+	if slices.Contains(lines(listed), file) {
+		if content, err = reader.repo.git(reader.ctx, "show", key); err != nil {
+			return "", err
+		}
+	}
+	reader.cache[key] = content
+	return content, nil
 }
 
 // idProperty matches the id property of a step declaration, any quote style.

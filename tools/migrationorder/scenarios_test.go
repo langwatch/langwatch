@@ -2,6 +2,7 @@ package migrationorder_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -182,6 +183,34 @@ func TestStepsRefusesRemovingAReleasedStep(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStepsStopsOnAFileItCannotRead(t *testing.T) {
+	root := initRepo(t)
+	writeAndCommit(t, root, stepFile, twoStepsFile)
+	writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", twoStepsManifest)
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+	writeAndCommit(t, root, stepFile, "// unreadable on HEAD\n"+twoStepsFile)
+	blob := strings.TrimSpace(gitOut(t, root, "rev-parse", "HEAD:"+stepFile))
+	if err := os.Remove(filepath.Join(root, ".git", "objects", blob[:2], blob[2:])); err != nil {
+		t.Fatal(err)
+	}
+	in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+	if err == nil {
+		t.Fatalf("a HEAD file git cannot read must stop the check, got findings %+v", migrationorder.CheckSteps(in))
+	}
+	if !strings.Contains(err.Error(), "git show HEAD:"+stepFile) {
+		t.Errorf("error does not name the read: %v", err)
+	}
+}
+
+func gitOut(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	out, err := exec.CommandContext(t.Context(), "git", append([]string{"-C", root}, args...)...).Output() //nolint:gosec // test helper driving git with fixed subcommands
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return string(out)
 }
 
 // @scenario "A PR changes the rest of a file declaring a released code step"
