@@ -7,8 +7,8 @@ import type { DispatchedWork, DispatchResult, GroupStagingScripts } from "./scri
 
 /** Max jobs to dispatch per Lua call to bound script execution time. */
 const MAX_BATCH_SIZE = 200;
-/** Claims at or above this many leave no pause before the next: there is a backlog to drain. */
-const FULL_CLAIM = 32;
+/** The pause after a claim that found fewer jobs than free slots, so arrivals gather. */
+const DRAINED_PAUSE_MS = 25;
 
 /** The shortest BRPOP wait: a due-but-unclaimable group cannot spin the loop faster. */
 const MIN_SIGNAL_WAIT_MS = 50;
@@ -158,11 +158,12 @@ export class GroupQueueDispatcher {
   private async dispatchUntilEmpty(): Promise<void> {
     let dispatched: number;
     do {
-      dispatched = await this.dispatchBatch();
-      // A short claim means the queue is nearly drained: pause so arrivals gather. A full one
-      // means a backlog, so only yield the turn; a fixed pause capped each pod's claim rate.
-      if (dispatched > 0 && dispatched < FULL_CLAIM) {
-        await new Promise((resolve) => setTimeout(resolve, 25));
+      const batch = await this.dispatchBatch();
+      dispatched = batch.claimed;
+      // Fewer jobs than asked means the queue is nearly drained: pause so arrivals gather. A claim
+      // that filled every free slot means a backlog, so only yield the turn.
+      if (dispatched > 0 && dispatched < batch.requested) {
+        await new Promise((resolve) => setTimeout(resolve, DRAINED_PAUSE_MS));
       } else if (dispatched > 0) {
         await new Promise((resolve) => setImmediate(resolve));
       }
@@ -432,13 +433,14 @@ export class GroupQueueDispatcher {
     return { groupBatch: { ...batching, maxClaims: MAX_BATCH_SIZE } };
   }
 
-  private async dispatchBatch(): Promise<number> {
-    if (this.paused) return 0;
+  /** One claim for every free slot: how many it asked for and how many it got. */
+  private async dispatchBatch(): Promise<{ requested: number; claimed: number }> {
+    if (this.paused) return { requested: 0, claimed: 0 };
     this.slotFreed = false;
     const availableSlots =
       this.slots() - this.params.processingQueue.length() - this.params.processingQueue.running();
     if (availableSlots <= 0) {
-      return 0;
+      return { requested: 0, claimed: 0 };
     }
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
@@ -474,6 +476,6 @@ export class GroupQueueDispatcher {
       );
     }
 
-    return claimed;
+    return { requested: maxJobs, claimed };
   }
 }
