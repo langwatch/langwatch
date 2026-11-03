@@ -86,6 +86,9 @@ vi.mock("../../../behavior/agent-api.ts", () => {
               return Promise.resolve();
             },
           },
+          getById: { invalidate: () => Promise.resolve() },
+          listVersions: { invalidate: () => Promise.resolve() },
+          getHistory: { invalidate: () => Promise.resolve() },
         },
       }),
       agents: {

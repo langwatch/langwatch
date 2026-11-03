@@ -255,6 +255,28 @@ Feature: Agent versions and deploy labels
     When the backfill step runs as a dry run
     Then no version is written and no checkpoint is saved
 
+  # --- Fresh reads after a write ---
+
+  @unit
+  Scenario: Every write to an agent records that it changed
+    Given an HTTP agent "Support bot" calling "https://old.example.test/chat"
+    When a user changes its URL to "https://new.example.test/chat"
+    Then an "agent changed" fact is recorded for that agent in its own project
+    And creating, copying, pushing to copies, syncing a copy and moving a label record one too
+
+  @unit
+  Scenario: Every read of an agent goes stale when the agent changes or is archived
+    Given the agents list, one agent, its copies, its history and its versions are read
+    When an "agent changed" or "agent archived" fact is committed
+    Then each of those reads is hinted stale and refetches in every open tab
+
+  @integration
+  Scenario: A saved URL change shows at once in the tab that saved it
+    Given an HTTP agent calling "https://old.example.test/chat" that the editor has read
+    When the user saves it with the URL "https://new.example.test/chat"
+    Then the agent, the agents list and its versions are read again
+    And the editor, opened again, shows "https://new.example.test/chat" without a reload
+
   # --- UI ---
 
   @integration
