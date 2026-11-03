@@ -51,7 +51,7 @@ import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
-import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
+import { buildClaudeCodeEnvBlock, SourceEditDrawer } from "./governance-inventory.screen.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
 
 /**
@@ -816,40 +816,8 @@ function SecretRevealModal({
   const usesWebhookUrl = sourceType === "workato" || sourceType === "s3_custom";
   const isClaudeCode = sourceType === "claude_code";
 
-  // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
-  // plus the standard OTEL_*_EXPORTER env vars before any signals are emitted.
-  // We also recommend OTEL_TRACES_EXPORTER=otlp so any spans Claude Code does
-  // instrument propagate to LangWatch and any logs/metrics emitted INSIDE a
-  // span get correlated. Standalone records still arrive without trace context
-  // (logs emitted outside spans always will, per OTLP proto v1.0.0 where
-  // trace_id/span_id are optional on LogRecord), but the receiver synthesizes
-  // a stable trace id from service.name + service.instance.id so each session
-  // surfaces as one named trace in the listing. Pre-build the shell export
-  // block so admins paste once instead of stitching seven lines off the docs
-  // page.
-  // Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
-  // TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
-  // metadata-only: tokens, cost, durations, tool sizes-in-bytes - but
-  // no user prompt text, no assistant response text, no tool I/O
-  // content. With them on, langwatch.input + langwatch.output lift
-  // verbatim from claude's api_request + api_response_body events.
-  // Payload risk is bounded: claude caps api_request_body +
-  // api_response_body at 60KB INLINE per event; the langwatch receiver
-  // adds a defense-in-depth content cap on top.
   const claudeCodeEnvBlock = isClaudeCode
-    ? [
-        `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
-        `export OTEL_TRACES_EXPORTER=otlp`,
-        `export OTEL_LOGS_EXPORTER=otlp`,
-        `export OTEL_METRICS_EXPORTER=otlp`,
-        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
-        `export OTEL_LOG_USER_PROMPTS=1`,
-        `export OTEL_LOG_TOOL_DETAILS=1`,
-        `export OTEL_LOG_TOOL_CONTENT=1`,
-        `export OTEL_LOG_RAW_API_BODIES=1`,
-        `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
-        `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
-      ].join("\n")
+    ? buildClaudeCodeEnvBlock({ secret: details.secret, otlpUrl })
     : "";
 
   const copy = (value: string) => {

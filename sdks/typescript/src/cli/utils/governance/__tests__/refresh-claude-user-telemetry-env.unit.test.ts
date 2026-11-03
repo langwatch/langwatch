@@ -17,6 +17,7 @@ import {
   CURRENT_TOKEN,
   currentClaudeVars,
   installTempHomeAndCwd,
+  preLightClaudeVars,
   STALE_ENDPOINT,
   STALE_TOKEN,
 } from "./telemetry-refresh-test-helpers";
@@ -58,6 +59,32 @@ describe("refreshClaudeUserTelemetryEnv", () => {
         expect(after.env.MY_OWN).toBe("keep");
         expect(after.model).toBe("claude-sonnet-5");
       });
+    });
+  });
+
+  describe("given a pre-#8284 block that still carries the raw-body default", () => {
+    it("strips the raw-body flag and reports the refresh", () => {
+      const target = appSettingsTargetFor("claude")!;
+      installAppEnv(target, preLightClaudeVars(STALE_ENDPOINT, STALE_TOKEN));
+
+      const label = refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() });
+
+      expect(label).toContain("~/.claude/settings.json");
+      const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
+      expect(written.env.OTEL_LOG_RAW_API_BODIES).toBeUndefined();
+      expect(written.env.OTEL_LOG_ASSISTANT_RESPONSES).toBe("1");
+    });
+  });
+
+  describe("given a migrated block with a raw-body flag the user added back", () => {
+    /** @scenario "A raw-body opt-in added after the upgrade survives every refresh" */
+    it("keeps the flag and returns null, so no refresh line prints", () => {
+      const target = appSettingsTargetFor("claude")!;
+      installAppEnv(target, { ...currentClaudeVars(), OTEL_LOG_RAW_API_BODIES: "1" });
+
+      expect(refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() })).toBe(null);
+      const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
+      expect(written.env.OTEL_LOG_RAW_API_BODIES).toBe("1");
     });
   });
 
