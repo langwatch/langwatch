@@ -3,8 +3,14 @@
  * the contract already named. Names, kinds and schemas are not repeated here.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import { evaluatorTrpc, type EvaluatorApi } from "@langwatch/evaluator-contract";
+import {
+  evaluatorTrpc,
+  type EvaluatorApi,
+  type EvaluatorCaller,
+} from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/module";
+
+import { evaluatorCallerOf } from "../rules/evaluator-version-caller.rules.ts";
 
 /** What the evaluator browser door reaches: the evaluator application, and the studio switch. */
 export interface EvaluatorBrowserApi {
@@ -16,8 +22,12 @@ export interface EvaluatorBrowserApi {
     projectId: string;
     isEvaluator: boolean;
   }): Promise<void>;
-  /** Clears a workflow's evaluator flag and archives the evaluator that wrapped it. */
-  disableAsEvaluator(input: { workflowId: string; projectId: string }): Promise<void>;
+  /** Clears a workflow's evaluator flag; a deployed evaluator needs the caller's deploy right. */
+  disableAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    caller?: EvaluatorCaller;
+  }): Promise<void>;
 }
 
 export const EvaluatorBrowserApi = moduleApi<EvaluatorBrowserApi>()("evaluator");
@@ -51,8 +61,9 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("create")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.evaluators().create({
+      caller: evaluatorCallerOf({ actor }),
       id: input.id,
       projectId: input.projectId,
       name: input.name,
@@ -64,10 +75,12 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("update")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.evaluators().update({
       id: input.id,
       projectId: input.projectId,
+      caller: evaluatorCallerOf({ actor }),
+      ...(input.commitMessage !== void 0 && { commitMessage: input.commitMessage }),
       data: {
         ...(input.name !== void 0 && { name: input.name }),
         ...(input.type !== void 0 && { type: input.type }),
@@ -96,14 +109,22 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("cascadeArchive")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input }) =>
-    app.evaluators().cascadeArchive({ id: input.id, projectId: input.projectId }),
+  .handle(async ({ app, input, actor }) =>
+    app.evaluators().cascadeArchive({
+      id: input.id,
+      projectId: input.projectId,
+      caller: evaluatorCallerOf({ actor }),
+    }),
   )
 
   .procedure("delete")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input }) =>
-    app.evaluators().archive({ id: input.id, projectId: input.projectId }),
+  .handle(async ({ app, input, actor }) =>
+    app.evaluators().archive({
+      id: input.id,
+      projectId: input.projectId,
+      caller: evaluatorCallerOf({ actor }),
+    }),
   )
 
   .procedure("getWorkflowFields")
@@ -164,8 +185,8 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
   /** Moved from `optimization.*` with its input, answer and permission (round 26, CD-2). */
   .procedure("disableAsEvaluator")
   .withPermission("workflows:update")
-  .handle(async ({ app, input }) => {
-    await app.disableAsEvaluator(input);
+  .handle(async ({ app, input, actor }) => {
+    await app.disableAsEvaluator({ ...input, caller: evaluatorCallerOf({ actor }) });
 
     return { success: true };
   })
@@ -178,4 +199,18 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
 
     return { success: true };
   })
+
+  .procedure("listVersions")
+  .withPermission("evaluations:view")
+  .handle(async ({ app, input }) => app.evaluators().listVersions(input))
+
+  .procedure("assignLabel")
+  .withPermission("evaluators:deploy")
+  .handle(async ({ app, input, actor }) =>
+    app.evaluators().assignLabel({ ...input, caller: evaluatorCallerOf({ actor }) }),
+  )
+
+  .procedure("removeLabel")
+  .withPermission("evaluators:deploy")
+  .handle(async ({ app, input }) => app.evaluators().removeLabel(input))
   .build();

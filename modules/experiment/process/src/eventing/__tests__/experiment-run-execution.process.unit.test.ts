@@ -182,6 +182,22 @@ describe("the run's execution manager", () => {
     });
   });
 
+  describe("given a run of four cells started with a concurrency of one", () => {
+    /** @scenario "A run with a concurrency of one sends its cells one at a time in ordinal order" */
+    it("sends only the first cell, then each next one only after the one before finished", () => {
+      const started = start(plan({ phaseOne: 4, phaseTwo: 0, concurrency: 1 }));
+      let state = started.state;
+      const sentAfter: string[][] = [ordinalsSent(started.intents)];
+      for (const ordinal of [0, 1, 2, 3]) {
+        const next = finish(state, ordinal);
+        state = next.state;
+        sentAfter.push(ordinalsSent(next.intents));
+      }
+
+      expect(sentAfter).toEqual([["cell:0:1"], ["cell:1:1"], ["cell:2:1"], ["cell:3:1"], []]);
+    });
+  });
+
   describe("given a cell whose finish is delivered twice", () => {
     /** @scenario "The run manager counts a redelivered finish once" */
     it("frees one place in the window, not two", () => {

@@ -100,6 +100,30 @@ export const rowsFromInlineData = (data: Record<string, unknown>[]): LoadedDatas
 };
 
 /**
+ * Every row with a key for each text column the dataset declares: a cell with no
+ * value reads as empty text, so a column left empty on purpose still reaches the
+ * target. Other column types and undeclared keys are never added.
+ * @see specs/experiments-v3/execution-inputs.feature
+ */
+export const fillDeclaredColumns = ({
+  rows,
+  columns,
+}: {
+  rows: Record<string, unknown>[];
+  columns: { name: string; type?: string }[];
+}): Record<string, unknown>[] => {
+  const textColumns = columns.filter((column) => column.type === "string");
+  if (textColumns.length === 0) return rows;
+  return rows.map((row) => {
+    const missing = textColumns.filter((column) => row[column.name] === undefined);
+    if (missing.length === 0) return row;
+    const filled = { ...row };
+    for (const column of missing) filled[column.name] = "";
+    return filled;
+  });
+};
+
+/**
  * Applies caller-provided parameters as constant columns across every row.
  */
 export function applyParametersToRows({
@@ -163,6 +187,13 @@ export function workflowLoadKey(target: {
  */
 export function promptLoadKey(target: { promptId?: string; promptVersionNumber?: number }): string {
   return `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
+}
+
+/** The loaded-agents key: the agent id, plus the deploy label when the target pins one. */
+export function agentLoadKey(target: { dbAgentId?: string; agentLabel?: string }): string {
+  return target.agentLabel
+    ? `${target.dbAgentId ?? ""}@${target.agentLabel}`
+    : (target.dbAgentId ?? "");
 }
 
 /** The bytes one row holds, as the JSON it is stored and sent as. */
