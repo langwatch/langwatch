@@ -90,7 +90,7 @@ describe("given a docked side panel only narrows a dialog's maximum width", () =
   it("leaves the dialog's maximum width alone when no panel is docked", () => {
     setDrawerEndInset(0);
     const { base, media } = rulesFor(renderOpenDialog());
-    expect(maxWidths(media.map((entry) => entry.rule))).not.toContain("px)");
+    expect(media.filter((entry) => entry.rule.style.maxWidth !== "")).toEqual([]);
     expect(maxWidths(base)).toMatch(/calc\(100vw - 2rem\)/);
   });
 });
