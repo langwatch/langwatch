@@ -56,6 +56,12 @@ class Repo implements DatasetRepository {
   async findStoragePage(): Promise<DatasetStorageEntry[]> {
     return [];
   }
+  async findEmptySlugPage(): Promise<{ id: string; name: string }[]> {
+    return [];
+  }
+  async fillEmptySlug(): Promise<"not-empty"> {
+    return "not-empty";
+  }
 }
 
 class Records implements DatasetRecordRepository {

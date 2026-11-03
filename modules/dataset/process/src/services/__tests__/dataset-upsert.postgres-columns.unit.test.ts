@@ -53,8 +53,9 @@ async function seeded() {
       { id: "rec_2", input: "Opening hours?", expected_output: "Nine to six." },
     ],
   });
+  const repository = MemoryDatasetRepository.create({ database });
   const service = DatasetService.create({
-    repository: MemoryDatasetRepository.create({ database }),
+    repository,
     records,
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
@@ -65,7 +66,7 @@ async function seeded() {
       await records.findPage({ datasetId: dataset.id, projectId: dataset.projectId, limit: 10 })
     ).map((record) => ({ id: record.id, ...record.entry }));
   const stored = () => database.getDataset(dataset.projectId, dataset.id).columnTypes;
-  return { service, records, database, entries, stored };
+  return { service, records, repository, database, entries, stored };
 }
 
 const original = [
@@ -181,6 +182,31 @@ describe("given a dataset whose records are stored in Postgres", () => {
         name: "Renamed Set",
         columnTypes: [{ name: "reference", type: "string" }],
         columnRenames: [{ from: "expected_output", to: "reference" }],
+      });
+
+      expect(stored()).toEqual(later);
+      expect(database.getDataset(dataset.projectId, dataset.id).name).toBe("Renamed Set");
+    });
+  });
+
+  describe("when a column edit commits while a rename-only save is in flight", () => {
+    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+    it("keeps the column edit's columns: the rename writes no columns", async () => {
+      const { service, repository, database, stored } = await seeded();
+      const later = [{ name: "later", type: "string" }] as const;
+      const findBySlug = repository.findBySlug.bind(repository);
+      vi.spyOn(repository, "findBySlug").mockImplementation(async (input) => {
+        const found = await findBySlug(input);
+        const row = database.getDataset(dataset.projectId, dataset.id);
+        database.putDataset({ ...row, columnTypes: [...later] });
+        return found;
+      });
+
+      await service.upsertDataset({
+        projectId: dataset.projectId,
+        datasetId: dataset.id,
+        name: "Renamed Set",
+        columnTypes: dataset.columnTypes,
       });
 
       expect(stored()).toEqual(later);

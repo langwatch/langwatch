@@ -81,8 +81,10 @@ export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) =>
   useEffect(() => {
     if (!dataset || !isSavedDataset || !query.data) return;
     if (appliedAtRef.current === query.dataUpdatedAt && !needsLoading) return;
-    appliedAtRef.current = query.dataUpdatedAt;
-    applySavedRead({ dataset, read: query.data, setSavedDatasetRecords });
+    // A read held for other columns stays unrecorded, so it applies once the tab's columns match.
+    if (applySavedRead({ dataset, read: query.data, setSavedDatasetRecords })) {
+      appliedAtRef.current = query.dataUpdatedAt;
+    }
   }, [
     dataset,
     isSavedDataset,
@@ -109,7 +111,10 @@ type SavedRead = {
   totalRows: number;
 };
 
-/** Puts a read into the tab: whole on the first load, under the unsynced edits after that. */
+/**
+ * Puts a read into the tab: whole on the first load, under the unsynced edits after that.
+ * False when the read is held because its columns differ from the tab's.
+ */
 function applySavedRead({
   dataset,
   read,
@@ -118,28 +123,29 @@ function applySavedRead({
   dataset: DatasetReference;
   read: SavedRead;
   setSavedDatasetRecords: (id: string, records: SavedRecord[], cut?: SavedRecordsCut) => void;
-}): void {
+}): boolean {
   const columnNames = dataset.columns.map((col) => col.name);
   const fresh = savedRecordsFrom({ records: read.datasetRecords ?? [], columnNames });
   const cut = savedRecordsCutOf(read);
   if (!dataset.savedRecords) {
     setSavedDatasetRecords(dataset.id, fresh, cut);
-    return;
+    return true;
   }
   // Columns that differ mean a column edit is in flight or landed elsewhere: keying the read by
-  // this tab's names would blank cells, so the rows wait for a read under matching columns.
+  // this tab's names would blank cells, so the read is held until the tab's columns match.
   const serverColumns = read.columnTypes.map((column) => column.name);
-  if (!sameColumnNames({ serverColumns, workbenchColumns: columnNames })) return;
+  if (!sameColumnNames({ serverColumns, workbenchColumns: columnNames })) return false;
   const store = useEvaluationsV3Store.getState();
   const refreshed = refreshedSavedRecords({
     fresh,
     current: dataset.savedRecords,
     pending: dataset.datasetId ? store.pendingSavedChanges[dataset.datasetId] : undefined,
   });
-  if (isDeepEqual(refreshed, dataset.savedRecords)) return;
+  if (isDeepEqual(refreshed, dataset.savedRecords)) return true;
   setSavedDatasetRecords(dataset.id, refreshed, cut);
   // Undo must not step back onto rows the dataset no longer holds.
   useEvaluationsV3Store.temporal.getState().clear();
+  return true;
 }
 
 /**

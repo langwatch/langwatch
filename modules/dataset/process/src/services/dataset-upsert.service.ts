@@ -94,20 +94,22 @@ export class DatasetUpsertService {
       });
     }
 
-    if (isSingleFileDataset(existing) && options.singleFile && rewrites) {
+    const lockedLayout =
+      (isSingleFileDataset(existing) && options.singleFile !== undefined) ||
+      existing.contentLayout === "postgres";
+    if (rewrites && isSingleFileDataset(existing) && options.singleFile) {
       await options.singleFile.updateColumns({
         dataset: existing,
         columnTypes: parsed.columnTypes,
         columnRenames: parsed.columnRenames,
       });
-    } else if (existing.contentLayout === "postgres" && rewrites) {
+    } else if (rewrites && existing.contentLayout === "postgres") {
       await this.migrateRecordColumns({ dataset: existing, parsed, movesValues });
-    } else {
-      return options.repository.update(update);
     }
-    // The columns were stored under the lock; writing them again here could undo a later edit.
-    const { columnTypes: _stored, ...named } = update;
-    return options.repository.update(named);
+    // Unchanged columns, or columns stored under the lock: writing them could undo a later edit.
+    const { columnTypes: _kept, ...named } = update;
+    const writesColumns = columnsChanged && !lockedLayout;
+    return options.repository.update(writesColumns ? update : named);
   }
 
   /**

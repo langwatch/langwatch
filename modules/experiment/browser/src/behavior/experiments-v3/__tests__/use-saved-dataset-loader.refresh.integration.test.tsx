@@ -133,20 +133,41 @@ describe("given a workbench showing a saved dataset", () => {
   });
 
   describe("when the refetched read is keyed by other columns than the tab's", () => {
-    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
-    it("leaves the rows as they are rather than blanking them", async () => {
+    beforeEach(async () => {
       const { hint } = openWorkbench();
-      await waitFor(() => expect(shown()).toHaveLength(2));
-
+      await waitFor(() => {
+        if (shown()?.length !== 2) throw new Error("the first read has not loaded yet");
+      });
       server.columns = ["prompt"];
       server.rows = [{ id: "r1", entry: { prompt: "renamed" } }];
       await hint();
-
       await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("leaves the rows as they are rather than blanking them", () => {
       expect(shown()).toEqual([
         { id: "r1", question: "a" },
         { id: "r2", question: "b4" },
       ]);
+    });
+
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("applies the held read once the tab takes the same columns, with no second refetch", async () => {
+      act(() =>
+        useEvaluationsV3Store.setState((state) => ({
+          datasets: state.datasets.map((tab) => ({
+            ...tab,
+            columns: [{ id: "prompt_0", name: "prompt", type: "string" as const }],
+            savedRecords: [
+              { id: "r1", prompt: "a" },
+              { id: "r2", prompt: "b4" },
+            ],
+          })),
+        })),
+      );
+
+      await waitFor(() => expect(shown()).toEqual([{ id: "r1", prompt: "renamed" }]));
     });
   });
 });

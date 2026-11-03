@@ -428,6 +428,19 @@ describe("given a saved experiment over a saved dataset", () => {
     });
 
     /** @scenario "The run API refuses a dataset version with no saved dataset to read" */
+    it("refuses an empty dataset_id rather than reading it as no dataset_id", async () => {
+      const dataset = new VersionedDataset(questions("a"));
+      dataset.save({ rows: questions("a"), trigger: "manual" });
+      const { run, started } = harness({ dataset, inline: true });
+
+      await expect(
+        run({ body: JSON.stringify({ dataset_id: "", dataset_version: 1 }) }),
+      ).rejects.toMatchObject({ code: "experiment_evaluation_input_invalid", httpStatus: 400 });
+      expect(dataset.resolved).toEqual([]);
+      expect(started).toEqual([]);
+    });
+
+    /** @scenario "The run API refuses a dataset version with no saved dataset to read" */
     it("reads the version when the body also names the saved dataset", async () => {
       const dataset = new VersionedDataset(questions("a", "b"));
       dataset.save({ rows: questions("a"), trigger: "manual" });
