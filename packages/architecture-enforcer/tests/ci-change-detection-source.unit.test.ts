@@ -30,6 +30,11 @@ interface Workflow {
 }
 
 const DORNY = "dorny/paths-filter@";
+/**
+ * v4.0.3, read for `base`: with an empty token its src/main.ts diffs
+ * `base || pull_request.base.sha` on a pull request. A bump fails until re-read.
+ */
+const DORNY_READ_FOR_BASE = "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d";
 /** A step `if` that pins one event other than a pull request. */
 const NON_PR_EVENT_ONLY =
   /^github\.event_name\s*==\s*'(push|merge_group|schedule|workflow_dispatch)'$/;
@@ -52,6 +57,7 @@ const directUses = readdirSync(WORKFLOWS)
         .map((step) => ({
           where: `${file} job ${job}`,
           step,
+          earlier: steps.slice(0, steps.indexOf(step)),
           runsOnPullRequest: onPullRequest && !NON_PR_EVENT_ONLY.test((step.if ?? "").trim()),
         })),
     );
@@ -65,6 +71,23 @@ describe("where CI path gates read a pull request's changed paths", () => {
       expect(onPullRequest.length).toBeGreaterThan(0);
       for (const { where, step } of onPullRequest) {
         expect(step.with?.token, `${where} would read the files API`).toBe("");
+      }
+    });
+
+    /** @scenario "A workflow that calls dorny/paths-filter directly reads pull requests with git" */
+    it("diffs a pull request from the main its merge commit is built on", () => {
+      for (const { where, step, earlier } of directUses.filter((use) => use.runsOnPullRequest)) {
+        expect(step.with?.base, `${where} would diff from the event's base commit`).toBe(
+          "${{ steps.diff-base.outputs.sha }}",
+        );
+        const base = earlier.find((s) => s.id === "diff-base");
+        expect(base?.run, `${where} computes no diff base`).toContain(
+          ".github/scripts/pull-request-diff-base.sh",
+        );
+        expect(base?.if).toBe("github.event_name == 'pull_request'");
+        expect(step.uses, `${where} runs a dorny nobody checked honours \`base\``).toBe(
+          DORNY_READ_FOR_BASE,
+        );
       }
     });
   });

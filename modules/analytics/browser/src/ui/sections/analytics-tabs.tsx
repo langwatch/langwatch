@@ -1,4 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import type { AnalyticsTab } from "./analytics-layout.tsx";
@@ -24,19 +25,27 @@ export function AnalyticsTabs({
     evaluations: { label: "Evaluations", href: `${base}/evaluations` },
   };
   const activeHref = !tab || tab === "reports" ? "" : tabs[tab].href;
+  const isAggregate = isAggregateProjectKind(host.project()?.kind);
+  // An aggregate's members keep their own topic clusters, which do not add up (ADR-177 v4.15).
+  const offered = isAggregate
+    ? Object.values(tabs).filter((offeredTab) => offeredTab !== tabs.topics)
+    : Object.values(tabs);
 
   return (
     <PageLayout.Tabs
       label="Analytics pages"
-      tabs={Object.values(tabs)}
+      tabs={offered}
       activeHref={activeHref}
       onNavigate={(href) => host.navigate(href)}
     >
-      <DashboardsTabMenu
-        projectSlug={projectSlug}
-        activeDashboardId={tab === "reports" ? activeDashboardId : void 0}
-        isActive={tab === "reports"}
-      />
+      {/* An aggregate keeps no dashboards and adds none, so the menu would open empty. */}
+      {isAggregate ? null : (
+        <DashboardsTabMenu
+          projectSlug={projectSlug}
+          activeDashboardId={tab === "reports" ? activeDashboardId : void 0}
+          isActive={tab === "reports"}
+        />
+      )}
     </PageLayout.Tabs>
   );
 }

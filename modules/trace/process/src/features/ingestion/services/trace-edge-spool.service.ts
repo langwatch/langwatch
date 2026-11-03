@@ -3,7 +3,7 @@ import type { Logger } from "@langwatch/observability";
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
 
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
-import { TraceIngressPayload } from "./trace-ingestion.service.ts";
+import { TraceIngressPayload } from "./trace-span-collection.service.ts";
 
 /**
  * The write half of the ADR-022 claim check: the edge size check, and the

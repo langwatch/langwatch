@@ -44,9 +44,14 @@ function unused(member: string) {
 function buildService(langevalsEvaluate: Mock<LangevalsEvaluatorService["evaluate"]>) {
   const { api: evaluators, executeNative } = createFakeEvaluatorApi();
   const deps: EvaluationExecutionDeps = {
+    runs: { findTraceEvaluations: async () => [] },
+    authz: {
+      authorizeInternal: async () => {
+        throw new Error("these cases read no earlier evaluations");
+      },
+    },
     traces: {
       readTracesWithSpans: unused("traces.readTracesWithSpans"),
-      readEvaluations: unused("traces.readEvaluations"),
       readThreadsTraces: unused("traces.readThreadsTraces"),
     },
     spanDigest: {
@@ -62,6 +67,7 @@ function buildService(langevalsEvaluate: Mock<LangevalsEvaluatorService["evaluat
         throw new Error("no judge here is on Instant Evals");
       },
     },
+    decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     installEnvironment: {},
   };
 

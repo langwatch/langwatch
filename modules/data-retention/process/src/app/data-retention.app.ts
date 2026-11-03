@@ -6,6 +6,7 @@ import {
   resolvePlatformDefaultRetentionDays,
   type DataRetentionApi as DataRetentionApiContract,
   type DataRetentionServerConfig,
+  type IdIndexRetentionRaiseInput,
   type KillRetroactiveMutationInput,
   type PinTraceInput,
   type PinnedTrace,
@@ -237,6 +238,10 @@ export class DataRetentionModule implements DataRetentionApiContract {
     input: RetroactiveMutationProjectInput,
   ): Promise<RetroactiveMutationProgress[]> {
     return this.#retention.getRetroactiveMutationProgress(input);
+  }
+
+  raiseIdIndexRetention(input: IdIndexRetentionRaiseInput): Promise<{ tables: string[] }> {
+    return this.#retention.raiseIdIndexRetention(input);
   }
 
   getTotalStorageBytes(input: StorageMeterTenantInput): Promise<number> {

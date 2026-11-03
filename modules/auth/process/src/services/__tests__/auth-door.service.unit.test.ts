@@ -90,7 +90,10 @@ describe("AuthDoorService", () => {
     it("hands Better Auth the caller the platform resolved, over the one it claimed", async () => {
       const world = door();
       const request = signIn();
-      ClientAddress.classifyByAddress().handle({ request, socketAddress: "198.51.100.11" });
+      ClientAddress.fromTrustedProxies({ addresses: [] }).handle({
+        request,
+        socketAddress: "198.51.100.11",
+      });
 
       await world.service.betterAuthHandshake(request);
 
@@ -113,7 +116,10 @@ describe("AuthDoorService", () => {
         },
         body: JSON.stringify({ email: "new@acme.com", password: "hunter2hunter2", name: "New" }),
       });
-      ClientAddress.classifyByAddress().handle({ request, socketAddress: "198.51.100.11" });
+      ClientAddress.fromTrustedProxies({ addresses: [] }).handle({
+        request,
+        socketAddress: "198.51.100.11",
+      });
 
       await world.service.betterAuthHandshake(request);
 
@@ -356,6 +362,39 @@ describe("AuthDoorService", () => {
       expect(new URL(admitted.headers.get("location") ?? "").searchParams.get("error")).toBe(
         "SSO_PROVIDER_NOT_ALLOWED",
       );
+    });
+  });
+
+  describe("when an identity provider refuses the person with access_denied", () => {
+    /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+    it("keeps only the code on the redirect and logs it at warn without the description", async () => {
+      loggerSpies.warn.mockClear();
+      loggerSpies.error.mockClear();
+      const world = door({
+        betterAuth: async () => ({
+          handler: async () =>
+            new Response(null, {
+              status: 302,
+              headers: {
+                location: `${BASE_URL}/auth/error?error=access_denied&error_description=User+is+not+assigned`,
+              },
+            }),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/sso/callback/conn_1?code=c`),
+      );
+
+      const location = new URL(answered.headers.get("location") ?? "");
+      expect(location.searchParams.get("error")).toBe("access_denied");
+      expect(location.searchParams.has("error_description")).toBe(false);
+      expect(loggerSpies.error).not.toHaveBeenCalled();
+      expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
+      const [fields] = loggerSpies.warn.mock.calls[0] ?? [];
+      expect(Object.keys(fields ?? {}).toSorted()).toEqual(["code", "traceId"]);
+      expect(fields).toMatchObject({ code: "access_denied" });
+      expect(JSON.stringify(loggerSpies.warn.mock.calls)).not.toContain("not assigned");
     });
   });
 

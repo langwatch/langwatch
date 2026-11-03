@@ -1,5 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 
+import { DEFAULT_LOG_LEVEL } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
@@ -40,10 +41,11 @@ export async function startNlpgo(
         // Engine pointer back to the langwatch app for evaluator +
         // agent-workflow callbacks. /api/* routes terminate inside the
         // langwatch process.
-        NLPGO_ENGINE_LANGWATCH_BASE_URL: `http://127.0.0.1:${ctx.ports.langwatch}`,
+        NLPGO_ENGINE_LANGWATCH_BASE_URL: `http://127.0.0.1:${ctx.ports.backend}`,
         // OTel exporter target. Set explicitly for .env backward compat.
-        LANGWATCH_ENDPOINT: `http://127.0.0.1:${ctx.ports.langwatch}`,
+        LANGWATCH_ENDPOINT: `http://127.0.0.1:${ctx.ports.backend}`,
         LOG_FORMAT: "pretty",
+        LOG_LEVEL: ctx.logLevel ?? DEFAULT_LOG_LEVEL,
       },
     },
     paths: sp,

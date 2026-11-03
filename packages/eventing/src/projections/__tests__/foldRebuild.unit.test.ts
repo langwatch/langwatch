@@ -89,6 +89,50 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
     });
   });
 
+  describe("given the missed event redelivers a key the fold already applied under another id", () => {
+    const keyed = (createdAt: number, id: string) => ({
+      ...at(createdAt),
+      id,
+      idempotencyKey: "span-key",
+    });
+
+    describe("when the first history read lags behind the log", () => {
+      /** @scenario "A rebuild for a redelivered key folds the event log's copy, not the redelivery" */
+      it("retries until the log returns its copy and folds that copy, not the redelivery", async () => {
+        const original = keyed(1_000, "evt-original");
+        const redelivery = keyed(2_000, "evt-redelivery");
+        const reads = [[], [original]];
+        let read = 0;
+        const { fold, current } = countingFold({
+          log: () => reads[Math.min(read++, reads.length - 1)]!,
+        });
+        const retrying = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [0] });
+        await retrying.execute(fold, original, context);
+
+        await retrying.rebuild(fold, redelivery, context);
+
+        expect(read).toBeGreaterThan(1);
+        expect(current()?.state.seen).toEqual([original.id]);
+      });
+    });
+
+    describe("when the log never returns an event under the key", () => {
+      /** @scenario "A rebuild for a redelivered key folds the event log's copy, not the redelivery" */
+      it("refuses the incomplete history and leaves the job to retry", async () => {
+        const original = keyed(1_000, "evt-original");
+        const redelivery = keyed(2_000, "evt-redelivery");
+        const { fold, current } = countingFold({ log: () => [] });
+        const strict = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [] });
+        await strict.execute(fold, original, context);
+
+        await expect(strict.rebuild(fold, redelivery, context)).rejects.toThrow(
+          "read an incomplete history; retrying",
+        );
+        expect(current()?.state.seen).toEqual([original.id]);
+      });
+    });
+  });
+
   describe("given the fold's queued lanes", () => {
     /** @scenario "The rebuild job runs in the aggregate's own ordered lane" */
     it("routes the rebuild job to the same group as the aggregate's live fold jobs", () => {

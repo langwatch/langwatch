@@ -4,6 +4,20 @@
  * sits outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
+import { hasIdBound, type IdBound, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
+import {
+  type IdIndexBounds,
+  type IdIndexDeclaration,
+  idIndexBoundsOf,
+  idIndexBoundsStatement,
+  type IdIndexLookup,
+  SHARED_CLICKHOUSE_TARGET,
+} from "./idIndexFlags.ts";
+import {
+  coalesceKeyOf,
+  DEFAULT_INSERT_COALESCE_MAX_ROWS,
+  InsertCoalescer,
+} from "./insert-coalescing.ts";
 import type {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
@@ -13,6 +27,7 @@ import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./qu
 import { TRANSIENT_NETWORK_CODES } from "./resilience.ts";
 import type { RetryPolicy } from "./retry.ts";
 import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
+import { ID_BOUND_PARAM_PREFIX, StatementScopeError } from "./statementScopeError.ts";
 import { extractQueryType, extractTableName } from "./statementShape.ts";
 import type { PrivateRouteVariable } from "./tenancy.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
@@ -35,10 +50,17 @@ export interface ClickHouseQueryClientOptions {
   privateRoutes?: ReadonlyMap<string, string> | undefined;
   /** Every private route variable this process parsed, usable or not; none by default. */
   privateRouteVariables?: readonly PrivateRouteVariable[] | undefined;
+  /** The organisation a tenant belongs to, from the router's cache; needed once a route exists. */
+  organizationOf?: ((tenantId: string) => Promise<string>) | undefined;
   /** Builds the handled refusal for a read whose server stopped answering; raw by default. */
   unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
   /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
   overloadErrorFactory?: ClickHouseOverloadErrorFactory | undefined;
+  /**
+   * Rows one coalesced async insert carries at most (ADR-187); 0 sends every insert alone.
+   * Coalescing needs a limiter: with none, nothing ever waits for a slot.
+   */
+  insertCoalesceMaxRows?: number | undefined;
 }
 
 /** The handled refusal for a read whose server did not answer once retries ran out. */
@@ -62,6 +84,22 @@ function isServerOverload(error: unknown): error is Error {
 
 const now = (): number => globalThis.performance.now();
 
+/**
+ * A refused connection is the one insert failure that provably sent nothing: no socket opened,
+ * so no row can have landed. Anything later (a reset, a hang up, a cancelled query, a timeout)
+ * may have written the batch, and with no insert dedup token a retry in place would write it twice.
+ */
+function wasRefusedBeforeSending(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === "ECONNREFUSED";
+}
+
+/** Carries an insert failure past the retry policy untouched, so it is not retried in place. */
+class InsertNotRetriedInPlace extends Error {
+  constructor(readonly failure: unknown) {
+    super("insert not retried in place");
+  }
+}
+
 export class ClickHouseQueryClient {
   private readonly driver: QueryDriver;
   private readonly tenantGuard: TenantGuard;
@@ -71,9 +109,12 @@ export class ClickHouseQueryClient {
   private readonly reporter: StatementReporter | undefined;
   private readonly routes: ReadonlyMap<string, string>;
   private readonly routeVariables: readonly PrivateRouteVariable[];
+  private readonly organizationOf: ((tenantId: string) => Promise<string>) | undefined;
   private readonly columnLists = new Map<string, ClickHouseColumns>();
   private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
   private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
+  private readonly idIndexRegistry: IdIndexRegistry;
+  private readonly coalescer: InsertCoalescer<InsertRequest> | undefined;
 
   constructor({
     driver,
@@ -86,6 +127,8 @@ export class ClickHouseQueryClient {
     privateRouteVariables,
     unavailableErrorFactory,
     overloadErrorFactory,
+    organizationOf,
+    insertCoalesceMaxRows,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
@@ -97,6 +140,81 @@ export class ClickHouseQueryClient {
     this.routeVariables = privateRouteVariables ?? [];
     this.unavailable = unavailableErrorFactory;
     this.overloaded = overloadErrorFactory;
+    this.organizationOf = organizationOf;
+    this.idIndexRegistry = new IdIndexRegistry(this);
+    this.coalescer =
+      limiter === undefined
+        ? undefined
+        : new InsertCoalescer<InsertRequest>(
+            {
+              admitsNow: () => limiter.admitsNow("insert"),
+              admit: (task, callers) => limiter.run({ operation: "insert", task, callers }),
+              send: (requests) => this.sendInsert(coalescedRequest(requests)),
+            },
+            insertCoalesceMaxRows ?? DEFAULT_INSERT_COALESCE_MAX_ROWS,
+          );
+  }
+
+  /**
+   * Declares id indexes once, at composition: from then on a statement's `{{idBound}}` marker
+   * over one of them is bounded by it, and its readiness is checked on every target.
+   */
+  declareIdIndexes({ indexes }: { indexes: readonly IdIndexDeclaration[] }): void {
+    this.idIndexRegistry.declare({ indexes });
+  }
+
+  /** The declared id indexes and their readiness, for the fenced reader and the fill. */
+  idIndexes(): IdIndexRegistry {
+    return this.idIndexRegistry;
+  }
+
+  /**
+   * The target a tenant's statements land on: `"shared"`, with no I/O while no private route
+   * exists, else its organisation when that has a route. Keys an owner's id-index readiness.
+   */
+  async targetOf({ tenantId }: { tenantId: string }): Promise<string> {
+    if (this.routes.size === 0) return SHARED_CLICKHOUSE_TARGET;
+    if (this.organizationOf === undefined) {
+      throw new Error("A client with private routes cannot name a tenant's target without them.");
+    }
+    const organizationId = await this.organizationOf(tenantId);
+    return this.routes.has(organizationId) ? organizationId : SHARED_CLICKHOUSE_TARGET;
+  }
+
+  /**
+   * One point read of an id index: for one tenant, or for a declared tenant set (a fenced
+   * read's own and shared projects), so a shared grant's ids are found too.
+   */
+  async indexBounds({
+    tenantId,
+    tenantIds,
+    ...lookup
+  }: IdIndexLookup & {
+    tenantId: string;
+    tenantIds?: readonly string[] | undefined;
+  }): Promise<IdIndexBounds> {
+    const statement = idIndexBoundsStatement({
+      ...lookup,
+      tenantPredicate:
+        tenantIds === undefined
+          ? "TenantId = {tenantId:String}"
+          : `TenantId IN ({${ID_BOUND_PARAM_PREFIX}_tenants:Array(String)})`,
+    });
+    const tenants =
+      tenantIds === undefined
+        ? { params: { tenantId } }
+        : {
+            params: { [`${ID_BOUND_PARAM_PREFIX}_tenants`]: [...tenantIds] },
+            tenantIds,
+          };
+    const result = await this.statement<unknown>({
+      tenantId,
+      ...(tenants.tenantIds === undefined ? {} : { tenantIds: tenants.tenantIds }),
+      sql: statement.sql,
+      params: { ...statement.params, ...tenants.params },
+      table: lookup.index,
+    });
+    return idIndexBoundsOf({ rows: result.rows });
   }
 
   /**
@@ -137,12 +255,52 @@ export class ClickHouseQueryClient {
   }
 
   /**
+   * Runs one statement under every policy this client was given; a statement carrying an
+   * `{{idBound}}` marker runs once per window its id index read takes, each under every policy.
+   */
+  async query<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
+    const bound = hasIdBound(request)
+      ? idBoundOf({
+          sql: request.sql,
+          params: request.params ?? {},
+          registry: this.idIndexRegistry,
+          openEnded: request.idBound?.openEnded,
+        })
+      : null;
+    if (bound !== null) return this.boundedQuery<Row>({ request, bound });
+    return this.statement<Row>(request);
+  }
+
+  /** A statement bounded by its id index, each attempt run as its own statement. */
+  private async boundedQuery<Row>({
+    request,
+    bound,
+  }: {
+    request: QueryRequest;
+    bound: IdBound;
+  }): Promise<QueryResult<Row>> {
+    const { tenantId } = request;
+    const rows = await readIdBound<Row>({
+      bound,
+      tenantId,
+      registry: this.idIndexRegistry,
+      targetOf: () => this.targetOf({ tenantId }),
+      indexBounds: (lookup) =>
+        this.indexBounds({ tenantId, tenantIds: request.tenantIds, ...lookup }),
+      options: request.idBound,
+      run: async ({ sql, params }) => (await this.statement<Row>({ ...request, sql, params })).rows,
+    });
+    return { rows };
+  }
+
+  /**
    * Runs one statement under every policy this client was given, top to
    * bottom per the class order. Each step is a plain call rather than a
    * wrap, so an absent policy is a skipped line, not a hole in a chain.
    */
-  async query<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
+  private async statement<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
     this.tenantGuard.assert(request);
+    refuseUnexpandedIdBound({ request });
 
     const runOnce = () => this.driver.execute<Row>(request);
     const withRetries = () =>
@@ -166,7 +324,11 @@ export class ClickHouseQueryClient {
     const withSlot = () =>
       this.limiter === undefined
         ? withReport()
-        : this.limiter.run({ operation: "query", task: withReport, signal: request.signal });
+        : this.limiter.run({
+            operation: "query",
+            task: withReport,
+            signal: request.signal,
+          });
 
     try {
       return await (this.tracer === undefined
@@ -188,7 +350,8 @@ export class ClickHouseQueryClient {
    */
   async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
     this.tenantGuard.assert(request);
-    if (this.driver.stream === undefined) {
+    // A bounded read expands its marker per window, so it is answered whole, as one batch.
+    if (this.driver.stream === undefined || hasIdBound(request)) {
       yield (await this.query<Row>(request)).rows;
       return;
     }
@@ -201,6 +364,7 @@ export class ClickHouseQueryClient {
    */
   async command(request: QueryRequest): Promise<void> {
     this.tenantGuard.assert(request);
+    refuseUnexpandedIdBound({ request });
 
     const runOnce = () => this.driver.command(request);
     const withRetries = () =>
@@ -209,36 +373,70 @@ export class ClickHouseQueryClient {
         : this.retries.run(runOnce, { signal: request.signal, request });
 
     if (this.limiter === undefined) return withRetries();
-    await this.limiter.run({ operation: "command", task: withRetries, signal: request.signal });
+    await this.limiter.run({
+      operation: "command",
+      task: withRetries,
+      signal: request.signal,
+    });
   }
 
   /**
-   * Writes one batch under every policy this client was given, same order as
-   * {@link query}: the guard refuses a multi-tenant batch before it costs a
-   * slot or socket, and a retrying insert keeps its slot.
+   * Writes one batch under every policy, in {@link query}'s order. Retried in place only when
+   * the connection was refused before anything was sent; other failures go to the caller.
+   * Spec: specs/background/worker-graceful-shutdown.feature
    */
   async insert(request: InsertRequest): Promise<void> {
     this.tenantGuard.assertInsert(request);
     if (request.rows.length === 0) return;
 
-    const runOnce = () => this.driver.insert(request);
-    const withRetries = () =>
-      this.retries === undefined
-        ? runOnce()
-        : this.retries.run(runOnce, {
-            signal: request.signal,
-            request: {
-              tenantId: request.tenantId,
-              sql: `INSERT INTO ${request.table}`,
-              table: request.table,
-              kind: "write",
-            },
-          });
-    const withReport = () =>
-      this.reported({ operation: "insert", params: { table: request.table }, task: withRetries });
+    // An async insert that would wait for a slot joins others of its route and table (ADR-187).
+    const coalesced = this.coalescer?.submit(request, coalesceKeyOf(request));
+    if (coalesced !== undefined && coalesced !== null) return coalesced;
+    return this.insertAlone(request);
+  }
 
-    if (this.limiter === undefined) return withReport();
-    await this.limiter.run({ operation: "insert", task: withReport, signal: request.signal });
+  /** One insert in a statement of its own, under its own slot. */
+  private async insertAlone(request: InsertRequest): Promise<void> {
+    if (this.limiter === undefined) return this.sendInsert(request);
+    await this.limiter.run({
+      operation: "insert",
+      task: () => this.sendInsert(request),
+      signal: request.signal,
+    });
+  }
+
+  /** One insert statement under the slot already held: retried only when refused, and reported. */
+  private sendInsert(request: InsertRequest): Promise<void> {
+    const runOnce = () => this.driver.insert(request);
+    const refusedOnly = async (): Promise<void> => {
+      try {
+        await runOnce();
+      } catch (error) {
+        if (wasRefusedBeforeSending(error)) throw error;
+        throw new InsertNotRetriedInPlace(error);
+      }
+    };
+    const withRetries = async (): Promise<void> => {
+      if (this.retries === undefined) return runOnce();
+      try {
+        await this.retries.run(refusedOnly, {
+          signal: request.signal,
+          request: {
+            tenantId: request.tenantId,
+            sql: `INSERT INTO ${request.table}`,
+            table: request.table,
+            kind: "write",
+          },
+        });
+      } catch (error) {
+        throw error instanceof InsertNotRetriedInPlace ? error.failure : error;
+      }
+    };
+    return this.reported({
+      operation: "insert",
+      params: { table: request.table },
+      task: withRetries,
+    });
   }
 
   /** One statement's outcome, reported the way the vendor client policy reports it. */
@@ -270,4 +468,20 @@ export class ClickHouseQueryClient {
       throw error;
     }
   }
+}
+
+/**
+ * One statement carrying every request's rows. They share a coalescing key, so the route, the
+ * tenant set and the settings are the first's; each request passed the tenant guard on its own.
+ */
+function coalescedRequest(requests: readonly InsertRequest[]): InsertRequest {
+  const [first, ...rest] = requests;
+  if (first === undefined) throw new Error("A coalesced insert carries at least one request.");
+  if (rest.length === 0) return first;
+  return { ...first, rows: requests.flatMap((request) => request.rows) };
+}
+
+/** The last check before a statement leaves: an unexpanded marker never reaches the server. */
+function refuseUnexpandedIdBound({ request }: { request: QueryRequest }): void {
+  if (hasIdBound(request)) throw new StatementScopeError({ kind: "unexpanded-id-bound" });
 }

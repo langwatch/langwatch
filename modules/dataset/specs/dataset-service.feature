@@ -75,6 +75,30 @@ Feature: Shared Dataset service
     Then each answers the same rows, the same absences and the same totals
     And neither answers with a dataset belonging to another project
 
+  @integration
+  Scenario: Entries written together list in the byte order of their ids
+    Given entries written in one batch, so they share a creation time, under ids that differ only in letter case
+    When each backend lists them, page by page or after a cursor
+    Then every backend lists them in the byte order of their ids, capital letters before lowercase
+
+  @integration
+  Scenario: A cursor naming no entry of the dataset answers an empty page
+    Given a dataset with entries
+    When a backend is asked for the page after an id that is no entry of that dataset, or an entry of another dataset
+    Then every backend answers an empty page rather than starting again from the first entry
+
+  @integration
+  Scenario: A content migration writes entries in the order the dataset lists them
+    Given entries written in one batch under ids that differ only in letter case
+    When the content migration reads them page by page into storage
+    Then it reads them in the byte order of their ids, the order the dataset lists them
+
+  @unit
+  Scenario: A copied dataset lists its entries in the order of its source
+    Given a dataset of several hundred entries
+    When I copy it
+    Then the copy lists its entries in the order the source lists them
+
   @unit
   Scenario: The dataset transports move without changing who may call them
     Given the dataset and dataset record tRPC surfaces

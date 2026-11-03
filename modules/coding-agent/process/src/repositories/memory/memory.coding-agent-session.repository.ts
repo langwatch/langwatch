@@ -5,7 +5,10 @@ import type {
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 
-import { CodingAgentSessionRepository } from "../coding-agent-session.repository.ts";
+import {
+  CodingAgentSessionRepository,
+  type OtherSessionKind,
+} from "../coding-agent-session.repository.ts";
 import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
 
 /** The session aggregate, held in the process rather than in ClickHouse. */
@@ -60,6 +63,17 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
     if (!stored) return null;
     if (!withinWindow(stored.row.startedAtMs, input.window)) return null;
     return { row: stored.row, appliedEventIds: [...stored.appliedEventIds] };
+  }
+
+  async findOtherSessionKind(input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<OtherSessionKind> {
+    const others = this.rows().filter(
+      (row) => row.tenantId === input.tenantId && !input.excludeSessionIds.includes(row.sessionId),
+    );
+    if (others.some((row) => !row.auxiliary)) return "main";
+    return others.length > 0 ? "helpers_only" : "none";
   }
 
   async findManyRecent(input: {

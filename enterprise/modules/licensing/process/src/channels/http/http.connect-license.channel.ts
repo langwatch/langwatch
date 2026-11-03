@@ -3,7 +3,10 @@ import {
   type ConnectCredential,
   type LicenseSeatCounts,
   type LicenseSyncAnswer,
+  type UpgradeDiagnosticsReceipt,
+  type UpgradeDiagnosticsSubmission,
   connectActivationAnswerSchema,
+  upgradeDiagnosticsReceiptSchema,
   connectSyncAnswerSchema,
 } from "@langwatch/enterprise-licensing-contract";
 
@@ -13,7 +16,7 @@ import { type ConnectHostOptions, ConnectHost } from "./http.connect-host.channe
 /** Origin of the connect host; the paths are this channel's own. */
 type HttpConnectLicenseChannelOptions = ConnectHostOptions;
 
-/** The two routes the connect host answers, over the shared transport. */
+/** The routes the connect host answers, over the shared transport. */
 export class HttpConnectLicenseChannel extends ConnectLicenseChannel {
   private constructor(private readonly host: ConnectHost) {
     super();
@@ -65,5 +68,24 @@ export class HttpConnectLicenseChannel extends ConnectLicenseChannel {
       services: answer.services,
       ...(answer.license ? { license: answer.license } : {}),
     };
+  }
+
+  async sendUpgradeDiagnostics({
+    credential,
+    submission,
+    signal,
+  }: {
+    credential: ConnectCredential;
+    submission: UpgradeDiagnosticsSubmission;
+    signal?: AbortSignal;
+  }): Promise<UpgradeDiagnosticsReceipt> {
+    return this.host.call({
+      path: "/v1/upgrade-diagnostics",
+      method: "POST",
+      credential,
+      body: submission,
+      schema: upgradeDiagnosticsReceiptSchema,
+      ...(signal ? { signal } : {}),
+    });
   }
 }

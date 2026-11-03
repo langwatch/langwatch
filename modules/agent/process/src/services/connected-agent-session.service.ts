@@ -29,6 +29,10 @@ import { nowInstant } from "@langwatch/time";
 
 import type { InstanceMeta } from "../repositories/connected-agent-state.repository.ts";
 import { detectResultCapViolation } from "../rules/connected-agent-caps.rules.ts";
+import {
+  checkResultShape,
+  UNREADABLE_RESULT_MESSAGE,
+} from "../rules/connected-agent-frame.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 import { ConnectedAgentLastSeenService } from "./connected-agent-last-seen.service.ts";
 import { ConnectedAgentRegistrationService } from "./connected-agent-registration.service.ts";
@@ -228,16 +232,34 @@ export class AgentSessionService {
     await this.#nudgeReply(stored, { callId, kind: "ack" });
   }
 
-  /** The instance answered: the result lands under its cap or as a payload error. */
+  /**
+   * The instance answered: the result lands under its cap, or as a payload error, or as a
+   * call failure when it lacks what its call kind needs.
+   */
   async result(session: SessionInfo, frame: ResultFrame): Promise<void> {
     const stored = await this.findCallForSession(session, frame.callId);
     if (!stored) {
       return;
     }
 
+    const shape = checkResultShape({ kind: stored.envelope.kind, frame });
+    if (!shape.complete) {
+      const { issue } = shape;
+      logger.warn({ callId: frame.callId, issue }, "result incomplete for its call kind");
+      await this.#writeResult({
+        stored,
+        result: {
+          instanceId: session.instanceId,
+          error: { code: "agent_call_failed", message: `${UNREADABLE_RESULT_MESSAGE}: ${issue}` },
+        },
+      });
+      return;
+    }
+
     const violation = detectResultCapViolation({
       output: frame.output,
       session: frame.session,
+      state: frame.state,
       caps: relayPayloadCaps(this.#relayMaxPayloadMb),
     });
     const result: StoredResult = violation
@@ -246,6 +268,7 @@ export class AgentSessionService {
           instanceId: session.instanceId,
           output: frame.output,
           session: frame.session,
+          state: frame.state,
           error: frame.error,
         };
     await this.#writeResult({ stored, result });
@@ -358,7 +381,7 @@ function ttlOf(stored: StoredCall, now: number): number {
 function tooLarge(
   session: SessionInfo,
   violation: {
-    what: "result" | "session";
+    what: "result" | "session" | "state";
     sizeBytes: number;
     limitBytes: number;
   },

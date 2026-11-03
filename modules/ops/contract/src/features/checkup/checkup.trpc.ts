@@ -5,7 +5,10 @@
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { usageReportPreviewSchema } from "./checkup-usage-report.ts";
+import {
+  upgradeDiagnosticsAutoSendSchema,
+  usageReportPreviewSchema,
+} from "./checkup-usage-report.ts";
 import { checkupResultSchema, explicitCheckInputSchema } from "./checkup.ts";
 
 const organizationInput = z.object({ organizationId: z.string().min(1) });
@@ -32,6 +35,20 @@ export interface UsageReportAnswerSchema extends Named<typeof usageReportAnswerS
 export const usageReportAnswerSchema: UsageReportAnswerSchema = usageReportAnswerSchemaDefinition;
 export type UsageReportAnswer = z.infer<typeof usageReportAnswerSchema>;
 
+/** The automatic diagnostics switch, or the answer a LangWatch Cloud install gives instead. */
+const upgradeDiagnosticsAutoSendAnswerSchemaDefinition = z.union([
+  onCloud,
+  z.object({ ...upgradeDiagnosticsAutoSendSchema.shape, ...selfHosted }),
+]);
+export interface UpgradeDiagnosticsAutoSendAnswerSchema extends Named<
+  typeof upgradeDiagnosticsAutoSendAnswerSchemaDefinition
+> {}
+export const upgradeDiagnosticsAutoSendAnswerSchema: UpgradeDiagnosticsAutoSendAnswerSchema =
+  upgradeDiagnosticsAutoSendAnswerSchemaDefinition;
+export type UpgradeDiagnosticsAutoSendAnswer = z.infer<
+  typeof upgradeDiagnosticsAutoSendAnswerSchema
+>;
+
 const checkupAnswer = checkupAnswerSchema;
 const usageReportAnswer = usageReportAnswerSchema;
 
@@ -57,4 +74,13 @@ export const checkupTrpc = defineTrpcContract("checkup")
     }),
   )
   .withOutput(usageReportAnswer)
+
+  /** Install-wide: whether the hourly check sends a failed step's diagnostics by itself. */
+  .query("upgradeDiagnosticsAutoSend")
+  .withInput(organizationInput)
+  .withOutput(upgradeDiagnosticsAutoSendAnswerSchema)
+
+  .mutation("setUpgradeDiagnosticsAutoSend")
+  .withInput(z.object({ ...organizationInput.shape, enabled: z.boolean() }))
+  .withOutput(upgradeDiagnosticsAutoSendAnswerSchema)
   .build();

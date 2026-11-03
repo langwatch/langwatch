@@ -96,6 +96,7 @@ export function createCanonicalAutomationApp(): {
       onAutoPaused: vi.fn(),
       onContainmentFailed: vi.fn(),
       error: vi.fn(),
+      warn: vi.fn(),
       info: vi.fn(),
     };
   const testFire: AutomationTestFire = {

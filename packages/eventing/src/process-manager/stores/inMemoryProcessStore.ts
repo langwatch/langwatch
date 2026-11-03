@@ -32,6 +32,15 @@ interface StoredMessage extends OutboxMessageRecord {
   updatedAt: number;
 }
 
+/** The durable claim's order: due time, then the ref, so ties pick the same instance first. */
+function compareDueWakes(
+  left: { wakeAt: number; instance: { ref: ProcessRef } },
+  right: { wakeAt: number; instance: { ref: ProcessRef } },
+): number {
+  if (left.wakeAt !== right.wakeAt) return left.wakeAt - right.wakeAt;
+  return refKey(left.instance.ref) < refKey(right.instance.ref) ? -1 : 1;
+}
+
 function refKey(ref: ProcessRef): string {
   return `${ref.processName}|${ref.projectId}|${ref.processKey}`;
 }
@@ -414,6 +423,50 @@ export class InMemoryProcessStore implements ProcessStore {
       });
     }
     return due;
+  }
+
+  /**
+   * The durable claim's twin: oldest due first, each claimed wake's nextWakeAt moved a lease
+   * ahead with no await between the pick and the move, so concurrent callers get disjoint batches.
+   */
+  async leaseDueWakes(params: {
+    now: number;
+    limit: number;
+    leaseDurationMs: number;
+    processNames?: readonly string[];
+  }): Promise<DueWake[]> {
+    if (params.limit <= 0) return [];
+    if (params.processNames && params.processNames.length === 0) return [];
+    const allowed = params.processNames ? new Set(params.processNames) : undefined;
+    const due = [...this.instances.entries()]
+      .flatMap(([key, instance]) =>
+        instance.nextWakeAt !== null &&
+        instance.nextWakeAt <= params.now &&
+        (!allowed || allowed.has(instance.ref.processName))
+          ? [{ key, instance, wakeAt: instance.nextWakeAt }]
+          : [],
+      )
+      .toSorted(compareDueWakes)
+      .slice(0, params.limit);
+    const leasedUntil = params.now + params.leaseDurationMs;
+    return due.map(({ key, instance, wakeAt }) => {
+      this.instances.set(key, { ...instance, nextWakeAt: leasedUntil });
+      return { ref: instance.ref, revision: instance.revision, wakeAt };
+    });
+  }
+
+  async releaseWakeClaim(params: {
+    ref: ProcessRef;
+    revision: number;
+    wakeAt: number;
+    claimedUntil: number;
+  }): Promise<{ applied: boolean }> {
+    const key = refKey(params.ref);
+    const instance = this.instances.get(key);
+    if (!instance || instance.revision !== params.revision) return { applied: false };
+    if (instance.nextWakeAt !== params.claimedUntil) return { applied: false };
+    this.instances.set(key, { ...instance, nextWakeAt: params.wakeAt });
+    return { applied: true };
   }
 
   async deleteDispatchedBefore(params: { processName: string; before: number }): Promise<number> {

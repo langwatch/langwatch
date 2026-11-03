@@ -1,4 +1,4 @@
-import { PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
+import { CONTENT_KEY_CATALOG, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type {
   Protections,
   DerivedTraceEvent,
@@ -8,9 +8,18 @@ import type {
   SpanMetrics,
   Trace,
 } from "@langwatch/trace-contract";
-import { parsePythonInsideJson } from "@langwatch/trace-contract";
+import {
+  chatMessageSchema,
+  chatRichContentSchema,
+  parsePythonInsideJson,
+  spanInputOutputSchema,
+} from "@langwatch/trace-contract";
+import { z } from "zod";
 
-import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
+import {
+  createAttributeRedactor,
+  hiddenContentCategoryRules,
+} from "./trace-attribute-redaction.rules.ts";
 import { redactSpanContent, redactTraceContent } from "./trace-visibility-teaser.rules.ts";
 
 // Stable display order for the content categories a drop policy can strip, so
@@ -61,6 +70,79 @@ function collectDroppedCategories(spans: Span[] | undefined): string[] {
   ];
 }
 
+/** The string literals a schema admits, through unions, optionals and nullables. */
+function literalStringsOf(schema: unknown): string[] {
+  if (schema instanceof z.ZodLiteral) {
+    return [...schema.values].filter((value): value is string => typeof value === "string");
+  }
+  if (schema instanceof z.ZodUnion) {
+    return schema.options.flatMap((option) => literalStringsOf(option));
+  }
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
+    return literalStringsOf(schema.unwrap());
+  }
+
+  return [];
+}
+
+/** The literals each object arm of a union pins its `key` to. */
+function keyLiteralsOf(schema: unknown, key: string): string[] {
+  if (schema instanceof z.ZodLazy) {
+    return keyLiteralsOf(schema.unwrap(), key);
+  }
+  if (schema instanceof z.ZodUnion) {
+    return schema.options.flatMap((option) => keyLiteralsOf(option, key));
+  }
+  if (schema instanceof z.ZodObject) {
+    return literalStringsOf((schema.shape as Record<string, unknown>)[key]);
+  }
+
+  return [];
+}
+
+/**
+ * Every literal a `role` or `type` key takes in the span input/output shapes: the chat roles,
+ * the content-part types and the typed-value types, read off the schemas so a new shape is
+ * covered the day it is added. They describe a message's shape, not what anyone wrote.
+ */
+const SPAN_IO_SHAPE_LITERALS: ReadonlySet<string> = new Set([
+  ...keyLiteralsOf(chatMessageSchema, "role"),
+  ...keyLiteralsOf(chatRichContentSchema, "type"),
+  ...keyLiteralsOf(spanInputOutputSchema, "type"),
+]);
+
+/**
+ * Keys whose shape-describing values ("user", "text", "image_url", ...) stay out of the
+ * redaction set, or every attribute that mentions a role would be blanked along with the
+ * content. Any other value under these keys is content and is kept.
+ */
+const STRUCTURAL_KEYS: ReadonlySet<string> = new Set(["role", "type"]);
+
+/**
+ * Below this length a hidden string is redacted inside another value only where it stands as a
+ * whole word: as a bare substring, a short word the content also used ("user") blanks unrelated
+ * values that merely contain it ("user_selected").
+ */
+const MIN_CONTAINED_REDACTION_LENGTH = 8;
+
+/**
+ * Scripts whose words are cut by spaces and punctuation alone. Elsewhere (Han, kana, Thai, Hangul
+ * with its attached particles, Arabic with its attached prefixes) a word boundary says nothing.
+ */
+const WORD_BOUNDARY_SCRIPTS = "\\p{sc=Latin}\\p{sc=Greek}\\p{sc=Cyrillic}";
+const WORD_CHAR = `[${WORD_BOUNDARY_SCRIPTS}\\p{N}_]`;
+/** A string whose letters all come from the word-boundary scripts. */
+const BOUNDARY_SCRIPT_ONLY = new RegExp(`^(?:[${WORD_BOUNDARY_SCRIPTS}]|\\P{L})+$`, "u");
+
+function isStructuralValue(key: string, value: unknown): boolean {
+  return STRUCTURAL_KEYS.has(key) && typeof value === "string" && SPAN_IO_SHAPE_LITERALS.has(value);
+}
+
+/** A string leaf as a redaction; blank strings carry no content and match every value. */
+function contentStrings(value: string): string[] {
+  return value.trim() === "" ? [] : [value];
+}
+
 /** A string's redactions: its parsed JSON or Python-repr object's strings, else itself. */
 function extractRedactionsForString(value: string): string[] {
   try {
@@ -76,16 +158,17 @@ function extractRedactionsForString(value: string): string[] {
       }
     } catch {
       // Not valid Python repr either
-      return [value];
+      return contentStrings(value);
     }
 
-    return [value];
+    return contentStrings(value);
   }
 }
 
 /**
  * Every string value in an object, so that when input and output are not visible they can be
- * redacted out of the fields that are.
+ * redacted out of the fields that are. Blank strings and the shape words under `role`/`type`
+ * are skipped: they carry no content.
  */
 export function extractRedactionsForObject(object: unknown): string[] {
   if (typeof object === "string") {
@@ -97,10 +180,56 @@ export function extractRedactionsForObject(object: unknown): string[] {
   }
 
   if (typeof object === "object" && object !== null) {
-    return Object.values(object).flatMap((value) => extractRedactionsForObject(value));
+    return Object.entries(object)
+      .filter(([key, value]) => !isStructuralValue(key, value))
+      .flatMap(([, value]) => extractRedactionsForObject(value));
   }
 
   return [];
+}
+
+interface RedactionMatchers {
+  long: string[];
+  short: RegExp[];
+}
+
+const matchersByRedactions = new WeakMap<Set<string>, RedactionMatchers>();
+
+/** The redaction set split by how each string is matched, compiled once per set. */
+function matchersFor(redactions: Set<string>): RedactionMatchers {
+  const cached = matchersByRedactions.get(redactions);
+  if (cached) return cached;
+
+  const matchers: RedactionMatchers = { long: [], short: [] };
+  for (const redaction of redactions) {
+    // Only a short string in a word-boundary script is matched as a whole word.
+    if (
+      redaction.length >= MIN_CONTAINED_REDACTION_LENGTH ||
+      !BOUNDARY_SCRIPT_ONLY.test(redaction)
+    ) {
+      matchers.long.push(redaction);
+      continue;
+    }
+    const escaped = redaction.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    matchers.short.push(new RegExp(`(?<!${WORD_CHAR})${escaped}(?!${WORD_CHAR})`, "u"));
+  }
+  matchersByRedactions.set(redactions, matchers);
+
+  return matchers;
+}
+
+/**
+ * Whether a string carries hidden content: it is one of the hidden strings, quotes a long one
+ * anywhere, or holds a short one as a whole word.
+ */
+function carriesRedaction(value: string, redactions: Set<string>): boolean {
+  if (redactions.has(value)) return true;
+  const { long, short } = matchersFor(redactions);
+
+  return (
+    long.some((redaction) => value.includes(redaction)) ||
+    short.some((pattern) => pattern.test(value))
+  );
 }
 
 /**
@@ -129,8 +258,7 @@ function redactUnparsedString(value: string, redactions: Set<string>): string {
     // Not valid Python repr either
   }
 
-  const present = Array.from(redactions).filter((redaction) => value.includes(redaction));
-  return present.length > 0 ? "[REDACTED]" : value;
+  return carriesRedaction(value, redactions) ? "[REDACTED]" : value;
 }
 
 /** Redacts sensitive values from an object. */
@@ -224,17 +352,15 @@ export const applySpanProtections = (
     }
   }
 
-  // Custom attribute rules with a restrict disposition: replace matched span
-  // params (the mapper unflattens dotted keys into nested objects, so the
-  // matcher walks the nested paths) with the placeholder naming who can see
-  // them. Hidden input/output content riding along inside params (e.g. the
-  // raw gen_ai message attributes) is scrubbed by the redactions set.
-  const transformedParams = redactObject(
-    createAttributeRedactor({ hidden: protections.hiddenAttributes })(
-      span.params as Record<string, unknown> | null | undefined,
-    ),
-    redactions,
-  );
+  // Scrub copies of hidden content first, then replace restricted and hidden-category params
+  // whole with the audience placeholder (the matcher walks the unflattened nested paths). In
+  // this order the scrub never rewrites a placeholder that shares a word with hidden content.
+  const transformedParams = createAttributeRedactor({
+    hidden: [
+      ...(protections.hiddenAttributes ?? []),
+      ...hiddenContentCategoryRules({ protections, contentKeyCatalog: CONTENT_KEY_CATALOG }),
+    ],
+  })(redactObject(span.params as Record<string, unknown> | null | undefined, redactions));
 
   const transformed = {
     ...span,

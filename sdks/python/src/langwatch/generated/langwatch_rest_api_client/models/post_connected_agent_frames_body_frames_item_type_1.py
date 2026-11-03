@@ -18,6 +18,9 @@ if TYPE_CHECKING:
     from ..models.post_connected_agent_frames_body_frames_item_type_1_output_type_2_item import (
         PostConnectedAgentFramesBodyFramesItemType1OutputType2Item,
     )
+    from ..models.post_connected_agent_frames_body_frames_item_type_1_state_type_0 import (
+        PostConnectedAgentFramesBodyFramesItemType1StateType0,
+    )
 
 
 T = TypeVar("T", bound="PostConnectedAgentFramesBodyFramesItemType1")
@@ -33,6 +36,7 @@ class PostConnectedAgentFramesBodyFramesItemType1:
         output (list[PostConnectedAgentFramesBodyFramesItemType1OutputType2Item] |
             PostConnectedAgentFramesBodyFramesItemType1OutputType1 | str | Unset):
         session (Any | Unset):
+        state (None | PostConnectedAgentFramesBodyFramesItemType1StateType0 | Unset):
         error (PostConnectedAgentFramesBodyFramesItemType1Error | Unset):
     """
 
@@ -46,12 +50,16 @@ class PostConnectedAgentFramesBodyFramesItemType1:
         | Unset
     ) = UNSET
     session: Any | Unset = UNSET
+    state: None | PostConnectedAgentFramesBodyFramesItemType1StateType0 | Unset = UNSET
     error: PostConnectedAgentFramesBodyFramesItemType1Error | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_connected_agent_frames_body_frames_item_type_1_output_type_1 import (
             PostConnectedAgentFramesBodyFramesItemType1OutputType1,
+        )
+        from ..models.post_connected_agent_frames_body_frames_item_type_1_state_type_0 import (
+            PostConnectedAgentFramesBodyFramesItemType1StateType0,
         )
 
         protocol = self.protocol
@@ -76,6 +84,14 @@ class PostConnectedAgentFramesBodyFramesItemType1:
 
         session = self.session
 
+        state: dict[str, Any] | None | Unset
+        if isinstance(self.state, Unset):
+            state = UNSET
+        elif isinstance(self.state, PostConnectedAgentFramesBodyFramesItemType1StateType0):
+            state = self.state.to_dict()
+        else:
+            state = self.state
+
         error: dict[str, Any] | Unset = UNSET
         if not isinstance(self.error, Unset):
             error = self.error.to_dict()
@@ -93,6 +109,8 @@ class PostConnectedAgentFramesBodyFramesItemType1:
             field_dict["output"] = output
         if session is not UNSET:
             field_dict["session"] = session
+        if state is not UNSET:
+            field_dict["state"] = state
         if error is not UNSET:
             field_dict["error"] = error
 
@@ -108,6 +126,9 @@ class PostConnectedAgentFramesBodyFramesItemType1:
         )
         from ..models.post_connected_agent_frames_body_frames_item_type_1_output_type_2_item import (
             PostConnectedAgentFramesBodyFramesItemType1OutputType2Item,
+        )
+        from ..models.post_connected_agent_frames_body_frames_item_type_1_state_type_0 import (
+            PostConnectedAgentFramesBodyFramesItemType1StateType0,
         )
 
         d = dict(src_dict)
@@ -166,6 +187,23 @@ class PostConnectedAgentFramesBodyFramesItemType1:
 
         session = d.pop("session", UNSET)
 
+        def _parse_state(data: object) -> None | PostConnectedAgentFramesBodyFramesItemType1StateType0 | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                state_type_0 = PostConnectedAgentFramesBodyFramesItemType1StateType0.from_dict(data)
+
+                return state_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | PostConnectedAgentFramesBodyFramesItemType1StateType0 | Unset, data)
+
+        state = _parse_state(d.pop("state", UNSET))
+
         _error = d.pop("error", UNSET)
         error: PostConnectedAgentFramesBodyFramesItemType1Error | Unset
         if isinstance(_error, Unset):
@@ -179,6 +217,7 @@ class PostConnectedAgentFramesBodyFramesItemType1:
             call_id=call_id,
             output=output,
             session=session,
+            state=state,
             error=error,
         )
 

@@ -12,7 +12,7 @@ export type BlobDeleteOutcome = (typeof BLOB_DELETE_OUTCOMES)[number];
  * ignores TTL since deletion is intentional.
  * Returns: [outcome, liveLeases].
  */
-export const BLOB_OPERATOR_DELETE_LUA = `
+export const BLOB_OPERATOR_DELETE_LUA = `#!lua flags=allow-oom
 local now = redis.call("TIME")
 local nowMs = (tonumber(now[1]) * 1000) + math.floor(tonumber(now[2]) / 1000)
 

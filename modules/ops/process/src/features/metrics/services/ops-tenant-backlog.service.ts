@@ -3,34 +3,57 @@ import type { QueueInfo } from "@langwatch/ops-contract";
 
 import type { AnomalyRateTrackerRepository } from "../../../repositories/anomaly.repository.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../../rules/anomaly-constants.rules.ts";
-import { countWaitingJobsByTenant } from "../../../rules/ops-tenant-backlog.rules.ts";
+import {
+  countArrivalsByTenant,
+  countWaitingJobsByTenant,
+} from "../../../rules/ops-tenant-backlog.rules.ts";
 
 interface OpsTenantBacklogOptions {
   rateTracker: AnomalyRateTrackerRepository;
   featureFlags: Pick<FeatureFlagApi, "isEnabled"> | undefined;
 }
 
-/** Each tenant's waiting jobs per metrics cycle, as anomaly detection reads them. */
+/** Each tenant's job arrivals between metrics cycles, as anomaly detection reads them. */
 export class OpsTenantBacklogService {
   static create(options: OpsTenantBacklogOptions): OpsTenantBacklogService {
     return new OpsTenantBacklogService(options);
   }
 
+  /** The previous scan's waiting jobs per tenant; null until this pod has scanned once. */
+  private previousBacklogs: ReadonlyMap<string, number> | null = null;
+
   private constructor(private readonly options: OpsTenantBacklogOptions) {}
 
   /**
-   * What anomaly detection reads: each tenant's waiting jobs as this cycle saw them, recorded once
-   * across the fleet because only the lease holder scans. Main counted at enqueue instead; the
+   * Records each tenant's arrivals since the last scan, once across the fleet because only the
+   * lease holder scans. The first scan only sets the baseline. Main counted at enqueue; the
    * difference is in specs/event-queue-anomaly-detection.feature.
    */
   async record(queues: QueueInfo[]): Promise<void> {
     const backlogs = countWaitingJobsByTenant({ queues });
+    const previous = this.previousBacklogs;
+    if (!previous) {
+      this.previousBacklogs = backlogs;
+      return;
+    }
+
+    const arrivals = countArrivalsByTenant({ previous, current: backlogs });
+    const baseline = new Map(backlogs);
+    const failures: unknown[] = [];
     await Promise.all(
-      [...backlogs].map(async ([tenantId, count]) => {
-        if (await this.isKilledForTenant(tenantId)) return;
-        await this.options.rateTracker.record(tenantId, count);
+      [...arrivals].map(async ([tenantId, count]) => {
+        try {
+          if (await this.isKilledForTenant(tenantId)) return;
+          await this.options.rateTracker.record(tenantId, count);
+        } catch (error) {
+          // Unrecorded, so this tenant's baseline stays put and the next scan counts them again.
+          keepPreviousBaseline({ baseline, previous, tenantId });
+          failures.push(error);
+        }
       }),
     );
+    this.previousBacklogs = baseline;
+    if (failures.length > 0) throw failures[0];
   }
 
   /** The detector's per-tenant kill switch; a failed lookup counts the tenant. */
@@ -45,4 +68,18 @@ export class OpsTenantBacklogService {
       return false;
     }
   }
+}
+
+function keepPreviousBaseline({
+  baseline,
+  previous,
+  tenantId,
+}: {
+  baseline: Map<string, number>;
+  previous: ReadonlyMap<string, number>;
+  tenantId: string;
+}): void {
+  const before = previous.get(tenantId);
+  if (before === undefined) baseline.delete(tenantId);
+  else baseline.set(tenantId, before);
 }

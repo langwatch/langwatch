@@ -2,8 +2,9 @@
 
 The decorated object stays callable with the original signature, so unit
 tests and local scenario runs use it as before. It also answers `.call(input)`
-and `.role` for the scenario library, and `.invoke(call)` for the connection
-client.
+and `.role` for the scenario library, and `.answer(kind, call)` for the
+connection client. `.scenario.setup` and `.scenario.teardown` declare the
+scenario hooks of ADR-180.
 """
 
 from __future__ import annotations
@@ -11,20 +12,25 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, TypeVar, Union
 
 from pydantic import BaseModel
 
-from .client import register
+from .client import refresh_registration, register
 from .identity import resolve_environment
 from .protocol import AgentRegistration, CallFrame, Message
 from .schema import (
     TURN_FIELDS,
     AgentReplyInvalid,
     AgentSignature,
+    HookNotDeclared,
+    ParameterConflict,
     analyze_signature,
+    coerce_state,
+    merge_parameters,
 )
 
 DEFAULT_TIMEOUT_SECONDS = 120
@@ -32,6 +38,8 @@ MAX_TIMEOUT_SECONDS = 300
 DEFAULT_CONCURRENCY = 10
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+logger = logging.getLogger("langwatch.agent")
 
 Output = Union[str, Message, list[Message]]
 
@@ -44,6 +52,7 @@ class AgentCall:
     new_messages: list[Message] = field(default_factory=list)
     thread_id: str = ""
     session: Any = None
+    state: dict[str, Any] | None = None
     trace_id: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
     call_id: str | None = None
@@ -56,16 +65,70 @@ class AgentCall:
             "new_messages": self.new_messages,
             "thread_id": self.thread_id,
             "session": self.session,
+            "state": self.state,
             "trace_id": self.trace_id,
         }
 
 
 @dataclass
 class AgentReply:
-    """The function's answer plus the session it wants back on the next turn."""
+    """The function's answer, the session it wants back on the next turn, and
+    an update to the scenario's state, if any."""
 
     output: Output
     session: Any = None
+    state: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class ScenarioRun:
+    """The scenario run a hook is called for."""
+
+    scenario_run_id: str | None = None
+    scenario_name: str | None = None
+    batch_run_id: str | None = None
+
+    @classmethod
+    def from_frame(cls, run: Mapping[str, Any]) -> ScenarioRun:
+        return cls(
+            scenario_run_id=run.get("scenarioRunId"),
+            scenario_name=run.get("scenarioName"),
+            batch_run_id=run.get("batchRunId"),
+        )
+
+
+@dataclass
+class CallAnswer:
+    """What one call answers: a turn's output, or a hook's state alone."""
+
+    output: Output | None = None
+    session: Any = None
+    state: dict[str, Any] | None = None
+
+
+@dataclass
+class ScenarioHook:
+    """One declared hook and the run parameters its signature reads."""
+
+    func: Callable[..., Any]
+    signature: AgentSignature
+
+
+class ScenarioHooks:
+    """`agent.scenario`: the decorators that declare setup and teardown."""
+
+    def __init__(self, agent: ConnectedAgent) -> None:
+        self._agent = agent
+
+    def setup(self, func: F) -> F:
+        """`setup(run, **params) -> dict`: makes the test data, returns the state."""
+        self._agent.attach_hook("setup", func)
+        return func
+
+    def teardown(self, func: F) -> F:
+        """`teardown(run, state, **params) -> dict | None`: removes the test data."""
+        self._agent.attach_hook("teardown", func)
+        return func
 
 
 def coerce_reply(value: Any) -> AgentReply:
@@ -76,7 +139,9 @@ def coerce_reply(value: Any) -> AgentReply:
     """
     if isinstance(value, AgentReply):
         return AgentReply(
-            output=coerce_reply(value.output).output, session=value.session
+            output=coerce_reply(value.output).output,
+            session=value.session,
+            state=value.state,
         )
     if value is None:
         return AgentReply(output="")
@@ -158,6 +223,10 @@ class ConnectedAgent:
         self.signature: AgentSignature = analyze_signature(
             func, agent_call_type=AgentCall, parameters=parameters
         )
+        self.hooks: dict[str, ScenarioHook] = {}
+        self.scenario = ScenarioHooks(self)
+        self.refusal: str | None = None
+        """Why this agent stays off the platform; the client skips it when set."""
         # `updated=()` drops the default `__dict__` merge. That merge runs
         # after the assignments above, so a decorated function that already
         # carries `name`, `timeout` or `environment` would replace the values
@@ -197,14 +266,52 @@ class ConnectedAgent:
             return "Agent"
         return AgentRole.AGENT
 
+    def attach_hook(self, kind: str, func: Callable[..., Any]) -> None:
+        """Declare a scenario hook, refusing the agent when a parameter clashes.
+
+        The refusal is a warning rather than an exception, like every other
+        decoration failure, so the application still imports. A hook declared
+        after the connection started registers again, and a refused agent
+        leaves the platform.
+        """
+        if not callable(func):
+            raise TypeError(f"{self.name}.scenario.{kind}: the hook must be callable")
+        self.hooks[kind] = ScenarioHook(
+            func=func,
+            signature=analyze_signature(
+                func, agent_call_type=AgentCall, skip=1 if kind == "setup" else 2
+            ),
+        )
+        self.refusal = None
+        try:
+            self.run_parameters()
+        except ParameterConflict as conflict:
+            self.refusal = f"{conflict.code}: {conflict}"
+            logger.warning(
+                "connect_agent: %s is not registered, %s", self.name, self.refusal
+            )
+        refresh_registration(self)
+
+    def run_parameters(self) -> AgentSignature:
+        """The one run-parameter set of the agent and its hooks."""
+        return AgentSignature(
+            parameters=merge_parameters(
+                self.signature, *(hook.signature for hook in self.hooks.values())
+            )
+        )
+
     def registration(self) -> AgentRegistration:
         frame: AgentRegistration = {
             "name": self.name,
             "environment": self.environment,
-            "parameters": self.signature.json_schema(),
+            "parameters": self.run_parameters().json_schema(),
             "concurrency": self.concurrency,
             "timeoutMs": self.timeout_ms,
             "sticky": self.sticky,
+            "hooks": {
+                "setup": "setup" in self.hooks,
+                "teardown": "teardown" in self.hooks,
+            },
         }
         return frame
 
@@ -225,6 +332,7 @@ class ConnectedAgent:
             new_messages=list(frame.get("newMessages") or []),
             thread_id=str(frame.get("threadId") or ""),
             session=frame.get("session"),
+            state=frame.get("state"),
             trace_id=trace_id,
             parameters=dict(frame.get("params") or {}),
             call_id=frame.get("callId"),
@@ -262,13 +370,30 @@ class ConnectedAgent:
         context, and so the adopted trace, travels into the worker thread.
         """
         args, kwargs = self.bind(call)
-        if self.is_async:
-            result = await self.func(*args, **kwargs)
-        else:
-            result = await asyncio.to_thread(self.func, *args, **kwargs)
-            if inspect.isawaitable(result):
-                result = await result
-        return coerce_reply(result)
+        return coerce_reply(await _run(self.func, args, kwargs))
+
+    async def answer(self, kind: str, call: AgentCall) -> CallAnswer:
+        """Answer one call of the platform: a turn, a setup or a teardown."""
+        if kind == "turn":
+            reply = await self.invoke(call)
+            return CallAnswer(
+                output=reply.output,
+                session=reply.session,
+                state=coerce_state(reply.state),
+            )
+        if kind not in ("setup", "teardown"):
+            raise ValueError(f"unknown call kind {kind!r}")
+        hook = self.hooks.get(kind)
+        if hook is None:
+            raise HookNotDeclared(agent=self.name, kind=kind)
+        run = ScenarioRun.from_frame(call.run)
+        args: list[Any] = [run] if kind == "setup" else [run, call.state]
+        parameters = hook.signature.resolve_parameters(call.parameters)
+        returned = await _run(hook.func, args, parameters)
+        if kind == "setup" and returned is None:
+            # The platform needs a setup's state; a setup that only seeds data sends an empty one.
+            returned = {}
+        return CallAnswer(state=coerce_state(returned))
 
     async def call(self, input: Any) -> Output:
         """Duck-typed entry for the scenario library's `AgentAdapter.call`.
@@ -288,11 +413,26 @@ class ConnectedAgent:
             new_messages=list(read("new_messages", []) or []),
             thread_id=str(read("thread_id", "") or ""),
             session=read("session", None),
+            state=read("state", None),
             trace_id=read("trace_id", None),
             parameters=dict(read("parameters", {}) or {}),
         )
         reply = await self.invoke(call)
         return reply.output
+
+
+async def _run(
+    func: Callable[..., Any], args: list[Any], kwargs: dict[str, Any]
+) -> Any:
+    """Await an async function on the calling loop; run a sync one in a worker
+    thread so the connection loop stays free. The current context, and so the
+    adopted trace, travels into the worker thread."""
+    if inspect.iscoroutinefunction(func):
+        return await func(*args, **kwargs)
+    result = await asyncio.to_thread(func, *args, **kwargs)
+    if inspect.isawaitable(result):
+        result = await result
+    return result
 
 
 def connect_agent(
@@ -313,7 +453,7 @@ def connect_agent(
     """Connect the function that runs your agent to LangWatch Agent Testing.
 
     The function receives the turn fields it declares (`messages`,
-    `new_messages`, `thread_id`, `session`, `trace_id`), and every other
+    `new_messages`, `thread_id`, `session`, `state`, `trace_id`), and every other
     parameter with a default is a run parameter the platform can set. The
     connection starts once per process, lazily, on a daemon thread.
 
@@ -365,7 +505,9 @@ __all__ = [
     "TURN_FIELDS",
     "AgentCall",
     "AgentReply",
+    "CallAnswer",
     "ConnectedAgent",
+    "ScenarioRun",
     "coerce_reply",
     "connect_agent",
 ]

@@ -1,6 +1,7 @@
 import {
   type EvaluationApi,
   LangevalsClusteringError,
+  type LangevalsClusteringFailureCode,
   type TopicClusteringRequest,
 } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
@@ -9,6 +10,7 @@ import {
   type BatchClusteringParams,
   CLUSTERING_ERROR_CODES,
   ClusteringError,
+  type ClusteringErrorCode,
   type IncrementalClusteringParams,
   type TopicClusteringResponse,
   type TopicClusteringSubtopic,
@@ -598,6 +600,22 @@ type ClusteringCall = TopicClusteringRequest extends infer R
     : never
   : never;
 
+/**
+ * A provider bad request stays ours: the request is the one we built from the
+ * project's settings, so the customer has nothing to change.
+ */
+const CLUSTERING_CODE_OF_LANGEVALS_FAILURE: Partial<
+  Record<LangevalsClusteringFailureCode, ClusteringErrorCode>
+> = {
+  model_not_configured: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+  model_provider_auth_failed: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
+  model_provider_rate_limited: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,
+};
+
+const clusteringCodeOfRefusal = (error: LangevalsClusteringError): ClusteringErrorCode =>
+  (error.failureCode && CLUSTERING_CODE_OF_LANGEVALS_FAILURE[error.failureCode]) ??
+  CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE;
+
 /** The whole exchange, staging upload and body read included, lives inside the deadline. */
 const requestClustering = async (
   deps: TopicClusteringRunnerDeps,
@@ -627,11 +645,9 @@ const requestClustering = async (
     });
   } catch (error) {
     // Ours by default: the body often quotes an upstream provider error, but
-    // quoting is not evidence, so the customer is told the code only.
+    // quoting is not evidence. Only a code langevals named is.
     if (error instanceof LangevalsClusteringError) {
-      throw new ClusteringError(CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE, error.message, {
-        cause: error,
-      });
+      throw new ClusteringError(clusteringCodeOfRefusal(error), error.message, { cause: error });
     }
     if (controller.signal.aborted) {
       logger.warn(

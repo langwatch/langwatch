@@ -2,7 +2,7 @@
  * Custom error types for dataset domain.
  * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { REFUSED_ATTACHMENT_MEDIA_TYPES } from "@langwatch/stored-object-contract";
 
 import { formatDatasetByteLimit, formatDatasetRowLimit } from "./dataset-limits.ts";
@@ -160,8 +160,10 @@ export class MalformedColumnTypesError extends Error {
 
 /**
  * Thrown when a record entry contains a column name not defined in the dataset schema.
+ * The caller can fix the entry, so it is a handled 422; REST still answers it 400 by name.
  */
-export class InvalidColumnError extends Error {
+export class InvalidColumnError extends HandledError {
+  declare readonly code: "dataset_invalid_column";
   readonly columnName: string;
   readonly validColumns: string[];
 
@@ -176,7 +178,9 @@ export class InvalidColumnError extends Error {
   }) {
     const validColumnsList = validColumns.length > 0 ? validColumns.join(", ") : "(none)";
     super(
+      "dataset_invalid_column",
       `Column "${columnName}" is not defined in the "${datasetName}" dataset schema. Valid columns: ${validColumnsList}`,
+      { ...remediation("dataset_invalid_column"), httpStatus: 422, fault: "customer" },
     );
     this.name = "InvalidColumnError";
     this.columnName = columnName;

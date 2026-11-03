@@ -35,11 +35,12 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
         run: async ({ checkpoint, dryRun, signal }) => {
           const resumed = checkpoint.resumeFrom?.afterProjectId;
           const count = (
-            key: "projects" | "departmentAssignments" | "presenceSettings",
+            key: "projects" | "departmentAssignments" | "presenceSettings" | "skippedOrphans",
           ): number => {
             const counted = checkpoint.resumeFrom?.[key];
             return typeof counted === "number" ? counted : 0;
           };
+          const orphans = checkpoint.resumeFrom?.orphanProjectIds;
           const report = await app.recordExistingFacts({
             dryRun,
             signal,
@@ -48,6 +49,10 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
               projects: count("projects"),
               departmentAssignments: count("departmentAssignments"),
               presenceSettings: count("presenceSettings"),
+              skippedOrphans: count("skippedOrphans"),
+              orphanProjectIds: Array.isArray(orphans)
+                ? orphans.filter((id): id is string => typeof id === "string")
+                : [],
             },
             onPageDone: ({ afterProjectId, report: page }) =>
               checkpoint.save({ report: { afterProjectId, ...page } }),

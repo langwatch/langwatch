@@ -313,6 +313,7 @@ export const apiKeyRest = defineRestRouter(ApiKeyApi)
   })
 
   .post("/", "createApiKey")
+  .keepsRecords()
   .withInput(apiKeyRestCreateSchema)
   .withPermission("organization:manage")
   .withOutput(apiKeyRestMintedSchema)
@@ -416,6 +417,7 @@ export const apiKeyRest = defineRestRouter(ApiKeyApi)
   )
 
   .patch("/:id", "updateApiKey")
+  .keepsRecords()
   .withParams(apiKeyRestParamsSchema)
   .withInput(apiKeyRestUpdateSchema)
   .withPermission("organization:manage")
@@ -494,6 +496,7 @@ export const apiKeyRest = defineRestRouter(ApiKeyApi)
   })
   .withMiddlewareContext(apiKeyRestCredential)
   .withAudit("management.api-key.revoke")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .handle(async ({ app, input, scope }, caller) => {
     // Real adminness, so revoke() can enforce its owner-only path: without
     // this, any organization:manage holder could revoke anyone's key.
@@ -510,6 +513,7 @@ export const apiKeyRest = defineRestRouter(ApiKeyApi)
   // A person's project-bound sign-in mints their app's ingestion key here (record, OAuth
   // sentences): no organization:manage, and no key may mint one, so a leaked key cannot breed.
   .post("/ingestion", "createIngestionApiKey")
+  .keepsRecords()
   .withCredential("project")
   .withInput(apiKeyRestCreateSchema)
   .withPermission("traces:create")
@@ -553,6 +557,7 @@ export const apiKeyRest = defineRestRouter(ApiKeyApi)
   // `langwatch login --project` mints the key it writes to .env here: the person's own key with
   // full access to the project their sign-in is bound to, behind project:manage.
   .post("/full-access", "createFullAccessApiKey")
+  .keepsRecords()
   .withCredential("project")
   .withInput(apiKeyRestCreateSchema)
   .withPermission("project:manage")

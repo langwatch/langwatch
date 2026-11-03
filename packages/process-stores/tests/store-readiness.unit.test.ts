@@ -58,7 +58,7 @@ describe("given the stores hosted on a server", () => {
       try {
         members.read("prisma");
 
-        await expect(hostedStores(members).ready?.()).rejects.toMatchObject({
+        await expect(hostedStores({ source: members }).ready?.()).rejects.toMatchObject({
           code: "store_not_answering",
         });
       } finally {

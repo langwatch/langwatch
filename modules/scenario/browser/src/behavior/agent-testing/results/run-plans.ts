@@ -278,6 +278,7 @@ export function toRunGroupSummary(lastRun: RunPlanLastRun): RunGroupSummary {
     failedCount: lastRun.failedCount,
     stalledCount: 0,
     cancelledCount: 0,
+    notScoredCount: 0,
     completedCount: lastRun.passedCount + lastRun.failedCount,
     totalCount: settledCount,
     inProgressCount: 0,

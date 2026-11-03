@@ -13,7 +13,12 @@ import { assertCodexAgentGuidance } from "./codex-agents-md";
 import type { GovernanceConfig } from "./config";
 import { buildOtelEnvBlock } from "./otel-env-block";
 import { runningCodeRestartNotice } from "./running-code";
-import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
+import {
+  assertOwnedHookFileFor,
+  hookFileNotOursNotice,
+  installSessionContextHooks,
+  removeSessionContextHooks,
+} from "./session-context-hooks";
 import {
   type DetectedShell,
   assertCodexTurnHarvest,
@@ -165,6 +170,8 @@ export function installTelemetryWiring({
     return { labels, warnings, requiredFailures };
   }
 
+  warnings.push(...assertOwnedHookFile(tool));
+
   // Every remaining tool persists as a scoped shell function so the OTel
   // env applies to `<tool>` runs only, never to other shell children.
   const shell = detectShell();
@@ -202,4 +209,21 @@ export function installTelemetryWiring({
     if (notice) warnings.push(notice);
   }
   return { labels, warnings, requiredFailures };
+}
+
+/**
+ * Both Copilot surfaces and Grok load a hook file LangWatch owns (ADR-039 S4,
+ * ADR-192), so wiring writes it, quietly and best-effort as claude's is. The
+ * warning is for a file of the user's at its path: then linking is off.
+ */
+function assertOwnedHookFile(tool: string): string[] {
+  const hookFile = assertOwnedHookFileFor({ command: tool });
+  if (hookFile?.action !== "not_ours") return [];
+  return [
+    hookFileNotOursNotice({
+      displayPath: hookFile.displayPath,
+      agentId: hookFile.tool,
+      command: tool,
+    }),
+  ];
 }

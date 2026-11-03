@@ -1,8 +1,7 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
-  DEFAULT_PARTITION_WINDOW_MS,
-  queryWindowed,
+  type IdBoundOptions,
   type TenantScopedReader,
   tenantScope,
   tenantScopeKey,
@@ -25,7 +24,6 @@ import {
   type TraceSummaryReadWindow,
 } from "../trace-summary-projection.repository.ts";
 import type {
-  FindByTraceIdOptions,
   FindByTraceIdParams,
   TraceSummaryRead,
   TraceSummaryRepository,
@@ -324,126 +322,54 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     }
   }
 
-  /**
-   * Fold read-back path (ADR-066): an explicit window applies verbatim with
-   * NO internal fallback — the fold executor owns the miss retry, so a
-   * second recovery ladder here would re-run a seek the executor redoes anyway.
-   */
-  async #findInExplicitWindow({
-    authorization,
-    traceId,
-    window: { fromMs, toMs },
-  }: {
-    authorization: Authorization;
-    traceId: string;
-    window: { fromMs: number; toMs: number };
-  }): Promise<TraceSummaryRead | null> {
-    try {
-      return await queryWindowed<TraceSummaryRead | null>({
-        table: TABLE_NAME,
-        hintMs: (fromMs + toMs) / 2,
-        windowMs: (toMs - fromMs) / 2,
-        fallback: "none",
-        isEmpty: (result) => result === null,
-        run: async (window) =>
-          // With a hint and `fallback: "none"` the fragment is always
-          // present; the null arm exists only to satisfy the contract.
-          window
-            ? this.queryByTraceId({
-                authorization,
-                traceId,
-                window: { fromMs: window.fromMs, toMs: window.toMs },
-              })
-            : null,
-      });
-    } catch (error) {
-      logSummaryReadFailure({ authorization, traceId, error });
-      throw error;
-    }
-  }
-
-  /**
-   * The fallback stage: the hint window missed, or there was none. Resolves
-   * OccurredAt from a cheap sort-key seek and bounds the heavy read instead
-   * of scanning every weekly partition. A genuinely absent trace returns null.
-   */
-  async #findByResolvedOccurredAt({
-    authorization,
-    traceId,
-    hasHint,
-    options,
-  }: {
-    authorization: Authorization;
-    traceId: string;
-    hasHint: boolean;
-    options: FindByTraceIdOptions;
-  }): Promise<TraceSummaryRead | null> {
-    if (hasHint) {
-      logger.debug(
-        { traceId, occurredAtMs: options.occurredAtMs },
-        "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
-      );
-    }
-
-    const resolved = await this.resolveOccurredAtMs({ authorization, traceId });
-    if (!resolved.found) return null;
-
-    if (resolved.occurredAtMs === undefined) {
-      logger.debug(
-        { traceId },
-        "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
-      );
-
-      return this.queryByTraceId({ authorization, traceId });
-    }
-
-    return this.queryByTraceId({
-      authorization,
-      traceId,
-      window: {
-        fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-        toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
-      },
-    });
-  }
-
   async findByTraceId({
     authorization,
     traceId,
     ...options
   }: FindByTraceIdParams): Promise<TraceSummaryRead | null> {
-    // Fold read-back path (ADR-066): an explicit window applies verbatim
-    // with NO internal fallback — the fold executor owns the miss retry, so
-    // a second recovery ladder here would re-run a seek it redoes anyway.
-    if (options.window) {
-      return this.#findInExplicitWindow({ authorization, traceId, window: options.window });
-    }
-
-    // Two-stage read: hinted window for partition pruning, fallback unbounded.
-    const hasHint = options.occurredAtMs !== undefined;
-
     try {
-      return await queryWindowed<TraceSummaryRead | null>({
-        table: TABLE_NAME,
-        hintMs: options.occurredAtMs ?? null,
-        fallback: "unbounded",
-        isEmpty: (result) => result === null,
-        run: async (window) => {
-          if (window) {
-            return this.queryByTraceId({
-              authorization,
-              traceId,
-              window: { fromMs: window.fromMs, toMs: window.toMs },
-            });
-          }
-
-          return this.#findByResolvedOccurredAt({ authorization, traceId, hasHint, options });
-        },
+      return await this.queryByTraceId({
+        authorization,
+        traceId,
+        idBound: this.summaryBound({ authorization, traceId, options }),
       });
     } catch (error) {
       logSummaryReadFailure({ authorization, traceId, error });
       throw error;
     }
+  }
+
+  /**
+   * A fold read-back's explicit window applies first and never widens: the fold executor owns
+   * the miss retry (ADR-066). Otherwise the hint, then the id index once ready; before that, the
+   * OccurredAt a sort-key seek resolves bounds the read instead of every weekly partition.
+   */
+  private summaryBound({
+    authorization,
+    traceId,
+    options,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+    options: Omit<FindByTraceIdParams, "authorization" | "traceId">;
+  }): IdBoundOptions {
+    const { window } = options;
+    if (window) {
+      return {
+        occurredAtHint: (window.fromMs + window.toMs) / 2,
+        windowMs: (window.toMs - window.fromMs) / 2,
+        fallback: "none",
+      };
+    }
+    return {
+      occurredAtHint: options.occurredAtMs ?? null,
+      fallback: "none",
+      resolveOnHintMiss: true,
+      resolveHint: async () => {
+        const resolved = await this.resolveOccurredAtMs({ authorization, traceId });
+        return resolved.found ? resolved.occurredAtMs : null;
+      },
+    };
   }
 
   /**
@@ -458,17 +384,20 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     authorization: Authorization;
     traceId: string;
   }): Promise<string[]> {
+    const reader = this.reader(authorization);
     try {
-      const result = await this.reader(authorization).query({
+      const result = await reader.query({
         query: `
           SELECT DISTINCT TenantId
           FROM ${TABLE_NAME}
           WHERE ${tenantScope("OccurredAt")}
             AND TraceId = {traceId:String}
+            {{idBound:trace_summaries.TraceId:traceId}}
           ORDER BY TenantId
         `,
         query_params: { traceId },
         format: "JSONEachRow",
+        idBound: { fallback: "unbounded" },
       });
       return tenantIdRowsSchema.parse(await result.json()).map((row) => row.TenantId);
     } catch (error) {
@@ -495,6 +424,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     traceId: string;
   }): Promise<{ found: boolean; occurredAtMs?: number }> {
     const result = await this.reader(authorization).query({
+      // ID_BOUND_SKIP: the not-ready hint resolver; the index path never runs it.
       query: `
         SELECT
           count() AS rowCount,
@@ -531,21 +461,12 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   private async queryByTraceId({
     authorization,
     traceId,
-    window,
+    idBound,
   }: {
     authorization: Authorization;
     traceId: string;
-    window?: { fromMs: number; toMs: number };
+    idBound: IdBoundOptions;
   }): Promise<TraceSummaryRead | null> {
-    const outerTimeFilter = window
-      ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-        "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
-      : "";
-    const innerTimeFilter = window
-      ? "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-        "AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
-      : "";
-
     const client = this.reader(authorization);
     // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
     // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
@@ -606,20 +527,21 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         FROM ${TABLE_NAME} AS t
         WHERE ${tenantSet()}
           AND t.TraceId = {traceId:String}
-          ${outerTimeFilter}
+          {{idBound:trace_summaries.TraceId:traceId:t}}
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE ${tenantScope("OccurredAt")}
               AND TraceId = {traceId:String}
-              ${innerTimeFilter}
+              {{idBound:trace_summaries.TraceId:traceId}}
             GROUP BY TenantId, TraceId
           )
         ORDER BY t.TenantId ASC
         LIMIT 1
       `,
-      query_params: window ? { traceId, fromMs: window.fromMs, toMs: window.toMs } : { traceId },
+      query_params: { traceId },
       format: "JSONEachRow",
+      idBound,
     });
 
     const rows = summaryReadRowsSchema.parse(await result.json());

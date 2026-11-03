@@ -170,7 +170,15 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the gateway evicts the cached entry
       And the request is rejected with error.type "auth_upstream_unavailable"
       And no further soft-bump is applied
-      And the failure is logged with level=error (operator must investigate)
+      And the eviction is logged at info, as the cache's ordinary lifecycle
+      And the rejection is logged by the request as a platform fault (operator must investigate)
+
+    @unit
+    Scenario: an entry evicted at lookup for running out its lifetime logs at info
+      Given the cache holds an entry past its hard cap, or past the key's expiration date
+      When I send a request with that VK
+      Then the gateway evicts the cached entry
+      And the eviction is logged at info, not error
 
     @unit @unimplemented
     Scenario: successful refresh resets soft expiry to fresh JWT exp

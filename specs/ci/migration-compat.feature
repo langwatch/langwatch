@@ -98,7 +98,7 @@ Feature: Migration compatibility gates
 
   @unit
   Scenario: The previous release's image boots on the schema head migrated
-    Given the run is the nightly schedule or a manual dispatch
+    Given the run is the nightly suite or a manual dispatch
     And the previous release is the newest release manifest in packages/upgrade/releases
     When head's tasks have migrated the databases and that release's langwatch/langwatch image starts against them
     Then its health route answers within the timeout

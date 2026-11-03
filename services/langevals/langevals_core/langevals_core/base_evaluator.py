@@ -61,9 +61,9 @@ class LLMEvaluatorSettings(EvaluatorSettings):
         default="openai/gpt-5-mini",
         description="The model to use for evaluation",
     )
-    max_tokens: int = Field(
-        default=DEFAULT_MAX_TOKENS,
-        description="Max tokens allowed for evaluation",
+    max_tokens: Optional[int] = Field(
+        default=None,
+        description="Max tokens allowed for evaluation; unset reads as 128000",
     )
 
 

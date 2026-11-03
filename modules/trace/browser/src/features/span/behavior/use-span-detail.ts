@@ -12,13 +12,13 @@ import { applyOverlayToSpanDetail } from "../../../model/traces/edit-overlay/app
  * view.
  */
 export function useSpanDetailCanonical() {
-  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
+  const { isReady, queryArgs } = useTraceQueryArgs();
   const spanId = useTraceDrawer((s) => s.selectedSpanId);
 
   return api.traces.spanDetail.useQuery(
     { ...queryArgs, spanId: spanId ?? "" },
     {
-      enabled: isReady && hintReady && !!spanId,
+      enabled: isReady && !!spanId,
     },
   );
 }

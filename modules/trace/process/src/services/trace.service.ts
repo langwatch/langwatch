@@ -179,6 +179,7 @@ export class TraceService {
       authorization: input.authorization,
       traceId: input.traceId,
       sinceUpdatedAtMs: input.sinceUpdatedAtMs,
+      ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
     });
 
     return spanTreeNodesSchema.parse(

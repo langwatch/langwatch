@@ -239,15 +239,18 @@ func TestResolve_StaleEntry_TransportFailure_ServesStaleAndBumpsSoft(t *testing.
 
 // --- Hard cap stops the chain ------------------------------------------------
 
+// @scenario "an entry evicted at lookup for running out its lifetime logs at info"
 func TestResolve_StaleEntry_HardCapExceeded_EvictsAndRejects(t *testing.T) {
 	transportErr := herr.New(context.Background(), domain.ErrAuthUpstream, nil)
 	resolver := &fakeResolver{returns: []resolverReturn{{err: transportErr}}}
+	core, logs := observer.New(zap.InfoLevel)
 	// Use a small HardGrace so we can drive the entry past the cap quickly.
-	svc, logs := newService(t, Options{
+	svc, _ := newService(t, Options{
 		Resolver:      resolver,
 		ConfigFetcher: resolver,
 		SoftBump:      1 * time.Second,
 		HardGrace:     2 * time.Second,
+		Logger:        zap.New(core),
 	})
 	rawKey := "vk-lw-hardcap"
 	// Seed an entry whose original JWT exp is already past the hard cap
@@ -269,6 +272,9 @@ func TestResolve_StaleEntry_HardCapExceeded_EvictsAndRejects(t *testing.T) {
 	for _, entry := range logs.All() {
 		if entry.Message == "auth_cache_hard_evict" {
 			found = true
+			if entry.Level != zap.InfoLevel {
+				t.Fatalf("a lifetime eviction is the cache's lifecycle, logged at info; got %s", entry.Level)
+			}
 			break
 		}
 	}

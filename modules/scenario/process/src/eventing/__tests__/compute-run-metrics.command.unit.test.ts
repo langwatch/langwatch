@@ -100,38 +100,36 @@ describe("ComputeRunMetricsCommand", () => {
     });
   });
 
-  describe("when trace summary exists but has no metrics yet", () => {
+  describe("when the trace summary has not arrived", () => {
     /** @scenario "Pull-mode command schedules deferred retry for missing traces" */
-    it("schedules a deferred retry instead of silently returning", async () => {
-      const deps = makeDeps({
-        traceSummaryStore: {
-          get: vi
-            .fn()
-            .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: null }) }),
-        },
-        // No role cost derivable yet (spans not settled) and totalCost null.
-        deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
-          scenarioRoleCosts: {},
-          scenarioRoleLatencies: {},
-        }),
-      });
+    it("schedules a deferred retry with an incremented retry count", async () => {
+      const deps = makeDeps();
 
-      const handler = new ComputeRunMetricsCommand(deps);
-      const cmd = makeCommand({ retryCount: 0 });
-
-      const events = await handler.handle(cmd);
+      const events = await new ComputeRunMetricsCommand(deps).handle(
+        makeCommand({ retryCount: 0 }),
+      );
 
       expect(events).toEqual([]);
       expect(deps.scheduleRetry).toHaveBeenCalledWith(
-        expect.objectContaining({
-          retryCount: 1,
-          traceId: "trace-1",
-          scenarioRunId: "run-1",
-        }),
+        expect.objectContaining({ retryCount: 1, traceId: "trace-1", scenarioRunId: "run-1" }),
       );
     });
 
     it("gives up after MAX_RETRIES", async () => {
+      const deps = makeDeps();
+
+      const events = await new ComputeRunMetricsCommand(deps).handle(
+        makeCommand({ retryCount: 3 }),
+      );
+
+      expect(events).toEqual([]);
+      expect(deps.scheduleRetry).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the trace summary has no role-attributed spans and no cost", () => {
+    /** @scenario "Pull-mode command treats a trace with nothing to aggregate as final" */
+    it("emits nothing and schedules no retry", async () => {
       const deps = makeDeps({
         traceSummaryStore: {
           get: vi
@@ -140,10 +138,9 @@ describe("ComputeRunMetricsCommand", () => {
         },
       });
 
-      const handler = new ComputeRunMetricsCommand(deps);
-      const cmd = makeCommand({ retryCount: 3 });
-
-      const events = await handler.handle(cmd);
+      const events = await new ComputeRunMetricsCommand(deps).handle(
+        makeCommand({ retryCount: 0 }),
+      );
 
       expect(events).toEqual([]);
       expect(deps.scheduleRetry).not.toHaveBeenCalled();

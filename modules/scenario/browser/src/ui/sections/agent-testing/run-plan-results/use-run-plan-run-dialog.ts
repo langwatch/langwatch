@@ -52,7 +52,7 @@ export function runAgainSubjectOf({
     kind: "case",
     scenarioId: scenarioRun.scenarioId,
     name: scenarioRun.name ?? scenarioRun.scenarioId,
-    initialTarget: langwatch
+    initialTarget: langwatch?.targetType
       ? { type: langwatch.targetType, id: langwatch.targetReferenceId }
       : readScenarioTarget({ projectId, scenarioId: scenarioRun.scenarioId }),
   };

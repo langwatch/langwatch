@@ -65,9 +65,9 @@ function fixture(input: {
     datasetFindMany.mockResolvedValueOnce(page.map((id) => ({ id })));
   }
 
-  const recordFindMany = vi.fn();
+  const recordPageQuery = vi.fn();
   for (const page of input.recordPages ?? [[]]) {
-    recordFindMany.mockResolvedValueOnce(page);
+    recordPageQuery.mockResolvedValueOnce(page);
   }
   const recordAggregate = vi.fn(async () => fingerprintRow({ count: 0, maxUpdatedAt: null }));
   const update = vi.fn(async () => {});
@@ -90,9 +90,9 @@ function fixture(input: {
       update,
     },
     datasetRecord: {
-      findMany: recordFindMany,
       aggregate: recordAggregate,
     },
+    $queryRaw: recordPageQuery,
     $transaction: runTransaction,
   };
   const storage = new FixtureStorage();
@@ -113,7 +113,7 @@ function fixture(input: {
     lockedDatasetFindFirst,
     migration,
     recordAggregate,
-    recordFindMany,
+    recordPageQuery,
     storage,
     update,
   };
@@ -176,14 +176,19 @@ describe("PrismaDatasetMigrationRepository", () => {
       }),
     ).resolves.toBe("migrated");
 
-    expect(subject.recordFindMany).toHaveBeenNthCalledWith(2, {
-      where: { datasetId: "dataset_1", projectId: "project_1" },
-      select: { id: true, entry: true },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      take: 1000,
-      cursor: { id: "record_2" },
-      skip: 1,
-    });
+    const [sql, ...values] = subject.recordPageQuery.mock.calls[1] ?? [];
+    expect((sql as readonly string[]).join("?")).toContain(
+      'ORDER BY "createdAt" ASC, "id" COLLATE "C" ASC',
+    );
+    expect(values).toEqual([
+      "dataset_1",
+      "project_1",
+      "record_2",
+      "record_2",
+      "dataset_1",
+      "project_1",
+      1000,
+    ]);
     expect(subject.storage.writeChunks.mock.calls[0]?.[0].records).toEqual([
       { id: "record_1", entry: { value: 1 } },
       { id: "record_2", entry: { value: 2 } },

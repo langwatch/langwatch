@@ -405,6 +405,56 @@ describe("GroupQueueProcessor - Poison guard", () => {
 
         expect(await redis.exists(claimKey(name, "sole-owner"))).toBe(0);
       });
+
+      /** @scenario "a worker's release names the claim it belongs to" */
+      it("keeps the marker of the worker's current claim when it releases an earlier one", async () => {
+        const record = (claimToken: string) =>
+          scripts.recordClaim({
+            groupId: "reclaimed",
+            workerId: "same-worker",
+            stagedJobId: "job-1",
+            claimToken,
+          });
+        await record("claim-earlier");
+        await record("claim-current");
+        await redis.hset(claimKey(name, "reclaimed"), "deaths", "2");
+
+        await scripts.releaseClaim({
+          groupId: "reclaimed",
+          workerId: "same-worker",
+          claimToken: "claim-earlier",
+        });
+        expect(await redis.hget(claimKey(name, "reclaimed"), "token")).toBe("claim-current");
+        expect(await confirmedDeaths(name, "reclaimed")).toBe("2");
+
+        await scripts.releaseClaim({
+          groupId: "reclaimed",
+          workerId: "same-worker",
+          claimToken: "claim-current",
+        });
+        expect(await redis.exists(claimKey(name, "reclaimed"))).toBe(0);
+      });
+
+      /** @scenario "a worker's release names the claim it belongs to" */
+      it("compares the owner alone when the caller or the marker names no claim", async () => {
+        await scripts.recordClaim({
+          groupId: "older-caller",
+          workerId: "same-worker",
+          stagedJobId: "job-1",
+          claimToken: "claim-current",
+        });
+        await scripts.releaseClaim({ groupId: "older-caller", workerId: "same-worker" });
+        expect(await redis.exists(claimKey(name, "older-caller"))).toBe(0);
+
+        // A marker an older dispatch wrote carries no token.
+        await redis.hset(claimKey(name, "older-marker"), { owner: "same-worker", deaths: "1" });
+        await scripts.releaseClaim({
+          groupId: "older-marker",
+          workerId: "same-worker",
+          claimToken: "claim-current",
+        });
+        expect(await redis.exists(claimKey(name, "older-marker"))).toBe(0);
+      });
     });
   });
 
@@ -422,6 +472,8 @@ describe("GroupQueueProcessor - Poison guard", () => {
         const { queue, name } = createQueue(processed);
         await queue.waitUntilReady();
 
+        // Releases ride the outcome scripts now; an owner they do not name releases nothing.
+        Object.assign(queue["scripts"], { claimMarkerOwner: "" });
         vi.spyOn(GroupStagingScripts.prototype, "releaseClaim").mockResolvedValue(undefined);
 
         const jobs = DEFAULT_CONFIRMED_DEATH_THRESHOLD * 3;

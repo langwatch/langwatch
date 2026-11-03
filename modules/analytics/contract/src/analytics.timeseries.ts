@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -334,4 +335,9 @@ export function isZeroWhenAbsentSeries(series: AnalyticsSeries): boolean {
 
 export interface AnalyticsTimeseriesReadOptions {
   readonly maxResultRows?: number;
+  /**
+   * The door's proof for the series' project (ADR-177). An aggregate's proof reads its members
+   * inside their grants' windows; without one the series reads its own project as the platform.
+   */
+  readonly authorization?: Authorization;
 }

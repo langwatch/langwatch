@@ -3,16 +3,22 @@
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
+import type { AgentHooks } from "@langwatch/agent-contract";
 import type { Logger } from "@langwatch/observability";
 import * as ScenarioRunner from "@langwatch/scenario";
 import {
   type CallLimitTimer,
   type ChildProcessJobData,
   createCallLimitTimer,
+  type ScenarioRunHooks,
   DEFAULT_CALLER_VOICE,
 } from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
+import {
+  type ConnectedCallRun,
+  HttpSerializedConnectedAgentChannel,
+} from "../channels/http/http.serialized-connected-agent.channel.ts";
 import type { ScenarioHttp } from "../channels/http/http.serialized-http-agent.channel.ts";
 import { litellmModelChannels } from "../channels/litellm-model-channels.registry.ts";
 import type { NlpFetchTimeouts } from "../channels/nlp-fetch.channel.ts";
@@ -30,6 +36,8 @@ import { buildCallerVoiceSimulatorConfig } from "../rules/caller-voice-simulator
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptService } from "./agent-test-script.service.ts";
+import { RunStateRolesService } from "./run-state-roles.service.ts";
+import { ScenarioRunHooksError, ScenarioRunHooksService } from "./scenario-run-hooks.service.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
@@ -70,6 +78,8 @@ export interface ScenarioChildExecutionResult {
   agentInstance?: { hostname: string; label: string | null };
   /** LangWatch ended the voice call at the maximum call duration (AC28). */
   isCutAtLimit?: boolean;
+  /** The setup and teardown the run called, when the agent declared any (ADR-180). */
+  hooks?: ScenarioRunHooks;
 }
 
 /**
@@ -118,10 +128,13 @@ function buildRunCast({
   jobData,
   adapter,
   nlpInternalSecret,
+  readState,
 }: {
   jobData: ChildProcessJobData;
   adapter: ScenarioRunner.AgentAdapter;
   nlpInternalSecret: string | undefined;
+  /** The run's hook state, which the simulated user and the judge then see on every turn. */
+  readState?: () => Record<string, unknown> | null;
 }): {
   agents: ScenarioRunner.AgentAdapter[];
   script?: ScenarioRunner.ScriptStep[];
@@ -157,15 +170,15 @@ function buildRunCast({
   // simulator/judge loop; every other run keeps the default cast, which opens
   // with the caller.
   const agentGreetsFirstScript = buildAgentGreetsFirstScript(jobData.adapterData);
+  const roles = {
+    userSimulator: ScenarioRunner.userSimulatorAgent({ model: simulatorModel, ...voiceSimConfig }),
+    judge: ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel }),
+  };
+  const { userSimulator, judge } = readState
+    ? RunStateRolesService.create({ readState }).wrap(roles)
+    : roles;
   return {
-    agents: [
-      adapter,
-      ScenarioRunner.userSimulatorAgent({ model: simulatorModel, ...voiceSimConfig }),
-      ScenarioRunner.judgeAgent({
-        criteria: scenario.criteria,
-        model: judgeModel,
-      }),
-    ],
+    agents: [adapter, userSimulator, judge],
     ...(agentGreetsFirstScript ? { script: agentGreetsFirstScript } : {}),
   };
 }
@@ -189,6 +202,92 @@ function buildMaxTurnsRunConfig({
   };
 }
 
+/**
+ * The connected agent a scenario run calls hooks on, with the hooks it declared, or null when the
+ * run calls none. An agent test calls none.
+ */
+function hookTargetOf({
+  jobData,
+  adapter,
+}: {
+  jobData: ChildProcessJobData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): { caller: HttpSerializedConnectedAgentChannel; declared: AgentHooks } | null {
+  const { adapterData } = jobData;
+  if (jobData.script || adapterData.type !== "connected") return null;
+  const declared = adapterData.hooks;
+  if (!declared?.setup && !declared?.teardown) return null;
+  if (!(adapter instanceof HttpSerializedConnectedAgentChannel)) return null;
+  return { caller: adapter, declared };
+}
+
+/** The scenario run every connected agent call names (ADR-180). */
+function callRunOf(jobData: ChildProcessJobData): ConnectedCallRun {
+  return {
+    ...(jobData.scenarioRunId ? { scenarioRunId: jobData.scenarioRunId } : {}),
+    scenarioName: jobData.scenario.name,
+    batchRunId: jobData.context.batchRunId,
+  };
+}
+
+/** The run's turns through the scenario library, up to its verdict. */
+function runScenarioTurns({
+  jobData,
+  runtime,
+  cast,
+  voiceMetadata,
+}: {
+  jobData: ChildProcessJobData;
+  runtime: ScenarioChildRuntime;
+  cast: ReturnType<typeof buildRunCast>;
+  voiceMetadata: Record<string, unknown>;
+}): ReturnType<typeof ScenarioRunner.run> {
+  const { context, scenario, parameters, target } = jobData;
+  const { langwatchEndpoint, langwatchApiKey } = runtime;
+  return ScenarioRunner.run(
+    {
+      id: scenario.id,
+      name: scenario.name,
+      description: scenario.situation,
+      setId: context.setId,
+      agents: cast.agents,
+      ...(cast.script ? { script: cast.script } : {}),
+      verbose: runtime.verbose,
+      // An http target's own spans land in the trace each turn propagates,
+      // so the judge fetches them back from the platform's trace API before
+      // any verdict. The wait budget comes from the prefetcher's per-project
+      // ingest-lag measurement.
+      ...buildRemoteTraceRunConfig({
+        targetType: target.type,
+        traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+        langwatchEndpoint,
+        langwatchApiKey,
+      }),
+      ...buildMaxTurnsRunConfig({
+        jobData,
+        scenarioMaxTurns: scenario.maxTurns,
+      }),
+      ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
+      metadata: {
+        langwatch: {
+          targetReferenceId: target.referenceId,
+          targetType: target.type,
+          ...voiceMetadata,
+        },
+        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+      },
+    },
+    {
+      batchRunId: context.batchRunId,
+      runId: jobData.scenarioRunId,
+      langwatch: {
+        endpoint: langwatchEndpoint,
+        apiKey: langwatchApiKey,
+      },
+    },
+  );
+}
+
 async function executeScenarioChildValue({
   jobData,
   runtime,
@@ -196,18 +295,9 @@ async function executeScenarioChildValue({
   jobData: ChildProcessJobData;
   runtime: ScenarioChildRuntime;
 }): Promise<ScenarioChildExecutionResult> {
-  const {
-    context,
-    scenario,
-    parameters,
-    adapterData,
-    modelParams,
-    nlpServiceUrl,
-    executeSyncRoute,
-    target,
-  } = jobData;
+  const { parameters, adapterData, modelParams, nlpServiceUrl, executeSyncRoute } = jobData;
 
-  const { langwatchEndpoint, langwatchApiKey, logger } = runtime;
+  const { langwatchApiKey, logger } = runtime;
 
   // The run's minted key rides LANGWATCH_API_KEY, the telemetry channel every
   // child already gets, so the job payload never carries it. The workflow and
@@ -225,62 +315,30 @@ async function executeScenarioChildValue({
     parameters,
     httpPort: runtime.httpPort,
     logger,
+    run: callRunOf(jobData),
   });
+  const hookTarget = hookTargetOf({ jobData, adapter });
   const cast = buildRunCast({
     jobData,
     adapter,
     nlpInternalSecret: runtime.nlpInternalSecret,
+    ...(hookTarget ? { readState: () => hookTarget.caller.runState } : {}),
   });
   const { voiceMetadata, callLimitTimer } = buildVoiceRunSetup({ jobData, adapter, runtime });
+  const runTurns = () => runScenarioTurns({ jobData, runtime, cast, voiceMetadata });
 
   // The timer clears on a rejected run too, or it could fire after the failure is reported.
-  let result: Awaited<ReturnType<typeof ScenarioRunner.run>>;
+  let ran: { value: Awaited<ReturnType<typeof ScenarioRunner.run>>; hooks?: ScenarioRunHooks };
   try {
-    result = await ScenarioRunner.run(
-      {
-        id: scenario.id,
-        name: scenario.name,
-        description: scenario.situation,
-        setId: context.setId,
-        agents: cast.agents,
-        ...(cast.script ? { script: cast.script } : {}),
-        verbose: runtime.verbose,
-        // An http target's own spans land in the trace each turn propagates,
-        // so the judge fetches them back from the platform's trace API before
-        // any verdict. The wait budget comes from the prefetcher's per-project
-        // ingest-lag measurement.
-        ...buildRemoteTraceRunConfig({
-          targetType: target.type,
-          traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
-          langwatchEndpoint,
-          langwatchApiKey,
-        }),
-        ...buildMaxTurnsRunConfig({
-          jobData,
-          scenarioMaxTurns: scenario.maxTurns,
-        }),
-        ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
-        metadata: {
-          langwatch: {
-            targetReferenceId: target.referenceId,
-            targetType: target.type,
-            ...voiceMetadata,
-          },
-          ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
-        },
-      },
-      {
-        batchRunId: context.batchRunId,
-        runId: jobData.scenarioRunId,
-        langwatch: {
-          endpoint: langwatchEndpoint,
-          apiKey: langwatchApiKey,
-        },
-      },
-    );
+    ran = hookTarget
+      ? await ScenarioRunHooksService.create({ ...hookTarget, keepData: jobData.keepData }).around(
+          runTurns,
+        )
+      : { value: await runTurns() };
   } finally {
     callLimitTimer?.clear();
   }
+  const { value: result, hooks } = ran;
 
   // A failed test is still a successful execution — results are reported via SDK.
   if (result.success) {
@@ -309,6 +367,7 @@ async function executeScenarioChildValue({
   if (servedInstance) outputResult.agentInstance = servedInstance;
   // The parent records the marker so the run header can show "Cut at the call limit".
   if (callLimitTimer?.wasCut()) outputResult.isCutAtLimit = true;
+  if (hooks) outputResult.hooks = hooks;
   return outputResult;
 }
 
@@ -366,6 +425,18 @@ function formatScenarioChildErrorValue(error: unknown): string {
   return parts.filter((p) => p.length > 0).join(": ");
 }
 
+/** The result line of a run that threw: the error, and the hooks it called when it had any. */
+function failureLineValue(error: unknown): ScenarioChildExecutionResult {
+  if (error instanceof ScenarioRunHooksError) {
+    return {
+      success: false,
+      error: formatScenarioChildErrorValue(error.reason),
+      hooks: error.hooks,
+    };
+  }
+  return { success: false, error: formatScenarioChildErrorValue(error) };
+}
+
 export class ScenarioChildExecutionService {
   static create(): ScenarioChildExecutionService {
     return new ScenarioChildExecutionService();
@@ -375,9 +446,9 @@ export class ScenarioChildExecutionService {
 
   static readonly execute = executeScenarioChildValue;
   static readonly flushTraces = flushScenarioOtelTracesValue;
-  static readonly formatError = formatScenarioChildErrorValue;
+  static readonly failureLine = failureLineValue;
 }
 
 export const executeScenarioChild = ScenarioChildExecutionService.execute;
 export const flushScenarioOtelTraces = ScenarioChildExecutionService.flushTraces;
-export const formatScenarioChildError = ScenarioChildExecutionService.formatError;
+export const scenarioChildFailureLine = ScenarioChildExecutionService.failureLine;

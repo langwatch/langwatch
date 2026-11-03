@@ -1,4 +1,4 @@
-import type { PeerSubscriberContext, PeerSubscriberDefinition } from "@langwatch/eventing";
+import type { PeerSubscriberContext, PeerEventSubscriberDefinition } from "@langwatch/eventing";
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -22,18 +22,24 @@ export type WebhookGatewayEventDelivery = (
 
 /** One peer subscriber per gateway fact webhook delivers, each on that event's contract data. */
 type WebhookGatewayEventSubscribers = Readonly<{
-  gatewaySpendAdmittedDelivery: PeerSubscriberDefinition<
+  gatewaySpendAdmittedDelivery: PeerEventSubscriberDefinition<
     typeof gatewaySpendAdmittedEventDataSchema
   >;
-  gatewaySpendConfirmedDelivery: PeerSubscriberDefinition<
+  gatewaySpendConfirmedDelivery: PeerEventSubscriberDefinition<
     typeof gatewaySpendConfirmedEventDataSchema
   >;
-  gatewaySpendFailedDelivery: PeerSubscriberDefinition<typeof gatewaySpendFailedEventDataSchema>;
-  gatewaySpendSettledDelivery: PeerSubscriberDefinition<typeof gatewaySpendSettledEventDataSchema>;
-  gatewayBudgetCrossingDelivery: PeerSubscriberDefinition<
+  gatewaySpendFailedDelivery: PeerEventSubscriberDefinition<
+    typeof gatewaySpendFailedEventDataSchema
+  >;
+  gatewaySpendSettledDelivery: PeerEventSubscriberDefinition<
+    typeof gatewaySpendSettledEventDataSchema
+  >;
+  gatewayBudgetCrossingDelivery: PeerEventSubscriberDefinition<
     typeof recordBudgetCrossingCommandDataSchema
   >;
-  gatewayVkLifecycleDelivery: PeerSubscriberDefinition<typeof recordVkLifecycleCommandDataSchema>;
+  gatewayVkLifecycleDelivery: PeerEventSubscriberDefinition<
+    typeof recordVkLifecycleCommandDataSchema
+  >;
 }>;
 
 /** A fact's delivery identity: its idempotency key when it has one, as gateway's lanes keyed it. */

@@ -67,6 +67,10 @@ export class AutomationRunawayUncontainedService
     this.logger.error(fields, message);
   }
 
+  warn(fields: Record<string, unknown>, message: string): void {
+    this.logger.warn(fields, message);
+  }
+
   info(fields: Record<string, unknown>, message: string): void {
     this.logger.info(fields, message);
   }

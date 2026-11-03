@@ -22,6 +22,10 @@ langwatch instrument claude --key ik-lw-...
 langwatch instrument codex --key ik-lw-...
 ```
 
+GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the Copilot settings in the job or the image instead.
+
+`langwatch ingest install copilot_cli --env-only` prints those settings, but it needs a signed-in device, so run it on a machine where you are signed in and copy the lines, as [Bake it into an image](#bake-it-into-an-image) shows. With an ingest key alone, write the same lines by hand from [Manual OpenTelemetry setup](/coding-agents/github-copilot-cli#manual-opentelemetry-setup).
+
 The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
 
 ```bash
@@ -62,7 +66,9 @@ For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent,
 
 ## Bake it into an image
 
-`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`. Add `--json` for machine-readable output.
+`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
+
+`--env-only` also skips the hooks that report each session's repository and branch. For `copilot_cli`, that is the file `~/.copilot/hooks/langwatch.json`, and without it Copilot sessions reach no pull request. Run the command without `--env-only` to write it. See [GitHub Copilot](/coding-agents/github-copilot-cli#link-sessions-to-their-pull-requests).
 
 ## Roll out to a managed fleet
 

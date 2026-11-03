@@ -2,7 +2,7 @@ Feature: GroupQueue pending counter ground-truth reconcile
   As an operator monitoring the GroupQueue dashboard
   I want the pending counter to self-heal to the live ground truth
   So that the "pending jobs" tile reflects reality even after worker deaths,
-  TTL reaps, or DLQ moves that cannot decrement the counter atomically
+  TTL reaps, or writers from an older release that did not adjust it
 
   Background:
     Given a GroupQueue whose pending counter is tracked separately from the jobs
@@ -147,11 +147,16 @@ Feature: GroupQueue pending counter ground-truth reconcile
     When reconciles keep running before the next sweep is due
     Then the sweep still runs once its interval has elapsed
 
+  # Under steady churn some group is always caught between indexes, so nearly
+  # every sweep adopts one. Sweeping again on the very next pass then walks the
+  # whole keyspace back to back, forever. A short pause keeps adoption quick
+  # while the walk stays a fraction of the engine's time.
   @unit
-  Scenario: A sweep that adopts keeps sweeping on the next pass
+  Scenario: A sweep that adopts sweeps again after a short pause
     Given a sweep finds a group holding jobs that the index does not list
-    When the next reconcile runs
-    Then it sweeps again without waiting for the interval
+    When reconciles run inside the pause
+    Then they read the indexes without walking the keyspace
+    And the sweep runs again once the pause has elapsed, well before the interval
 
   # A group listed in a lifecycle index while holding no jobs is adopted, pruned
   # for being empty, and found again on the next pass. Treating that as progress
@@ -196,3 +201,12 @@ Feature: GroupQueue pending counter ground-truth reconcile
     When it goes to publish
     Then neither the counter nor the drift is written
 
+  # Moving a group to the dead-letter queue and replaying it adjust the counter
+  # in the same step as the jobs, so the tile is right before any reconcile runs.
+  @integration
+  Scenario: Operator dead-letter moves and replays keep the pending counter without a reconcile
+    Given a blocked group whose staged job the pending counter counts
+    When an operator moves it to the dead-letter queue, singly or in bulk
+    Then the pending counter drops by the jobs moved
+    When the operator replays or redrives it, even more than once
+    Then the pending counter equals the jobs back on the live group

@@ -30,6 +30,24 @@ export const paramsSchema: ParamsSchema = paramsSchemaDefinition;
 /** The agent's own per-conversation memory: any JSON value, or nothing. */
 export const sessionSchema = z.unknown().optional();
 
+/** The test data a scenario's setup made: a JSON object, or nothing (ADR-180). */
+const stateSchemaDefinition = z.record(z.string(), z.unknown()).nullable().optional();
+export interface StateSchema extends Named<typeof stateSchemaDefinition> {}
+export const stateSchema: StateSchema = stateSchemaDefinition;
+
+/** What one call asks of the instance; an envelope without it is a turn. */
+export const CALL_KINDS = ["turn", "setup", "teardown"] as const;
+export type CallKind = (typeof CALL_KINDS)[number];
+
+/** The scenario hooks an agent declares; the platform calls only these. */
+const agentHooksSchemaDefinition = z.object({
+  setup: z.boolean(),
+  teardown: z.boolean(),
+});
+export interface AgentHooksSchema extends Named<typeof agentHooksSchemaDefinition> {}
+export const agentHooksSchema: AgentHooksSchema = agentHooksSchemaDefinition;
+export type AgentHooks = z.infer<typeof agentHooksSchema>;
+
 const sdkSchemaDefinition = z.object({
   name: z.string().min(1).max(64),
   version: z.string().min(1).max(64),
@@ -61,6 +79,8 @@ const registerAgentSchemaDefinition = z.object({
   concurrency: z.number().int().positive().max(1000).optional(),
   timeoutMs: z.number().int().positive().optional(),
   sticky: z.boolean().optional(),
+  /** Absent from an SDK that predates hooks: the agent has none. */
+  hooks: agentHooksSchema.optional(),
 });
 export interface RegisterAgentSchema extends Named<typeof registerAgentSchemaDefinition> {}
 export const registerAgentSchema: RegisterAgentSchema = registerAgentSchemaDefinition;
@@ -144,10 +164,11 @@ export interface CallRunSchema extends Named<typeof callRunSchemaDefinition> {}
 export const callRunSchema: CallRunSchema = callRunSchemaDefinition;
 
 /**
- * What an instance receives for one turn: the contract fields and nothing
+ * What an instance receives for one call: the contract fields and nothing
  * else. `judgmentRequest` and platform metadata never travel here.
  */
 const callEnvelopeSchemaDefinition = z.object({
+  kind: z.enum(CALL_KINDS).default("turn"),
   callId: z.string(),
   agentId: z.string(),
   threadId: z.string(),
@@ -155,6 +176,7 @@ const callEnvelopeSchemaDefinition = z.object({
   newMessages: z.array(messageSchema),
   params: paramsSchema,
   session: sessionSchema,
+  state: stateSchema,
   traceparent: z.string().nullable(),
   deadlineAt: z.number().int(),
   run: callRunSchema,
@@ -163,8 +185,9 @@ export interface CallEnvelopeSchema extends Named<typeof callEnvelopeSchemaDefin
 export const callEnvelopeSchema: CallEnvelopeSchema = callEnvelopeSchemaDefinition;
 export type CallEnvelope = z.infer<typeof callEnvelopeSchema>;
 
-/** The ten keys of an envelope, the exact set a test pins. */
+/** The twelve keys of an envelope, the exact set a test pins. */
 export const CALL_ENVELOPE_KEYS = [
+  "kind",
   "callId",
   "agentId",
   "threadId",
@@ -172,6 +195,7 @@ export const CALL_ENVELOPE_KEYS = [
   "newMessages",
   "params",
   "session",
+  "state",
   "traceparent",
   "deadlineAt",
   "run",
@@ -215,9 +239,12 @@ const resultFrameSchemaDefinition = z
     callId: z.string().min(1),
     output: outputSchema.optional(),
     session: sessionSchema,
+    /** Setup's state, a turn's update, or teardown's returned object. */
+    state: stateSchema,
     error: resultErrorSchema.optional(),
   })
-  .refine((frame) => (frame.output !== void 0) !== (frame.error !== void 0), {
+  // A hook answers without an output, and a teardown may answer with nothing at all.
+  .refine((frame) => frame.output === void 0 || frame.error === void 0, {
     message: "A result carries an output or an error, and never both",
   });
 export interface ResultFrameSchema extends Named<typeof resultFrameSchemaDefinition> {}

@@ -1,26 +1,26 @@
 import chalk from "chalk";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
+import { findMonitor } from "./findMonitor";
+
 /**
  * Returns the monitor rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getMonitorCommand = async (id: string): Promise<CommandResult | void> => {
+export const getMonitorCommand = async (idOrSlugOrName: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = createSpinner(`Fetching monitor "${id}"...`).start();
+  const spinner = createSpinner(`Fetching monitor "${idOrSlugOrName}"...`).start();
 
   let monitor: {
     id: string;
@@ -37,29 +37,16 @@ export const getMonitorCommand = async (id: string): Promise<CommandResult | voi
     platformUrl?: string;
   };
   try {
-    const response = await langwatchFetch(`${endpoint}/api/v1/monitors/${id}`, {
-      headers: buildRequestHeaders({ apiKey }),
+    const found = await findMonitor<typeof monitor>({
+      endpoint,
+      apiKey,
+      reference: idOrSlugOrName,
     });
-
-    if (!response.ok) {
-      await failSpinnerFromResponse({ spinner, response, action: "fetch monitor" });
+    if ("failed" in found) {
+      await failSpinnerFromResponse({ spinner, response: found.failed, action: "fetch monitor" });
       process.exit(1);
     }
-
-    monitor = (await response.json()) as {
-      id: string;
-      name: string;
-      slug: string;
-      checkType: string;
-      enabled: boolean;
-      executionMode: string;
-      sample: number;
-      level: string;
-      evaluatorId: string | null;
-      preconditions: unknown;
-      createdAt: string;
-      platformUrl?: string;
-    };
+    monitor = found.monitor;
 
     spinner.succeed(`Monitor "${monitor.name}"`);
   } catch (error) {

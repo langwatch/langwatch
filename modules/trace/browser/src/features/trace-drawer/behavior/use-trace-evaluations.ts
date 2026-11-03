@@ -30,14 +30,29 @@ export type RichEval = EvalSummary & {
   errorMessage?: string;
   errorStacktrace?: string[];
   retries?: number;
+  /** Attempts that failed while the evaluator service was down, before this verdict. */
+  attempts?: number;
   executionTime?: number;
   evalCost?: number;
   /** Wall-clock when the evaluator started, ms epoch. Used to order history. */
   timestamp?: number;
 };
 
+/** A pending run whose attempts have failed and that the worker will try again. */
+export interface RetryingEval {
+  evaluationId: string;
+  name: string;
+  attempts: number;
+  lastAttemptError?: string;
+  /** When the last attempt failed, ms epoch. */
+  lastAttemptAt?: number;
+  /** When the next attempt is due, ms epoch. */
+  nextAttemptAt?: number;
+}
+
 interface TraceEvaluationsResult {
   rich: RichEval[];
+  retrying: RetryingEval[];
   pendingCount: number;
   isLoading: boolean;
   isError: boolean;
@@ -90,6 +105,14 @@ export function mapScore(ev: Evaluation): number | boolean | null {
   return null;
 }
 
+function isPending(ev: Evaluation): boolean {
+  return ev.status === "scheduled" || ev.status === "in_progress";
+}
+
+function isRetrying(ev: Evaluation): boolean {
+  return isPending(ev) && (ev.attempts ?? 0) > 0;
+}
+
 export function useTraceEvaluations(): TraceEvaluationsResult {
   // Read-only viewers and previews are gated out by `isReady`. The read looks
   // up by trace id and prunes nothing by time, so it carries no time hint; on
@@ -109,9 +132,15 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
 
   return useMemo(() => {
     const all = rawEvaluations ?? [];
-    const pendingCount = all.filter(
-      (e) => e.status === "scheduled" || e.status === "in_progress",
-    ).length;
+    const pendingCount = all.filter((e) => isPending(e) && !isRetrying(e)).length;
+    const retrying: RetryingEval[] = all.filter(isRetrying).map((e) => ({
+      evaluationId: e.evaluation_id,
+      name: e.name,
+      attempts: e.attempts ?? 0,
+      lastAttemptError: e.last_attempt_error ?? undefined,
+      lastAttemptAt: e.timestamps.last_attempt_at ?? undefined,
+      nextAttemptAt: e.timestamps.next_attempt_at ?? undefined,
+    }));
 
     const rich: RichEval[] = all
       .filter((e) => e.status === "processed" || e.status === "error" || e.status === "skipped")
@@ -143,6 +172,7 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
           errorMessage: e.error?.message ?? undefined,
           errorStacktrace: e.error?.stacktrace ?? undefined,
           retries: e.retries ?? undefined,
+          attempts: e.attempts ?? undefined,
           executionTime,
           timestamp: started ?? undefined,
         };
@@ -150,6 +180,7 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
 
     return {
       rich,
+      retrying,
       pendingCount,
       isLoading: query.isLoading,
       isError: query.isError,

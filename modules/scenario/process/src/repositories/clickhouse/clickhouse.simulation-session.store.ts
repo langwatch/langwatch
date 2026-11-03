@@ -1,5 +1,9 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import type { ClickHouseColumns, ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseColumns,
+  type ClickHouseQueryClient,
+  type IdBoundOptions,
+} from "@langwatch/clickhouse-client";
 
 type SimulationEventingClickHouseClient = {
   query(input: {
@@ -7,6 +11,8 @@ type SimulationEventingClickHouseClient = {
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
+    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+    idBound?: IdBoundOptions;
   }): Promise<{ json<Row>(): Promise<Row[]> }>;
   insert(input: {
     table: string;
@@ -41,6 +47,7 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
       sql: input.query,
       params: input.query_params,
       ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),
+      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
     };
 
     return { json: async <Row>() => (await this.clickhouse.query<Row>(request)).rows };

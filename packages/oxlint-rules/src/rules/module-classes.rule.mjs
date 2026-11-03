@@ -1,4 +1,6 @@
+import { FEATURE_PREFIX } from "../../grammar/feature-layout-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
+import { publishedNamesOf } from "./module-classes.published.mjs";
 
 // The class shape each module artifact exports, per ARCHITECTURE.md §3.2: a
 // concrete class is built through `static create` behind a private constructor,
@@ -14,42 +16,52 @@ const CONTRACT_KINDS = [
   { pattern: /^src\/.+\.service\.ts$/, suffix: "Service", shape: "declared" },
 ];
 
+const SERVICE_SHAPE = {
+  suffix: "Service",
+  shape: "concrete",
+  create: METHOD_CREATE,
+  privateConstructor: true,
+};
+const APP_SHAPE = { suffix: "Module", shape: "concrete", create: METHOD_CREATE };
+const REPOSITORY_INTERFACE_SHAPE = { suffix: "Repository", shape: "declared" };
+const REPOSITORY_BACKEND_SHAPE = {
+  suffix: "Repository",
+  shape: "concrete",
+  create: FACTORY_CREATE,
+  inheritedFactory: true,
+};
+
 const PROCESS_KINDS = [
-  {
-    pattern: /^src\/services\/.+\.service\.ts$/,
-    suffix: "Service",
-    shape: "concrete",
-    create: METHOD_CREATE,
-    privateConstructor: true,
-  },
-  {
-    pattern: /^src\/app\/[^/]+\.app\.ts$/,
-    suffix: "Module",
-    shape: "concrete",
-    create: METHOD_CREATE,
-  },
+  { pattern: /^src\/services\/.+\.service\.ts$/, ...SERVICE_SHAPE },
+  { pattern: /^src\/app\/[^/]+\.app\.ts$/, ...APP_SHAPE },
   {
     pattern: /^src\/migrations\/.+\.migration\.ts$/,
     suffix: "Migration",
     shape: "concrete",
     create: METHOD_CREATE,
   },
+  { pattern: /^src\/repositories\/[^/]+\.repository\.ts$/, ...REPOSITORY_INTERFACE_SHAPE },
+  { pattern: /^src\/repositories\/[^/]+\/.+\.repository\.ts$/, ...REPOSITORY_BACKEND_SHAPE },
+];
+
+// An opted-in framework package (ADR-181): the same shapes, nested one concern deep.
+const FRAMEWORK_KINDS = [
+  { pattern: new RegExp(`^src/${FEATURE_PREFIX}services/.+\\.service\\.ts$`), ...SERVICE_SHAPE },
+  { pattern: /^src\/app\/[^/]+\.app\.ts$/, ...APP_SHAPE },
   {
-    pattern: /^src\/repositories\/[^/]+\.repository\.ts$/,
-    suffix: "Repository",
-    shape: "declared",
+    pattern: new RegExp(`^src/${FEATURE_PREFIX}repositories/[^/]+\\.repository\\.ts$`),
+    ...REPOSITORY_INTERFACE_SHAPE,
   },
   {
-    pattern: /^src\/repositories\/[^/]+\/.+\.repository\.ts$/,
-    suffix: "Repository",
-    shape: "concrete",
-    create: FACTORY_CREATE,
-    inheritedFactory: true,
+    pattern: new RegExp(`^src/${FEATURE_PREFIX}repositories/[^/]+/.+\\.repository\\.ts$`),
+    ...REPOSITORY_BACKEND_SHAPE,
   },
 ];
 
 function moduleClassKind(file) {
   if (!file.relative) return undefined;
+  if (file.kind === "framework" && file.strictSource)
+    return FRAMEWORK_KINDS.find((kind) => kind.pattern.test(file.relative));
   if (file.role === "contract")
     return CONTRACT_KINDS.find((kind) => kind.pattern.test(file.relative));
   if (file.role === "process")
@@ -109,8 +121,9 @@ function constructorOf(candidate) {
   );
 }
 
-function validClasses(exported, kind) {
-  const named = (candidate) => candidate.id?.name?.endsWith(kind.suffix);
+function validClasses({ exported, kind, published }) {
+  const named = (candidate) =>
+    candidate.id?.name?.endsWith(kind.suffix) || published.has(candidate.id?.name);
   const matching = exported.classes.filter(named);
   if (kind.shape === "concrete") return matching.filter((candidate) => !candidate.abstract);
   return matching
@@ -133,8 +146,9 @@ function reportStandalone(context, { file, functions, kind, owner }) {
   }
 }
 
-function reportConstruction(context, { candidate, kind }) {
+function reportConstruction(context, { candidate, kind, published }) {
   const name = candidate.id?.name ?? "This class";
+  if (published.has(name)) return;
   if (!hasCreate(candidate, kind)) {
     const create = kind.create.replaceAll("{{name}}", name);
     context.report({ node: candidate, messageId: "create", data: { create, name } });
@@ -185,11 +199,13 @@ export const moduleClassesRule = defineRule({
   },
   create(context, file) {
     const kind = moduleClassKind(file);
+    const published =
+      file.kind === "framework" ? publishedNamesOf({ cwd: context.cwd, file }) : new Set();
 
     return {
       Program(node) {
         const exported = exportedDeclarations(node);
-        const valid = validClasses(exported, kind);
+        const valid = validClasses({ exported, kind, published });
         reportStandalone(context, { file, functions: exported.functions, kind, owner: valid[0] });
         if (valid.length === 0) {
           context.report({
@@ -200,7 +216,7 @@ export const moduleClassesRule = defineRule({
           return;
         }
         if (kind.shape === "declared") return;
-        for (const candidate of valid) reportConstruction(context, { candidate, kind });
+        for (const candidate of valid) reportConstruction(context, { candidate, kind, published });
       },
     };
   },

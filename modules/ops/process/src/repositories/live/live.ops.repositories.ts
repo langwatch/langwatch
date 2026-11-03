@@ -1,6 +1,9 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
-import { EventingClickHouseEventExplorer } from "@langwatch/eventing/server";
+import {
+  EventingClickHouseEventExplorer,
+  eventLogIdIndexReadiness,
+} from "@langwatch/eventing/server";
 import { privateTenantListing } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -16,6 +19,7 @@ import { RedisAnomalyStateRepository } from "../redis/redis.anomaly-state.reposi
 import { BlobStoreRedisRepository } from "../redis/redis.blob-store.repository.ts";
 import { RedisBugReportRateLimitRepository } from "../redis/redis.bug-report-rate-limit.repository.ts";
 import { RedisCloudLatestReleaseRepository } from "../redis/redis.cloud-latest-release.repository.ts";
+import { RedisCloudNoticeRepository } from "../redis/redis.cloud-notice.repository.ts";
 import { RedisRedisHealthRepository } from "../redis/redis.datastore-health.repository.ts";
 import { RedisGroupQueueReaperRepository } from "../redis/redis.group-queue-reaper.repository.ts";
 import { RedisMigrationLeaseRepository } from "../redis/redis.migration-lease.repository.ts";
@@ -62,6 +66,7 @@ export const LiveOpsRepositories = {
         redis,
         clickhouse,
         eventing,
+        eventLogIndexReadiness: eventLogIdIndexReadiness({ clickhouse }),
         ...(privateTenants === undefined ? {} : { privateTenants }),
       }),
       pipelineDefinitions: EventingPipelineDefinitionsRepository.create({ eventing }),
@@ -70,6 +75,7 @@ export const LiveOpsRepositories = {
       rateTracker: RedisAnomalyRateTrackerRepository.create({ redis }),
       storageReadings: RedisStorageStatsReadingsRepository.create({ redis }),
       cloudLatestRelease: RedisCloudLatestReleaseRepository.create({ redis }),
+      cloudNotices: RedisCloudNoticeRepository.create({ redis }),
       redisHealth: RedisRedisHealthRepository.create(redis),
       clickhouseHealth: ClickHouseClickHouseHealthRepository.create({ clickhouse }),
       events: EventingClickHouseEventExplorer.create({ clickhouse }),

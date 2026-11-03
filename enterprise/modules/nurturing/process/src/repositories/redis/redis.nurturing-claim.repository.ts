@@ -4,7 +4,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { NurturingClaimRepository } from "../nurturing-claim.repository.ts";
 
 /** Only the command this repository calls. */
-export type NurturingClaimRedis = Pick<RedisConnection, "set">;
+export type NurturingClaimRedis = Pick<RedisConnection, "set" | "del">;
 
 /** The keys the process-wide idempotency claim wrote, so a rolling deploy still dedupes. */
 const CLAIM_KEY_PREFIX = "member:idempotency:";
@@ -28,5 +28,9 @@ export class RedisNurturingClaimRepository implements NurturingClaimRepository {
       (await this.#redis.set(`${CLAIM_KEY_PREFIX}${key}`, "claimed", "EX", ttlSeconds, "NX")) ===
       "OK"
     );
+  }
+
+  async release(key: string): Promise<void> {
+    await this.#redis.del(`${CLAIM_KEY_PREFIX}${key}`);
   }
 }

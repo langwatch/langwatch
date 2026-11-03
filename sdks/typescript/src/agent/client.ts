@@ -7,7 +7,7 @@
 import { context, propagation, trace } from "@opentelemetry/api";
 
 import type { Logger } from "../logger";
-import type { AgentCall, AgentResult } from "./define";
+import type { AgentCall, AgentResult, ScenarioRun } from "./define";
 import {
   buildConnectHeaders,
   buildInstance,
@@ -28,6 +28,7 @@ import {
   type RegisterInstance,
   type RegisteredAgent,
   type RegisteredFrame,
+  type ScenarioState,
 } from "./protocol";
 import {
   describeError,
@@ -39,6 +40,7 @@ import {
   watchdogDelayMs,
 } from "./reconnect";
 import { AgentParameterError, type ParameterReader } from "./schema";
+import { AgentStateError, checkState } from "./state";
 import {
   type AgentTransport,
   defaultSocketFactory,
@@ -57,7 +59,65 @@ export interface AgentRuntime {
   concurrency: number;
   timeoutMs: number;
   run: (call: AgentCall<Record<string, AgentParameterValue>>) => Promise<AgentResult>;
+  /** The scenario hooks declared so far; each answers with the state to send, if any. */
+  hooks: Partial<Record<"setup" | "teardown", HookRunner>>;
 }
+
+export type HookRunner = (input: {
+  run: ScenarioRun;
+  state: ScenarioState | null;
+  params: Record<string, AgentParameterValue>;
+}) => Promise<ScenarioState | undefined | void>;
+
+/** What a call answers: a turn's output, or a hook's state alone. */
+interface CallAnswer {
+  output?: AgentResult["output"];
+  session?: unknown;
+  state?: ScenarioState;
+}
+
+/** Why the instance cannot take a call of this kind, or null when it can. */
+const kindRefusal = (
+  runtime: AgentRuntime,
+  kind: string,
+): { code: string; message: string } | null => {
+  if (kind === "turn") return null;
+  if (kind !== "setup" && kind !== "teardown") {
+    return { code: "agent_call_failed", message: `unknown call kind "${kind}"` };
+  }
+  if (runtime.hooks[kind]) return null;
+  return {
+    code: "hook_not_declared",
+    message: `agent "${runtime.name}" declares no ${kind} hook`,
+  };
+};
+
+/** The code a failed call answers with: the error's own, when it carries one the platform reads. */
+const errorCodeOf = (error: unknown): string =>
+  error instanceof AgentParameterError || error instanceof AgentStateError
+    ? error.code
+    : "agent_call_failed";
+
+/** Runs the turn or the hook a call asks for. */
+const answerCall = async ({
+  runtime,
+  frame,
+  call,
+}: {
+  runtime: AgentRuntime;
+  frame: CallFrame;
+  call: AgentCall<Record<string, AgentParameterValue>>;
+}): Promise<CallAnswer> => {
+  const hook =
+    frame.kind === "setup" || frame.kind === "teardown" ? runtime.hooks[frame.kind] : undefined;
+  if (!hook) {
+    const result = await runtime.run(call);
+    return { ...result, state: checkState(result.state) };
+  }
+  const state = await hook({ run: frame.run, state: frame.state, params: call.params });
+  // The platform needs a setup's state; a setup that only seeds data sends an empty one.
+  return { state: checkState(frame.kind === "setup" ? (state ?? {}) : state) };
+};
 
 export interface AgentClientConfig {
   apiKey: string;
@@ -238,6 +298,12 @@ export class AgentClient {
       return;
     }
     this.scheduleConnect(0);
+  }
+
+  /** Registers the agents again after one changed: a hook declared once the socket opened. */
+  refreshAgents(): void {
+    // The platform ignores a second register on an open socket; a fresh one carries the change.
+    if (this.socket) this.restartSocket();
   }
 
   /** Closes the socket and connects again at once, keeping the reconnect loop. */
@@ -561,21 +627,9 @@ export class AgentClient {
       });
       return;
     }
-    const busy = [...this.inFlight.values()].filter((call) => call.runtime === runtime).length;
-    if (busy >= runtime.concurrency) {
-      this.sendError({
-        callId: frame.callId,
-        code: "agent_busy",
-        message: `agent "${runtime.name}" has ${busy} call${busy === 1 ? "" : "s"} in flight, its limit`,
-      });
-      return;
-    }
-    if (frame.deadlineAt !== null && frame.deadlineAt <= Date.now()) {
-      this.sendError({
-        callId: frame.callId,
-        code: "agent_call_timeout",
-        message: "the call deadline passed before it started",
-      });
+    const refusal = this.callRefusal({ frame, runtime });
+    if (refusal) {
+      this.sendError({ callId: frame.callId, ...refusal });
       return;
     }
 
@@ -614,12 +668,13 @@ export class AgentClient {
       newMessages: frame.newMessages,
       threadId: frame.threadId,
       session: frame.session,
+      state: frame.state,
       params,
       traceId,
     };
 
     try {
-      const result = await context.with(parent, () => runtime.run(call));
+      const result = await context.with(parent, () => answerCall({ runtime, frame, call }));
       if (entry.cancelled) return;
       // The handler answered, so its deadline is over. Disarming it before
       // the export matters: an export slower than what is left of the limit
@@ -631,12 +686,13 @@ export class AgentClient {
         type: "result",
         protocol: PROTOCOL_VERSION,
         callId: frame.callId,
-        output: result.output,
+        ...(result.output === undefined ? {} : { output: result.output }),
         ...(result.session === undefined ? {} : { session: result.session }),
+        ...(result.state === undefined ? {} : { state: result.state }),
       });
     } catch (error) {
       if (entry.cancelled) return;
-      const code = error instanceof AgentParameterError ? error.code : "agent_call_failed";
+      const code = errorCodeOf(error);
       const message = describeError(error);
       this.logger.warn(`agent "${runtime.name}" call ${frame.callId} failed: ${message}`);
       this.releaseCall({ callId: frame.callId, entry });
@@ -645,6 +701,32 @@ export class AgentClient {
     } finally {
       this.releaseCall({ callId: frame.callId, entry });
     }
+  }
+
+  /** Why the runtime cannot take this call now, or null when it can. */
+  private callRefusal({
+    frame,
+    runtime,
+  }: {
+    frame: CallFrame;
+    runtime: AgentRuntime;
+  }): { code: string; message: string } | null {
+    const kind = kindRefusal(runtime, frame.kind);
+    if (kind) return kind;
+    const busy = [...this.inFlight.values()].filter((call) => call.runtime === runtime).length;
+    if (busy >= runtime.concurrency) {
+      return {
+        code: "agent_busy",
+        message: `agent "${runtime.name}" has ${busy} call${busy === 1 ? "" : "s"} in flight, its limit`,
+      };
+    }
+    if (frame.deadlineAt !== null && frame.deadlineAt <= Date.now()) {
+      return {
+        code: "agent_call_timeout",
+        message: "the call deadline passed before it started",
+      };
+    }
+    return null;
   }
 
   /**
@@ -688,7 +770,11 @@ export class AgentClient {
     runtime: AgentRuntime;
   }): void {
     const fromDeadline = frame.deadlineAt === null ? Infinity : frame.deadlineAt - Date.now();
-    const limit = Math.min(fromDeadline, runtime.timeoutMs);
+    // A hook's deadline is its own budget, never cut to the turn timeout.
+    const limit =
+      frame.kind !== "turn" && frame.deadlineAt !== null
+        ? fromDeadline
+        : Math.min(fromDeadline, runtime.timeoutMs);
     if (!Number.isFinite(limit)) return;
     const timer = setTimeout(
       () => {

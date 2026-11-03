@@ -3,6 +3,8 @@ import { type UpgradeLease, upgradeLeaseSchema, type UpgradeStepStatus } from ".
 import type { ManifestStep } from "../manifest/manifest.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { PROJECTION_REPLAY_CURSOR } from "../step/projection-replay-step.ts";
+import { type LedgerTextRedactor, ledgerText } from "../step/step-log.ts";
+import { redactSecrets } from "./run-log.ts";
 
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed", "failed"]);
@@ -18,10 +20,20 @@ export type RegisteredStep = ManifestStep & { release: string | null };
  * release attribution and the run's plan. Same tables, same package, as the reader's repository.
  */
 export class UpgradeRunnerRepository {
-  private constructor(private readonly postgres: UpgradePostgres) {}
+  private constructor(
+    private readonly postgres: UpgradePostgres,
+    private readonly redact: LedgerTextRedactor,
+  ) {}
 
-  static create({ postgres }: { postgres: UpgradePostgres }): UpgradeRunnerRepository {
-    return new UpgradeRunnerRepository(postgres);
+  /** `redact` masks stored step errors; the gate passes one that knows its store URLs. */
+  static create({
+    postgres,
+    redact = redactSecrets,
+  }: {
+    postgres: UpgradePostgres;
+    redact?: LedgerTextRedactor;
+  }): UpgradeRunnerRepository {
+    return new UpgradeRunnerRepository(postgres, redact);
   }
 
   /** Runs `text` against this installation's ledger tables (`ledgerTables`). */
@@ -143,12 +155,15 @@ export class UpgradeRunnerRepository {
     runId,
     lastError = null,
     report,
+    logTail,
   }: {
     ids: readonly string[];
     status: UpgradeStepStatus;
     runId: string;
     lastError?: string | null;
     report?: Record<string, unknown>;
+    /** The attempt's last log lines; omitted keeps the stored tail. */
+    logTail?: readonly string[];
   }): Promise<void> {
     if (ids.length === 0) return;
     await this.query(
@@ -156,15 +171,17 @@ export class UpgradeRunnerRepository {
           SET "status" = $2, "run_id" = $3, "last_error" = $4, "inferred" = false,
               "report" = COALESCE($5::jsonb, "report"),
               "finished_at" = CASE WHEN $6::boolean THEN ${NOW_UTC} ELSE NULL END,
+              "log_tail" = COALESCE($7::jsonb, "log_tail"),
               "updated_at" = ${NOW_UTC}
         WHERE "id" = ANY($1::text[])`,
       [
         ids,
         status,
         runId,
-        lastError,
+        lastError === null ? null : ledgerText({ text: lastError, redact: this.redact }),
         report === undefined ? null : JSON.stringify(report),
         SETTLED.has(status),
+        logTail === undefined ? null : JSON.stringify(logTail),
       ],
     );
   }

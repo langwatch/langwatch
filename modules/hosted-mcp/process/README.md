@@ -40,7 +40,7 @@ Optional credential: the browser door resolves the consent page session; OAuth a
 Answers at `/api/mcp/authorize`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/mcp-authorize.rest.ts:44)
+// Rawbody: "text" (inline, src/transport/mcp-authorize.rest.ts:45)
 ```
 
 ## tRPC transport

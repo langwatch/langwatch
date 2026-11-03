@@ -4,7 +4,7 @@
  * modules/organization/specs/organization-id-paging.feature
  */
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi, OrganizationIdPageInput } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceAnnotationMarker, TraceApi } from "@langwatch/trace-contract";
@@ -21,7 +21,7 @@ function backfillOver() {
   const service = AnnotationTraceBackfillService.create({
     peers: {
       organizations: createApiFixture<OrganizationApi>({
-        listAllIds: async ({ after } = {}) => {
+        listAllIds: async ({ after }: OrganizationIdPageInput = {}) => {
           const from = after === undefined ? 0 : ORGANIZATIONS.indexOf(after) + 1;
           const ids = ORGANIZATIONS.slice(from, from + 2);
           return { ids, next: from + 2 < ORGANIZATIONS.length ? (ids.at(-1) ?? null) : null };
@@ -191,7 +191,7 @@ describe("given an install whose organizations arrive in pages", () => {
       const service = AnnotationTraceBackfillService.create({
         peers: {
           organizations: createApiFixture<OrganizationApi>({
-            listAllIds: async ({ after, limit } = {}) => {
+            listAllIds: async ({ after, limit }: OrganizationIdPageInput = {}) => {
               limits.push(limit);
               const rest = ids.filter((id) => after === undefined || id > after);
               const page = rest.slice(0, 2);

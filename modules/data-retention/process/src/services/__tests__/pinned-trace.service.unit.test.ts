@@ -56,6 +56,21 @@ class RecordingRetroactive implements RetroactiveRetentionRepository {
   async startKeepForeverRewrite(): Promise<void> {
     this.calls.push("startKeepForeverRewrite");
   }
+
+  async findHeldIdIndexes(): Promise<string[]> {
+    this.calls.push("findHeldIdIndexes");
+    return [];
+  }
+
+  async findIdIndexTenantIds(): Promise<string[]> {
+    this.calls.push("findIdIndexTenantIds");
+    return [];
+  }
+
+  async raiseIdIndexRetention(): Promise<string[]> {
+    this.calls.push("raiseIdIndexRetention");
+    return [];
+  }
 }
 
 /** No statement this suite issues ever reaches a server. */

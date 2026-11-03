@@ -464,7 +464,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<A
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/automation.rest.ts:123`   |
+| Declared at | `src/transport/automation.rest.ts:148`   |
 | Base URL    | `/api/triggers`, twin `/api/v1/triggers` |
 | Addressing  | dated                                    |
 | Credential  | project                                  |
@@ -474,19 +474,19 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<A
 
 List the project's automations, newest first. Paused automations are included.
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:127`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:152`.
 
 Answers at `/api/triggers`, `/api/v1/triggers`; also, undocumented, `/api/triggers/2026-08-07`, `/api/v1/triggers/2026-08-07`, `/api/triggers/latest`, `/api/v1/triggers/latest`.
 
 ```typescript
-// Response: z.array(automationRestResponseSchema) (inline, src/transport/automation.rest.ts:129)
+// Response: z.array(automationRestResponseSchema) (inline, src/transport/automation.rest.ts:154)
 ```
 
 #### `GET /:triggerId` · `getApiTriggersById`
 
 Get a trigger by its ID
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:144`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:169`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
@@ -501,7 +501,7 @@ interface Params {
 
 What this automation has done: its fires, newest first. Metadata only (no trace ids and no trace content). Send `nextCursor` back as `cursor` to read the page after this one.
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:162`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:187`.
 
 Answers at `/api/triggers/:triggerId/fires`, `/api/v1/triggers/:triggerId/fires`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/fires`, `/api/v1/triggers/2026-08-07/:triggerId/fires`, `/api/triggers/latest/:triggerId/fires`, `/api/v1/triggers/latest/:triggerId/fires`.
 
@@ -518,7 +518,7 @@ interface Query {
 
 Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
-Permission `triggers:create`. Declared at `src/transport/automation.rest.ts:187`.
+Permission `triggers:create`. Declared at `src/transport/automation.rest.ts:212`.
 
 Answers at `/api/triggers`, `/api/v1/triggers`; also, undocumented, `/api/triggers/2026-08-07`, `/api/v1/triggers/2026-08-07`, `/api/triggers/latest`, `/api/v1/triggers/latest`.
 
@@ -531,7 +531,7 @@ type Response = z.infer<typeof automationRestResponseSchema>; // ../contract/src
 
 Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an alert's graph cannot be changed.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:212`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:238`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
@@ -544,7 +544,7 @@ type Body = z.infer<typeof automationRestUpdateInputSchema>; // ../contract/src/
 
 Resume a paused automation. A report goes back on its schedule; the pause record is cleared.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:243`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:273`.
 
 Answers at `/api/triggers/:triggerId/enable`, `/api/v1/triggers/:triggerId/enable`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/enable`, `/api/v1/triggers/2026-08-07/:triggerId/enable`, `/api/triggers/latest/:triggerId/enable`, `/api/v1/triggers/latest/:triggerId/enable`.
 
@@ -558,7 +558,7 @@ type Body = Record<string, unknown>;
 
 Pause an automation. A report stops claiming its schedule.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:268`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:299`.
 
 Answers at `/api/triggers/:triggerId/disable`, `/api/v1/triggers/:triggerId/disable`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/disable`, `/api/v1/triggers/2026-08-07/:triggerId/disable`, `/api/triggers/latest/:triggerId/disable`, `/api/v1/triggers/latest/:triggerId/disable`.
 
@@ -571,7 +571,7 @@ type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/autom
 
 Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:294`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:326`.
 
 Answers at `/api/triggers/:triggerId/test-fire`, `/api/v1/triggers/:triggerId/test-fire`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/test-fire`, `/api/v1/triggers/2026-08-07/:triggerId/test-fire`, `/api/triggers/latest/:triggerId/test-fire`, `/api/v1/triggers/latest/:triggerId/test-fire`.
 
@@ -584,7 +584,7 @@ type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/autom
 
 Delete (soft-delete) a trigger
 
-Permission `triggers:manage`. Declared at `src/transport/automation.rest.ts:318`.
+Permission `triggers:manage`. Declared at `src/transport/automation.rest.ts:351`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
@@ -983,19 +983,19 @@ Declared at `src/eventing/automation.pipeline.ts:181`. Events: `triggerMatchReco
 | command         | `requestReportRun`                 | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:198` |
 | command         | `settleReportRun`                  | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:199` |
 | process manager | `triggerSettlement`                | intents `logOverflow`, `persistMatch`, `notifyDigest`, `persistMatch`, `notifyDigest`, `logOverflow`, `notifyDigest`, `persistMatch` (outbox) | `src/eventing/automation.pipeline.ts:200` |
-| process manager | `reportSchedule`                   | intents `dispatchReport` (outbox)                                                                                                             | `src/eventing/automation.pipeline.ts:298` |
-| process manager | `automationAudit`                  | every 1 d (`AUTOMATION_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)                          | `src/eventing/automation.pipeline.ts:314` |
-| process manager | `graphAlertSweep`                  | every 30 s (`GRAPH_ALERT_SWEEP_INTERVAL_MS`); intents `evaluateGraph`                                                                         | `src/eventing/automation.pipeline.ts:331` |
-| peer subscriber | `traceSpanTriggerMatch`            | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:342` |
-| peer subscriber | `traceOriginTriggerMatch`          | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:359` |
-| peer subscriber | `evaluationCompletedTriggerMatch`  | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:375` |
-| peer subscriber | `evaluationReportedTriggerMatch`   | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:392` |
-| peer subscriber | `traceSpanGraphActivity`           | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:410` |
-| peer subscriber | `traceOriginGraphActivity`         | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:420` |
-| peer subscriber | `evaluationCompletedGraphActivity` | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:430` |
-| peer subscriber | `evaluationReportedGraphActivity`  | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:440` |
-| lane aliases    | `≈ MAIN_TRIGGER_LANE_ALIASES`      | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:450` |
-| retention       | `≈ deps.tenantRetention`           | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:451` |
+| process manager | `reportSchedule`                   | intents `dispatchReport` (outbox)                                                                                                             | `src/eventing/automation.pipeline.ts:301` |
+| process manager | `automationAudit`                  | every 1 d (`AUTOMATION_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)                          | `src/eventing/automation.pipeline.ts:317` |
+| process manager | `graphAlertSweep`                  | every 30 s (`GRAPH_ALERT_SWEEP_INTERVAL_MS`); intents `evaluateGraph`                                                                         | `src/eventing/automation.pipeline.ts:334` |
+| peer subscriber | `traceSpanTriggerMatch`            | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:345` |
+| peer subscriber | `traceOriginTriggerMatch`          | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:362` |
+| peer subscriber | `evaluationCompletedTriggerMatch`  | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:378` |
+| peer subscriber | `evaluationReportedTriggerMatch`   | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:395` |
+| peer subscriber | `traceSpanGraphActivity`           | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:413` |
+| peer subscriber | `traceOriginGraphActivity`         | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:423` |
+| peer subscriber | `evaluationCompletedGraphActivity` | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:433` |
+| peer subscriber | `evaluationReportedGraphActivity`  | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:443` |
+| lane aliases    | `≈ MAIN_TRIGGER_LANE_ALIASES`      | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:453` |
+| retention       | `≈ deps.tenantRetention`           | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:454` |
 
 ### Tasks
 

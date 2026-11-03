@@ -738,3 +738,12 @@ Feature: Gateway service — public HTTP surface and operational basics
       When the gateway chart is rendered
       Then the ConfigMap carries them comma-joined as LW_GATEWAY_CORS_ALLOWED_ORIGINS
       And the default render leaves the value empty
+
+    # Binding: charts/gateway/tests/shutdown-values.sh.
+    @unit
+    Scenario: extra CA certificates an operator names are trusted by the pod
+      Given a values file that sets security.extraCACertsConfigMap to a ConfigMap name
+      When the gateway chart is rendered
+      Then the pod mounts that ConfigMap read-only at /etc/langwatch/ca
+      And SSL_CERT_DIR names /etc/langwatch/ca
+      And the default render mounts no CA ConfigMap and sets no SSL_CERT_DIR

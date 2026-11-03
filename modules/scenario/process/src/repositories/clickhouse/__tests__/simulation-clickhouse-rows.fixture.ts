@@ -1,9 +1,18 @@
 /** One simulation_runs row builder, insert and per-tenant cleanup for the ClickHouse suites. */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { type VendorStatements, vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll } from "vitest";
 
+import {
+  SCENARIO_ID_INDEXES,
+  SCENARIO_SECOND_ID_INDEXES,
+} from "../clickhouse.scenario-id-indexes.database.ts";
+import {
+  ClickHouseSimulationSession,
+  type SimulationEventingClickHouseResolver,
+} from "../clickhouse.simulation-session.store.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
@@ -70,7 +79,7 @@ export function useSimulationClickHouse({ tenantId }: { tenantId: string }) {
       clickhouse_settings: { date_time_input_format: "best_effort" },
     });
     client = opened;
-    repo = SimulationClickHouseRepository.create(async () => opened);
+    repo = SimulationClickHouseRepository.create(scenarioClickHouseOver(opened));
   });
 
   afterAll(async () => {
@@ -102,4 +111,16 @@ export function useSimulationClickHouse({ tenantId }: { tenantId: string }) {
       });
     },
   };
+}
+
+/**
+ * Scenario's own read path over a suite's connection: the process's client with scenario's id
+ * indexes declared, one tenant's session per resolve, so an id-bound read expands its marker.
+ */
+export function scenarioClickHouseOver(
+  vendor: VendorStatements,
+): SimulationEventingClickHouseResolver {
+  return ClickHouseSimulationSession.resolver(
+    vendorQueryClient({ vendor, indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES] }),
+  );
 }

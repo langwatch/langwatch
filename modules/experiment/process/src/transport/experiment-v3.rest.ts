@@ -86,13 +86,14 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
   .post("/:slug/run", "postApiExperimentsBySlugRun")
+  .keepsRecords()
   .withParams(slugParamsSchema)
   // The body is read unparsed under any Content-Type, as main read it: an
   // empty one is a full run, malformed JSON is a 400 in this family's own
   // words, and `runInputsBodySchema` parses what is left.
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
-  .withPermission("evaluations:create")
+  .withPermission("evaluations:create", { legacyKey: "legacy_project_key_experiments" })
   .withoutAudit("run, not a change")
   .withResponse("negotiated", {})
   .withDocs({
@@ -140,7 +141,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── GET /runs?experimentSlug=... (list runs for an experiment) ────────
   .get("/runs", "getApiExperimentsRuns")
   .withQuery(listRunsQuerySchema)
-  .withPermission("evaluations:view")
+  .withPermission("evaluations:view", { legacyKey: "legacy_project_key_experiments" })
   .responds({ 200: listRunsResponseSchema, 400: runRefusalSchema })
   .withDocs({
     summary: "List runs of an experiment",
@@ -165,7 +166,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── GET /runs/:runId (poll run status) ─────────────────────────────────
   .get("/runs/:runId", "getApiExperimentsRunsByRunId")
   .withParams(runIdParamsSchema)
-  .withPermission("evaluations:view")
+  .withPermission("evaluations:view", { legacyKey: "legacy_project_key_experiments" })
   .withOutput(runStatusResponseSchema)
   .withDocs({
     summary: "Poll a run",
@@ -183,7 +184,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/runs/:runId/results", "getApiExperimentsRunsByRunIdResults")
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
-  .withPermission("evaluations:view")
+  .withPermission("evaluations:view", { legacyKey: "legacy_project_key_experiments" })
   .withOutput(runResultsResponseSchema)
   .withDocs({
     summary: "Read run results",
@@ -207,7 +208,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/:slug/workbench-state", "getApiExperimentsBySlugWorkbenchState")
   .withParams(slugParamsSchema)
   .withQuery(workbenchStateQuerySchema)
-  .withPermission("experiments:view")
+  .withPermission("experiments:view", { legacyKey: "legacy_project_key_experiments" })
   .withOutput(workbenchStateAnswerSchema)
   .withDocs({
     summary: "Read an experiment's setup",
@@ -228,9 +229,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── PUT /:slug/workbench-state ───────────────────────────────────────
   .put("/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
+  .keepsRecords()
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
-  .withPermission("experiments:update")
+  .withPermission("experiments:update", { legacyKey: "legacy_project_key_experiments" })
   .withAudit("experiments.saveEvaluationsV3")
   .withOutput(saveWorkbenchStateResponseSchema)
   .withDocs({
@@ -263,7 +265,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/:slug/versions", "getApiExperimentsBySlugVersions")
   .withParams(slugParamsSchema)
   .withQuery(listVersionsQuerySchema)
-  .withPermission("experiments:view")
+  .withPermission("experiments:view", { legacyKey: "legacy_project_key_experiments" })
   .withOutput(listWorkbenchVersionsResponseSchema)
   .withDocs({
     summary: "List an experiment's versions",
@@ -284,8 +286,9 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /:slug/versions/:version/restore ────────────────────────────
   .post("/:slug/versions/:version/restore", "postApiExperimentsBySlugVersionsByVersionRestore")
+  .keepsRecords()
   .withParams(slugVersionParamsSchema)
-  .withPermission("experiments:update")
+  .withPermission("experiments:update", { legacyKey: "legacy_project_key_experiments" })
   .withAudit("experiments.restoreWorkbenchVersion")
   .withInput(restoreWorkbenchVersionBodySchema)
   .withOutput(restoreWorkbenchVersionResponseSchema)

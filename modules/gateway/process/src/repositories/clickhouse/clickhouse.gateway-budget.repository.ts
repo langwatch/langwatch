@@ -239,14 +239,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       );
     }
 
-    const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} LIMIT 1`,
-      query_params: { tenantId, gatewayRequestId },
-      format: "JSONEachRow",
-    });
-    const probeRows = (await probe.json()) as unknown[];
-    if (probeRows.length > 0) {
+    if (await this.requestInLedger({ tenantId, gatewayRequestId })) {
       logger.debug(
         { tenantId, gatewayRequestId, batchSize: rows.length },
         "skipping replay — gateway_request_id already in ledger",
@@ -255,6 +248,28 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     }
 
     await this.insertRows(rows);
+  }
+
+  /**
+   * Whether the ledger holds the request: bounded by its id index once ready, unbounded before.
+   * An index miss never alone declares a request new: the recent probe confirms it, so a lost
+   * index row cannot double-debit a replay, and a hit there is counted as a found miss.
+   */
+  private async requestInLedger({
+    tenantId,
+    gatewayRequestId,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+  }): Promise<boolean> {
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} {{idBound:gateway_budget_ledger_events.GatewayRequestId:gatewayRequestId}} LIMIT 1`,
+      query_params: { tenantId, gatewayRequestId },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    return ((await probe.json()) as unknown[]).length > 0;
   }
 
   /** Map + insert debit rows; shared by every probing insert path. */
@@ -380,6 +395,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     const occurredAtMs = rows.map((r) => r.occurredAt.epochMilliseconds);
     const SPAN_SLACK_MS = 24 * 60 * 60 * 1000;
     const probe = await client.query({
+      // ID_BOUND_SKIP: bounded by the pulled rows' own bucket times, which a restatement keeps.
       query: `
         SELECT GatewayRequestId,
                argMax(AmountNanoUSD, EventTimestamp)    AS AmountNanoUSD,
@@ -500,6 +516,29 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
   }
 
   /**
+   * The budgets already on one request, bounded by the id index once ready; a miss confirms
+   * against the recent ledger, so a lost index row cannot double-debit.
+   */
+  private async budgetsOnRequest({
+    tenantId,
+    gatewayRequestId,
+    budgetIds,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+    budgetIds: string[];
+  }): Promise<{ BudgetId: string; ScopeId: string }[]> {
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT DISTINCT BudgetId, ScopeId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)} {{idBound:gateway_budget_ledger_events.GatewayRequestId:requestId}}`,
+      query_params: { tenantId, requestId: gatewayRequestId, budgetIds },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    return (await probe.json()) as { BudgetId: string; ScopeId: string }[];
+  }
+
+  /**
    * One request resolves several budgets, each landing its own row, so the probe is per
    * (BudgetId, GatewayRequestId) rather than the whole-request one `insertDebit` takes — a
    * whole-request probe would silently skip every budget after the first it saw.
@@ -519,18 +558,8 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       );
     }
     const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
-    const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT DISTINCT BudgetId, ScopeId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)}`,
-      query_params: { tenantId, requestId: gatewayRequestId, budgetIds },
-      format: "JSONEachRow",
-    });
-    const existing = new Map(
-      ((await probe.json()) as { BudgetId: string; ScopeId: string }[]).map((r) => [
-        r.BudgetId,
-        r.ScopeId,
-      ]),
-    );
+    const probed = await this.budgetsOnRequest({ tenantId, gatewayRequestId, budgetIds });
+    const existing = new Map(probed.map((r) => [r.BudgetId, r.ScopeId]));
     // A budget already on this request suppresses the row (idempotent replay) — unless the
     // existing row names a DIFFERENT bucket, since the ledger key has no bucket in it. That
     // silently drops one side's spend from whichever bucket enforcement reads.

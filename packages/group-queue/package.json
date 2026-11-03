@@ -23,7 +23,7 @@
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts && vitest run --config vitest.memory-cap.config.ts"
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",

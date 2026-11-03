@@ -36,6 +36,7 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/mcp/authorize", "approveMcpAuthorization")
+  .keepsRecords()
   .withAudit("mcp.authorize")
   // The body is read rather than parsed: a blank or absent field is a refusal
   // this route words itself, and may owe the client at its own registered

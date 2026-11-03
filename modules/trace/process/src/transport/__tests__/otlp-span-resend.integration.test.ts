@@ -19,6 +19,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
@@ -92,15 +93,11 @@ function deployment() {
         }),
       }),
       dedup: MemoryTraceSpanDedupRepository.create(),
-      commands: {
+      commands: fakeTraceProcessingCommands({
         recordSpan: async (data) => {
           recordedSpans.push(data);
         },
-        changeTraceName: async () => undefined,
-        addAnnotation: async () => undefined,
-        removeAnnotation: async () => undefined,
-        assignTopic: async () => undefined,
-      },
+      }),
       broadcast: {
         getTenantEmitter: () => {
           throw new Error("no broadcast fabric in this test");

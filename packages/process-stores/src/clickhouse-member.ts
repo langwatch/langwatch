@@ -19,6 +19,7 @@ import {
   detectColdScan,
   RetryPolicy,
   routingDriver,
+  setIdIndexMissLogger,
   setWindowedReadMetrics,
   StatementReporter,
   TenantGuard,
@@ -82,6 +83,7 @@ export function vendorClickHouseClientOptions({
 export function vendorClickHouseSettings(
   settings: ClickHouseConfig["settings"],
 ): ClickHouseSettings {
+  // The id-index view dedup setting is per insert (routingDriver), since async inserts refuse it.
   return { date_time_input_format: "best_effort", ...settings };
 }
 
@@ -290,6 +292,7 @@ export function buildClickHouse(options: {
   }).connect(configuration);
 
   setWindowedReadMetrics(clickHouseWindowedReadMetrics());
+  setIdIndexMissLogger(createLogger("langwatch:clickhouse:id-index"));
   const reporter = new StatementReporter({
     metrics: clickHouseStatementMetrics(),
     noticeLogger: createLogger("langwatch:clickhouse:resilient"),
@@ -345,6 +348,7 @@ export function buildClickHouse(options: {
         state: "malformed" as const,
       })),
     ],
+    organizationOf: (tenantId) => connection.organizationOf(tenantId),
   });
 
   return {

@@ -2,6 +2,7 @@ import type { Authorization } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
+import type { DecisionModelResolution } from "./catalog/decision-models.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
 import type { PlatformProviderEntry } from "./model-provider-platform-chain.ts";
 import type {
@@ -42,6 +43,7 @@ import type {
   TranslateInput,
   TranslateOutput,
 } from "./model-provider.ts";
+import type { BuiltInModel } from "./model-selection.ts";
 
 export interface ModelProviderCaller {
   readonly id: string;
@@ -297,6 +299,17 @@ export interface ModelProviderApi {
   }): Promise<ModelDefaultInheritedValues>;
   findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null>;
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution>;
+  /**
+   * What the project's Instant Evals run on, or `model` when a caller picked one: LangWatch's
+   * classifier, or the organization's own decision model with its key. One that cannot run
+   * answers `own_unavailable`, never `langwatch`; a non-decision model id is ignored (ADR-182).
+   */
+  resolveDecisionModel(input: {
+    projectId: string;
+    model?: string;
+  }): Promise<DecisionModelResolution>;
+  /** The decision models this project may be offered, hosted first; see `resolveDecisionModel`. */
+  listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]>;
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;

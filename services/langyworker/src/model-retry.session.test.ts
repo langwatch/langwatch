@@ -55,6 +55,15 @@ const OVERLOADED_STREAM = `data: ${JSON.stringify({
   },
 })}\n\n`;
 
+/** The AI gateway's error for a spent provider account, as an in-stream error event. */
+const SPENT_BALANCE_STREAM = `data: ${JSON.stringify({
+  error: {
+    message: "Your organization's AI gateway access is exhausted. Contact your LangWatch admin.",
+    type: "invalid_request_error",
+    code: "provider_account_exhausted",
+  },
+})}\n\n`;
+
 const ANSWER_STREAM =
   chunk({ role: "assistant", content: "Counted." }) + chunk({}, "stop") + "data: [DONE]\n\n";
 
@@ -224,6 +233,19 @@ describe("a pi session with the model retry installed", () => {
         expect(provider.requests()).toBe(1 + MODEL_RETRY_MAX_ATTEMPTS + 2);
         expect(session.getLastAssistantText()).toBe("Counted.");
       });
+    });
+  });
+
+  describe("when the model call fails with a spent provider balance", () => {
+    /** @scenario "A spent provider balance fails the turn on the first attempt" */
+    it("makes one provider request and fails the turn", async () => {
+      const provider = await scriptedProvider([SPENT_BALANCE_STREAM, ANSWER_STREAM]);
+      const { session } = await sessionAgainst(provider.url);
+
+      await session.prompt("count");
+
+      expect(provider.requests()).toBe(1);
+      expect(session.agent.state.errorMessage).toMatch(/gateway access is exhausted/);
     });
   });
 

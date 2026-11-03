@@ -23,6 +23,7 @@ import {
 } from "../../../eventing/simulation-run-state.projection.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 import type { SimulationEventingClickHouseResolver } from "../clickhouse.simulation-session.store.ts";
+import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -52,9 +53,10 @@ beforeAll(() => {
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
   ch = client;
-  resolveClient = async () => ({
+  resolveClient = scenarioClickHouseOver({
     query: (input) => client.query({ ...input, query_id: nextQueryId }),
     insert: (input) => client.insert(input),
+    command: (input) => client.command(input),
   });
   repo = ClickHouseSimulationRunStateRepository.create<SimulationRunState>({
     resolveClient,
@@ -307,8 +309,9 @@ describe.skipIf(databaseUrl === null)("the scenario-run state read window", () =
 
       expect(windowed?.data.ScenarioRunId).toBe(scenarioRunId);
       expect(unbounded?.data.ScenarioRunId).toBe(scenarioRunId);
-      // Weeks 3 to 8 back lie outside both bounds: six parts, counted by both scopes.
-      expect(unboundedParts).toBeGreaterThanOrEqual(windowedParts + 12);
+      // Weeks 3 to 8 back are six weekly partitions only the unbounded read opens, at least one
+      // mark each. Background merges in the shared database change marks per part, never that.
+      expect(unboundedParts).toBeGreaterThanOrEqual(windowedParts + 6);
     });
   });
 });

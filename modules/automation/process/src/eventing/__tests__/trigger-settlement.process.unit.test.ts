@@ -8,6 +8,7 @@ import {
   MAX_PENDING_MATCHES,
   PERSIST_PAGE_MAX,
   type SettlementState,
+  triggerSettlementStateSchema,
 } from "../../rules/trigger-settlement-state.rules.ts";
 import {
   addPending,
@@ -138,6 +139,100 @@ describe("trigger settlement process", () => {
         };
 
         expect(drainDue(state, 1_000).nextBoundary).toBe(2_000);
+      });
+    });
+  });
+
+  describe("given matches pending at several dispatch boundaries", () => {
+    const pending = (
+      dispatchDueAt: number,
+      actionClass: "notify" | "persist",
+    ): SettlementState["pendingMatches"][string] => ({
+      settleDueAt: dispatchDueAt,
+      dispatchDueAt,
+      actionClass,
+      settleWindowBucket: "30000-0",
+    });
+    const persistTraceIds = Array.from(
+      { length: 2 * PERSIST_PAGE_MAX + 10 },
+      (_, index) => `persist-${String(index).padStart(3, "0")}`,
+    );
+    const state: SettlementState = {
+      pendingMatches: {
+        "notify-b": pending(1_000, "notify"),
+        "notify-a": pending(1_000, "notify"),
+        "notify-c": pending(2_000, "notify"),
+        "notify-d": pending(3_000, "notify"),
+        ...Object.fromEntries(
+          persistTraceIds.map((traceId, index) => [
+            traceId,
+            pending(index % 2 === 0 ? 1_500 : 2_500, "persist"),
+          ]),
+        ),
+        "notify-future": pending(10_000, "notify"),
+      },
+      overflowFlushed: 0,
+    };
+    const definition = automationProcessDefinition({ name: "triggerSettlement" });
+    const wakeAt = (now: number) =>
+      definition.config.onWake!(state, {
+        at: 1_000,
+        now,
+        key: "trigger-1",
+        projectId: "project-1",
+        intent: buildIntentAccessor(definition.config.intents),
+      });
+
+    describe("when the wake armed for the first boundary is handled after all of them", () => {
+      /** @scenario "A late wake drains every overdue match in one commit" */
+      it("dispatches every overdue match in one evolution, persist matches in bounded pages", () => {
+        const evolution = wakeAt(5_000);
+
+        const pages = pagePersistMatches({
+          matches: persistTraceIds.map((traceId) => ({ traceId, settleWindowBucket: "30000-0" })),
+        });
+
+        expect(pages.map((page) => page.traceIds.length)).toEqual([
+          PERSIST_PAGE_MAX,
+          PERSIST_PAGE_MAX,
+          10,
+        ]);
+        expect(evolution.intents?.map((intent) => intent.messageKey)).toEqual([
+          `digest:1000:${digestBatchKey(["notify-a", "notify-b"])}`,
+          `digest:2000:${digestBatchKey(["notify-c"])}`,
+          `digest:3000:${digestBatchKey(["notify-d"])}`,
+          ...pages.map((page) => `persist:${page.pageKey}`),
+        ]);
+        expect(
+          evolution.intents
+            ?.filter((intent) => intent.intentType === "persistMatch")
+            .map((intent) => intent.payload),
+        ).toEqual(pages.map((page) => ({ triggerId: "trigger-1", traceIds: page.traceIds })));
+      });
+
+      /** @scenario "A late wake drains every overdue match in one commit" */
+      it("keeps only the future match pending and arms the next wake at its boundary", () => {
+        const evolution = wakeAt(5_000);
+
+        const { pendingMatches } = triggerSettlementStateSchema.parse(evolution.state);
+        expect(Object.keys(pendingMatches)).toEqual(["notify-future"]);
+        expect(evolution.nextWakeAt).toBe(10_000);
+      });
+
+      /** @scenario "A late wake drains every overdue match in one commit" */
+      it("mints the same messages whichever later instant handles it", () => {
+        expect(wakeAt(9_999)).toEqual(wakeAt(5_000));
+      });
+    });
+
+    describe("when the wake is handled on time", () => {
+      it("drains only the boundary it was armed for", () => {
+        const evolution = wakeAt(1_000);
+
+        expect(evolution.intents?.map((intent) => intent.messageKey)).toEqual([
+          `digest:1000:${digestBatchKey(["notify-a", "notify-b"])}`,
+        ]);
+        expect(evolution.nextWakeAt).toBe(1_500);
       });
     });
   });

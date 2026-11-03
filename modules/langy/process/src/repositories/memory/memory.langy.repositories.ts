@@ -5,6 +5,7 @@ import { MemoryLangyConversationProjectionRepository } from "./memory.langy-conv
 import { MemoryLangyConversationTurnProjectionRepository } from "./memory.langy-conversation-turn-projection.repository.ts";
 import { MemoryLangyConversationRepository } from "./memory.langy-conversation.repository.ts";
 import { MemoryLangyCredentialRepository } from "./memory.langy-credential.repository.ts";
+import { LangyDeleteConfirmationMemoryRepository } from "./memory.langy-delete-confirmation.repository.ts";
 import { LangyFeedbackPromptMemoryRepository } from "./memory.langy-feedback-prompt.repository.ts";
 import { LangyGithubPrCountMemoryRepository } from "./memory.langy-github-pr-count.repository.ts";
 import {
@@ -52,6 +53,7 @@ export class MemoryLangyRepositories {
       localCalls: LangyLocalCallMemoryRepository.create(),
       localUserWaits: LangyLocalUserWaitMemoryRepository.create(),
       localControlRequests: LangyLocalControlRequestMemoryRepository.create(),
+      deleteConfirmations: LangyDeleteConfirmationMemoryRepository.create(),
       githubPrCounts: LangyGithubPrCountMemoryRepository.create(),
       feedbackPrompts: LangyFeedbackPromptMemoryRepository.create(),
       // Every call returns the twin over the SAME shared store, the way one

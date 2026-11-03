@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { moduleApi, type Named } from "@langwatch/module";
-import { USAGE_REPORT_MAX_BODY_BYTES, usageReportBodySchema } from "@langwatch/ops-contract";
+import {
+  selfHostedNoticeSchema,
+  USAGE_REPORT_MAX_BODY_BYTES,
+  usageReportBodySchema,
+} from "@langwatch/ops-contract";
 import { z } from "zod";
 
 /** The report as either door reads it: ops' body, with unknown fields kept so they can be counted. */
@@ -14,19 +18,6 @@ export const usageReportRequestSchema: UsageReportRequestSchema =
 /** The largest report either door reads. */
 export const USAGE_REPORT_REQUEST_MAX_BYTES = USAGE_REPORT_MAX_BODY_BYTES;
 
-/** The proxy headers that name a sender's address. */
-const senderAddressHeadersSchemaDefinition = z.object({
-  "cf-connecting-ip": z.string().optional(),
-  "x-forwarded-for": z.string().optional(),
-  "x-real-ip": z.string().optional(),
-  "true-client-ip": z.string().optional(),
-});
-export interface SenderAddressHeadersSchema extends Named<
-  typeof senderAddressHeadersSchemaDefinition
-> {}
-export const senderAddressHeadersSchema: SenderAddressHeadersSchema =
-  senderAddressHeadersSchemaDefinition;
-
 /** A release as Cloud names it: the release name and the commit it was built from. */
 const releaseIdentitySchemaDefinition = z.object({
   release: z.string(),
@@ -35,10 +26,15 @@ const releaseIdentitySchemaDefinition = z.object({
 export interface ReleaseIdentitySchema extends Named<typeof releaseIdentitySchemaDefinition> {}
 export const releaseIdentitySchema: ReleaseIdentitySchema = releaseIdentitySchemaDefinition;
 
-/** What an accepted usage report is answered with, on either door; release fields only when configured. */
+/**
+ * What an accepted usage report is answered with, on either door: release fields only when
+ * configured, notices only when staff published some that have not expired.
+ */
 const usageReportReceiptSchemaDefinition = z.object({
   message: z.literal("Event captured"),
   latest_release: releaseIdentitySchema.optional(),
+  /** Notices LangWatch staff send every install (self-hosted-notices.feature). */
+  notices: z.array(selfHostedNoticeSchema).optional(),
 });
 export interface UsageReportReceiptSchema extends Named<
   typeof usageReportReceiptSchemaDefinition
@@ -48,10 +44,11 @@ export const usageReportReceiptSchema: UsageReportReceiptSchema =
 
 export type UsageReportReceipt = z.infer<typeof usageReportReceiptSchema>;
 
-/** One posted report as the door read it: the body, and the headers naming the sender's address. */
+/** One posted report as the door read it: the body, and the sender's address the door resolved. */
 export interface IncomingUsageReportRequest {
   readonly report: Readonly<Record<string, unknown>>;
-  readonly addressHeaders: Readonly<Record<string, string | undefined>>;
+  /** Lowercased, an IPv4-mapped address unmapped; null where the door resolved none. */
+  readonly callerAddress: string | null;
 }
 
 /** LangWatch Cloud's own surface. Every operation refuses on any other deployment. */

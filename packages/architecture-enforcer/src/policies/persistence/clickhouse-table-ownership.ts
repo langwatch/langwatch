@@ -88,6 +88,12 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
         "the event store appends every pipeline's events; modules reach it through eventing (§7)",
     },
     {
+      table: "event_log_id_index",
+      owner: "framework",
+      writer: "packages/eventing",
+      reason: "the view event_log_id_index_mv on event_log fills it; eventing reads and fills it",
+    },
+    {
       table: "stored_log_records",
       owner: "legacy",
       writer: LEGACY,

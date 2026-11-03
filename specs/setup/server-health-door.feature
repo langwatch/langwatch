@@ -75,6 +75,34 @@ Feature: The process boundary's built-in health door
       When a caller requests a path no route was contributed for
       Then the response is 404
 
+  Rule: Requests in flight at shutdown finish before anything they call into closes
+
+    # The health door is hosted first so it stops last, and it is also the listener that
+    # carries the application's requests. Draining it last let in-flight requests run
+    # against stores that had already closed ("Cannot use a pool after calling end on the
+    # pool"). The application's requests drain right after the door refuses new work.
+
+    @unit
+    Scenario: A request in flight at shutdown finishes before any hosted component stops
+      Given an application request is still running when the server closes
+      When the request finishes
+      Then no hosted component has heard shutdown begin or stopped before it finished
+      And the components stop afterwards, in reverse order
+
+    @unit
+    Scenario: A product request arriving while the application drains is refused by name
+      Given an application request is still running when the server closes
+      When a new product request arrives during the drain
+      Then the response is 503 saying the process is shutting down
+      And "/healthz" still answers 200
+
+    @unit
+    Scenario: An open event stream is closed at shutdown rather than waited on
+      Given a client holds an event stream open when the server closes
+      When the application drains
+      Then the stream is closed straight away
+      And the components stop without waiting out the drain grace
+
   Rule: The health door outlives every drain
 
     @unit

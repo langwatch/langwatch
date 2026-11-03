@@ -127,6 +127,7 @@ function serviceWith({
       rolled_back: 0,
     }),
     findRecordsByStatus: vi.fn().mockResolvedValue([]),
+    countHeld: vi.fn().mockResolvedValue(0),
     getRecord: vi
       .fn()
       .mockImplementation((args: { migrationName: string; tenantId: string }) =>
@@ -728,6 +729,32 @@ describe("SystemMigrationsService enrollment", () => {
         { name: "heal", migratedIsSteady: true },
         { name: "backfill", migratedIsSteady: false },
       ]);
+    });
+  });
+
+  describe("when users wait on a person", () => {
+    /** @scenario "Users waiting on a person are counted, not listed as needing attention" */
+    it("asks for the attention rows without them and counts them apart", async () => {
+      const { service, state } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: "backfill", tenant: "user" })],
+      });
+      state.countHeld.mockResolvedValue(3);
+
+      const [overview] = await service.getOverview();
+
+      expect(state.findRecordsByStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          migrationName: "backfill",
+          statuses: ["migrated", "parked"],
+          exceptHeldReason: "person",
+        }),
+      );
+      expect(state.countHeld).toHaveBeenCalledWith({
+        migrationName: "backfill",
+        heldReason: "person",
+      });
+      expect(overview?.waitingOnPerson).toBe(3);
     });
   });
 

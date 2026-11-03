@@ -36,6 +36,8 @@ import type {
 import type { UserLifecycleEventData } from "@langwatch/user-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
 
+import { utcDayOf } from "./nurturing-time.rules.ts";
+
 /** The signal a peer's event raises, keyed by the aggregate and instant the event carries. */
 type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;
 /** An owner's event whose data names no tenant: the delivery context's is the event's own. */
@@ -97,14 +99,16 @@ export function onboardingVariantAssignedSignal({
   };
 }
 
-/** Main told Customer.io of a full run of a saved experiment and PostHog of every run. */
+/**
+ * Main told Customer.io of a full run of a saved experiment and PostHog of every run. Keyed by the
+ * project, person and instant, never the event's aggregate, which names the run, not the project.
+ */
 export function experimentRanSignal({
   data,
-  aggregateId,
-}: OwnerEvent<ExperimentRanEventData>): NurturingSignal {
+}: Readonly<{ data: ExperimentRanEventData }>): NurturingSignal {
   return {
     kind: "experiment_ran",
-    sourceEventId: `${aggregateId}:${data.userId}:${data.occurredAt}`,
+    sourceEventId: `${data.projectId}:${data.userId}:${data.occurredAt}`,
     tenantId: data.tenantId,
     occurredAt: data.occurredAt,
     userId: data.userId,
@@ -114,14 +118,13 @@ export function experimentRanSignal({
   };
 }
 
-/** A person's hand-run evaluation reaches PostHog alone, as main tracked it. */
+/** A person's hand-run evaluation reaches PostHog alone, as main tracked it, keyed as above. */
 export function evaluationRanSignal({
   data,
-  aggregateId,
-}: OwnerEvent<EvaluationRanEventData>): NurturingSignal {
+}: Readonly<{ data: EvaluationRanEventData }>): NurturingSignal {
   return {
     kind: "evaluation_ran",
-    sourceEventId: `${aggregateId}:${data.userId}:${data.occurredAt}`,
+    sourceEventId: `${data.projectId}:${data.userId}:${data.occurredAt}`,
     tenantId: data.tenantId,
     occurredAt: data.occurredAt,
     userId: data.userId,
@@ -151,30 +154,37 @@ type CountedOrganization = Readonly<{
   evaluationCount: number;
 }>;
 
-/** A settled evaluation against the organization's admin; none where nurturing knows no admin. */
+/**
+ * A project's evaluations one batch counted, against the organization's admin; none where
+ * nurturing knows no admin. The milestone is the organization's first when these are all it has.
+ */
 export function evaluationCompletedSignal({
-  data,
-  aggregateId,
+  latest,
+  count,
   organization,
-}: OwnerEvent<EvaluationLifecycleCompletedEventData> & {
+}: Readonly<{
+  /** The latest of the counted evaluations; the signal is keyed and timed by it. */
+  latest: EvaluationLifecycleCompletedEventData;
+  count: number;
   organization: CountedOrganization;
-}): NurturingSignal[] {
+}>): NurturingSignal[] {
   const { adminUserId, seeded, evaluationCount } = organization;
   if (!adminUserId) return [];
   return [
     {
       kind: "evaluation_completed",
-      sourceEventId: `${aggregateId}:${data.evaluationId}`,
-      tenantId: data.tenantId,
-      occurredAt: data.occurredAt,
+      sourceEventId: `${latest.projectId}:${latest.evaluationId}`,
+      tenantId: latest.tenantId,
+      occurredAt: latest.occurredAt,
       userId: adminUserId,
-      projectId: data.projectId,
-      evaluationId: data.evaluationId,
-      evaluatorType: data.evaluatorType,
-      score: data.score,
-      passed: data.passed,
+      projectId: latest.projectId,
+      evaluationId: latest.evaluationId,
+      evaluatorType: latest.evaluatorType,
+      score: latest.score,
+      passed: latest.passed,
+      evaluationsCounted: count,
       organizationEvaluationCount: evaluationCount,
-      first: !seeded && evaluationCount === 1,
+      first: !seeded && evaluationCount === count,
     },
   ];
 }
@@ -432,8 +442,11 @@ export function simulationRunFinishedSignal({
   data,
   aggregateId,
   tenantId,
+  count,
   organization,
 }: TenantEvent<SimulationRunFinishedEventData> & {
+  /** The project's runs counted together with this one, the latest of them. */
+  count: number;
   organization: CountedRunOrganization;
 }): NurturingSignal[] {
   const { adminUserId, seeded, simulationRunCount } = organization;
@@ -448,7 +461,7 @@ export function simulationRunFinishedSignal({
       userId: adminUserId,
       projectId: tenantId,
       organizationRunCount: simulationRunCount,
-      first: !seeded && simulationRunCount === 1,
+      first: !seeded && simulationRunCount === count,
     },
   ];
 }
@@ -500,7 +513,7 @@ export function projectActiveDaySignal({
   organizationCreatedAt,
   onboardingVariant,
 }: ActiveDaySignal): NurturingSignal {
-  const day = Temporal.Instant.fromEpochMilliseconds(occurredAt).toString().slice(0, 10);
+  const day = utcDayOf(occurredAt);
   const daysSinceSignup =
     organizationCreatedAt == null
       ? null
@@ -521,10 +534,9 @@ export function projectActiveDaySignal({
 /** A later real trace against the admin, keyed by the project and the trace's instant. */
 export function traceReceivedSignal({
   data,
-  aggregateId,
-}: OwnerEvent<TraceReceivedEventData>): NurturingSignal {
+}: Readonly<{ data: TraceReceivedEventData }>): NurturingSignal {
   const { tenantId, occurredAt, userId, projectId } = data;
-  const sourceEventId = `${aggregateId}:${occurredAt}`;
+  const sourceEventId = `${projectId}:${occurredAt}`;
   return { kind: "trace_received", sourceEventId, tenantId, occurredAt, userId, projectId };
 }
 

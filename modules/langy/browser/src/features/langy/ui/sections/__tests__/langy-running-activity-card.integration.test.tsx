@@ -5,7 +5,7 @@
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { LangyToolActivity } from "../langy-tool-activity.tsx";
@@ -49,6 +49,11 @@ function renderTurn(message: UIMessage, { live = true }: { live?: boolean } = {}
 }
 
 describe("a turn's activity cards", () => {
+  // The store outlives a file when modules are shared, so start from its initial state.
+  beforeEach(() => {
+    useLangyStore.setState(useLangyStore.getInitialState(), true);
+  });
+
   afterEach(() => {
     cleanup();
     useLangyStore.setState({ turnPhase: "idle" });

@@ -35,6 +35,7 @@ export const adminRest = defineRestRouter(OpsApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/admin/impersonate", "startAdminImpersonation")
+  .keepsRecords()
   .withAudit("ops.startImpersonation")
   .withInput(adminImpersonationRequestSchema)
   .withCredential("browser")
@@ -47,6 +48,7 @@ export const adminRest = defineRestRouter(OpsApi)
 
   .delete("/api/admin/impersonate", "stopAdminImpersonation")
   .withAudit("ops.stopImpersonation")
+  .withoutConfirmation("answers only a signed-in browser, never an API key")
   .withInput(adminEmptyRequestSchema)
   .withCredential("browser")
   // ops:view, because ops:manage is not answered while impersonating and this is the way out.
@@ -58,6 +60,7 @@ export const adminRest = defineRestRouter(OpsApi)
   )
 
   .post("/api/admin/:resource", "runAdminOperation")
+  .keepsRecords()
   .withAudit("ops.runAdminOperation")
   .withParams(adminResourceParamsSchema)
   .withInput(adminOperationBodySchema)

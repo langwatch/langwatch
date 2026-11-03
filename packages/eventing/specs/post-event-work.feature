@@ -98,6 +98,14 @@ Feature: Post-event work
     And its intent outbox contains no duplicate message key
 
   @unit
+  Scenario: A process manager redelivery stands down before reading its state
+    Given a process manager has committed an event to its inbox and state
+    When the same event is delivered again
+    Then the delivery is reported as a duplicate event
+    And the process state is neither read nor evolved, and no commit is opened
+    And a redelivery that races past that read is still refused by the commit
+
+  @unit
   Scenario: Replay never re-runs side effects
     Given committed events are replayed into selected projections
     When the replay applies them

@@ -6,6 +6,9 @@ export default defineModuleVitestConfig({
   // partial shapes — isolate:false's default shared registry lets one
   // file's mock leak into the next.
   isolate: true,
+  // The isolated files share a worker's jsdom code and get a fresh window
+  // each, instead of a process each that loads jsdom again (ADR-184).
+  isolateIn: "vm-context",
   test: {
     setupFiles: ["./vitest.setup.ts"],
     // `*.browser.test.tsx` is the real-browser lane the explorer's editor

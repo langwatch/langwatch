@@ -102,6 +102,12 @@ function BatchStatusCounts({ summary }: { summary: BatchRunSummary }) {
       color: "fg.muted",
       label: "cancelled",
     });
+  if (summary.notScoredCount > 0)
+    items.push({
+      count: summary.notScoredCount,
+      color: "fg.subtle",
+      label: "not scored",
+    });
   if (summary.inProgressCount > 0)
     items.push({
       count: summary.inProgressCount,

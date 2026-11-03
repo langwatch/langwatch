@@ -37,6 +37,7 @@ function serviceWith({
     state: {
       findStatusCounts: vi.fn(),
       findRecordsByStatus: vi.fn(),
+      countHeld: vi.fn(),
       getRecord: vi.fn(),
       upsertRecord: vi.fn(),
     },

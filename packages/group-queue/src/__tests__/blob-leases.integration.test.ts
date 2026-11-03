@@ -336,7 +336,7 @@ describe("BlobLeases", () => {
 
     describe("given a holder token written by a pre-lease release", () => {
       describe("when the last lease is released", () => {
-        /** @scenario "An unreferenced blob is put on the grace window even though a stale holder token withheld it" */
+        /** @scenario "The grace window is withheld while an old release still holds the blob" */
         it("withholds the grace window because that holder has no deadline to read", async () => {
           await redis.set(BLOB_KEY, "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
           await leases.take({
@@ -356,6 +356,48 @@ describe("BlobLeases", () => {
 
           expect(graced).toBe(false);
           expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+        });
+      });
+    });
+
+    describe("given a holder set an old release wrote, with one holder and no sentinel", () => {
+      describe("when a release that holds no token there retires", () => {
+        /** @scenario "The grace window is withheld while an old release still holds the blob" */
+        it("withholds the grace window rather than counting the holder as the sentinel", async () => {
+          await redis.set(BLOB_KEY, "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+          await redis.sadd(LEGACY_HOLDER_KEY, "old-release-holder");
+
+          const graced = await leases.release({
+            projectId: PROJECT,
+            hash: HASH,
+            holderId: "never-took-a-lease",
+            tier: "redis",
+          });
+
+          expect(graced).toBe(false);
+          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+          expect(await redis.smembers(LEGACY_HOLDER_KEY)).toEqual(["old-release-holder"]);
+        });
+      });
+    });
+
+    describe("given a holder set holding only the migration sentinel", () => {
+      describe("when the last lease is released", () => {
+        /** @scenario "The migration sentinel alone does not hold a blob" */
+        it("applies the grace window", async () => {
+          await redis.set(BLOB_KEY, "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+          await leases.take({ projectId: PROJECT, hash: HASH, holderId: "only", tier: "redis" });
+
+          const graced = await leases.release({
+            projectId: PROJECT,
+            hash: HASH,
+            holderId: "only",
+            tier: "redis",
+          });
+
+          expect(graced).toBe(true);
+          expect(await redis.smembers(LEGACY_HOLDER_KEY)).toEqual([LEGACY_HOLDER_LEASE_GUARD]);
+          expect(await redis.ttl(BLOB_KEY)).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
         });
       });
     });

@@ -4,8 +4,8 @@
  * reads the same names as types — the mounted namespace, never respelled.
  */
 
-// `create` is the ONLY procedure that ever returns the plaintext token — once,
-// at minting; every read hands back a five-character `lookupIdPrefix` and
+// `create` and `mintDocsSessionKey` are the only procedures that return a plaintext
+// token — once, at minting; every read hands back a five-character `lookupIdPrefix` and
 // nothing more. `nameById` answers null identically for an unknown id and one
 // in another organization, so it cannot enumerate. `orgProjects` / `orgTeams`
 // / `orgMembers` feed the pickers the drawers render.
@@ -19,6 +19,10 @@ import {
   apiKeyTrpcRevokeInputSchema,
   apiKeyTrpcUpdateInputSchema,
 } from "./api-key-trpc.schemas.ts";
+import {
+  apiKeyTrpcMintDocsSessionKeyInputSchema,
+  docsSessionKeyMintedSchema,
+} from "./api-key.docs-session.ts";
 import { apiKeyListEntrySchema, namedApiKeyBindingSchema } from "./api-key.list.ts";
 import {
   apiKeyMintedSchema,
@@ -66,5 +70,10 @@ export const apiKeyTrpc = defineTrpcContract("apiKey")
   .query("orgMembers")
   .withInput(apiKeyTrpcOrganizationScopeSchema)
   .withOutput(apiKeyUserSchema.array())
+
+  // The docs consent page's Allow (ADR-185): the second place a plaintext token is answered.
+  .mutation("mintDocsSessionKey")
+  .withInput(apiKeyTrpcMintDocsSessionKeyInputSchema)
+  .withOutput(docsSessionKeyMintedSchema)
 
   .build();

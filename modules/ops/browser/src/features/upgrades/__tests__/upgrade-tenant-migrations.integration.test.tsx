@@ -20,6 +20,7 @@ const LONG_STEP = [
     enrolledAutomatically: true,
     tenant: "organization",
     migratedIsSteady: false,
+    waitingOnPerson: 0,
     counts: { finalized: 4, migrated: 0, parked: 2, rolled_back: 0 },
     enrollment: null,
     attention: [],
@@ -170,6 +171,31 @@ describe("UpgradeTenantMigrations", () => {
       expect(screen.getByText("Organization needing attention")).toBeTruthy();
       const attentionRow = screen.getByText("user-9").closest("tr");
       expect(attentionRow?.textContent).toContain("Parked");
+    });
+  });
+
+  describe("given a step holding 2 users for their proof and 3 waiting to confirm their address", () => {
+    /** @scenario "Users waiting on a person are counted, not listed as needing attention" */
+    it("badges the 2 held and notes the 3 waiting on the person beneath", () => {
+      MIGRATIONS = [
+        {
+          ...LONG_STEP[0],
+          name: "identity:identifier-backfill",
+          title: "Identifier history backfill",
+          tenant: "user",
+          waitingOnPerson: 3,
+          counts: { finalized: 10, migrated: 5, parked: 0, rolled_back: 0 },
+        },
+      ];
+      isSaaS = true;
+      renderTab();
+
+      const row = screen.getByTestId("upgrade-tenant-migration-identity:identifier-backfill");
+      expect(within(row).getByTestId("upgrade-waiting-on-person").textContent).toBe(
+        "3 waiting on the person",
+      );
+      const badges = row.querySelectorAll("[class*='badge']");
+      expect([...badges].map((badge) => badge.textContent)).toEqual(["2"]);
     });
   });
 

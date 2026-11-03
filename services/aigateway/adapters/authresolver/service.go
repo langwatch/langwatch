@@ -698,9 +698,13 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*doma
 	}
 }
 
+// evictOnLookup drops an entry whose lifetime ran out (past the hard cap, or
+// the key's own expiration date). That is the cache's ordinary lifecycle, so
+// it logs at info: what the caller is answered with next, a fresh bundle or a
+// rejection, is reported by the request itself.
 func (s *Service) evictOnLookup(h [64]byte, e *entry, reason string) {
 	s.l1.Remove(h)
-	s.logger.Error("auth_cache_hard_evict",
+	s.logger.Info("auth_cache_hard_evict",
 		zap.String("vk_id", e.bundle.VirtualKeyID),
 		zap.String("reason", reason),
 	)

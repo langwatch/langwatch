@@ -4,6 +4,7 @@ import type {
   PullResult,
   PulledUsageObservedEventData,
 } from "@langwatch/enterprise-governance-contract";
+import { isDispatchError } from "@langwatch/eventing";
 import {
   type InternalProject,
   type InternalProjectQuery,
@@ -293,6 +294,9 @@ export class IngestionPullWorkerService {
         ),
       );
     } catch (error) {
+      // The provider refused the source's own setup (a revoked key, say): the run records the
+      // refusal for the customer and warns there, so it is not ours to report as a failure.
+      if (isCustomerRefusal(error)) throw error;
       const normalized = error instanceof Error ? error : new Error(String(error));
       this.diagnostics.error("adapter.runOnce threw — leaving the durable cursor unchanged", {
         ingestionSourceId: source.id,
@@ -419,4 +423,12 @@ export class IngestionPullWorkerService {
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * A refusal no retry changes that carries the customer's remediation sentence: what the
+ * customer fixes on their side, and what the run records as PULL_REFUSED.
+ */
+function isCustomerRefusal(error: unknown): boolean {
+  return isDispatchError(error) && !error.retryable && error.customerMessage !== undefined;
 }

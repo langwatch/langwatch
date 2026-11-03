@@ -140,6 +140,15 @@ export class ProcessManagerService<State> {
         ...(envelope.userId ? { "user.id": envelope.userId } : {}),
       },
       run: async () => {
+        // Inbox first: a redelivery stands down before the read, evolve and locked
+        // commit. The commit's in-lock check stays the authority; a transient
+        // process writes no marker, so it keeps its one-write path unread.
+        if (
+          !this.definition.transient &&
+          (await this.store.hasConsumedSource({ ref, sourceEventId: envelope.eventId }))
+        ) {
+          return { outcome: "duplicateEvent" as const };
+        }
         const existing = await this.store.findByRef<State>({ ref });
         const evolution = this.definition.evolve({
           previousState: existing?.state ?? this.definition.initialState,

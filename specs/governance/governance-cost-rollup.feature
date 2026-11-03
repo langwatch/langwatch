@@ -106,6 +106,14 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     # meant to catch.
 
   @unit
+  Scenario: A pulled item delivered twice is counted once
+    Given a day already summarizing one pulled item
+    When the same observation or retraction of that item is delivered again
+    Then the day's summary is unchanged
+    # A missed hand-off re-sends the single event rather than rebuilding the
+    # day, which spans many items; this is what makes that re-send safe.
+
+  @unit
   Scenario: The watchdog compares the amount in the currency it was billed in
     Given a summary row in a currency other than dollars that disagrees with its events
     When the comparator runs

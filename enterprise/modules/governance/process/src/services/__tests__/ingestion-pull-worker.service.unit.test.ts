@@ -4,6 +4,7 @@ import type {
   PulledUsageObservedEventData,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
+import { DispatchError } from "@langwatch/eventing";
 import type {
   InternalProject,
   InternalProjectQuery,
@@ -932,6 +933,39 @@ describe("the window a pull read but was not allowed to price", () => {
         "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",
         { ingestionSourceId: "source-1" },
       );
+    });
+  });
+});
+
+describe("given a pull the provider refuses", () => {
+  describe("when the refusal is the customer's to fix and no retry changes it", () => {
+    /** @scenario "A pull the provider refuses for the customer's own setup is not reported as our failure" */
+    it("rethrows it for the run to record, with no error line and no capture", async () => {
+      const refusal = new DispatchError({
+        message: "anthropic admin API answered 401",
+        retryable: false,
+        customerMessage: "Anthropic refused the admin key. Paste a current admin key.",
+      });
+      const { service, diagnostics } = worker({ runOnce: () => Promise.reject(refusal) });
+
+      await expect(service.run({ sourceId: "source-1", cursor: null })).rejects.toBe(refusal);
+      expect(diagnostics.error).not.toHaveBeenCalled();
+      expect(diagnostics.capture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the failure is not one the customer can fix", () => {
+    /** @scenario "A pull the provider refuses for the customer's own setup is not reported as our failure" */
+    it.each([
+      new DispatchError({ message: "socket hang up", retryable: true }),
+      new DispatchError({ message: "unexpected answer", retryable: false }),
+      new Error("boom"),
+    ])("still reports %s as an error and captures it", async (failure) => {
+      const { service, diagnostics } = worker({ runOnce: () => Promise.reject(failure) });
+
+      await expect(service.run({ sourceId: "source-1", cursor: null })).rejects.toBe(failure);
+      expect(diagnostics.error).toHaveBeenCalledTimes(1);
+      expect(diagnostics.capture).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { bindRestCredential } from "@langwatch/api/rest";
+import { bindConfirmationGate, bindRestCredential } from "@langwatch/api/rest";
 import type { LangyApi, LangyServerConfig } from "@langwatch/langy-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
@@ -46,6 +46,8 @@ export const langyProcessModule: PublishedProcessModule<"langy", LangyApi, Langy
     )
     .provideMiddlewareBindings(({ app }) => [
       bindRestCredential("internal_secret", () => app.internalDoor),
+      // Langy shows the cards, so Langy keeps the clicks every Langy key's delete is asked for.
+      bindConfirmationGate(app.deleteConfirmations),
     ])
     .withDoors({ session_key: localControlSessionKeyDoor })
     .withEventing(langyConversationEventing)

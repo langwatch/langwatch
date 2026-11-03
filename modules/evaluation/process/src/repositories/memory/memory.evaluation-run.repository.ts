@@ -1,5 +1,9 @@
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
-import { EvaluationNotFoundError, type EvaluationRunData } from "@langwatch/evaluation-contract";
+import {
+  EvaluationNotFoundError,
+  type EvaluationRunData,
+  type TraceEvaluationData,
+} from "@langwatch/evaluation-contract";
 
 import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
 import {
@@ -58,6 +62,40 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
       .flatMap((projectId) => this.#tenantRuns(projectId))
       .filter((run) => run.traceId === input.traceId)
       .toSorted((left, right) => right.updatedAt - left.updatedAt);
+  }
+
+  async findTraceEvaluations(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+  }): Promise<TraceEvaluationData[]> {
+    return projectIdsReadBy(input.authorization)
+      .flatMap((projectId) => this.#tenantRuns(projectId))
+      .flatMap((run) =>
+        run.traceId !== null && input.traceIds.includes(run.traceId)
+          ? [
+              {
+                evaluationId: run.evaluationId,
+                evaluatorId: run.evaluatorId,
+                evaluatorType: run.evaluatorType,
+                evaluatorName: run.evaluatorName,
+                traceId: run.traceId,
+                isGuardrail: run.isGuardrail,
+                status: run.status,
+                score: run.score,
+                passed: run.passed,
+                label: run.label,
+                details: run.details,
+                error: run.error,
+                inputs: run.inputs,
+                timestamps: {
+                  scheduledAt: run.scheduledAt,
+                  startedAt: run.startedAt,
+                  completedAt: run.completedAt,
+                },
+              },
+            ]
+          : [],
+      );
   }
 
   async findInputs(input: {

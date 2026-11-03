@@ -78,9 +78,21 @@ type SupervisionState = {
 // Every supervisor still running, in launch order, so a shutdown during boot
 // reaches the children whose start helper has not returned a handle yet.
 const running = new Set<SupervisionState>();
+// Set by the stop: a start still awaiting its step (initdb, a predep) launches nothing after it.
+let isStopping = false;
 
-/** Stops every supervised service still running, the last launched first. */
+/** A launch asked for after the stop began; the boot that asked for it fails instead. */
+export class SupervisionStoppedError extends Error {
+  readonly code = "supervision_stopped";
+  constructor(name: string) {
+    super(`not starting ${name}: LangWatch is stopping`);
+    this.name = "SupervisionStoppedError";
+  }
+}
+
+/** Stops every supervised service still running, the last launched first; none starts after. */
 export async function stopEverySupervised(): Promise<void> {
+  isStopping = true;
   for (const state of [...running].reverse()) {
     await stopSupervised(state);
   }
@@ -99,6 +111,7 @@ export function supervise({
   bus: EventBus;
   restartPolicy?: RestartPolicy;
 }): SupervisedHandle {
+  if (isStopping) throw new SupervisionStoppedError(spec.name);
   const logPath = paths.log(spec.name);
   const pidPath = paths.pid(spec.name);
   mkdirSync(dirname(logPath), { recursive: true });

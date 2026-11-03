@@ -220,6 +220,7 @@ async def test_register_carries_sdk_instance_and_agents():
                     "concurrency": 10,
                     "timeoutMs": 120000,
                     "sticky": False,
+                    "hooks": {"setup": False, "teardown": False},
                 }
             ]
         finally:

@@ -148,3 +148,51 @@ describe("given an evaluate door reached with the evaluator in the path", () => 
     expect(findMonitorBySlug).toHaveBeenCalledWith(expect.objectContaining({ slug }));
   });
 });
+
+describe("given an evaluate call whose evaluator ran", () => {
+  describe("when the event pipeline refuses the verdict", () => {
+    /** @scenario "An evaluate call whose verdict cannot be recorded answers a retryable 503" */
+    it("answers a retryable 503 instead of a 200 for a verdict never stored", async () => {
+      const runtime = createRestRuntime({
+        authorization: restTestAuthorization(),
+        identity: {
+          authenticate: () => ({
+            actor: { type: "user", id: "user-1" },
+            scope: { tier: "project", id: PROJECT_ID },
+          }),
+        },
+      });
+      const reportEvaluation = vi.fn(() =>
+        Promise.reject(new Error("Cannot send to queue after its drain has finished")),
+      );
+      const app = runtime.mount(evaluationsLegacyRest.router(), {
+        app: () =>
+          createApiFixture<EvaluationApi>({
+            findMonitorBySlug: () => Promise.resolve(null),
+            listCustomEvaluators: () => Promise.resolve([]),
+            findModelForFeature: () => Promise.resolve(null),
+            runEvaluator: () =>
+              Promise.resolve({ status: "processed", score: 1, passed: true } as never),
+            reportEvaluation,
+          }),
+        onError: (error, context) =>
+          HandledError.isHandled(error)
+            ? canonicalErrorResponse(error, context)
+            : context.json({ error: String(error) }, 500),
+      });
+
+      const response = await app.fetch(
+        new Request("http://api.test/api/evaluations/langevals/valid_format/evaluate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ data: { input: "hi", output: "hello" }, settings: {} }),
+        }),
+      );
+
+      expect(reportEvaluation).toHaveBeenCalledTimes(1);
+      expect(response.status).toBe(503);
+      // A platform fault: the envelope masks the code, and keeps the status and the retry hint.
+      await expect(response.json()).resolves.toMatchObject({ retryable: true });
+    });
+  });
+});

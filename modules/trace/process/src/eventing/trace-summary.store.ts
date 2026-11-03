@@ -15,18 +15,26 @@ import type { TraceSummaryProjectionRepository } from "../repositories/trace-sum
  * tenant from `authorize` (ADR-177 block C), so the fold reads back exactly the row it wrote.
  */
 export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> {
-  private constructor(
-    private readonly storage: TraceSummaryProjectionRepository,
-    private readonly defaultRetentionDays: () => number,
-    private readonly authorize: FoldReadAuthorizer,
-  ) {}
+  private readonly storage: TraceSummaryProjectionRepository;
+  private readonly defaultRetentionDays: () => number;
+  private readonly authorize: FoldReadAuthorizer;
+
+  private constructor(options: {
+    storage: TraceSummaryProjectionRepository;
+    defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
+  }) {
+    this.storage = options.storage;
+    this.defaultRetentionDays = options.defaultRetentionDays;
+    this.authorize = options.authorize;
+  }
 
   static create(options: {
     storage: TraceSummaryProjectionRepository;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
   }): TraceSummaryStore {
-    return new TraceSummaryStore(options.storage, options.defaultRetentionDays, options.authorize);
+    return new TraceSummaryStore(options);
   }
 
   /**

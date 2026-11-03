@@ -29,7 +29,7 @@ const firstTrace: NurturingSignal = {
   kind: "first_trace_integrated",
   sourceEventId: "event-2",
   tenantId: "project-1",
-  occurredAt: 1_600,
+  occurredAt: 1_792_664_000_123,
   userId: "admin-1",
   projectId: "project-1",
   sdkLanguage: "python",
@@ -187,7 +187,7 @@ describe("NurturingDeliveryService", () => {
               has_traces: true,
               sdk_language: "python",
               sdk_framework: "unknown",
-              first_trace_at: "1970-01-01T00:00:01.600Z",
+              first_trace_at: 1_792_664_000,
             },
           }),
         },
@@ -616,12 +616,166 @@ describe("NurturingDeliveryService", () => {
           path: "/v1/identify",
           body: expect.objectContaining({
             userId: "user-app-active",
-            traits: { last_active_at: expect.any(String) },
+            traits: { last_active_at: expect.any(Number) },
           }),
         },
         {
           path: "/v1/track",
           body: expect.objectContaining({ userId: "user-app-active", event: "app_active" }),
+        },
+      ]);
+    });
+  });
+
+  describe("when a signal carries a date to Customer.io", () => {
+    const at = { tenantId: "project-1", occurredAt: 1_792_664_000_123 };
+    const seconds = 1_792_664_000;
+
+    async function identifiedTraits(signal: NurturingSignal): Promise<unknown[]> {
+      const { cio, delivery } = deliveryOverBothSinks();
+      await delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
+      await settle();
+      return cio.sent
+        .filter((call) => call.path === "/v1/identify" || call.path === "/v1/group")
+        .map((call) => (call.body as { traits: unknown }).traits);
+    }
+
+    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
+    it("sends last_trace_at as whole Unix seconds", async () => {
+      const traits = await identifiedTraits({
+        kind: "trace_received",
+        sourceEventId: "event-40",
+        ...at,
+        userId: "admin-1",
+        projectId: "project-1",
+      });
+
+      expect(traits).toEqual([{ last_trace_at: seconds }]);
+    });
+
+    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
+    it("sends first_simulation_at and last_simulation_at as whole Unix seconds", async () => {
+      const run = {
+        kind: "simulation_run_finished",
+        ...at,
+        userId: "admin-1",
+        projectId: "project-1",
+        organizationRunCount: 1,
+      } as const;
+
+      expect(await identifiedTraits({ ...run, sourceEventId: "run-40", first: true })).toEqual([
+        { has_simulations: true, simulation_count: 1, first_simulation_at: seconds },
+      ]);
+      expect(await identifiedTraits({ ...run, sourceEventId: "run-41", first: false })).toEqual([
+        { simulation_count: 1, last_simulation_at: seconds },
+      ]);
+    });
+
+    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
+    it("sends first_evaluation_at and last_evaluation_at as whole Unix seconds", async () => {
+      const evaluation = {
+        kind: "evaluation_completed",
+        ...at,
+        userId: "admin-1",
+        projectId: "project-1",
+        evaluationId: "eval-40",
+        organizationEvaluationCount: 1,
+      } as const;
+
+      expect(
+        await identifiedTraits({ ...evaluation, sourceEventId: "eval-40", first: true }),
+      ).toEqual([{ has_evaluations: true, evaluation_count: 1, first_evaluation_at: seconds }]);
+      expect(
+        await identifiedTraits({ ...evaluation, sourceEventId: "eval-41", first: false }),
+      ).toEqual([{ evaluation_count: 1, last_evaluation_at: seconds }]);
+    });
+
+    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
+    it("sends a minted account's createdAt in Unix seconds and keeps PostHog's ISO date", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "user_created:event-42",
+        signal: { kind: "user_created", sourceEventId: "event-42", ...at, userId: "user-1" },
+      });
+      await settle();
+
+      expect(cio.sent[0]?.body).toEqual(
+        expect.objectContaining({
+          traits: { email: "jane@example.com", name: "Jane Doe", createdAt: seconds },
+        }),
+      );
+      expect(posthog.identified).toEqual([
+        { userId: "user-1", properties: { created_at: "2026-10-22T10:13:20.123Z" } },
+      ]);
+    });
+
+    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
+    it("sends a self-hosted install's report dates on the organization in Unix seconds", async () => {
+      const traits = await identifiedTraits({
+        kind: "self_hosted_crm",
+        sourceEventId: "event-43",
+        ...at,
+        userId: "user-1",
+        organizationId: "org-1",
+        instanceId: "instance-1",
+        traits: {
+          self_hosted: true,
+          self_hosted_first_seen_at: "2026-10-01T00:00:00.999Z",
+          self_hosted_last_report_at: "2026-10-22T10:13:20.123Z",
+        },
+        events: [],
+      });
+
+      expect(traits).toEqual([
+        {
+          self_hosted: true,
+          self_hosted_first_seen_at: 1_790_812_800,
+          self_hosted_last_report_at: seconds,
+        },
+      ]);
+    });
+
+    /** @scenario "A malformed self-hosted report date is left out and the rest is still sent" */
+    it("groups the organization without the malformed date and still tracks the events", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await expect(
+        delivery.deliver({
+          key: "self_hosted_crm:event-44",
+          signal: {
+            kind: "self_hosted_crm",
+            sourceEventId: "event-44",
+            ...at,
+            userId: "user-1",
+            organizationId: "org-1",
+            instanceId: "instance-1",
+            traits: {
+              self_hosted: true,
+              self_hosted_first_seen_at: "2026-10-22T10:13:20Z",
+              self_hosted_last_report_at: "not-a-date",
+            },
+            events: ["self_hosted_license_expiring"],
+          },
+        }),
+      ).resolves.toBeUndefined();
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            traits: { self_hosted: true, self_hosted_first_seen_at: 1_792_664_000 },
+          }),
+        },
+      ]);
+      expect(cio.sent.filter((call) => call.path === "/v1/track")).toEqual([
+        {
+          path: "/v1/track",
+          body: expect.objectContaining({
+            userId: "user-1",
+            event: "self_hosted_license_expiring",
+          }),
         },
       ]);
     });
@@ -686,6 +840,121 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(cio.sent.filter((call) => call.path === "/v1/identify")).toHaveLength(1);
+    });
+  });
+
+  describe("when a batch's evaluation count is delivered", () => {
+    function counted(
+      sourceEventId: string,
+      overrides: Partial<NurturingSignalOf<"evaluation_completed">> = {},
+    ): NurturingSignal {
+      return {
+        kind: "evaluation_completed",
+        sourceEventId,
+        ...source,
+        userId: "admin-1",
+        projectId: "project-1",
+        evaluationId: "eval-3",
+        score: 1,
+        passed: true,
+        evaluationsCounted: 3,
+        organizationEvaluationCount: 7,
+        first: false,
+        ...overrides,
+      };
+    }
+
+    /** @scenario "A backed-up project's settled evaluations are counted in one step and send one update" */
+    it("tells Customer.io the new count once and PostHog how many the batch counted", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3"),
+      });
+      await settle();
+
+      expect(cio.sent).toEqual([
+        {
+          path: "/v1/identify",
+          body: expect.objectContaining({
+            userId: "admin-1",
+            traits: expect.objectContaining({ evaluation_count: 7 }),
+          }),
+        },
+        {
+          path: "/v1/track",
+          body: expect.objectContaining({
+            event: "evaluation_ran",
+            properties: { evaluation_id: "eval-3", score: 1, passed: true, count: 3 },
+          }),
+        },
+      ]);
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "admin-1",
+          event: "evaluations_completed",
+          properties: { count: 3, projectId: "project-1" },
+        },
+      ]);
+    });
+
+    /** @scenario "The batch that counts an organization's first evaluations sends its milestone once" */
+    it("sends first_evaluation_created with the count the batch reached", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-2",
+        signal: counted("project-1:eval-2", {
+          evaluationId: "eval-2",
+          evaluationsCounted: 2,
+          organizationEvaluationCount: 2,
+          first: true,
+        }),
+      });
+      await settle();
+
+      expect(cio.sent.slice(0, 2)).toEqual([
+        {
+          path: "/v1/identify",
+          body: expect.objectContaining({
+            traits: expect.objectContaining({ has_evaluations: true, evaluation_count: 2 }),
+          }),
+        },
+        {
+          path: "/v1/track",
+          body: expect.objectContaining({ userId: "admin-1", event: "first_evaluation_created" }),
+        },
+      ]);
+    });
+  });
+
+  describe("when a batch's first finished runs are delivered", () => {
+    /** @scenario "A backed-up project's finished runs are counted in one step" */
+    it("identifies the admin with the organization's run count the batch reached", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "simulation_run_finished:run-2",
+        signal: {
+          kind: "simulation_run_finished",
+          sourceEventId: "run-2",
+          ...source,
+          userId: "admin-1",
+          projectId: "project-1",
+          organizationRunCount: 2,
+          first: true,
+        },
+      });
+      await settle();
+
+      expect(cio.sent[0]).toEqual({
+        path: "/v1/identify",
+        body: expect.objectContaining({
+          userId: "admin-1",
+          traits: expect.objectContaining({ has_simulations: true, simulation_count: 2 }),
+        }),
+      });
     });
   });
 

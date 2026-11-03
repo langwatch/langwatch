@@ -43,7 +43,7 @@ export APP_PORT API_PORT
 
 # Strip any stale http://localhost:<oldport> exports of NEXTAUTH_URL /
 # BASE_HOST so dynamic-port worktrees don't 403 on login (lw#3453). Real
-# overrides (e.g. boxd proxy URLs) are left alone — see comment in helper.
+# overrides (e.g. proxy or tunnel URLs) are left alone — see comment in helper.
 . "$(dirname "$0")/lib/sanitize-dev-env.sh"
 sanitize_localhost_dev_env
 

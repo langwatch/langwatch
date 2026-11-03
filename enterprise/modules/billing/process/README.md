@@ -126,7 +126,7 @@ Public: the provider signs every delivery and the signature is verified over the
 Answers at `/api/webhooks/stripe`, `/api/v1/webhooks/stripe`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/billing-stripe-webhook.rest.ts:41)
+// Rawbody: "bytes" (inline, src/transport/billing-stripe-webhook.rest.ts:42)
 type Headers = z.infer<typeof billingStripeWebhookHeadersSchema>; // ../contract/src/billing-types.ts:250
 // Response: billingStripeWebhookReceiptSchema, ../contract/src/billing-types.ts:241
 interface Response {
@@ -206,7 +206,7 @@ type Output = z.infer<typeof connectedInvoiceTargetSchema>; // ../contract/src/c
 
 ### `currency`
 
-Contract `../contract/src/currency.trpc.ts:22`, router `src/transport/currency.trpc.ts:46`.
+Contract `../contract/src/currency.trpc.ts:22`, router `src/transport/currency.trpc.ts:47`.
 
 | Procedure                 | Kind  | Gate                                                                                                                                     | Input                       | Output                   |
 | ------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------ |

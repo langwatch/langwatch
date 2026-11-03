@@ -13,6 +13,12 @@ export const MCP_IDENTITY_HEADERS: Record<string, string> = {
   "X-LangWatch-SDK-Version": packageJson.version,
 };
 
+/** The dated API version every request names (specs/api-reference/client-api-version.feature). */
+export const LANGWATCH_API_VERSION = "2026-10-26";
+
+/** Names the hosted MCP server's calls apart from a local server's. */
+export const HOSTED_MCP_HEADER = "X-LangWatch-MCP-Host";
+
 // --- Response types ---
 
 export interface TraceSearchResult {
@@ -174,6 +180,15 @@ interface ParsedErrorBody {
   docsUrl?: string;
   fault?: HandledErrorFault;
   reasons?: SerializedReason[];
+  /** What the error says beyond its reasons, such as the names it refused. */
+  meta?: Record<string, unknown>;
+}
+
+/** The error's own facts: `meta` without the reasons (shown apart) and the request echo. */
+function detailsOf(meta: Record<string, unknown>): Record<string, unknown> | undefined {
+  const { reasons: _reasons, target: _target, fields: _fields, ...details } = meta;
+
+  return Object.keys(details).length > 0 ? details : undefined;
 }
 
 const VALID_FAULTS: readonly HandledErrorFault[] = [
@@ -210,11 +225,14 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
     const fault = VALID_FAULTS.includes(body.fault as HandledErrorFault)
       ? (body.fault as HandledErrorFault)
       : undefined;
+    // The v1 envelope carries the per-field failures in `meta.reasons`; older ones at the top.
+    const meta = isRecord(body.meta) ? body.meta : {};
+    const rawReasons = Array.isArray(body.reasons) ? body.reasons : meta.reasons;
     const reasons =
-      Array.isArray(body.reasons) && body.reasons.every((r) => !!r && typeof r === "object")
-        ? (body.reasons as SerializedReason[])
+      Array.isArray(rawReasons) && rawReasons.every((r) => !!r && typeof r === "object")
+        ? (rawReasons as SerializedReason[])
         : undefined;
-    return { code, message, tips, docsUrl, fault, reasons };
+    return { code, message, tips, docsUrl, fault, reasons, meta: detailsOf(meta) };
   } catch {
     return {};
   }
@@ -261,6 +279,39 @@ function describeReason(reason: SerializedReason): string | null {
   return parts.join(" — ");
 }
 
+/** The error an unsuccessful response becomes: its message, code, details, fields and tips. */
+function apiErrorOf({
+  status,
+  responseBody,
+}: {
+  status: number;
+  responseBody: string;
+}): LangWatchApiError {
+  const parsed = parseErrorBody(responseBody);
+  const lines = [`LangWatch API error ${status}: ${parsed.message ?? responseBody}`];
+  if (parsed.code) lines.push(`Code: ${parsed.code}`);
+  if (parsed.meta) lines.push(`Details: ${JSON.stringify(parsed.meta)}`);
+  const reasonLines = (parsed.reasons ?? [])
+    .map(describeReason)
+    .filter((line): line is string => line !== null);
+  if (reasonLines.length > 0) {
+    lines.push("Rejected fields:", ...reasonLines);
+  }
+  if (parsed.tips && parsed.tips.length > 0) {
+    lines.push("Tips:", ...parsed.tips.map((tip) => `- ${tip}`));
+  }
+  if (parsed.docsUrl) {
+    lines.push(`Docs: ${parsed.docsUrl}`);
+  }
+  return new LangWatchApiError(lines.join("\n"), status, responseBody, {
+    code: parsed.code,
+    tips: parsed.tips,
+    docsUrl: parsed.docsUrl,
+    fault: parsed.fault,
+    reasons: parsed.reasons,
+  });
+}
+
 /**
  * Sends an HTTP request to the LangWatch API. Builds the full URL from the configured endpoint,
  * adds authentication, and handles JSON serialization/deserialization. @throws
@@ -275,10 +326,14 @@ export async function makeRequest(
   const url = config.endpoint + path;
   const headers: Record<string, string> = {
     ...MCP_IDENTITY_HEADERS,
+    "X-API-Version": LANGWATCH_API_VERSION,
     "X-Auth-Token": requireApiKey(),
   };
   if (config.projectId) {
     headers["X-Project-Id"] = config.projectId;
+  }
+  if (config.hosted) {
+    headers[HOSTED_MCP_HEADER] = "hosted";
   }
 
   if (body !== undefined) {
@@ -291,30 +346,8 @@ export async function makeRequest(
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
 
-  if (!response.ok) {
-    const responseBody = await response.text();
-    const parsed = parseErrorBody(responseBody);
-    const lines = [`LangWatch API error ${response.status}: ${parsed.message ?? responseBody}`];
-    const reasonLines = (parsed.reasons ?? [])
-      .map(describeReason)
-      .filter((line): line is string => line !== null);
-    if (reasonLines.length > 0) {
-      lines.push("Rejected fields:", ...reasonLines);
-    }
-    if (parsed.tips && parsed.tips.length > 0) {
-      lines.push("Tips:", ...parsed.tips.map((tip) => `- ${tip}`));
-    }
-    if (parsed.docsUrl) {
-      lines.push(`Docs: ${parsed.docsUrl}`);
-    }
-    throw new LangWatchApiError(lines.join("\n"), response.status, responseBody, {
-      code: parsed.code,
-      tips: parsed.tips,
-      docsUrl: parsed.docsUrl,
-      fault: parsed.fault,
-      reasons: parsed.reasons,
-    });
-  }
+  if (!response.ok)
+    throw apiErrorOf({ status: response.status, responseBody: await response.text() });
 
   if (response.status === 204 || response.headers?.get("content-length") === "0") {
     return null;

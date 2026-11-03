@@ -20,6 +20,7 @@ export {
   ProjectRequiredError,
   ApiVersionConflictError,
   BatchingNotSupportedError,
+  ConfirmationRequiredError,
   createErrorHandler,
   EnterprisePlanRequiredError,
   formatError,

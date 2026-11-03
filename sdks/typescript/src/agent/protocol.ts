@@ -34,6 +34,15 @@ export interface RegisterInstance {
   inFlightCallIds: string[];
 }
 
+/** The scenario hooks an agent declares (ADR-180). */
+export interface AgentHooks {
+  setup: boolean;
+  teardown: boolean;
+}
+
+/** The test data a scenario's setup made, as a JSON object. */
+export type ScenarioState = Record<string, unknown>;
+
 export interface RegisterAgent {
   name: string;
   environment: string;
@@ -41,6 +50,7 @@ export interface RegisterAgent {
   concurrency?: number;
   timeoutMs?: number;
   sticky?: boolean;
+  hooks?: AgentHooks;
 }
 
 export interface RegisterFrame {
@@ -67,8 +77,10 @@ export type ResultFrame =
       type: "result";
       protocol: typeof PROTOCOL_VERSION;
       callId: string;
-      output: unknown;
+      /** Absent when a hook answers. */
+      output?: unknown;
       session?: unknown;
+      state?: ScenarioState;
     }
   | {
       type: "result";
@@ -129,6 +141,8 @@ export interface CallRun {
 export interface CallFrame {
   type: "call";
   protocol: number;
+  /** "turn", "setup" or "teardown"; a kind this SDK does not know is answered as an error. */
+  kind: string;
   callId: string;
   agentId: string;
   threadId: string;
@@ -136,6 +150,7 @@ export interface CallFrame {
   newMessages: AgentMessage[];
   params: Record<string, AgentParameterValue>;
   session: unknown;
+  state: ScenarioState | null;
   traceparent: string | null;
   /** Epoch milliseconds, null when the platform sent none. */
   deadlineAt: number | null;
@@ -248,6 +263,8 @@ const readCall = (frame: Record<string, unknown>): CallFrame | null => {
   return {
     type: "call",
     protocol: typeof frame.protocol === "number" ? frame.protocol : PROTOCOL_VERSION,
+    // A platform that predates hooks sends no kind: every call is a turn.
+    kind: isString(frame.kind) ? frame.kind : "turn",
     callId: frame.callId,
     agentId: frame.agentId,
     threadId: isString(frame.threadId) ? frame.threadId : "",
@@ -255,6 +272,7 @@ const readCall = (frame: Record<string, unknown>): CallFrame | null => {
     newMessages: isMessageList(frame.newMessages) ? frame.newMessages : messages,
     params: readParams(frame.params),
     session: frame.session === undefined ? null : frame.session,
+    state: isRecord(frame.state) ? frame.state : null,
     traceparent: isString(frame.traceparent) ? frame.traceparent : null,
     deadlineAt: readDeadline(frame.deadlineAt),
     run: {

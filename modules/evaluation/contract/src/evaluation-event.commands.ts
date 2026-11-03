@@ -36,6 +36,8 @@ const executeEvaluationCommandDataSchemaDefinition = z.object({
   spanModels: z.array(z.string()).optional(),
   computedInput: z.string().nullable().optional(),
   computedOutput: z.string().nullable().optional(),
+  // Which attempt this is, from 1; a retry after the evaluator service was not up sends the next
+  attempt: z.number().int().positive().optional(),
 });
 export interface ExecuteEvaluationCommandDataSchema extends Named<
   typeof executeEvaluationCommandDataSchemaDefinition

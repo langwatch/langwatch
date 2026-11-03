@@ -275,6 +275,7 @@ describe("ClickHouse ownership records", () => {
       expect(entries.filter((entry) => entry.reason.trim() === "")).toEqual([]);
       expect(DECLARED_OWNERSHIP.records.map((record) => record.table)).toEqual([
         "event_log",
+        "event_log_id_index",
         "stored_log_records",
         "stored_metric_records",
         "stored_objects",

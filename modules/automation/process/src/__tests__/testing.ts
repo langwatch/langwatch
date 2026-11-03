@@ -110,6 +110,7 @@ class TestRunaway
   onAutoPaused() {}
   onContainmentFailed() {}
   error() {}
+  warn() {}
   info() {}
 }
 

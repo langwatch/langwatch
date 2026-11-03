@@ -116,6 +116,7 @@ export const apiKeyProjectsRest = defineRestRouter(ApiKeyProjectsDoorApi)
   })
 
   .post("/api/projects", "createProject")
+  .keepsRecords()
   .withSharedPath(PROJECTS_SHARED_PATH)
   .withInput(projectRestCreateSchema)
   .withPermission("project:create")

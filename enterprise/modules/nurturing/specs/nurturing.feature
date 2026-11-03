@@ -89,6 +89,65 @@ Feature: Nurturing sends the signals its owners record
     When an evaluation in that project settles
     Then Customer.io is told about it against that admin, with nurturing's own count of the organization's evaluations
 
+  # Batched (Alex, 2026-10-20): a busy project can settle evaluations far faster than
+  # nurturing's work for each one (a queue hop, three Postgres reads and writes, Customer.io)
+  # can keep up with, and they queued behind each other. Nurturing's busy lanes now queue per project and drain a
+  # backed-up project's facts together, up to 200 at a time; an idle project's fact is a batch
+  # of one, so nothing waits on a timer.
+  @unit
+  Scenario: A backed-up project's settled evaluations are counted in one step and send one update
+    Given three evaluations in a project settled while its lane was busy
+    When nurturing takes them as one batch
+    Then the organization's evaluation count rises by three in one step
+    And Customer.io is told the new count once
+    And PostHog receives evaluations_completed once, with a count of three and the project
+
+  @unit
+  Scenario: The batch that counts an organization's first evaluations sends its milestone once
+    Given an unseeded organization with no evaluation counted yet
+    When two of its evaluations settle and one batch counts them
+    Then first_evaluation_created is sent once, against the admin
+
+  @unit
+  Scenario: A redelivered settled evaluation is counted once
+    Given an evaluation settled and was counted
+    When the same settled evaluation is delivered again, in the same batch or a later one
+    Then it is not counted again
+
+  @unit
+  Scenario: A batch that fails counting is retried without counting twice
+    Given a batch of settled evaluations is being counted
+    When counting it fails
+    Then the batch fails and the queue retries it
+    And no evaluation in it is counted a second time
+
+  @unit
+  Scenario: A batch whose claims cannot all be taken is retried whole
+    Given a batch of settled evaluations is being claimed
+    When taking one of its claims fails
+    Then the batch gives back the claims it took and fails
+    And the queue's retry counts every evaluation in it once
+
+  @unit
+  Scenario: A failed delivery does not hold back the rest of the batch
+    Given a batch of settled evaluations spans two projects
+    When sending the first project's signal fails
+    Then the second project is still counted and its signal sent
+    And the batch fails, but the retry counts neither project a second time
+
+  @unit
+  Scenario: A backed-up project's finished runs are counted in one step
+    Given two runs in a project finished while its lane was busy, one delivered twice
+    When nurturing takes them as one batch
+    Then the organization's run count rises by two, told once under the latest run
+
+  @unit
+  Scenario: A backed-up project's traces tell Customer.io once
+    Given several traces in a project were received while its lane was busy
+    When nurturing takes them as one batch
+    Then trace_received is sent once, for the latest trace
+    And the project's active day is sent once per day the traces fell on
+
   @unit
   Scenario: A seeded organization's first counted evaluation is not its first milestone
     Given nurturing learned an organization from project's backfill

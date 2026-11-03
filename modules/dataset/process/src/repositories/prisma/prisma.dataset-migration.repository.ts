@@ -63,19 +63,33 @@ export class PrismaDatasetMigrationRepository implements DatasetMigrationReposit
     return fingerprintOf(this.options.database.datasetRecord, input);
   }
 
+  /**
+   * Pages in the order the dataset lists its entries, so the chunks keep it:
+   * `id COLLATE "C"` breaks a `createdAt` tie by byte order whatever the
+   * column's collation, which Prisma's `orderBy` cannot say.
+   */
   async findRecordPage(input: {
     datasetId: string;
     projectId: string;
     afterId?: string | undefined;
     limit: number;
   }): Promise<{ id: string; entry: unknown }[]> {
-    return this.options.database.datasetRecord.findMany({
-      where: { datasetId: input.datasetId, projectId: input.projectId },
-      select: { id: true, entry: true },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      take: input.limit,
-      ...(input.afterId ? { cursor: { id: input.afterId }, skip: 1 } : {}),
-    });
+    const afterId = input.afterId ?? null;
+    return this.options.database.$queryRaw<{ id: string; entry: unknown }[]>`
+      SELECT "id", "entry"
+        FROM "DatasetRecord"
+       WHERE "datasetId" = ${input.datasetId}
+         AND "projectId" = ${input.projectId}
+         AND (${afterId}::text IS NULL OR ("createdAt", "id" COLLATE "C") > (
+               SELECT "createdAt", "id" COLLATE "C"
+                 FROM "DatasetRecord"
+                WHERE "id" = ${afterId}
+                  AND "datasetId" = ${input.datasetId}
+                  AND "projectId" = ${input.projectId}
+             ))
+       ORDER BY "createdAt" ASC, "id" COLLATE "C" ASC
+       LIMIT ${input.limit}
+    `;
   }
 
   async commit(input: {

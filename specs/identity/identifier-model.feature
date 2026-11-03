@@ -363,6 +363,14 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then "sam" is held at migrated and nothing is written for "sam"
     And once "sam"'s address is confirmed, a later pass finalizes "sam" as before
 
+  # Only the person confirming the address moves an unproven account: a hold, not a failure (2026-10-21).
+  @unit
+  Scenario: The identifier backfill holds an unproven account on the person and a disagreeing proof on the proof
+    Given "sam"'s account was never confirmed and never signed into and carries a password
+    When the identifier backfill migration visits "sam"
+    Then "sam" is held with reason "person"
+    But a user whose identifiers disagree with their accounts is held with the default reason, "proof"
+
   @unit
   Scenario: The backfill finalizes an unproven account carrying only its address, unverified
     Given "ana"'s account was never confirmed and never signed into

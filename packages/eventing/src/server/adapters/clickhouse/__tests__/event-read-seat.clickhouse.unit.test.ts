@@ -38,7 +38,7 @@ function recordingClient(eventId: string) {
 
 describe("EventLogReadSeat over the ClickHouse event log", () => {
   describe("when asked for an event whose id is a KSUID", () => {
-    /** @scenario "The event log read is bounded to two days either side of the id's time" */
+    /** @scenario "The event log read is bounded to seven days either side of the id's time" */
     it("names the tenant first and keeps unknown and in-window occurred times", async () => {
       const eventId = generate("event").toString();
       const idTimeMs = Ksuid.parse(eventId).date.getTime();

@@ -11,6 +11,7 @@ export abstract class AutomationPersistActionRepository {
   abstract addToDataset(input: {
     datasetId: string;
     projectId: string;
+    triggerId: string;
     datasetRecords: DatasetRecordEntry[];
   }): Promise<void>;
 }

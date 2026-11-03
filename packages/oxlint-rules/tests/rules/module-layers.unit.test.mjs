@@ -173,3 +173,72 @@ describe("given a test beside a repository", () => {
     ).toEqual([]);
   });
 });
+
+// ADR-181: `relay` opts into the feature layout; `eventing` is a framework that has not.
+const framework = createFixtureWorkspace({
+  files: {
+    "packages/relay/package.json": JSON.stringify({
+      name: "@langwatch/relay",
+      exports: { ".": { default: "./src/index.ts" } },
+      langwatch: { group: "framework", layout: "features" },
+    }),
+    "packages/eventing/package.json": JSON.stringify({
+      name: "@langwatch/eventing",
+      langwatch: { group: "framework" },
+    }),
+  },
+});
+
+afterAll(() => framework.cleanup());
+
+function frameworkReport(filename, code) {
+  return runRule(moduleLayersRule, { code, cwd: framework.cwd, filename }).map(
+    ({ data, line, messageId }) => ({ crossed: data.crossed, line, messageId }),
+  );
+}
+
+describe("given an opted-in framework package", () => {
+  describe("when its vocabulary value-imports a service", () => {
+    /** @scenario "A framework layer that crosses its row is reported" */
+    it("reports vocabularyCrossing and lets rules, telemetry and a type through", () => {
+      const code = [
+        'import { compareOrdinal } from "../rules/compare-ordinal.rules.ts";',
+        'import { foldsTotal } from "../telemetry/relay.metrics.ts";',
+        'import type { ClaimService } from "../features/claim/services/claim.service.ts";',
+        'import { ClaimService as Live } from "../features/claim/services/claim.service.ts";',
+      ].join("\n");
+      expect(frameworkReport("packages/relay/src/vocabulary/relay.ts", code)).toEqual([
+        { crossed: "a service", line: 4, messageId: "vocabularyCrossing" },
+      ]);
+    });
+  });
+
+  describe("when its telemetry value-imports the vocabulary", () => {
+    /** @scenario "A framework layer that crosses its row is reported" */
+    it("reports telemetryCrossing", () => {
+      const code = 'import { RelayError } from "../vocabulary/relay.errors.ts";';
+      expect(frameworkReport("packages/relay/src/telemetry/relay.metrics.ts", code)).toEqual([
+        { crossed: "the vocabulary", line: 1, messageId: "telemetryCrossing" },
+      ]);
+    });
+  });
+
+  describe("when a concern's service names a repository backend", () => {
+    /** @scenario "A framework layer that crosses its row is reported" */
+    it("reports serviceNamesABackend", () => {
+      const code =
+        'import { RedisClaimRepository } from "../repositories/redis/redis.claim.repository.ts";';
+      expect(
+        frameworkReport("packages/relay/src/features/claim/services/claim.service.ts", code),
+      ).toEqual([{ crossed: "a repository backend", line: 1, messageId: "serviceNamesABackend" }]);
+    });
+  });
+});
+
+describe("given a framework package that has not opted in", () => {
+  /** @scenario "A framework package that has not opted in is left alone by the layered rules" */
+  it("reports nothing for the same crossing", () => {
+    const code = 'import { ClaimService } from "../services/claim.service.ts";';
+    expect(frameworkReport("packages/eventing/src/vocabulary/relay.ts", code)).toEqual([]);
+  });
+});

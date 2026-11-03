@@ -1,6 +1,7 @@
 /**
  * Picks which child channel starts a scenario run: the Go runner when the project's flag is on and
- * its binary is on disk, the Node child otherwise. Voice always runs on the Node child.
+ * its binary is on disk, the Node child otherwise. Voice, and a target that declares scenario
+ * hooks, always run on the Node child.
  * @see specs/scenarios/go-scenario-runner-choice.feature
  */
 
@@ -58,13 +59,21 @@ export class ScenarioChildChoiceService implements ScenarioChildBootstrap {
     jobData: ExecutionJobData;
     environment: ScenarioChildEnvironment;
   }): Promise<ScenarioChildExecutionSession> => {
-    const runner = (await this.#choose(input.jobData)) ?? this.options.node;
+    const runner = (await this.#choose(input)) ?? this.options.node;
     const { pool, nonces, voicePublicUrl } = this.options;
     return runner.start({ ...input, pool, nonces, voicePublicUrl });
   };
 
-  async #choose(jobData: ExecutionJobData): Promise<ScenarioChildChannel | undefined> {
+  async #choose({
+    jobData,
+    environment,
+  }: {
+    jobData: ExecutionJobData;
+    environment: ScenarioChildEnvironment;
+  }): Promise<ScenarioChildChannel | undefined> {
     if (jobData.target.type === "voice") return void 0;
+    // Go parity for hooks comes later (ADR-180).
+    if (environment.callsHooks) return void 0;
     if (!(await this.#flagOn(jobData.projectId))) return void 0;
     const { go } = this.options;
     if (!this.#hasBinary(go.binaryPath)) return void 0;

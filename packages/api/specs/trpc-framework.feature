@@ -91,6 +91,13 @@ Feature: tRPC framework boundary
     Then nothing is logged as an SSE handler error
 
   @unit
+  Scenario: A live subscription refused for access is logged as a warning, not an error
+    Given a subscription the access policy refuses because the subscriber is signed out or not allowed
+    When the stream is being served
+    Then the refusal is logged as a warning
+    And nothing is logged as an error
+
+  @unit
   Scenario: A live subscription whose own signal aborted is the stream closing, not a failure
     Given a subscription whose request signal aborted before its stream rejected with an abort
     When the stream is being served

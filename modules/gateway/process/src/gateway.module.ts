@@ -24,6 +24,7 @@ import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { GATEWAY_ID_INDEXES } from "./repositories/clickhouse/clickhouse.gateway-id-indexes.database.ts";
 import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
@@ -103,6 +104,11 @@ export const gatewayProcessModule: PublishedProcessModule<
     elevenLabsSignature: (request) => ({
       signature: request.headers.get("elevenlabs-signature") ?? undefined,
     }),
+  })
+  .withIdIndexes(GATEWAY_ID_INDEXES, {
+    after: ["coding-agent:fill-id-indexes"],
+    description:
+      "Fills the id indexes of gateway spend and the budget ledger from older rows, then marks them ready on each ClickHouse target.",
   });
 
 /**

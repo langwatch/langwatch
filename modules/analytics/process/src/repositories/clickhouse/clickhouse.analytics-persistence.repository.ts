@@ -14,6 +14,12 @@ import {
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
+import {
+  type ClickHouseQueryClient,
+  type IdBoundOptions,
+  queryWindowed,
+  type WindowFragment,
+} from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -22,6 +28,9 @@ import { AnalyticsEvaluationRepository } from "../analytics-persistence.reposito
 
 const SLIM_TABLE = "evaluation_analytics";
 const ROLLUP_TABLE = "evaluation_analytics_rollup";
+/** The newest version first; a tie keeps the one with the most applied events. */
+const LATEST_ORDER = `ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,
+          length(AppliedEventIds) DESC`;
 const INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
@@ -59,28 +68,33 @@ function readOutcome({
   return hasRecord ? "hit" : "windowed_empty";
 }
 
+type AnalyticsEvaluationRepositoryOptions = {
+  resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
+  /** Read per stamp: the owner of the default answers it, not this module. */
+  defaultRetentionDays: () => number;
+  readMetrics?: AnalyticsEvaluationReadMetrics;
+  /** The routed client every read by id goes through, bounded by the evaluation id index. */
+  clickhouse?: ClickHouseQueryClient;
+};
+
 export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluationRepository {
-  static create(options: {
-    resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
-    /** Read per stamp: the owner of the default answers it, not this module. */
-    defaultRetentionDays: () => number;
-    readMetrics?: AnalyticsEvaluationReadMetrics;
-  }): ClickHouseAnalyticsEvaluationRepository {
-    return new ClickHouseAnalyticsEvaluationRepository(
-      options.resolveClient,
-      options.defaultRetentionDays,
-      options.readMetrics,
-    );
+  static create(
+    options: AnalyticsEvaluationRepositoryOptions,
+  ): ClickHouseAnalyticsEvaluationRepository {
+    return new ClickHouseAnalyticsEvaluationRepository(options);
   }
 
-  private constructor(
-    private readonly resolveClient: (
-      tenantId: string,
-    ) => Promise<EvaluationAnalyticsClickHouseClient | null>,
-    private readonly defaultRetentionDays: () => number,
-    private readonly readMetrics?: AnalyticsEvaluationReadMetrics,
-  ) {
+  private readonly resolveClient: AnalyticsEvaluationRepositoryOptions["resolveClient"];
+  private readonly defaultRetentionDays: () => number;
+  private readonly readMetrics: AnalyticsEvaluationReadMetrics | undefined;
+  private readonly clickhouse: ClickHouseQueryClient | undefined;
+
+  private constructor(options: AnalyticsEvaluationRepositoryOptions) {
     super();
+    this.resolveClient = options.resolveClient;
+    this.defaultRetentionDays = options.defaultRetentionDays;
+    this.readMetrics = options.readMetrics;
+    this.clickhouse = options.clickhouse;
   }
 
   async upsert(input: AnalyticsEvaluationUpsertInput): Promise<void> {
@@ -157,39 +171,10 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     const parsed = analyticsEvaluationReadInputSchema.parse(input);
     this.validateTenant(parsed.tenantId, "findLatest");
     try {
-      const client = await this.clientFor(parsed.tenantId);
-      const range = parsed.window
-        ? "AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
-        : "";
-      const result = await client.query({
-        query: `
-          SELECT * FROM ${SLIM_TABLE}
-          WHERE TenantId = {tenantId:String}
-            AND EvaluationId = {evaluationId:String}
-            ${range}
-            AND (TenantId, EvaluationId, UpdatedAt) IN (
-              SELECT TenantId, EvaluationId, max(UpdatedAt)
-              FROM ${SLIM_TABLE}
-              WHERE TenantId = {tenantId:String}
-                AND EvaluationId = {evaluationId:String}
-              GROUP BY TenantId, EvaluationId
-            )
-          ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,
-            length(AppliedEventIds) DESC
-          LIMIT 1
-        `,
-        query_params: {
-          tenantId: parsed.tenantId,
-          evaluationId: parsed.evaluationId,
-          ...(parsed.window ? { from: parsed.window.fromMs, to: parsed.window.toMs } : {}),
-        },
-        format: "JSONEachRow",
-      });
-      const rows = await result.json();
-      const record = rows[0];
+      const rows = await this.findLatestRows(parsed);
       this.readMetrics?.record({
         table: "evaluation_analytics",
-        outcome: readOutcome({ hasRecord: Boolean(record), isWindowed: Boolean(parsed.window) }),
+        outcome: readOutcome({ hasRecord: Boolean(rows[0]), isWindowed: Boolean(parsed.window) }),
       });
       return rows.map((row) => fromSlimRecord(row));
     } catch (error) {
@@ -200,6 +185,101 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
       );
       throw error;
     }
+  }
+
+  /**
+   * The caller's window reads as it always did, the outer read only (ADR-071), and its miss is
+   * final; with no window the evaluation id index bounds the read, inner dedup subquery included.
+   */
+  private async findLatestRows(
+    parsed: AnalyticsEvaluationReadInput,
+  ): Promise<Record<string, unknown>[]> {
+    const caller = parsed.window;
+    if (caller === undefined) return this.readById({ parsed, idBound: { fallback: "unbounded" } });
+    return queryWindowed({
+      table: SLIM_TABLE,
+      // The caller's [from, to], as the centre and half-width the windowed read takes.
+      hintMs: (caller.fromMs + caller.toMs) / 2,
+      windowMs: (caller.toMs - caller.fromMs) / 2,
+      fallback: "none",
+      isEmpty: (found: Record<string, unknown>[]) => found.length === 0,
+      run: (window) => this.readInWindow({ parsed, window }),
+    });
+  }
+
+  private async readInWindow({
+    parsed,
+    window,
+  }: {
+    parsed: AnalyticsEvaluationReadInput;
+    window: WindowFragment | null;
+  }): Promise<Record<string, unknown>[]> {
+    const client = await this.clientFor(parsed.tenantId);
+    const result = await client.query({
+      // ID_BOUND_SKIP: a fold read-back's own window, on the outer read only (ADR-071).
+      query: `
+        SELECT * FROM ${SLIM_TABLE}
+        WHERE TenantId = {tenantId:String}
+          AND EvaluationId = {evaluationId:String}
+          ${window?.sqlFor("OccurredAt") ?? ""}
+          AND (TenantId, EvaluationId, UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM ${SLIM_TABLE}
+            WHERE TenantId = {tenantId:String}
+              AND EvaluationId = {evaluationId:String}
+            GROUP BY TenantId, EvaluationId
+          )
+        ${LATEST_ORDER}
+        LIMIT 1
+      `,
+      query_params: {
+        tenantId: parsed.tenantId,
+        evaluationId: parsed.evaluationId,
+        ...window?.params,
+      },
+      format: "JSONEachRow",
+    });
+    return result.json();
+  }
+
+  /** The latest row by id, bounded by the evaluation id index once ready (id-index plan §4). */
+  private async readById({
+    parsed,
+    idBound,
+  }: {
+    parsed: AnalyticsEvaluationReadInput;
+    idBound: IdBoundOptions;
+  }): Promise<Record<string, unknown>[]> {
+    const { rows } = await this.routed().query<Record<string, unknown>>({
+      tenantId: parsed.tenantId,
+      sql: `
+        SELECT * FROM ${SLIM_TABLE}
+        WHERE TenantId = {tenantId:String}
+          AND EvaluationId = {evaluationId:String}
+          {{idBound:evaluation_analytics.EvaluationId:evaluationId}}
+          AND (TenantId, EvaluationId, UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM ${SLIM_TABLE}
+            WHERE TenantId = {tenantId:String}
+              AND EvaluationId = {evaluationId:String}
+              {{idBound:evaluation_analytics.EvaluationId:evaluationId}}
+            GROUP BY TenantId, EvaluationId
+          )
+        ${LATEST_ORDER}
+        LIMIT 1
+      `,
+      params: { tenantId: parsed.tenantId, evaluationId: parsed.evaluationId },
+      table: SLIM_TABLE,
+      idBound,
+    });
+    return rows;
+  }
+
+  private routed(): ClickHouseQueryClient {
+    if (this.clickhouse === undefined) {
+      throw new Error("This analytics repository was composed without a routed ClickHouse client");
+    }
+    return this.clickhouse;
   }
 
   async appendRollup(input: AnalyticsEvaluationRollupAppendInput): Promise<void> {

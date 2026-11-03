@@ -460,19 +460,26 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When a later relayed call streams to completion without an error event
     Then the capture is cleared and later calls pass through untouched
 
-  # The gateway can also forward an upstream rejection as a 200 whose
-  # Content-Type says event-stream but whose body is ONE bare JSON error
-  # object, with no event framing at all (seen live: Anthropic rejecting a
-  # request parameter). A sniffer that only reads framed events sees nothing,
-  # and the clean-end rule then CLEARS the capture, so the turn fails with no
-  # cause on record.
+  # A gateway can forward an upstream rejection as a 200 whose Content-Type
+  # says event-stream but whose body is ONE bare JSON error object (seen live:
+  # Anthropic rejecting a parameter, and a spent credit balance). Passed on as
+  # a 200, the SDK read a stream that ended without a stop reason and retried
+  # a deterministic refusal five times.
   @unit
   Scenario: A bare JSON error body under a stream content type is captured as the cause
     Given the model provider rejects a relayed call
     And the gateway forwards the rejection as a 200 stream whose body is one bare JSON error object
-    When the agent's SDK reads that body to its end
-    Then the rejection's reason code is captured as the turn's LLM cause
+    When the relay answers the agent's SDK
+    Then the SDK receives the same body with the status the error type stands for, 400 for an invalid request
+    And the rejection's reason code is captured as the turn's LLM cause
     And the provider's own prose stays out of the capture
+
+  @unit
+  Scenario: A bare JSON error that is transient keeps its retries
+    Given the gateway forwards an overloaded or rate-limited provider as a 200 stream of one bare JSON error object
+    When the relay answers the agent's SDK
+    Then the SDK receives the provider's own retryable status for it
+    And a healthy stream is passed through untouched
 
   # The turn stream's terminal error entry shares its `type: "error"`
   # discriminant with the SSE transport's own protocol failure frame. The

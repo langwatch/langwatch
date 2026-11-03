@@ -17,6 +17,7 @@ import {
   langyPermissionCards,
   langyQuestionCards,
   langyQuestionWaitsByToolCall,
+  langyAnswerStartsNextTurn,
   routeLangyChoiceAnswer,
   routeLangyQuestionRefusal,
 } from "../../../../model/langy-local-waits.ts";
@@ -127,6 +128,20 @@ function selectedLabels({ selection, card }: ChoiceAnswer): string[] {
   });
 }
 
+/** An answer the wait took; one that has nobody waiting on it also starts the next turn. */
+function settleAnswered({
+  settle,
+  startsNextTurn,
+  send,
+}: {
+  settle: (status: "answered") => void;
+  startsNextTurn: boolean;
+  send: () => void;
+}) {
+  settle("answered");
+  if (startsNextTurn) send();
+}
+
 /** A refused wait answer: a real failure is shown, a settled wait never answers twice. */
 function settleRefusedAnswer({
   error,
@@ -208,6 +223,11 @@ export function useLangyChoiceAnswer({
     if (!projectId) return;
     // The card stays open until the answer lands, so a second click must not answer twice.
     if (answeringWaits.current.has(waitId)) return;
+    const followUp = langyAnswerStartsNextTurn({
+      turnRunning: isBusy,
+      blockId: answer.selection.blockId,
+      waitId,
+    });
     answeringWaits.current.add(waitId);
     const settle = (status: "answered" | "expired") =>
       useLangyLocalControlStore.getState().settleWait({ waitId, kind: "question", status });
@@ -221,7 +241,8 @@ export function useLangyChoiceAnswer({
         answers: [{ question: card.question, selected: selectedLabels(answer), ...other }],
       },
       {
-        onSuccess: () => settle("answered"),
+        onSuccess: () =>
+          settleAnswered({ settle, startsNextTurn: followUp, send: () => sendAsMessage(answer) }),
         onError: (error) =>
           settleRefusedAnswer({
             error,

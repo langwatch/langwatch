@@ -26,10 +26,10 @@ model Account {
   userId            String
   type              String    @default("oauth")
   provider          String
-  /// WHO asserted `providerAccountId` — the other half of better-auth 1.7's
-  /// account key, which it looks up as `(issuer, accountId)`. Nullable only
-  /// so the column could be added to a populated table; every write path
-  /// supplies it and the migration backfilled every existing row.
+  /// WHO asserted `providerAccountId`. Better Auth keys accounts by
+  /// `(provider, providerAccountId)`; auth's account create hook writes this
+  /// (modules/auth/specs/account-issuer.feature). Nullable only so the column
+  /// could be added to a populated table; the migration backfilled every row.
   issuer            String?
   providerAccountId String
   refresh_token     String?   @db.Text
@@ -47,7 +47,7 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
-  // The pair better-auth 1.7 looks a row up by. NOT unique, on purpose: the
+  // The pair identity reads look a row up by. NOT unique, on purpose: the
   // uniqueness that matters is already enforced above, and every issuer here
   // is derived from `provider`, so this pair is unique exactly when that one
   // is. See migration 20260825030000.
@@ -239,6 +239,10 @@ model User {
   /// answered. The browser's own permission is not stored here.
   /// Spec: specs/langy/langy-notifications.feature
   notificationPreferences       Json                     @default("{}")
+  /// When an operator marked this person's password as no longer trusted. A
+  /// password sign-in opens no session while it is set; any write of a new
+  /// password hash clears it. Spec: modules/auth/specs/forced-password-reset.feature
+  passwordResetRequiredAt       DateTime?
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]
@@ -1839,6 +1843,9 @@ model Project {
   name                String
   slug                String                    @unique
   apiKey              String                    @unique
+  /// When the legacy apiKey last authenticated a request, written at most once a
+  /// minute per project and process. Spec: modules/api-key/specs/request-credential-type.feature
+  legacyApiKeyLastUsedAt DateTime?
   /// Random per-project secret whose SHA-256 digest is this project's LangWatchQL
   /// SQL tenant capability in ClickHouse. Deliberately NOT the API key: the
   /// credential a caller authenticates with and the capability the database
@@ -2105,6 +2112,11 @@ model Monitor {
   threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @default(now()) @updatedAt
+  autoPausedAt      DateTime? // Set when the monitor paused itself because its evaluations mostly errored
+  autoPausedReason  String? // Why it paused itself; cleared with autoPausedAt when enabled again
+  evaluatorLabel    String? // The evaluator's deploy label this monitor runs; null runs the latest
+  createdById       String? // The user who created the monitor; null before creators were recorded
+  updatedById       String? // The user who changed it last
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -2309,21 +2321,24 @@ model DashboardFavourite {
 /// made before the split were copied here with their ids, so stars and insight
 /// pointers still name them. No relation, per the database rule.
 model DashboardsV2 {
-  id             String         @id @default(nanoid())
+  id              String         @id @default(nanoid())
   /// The project that owns the board; only there can it be edited.
-  projectId      String
-  name           String
+  projectId       String
+  name            String
   /// Free text under the board's name; null until a member writes one.
-  description    String?
+  description     String?
   /// The member who created it; null for boards that predate authorship.
-  createdById    String?
+  createdById     String?
   /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
-  scope          DashboardScope @default(PROJECT)
+  scope           DashboardScope @default(PROJECT)
   /// The owning project's organization, stamped when the board is first set to
   /// ORGANIZATION; null before.
-  organizationId String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @default(now()) @updatedAt
+  organizationId  String?
+  /// Deprecated: unused since each widget query names its own sources (dashboards-v2 AC200,
+  /// 2026-10-28); dropped in a later migration, once no serving release reads it.
+  excludedOrigins Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
 
   @@index([projectId])
   @@index([organizationId, scope])
@@ -4216,12 +4231,53 @@ model Agent {
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
+  // The user who created the agent and the one who changed it last; null for
+  // API key callers and for rows written before creators were recorded.
+  createdById       String?
+  updatedById       String?
 
   @@unique([projectId, identityKey])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromAgentId])
   @@index([projectId, lastSeenAt])
+}
+
+/// One immutable snapshot of an agent; the Agent row is always the latest.
+model AgentVersion {
+  id            String   @id
+  projectId     String
+  agentId       String
+  version       Int
+  name          String
+  type          String
+  config        Json
+  workflowId    String?
+  commitMessage String?
+  authorId      String?
+  /// "user", "api_key" or "system": who wrote the version when authorId is null.
+  authorKind    String?
+  createdAt     DateTime @default(now())
+
+  @@unique([agentId, version])
+  @@index([projectId])
+}
+
+/// A deploy label ("production", "staging") pointing at one version of an agent.
+model AgentVersionLabel {
+  id          String   @id
+  projectId   String
+  agentId     String
+  label       String
+  versionId   String
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([agentId, label])
+  @@index([projectId])
+  @@index([versionId])
 }
 
 model Evaluator {
@@ -4242,11 +4298,52 @@ model Evaluator {
   archivedAt            DateTime?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @default(now()) @updatedAt
+  // The user who created the evaluator and the one who changed it last; null
+  // for API key callers and for rows written before creators were recorded.
+  createdById           String?
+  updatedById           String?
 
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromEvaluatorId])
+}
+
+/// One immutable snapshot of an evaluator; the Evaluator row is always the latest.
+model EvaluatorVersion {
+  id            String   @id
+  projectId     String
+  evaluatorId   String
+  version       Int
+  name          String
+  type          String
+  config        Json
+  workflowId    String?
+  commitMessage String?
+  authorId      String?
+  /// "user", "api_key" or "system": who wrote the version when authorId is null.
+  authorKind    String?
+  createdAt     DateTime @default(now())
+
+  @@unique([evaluatorId, version])
+  @@index([projectId])
+}
+
+/// A deploy label ("production", "staging") pointing at one version of an evaluator.
+model EvaluatorVersionLabel {
+  id          String   @id
+  projectId   String
+  evaluatorId String
+  label       String
+  versionId   String
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([evaluatorId, label])
+  @@index([projectId])
+  @@index([versionId])
 }
 
 model Scenario {
@@ -4768,6 +4865,11 @@ model ApiKey {
   /// by a customer create; rows before the column stay false.
   isSystemManaged Boolean @default(false)
 
+  /// The browser session that minted a docs session key (ADR-185), so signing
+  /// out of that session revokes it. NULL for every other key. Unindexed:
+  /// sign-out filters by the indexed `userId` first.
+  createdByBrowserSessionId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   // DELIBERATELY UNINDEXED: the Langy session-key reaper sweeps on
@@ -4823,12 +4925,17 @@ model NurturingProject {
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {
-  organizationId     String   @id
-  adminUserId        String?
-  seeded             Boolean  @default(false)
-  evaluationCount    Int      @default(0)
-  simulationRunCount Int      @default(0)
-  updatedAt          DateTime @updatedAt
+  organizationId       String    @id
+  adminUserId          String?
+  seeded               Boolean   @default(false)
+  evaluationCount      Int       @default(0)
+  simulationRunCount   Int       @default(0)
+  // Each coding signal is written by one conditional update (null-only, not-has, lt-day).
+  codingFirstSessionAt DateTime?
+  codingAgentTypes     String[]  @default([])
+  codingActiveDays     Int       @default(0)
+  codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  updatedAt            DateTime  @updatedAt
 }
 
 model BillingMeterCheckpoint {
@@ -7115,6 +7222,9 @@ model InstanceIdentity {
   /// Hostname, which names the customer's own network and so has a switch of
   /// its own rather than travelling with its category.
   hostnameOptOut                         Boolean   @default(false)
+  /// Sending a failed upgrade step's diagnostics to LangWatch on its own,
+  /// switched off by the operator (upgrade-diagnostics-via-connect, decision 4).
+  upgradeDiagnosticsOptOut               Boolean   @default(false)
 }
 
 /// One self-hosted install, as its daily usage report describes it (ADR-139,
@@ -7188,6 +7298,55 @@ model SelfHostedInstance {
   @@index([lastSeenAt])
   @@index([organizationId])
   @@index([issuedLicenseId])
+}
+
+/// One upgrade diagnostics bundle a self-hosted install sent over Connect, on
+/// LangWatch Cloud. The bytes live in object storage under
+/// `upgrade-diagnostics/` and expire at 30 days by a lifecycle rule; this row
+/// points at them and feeds Cloud admin and the Slack signal. Plain column
+/// refs, no relation, as the usage report rows.
+model SelfHostedInstanceDiagnostic {
+  id               String    @id
+  /// The `SelfHostedInstance.instanceId` the licence caller presented.
+  instanceId       String
+  stepId           String
+  stepDescription  String?
+  release          String?
+  attempt          Int
+  /// `operator` or `automatic`.
+  trigger          String
+  byteLength       Int
+  objectKey        String
+  receivedAt       DateTime  @default(now())
+  /// When the lifecycle rule removes the bundle; the row is listed until then.
+  expiresAt        DateTime
+  /// Set on the report that posted this step and release's one Slack message.
+  slackAnnouncedAt DateTime?
+
+  @@index([instanceId, receivedAt])
+}
+
+/// A notice LangWatch staff send every self-hosted install in Cloud's reply to its daily usage
+/// report (enterprise/modules/licensing/specs/self-hosted-notices.feature). Cloud only, and no
+/// tenant: every install receives every published notice that has not expired.
+model SelfHostedNotice {
+  id          String    @id
+  /// `info`, `warning` or `security`.
+  severity    String
+  title       String
+  body        String
+  /// An https link to read more; null where the notice names none.
+  url         String?
+  /// The release that fixes what the notice is about; an install on it or newer hides it.
+  fixedIn     String?
+  /// `draft`, `published` or `withdrawn`. Only a published notice that has not expired is sent.
+  status      String
+  expiresAt   DateTime?
+  publishedAt DateTime?
+  /// The staff member who published it, by user id.
+  publishedBy String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 /// One usage report, exactly as it arrived. Kept so a number on an install's

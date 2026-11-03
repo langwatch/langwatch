@@ -31,8 +31,9 @@ describe("CLI doctor command", () => {
 
     beforeAll(async () => {
       const home = await mkdtemp(join(tmpdir(), "langwatch-doctor-"));
+      // Nx sets FORCE_COLOR for its tasks, and it outranks NO_COLOR; drop it.
       const result = await execa("node", [cliPath, "doctor"], {
-        env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1" },
+        env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1", FORCE_COLOR: undefined },
         reject: false,
       });
       stdout = result.stdout;
@@ -104,7 +105,7 @@ describe("CLI doctor command", () => {
     it("prints the resolved port table and path schema, then exits 0 without writing anything", async () => {
       const home = await mkdtemp(join(tmpdir(), "langwatch-dryrun-"));
       const result = await execa("node", [cliPath, "start", "--dry-run", "--port-base", "5570"], {
-        env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1" },
+        env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1", FORCE_COLOR: undefined },
         reject: false,
       });
       expect(result.exitCode).toBe(0);

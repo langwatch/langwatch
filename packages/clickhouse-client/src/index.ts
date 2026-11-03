@@ -87,6 +87,12 @@ export type {
   ClickHouseVendorClient,
   ClickHouseVendorClientOptions,
 } from "./managed-client.ts";
+export {
+  coalesceKeyOf,
+  DEFAULT_INSERT_COALESCE_MAX_ROWS,
+  InsertCoalescer,
+} from "./insert-coalescing.ts";
+export type { CoalescedInsertRunner } from "./insert-coalescing.ts";
 export type { RoutableStatementClient } from "./routingDriver.ts";
 export { PrivateTargetSchemaError, routingDriver } from "./routingDriver.ts";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool.ts";
@@ -214,11 +220,80 @@ export type {
   WindowedReadMetrics,
   WindowedReadOutcome,
 } from "./windowedRead.ts";
+
+/** Id indexes (dev/docs/plans/id-index-2026-10-10.md): the readiness seam, the bounded lookup by
+ * id, and the background fill each owner's step drives. */
 export type {
-  ClickHouseClientResolver,
-  ReadResource,
-  StatementScopeViolation,
-} from "./authorized-reads.ts";
+  IdIndexBounds,
+  IdIndexFlags,
+  IdIndexKey,
+  IdIndexLookup,
+  IdIndexReader,
+  IdIndexTimeFormat,
+} from "./idIndexFlags.ts";
+export type { IdIndexDeclaration } from "./idIndexFlags.ts";
+export { defineIdIndex, idIndexName, SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
+export type { IdIndexMarkerStatements, IdIndexMarkerTable } from "./idIndexReadiness.ts";
+export {
+  hasIdIndexMarker,
+  ID_INDEX_FILL_MARKER,
+  ID_INDEX_READINESS_RECHECK_MS,
+  IdIndexReadiness,
+  idIndexReadinessTargets,
+  idIndexTargetRoute,
+  isIdIndexReadinessStatement,
+  writeIdIndexMarker,
+} from "./idIndexReadiness.ts";
+export type { IdIndexMissLogger, IndexedReadOptions } from "./indexedRead.ts";
+export {
+  ID_INDEX_MISS_PROBE,
+  ID_INDEX_WIDEN_MS,
+  idIndexMissWindow,
+  indexedRead,
+  indexWindow,
+  reportIndexMissFound,
+  setIdIndexMissLogger,
+} from "./indexedRead.ts";
+export type { IdIndexRetentionBatch } from "./idIndexRetention.ts";
+export {
+  ID_INDEX_KEPT_FOREVER_DAYS,
+  ID_INDEX_RAISE_PARAM_BYTES,
+  ID_INDEX_RETENTION_RAISE,
+  idIndexRetentionDays,
+  idIndexRetentionRaises,
+} from "./idIndexRetention.ts";
+export type {
+  FillIdIndexesOptions,
+  IdIndexFillCheckpoint,
+  IdIndexFillCursor,
+  IdIndexFillReport,
+  IdIndexFillClient,
+  IdIndexFillTarget,
+  IdIndexOwnerFill,
+  IdIndexRetentionRaise,
+  IdIndexStatements,
+} from "./idIndexFill.ts";
+export type { IdIndexKeyRange, IdIndexTenantSplit } from "./idIndexFill.ts";
+export {
+  DEFAULT_ID_INDEX_BATCH_ROWS,
+  fillIdIndexes,
+  fillOwnerIdIndexes,
+  fillReportOf,
+  fillStatement,
+  IdIndexFillIncompleteError,
+  idIndexFillTargets,
+  sortKeyLeadsWith,
+} from "./idIndexFill.ts";
+export type { ClickHouseClientResolver, ReadResource } from "./authorized-reads.ts";
+export type { StatementScopeViolation } from "./statementScopeError.ts";
+export { ID_BOUND_PARAM_PREFIX, StatementScopeError } from "./statementScopeError.ts";
+export type {
+  IdBound,
+  IdBoundOptions,
+  IdBoundResolved,
+  IdIndexRegistryStatements,
+} from "./idBound.ts";
+export { hasIdBound, ID_BOUND_MARKER, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
 export type { TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
 export { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 export {
@@ -229,9 +304,7 @@ export {
   fenceFor,
   HAND_WRITTEN_TENANT_PREDICATE,
   ownProjectIdOf,
-  PROOF_BEARING_PERMISSIONS,
   singleTenantOf,
-  StatementScopeError,
   TenantReaderClientUnavailableError,
   TenantScopedReader,
   tenantScopeKey,

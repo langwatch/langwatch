@@ -40,11 +40,11 @@ describe.skipIf(!databaseUrl)("given nurturing's organizations table", () => {
   });
 
   describe("when an evaluation is counted for an organization nurturing learned", () => {
-    it("raises the organization's evaluation count by one", async () => {
+    it("raises the organization's evaluation count by what one batch counted, in one step", async () => {
       await repository.recordOrganization({ organizationId, adminUserId: null, seeded: false });
 
-      await expect(repository.countEvaluation({ organizationId })).resolves.toMatchObject([
-        { organizationId, seeded: false, evaluationCount: 1 },
+      await expect(repository.countEvaluation({ organizationId, by: 3 })).resolves.toMatchObject([
+        { organizationId, seeded: false, evaluationCount: 3 },
       ]);
     });
   });
@@ -71,7 +71,7 @@ describe.skipIf(!databaseUrl)("given nurturing's organizations table", () => {
   describe("when the organization is one nurturing never learned", () => {
     it("counts nothing", async () => {
       await expect(
-        repository.countEvaluation({ organizationId: `${organizationId}-absent` }),
+        repository.countEvaluation({ organizationId: `${organizationId}-absent`, by: 1 }),
       ).resolves.toEqual([]);
     });
   });

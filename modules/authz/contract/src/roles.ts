@@ -30,11 +30,13 @@ export const PROJECT_READER_ROLE_KEY = "project-reader" as const;
 
 /**
  * ADR-177: everything a project-reader grant may do. An aggregate project reads its members'
- * traces and analytics; the list is closed and the matcher test denies every other permission.
+ * traces, analytics and, since v4.15, the cost-gated analytics reads; whether a viewer sees cost
+ * is still their own `cost:view`. The list is closed and the matcher test denies every other.
  */
 export const PROJECT_READER_PERMISSIONS: readonly AuthzPermission[] = [
   "traces:view",
   "analytics:view",
+  "cost:view",
 ];
 
 const VIEWER: readonly AuthzPermission[] = [
@@ -76,6 +78,9 @@ const MEMBER_ADDITIONS: readonly AuthzPermission[] = [
   "triggers:view",
   "triggers:manage",
   "prompts:manage",
+  // A member deploys agents and evaluators as they tag prompts; a custom role can withhold it.
+  "agents:deploy",
+  "evaluators:deploy",
   "scenarios:manage",
   "secrets:manage",
   // Agent cache — a member runs agents, and an agent writes its own run state.

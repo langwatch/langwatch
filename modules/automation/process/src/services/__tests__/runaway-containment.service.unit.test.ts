@@ -78,8 +78,16 @@ class TestRunawaySignals
   onCeilingBreach(): void {}
   onAutoPaused(): void {}
   onContainmentFailed(): void {}
-  error(): void {}
-  info(): void {}
+  readonly logged: { level: "error" | "warn" | "info"; message: string }[] = [];
+  error(_fields: Record<string, unknown>, message: string): void {
+    this.logged.push({ level: "error", message });
+  }
+  warn(_fields: Record<string, unknown>, message: string): void {
+    this.logged.push({ level: "warn", message });
+  }
+  info(_fields: Record<string, unknown>, message: string): void {
+    this.logged.push({ level: "info", message });
+  }
 }
 
 const trigger = (overrides: Partial<AutomationRunawayTrigger> = {}): AutomationRunawayTrigger => ({
@@ -122,6 +130,41 @@ function runtime(
 }
 
 describe("runaway containment policy", () => {
+  describe("when a selective automation passes its daily ceiling", () => {
+    /** @scenario "Passing the daily ceiling is logged as a warning, not an error" */
+    it("logs the breach as a warning and reports no error", async () => {
+      const { signals, service } = runtime();
+
+      await service.handle(
+        breach({ trigger: trigger({ filters: { status: ["error"] } }), count: 899, skipped: 799 }),
+      );
+
+      expect(signals.logged).toContainEqual(
+        expect.objectContaining({
+          level: "warn",
+          message: expect.stringContaining("daily ceiling"),
+        }),
+      );
+      expect(signals.logged.filter(({ level }) => level === "error")).toEqual([]);
+    });
+
+    describe("when several breaches arrive within the containment window", () => {
+      /** @scenario "Repeated breaches within the containment window are logged once" */
+      it("logs the breach once", async () => {
+        const { signals, service } = runtime();
+        const selective = trigger({ filters: { status: ["error"] } });
+
+        for (let i = 0; i < 3; i++) {
+          await service.handle(breach({ trigger: selective, count: 899, skipped: 799 }));
+        }
+
+        expect(
+          signals.logged.filter(({ message }) => message.includes("daily ceiling")),
+        ).toHaveLength(1);
+      });
+    });
+  });
+
   /** @scenario "A grandfathered match-everything automation is paused on breach" */
   it("pauses a condition-less automation and sends a paused notification", async () => {
     const { signals, service } = runtime();

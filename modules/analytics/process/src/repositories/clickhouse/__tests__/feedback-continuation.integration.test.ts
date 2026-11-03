@@ -12,7 +12,9 @@ import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
+import { clickHouseQueryClientOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = "test-analytics-feedback-continuation";
 const OTHER_TENANT_ID = "test-analytics-feedback-continuation-other";
@@ -140,7 +142,9 @@ describe("the paged feedback query on the shipped schema", () => {
 
   beforeAll(async () => {
     ch = (await startMigratedClickHouse()).client;
-    repository = ClickHouseAnalyticsRepository.create({ resolveClient: async () => ch });
+    repository = ClickHouseAnalyticsRepository.create({
+      clickhouse: clickHouseQueryClientOver(ch),
+    });
     await deleteRows();
     const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;
     await ch.insert({
@@ -166,6 +170,7 @@ describe("the paged feedback query on the shipped schema", () => {
     let after: AnalyticsFeedbackPosition | undefined;
     for (let guard = 0; guard < 20; guard++) {
       const read = await repository.findFeedbackEventsPage({
+        authorization: analyticsProof({ projectId: TENANT_ID, permission: "cost:view" }),
         projectId: TENANT_ID,
         ...WINDOW,
         after,
@@ -198,6 +203,7 @@ describe("the paged feedback query on the shipped schema", () => {
       const [onePage] = await pagesOf({ limit: 50 });
       const paged = (await pagesOf({ limit: 2 })).flat();
       const unpaged = await repository.findFeedbackEvents({
+        authorization: analyticsProof({ projectId: TENANT_ID, permission: "cost:view" }),
         projectId: TENANT_ID,
         ...WINDOW,
       });
@@ -213,6 +219,7 @@ describe("the paged feedback query on the shipped schema", () => {
     /** @scenario "A history that fits one page, or is empty, has no next page" */
     it("reports no further page", async () => {
       const read = await repository.findFeedbackEventsPage({
+        authorization: analyticsProof({ projectId: TENANT_ID, permission: "cost:view" }),
         projectId: TENANT_ID,
         ...WINDOW,
         after: undefined,
@@ -225,6 +232,7 @@ describe("the paged feedback query on the shipped schema", () => {
 
     it("reports an empty end for a window with no feedbacks", async () => {
       const read = await repository.findFeedbackEventsPage({
+        authorization: analyticsProof({ projectId: TENANT_ID, permission: "cost:view" }),
         projectId: TENANT_ID,
         startDate: T0 - 400 * 24 * 60 * 60 * 1000,
         endDate: T0 - 399 * 24 * 60 * 60 * 1000,

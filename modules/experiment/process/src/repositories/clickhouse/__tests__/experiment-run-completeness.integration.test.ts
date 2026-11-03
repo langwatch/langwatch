@@ -6,6 +6,7 @@
  * @vitest-environment node
  */
 import { TupleParam, type ClickHouseClient } from "@clickhouse/client";
+import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { createTenantId, type Event } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -31,7 +32,12 @@ import {
   ExperimentClickHouseRepository,
   type ExperimentEventingClickHouseClient,
 } from "../../experiment-clickhouse.repository.ts";
+import {
+  EXPERIMENT_ID_INDEXES,
+  EXPERIMENT_SECOND_ID_INDEXES,
+} from "../clickhouse.experiment-id-indexes.database.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
+import { ClickHouseExperimentSession } from "../clickhouse.experiment-session.store.ts";
 
 const tenantId = `test-run-completeness-${nanoid()}`;
 const TENANT = createTenantId(tenantId);
@@ -153,7 +159,12 @@ beforeAll(async () => {
   ({ client } = await startMigratedClickHouse());
   repository = ClickHouseExperimentRunRepository.create({
     workflowVersions: { findByIds: async () => ({}) },
-    resolveClient: async () => client,
+    resolveClient: ClickHouseExperimentSession.resolverOver(
+      vendorQueryClient({
+        vendor: client,
+        indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
+      }),
+    ),
     tupleParam: (values: string[]) => new TupleParam(values),
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),

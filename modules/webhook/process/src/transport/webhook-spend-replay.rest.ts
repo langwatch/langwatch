@@ -46,6 +46,7 @@ export const webhookSpendReplayRest = defineRestRouter(WebhookSpendReplayApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/gateway/v1/spend-events/replay", "replayGatewaySpendEvents")
+  .keepsRecords()
   .withAudit("gatewaySpend.replay")
   .withSharedPath({
     owner: "gateway",

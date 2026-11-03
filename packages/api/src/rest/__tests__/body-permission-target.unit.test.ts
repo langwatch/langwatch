@@ -31,6 +31,7 @@ function mounted({ signedIn = true, granted = true, kind = "application" } = {})
     .withCredential("browser")
     .withAddressing("literal", { v1Twin: false })
     .post("/api/events", "post")
+    .keepsRecords()
     .withRawBody("text", { mediaType: "application/json" })
     .withPermission("workflows:manage", {
       at: "body",

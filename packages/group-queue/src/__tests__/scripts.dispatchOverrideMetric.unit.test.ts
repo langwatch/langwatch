@@ -12,9 +12,23 @@ import { GroupStagingScripts } from "../scripts.ts";
 
 const QUEUE_NAME = "{pipeline/handler/spanStorage}";
 
-/** One dispatched job in the script's flat 5-tuple layout; the last is its claim token. */
-function jobTuple(id: string): string[] {
-  return [id, `tenant-a/group-${id}`, JSON.stringify({ id }), "1000", `1000.${id}`];
+/** One dispatched job in the script's flat 9-tuple: token, chain counter, slot, claim marker. */
+function jobTuple(
+  id: string,
+  groupAttempt = "",
+  batchSlot = "1",
+  marker: [deaths: string, lastOwnerState: string] = ["", ""],
+): string[] {
+  return [
+    id,
+    `tenant-a/group-${id}`,
+    JSON.stringify({ id }),
+    "1000",
+    `1000.${id}`,
+    groupAttempt,
+    batchSlot,
+    ...marker,
+  ];
 }
 
 function scriptsReturning(value: unknown): GroupStagingScripts {
@@ -144,6 +158,64 @@ describe("dispatchBatch override accounting", () => {
         expect(dispatched).toEqual([]);
         expect(overrideCount()).toBe(0);
       });
+    });
+  });
+});
+
+describe("dispatchBatch batch slots", () => {
+  describe("given the script claimed two groups into one cross-group batch", () => {
+    it("hands each claim the slot it joined", async () => {
+      const scripts = scriptsReturning([[...jobTuple("a", "", "1"), ...jobTuple("b", "", "1")], 0]);
+
+      const dispatched = await dispatch(scripts);
+
+      expect(dispatched.map((d) => d.batchSlot)).toEqual([1, 1]);
+    });
+  });
+});
+
+describe("dispatchBatch retry-chain counter", () => {
+  describe("given the script read the group's counter inside the claim", () => {
+    it("hands each job its group's counter, so the worker does not ask Redis again", async () => {
+      const scripts = scriptsReturning([[...jobTuple("a", "3"), ...jobTuple("b")], 0]);
+
+      const dispatched = await dispatch(scripts);
+
+      expect(dispatched.map((d) => d.groupAttempt)).toEqual([3, 0]);
+    });
+
+    it("reads an unparseable counter as no chain yet, as the worker's own read does", async () => {
+      const scripts = scriptsReturning([[...jobTuple("a", "garbled")], 0]);
+
+      const dispatched = await dispatch(scripts);
+
+      expect(dispatched[0]?.groupAttempt).toBe(0);
+    });
+  });
+});
+
+describe("dispatchBatch claim markers", () => {
+  describe("given the script wrote the poison guard's marker with one claim and not the other", () => {
+    it("hands the marked claim its deaths and previous owner, and the other none", async () => {
+      const scripts = scriptsReturning([
+        [...jobTuple("a", "", "1", ["2", "gone"]), ...jobTuple("b")],
+        0,
+      ]);
+
+      const dispatched = await dispatch(scripts);
+
+      expect(dispatched.map((d) => d.claimGuard)).toEqual([
+        { deaths: 2, lastOwnerState: "gone" },
+        undefined,
+      ]);
+    });
+  });
+
+  describe("given a reply in the previous release's 7-tuple layout", () => {
+    it("dispatches nothing rather than misreading it", async () => {
+      const scripts = scriptsReturning([jobTuple("a").slice(0, 7), 0]);
+
+      expect(await dispatch(scripts)).toEqual([]);
     });
   });
 });

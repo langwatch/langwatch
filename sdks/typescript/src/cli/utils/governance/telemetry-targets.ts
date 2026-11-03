@@ -49,6 +49,11 @@ import {
 } from "./opencode-plugin";
 import { telemetryEnvVarNames } from "./otel-env-block";
 import {
+  hasPiTelemetryExtension,
+  piExtensionTarget,
+  removePiTelemetryExtension,
+} from "./pi-plugin";
+import {
   hasSessionContextHooks,
   removeSessionContextHooks,
   sessionContextHooksTarget,
@@ -231,6 +236,31 @@ export function scanTelemetryTargets({
     label: `opencode session plugin (${opencodePluginTarget().displayPath})`,
     present: hasOpencodeSessionContextPlugin(),
     remove: () => removeOpencodeSessionContextPlugin(),
+  });
+
+  // pi, the telemetry extension. It is both the exporter and the session
+  // context seam, so one target covers both. Ownership is the marker on its
+  // first line (ADR-188).
+  targets.push({
+    label: `pi telemetry extension (${piExtensionTarget().displayPath})`,
+    present: hasPiTelemetryExtension(),
+    remove: () => removePiTelemetryExtension(),
+  });
+
+  // copilot, LangWatch's own file in the hook folder the Copilot CLI and VS
+  // Code both load. The file is ours alone, so removal deletes it whole and
+  // the user's own hook files beside it are never opened.
+  targets.push({
+    label: `copilot session hooks (${sessionContextHooksTarget("copilot").displayPath})`,
+    present: hasSessionContextHooks({ tool: "copilot" }),
+    remove: () => removeSessionContextHooks({ tool: "copilot" }),
+  });
+
+  // grok, LangWatch's own file in Grok's hook folder, the same shape as Copilot's.
+  targets.push({
+    label: `grok session hooks (${sessionContextHooksTarget("grok").displayPath})`,
+    present: hasSessionContextHooks({ tool: "grok" }),
+    remove: () => removeSessionContextHooks({ tool: "grok" }),
   });
 
   // shell rc files — the global gateway block + per-tool scoped functions.

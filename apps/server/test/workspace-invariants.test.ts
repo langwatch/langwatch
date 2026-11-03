@@ -1,11 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-
-import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps.ts";
 
 // ADR-076 invariants. Cheap to state, expensive to lose.
 
@@ -13,10 +11,6 @@ const repoRoot = join(__dirname, "..", "..", "..");
 
 function readJson(relPath: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(repoRoot, relPath), "utf8"));
-}
-
-function readShippedFiles(): string[] {
-  return z.array(z.string()).parse(readJson("apps/server/distribution-files.json"));
 }
 
 function gitLsFiles(pattern: string): string[] {
@@ -69,25 +63,6 @@ function rootOverrideKeys(): string[] {
   return keys;
 }
 
-/**
- * The patch files `patchedDependencies:` names, same line-scan approach.
- */
-function patchedDependencyPaths(): string[] {
-  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
-  const start = lines.findIndex((l) => l.trimEnd() === "patchedDependencies:");
-  if (start === -1) return [];
-
-  const paths: string[] = [];
-  for (const line of lines.slice(start + 1)) {
-    if (line.trim() === "") continue;
-    if (line.trimStart().startsWith("#")) continue;
-    if (!/^\s/.test(line)) break; // next top-level key
-    const target = /:\s*"?([^"\s]+)"?\s*$/.exec(line);
-    if (target?.[1]) paths.push(target[1]);
-  }
-  return paths;
-}
-
 /** Every package.json the repo tracks, excluding installed dependencies. */
 function trackedManifests(): string[] {
   return execFileSync(
@@ -116,14 +91,6 @@ function isWorkspaceMember(dir: string): boolean {
       globParts.every((part, index) => part === "*" || part === directoryParts[index])
     );
   });
-}
-
-/**
- * Whether a distribution entry ships the path. The prefix compared against always ends in "/",
- * so an entry of `langwatch` cannot be read as shipping `langwatch-something/package.json`.
- */
-function isShippedBy({ shipped, relPath }: { shipped: string[]; relPath: string }): boolean {
-  return shipped.some((f) => relPath === f || relPath.startsWith(f.endsWith("/") ? f : `${f}/`));
 }
 
 const installRulesSchema = z.object({
@@ -164,29 +131,6 @@ function memberInternalDependencies(): { manifest: string; name: string; spec: s
     });
 }
 
-/**
- * `extends` targets of shipped tsconfigs the tarball does not carry. Only tsconfigs the tarball
- * carries count: one a package excludes on purpose extends nothing the end user needs.
- */
-function unshippedExtendsTargets({
-  shipped,
-  tsconfigPaths,
-}: {
-  shipped: string[];
-  tsconfigPaths: string[];
-}): string[] {
-  return tsconfigPaths
-    .filter((tsconfigPath) => isShippedBy({ shipped, relPath: tsconfigPath }))
-    .flatMap((tsconfigPath) => {
-      const target = /"extends"\s*:\s*"([^"]+)"/.exec(
-        readFileSync(join(repoRoot, tsconfigPath), "utf8"),
-      )?.[1];
-      if (target === undefined) return [];
-      const shippedTarget = isShippedBy({ shipped, relPath: join(dirname(tsconfigPath), target) });
-      return shippedTarget ? [] : [`${tsconfigPath} -> ${target}`];
-    });
-}
-
 describe("the repo is a single pnpm workspace", () => {
   describe("when the lockfiles are counted", () => {
     /** @scenario The repo holds one lockfile */
@@ -219,18 +163,16 @@ describe("the repo is a single pnpm workspace", () => {
 
   describe("when the package names are compared", () => {
     /** @scenario The application and the SDK no longer share a package name */
-    it("gives each deployable the name the npx installer filters by, and the SDK its own", () => {
-      const deployables = ["apps/backend", "apps/ui", "apps/tasks"].map(
-        (dir) => readJson(`${dir}/package.json`).name,
+    it("gives each process the image and the app archive install the name they filter by, and the SDK its own", () => {
+      const deployables = ["apps/backend", "apps/tasks"].map((dir) =>
+        String(readJson(`${dir}/package.json`).name),
       );
       const sdk = readJson("sdks/typescript/package.json").name;
+      const prune = readFileSync(join(repoRoot, "infra/docker/prune-runtime-tree.sh"), "utf8");
 
-      // Cross-checked against the constants the end-user install filters
-      // by, not against literals: pnpm exits 0 on a filter that matches
-      // nothing, so a rename that misses node-deps.ts turns every npx
-      // first boot into a silent no-op that fails minutes later inside a
-      // migration. This is the only assertion tying the two together.
-      expect(deployables).toEqual([...APP_PACKAGE_NAMES]);
+      // pnpm exits 0 on a filter that matches nothing, so a rename the production install misses
+      // ships a tree without that process's dependencies, which fails only at boot.
+      for (const name of deployables) expect(prune).toContain(`--filter-prod "${name}..."`);
       expect(sdk).toBe("langwatch");
       expect(deployables).not.toContain(sdk);
     });
@@ -354,85 +296,6 @@ describe("the repo is a single pnpm workspace", () => {
       expect(server.name).toBe("@langwatch/server");
       expect(server.private).not.toBe(true);
       expect(server.bin).toEqual({ "langwatch-server": "dist/cli.cjs" });
-    });
-
-    it("stages the workspace definition and the lockfile", () => {
-      // Necessary, not sufficient: the distribution manifest drives what
-      // pack-npm.sh stages, but npm deletes a package-root lockfile. The
-      // packing script and smoke job assert that the nested copy survives.
-      const shipped = readJson("apps/server/distribution-files.json") as unknown;
-
-      expect(shipped).toBeInstanceOf(Array);
-      expect(shipped).toContain("pnpm-workspace.yaml");
-      expect(shipped).toContain("pnpm-lock.yaml");
-    });
-
-    /** @scenario The published package carries every input its install reads */
-    it("ships every patch the workspace applies", () => {
-      const shipped = readShippedFiles();
-      const patches = patchedDependencyPaths();
-
-      // A patch the package does not carry is not a weaker install, it is no
-      // install: pnpm stops the whole `--frozen-lockfile` run with ENOENT on
-      // the missing file, before anything is built and long before the first
-      // migration. The workspace definition ships, so the declaration always
-      // reaches the end user whether or not the file it names does.
-      const unshipped = patches.filter((patch) => !isShippedBy({ shipped, relPath: patch }));
-      expect(unshipped, "patches no distribution entry ships").toEqual([]);
-    });
-
-    /** @scenario The published package carries every input its install reads */
-    it("lists every extends target of a listed package's tsconfig", () => {
-      // A tsconfig `extends` chain can reach a repo-root file (like
-      // tsconfig.base.json) that the sibling completeness checks above
-      // don't track as shipped — missing it crashes `prisma generate` at
-      // first boot.
-      const shipped = readShippedFiles();
-      const tsconfigPaths = gitLsFiles("*tsconfig*.json");
-      expect(tsconfigPaths.length).toBeGreaterThan(5);
-
-      expect(unshippedExtendsTargets({ shipped, tsconfigPaths })).toEqual([]);
-    });
-
-    /** @scenario Every project the lockfile mentions is resolvable */
-    it("ships a manifest for every workspace member", () => {
-      const shipped = readShippedFiles();
-
-      // Workspace members only — `sdks/typescript/examples/*` carry a
-      // package.json but are not members, so the lockfile never mentions
-      // them and the tarball has no reason to.
-      const memberManifests = trackedManifests().filter((manifest) =>
-        isWorkspaceMember(manifestDir(manifest)),
-      );
-
-      expect(memberManifests.length).toBeGreaterThan(5);
-
-      // A member whose directory is absent installs without complaint and
-      // fails much later, inside a migration.
-      const unshipped = memberManifests.filter(
-        (manifest) => !isShippedBy({ shipped, relPath: manifest }),
-      );
-      expect(unshipped, "member manifests no distribution entry ships").toEqual([]);
-    });
-  });
-
-  describe("when the end-user install arguments are built", () => {
-    /** @scenario The install still refuses to drift from the lockfile */
-    /** @scenario "The self-host command remains compatible" */
-    it("pins both install passes to the lockfile and to the app's closure", () => {
-      // Both invariants an `npx @langwatch/server` first boot depends on:
-      // --frozen-lockfile makes the install reproducible-or-failed, and the
-      // `...` filter keeps the SDK, skills compiler and test suites off the
-      // end user's machine. This PR rewrote these argv twice; they are the
-      // most likely thing to lose in a refactor.
-      for (const prod of [true, false]) {
-        const args = workspaceInstallArgs("/some/root", { prod });
-        expect(args).toContain("--frozen-lockfile");
-        for (const name of APP_PACKAGE_NAMES) {
-          expect(args).toContain(`${name}...`);
-        }
-        expect(args).toContain(prod ? "--prod" : "--prod=false");
-      }
     });
   });
 

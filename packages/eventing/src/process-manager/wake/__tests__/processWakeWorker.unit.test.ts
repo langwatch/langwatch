@@ -2,7 +2,7 @@ import { createTestLogger, type TestLogLine, type TestLogLines } from "@langwatc
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DueWake } from "../../stores/processStore.types.ts";
-import { ProcessWakeWorker } from "../processWakeWorker.ts";
+import { ProcessWakeWorker, WAKE_CLAIM_LEASE_MS } from "../processWakeWorker.ts";
 
 function linesAt(lines: TestLogLines, level: "warn" | "error"): TestLogLine[] {
   const wanted = level === "warn" ? 40 : 50;
@@ -22,6 +22,9 @@ function dueWake(overrides: Partial<DueWake["ref"]> = {}): DueWake {
   };
 }
 
+/** The release half of the store port, for tests whose wakes are all handled. */
+const releaseWakeClaim = () => Promise.resolve({ applied: true });
+
 const committed = {
   outcome: "committed" as const,
   revision: 4,
@@ -37,10 +40,10 @@ describe("ProcessWakeWorker", () => {
   describe("when a wake is due for a registered process", () => {
     it("hands it to that process manager and nudges the outbox", async () => {
       const handleWake = vi.fn().mockResolvedValue(committed);
-      const findDueWakes = vi.fn().mockResolvedValue([dueWake()]);
+      const leaseDueWakes = vi.fn().mockResolvedValue([dueWake()]);
       const notifyOutbox = vi.fn();
       const worker = new ProcessWakeWorker({
-        store: { findDueWakes },
+        store: { leaseDueWakes, releaseWakeClaim },
         managers: { topicClustering: { handleWake } },
         logger: createTestLogger().logger,
         notifyOutbox,
@@ -51,9 +54,10 @@ describe("ProcessWakeWorker", () => {
       worker.start();
       await vi.waitFor(() => expect(handleWake).toHaveBeenCalledTimes(1));
 
-      expect(findDueWakes).toHaveBeenCalledWith({
+      expect(leaseDueWakes).toHaveBeenCalledWith({
         now: 123,
         limit: 7,
+        leaseDurationMs: WAKE_CLAIM_LEASE_MS,
         processNames: ["topicClustering"],
       });
       expect(handleWake).toHaveBeenCalledWith({ wake: dueWake(), now: 123 });
@@ -66,7 +70,7 @@ describe("ProcessWakeWorker", () => {
       const handleWake = vi.fn().mockResolvedValue({ ...committed, insertedMessageKeys: [] });
       const notifyOutbox = vi.fn();
       const worker = new ProcessWakeWorker({
-        store: { findDueWakes: vi.fn().mockResolvedValue([dueWake()]) },
+        store: { leaseDueWakes: vi.fn().mockResolvedValue([dueWake()]), releaseWakeClaim },
         managers: { topicClustering: { handleWake } },
         logger: createTestLogger().logger,
         notifyOutbox,
@@ -85,7 +89,7 @@ describe("ProcessWakeWorker", () => {
       const { logger, lines } = createTestLogger();
       const handleWake = vi.fn().mockResolvedValue({ outcome: "staleWake" });
       const worker = new ProcessWakeWorker({
-        store: { findDueWakes: vi.fn().mockResolvedValue([dueWake()]) },
+        store: { leaseDueWakes: vi.fn().mockResolvedValue([dueWake()]), releaseWakeClaim },
         managers: { topicClustering: { handleWake } },
         logger,
       });
@@ -105,9 +109,10 @@ describe("ProcessWakeWorker", () => {
       const handleWake = vi.fn().mockResolvedValue(committed);
       const worker = new ProcessWakeWorker({
         store: {
-          findDueWakes: vi
+          leaseDueWakes: vi
             .fn()
             .mockResolvedValue([dueWake({ processName: "unknownProcess" }), dueWake()]),
+          releaseWakeClaim,
         },
         managers: { topicClustering: { handleWake } },
         logger,
@@ -133,13 +138,15 @@ describe("ProcessWakeWorker", () => {
         .fn()
         .mockRejectedValueOnce(new Error("database unavailable"))
         .mockResolvedValue(committed);
+      const release = vi.fn().mockResolvedValue({ applied: true });
       const worker = new ProcessWakeWorker({
         store: {
-          findDueWakes: vi
+          leaseDueWakes: vi
             .fn()
             .mockResolvedValueOnce([dueWake(), dueWake({ projectId: "p2" })])
             .mockResolvedValueOnce([dueWake()])
             .mockResolvedValue([]),
+          releaseWakeClaim: release,
         },
         managers: { topicClustering: { handleWake } },
         logger,
@@ -153,6 +160,13 @@ describe("ProcessWakeWorker", () => {
       // log line says in as many words.
       expect(linesAt(lines, "warn")).toHaveLength(1);
       expect(linesAt(lines, "error")).toHaveLength(0);
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(release).toHaveBeenCalledWith({
+        ref: dueWake().ref,
+        revision: dueWake().revision,
+        wakeAt: dueWake().wakeAt,
+        claimedUntil: Date.now() + WAKE_CLAIM_LEASE_MS,
+      });
 
       await vi.advanceTimersByTimeAsync(100);
       expect(handleWake).toHaveBeenCalledTimes(3);
@@ -167,12 +181,12 @@ describe("ProcessWakeWorker", () => {
       const blocked = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const findDueWakes = vi.fn().mockImplementation(async () => {
+      const leaseDueWakes = vi.fn().mockImplementation(async () => {
         await blocked;
         return [];
       });
       const worker = new ProcessWakeWorker({
-        store: { findDueWakes },
+        store: { leaseDueWakes, releaseWakeClaim },
         managers: {},
         logger: createTestLogger().logger,
         intervalMs: 50,
@@ -180,11 +194,11 @@ describe("ProcessWakeWorker", () => {
 
       worker.start();
       await vi.advanceTimersByTimeAsync(200);
-      expect(findDueWakes).toHaveBeenCalledTimes(1);
+      expect(leaseDueWakes).toHaveBeenCalledTimes(1);
 
       release();
       await vi.advanceTimersByTimeAsync(50);
-      expect(findDueWakes).toHaveBeenCalledTimes(2);
+      expect(leaseDueWakes).toHaveBeenCalledTimes(2);
       await worker.stop();
     });
   });

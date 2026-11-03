@@ -24,6 +24,7 @@ import {
 import { GatewaySpendScopeService } from "../../features/spend/services/gateway-spend-scope.service.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -113,8 +114,8 @@ function mountSpendFamily(spend: GatewaySpendApp) {
 }
 
 function buildApp(): void {
-  repo = new ClickHouseGatewaySpendEventsRepository(async () => client);
-  budgets = new GatewayBudgetClickHouseRepository(async () => client);
+  repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
+  budgets = new GatewayBudgetClickHouseRepository(gatewayClickHouseOver(client));
   const scope = GatewaySpendScopeService.create({
     projects: createTraceDestinationProjects(prisma),
     virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),

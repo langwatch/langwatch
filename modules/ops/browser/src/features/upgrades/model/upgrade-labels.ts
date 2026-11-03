@@ -239,6 +239,22 @@ export function heldOrganizationCount(
   ).size;
 }
 
+/**
+ * A step's `migrated` count split into the tenants held for a proof or queued work, which need
+ * attention, and those waiting on a person, which are expected. The two are read apart, so a
+ * tenant that moved between the reads never takes the held count below zero.
+ */
+export function migratedSplit({
+  migrated,
+  waitingOnPerson,
+}: {
+  migrated: number;
+  waitingOnPerson: number;
+}): { held: number; waitingOnPerson: number } {
+  const waiting = Math.min(waitingOnPerson, migrated);
+  return { held: migrated - waiting, waitingOnPerson: waiting };
+}
+
 /** Steps grouped by release in the reader's order; a step with no release goes last. */
 export function groupStepsByRelease<Step extends { release: string | null }>(
   steps: readonly Step[],

@@ -11,10 +11,10 @@ import { api } from "../../../behavior/trace-api.ts";
  * "Only LangWatch spans" filter light up once this resolves.
  */
 export function useSpanLangwatchSignals() {
-  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
+  const { isReady, queryArgs } = useTraceQueryArgs();
 
   const query = api.traces.spanLangwatchSignals.useQuery(queryArgs, {
-    enabled: isReady && hintReady,
+    enabled: isReady,
     gcTime: 1_800_000,
     placeholderData: keepPreviousData,
   });

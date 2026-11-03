@@ -98,6 +98,7 @@ function recordingProcessor(scenario: Scenario): {
     ["clearGroupFailures", () => undefined],
     ["stage", () => ({ isNew: true, orphanedValue: "", claimLost: Boolean(scenario.claimLost) })],
     ["discardClaim", () => undefined],
+    ["releaseClaim", () => undefined],
     ["retireWorker", () => undefined],
     ["recordWorkerAlive", () => undefined],
   ];
@@ -283,6 +284,38 @@ describe("given a claimed job whose claim another worker recovered", () => {
     });
     expect(named(calls, "scripts.stage")).toHaveLength(1);
   });
+});
+
+describe("given a claimed job under the poison guard", () => {
+  const OUTCOMES = new Set(["scripts.complete", "scripts.retryRestage", "scripts.restageAndBlock"]);
+  const fails = async () => {
+    throw new Error("handler failed");
+  };
+  const failsForGood = async () => {
+    throw new NonRetryableGroupQueueError("never again");
+  };
+  const outcomes: [string, Scenario][] = [
+    ["completes", {}],
+    ["is re-staged for a retry", { process: fails }],
+    ["blocks its group", { retryable: false, process: failsForGood }],
+  ];
+
+  /** @scenario "an outcome releases the claim marker only inside its own fenced step" */
+  it.each(outcomes)(
+    "names its claim and sends no separate release when it %s",
+    async (_, scenario) => {
+      for (const claimLost of [false, true]) {
+        const calls = (await runClaimed({ ...scenario, claimLost })) as [string, unknown[]][];
+        const sent = calls.filter(([name]) => OUTCOMES.has(name));
+        expect(sent).toHaveLength(1);
+        expect(sent[0]![1][0]).toMatchObject({ claimToken: "claim-1" });
+        const names = calls.map(([name]) => name);
+        expect(names).not.toContain("scripts.releaseClaim");
+        expect(names).not.toContain("scripts.discardClaim");
+        expect(names).not.toContain("redis.evalsha");
+      }
+    },
+  );
 });
 
 describe("given a claimed job that coalesces its siblings", () => {
@@ -474,5 +507,36 @@ describe("handBackOutcome", () => {
     expect(
       handBackOutcome({ handedBackSince: 1_000, now: 1_000 + HAND_BACK_CONFIG.windowMs }),
     ).toEqual({ kind: "spend-attempt", since: 1_000 });
+  });
+});
+
+describe("given a dispatch that read the group's retry-chain counter inside the claim", () => {
+  const named = (calls: unknown[], name: string) =>
+    calls.filter((call) => Array.isArray(call) && call[0] === name);
+  const dispatched = {
+    stagedJobId: "job-1",
+    groupId: GROUP,
+    jobDataJson: jobValue("job-1"),
+    originalScore: 1000,
+    claimToken: "claim-1",
+  };
+
+  it("takes the counter from the claim and does not read it from Redis", async () => {
+    const { processor, calls } = recordingProcessor({});
+
+    await processor["processWithRetries"]({ ...dispatched, groupAttempt: 4 });
+
+    expect(named(calls, "handler.process")).toHaveLength(1);
+    expect(named(calls, "redis.get")).toHaveLength(0);
+  });
+
+  it("still reads the counter itself when the claim carried none", async () => {
+    const { processor, calls } = recordingProcessor({});
+
+    await processor["processWithRetries"](dispatched);
+
+    expect(named(calls, "redis.get")).toEqual([
+      ["redis.get", [`{test/gq/characterize}:gq:group:${GROUP}:attempt`]],
+    ]);
   });
 });

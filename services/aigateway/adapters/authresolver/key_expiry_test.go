@@ -14,6 +14,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -77,7 +79,8 @@ func TestResolve_OutageAcrossKeyExpiry_FailsClosedWithTheKeysOwnError(t *testing
 	resolver := &fakeResolver{returns: []resolverReturn{
 		{err: herr.New(context.Background(), domain.ErrAuthUpstream, nil)},
 	}}
-	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+	core, logs := observer.New(zap.InfoLevel)
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core)})
 	rawKey := "vk-lw-outage-across-expiry"
 	// The key ran out a minute ago, and its token with it. Without the cap
 	// this entry is stale rather than dead, so the grace window would serve it.
@@ -99,6 +102,7 @@ func TestResolve_OutageAcrossKeyExpiry_FailsClosedWithTheKeysOwnError(t *testing
 	for _, line := range logs.All() {
 		if line.Message == "auth_cache_hard_evict" {
 			evicted = true
+			assert.Equal(t, zap.InfoLevel, line.Level, "an expired key's eviction is lifecycle, not an error")
 		}
 	}
 	assert.True(t, evicted, "the eviction must be reported")

@@ -10,14 +10,23 @@ import {
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
+import { createLogger, type Logger } from "@langwatch/observability";
 
+import { incrementEsJobsProjectGone } from "../metrics.ts";
 import {
   classifyClickHouseError,
   ErrorCategory,
+  isProjectGone,
   UndeclaredQueuedEventTypeError,
   UnroutableQueuedJobError,
 } from "../services/errorHandling.ts";
-import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types.ts";
+import type {
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
+  JobDelivery,
+} from "./queue.types.ts";
+
+const logger = createLogger("langwatch:event-sourcing:group-queue");
 
 export interface EventingGroupQueueFactoryOptions {
   dependencies: GroupQueueDependencies<Record<string, unknown>>;
@@ -57,6 +66,45 @@ export async function handBackUnroutable<T>({ run }: { run: () => Promise<T> }):
       error instanceof UnroutableQueuedJobError || error instanceof UndeclaredQueuedEventTypeError;
     if (!unhandled) throw error;
     throw new HandBackGroupQueueError(error.message, { cause: error });
+  }
+}
+
+/**
+ * A job whose project was deleted after it was queued can never succeed, whatever its kind
+ * (command, fold, map, subscriber, process manager): it completes as a logged no-op instead of
+ * retrying into a blocked group (specs/eventing/deleted-project-jobs.feature).
+ */
+export async function completeWhenProjectGone({
+  queueName,
+  payloads,
+  run,
+  log = logger,
+}: {
+  queueName: string;
+  payloads: readonly Record<string, unknown>[];
+  run: () => Promise<void>;
+  log?: Logger;
+}): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    if (!isProjectGone(error)) throw error;
+    const first = payloads[0];
+    incrementEsJobsProjectGone({
+      queue: queueName,
+      jobType: typeof first?.__jobType === "string" ? first.__jobType : "unknown",
+      count: payloads.length,
+    });
+    log.warn(
+      {
+        tenantId: first?.tenantId ?? null,
+        queueName,
+        jobType: first?.__jobType ?? null,
+        jobName: first?.__jobName ?? null,
+        jobs: payloads.length,
+      },
+      "Job's project no longer exists; completing it as a no-op",
+    );
   }
 }
 
@@ -114,6 +162,25 @@ function consumerDependencies({
 }
 
 /**
+ * Consumers first: a draining job sends its fan-out through THIS producer, whose gate shuts
+ * once its own close ends. Every consumer settles before the producer closes; the first drain
+ * failure wins over a producer-close failure. Spec: specs/background/queue-drain-send-gate.feature
+ */
+async function closeConsumersThenProducer({
+  consumers,
+  producer,
+}: {
+  consumers: readonly { close: () => Promise<void> }[];
+  producer: { close: () => Promise<void> };
+}): Promise<void> {
+  const drained = await Promise.allSettled(consumers.map((each) => each.close()));
+  const failed = drained.find((each): each is PromiseRejectedResult => each.status === "rejected");
+  const [producerClosed] = await Promise.allSettled([producer.close()]);
+  if (failed) throw failed.reason;
+  if (producerClosed?.status === "rejected") throw producerClosed.reason;
+}
+
+/**
  * Adapts the capability-split Group Queue API to Eventing's shared runtime
  * queue port. Application composition owns the Redis and storage dependencies;
  * Eventing owns only the routing definition and handler registry.
@@ -163,23 +230,37 @@ export function createEventingGroupQueueFactory({
       consumerDependencies: GroupQueueDependencies<Record<string, unknown>>,
     ): RunningGroupQueueConsumer<Record<string, unknown>> => {
       const configuredConsumer = new GroupQueueConsumer(queueDefinition, consumerDependencies);
+      const one = (payload: Record<string, unknown>, context: JobDelivery | undefined) =>
+        refuse(() =>
+          completeWhenProjectGone({
+            queueName: eventingDefinition.name,
+            payloads: [payload],
+            run: () => eventingDefinition.process(payload, context),
+          }),
+        );
       return eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
-            each: (payload, context) => refuse(() => eventingDefinition.process(payload, context)),
+            each: one,
             batch: (payloads, context) =>
               backOffWhenOverloaded({
                 queueName: eventingDefinition.name,
-                run: () => refuse(() => eventingDefinition.processBatch!(payloads, context)),
+                run: () =>
+                  refuse(() =>
+                    completeWhenProjectGone({
+                      queueName: eventingDefinition.name,
+                      payloads,
+                      run: () => eventingDefinition.processBatch!(payloads, context),
+                    }),
+                  ),
               }),
           })
-        : configuredConsumer.handle((payload, context) =>
-            refuse(() => eventingDefinition.process(payload, context)),
-          );
+        : configuredConsumer.handle(one);
     };
 
     return {
       send: (payload, options) => producer.send(payload, options),
       sendBatch: (payloads, options) => producer.sendBatch(payloads, options),
+      sendEach: (payloads, options) => producer.sendEach(payloads, options),
       runListedWork: (input) => producer.runListedWork(input),
       start() {
         if (!consumersEnabled || consumers.length > 0) return;
@@ -193,10 +274,7 @@ export function createEventingGroupQueueFactory({
           ...consumers.map((each) => each.waitUntilReady()),
         ]);
       },
-      async close() {
-        await producer.close();
-        await Promise.all(consumers.map((each) => each.close()));
-      },
+      close: () => closeConsumersThenProducer({ consumers, producer }),
     };
   };
 }

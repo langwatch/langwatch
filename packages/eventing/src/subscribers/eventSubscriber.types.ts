@@ -29,6 +29,8 @@ export interface StagedJobPayload {
 export interface EventSubscriberContext {
   tenantId: string;
   aggregateId: string;
+  /** The queue's 1-based delivery attempt; absent when the subscriber runs outside the queue. */
+  deliveryAttempt?: number;
 }
 
 /**
@@ -61,6 +63,11 @@ export interface EventSubscriberOptions<E extends Event = Event> {
    * a handler must stay correct for events its filter would have declined.
    */
   enqueue?: EnqueueDispatchOptions<E>;
+  /**
+   * Most due same-group jobs the queue drains into one `handleBatch` call (ADR-066).
+   * Defaults to 1, no coalescing; above 1 the definition must declare `handleBatch`.
+   */
+  coalesceMaxBatch?: number;
 }
 
 /**
@@ -73,22 +80,66 @@ export interface EventSubscriberDefinition<E extends Event = Event> {
   /** Empty means all event types. */
   eventTypes: readonly string[];
   handle: (event: E, context: EventSubscriberContext) => Promise<void>;
+  /**
+   * A coalesced batch of one tenant's events in queue order, `contexts[i]` for `events[i]`.
+   * A throw fails the whole batch, which the queue splits and retries. A single delivery
+   * still calls `handle`.
+   */
+  handleBatch?: (
+    events: readonly E[],
+    contexts: readonly EventSubscriberContext[],
+  ) => Promise<void>;
   options?: EventSubscriberOptions<E>;
 }
 
 /**
- * A module's subscriber on a peer pipeline's event (§9), named by the peer contract's event type
- * and data schema; the handler reads only the parsed data. Delivered at least once, per aggregate
- * ordered, never replayed, so the handler is idempotent and throws to be retried.
+ * A module's subscriber on a peer pipeline's event (§9), by contract event type and data schema.
+ * Delivered at least once, per aggregate ordered, never replayed: the handler is idempotent and
+ * throws to be retried. It declares one of `handle` (one event) or `handleBatch` (a batch).
  */
-export interface PeerSubscriberDefinition<Data extends ParsingSchema> {
+export type PeerSubscriberDefinition<Data extends ParsingSchema> =
+  | PeerEventSubscriberDefinition<Data>
+  | PeerBatchSubscriberDefinition<Data>;
+
+/** A peer subscriber handed one event per call. */
+export type PeerEventSubscriberDefinition<Data extends ParsingSchema> =
+  PeerSubscriberDeclaration<Data> & {
+    handle: (data: z.output<Data>, context: PeerSubscriberContext) => Promise<void>;
+    handleBatch?: never;
+  };
+
+/** A peer subscriber handed every delivery as a batch, so a backed-up group drains in one call. */
+export type PeerBatchSubscriberDefinition<Data extends ParsingSchema> =
+  PeerSubscriberDeclaration<Data> & {
+    /**
+     * Every delivery: a single job as a batch of one, a coalesced group (up to
+     * `options.coalesceMaxBatch`) in queue order. All items share one tenant; a throw,
+     * including a data parse failure, fails the batch, which the queue splits and retries.
+     */
+    handleBatch: (items: readonly PeerSubscriberBatchItem<Data>[]) => Promise<void>;
+    handle?: never;
+  };
+
+/** What a peer subscriber declares besides its handler. */
+interface PeerSubscriberDeclaration<Data extends ParsingSchema> {
   eventType: string;
   data: Data;
-  handle: (data: z.output<Data>, context: PeerSubscriberContext) => Promise<void>;
-  /** Enqueue shaping as an event subscriber declares it: delay, dedup, group lane and filter. */
-  options?: Pick<EventSubscriberOptions, "delay" | "deduplication" | "groupKeyFn"> & {
+  /**
+   * Enqueue shaping as an event subscriber declares it: delay, dedup, group lane and filter.
+   * `coalesceMaxBatch` above 1 needs `handleBatch`.
+   */
+  options?: Pick<
+    EventSubscriberOptions,
+    "delay" | "deduplication" | "groupKeyFn" | "coalesceMaxBatch"
+  > & {
     enqueue?: PeerSubscriberEnqueueOptions<Data>;
   };
+}
+
+/** One event of a coalesced peer batch: its parsed data and the context `handle` would get. */
+export interface PeerSubscriberBatchItem<Data extends ParsingSchema> {
+  data: z.output<Data>;
+  context: PeerSubscriberContext;
 }
 
 /** A peer subscriber's enqueue-time filter, over the data its handler would be handed. */

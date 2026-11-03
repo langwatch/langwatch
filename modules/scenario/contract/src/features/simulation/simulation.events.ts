@@ -3,6 +3,7 @@ import { onboardingVariantSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
 import { scenarioEvaluationResultSchema } from "../../schemas/event-schemas.ts";
+import { scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runEvaluatorsSchema } from "../run/scenario-run-evaluators.ts";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -435,6 +436,37 @@ export type SimulationRunCutAtLimitRecordedEvent = z.infer<
 >;
 
 /**
+ * HooksRecorded: the setup and teardown results the child reported, folded
+ * into the run's metadata under `langwatch.hooks`. Arrives after the run
+ * finished, like AgentInstanceRecorded, and changes nothing else on the run.
+ */
+const simulationRunHooksRecordedEventDataSchemaDefinition = z.object({
+  scenarioRunId: z.string(),
+  hooks: scenarioRunHooksSchema,
+});
+export interface SimulationRunHooksRecordedEventDataSchema extends Named<
+  typeof simulationRunHooksRecordedEventDataSchemaDefinition
+> {}
+export const simulationRunHooksRecordedEventDataSchema: SimulationRunHooksRecordedEventDataSchema =
+  simulationRunHooksRecordedEventDataSchemaDefinition;
+export type SimulationRunHooksRecordedEventData = z.infer<
+  typeof simulationRunHooksRecordedEventDataSchema
+>;
+
+const SimulationRunHooksRecordedEventSchemaDefinition = z.object({
+  ...simulationEventSchema.shape,
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.HOOKS_RECORDED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.HOOKS_RECORDED),
+  data: simulationRunHooksRecordedEventDataSchema,
+});
+export interface SimulationRunHooksRecordedEventSchema extends Named<
+  typeof SimulationRunHooksRecordedEventSchemaDefinition
+> {}
+export const SimulationRunHooksRecordedEventSchema: SimulationRunHooksRecordedEventSchema =
+  SimulationRunHooksRecordedEventSchemaDefinition;
+export type SimulationRunHooksRecordedEvent = z.infer<typeof SimulationRunHooksRecordedEventSchema>;
+
+/**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
 const simulationRunDeletedEventDataSchemaDefinition = z.object({
@@ -507,6 +539,7 @@ export type SimulationProcessingEvent =
   | SimulationRunCancelRequestedEvent
   | SimulationRunAgentInstanceRecordedEvent
   | SimulationRunCutAtLimitRecordedEvent
+  | SimulationRunHooksRecordedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
 
@@ -515,6 +548,7 @@ export {
   isSimulationRunAgentInstanceRecordedEvent,
   isSimulationRunCancelRequestedEvent,
   isSimulationRunCutAtLimitRecordedEvent,
+  isSimulationRunHooksRecordedEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,

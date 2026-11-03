@@ -1,3 +1,7 @@
+import {
+  createRecordingMeterProvider,
+  type RecordingMeterProvider,
+} from "@langwatch/observability/metrics/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
@@ -28,6 +32,42 @@ describe("EventSourcingService - Store Events Flow", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  describe("when events are stored", () => {
+    let meter: RecordingMeterProvider;
+
+    beforeEach(() => {
+      meter = createRecordingMeterProvider();
+      meter.install();
+    });
+
+    afterEach(() => meter.uninstall());
+
+    /** @scenario "Every pipeline records the events it stores and how long storing took" */
+    it("records the stored events and the store duration through the metrics facade", async () => {
+      const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+        aggregateType,
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
+        eventStore: createMockEventStore<Event>(),
+      });
+
+      await service.storeEvents(
+        [
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        ],
+        context,
+      );
+
+      const pipeline = { pipeline_name: TEST_CONSTANTS.PIPELINE_NAME };
+      expect(meter.valueOf("event_sourcing_events_stored_total", pipeline)).toBe(2);
+      expect(meter.valuesOf("event_sourcing_store_duration_milliseconds", pipeline)).toHaveLength(
+        1,
+      );
+    });
   });
 
   describe("when publishing events", () => {

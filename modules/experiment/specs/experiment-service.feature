@@ -165,3 +165,22 @@ Feature: Experiment service boundary
     When the workbench, the experiment or the evaluations list is read
     Then the answered target carries neither headers nor authentication
     And the saved agent's credentials are read by agent id when the row runs
+
+  # The (experiment, run) pairs travel as one query parameter in the request
+  # URL, and ClickHouse refuses a field over 128 KiB. A list read can hold
+  # 10,000 runs, so the cost and score lookups go a bounded number at a time.
+  @unit
+  Scenario: Listing a project with many runs reads their costs and scores in bounded batches
+    Given experiments whose run history holds more runs than one lookup carries
+    When the runs of those experiments are listed
+    Then the costs and scores are read in batches that each name a bounded number of runs
+    And every listed run carries its own costs and scores
+
+  # Keyed by the run, not the project (2026-10-20): keyed by project, every run in a project
+  # queued behind the one before it in one queue group.
+  @unit
+  Scenario: An experiment's ran fact is keyed by the run, not its project
+    Given two workbench runs in the same project end
+    When their ran facts are recorded
+    Then each fact is keyed by its person and instant, so neither waits for the other
+    And the same run sent twice is still one fact

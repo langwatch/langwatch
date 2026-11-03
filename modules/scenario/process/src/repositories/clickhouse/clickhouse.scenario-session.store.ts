@@ -1,4 +1,4 @@
-import type { ClickHouseColumns } from "@langwatch/clickhouse-client";
+import type { ClickHouseColumns, IdBoundOptions } from "@langwatch/clickhouse-client";
 
 import type { SimulationClickHouseClient } from "./simulation-clickhouse.repository.ts";
 
@@ -10,6 +10,7 @@ type ScenarioReadOnlyClickHouse = Readonly<{
     sql: string;
     params?: Record<string, unknown>;
     SKIP_COLD_SCAN_CHECK?: true | undefined;
+    idBound?: IdBoundOptions;
   }): Promise<{ rows: Row[] }>;
   columns(input: { tenantId: string }): ClickHouseColumns;
 }>;
@@ -34,6 +35,7 @@ export class ClickHouseScenarioSession implements SimulationClickHouseClient {
     format: "JSONEachRow";
     tenantIds?: readonly string[];
     SKIP_COLD_SCAN_CHECK?: true | undefined;
+    idBound?: IdBoundOptions;
   }): Promise<{ json<Result>(): Promise<Result[]> }> {
     const request = {
       tenantId: this.tenantId,
@@ -41,6 +43,7 @@ export class ClickHouseScenarioSession implements SimulationClickHouseClient {
       sql: input.query,
       params: input.query_params,
       ...(input.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
+      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
     };
 
     return { json: async <Result>() => (await this.clickhouse.query<Result>(request)).rows };

@@ -14,7 +14,7 @@ LangWatch follows the OpenTelemetry semantic conventions and adds its own attrib
   Understand the OpenTelemetry semantic conventions that LangWatch follows for consistent observability.
 </Card>
 
-<Card title="LangWatch Attributes" icon="attributes" href="#langwatch-custom-attributes">
+<Card title="LangWatch Attributes" icon="attributes" href="#langwatch-attributes-reference">
   Explore LangWatch's custom attributes designed specifically for LLM applications and AI observability.
 </Card>
 </CardGroup>
@@ -184,7 +184,7 @@ LangWatch provides a comprehensive set of custom attributes for LLM-specific obs
 | `langwatch.langchain.run.type`         | string | Type of LangChain run     | `"chain"`, `"tool"`       |
 | `langwatch.langchain.run.parent.id`    | string | Parent run identifier     | `"parent-run-456"`        |
 | `langwatch.langchain.event_name`       | string | LangChain event type      | `"chain_start"`           |
-| `langwatch.langchain.run.metadata`     | object | Run metadata              | `{ model: "gpt-5-mini" }` |
+| `langwatch.langchain.run.metadata`     | object | Run metadata              | `{ model: "gpt-6-luna" }` |
 | `langwatch.langchain.run.extra_params` | object | Additional run parameters | `{ max_tokens: 1000 }`    |
 | `langwatch.langchain.run.tags`         | array  | Run-specific tags         | `["production", "chain"]` |
 | `langwatch.langchain.tags`             | array  | LangChain operation tags  | `["langchain", "llm"]`    |

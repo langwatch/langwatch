@@ -425,3 +425,13 @@ Feature: API Key Scope and Fine-Grained Permissions
     When either read door resolves what that key may see
     Then costs are visible to it
     And no per-key permission is looked up
+
+  # A misconfigured client retries its refused request many times a second.
+  # Each retry is the same customer fault, so the API door logs one warning
+  # per key per window, like trace ingestion does.
+  @unit
+  Scenario: Repeated ceiling refusals for one key log one warning per window
+    Given an API key whose permissions do not include the route's permission
+    When it is refused three times inside one sampling window
+    Then one warning is logged and no error
+    And the next refusal after the window carries the two refusals held back

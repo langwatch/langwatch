@@ -1,6 +1,8 @@
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   type BootedApplication,
+  type IdIndexRetention,
   loadTaskModules,
   parseTaskModuleSpecifiers,
   processConfig,
@@ -10,6 +12,12 @@ import { Task, TaskCatalogue } from "@langwatch/task";
 
 import { processEnvironment } from "./config.ts";
 import { processModules } from "./process-modules.generated.ts";
+
+/** Each module's id-index fill raises its indexes' retention through data-retention. */
+const raiseThroughDataRetention: IdIndexRetention =
+  ({ api }) =>
+  (input) =>
+    api(DataRetentionApi).raiseIdIndexRetention(input);
 
 const isTask = (contribution: unknown): contribution is Task => contribution instanceof Task;
 
@@ -40,6 +48,7 @@ export async function withTasksApp<Result>({
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
     )
     .withProcessOwnership(false)
+    .withIdIndexRetention(raiseThroughDataRetention)
     .start();
   try {
     const app = await server.container("tasks").boot();

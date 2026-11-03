@@ -1,5 +1,7 @@
 import {
+  LANGEVALS_CLUSTERING_FAILURE_CODES,
   LangevalsClusteringError,
+  type LangevalsClusteringFailureCode,
   type TopicClusteringOutcome,
   type TopicClusteringRequest,
 } from "@langwatch/evaluation-contract";
@@ -25,6 +27,18 @@ function excerptOf(body: string): string {
   } catch {
     return body;
   }
+}
+
+/** `failureCode` set to a FastAPI error body's `detail.code` when langevals is known to send it. */
+function recognisedFailureCode(body: string): { failureCode?: LangevalsClusteringFailureCode } {
+  let code: unknown;
+  try {
+    code = (JSON.parse(body) as { detail?: { code?: unknown } } | null)?.detail?.code;
+  } catch {
+    return {};
+  }
+  const failureCode = LANGEVALS_CLUSTERING_FAILURE_CODES.find((known) => known === code);
+  return failureCode === undefined ? {} : { failureCode };
 }
 
 /** Topic clustering's langevals exchange: main's `fetchTopics*Clustering` post and read. */
@@ -63,10 +77,13 @@ export class LangevalsClusteringService {
     });
 
     if (!response.ok) {
+      const body = await response.text();
       throw new LangevalsClusteringError({
         mode: input.mode,
+        status: response.status,
         statusText: response.statusText,
-        body: excerptOf(await response.text()),
+        body: excerptOf(body),
+        ...recognisedFailureCode(body),
       });
     }
 

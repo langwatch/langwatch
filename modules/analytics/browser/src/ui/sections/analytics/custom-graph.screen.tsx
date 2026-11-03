@@ -1,4 +1,4 @@
-import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { customGraphInputSchema, parseStoredTimeScale } from "@langwatch/dashboard-contract";
 import { Card } from "@langwatch/design-system/card";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
@@ -96,9 +96,9 @@ import {
 import { FilterIconWithBadge } from "../../../ui/sections/filter-icon-with-badge.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
+import { LegacyAnalyticsBanner } from "../../../ui/sections/legacy-analytics-banner.tsx";
 import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
-import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 import { AnalyticsOverflowMenu } from "../analytics-overflow-menu.tsx";
 
 /** Which of the builder's two addresses this render is. */
@@ -134,7 +134,8 @@ export interface CustomGraphFormData {
   groupBy?: FlattenAnalyticsGroupsEnum | "";
   groupByKey?: string;
   includePrevious: boolean;
-  timeScale: "full" | number;
+  /** Minutes, or the native select's text: "full" or a number of minutes ("60"). */
+  timeScale: number | string;
   connected?: boolean;
   alert?: {
     enabled: boolean;
@@ -360,9 +361,6 @@ function AnalyticsCustomGraphContent({
 
     const customGraphInput = customGraphFormToCustomGraphInput(parsedFormData);
     const apiJson = customAPIinput(parsedFormData, filterParams);
-    if (typeof apiJson?.timeScale === "string" && apiJson.timeScale !== "full") {
-      apiJson.timeScale = parseInt(apiJson.timeScale);
-    }
     setDebouncedCustomAPIInput(apiJson);
     setDebouncedCustomGraphInput(customGraphInput);
   }, [formData, filterParams, setDebouncedCustomAPIInput, setDebouncedCustomGraphInput]);
@@ -562,7 +560,8 @@ export const customGraphFormToCustomGraphInput = (
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     groupByKey: formData.groupByKey,
     includePrevious: formData.includePrevious,
-    timeScale: formData.timeScale,
+    // The native select hands its value back as text; the saved chart carries minutes.
+    timeScale: parseStoredTimeScale(formData.timeScale) ?? 60,
     connected: formData.connected,
     height: 517,
   };
@@ -603,7 +602,7 @@ const customAPIinput = (
     }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     groupByKey: formData.groupByKey,
-    timeScale: formData.timeScale,
+    timeScale: parseStoredTimeScale(formData.timeScale) ?? 60,
   };
 };
 
@@ -665,6 +664,8 @@ function CustomGraphForm({
   const addNewGraph = analyticsApi.graphs.create.useMutation();
   const updateGraphById = analyticsApi.graphs.updateById.useMutation();
   const host = useAnalyticsHost();
+  // A write the shell refuses (an aggregate, ADR-177, or no grant) offers no button.
+  const canSave = host.hasPermission(customId ? "analytics:update" : "analytics:create");
   const showErrorToast = useShowErrorToast();
   const project = host.project();
   const trpc = analyticsApi.useUtils();
@@ -925,7 +926,7 @@ function CustomGraphForm({
         >
           Cancel
         </Button>
-        {customId ? (
+        {canSave && customId && (
           <Button
             colorPalette="orange"
             onClick={updateGraph}
@@ -936,7 +937,8 @@ function CustomGraphForm({
           >
             Update
           </Button>
-        ) : (
+        )}
+        {canSave && !customId && (
           <Button
             colorPalette="orange"
             loading={addNewGraph.isPending}
@@ -1543,7 +1545,7 @@ function GraphTypeField({ form }: { form: ReturnType<typeof useForm<CustomGraphF
  * The chart builder, at both of its addresses. ONE SCREEN, TWO KEYS, AND THE MODE ARRIVES AS A
  * PROP.
  */
-function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
+function CustomGraphScreenBody({ mode }: { mode: CustomGraphScreenMode }) {
   const host = useAnalyticsHost();
   const graphId = host.route().params.id;
   const projectId = host.project()?.id ?? "";
@@ -1599,4 +1601,14 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   );
 }
 
-export default withAggregateAnalyticsGate("Custom graph", CustomGraphScreen);
+/** The banner sits above every state, loading included, so no branch carries its own copy. */
+function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
+  return (
+    <>
+      <LegacyAnalyticsBanner />
+      <CustomGraphScreenBody mode={mode} />
+    </>
+  );
+}
+
+export default CustomGraphScreen;

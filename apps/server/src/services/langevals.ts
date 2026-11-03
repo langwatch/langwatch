@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { nowInstant } from "@langwatch/time";
 
+import { DEFAULT_LOG_LEVEL, pythonLogLevel } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
@@ -40,6 +41,8 @@ export async function startLangevals(
         UV_PROJECT_ENVIRONMENT: venvDir,
         PORT: String(ctx.ports.langevals),
         DISABLE_EVALUATORS_PRELOAD: "true",
+        // The only level LangEvals reads; its server's own log level is fixed at warning.
+        LANGEVALS_STAGED_LOG_LEVEL: pythonLogLevel(ctx.logLevel ?? DEFAULT_LOG_LEVEL),
       },
       cwd: projectDir,
     },

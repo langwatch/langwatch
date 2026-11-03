@@ -61,6 +61,8 @@ function cloudAdmin(reached: string[]) {
   const app = createApiFixture<EnterpriseOpsApi>({
     getSelfHostedInstance: reach("getSelfHostedInstance"),
     revokeActivationCode: reach("revokeActivationCode"),
+    findUpgradeDiagnostics: reach("findUpgradeDiagnostics"),
+    getUpgradeDiagnosticsDownload: reach("getUpgradeDiagnosticsDownload"),
   });
   const runtime = createTrpcRuntime<Context>({
     root,
@@ -124,6 +126,23 @@ describe("Cloud admin's registries at the platform door", () => {
 
       expect(reached).toEqual(["getSelfHostedInstance"]);
       expect(codeOf(write)).toEqual({ trpc: "FORBIDDEN", code: "permission_denied" });
+    });
+  });
+
+  describe("when staff holding ops:view but not ops:manage list diagnostics, then download one", () => {
+    it("admits the list and refuses the download with permission_denied", async () => {
+      const reached: string[] = [];
+      const { instances } = cloudAdmin(reached);
+
+      await instances("user-staff")
+        .findDiagnostics({ instanceRowId: "instance-1" })
+        .catch(() => void 0);
+      const download = await instances("user-staff")
+        .getDiagnosticsDownload({ id: "report-1" })
+        .catch((error: unknown) => error);
+
+      expect(reached).toEqual(["findUpgradeDiagnostics"]);
+      expect(codeOf(download)).toEqual({ trpc: "FORBIDDEN", code: "permission_denied" });
     });
   });
 });

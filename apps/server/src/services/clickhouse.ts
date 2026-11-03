@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { nowInstant } from "@langwatch/time";
 
+import { clickhouseLogLevel, DEFAULT_LOG_LEVEL } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
@@ -96,7 +97,7 @@ function writeClickhouseConfig(path: string, ctx: RuntimeContext): void {
   <tmp_path>${tmpDir}/</tmp_path>
   <user_files_path>${userFiles}/</user_files_path>
   <logger>
-    <level>information</level>
+    <level>${clickhouseLogLevel(ctx.logLevel ?? DEFAULT_LOG_LEVEL)}</level>
     <log>${logsDir}/clickhouse-server.log</log>
     <errorlog>${logsDir}/clickhouse-server.err.log</errorlog>
     <size>50M</size>

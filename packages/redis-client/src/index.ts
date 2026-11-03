@@ -14,7 +14,7 @@ export type {
 } from "./config.ts";
 export { RedisConnectionService } from "./connection.ts";
 export type { RedisConnectionServiceOptions } from "./connection.ts";
-export { RedisReadinessService } from "./readiness.ts";
+export { RedisReadinessService, UnsupportedRedisVersionError } from "./readiness.ts";
 export type { RedisPingOptions, RedisReadinessServiceOptions } from "./readiness.ts";
 export { RedisShutdownService } from "./shutdown.ts";
 export type { RedisConnection, RedisLogger } from "./types.ts";

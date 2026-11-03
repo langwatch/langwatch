@@ -221,6 +221,7 @@ describe("given the langy repository registry", () => {
         "conversationTurnState",
         "conversations",
         "credentials",
+        "deleteConfirmations",
         "feedbackPrompts",
         "frameDedup",
         "githubPrCounts",

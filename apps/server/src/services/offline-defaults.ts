@@ -14,10 +14,14 @@ import type { EventBus } from "./event-bus.ts";
  */
 
 /**
- * Prisma's version check to checkpoint.prisma.io, made by every prisma
- * command. LangWatch never uses it, so it is off in every environment.
+ * Prisma's version check to checkpoint.prisma.io, which LangWatch never uses. And pnpm's check
+ * before `pnpm run`: the prebuilt app, like the image, carries no pnpm-workspace.yaml, so the
+ * check fails on catalog: specifiers and tries to install (ADR-180).
  */
-export const FORCED_ENV = { CHECKPOINT_DISABLE: "1" } as const;
+export const FORCED_ENV = {
+  CHECKPOINT_DISABLE: "1",
+  pnpm_config_verify_deps_before_run: "false",
+} as const;
 
 type OfflineCachePaths = {
   /** Every tiktoken encoding file, read by the app through TIKTOKENS_PATH. */
@@ -26,17 +30,32 @@ type OfflineCachePaths = {
   tiktokenCache: string;
 };
 
-function offlineCachePaths(paths: Pick<LangwatchPaths, "root">): OfflineCachePaths {
+/** Where dev/scripts/build-app-archive.sh puts the tokenizer files inside the prebuilt app. */
+const SHIPPED_ENCODINGS_DIR = "tiktoken";
+const SHIPPED_LANGEVALS_CACHE_DIR = "tiktoken-python";
+
+type OfflineCacheInput = { paths: Pick<LangwatchPaths, "root">; appRootDir: string };
+
+/** The prebuilt app ships both tokenizer directories (ADR-180); a checkout fills the cache. */
+function offlineCachePaths({ paths, appRootDir }: OfflineCacheInput): OfflineCachePaths {
+  const shipped = (dir: string, fallback: string) => {
+    const inApp = join(appRootDir, dir);
+    return existsSync(inApp) ? inApp : join(paths.root, "cache", fallback);
+  };
   return {
-    tiktokenEncodings: join(paths.root, "cache", "tiktoken-encodings"),
-    tiktokenCache: join(paths.root, "cache", "tiktoken"),
+    tiktokenEncodings: shipped(SHIPPED_ENCODINGS_DIR, "tiktoken-encodings"),
+    tiktokenCache: shipped(SHIPPED_LANGEVALS_CACHE_DIR, "tiktoken"),
   };
 }
 
-/** Defaults for the app, the workers and the migrations. */
-export function appOfflineEnv(paths: Pick<LangwatchPaths, "root">): Record<string, string> {
+/**
+ * Defaults for the app, the workers and the migrations. Node's compile cache keeps the
+ * compiled modules between starts, so a second start skips most of the compile.
+ */
+export function appOfflineEnv(input: OfflineCacheInput): Record<string, string> {
   return {
-    TIKTOKENS_PATH: offlineCachePaths(paths).tiktokenEncodings,
+    TIKTOKENS_PATH: offlineCachePaths(input).tiktokenEncodings,
+    NODE_COMPILE_CACHE: join(input.paths.root, "cache", "node-compile"),
   };
 }
 
@@ -47,11 +66,8 @@ export function appOfflineEnv(paths: Pick<LangwatchPaths, "root">): Record<strin
 export function langevalsOfflineEnv({
   paths,
   appRootDir,
-}: {
-  paths: Pick<LangwatchPaths, "root">;
-  appRootDir: string;
-}): Record<string, string> {
-  const cache = offlineCachePaths(paths).tiktokenCache;
+}: OfflineCacheInput): Record<string, string> {
+  const cache = offlineCachePaths({ paths, appRootDir }).tiktokenCache;
   return {
     RAGAS_DO_NOT_TRACK: "true",
     LANGWATCH_MODEL_PRICING_DIR: join(
@@ -100,8 +116,8 @@ function missingTiktokenEncodings({
 const PREPARE_TIMEOUT_MS = 5 * 60_000;
 
 /**
- * Downloads the tiktoken encoding files once, as the image build does. A
- * failed download does not fail the install: the app fetches on first use.
+ * Downloads the tiktoken encoding files once, as the image build does; the prebuilt app
+ * already holds them. A failed download does not fail the install: the app fetches on first use.
  */
 export async function ensureTiktokenEncodings({
   paths,
@@ -113,8 +129,11 @@ export async function ensureTiktokenEncodings({
   appRootDir: string;
 }): Promise<void> {
   const service = "prepare:langwatch";
-  const dir = offlineCachePaths(paths).tiktokenEncodings;
-  const workerDir = join(appRootDir, "apps", "worker");
+  const dir = offlineCachePaths({ paths, appRootDir }).tiktokenEncodings;
+  // The prebuilt app ships the files; only a checkout fills its own cache.
+  if (dir.startsWith(appRootDir)) return;
+  // The package that depends on tiktoken, where the image runs the same script.
+  const workerDir = join(appRootDir, "modules", "trace", "process");
   try {
     const registryPath = createRequire(join(workerDir, "package.json")).resolve(
       "tiktoken/registry.json",
@@ -126,6 +145,7 @@ export async function ensureTiktokenEncodings({
       service,
       bin: process.execPath,
       args: [join(appRootDir, "dev", "scripts", "download-tiktoken-encodings.mjs"), dir],
+      logsDir: join(paths.root, "logs"),
       options: { cwd: workerDir, timeout: PREPARE_TIMEOUT_MS },
     });
   } catch (err) {
@@ -133,24 +153,29 @@ export async function ensureTiktokenEncodings({
       type: "log",
       service,
       stream: "stderr",
-      line: `could not pre-download the tokenizer files, they will be fetched on first use: ${err instanceof Error ? err.message : String(err)}`,
+      isNotice: true,
+      line: `could not pre-download the tokenizer files, they will be fetched on first use: ${firstLine(err)}`,
     });
   }
 }
 
+function firstLine(err: unknown): string {
+  return (err instanceof Error ? err.message : String(err)).split("\n")[0] ?? "";
+}
+
 /**
- * Fills LangEvals' tiktoken cache once per lockfile (a marker keyed on the
- * lockfile hash). A failed fill does not fail the install.
+ * Fills LangEvals' tiktoken cache once per lockfile (a marker keyed on the lockfile hash),
+ * unless the prebuilt app shipped it. A failed fill does not fail the install.
  */
 export async function ensureLangevalsTiktokenCache({
   paths,
+  appRootDir,
   bus,
   uvBin,
   projectDir,
   venvDir,
   lockFile,
-}: {
-  paths: Pick<LangwatchPaths, "root">;
+}: OfflineCacheInput & {
   bus: EventBus;
   uvBin: string;
   projectDir: string;
@@ -158,7 +183,8 @@ export async function ensureLangevalsTiktokenCache({
   lockFile: string;
 }): Promise<void> {
   const service = "prepare:langevals";
-  const cache = offlineCachePaths(paths).tiktokenCache;
+  if (existsSync(join(appRootDir, SHIPPED_LANGEVALS_CACHE_DIR))) return;
+  const cache = offlineCachePaths({ paths, appRootDir }).tiktokenCache;
   const marker = join(cache, ".filled");
   const expected = existsSync(lockFile)
     ? createHash("sha256").update(readFileSync(lockFile)).digest("hex")
@@ -171,6 +197,7 @@ export async function ensureLangevalsTiktokenCache({
       bus,
       service,
       bin: uvBin,
+      logsDir: join(paths.root, "logs"),
       args: [
         "run",
         "--project",
@@ -195,6 +222,7 @@ export async function ensureLangevalsTiktokenCache({
       type: "log",
       service,
       stream: "stderr",
+      isNotice: true,
       line: `could not pre-fill the tokenizer cache, encodings will be fetched on first use: ${err instanceof Error ? err.message : String(err)}`,
     });
   }

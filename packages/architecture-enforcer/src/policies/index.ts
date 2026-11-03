@@ -19,6 +19,8 @@ import {
 } from "./frontend/browser-packages.ts";
 import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
 import { lintEventingTableAccess } from "./persistence/eventing-table-access.ts";
+import { lintIdIndexBounds } from "./persistence/id-index-bounds.ts";
+import { lintIdIndexPairing } from "./persistence/id-index-pairing.ts";
 import { lintMemoryTwinDrift } from "./persistence/memory-twin-drift.ts";
 import { lintMigrationOwners } from "./persistence/migration-owners.ts";
 import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
@@ -218,6 +220,16 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "eventing-table-access",
     spec: "specs/eventing-table-access.feature",
     run: lintEventingTableAccess,
+  }),
+  definePolicy({
+    id: "id-index-pairing",
+    spec: "specs/tooling/lint-id-index-policies.feature",
+    run: lintIdIndexPairing,
+  }),
+  definePolicy({
+    id: "id-index-bounds",
+    spec: "specs/tooling/lint-id-index-policies.feature",
+    run: lintIdIndexBounds,
   }),
   definePolicy({
     id: "declarations",

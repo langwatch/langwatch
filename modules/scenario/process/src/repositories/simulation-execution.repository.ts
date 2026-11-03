@@ -10,6 +10,7 @@ import type {
   SimulationDeleteRun,
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
+  SimulationRecordHooks,
 } from "@langwatch/scenario-contract";
 
 /** Eventing is application composition; Simulation dispatches through this repository. */
@@ -25,4 +26,5 @@ export abstract class SimulationExecutionRepository {
   abstract deleteRun(input: SimulationDeleteRun): Promise<void>;
   abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;
   abstract recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void>;
+  abstract recordHooks(input: SimulationRecordHooks): Promise<void>;
 }

@@ -8,6 +8,7 @@ import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { exactLookupMissError } from "./findEvaluator";
 
 /**
  * Returns the updated evaluator rather than printing it: the output port
@@ -15,7 +16,7 @@ import { failSpinner } from "../../utils/spinnerError";
  */
 export const updateEvaluatorCommand = async (
   idOrSlug: string,
-  options: { name?: string; settings?: string },
+  options: { name?: string; settings?: string; commitMessage?: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -31,7 +32,7 @@ export const updateEvaluatorCommand = async (
   } catch (error) {
     failSpinner({
       spinner: resolveSpinner,
-      error,
+      error: exactLookupMissError({ error, reference: idOrSlug }),
       action: `find evaluator "${idOrSlug}"`,
     });
     process.exit(1);
@@ -43,6 +44,7 @@ export const updateEvaluatorCommand = async (
   try {
     const body: UpdateEvaluatorBody = {};
     if (options.name !== undefined) body.name = options.name;
+    if (options.commitMessage !== undefined) body.commitMessage = options.commitMessage;
     if (options.settings !== undefined) {
       // The canonical config shape is { evaluatorType, settings }: the parsed
       // JSON must land under config.settings, not at the top level of config,

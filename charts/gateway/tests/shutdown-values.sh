@@ -211,6 +211,28 @@ test_cors_allowed_origins_reach_the_configmap() {
   fi
 }
 
+# @scenario "extra CA certificates an operator names are trusted by the pod"
+test_extra_ca_certs_reach_the_pod() {
+  local rendered
+  rendered=$(render "")
+  if grep -q -e 'SSL_CERT_DIR' -e 'extra-ca-certs' <<<"$rendered"; then
+    fail "ca default" "the default render mounts a CA ConfigMap or sets SSL_CERT_DIR"
+  else
+    echo "ok   [ca default] no CA mount, no SSL_CERT_DIR"
+  fi
+
+  rendered=$(render "--set security.extraCACertsConfigMap=internal-ca")
+  if ! grep -A1 'name: SSL_CERT_DIR' <<<"$rendered" | grep -q 'value: /etc/langwatch/ca'; then
+    fail "ca override" "SSL_CERT_DIR does not name /etc/langwatch/ca"
+  elif ! grep -A2 'mountPath: /etc/langwatch/ca' <<<"$rendered" | grep -q 'readOnly: true'; then
+    fail "ca override" "the CA directory is not mounted read-only at /etc/langwatch/ca"
+  elif ! grep -A2 'name: extra-ca-certs' <<<"$rendered" | grep -A1 'configMap:' | grep -q 'name: internal-ca'; then
+    fail "ca override" "the mounted volume does not come from the internal-ca ConfigMap"
+  else
+    echo "ok   [ca override] internal-ca mounted read-only at /etc/langwatch/ca, SSL_CERT_DIR set"
+  fi
+}
+
 # The metrics listener is opt-in: off renders no key, on renders the switch, the port and the secret.
 test_the_metrics_listener_is_opt_in() {
   local exporter port rendered
@@ -236,6 +258,7 @@ test_the_metrics_listener_is_opt_in() {
 test_drain_timing_reaches_the_configmap
 test_the_metrics_listener_is_opt_in
 test_cors_allowed_origins_reach_the_configmap
+test_extra_ca_certs_reach_the_pod
 test_the_duration_string_keys_are_refused
 test_the_voice_drain_reaches_the_pod_and_fits_the_grace_period
 test_an_unsurvivable_drain_budget_is_refused

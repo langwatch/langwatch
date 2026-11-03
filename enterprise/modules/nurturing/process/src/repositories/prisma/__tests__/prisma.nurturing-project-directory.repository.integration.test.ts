@@ -90,7 +90,7 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
       const placement = await repository.getPlacement({ projectId });
 
       expect(placement).toEqual({ outcome: "known", organizationId });
-      await expect(milestones.countEvaluation({ organizationId })).resolves.toMatchObject([
+      await expect(milestones.countEvaluation({ organizationId, by: 1 })).resolves.toMatchObject([
         { organizationId, evaluationCount: 1 },
       ]);
     });

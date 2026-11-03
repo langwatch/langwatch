@@ -1,5 +1,9 @@
 import { BearerIdentity, RestHost, type RestCredentialBinding } from "@langwatch/api/rest";
-import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  isIdIndexReadinessStatement,
+  type QueryRequest,
+} from "@langwatch/clickhouse-client";
 import { EvaluationApi, type GuardrailCheckOutcome } from "@langwatch/evaluation-contract";
 import { createTenantId, type EventingCommandSender, type ProcessStore } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -127,7 +131,10 @@ function routedClickHouse(answer: (request: QueryRequest) => Promise<OpenAdmissi
         ["org-a", PRIVATE_SERVER],
         ["org-b", PRIVATE_SERVER],
       ]),
+    targetOf: async () => "shared",
     query: vi.fn().mockImplementation(async (request: QueryRequest) => {
+      // The id indexes' boot check finds no marker, so every read here takes today's path.
+      if (isIdIndexReadinessStatement(request)) return { rows: [] };
       reads.push(request);
       return { rows: await answer(request) };
     }),

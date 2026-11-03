@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Unit test for detect-changes-by-sha.sh, the pull_request_target path.
+# Unit test for detect-changes-by-sha.sh, the path pull_request and
+# pull_request_target runs take.
 #
 # A fork-style head (reachable only through refs/pull/1/head) is fetched by SHA
 # into the lean base checkout the gate runs in, and diffed. The head is never
@@ -136,7 +137,7 @@ test_every_failure_exits_non_zero() {
   check "a failure prints no filter" "" "$(by_sha FETCH_DEPTHS="2" || true)"
 }
 
-# @scenario "A pull_request_target filter may use neither braces nor negation"
+# @scenario "A pull request filter may use neither braces nor negation"
 test_picomatch_only_syntax_is_refused() {
   local filters
   for filters in "relevant: ['sdks/{go,python}/**']" "relevant: ['sdks/**', '!sdks/go/**']" \

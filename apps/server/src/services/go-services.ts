@@ -1,6 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 import { execa } from "execa";
 
+import { DEFAULT_LOG_LEVEL } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { startAigateway } from "./aigateway.ts";
 import type { EventBus } from "./event-bus.ts";
@@ -65,7 +66,7 @@ async function startCombined({
 }): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "go" });
   const start = nowInstant().epochMilliseconds;
-  const app = `http://127.0.0.1:${ctx.ports.langwatch}`;
+  const app = `http://127.0.0.1:${ctx.ports.backend}`;
   const handle = supervise({
     spec: {
       name: "go",
@@ -82,6 +83,7 @@ async function startCombined({
         LANGWATCH_ENDPOINT: app,
         LW_GATEWAY_BASE_URL: app,
         LOG_FORMAT: "pretty",
+        LOG_LEVEL: ctx.logLevel ?? DEFAULT_LOG_LEVEL,
       },
     },
     paths: servicePaths(ctx.paths),

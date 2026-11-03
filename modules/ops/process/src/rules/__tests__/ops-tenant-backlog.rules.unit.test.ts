@@ -1,7 +1,33 @@
 import { describe, expect, it } from "vitest";
 
 import { scannedGroup, scannedQueue } from "../../__tests__/support/queue-scan.ts";
-import { countWaitingJobsByTenant } from "../ops-tenant-backlog.rules.ts";
+import { countArrivalsByTenant, countWaitingJobsByTenant } from "../ops-tenant-backlog.rules.ts";
+
+describe("countArrivalsByTenant", () => {
+  describe("given a tenant whose waiting jobs grew, one steady, one draining and one new", () => {
+    /** @scenario "A tenant's arrivals are the growth of its waiting jobs between scans" */
+    it("counts only the growth, and a new tenant's whole backlog", () => {
+      const previous = new Map([
+        ["proj_growing", 10],
+        ["proj_steady", 5000],
+        ["proj_draining", 40],
+      ]);
+      const current = new Map([
+        ["proj_growing", 25],
+        ["proj_steady", 5000],
+        ["proj_draining", 12],
+        ["proj_new", 3],
+      ]);
+
+      expect(countArrivalsByTenant({ previous, current })).toEqual(
+        new Map([
+          ["proj_growing", 15],
+          ["proj_new", 3],
+        ]),
+      );
+    });
+  });
+});
 
 describe("countWaitingJobsByTenant", () => {
   describe("given every group-id shape the eventing queues build", () => {

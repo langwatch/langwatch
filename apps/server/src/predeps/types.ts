@@ -9,6 +9,7 @@ export type PredepId =
   | "clickhouse"
   | "goose"
   | "aigateway"
+  | "app"
   | "opencode";
 
 export type DetectionResult =

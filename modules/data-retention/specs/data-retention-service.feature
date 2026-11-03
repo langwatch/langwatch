@@ -12,13 +12,6 @@ Feature: Data Retention service boundary
     Then the Data Retention service rejects the mutation
 
   @unit
-  Scenario: A project with no row is refused, and the refusal is never cached
-    Given a retention read names a project project's table holds no row for
-    When the Data Retention service resolves that project
-    Then it is refused as project not found, so the job asking retries
-    And nothing is cached, so once the project's row exists its rules resolve
-
-  @unit
   Scenario: Default a missing removal preview
     Given a removal preview names a project data retention does not know
     When the Data Retention service previews the removal

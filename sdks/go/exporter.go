@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"os"
+	"strings"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -127,10 +128,14 @@ func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporte
 		return nil, err
 	}
 
-	otlpExporter, err := otlptracehttp.New(ctx,
+	otlpOpts := []otlptracehttp.Option{
 		otlptracehttp.WithEndpointURL(endpointURL),
 		otlptracehttp.WithHeaders(buildHeaders(cfg.apiKey, cfg.projectID)),
-	)
+	}
+	if !compressionSetInEnv() {
+		otlpOpts = append(otlpOpts, otlptracehttp.WithCompression(otlptracehttp.GzipCompression))
+	}
+	otlpExporter, err := otlptracehttp.New(ctx, otlpOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +143,19 @@ func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporte
 	return &LangWatchExporter{
 		FilteringExporter: newFilteringExporter(otlpExporter, cfg.dataCapture, cfg.filters...),
 	}, nil
+}
+
+// compressionSetInEnv reports whether an OTEL_EXPORTER_OTLP_*COMPRESSION
+// variable is set. An explicit option beats the environment in otlptracehttp,
+// so gzip is passed only when neither is set, as the Python and TypeScript
+// SDKs do.
+func compressionSetInEnv() bool {
+	for _, name := range []string{"OTEL_EXPORTER_OTLP_COMPRESSION", "OTEL_EXPORTER_OTLP_TRACES_COMPRESSION"} {
+		if strings.TrimSpace(os.Getenv(name)) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // NewDefaultExporter creates a LangWatch exporter with the ExcludeHTTPRequests preset.

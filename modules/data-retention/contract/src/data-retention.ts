@@ -206,6 +206,21 @@ export const killRetroactiveMutationInputSchema: KillRetroactiveMutationInputSch
   killRetroactiveMutationInputSchemaDefinition;
 export type KillRetroactiveMutationInput = z.infer<typeof killRetroactiveMutationInputSchema>;
 
+const idIndexRetentionRaiseInputSchemaDefinition = z
+  .object({
+    /** The organization whose private ClickHouse target is raised; none is the shared target. */
+    organizationId: z.string().min(1).optional(),
+    /** Id index tables by name; one retention does not govern, or the target lacks, is skipped. */
+    indexes: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+export interface IdIndexRetentionRaiseInputSchema extends Named<
+  typeof idIndexRetentionRaiseInputSchemaDefinition
+> {}
+export const idIndexRetentionRaiseInputSchema: IdIndexRetentionRaiseInputSchema =
+  idIndexRetentionRaiseInputSchemaDefinition;
+export type IdIndexRetentionRaiseInput = z.infer<typeof idIndexRetentionRaiseInputSchema>;
+
 const retentionPolicySchemaDefinition = z
   .object({
     id: z.string().min(1),

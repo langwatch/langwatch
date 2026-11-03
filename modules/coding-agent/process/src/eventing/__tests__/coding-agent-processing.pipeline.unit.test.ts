@@ -143,14 +143,20 @@ function compose(
 }
 
 /** One model call, folded and stored through the fold the pipeline registered. */
-async function storeThrough(pipeline: CodingAgentProcessingPipeline): Promise<void> {
+async function storeThrough(
+  pipeline: CodingAgentProcessingPipeline,
+  { auxiliary = false }: { auxiliary?: boolean } = {},
+): Promise<void> {
   const fold = pipeline.foldProjections.get("codingAgentSession");
   expect(fold, "the pipeline registered no codingAgentSession fold").toBeDefined();
   await fold!.open((definition) =>
-    definition.store.store(definition.apply(definition.init(), modelCallEvent()), {
-      aggregateId: "session_1",
-      tenantId: createTenantId("project_alpha"),
-    }),
+    definition.store.store(
+      { ...definition.apply(definition.init(), modelCallEvent()), auxiliary },
+      {
+        aggregateId: "session_1",
+        tenantId: createTenantId("project_alpha"),
+      },
+    ),
   );
 }
 
@@ -254,6 +260,15 @@ describe("coding_agent_processing over the live repositories", () => {
       // The stamp is why the pipeline used to demand the whole ProjectApi.
       // It is fire-and-forget behind the commit, so the assertion is that the
       // one-method seam this graph composed is the thing that receives it.
+      expect(projectActivity.touched.map((entry) => entry.projectId)).toEqual(["project_alpha"]);
+    });
+
+    /** @scenario "A helper-thread session stamps its project too" */
+    it("stamps the project for a helper-thread session", async () => {
+      const { pipeline, projectActivity } = compose();
+
+      await storeThrough(pipeline, { auxiliary: true });
+
       expect(projectActivity.touched.map((entry) => entry.projectId)).toEqual(["project_alpha"]);
     });
   });

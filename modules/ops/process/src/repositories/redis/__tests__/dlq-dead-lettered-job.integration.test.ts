@@ -62,12 +62,34 @@ describe.skipIf(!hasRedis)("A job the group queue dead-lettered", () => {
         { timeout: 10_000, interval: 50 },
       );
 
+      const pending = async () => Number(await redis.get(`${queueName}:gq:stats:total-pending`));
+      // The dead-lettered job left the live group at its claim, so nothing counts it.
+      expect(await pending()).toBe(0);
+
       isBroken = false;
       const redriven = await repo.redriveManyFromDlq({ queueName, groupIds: ["group-a"] });
 
       expect(redriven).toEqual({ redrivenCount: 1, jobsRedriven: 1 });
       await vi.waitFor(() => expect(ran).toEqual(["job-1"]), { timeout: 10_000, interval: 50 });
       expect(await repo.findDlqGroups({ queueName })).toEqual([]);
+      expect(await pending()).toBe(0);
+    });
+  });
+
+  describe("when the operator lists dead-letter groups after one's entries expired", () => {
+    /** @scenario "Listing dead-letter groups forgets the ones whose entries expired" */
+    it("drops the expired group from the index and keeps the live one", async () => {
+      const queueName = `{test/opsdlq/${crypto.randomUUID().slice(0, 8)}}`;
+      const prefix = `${queueName}:gq:`;
+      await redis.sadd(`${prefix}dlq`, "g-expired", "g-live");
+      await redis.zadd(`${prefix}dlq:g-live:jobs`, 1, "j1");
+      await redis.hset(`${prefix}dlq:g-live:data`, "j1", "{}");
+      const repo = QueueRedisRepository.create({ redis });
+
+      const groups = await repo.findDlqGroups({ queueName });
+
+      expect(groups.map((group) => group.groupId)).toEqual(["g-live"]);
+      expect(await redis.smembers(`${prefix}dlq`)).toEqual(["g-live"]);
     });
   });
 });

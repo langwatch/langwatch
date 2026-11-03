@@ -43,7 +43,7 @@ class MyAgent:
         # Configure the model using LiteLLM for provider flexibility
         self.model = LiteLLMModel(
             client_args={"api_key": os.getenv("OPENAI_API_KEY")},
-            model_id="openai/gpt-5-mini",
+            model_id="openai/gpt-6-luna",
         )
 
         # Create the agent with tracing attributes
@@ -64,6 +64,12 @@ print(response)
 ```
 
 LangWatch automatically captures all agent interactions, model calls, and tool executions through Strands Agents' built-in OpenTelemetry support. Use `@langwatch.trace()` decorators to add custom traces and metadata as needed.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the agent run, its model calls and its tool executions.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 

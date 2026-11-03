@@ -90,6 +90,7 @@ export function gateEvaluations({
     ...evaluation,
     inputs: undefined,
     details: contentVisible ? evaluation.details : null,
+    last_attempt_error: contentVisible ? evaluation.last_attempt_error : null,
     error: evaluation.error
       ? {
           ...evaluation.error,

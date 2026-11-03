@@ -1,4 +1,5 @@
 import {
+  type AgentHooks,
   CALL_ENVELOPE_KEYS,
   RESULT_TTL_SECONDS,
   buildCallEnvelope,
@@ -73,17 +74,23 @@ async function connectInstance({
   instanceId,
   maxConcurrency = 1,
   agentIds = ["agent_1"],
+  hooks,
   behavior,
 }: {
   instanceId: string;
   maxConcurrency?: number;
   agentIds?: string[];
+  /** The hooks the instance's SDK declared for every agent it registers; none when absent. */
+  hooks?: AgentHooks;
   behavior: InstanceBehavior;
 }): Promise<{ received: string[]; cancelled: string[] }> {
   const received: string[] = [];
   const cancelled: string[] = [];
   await runtime.registry.register({
-    meta: meta(instanceId, maxConcurrency),
+    meta: {
+      ...meta(instanceId, maxConcurrency),
+      ...(hooks ? { hooks: Object.fromEntries(agentIds.map((id) => [id, hooks])) } : {}),
+    },
     agentIds,
   });
   const unsubscribe = await runtime.relay.listenToInstance({
@@ -193,6 +200,125 @@ describe("ConnectedAgentDispatchService", () => {
         instanceId: "inst_1",
         hostname: "inst_1-host",
       });
+    });
+  });
+
+  describe("when the platform calls a scenario hook", () => {
+    it("sends the kind and the state in the envelope and returns the hook's state", async () => {
+      const envelopes: unknown[] = [];
+      await connectInstance({
+        instanceId: "inst_1",
+        hooks: { setup: true, teardown: true },
+        behavior: async (callId, reply) => {
+          const lookup = await runtime.state.readCall({ projectId, callId });
+          if (lookup.kind === "hit") envelopes.push(lookup.value.envelope);
+          await reply.ack();
+          await reply.result({ state: { deleted: 3 } });
+        },
+      });
+
+      const outcome = await runtime.dispatcher.dispatch({
+        projectId,
+        agent: agent(),
+        call: { ...call(), messages: [], newMessages: [], kind: "teardown", state: { id: "c_1" } },
+      });
+
+      expect(envelopes[0]).toMatchObject({ kind: "teardown", state: { id: "c_1" } });
+      expect(outcome.state).toEqual({ deleted: 3 });
+    });
+  });
+
+  describe("when instances of one agent run SDKs with and without hooks", () => {
+    /** @scenario "A hook call reaches only an instance that declared that hook" */
+    it("sends the hook call to the instance that declared it, never to the older one", async () => {
+      const older = await connectInstance({
+        instanceId: "inst_old",
+        maxConcurrency: 4,
+        behavior: async (_, reply) => {
+          await reply.ack();
+          await reply.result({ output: "the agent function ran" });
+        },
+      });
+      const newer = await connectInstance({
+        instanceId: "inst_new",
+        maxConcurrency: 4,
+        hooks: { setup: false, teardown: true },
+        behavior: async (_, reply) => {
+          await reply.ack();
+          await reply.result({ state: { deleted: 1 } });
+        },
+      });
+
+      for (const threadId of ["thread_a", "thread_b", "thread_c"]) {
+        const outcome = await runtime.dispatcher.dispatch({
+          projectId,
+          agent: agent(),
+          call: { ...call(threadId), messages: [], newMessages: [], kind: "teardown" },
+        });
+        expect(outcome.instance.instanceId).toBe("inst_new");
+      }
+      expect(older.received).toEqual([]);
+      expect(newer.received).toHaveLength(3);
+    });
+  });
+
+  describe("when no live instance declared the hook", () => {
+    /** @scenario "The platform sends no hook call to an agent that did not declare it" */
+    it("refuses with hook_not_declared and sends no call frame", async () => {
+      const older = await connectInstance({
+        instanceId: "inst_old",
+        hooks: { setup: false, teardown: true },
+        behavior: async (_, reply) => {
+          await reply.ack();
+          await reply.result({ output: "the agent function ran" });
+        },
+      });
+
+      const outcome = runtime.dispatcher.dispatch({
+        projectId,
+        agent: agent(),
+        call: { ...call(), messages: [], newMessages: [], kind: "setup" },
+      });
+
+      await expect(outcome).rejects.toMatchObject({
+        code: "agent_call_failed",
+        meta: { remoteCode: "hook_not_declared" },
+      });
+      expect(older.received).toEqual([]);
+    });
+  });
+
+  describe("when a hook call carries its own budget", () => {
+    /** @scenario "A hook call runs under the hook's budget, not the agent's turn timeout" */
+    it("sets the envelope deadline from the hook's budget, and a turn's from the agent's timeout", async () => {
+      const deadlines: number[] = [];
+      await connectInstance({
+        instanceId: "inst_1",
+        hooks: { setup: true, teardown: true },
+        behavior: async (callId, reply) => {
+          const lookup = await runtime.state.readCall({ projectId, callId });
+          if (lookup.kind === "hit") deadlines.push(lookup.value.envelope.deadlineAt);
+          await reply.ack();
+          await reply.result({ output: "ok", state: { id: "c_1" } });
+        },
+      });
+      const now = () => 1_000_000;
+      const slowAgent = agent({ timeoutMs: 120_000 });
+
+      await runtime.dispatcher.dispatch({
+        projectId,
+        agent: slowAgent,
+        call: { ...call(), kind: "setup", timeoutMs: 5_000 },
+        now,
+      });
+      await runtime.dispatcher.dispatch({
+        projectId,
+        agent: slowAgent,
+        call: { ...call(), timeoutMs: 5_000 },
+        now,
+      });
+
+      expect(deadlines).toEqual([1_005_000, 1_120_000]);
     });
   });
 
@@ -675,7 +801,7 @@ describe("ConnectedAgentDispatchService", () => {
 describe("buildCallEnvelope", () => {
   describe("when the relay body carries more than the contract", () => {
     /** @scenario "A call envelope carries only the contract fields" */
-    it("writes exactly the ten contract keys", () => {
+    it("writes exactly the contract keys", () => {
       const body = {
         callId: "call_1",
         agentId: "agent_1",

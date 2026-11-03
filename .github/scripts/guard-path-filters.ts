@@ -1,6 +1,6 @@
 // Guards path filters (R1: on.paths not a superset of an internal gate; R2:
 // on.paths contradicts a `*-complete` aggregator; R3: an unparseable filter is
-// reported, not passed; R4: a pull_request_target gate uses braces or `!`).
+// reported, not passed; R4: a pull request gate uses braces or `!`).
 // Dependency-free and line-based — no YAML library on a bare runner.
 // Spec: specs/ci/path-filters.feature
 
@@ -179,8 +179,32 @@ export const pullRequestFilter = (source: string): FilterResult => {
   return { kind: "filtered", entries };
 };
 
-/** Every path named inside any `filters:` block in the file. */
-export const gateFilters = (source: string): FilterResult => {
+const DETECTOR_USES = /^\s*(-\s+)?uses:\s*["']?\.\/\.github\/actions\/detect-changes["']?\s*$/;
+
+/**
+ * Is the line at `index` inside a step that uses .github/actions/detect-changes?
+ * The step is the nearest `- ` item above it at a shallower indent.
+ */
+export const inDetectorStep = (lines: string[], index: number): boolean => {
+  const indent = indentOf(lines[index]!);
+  for (let i = index - 1; i >= 0; i--) {
+    const line = lines[i]!;
+    if (isBlank(line)) continue;
+    const lineIndent = indentOf(line);
+    if (lineIndent >= indent) continue;
+    const isListItem = /^\s*-\s/.test(line);
+    if (!isListItem) continue;
+    const step = [line, ...blockUnder(lines, i, lineIndent)];
+    return step.some((stepLine) => DETECTOR_USES.test(stripComment(stepLine)));
+  }
+  return false;
+};
+
+/**
+ * Every path named inside any `filters:` block in the file, or with
+ * `onlyDetector` only those of .github/actions/detect-changes steps.
+ */
+export const gateFilters = (source: string, onlyDetector = false): FilterResult => {
   const lines = source.split("\n");
   const out: string[] = [];
   let hasInlineBlock = false;
@@ -188,6 +212,7 @@ export const gateFilters = (source: string): FilterResult => {
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i]!.match(/^\s*filters:\s*(.*)$/);
     if (!match) continue;
+    if (onlyDetector && !inDetectorStep(lines, i)) continue;
     const value = match[1]!.trim();
 
     // Two spellings of the same thing: a block scalar (`|`, `|-`, `>`, `>-`,
@@ -291,19 +316,25 @@ export const covers = (patterns: string[], target: string): boolean => {
   return covered;
 };
 
-const triggersOnPullRequestTarget = (source: string): boolean =>
+const triggersOnPullRequest = (source: string): boolean =>
   source
     .split("\n")
-    .some((line) => /(^|[{,\s[])pull_request_target\s*(:|,|\]|$)/.test(stripComment(line).trim()));
+    .some((line) =>
+      /(^|[{,\s[])(pull_request(_target)?\s*(:|,|\]|$)|(["'])pull_request(_target)?\5\s*(:|,|\]))/.test(
+        stripComment(line).trim(),
+      ),
+    );
 
 /**
- * R4. On pull_request_target the change detector matches its filters with git
- * pathspecs (.github/scripts/detect-changes-by-sha.sh): braces and `!`
- * negation mean something to dorny's picomatch and nothing to git.
+ * R4. On pull_request and pull_request_target the change detector matches its
+ * filters with git pathspecs (.github/scripts/detect-changes-by-sha.sh): braces
+ * and `!` negation mean something to dorny's picomatch and nothing to git.
  */
-export const pullRequestTargetGateIssues = (file: string, source: string): WorkflowIssue[] => {
-  if (!triggersOnPullRequestTarget(source)) return [];
-  const gate = gateFilters(source);
+export const pullRequestGateIssues = (file: string, source: string): WorkflowIssue[] => {
+  if (!triggersOnPullRequest(source)) return [];
+  // A step that calls dorny/paths-filter directly matches with picomatch,
+  // which reads braces and `!`; only the change detector's filters are git's.
+  const gate = gateFilters(source, true);
   if (gate.kind === "unparsed") {
     return [{ file, rule: "R4", detail: gate.detail.replace("R1", "R4") }];
   }
@@ -315,13 +346,13 @@ export const pullRequestTargetGateIssues = (file: string, source: string): Workf
       rule: "R4",
       detail:
         `gate filter entry "${entry}" uses ${entry.startsWith("!") ? "negation" : "braces"}. ` +
-        `On pull_request_target the change detector matches with git pathspecs, which ` +
+        `On pull requests the change detector matches with git pathspecs, which ` +
         `read neither, and refuses the filter by running every job. List the paths in full.`,
     }));
 };
 
 export const inspect = (file: string, source: string): WorkflowIssue[] => {
-  const issues = pullRequestTargetGateIssues(file, source);
+  const issues = pullRequestGateIssues(file, source);
   const filter = pullRequestFilter(source);
   if (filter.kind === "none") return issues;
 

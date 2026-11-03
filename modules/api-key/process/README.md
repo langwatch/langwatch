@@ -6,13 +6,13 @@ The server half of [api-key](../README.md). API keys: creating and updating them
 
 ## Installation
 
-`defineProcessModule("api-key").withRepositories(apiKeyRepositories).withApi(ApiKeyModule).withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyOrganizationsRest, apiKeyTrpcTransport).provideMiddlewareContext(…).withEventing(apiKeyEventing)`, `src/api-key.module.ts:23`.
+`defineProcessModule("api-key").withRepositories(apiKeyRepositories).withApi(ApiKeyModule).withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyOrganizationsRest, apiKeyDocsSessionRest, apiKeyTrpcTransport).provideMiddlewareContext(…).withEventing(apiKeyEventing)`, `src/api-key.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ApiKeyApi`)
 
-Peers call these through the token, declared at `../contract/src/api-key.api.ts:108`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/api-key.api.ts:114`; nothing else in this package is public.
 
 #### `create`
 
@@ -64,6 +64,22 @@ The key every code agent run of a project puts in its sandbox: the agent cache a
 
 ```typescript
 mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string>;
+```
+
+#### `mintDocsSessionKey`
+
+A docs session key (ADR-185): the member in one project, for at most five minutes and never past their browser session or the organization's session ceiling. Refuses an operator acting as the member and a docs origin this deployment does not register.
+
+```typescript
+mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted>;
+```
+
+#### `revokeDocsSessionKeys`
+
+Revokes the one docs key named, or every docs key the named browser sessions minted. Idempotent, and silent about any key that is not a live docs session key.
+
+```typescript
+revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked>;
 ```
 
 #### `resolveOrganizationToken`
@@ -352,6 +368,31 @@ listOrganizationMembers(input: { organizationId: string }, by: ApiKeyManagementC
 
 ## REST transport
 
+### `apiKeyDocsSessionRest`
+
+|             |                                                  |
+| ----------- | ------------------------------------------------ |
+| Declared at | `src/transport/api-key-docs-session.rest.ts:23`  |
+| Base URL    | `/api/docs-session`, twin `/api/v1/docs-session` |
+| Addressing  | dated                                            |
+| Credential  | project                                          |
+| Versions    | `2026-08-07`                                     |
+
+#### `DELETE /` · `revokeDocsSession`
+
+Disconnect a docs session
+
+Authenticated: The presenting key is the only thing this route touches, so holding it is the whole authority. Credential `project`. Declared at `src/transport/api-key-docs-session.rest.ts:27`.
+
+Answers at `/api/docs-session`, `/api/v1/docs-session`; also, undocumented, `/api/docs-session/2026-08-07`, `/api/v1/docs-session/2026-08-07`, `/api/docs-session/latest`, `/api/v1/docs-session/latest`.
+
+```typescript
+// Response: docsSessionRevokedSchema, ../contract/src/api-key.docs-session.ts:131
+interface Response {
+  revoked: true;
+}
+```
+
 ### `apiKeyOrganizationsRest`
 
 |             |                                                    |
@@ -485,7 +526,7 @@ interface Response {
 
 Get an API key
 
-Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:383`.
+Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:384`.
 
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
@@ -501,7 +542,7 @@ type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-k
 
 Update an API key
 
-Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:418`.
+Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:419`.
 
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
@@ -526,7 +567,7 @@ type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-k
 
 Revoke an API key
 
-Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:475`.
+Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:477`.
 
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
@@ -542,7 +583,7 @@ interface Response {
 
 Create an ingestion API key
 
-Permission `traces:create`. Credential `project`. Declared at `src/transport/api-key.rest.ts:512`.
+Permission `traces:create`. Credential `project`. Declared at `src/transport/api-key.rest.ts:515`.
 
 Answers at `/api/api-keys/ingestion`, `/api/v1/api-keys/ingestion`; also, undocumented, `/api/api-keys/2026-08-07/ingestion`, `/api/v1/api-keys/2026-08-07/ingestion`, `/api/api-keys/latest/ingestion`, `/api/v1/api-keys/latest/ingestion`.
 
@@ -555,7 +596,7 @@ type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-k
 
 Create a full-access API key
 
-Permission `project:manage`. Credential `project`. Declared at `src/transport/api-key.rest.ts:555`.
+Permission `project:manage`. Credential `project`. Declared at `src/transport/api-key.rest.ts:559`.
 
 Answers at `/api/api-keys/full-access`, `/api/v1/api-keys/full-access`; also, undocumented, `/api/api-keys/2026-08-07/full-access`, `/api/v1/api-keys/2026-08-07/full-access`, `/api/api-keys/latest/full-access`, `/api/v1/api-keys/latest/full-access`.
 
@@ -568,19 +609,20 @@ type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-k
 
 ### `apiKey`
 
-Contract `../contract/src/api-key.trpc.ts:33`, router `src/transport/api-key.trpc.ts:28`.
+Contract `../contract/src/api-key.trpc.ts:37`, router `src/transport/api-key.trpc.ts:32`.
 
-| Procedure            | Kind     | Gate                                                                                                                                                | Input                               | Output                |
-| -------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------- |
-| `apiKey.myBindings`  | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcOrganizationScopeSchema` | inline                |
-| `apiKey.nameById`    | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcNameByIdInputSchema`     | inline                |
-| `apiKey.list`        | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcOrganizationScopeSchema` | inline                |
-| `apiKey.create`      | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcCreateInputSchema`       | `apiKeyMintedSchema`  |
-| `apiKey.update`      | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcUpdateInputSchema`       | `apiKeyUpdatedSchema` |
-| `apiKey.revoke`      | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcRevokeInputSchema`       | `apiKeyRevokedSchema` |
-| `apiKey.orgProjects` | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema` | inline                |
-| `apiKey.orgTeams`    | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema` | inline                |
-| `apiKey.orgMembers`  | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema` | inline                |
+| Procedure                   | Kind     | Gate                                                                                                                                                | Input                                     | Output                       |
+| --------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------- |
+| `apiKey.myBindings`         | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcOrganizationScopeSchema`       | inline                       |
+| `apiKey.nameById`           | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcNameByIdInputSchema`           | inline                       |
+| `apiKey.list`               | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcOrganizationScopeSchema`       | inline                       |
+| `apiKey.create`             | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcCreateInputSchema`             | `apiKeyMintedSchema`         |
+| `apiKey.update`             | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcUpdateInputSchema`             | `apiKeyUpdatedSchema`        |
+| `apiKey.revoke`             | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcRevokeInputSchema`             | `apiKeyRevokedSchema`        |
+| `apiKey.orgProjects`        | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema`       | inline                       |
+| `apiKey.orgTeams`           | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema`       | inline                       |
+| `apiKey.orgMembers`         | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema`       | inline                       |
+| `apiKey.mintDocsSessionKey` | mutation | Permission `project:view`                                                                                                                           | `apiKeyTrpcMintDocsSessionKeyInputSchema` | `docsSessionKeyMintedSchema` |
 
 ```typescript
 // apiKey.myBindings
@@ -588,7 +630,7 @@ Contract `../contract/src/api-key.trpc.ts:33`, router `src/transport/api-key.trp
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/api-key.trpc.ts:36
+// Output: inline, ../contract/src/api-key.trpc.ts:40
 type Output = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
@@ -605,7 +647,7 @@ interface Input {
   organizationId: string;
   apiKeyId: string;
 }
-// Output: inline, ../contract/src/api-key.trpc.ts:40
+// Output: inline, ../contract/src/api-key.trpc.ts:44
 type Output = {
   name: string;
   revoked: boolean;
@@ -613,7 +655,7 @@ type Output = {
 
 // apiKey.list
 type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
-// Output: apiKeyListEntrySchema.array() (inline, ../contract/src/api-key.trpc.ts:44)
+// Output: apiKeyListEntrySchema.array() (inline, ../contract/src/api-key.trpc.ts:48)
 
 // apiKey.create
 type Input = z.infer<typeof apiKeyTrpcCreateInputSchema>; // ../contract/src/api-key-trpc.schemas.ts:63
@@ -649,7 +691,7 @@ interface Output {
 
 // apiKey.orgProjects
 type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
-// Output: inline, ../contract/src/api-key.trpc.ts:60
+// Output: inline, ../contract/src/api-key.trpc.ts:64
 type Output = {
   id: string;
   name: string;
@@ -658,7 +700,7 @@ type Output = {
 
 // apiKey.orgTeams
 type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
-// Output: inline, ../contract/src/api-key.trpc.ts:64
+// Output: inline, ../contract/src/api-key.trpc.ts:68
 type Output = {
   id: string;
   name: string;
@@ -666,12 +708,29 @@ type Output = {
 
 // apiKey.orgMembers
 type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
-// Output: inline, ../contract/src/api-key.trpc.ts:68
+// Output: inline, ../contract/src/api-key.trpc.ts:72
 type Output = {
   id: string;
   name: string | null;
   email: string | null;
 }[];
+
+// apiKey.mintDocsSessionKey
+// Input: apiKeyTrpcMintDocsSessionKeyInputSchema, ../contract/src/api-key.docs-session.ts:30
+interface Input {
+  projectId: string;
+  docsOrigin: string;
+}
+// Output: docsSessionKeyMintedSchema, ../contract/src/api-key.docs-session.ts:46
+interface Output {
+  token: string;
+  expiresAt: string;
+  expiresIn: number;
+  project: {
+    id: string;
+    name: string;
+  };
+}
 ```
 
 ## Sockets
@@ -691,11 +750,14 @@ Declared at `src/eventing/api-key.pipeline.ts:90`.
 
 ## Configuration
 
-| Kind   | Leaf                 | Environment variable          | Declared at                  |
-| ------ | -------------------- | ----------------------------- | ---------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:173` |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:174` |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:175` |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:177` |
+| Kind   | Leaf                 | Environment variable          | Declared at                            |
+| ------ | -------------------- | ----------------------------- | -------------------------------------- |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:184`           |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:185`           |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:186`           |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:188`           |
+| config | `docsOrigins`        | `LANGWATCH_DOCS_ORIGINS`      | `../contract/src/api-key.config.ts:23` |
+| config | `isSaas`             | `IS_SAAS`                     | `../contract/src/api-key.config.ts:25` |
+| config | `publicBaseUrl`      | `BASE_HOST`                   | `../contract/src/api-key.config.ts:27` |
 
 <!-- readme:generated:end -->

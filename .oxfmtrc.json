@@ -23,6 +23,7 @@
     "modules/langy/process/src/rules/setup-skill-bodies.rules.ts",
     "packages/prisma-client/src/table-catalogue.ts",
     "**/CHANGELOG.md",
+    "charts/*/Chart.yaml",
     "docs/api-reference/openapiLangWatch.json",
     "skills/_compiled/**",
     "services/langyagent/internal/assets/skills/**",

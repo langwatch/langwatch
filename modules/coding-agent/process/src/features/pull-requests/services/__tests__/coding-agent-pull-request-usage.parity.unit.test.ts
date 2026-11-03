@@ -25,6 +25,7 @@ import {
 import type { SessionModelTotalsRow } from "../../../../repositories/coding-agent-session-event.repository.ts";
 import type { CodingAgentBillingPolicy } from "../../../../services/coding-agent-cost-attribution.service.ts";
 import { CodingAgentFeatureService } from "../../../../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../../../services/model-catalog-cost-estimator.service.ts";
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 5, 1);
@@ -105,6 +106,7 @@ function modelTotalsRow(over: Partial<SessionModelTotalsRow> = {}): SessionModel
     cacheReadTokens: 20,
     cacheCreationTokens: 10,
     costUsd: 1.5,
+    aiUnits: 0,
     ...over,
   };
 }
@@ -202,6 +204,7 @@ function serviceWith({
     projects: createTestProjects(),
     billing,
     clock: new TestClock(NOW),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
   return {
     service,
@@ -297,6 +300,7 @@ function personalServiceWith({
       isSourceNonBillable({ organizationId: "org-1", sourceType }),
     ),
     clock: new TestClock(NOW),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
   return { service, findByRepositoryBranch, findAllByBranches };
 }
@@ -1027,6 +1031,46 @@ describe("PullRequestUsageService", () => {
       expect(usage.totals.costUsd).toBeCloseTo(5);
     });
 
+    /** @scenario "The billable lookup for a Grok session asks with the catalogue slug" */
+    it("asks the billable question of Grok's catalogue slug and applies the answer to its cost", async () => {
+      const askedSources: string[] = [];
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow({ agent: "grok", costUsd: 2 })],
+        isSourceNonBillable: async ({ sourceType }) => {
+          askedSources.push(sourceType);
+          return sourceType === "grok";
+        },
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      // The ingest key's source type is "grok_cli"; the catalogue, and so the lookup, says "grok".
+      expect(askedSources).toEqual(["grok"]);
+      expect(usage.totals.nonBilledCostUsd).toBeCloseTo(2);
+      expect(usage.totals.billedCostUsd).toBe(0);
+    });
+
+    /** @scenario "A pi session's billable lookup resolves through the catalogue slug, not the key's source type" */
+    it("asks the billable question of pi's catalogue slug and applies the answer to its cost", async () => {
+      const askedSources: string[] = [];
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow({ agent: "pi", costUsd: 2 })],
+        isSourceNonBillable: async ({ sourceType }) => {
+          askedSources.push(sourceType);
+          return sourceType === "pi";
+        },
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      // The ingest key's source type is "pi_cli"; the catalogue, and so the lookup, says "pi".
+      expect(askedSources).toEqual(["pi"]);
+      expect(usage.totals.nonBilledCostUsd).toBeCloseTo(2);
+      expect(usage.totals.billedCostUsd).toBe(0);
+    });
+
     /** @scenario "A viewer who may not price a project sees neither half of its cost" */
     it("leaves every half of the cost absent for a project the viewer may not price", async () => {
       const { service } = serviceWith({
@@ -1089,6 +1133,7 @@ describe("PullRequestUsageService", () => {
           totalTokens: 180,
           costUsd: 1.5,
           tokensKnown: true,
+          aiUnits: 0,
         },
         {
           model: "gpt-5-mini",
@@ -1099,6 +1144,7 @@ describe("PullRequestUsageService", () => {
           totalTokens: 4,
           costUsd: 0.25,
           tokensKnown: true,
+          aiUnits: 0,
         },
       ]);
     });

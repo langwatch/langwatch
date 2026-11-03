@@ -21,6 +21,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { fencedOver } from "../../features/legacy/repositories/clickhouse/__tests__/support/legacy-trace-mapping.support.ts";
@@ -123,13 +124,7 @@ function compose({
       legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
     }),
     dedup: MemoryTraceSpanDedupRepository.create(),
-    commands: {
-      recordSpan: async () => undefined,
-      changeTraceName: async () => undefined,
-      addAnnotation: async () => undefined,
-      removeAnnotation: async () => undefined,
-      assignTopic: async () => undefined,
-    },
+    commands: fakeTraceProcessingCommands(),
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no broadcast fabric in this test");

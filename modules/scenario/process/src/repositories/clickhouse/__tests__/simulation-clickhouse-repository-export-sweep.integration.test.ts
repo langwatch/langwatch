@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { STALL_THRESHOLD_MS } from "../../../eventing/simulation-run-execution-evolution.process.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
+import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -92,7 +93,7 @@ beforeAll(() => {
     url: databaseUrl,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  repo = SimulationClickHouseRepository.create(async () => client!);
+  repo = SimulationClickHouseRepository.create(scenarioClickHouseOver(client));
 });
 
 afterAll(async () => {

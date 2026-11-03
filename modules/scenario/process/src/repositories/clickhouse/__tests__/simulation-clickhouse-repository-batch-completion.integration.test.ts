@@ -91,6 +91,35 @@ describe.skipIf(databaseUrl === null)("the completion of a batch", () => {
   });
 });
 
+describe.skipIf(databaseUrl === null)("a batch with a run whose setup failed", () => {
+  /** @scenario "Server-side pass rates leave out a run whose setup failed" */
+  it("leaves that run out of the batch's failures and the set's pass-rate denominator", async () => {
+    const scenarioSetId = `set-hooks-${nanoid()}`;
+    const batchRunId = `batch-hooks-${nanoid()}`;
+    const setupFailed = {
+      ...makeRunRow({ scenarioSetId, batchRunId, status: "ERROR" }),
+      Metadata: JSON.stringify({
+        langwatch: { hooks: { setup: { status: "timed_out", durationMs: 60_000 } } },
+      }),
+    };
+    await ch.insertRows([
+      makeRunRow({ scenarioSetId, batchRunId, status: "SUCCESS" }),
+      makeRunRow({ scenarioSetId, batchRunId, status: "FAILED" }),
+      setupFailed,
+    ]);
+
+    const batch = await ch.repo.findBatchSummary({ projectId: tenantId, batchRunId });
+    expect(batch).toMatchObject({ passCount: 1, failCount: 1, settledCount: 3 });
+
+    const sets = await ch.repo.findExternalSetSummaries({ projectId: tenantId });
+    expect(sets.find((set) => set.scenarioSetId === scenarioSetId)).toMatchObject({
+      passedCount: 1,
+      failedCount: 1,
+      totalCount: 2,
+    });
+  });
+});
+
 describe.skipIf(databaseUrl === null)("the batch-scoped run list", () => {
   describe("given runs exist in two different batches", () => {
     describe("when the list is requested with only a batch run id", () => {

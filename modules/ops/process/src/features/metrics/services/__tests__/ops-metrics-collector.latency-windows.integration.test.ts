@@ -94,6 +94,7 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
         });
         await queue.waitUntilReady();
 
+        const sentAt = Date.now();
         for (let i = 0; i < 5; i++) {
           await queue.send({ id: `w${i}`, groupId: `g${i}` });
         }
@@ -102,8 +103,13 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
         // The completions must have landed in all three histogram tiers.
         const allTime = await redis.hgetall(latencyAllTimeKey(name));
         expect(Object.keys(allTime).length).toBeGreaterThan(0);
-        const minute = await redis.hgetall(latencyMinuteBucketKey(name, Date.now()));
-        expect(Object.keys(minute).length).toBeGreaterThan(0);
+        // Completions may straddle a minute boundary: read every minute since sending.
+        const minutes = await Promise.all(
+          [...new Set([sentAt, Date.now()].map((at) => latencyMinuteBucketKey(name, at)))].map(
+            (key) => redis.hgetall(key),
+          ),
+        );
+        expect(minutes.some((minute) => Object.keys(minute).length > 0)).toBe(true);
 
         const ops = OpsMetricsTestAdapter.create();
         ops.setQueueNames([name]);

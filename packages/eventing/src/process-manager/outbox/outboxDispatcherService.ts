@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 
+import { refusesRetry } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   propagation,
@@ -12,12 +13,17 @@ import {
 } from "@opentelemetry/api";
 
 import {
+  incrementEsJobsProjectGone,
   incrementEsProcessOutboxTotal,
   observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
 } from "../../metrics.ts";
-import { classifyClickHouseError, ErrorCategory } from "../../services/errorHandling.ts";
-import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
+import {
+  classifyClickHouseError,
+  ErrorCategory,
+  isProjectGone,
+} from "../../services/errorHandling.ts";
+import { diagnosticIsRedacted, toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { JsonValue } from "../json.ts";
 import type {
   FailedOutboxAttempt,
@@ -150,9 +156,38 @@ function retryAfterMsOf(error: unknown): number | undefined {
  */
 function isTerminalError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
-  // A handled refusal defaults to `retryable: false`; a transient ClickHouse cause still retries.
+  // A transient ClickHouse cause still retries; otherwise the group queue's refusal rule decides.
   if (classifyClickHouseError(error) === ErrorCategory.RECOVERABLE) return false;
-  return Reflect.get(error, "retryable") === false;
+  return refusesRetry(error);
+}
+
+/**
+ * A handled error the customer caused (bad configuration, invalid parameters). Read by
+ * field, not instanceof, since the error may have crossed a serialisation boundary.
+ */
+function isCustomerFault(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  return (
+    Reflect.get(error, "fault") === "customer" && typeof Reflect.get(error, "code") === "string"
+  );
+}
+
+/** One V8 frame, `at fn (file:line:col)` or `at file:line:col`; anything else is dropped. */
+const STACK_FRAME = /^at (?:(?:async |new )?[^\s()]+(?: \[as [^\s\]]+\])? \()?[^\s()]+:\d+:\d+\)?$/;
+
+/**
+ * The frames of an error's stack, read only after its whole `name: message` header, so
+ * no line of a multi-line name or message can pass for a frame. No header, no frames.
+ */
+function stackFramesOf(error: unknown): string[] {
+  if (!(error instanceof Error) || typeof error.stack !== "string") return [];
+  const header = Error.prototype.toString.call(error);
+  if (header === "" || !error.stack.startsWith(header)) return [];
+  return error.stack
+    .slice(header.length)
+    .split("\n")
+    .map((frame) => frame.trim())
+    .filter((frame) => STACK_FRAME.test(frame));
 }
 
 /** Attempt log records DispatchError diagnostics; check by name not instanceof. */
@@ -578,6 +613,10 @@ export class OutboxDispatcherService {
         status: "dispatched",
       });
     } catch (error) {
+      if (isProjectGone(error)) {
+        await this.completeProjectGone({ message, now, report, attempt, identity, startedAt });
+        return;
+      }
       await this.handleDispatchFailure({
         message,
         now,
@@ -591,6 +630,62 @@ export class OutboxDispatcherService {
     } finally {
       this.finishDispatchSpan({ message, attempt, span, startedAt });
     }
+  }
+
+  /**
+   * A message whose project was deleted after it was written can never be delivered: it is
+   * retired as dispatched with a warning, not retried and not dead-lettered
+   * (specs/eventing/deleted-project-jobs.feature).
+   */
+  private async completeProjectGone({
+    message,
+    now,
+    report,
+    attempt,
+    identity,
+    startedAt,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    now: number;
+    report: DispatchReport;
+    attempt: number;
+    identity: OutboxMessageIdentity;
+    startedAt: number;
+  }): Promise<void> {
+    const { applied } = await this.store.markDispatched({
+      identity,
+      leaseToken: message.leaseToken,
+      now,
+    });
+    if (!applied) {
+      this.countFenced({
+        message,
+        report,
+        phase: "dispatched",
+        durationMs: performance.now() - startedAt,
+      });
+      return;
+    }
+    report.dispatched.push(message.messageKey);
+    incrementEsProcessOutboxTotal({
+      processName: message.processName,
+      intentType: message.intentType,
+      status: "dispatched",
+    });
+    incrementEsJobsProjectGone({ queue: "process_outbox", jobType: message.intentType, count: 1 });
+    // Intentionally retain this opaque operational ID for delivery diagnostics.
+    this.logger.warn(
+      {
+        processName: message.processName,
+        processKey: message.processKey,
+        projectId: message.projectId,
+        tenantId: message.tenantId,
+        messageKey: message.messageKey,
+        intentType: message.intentType,
+        attempt,
+      },
+      "Outbox message's project no longer exists; retiring it as completed",
+    );
   }
 
   /**
@@ -765,8 +860,57 @@ export class OutboxDispatcherService {
       },
     });
     if (dead || attempt === 1) {
-      this.logDispatchFailure({ message, attempt, dead, errorType, errorMessage });
+      const hasCustomerFault = isCustomerFault(error);
+      this.logDispatchFailure({
+        message,
+        attempt,
+        dead,
+        errorType,
+        errorMessage,
+        hasCustomerFault,
+      });
+      if (diagnosticIsRedacted(error)) {
+        this.logRedactedCause({ message, attempt, error, dead, hasCustomerFault });
+      }
     }
+  }
+
+  /**
+   * Everything else carries only the redacted sentence, so this keeps where it failed:
+   * class and stack frames, never the foreign message or the payload. Its level follows
+   * the outcome, so a retry or a customer's own refusal never pages.
+   */
+  private logRedactedCause({
+    message,
+    attempt,
+    error,
+    dead,
+    hasCustomerFault,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    attempt: number;
+    error: unknown;
+    dead: boolean;
+    hasCustomerFault: boolean;
+  }): void {
+    // Intentionally retain this opaque operational ID for delivery diagnostics.
+    const fields = {
+      processName: message.processName,
+      processKey: message.processKey,
+      projectId: message.projectId,
+      tenantId: message.tenantId,
+      messageKey: message.messageKey,
+      sourceEventId: message.sourceEventId,
+      intentType: message.intentType,
+      attempt,
+      outcome: dead ? "dead" : "retry_scheduled",
+      causeType: toSafeFailureDiagnostic(error).errorType,
+      causeStackFrames: stackFramesOf(error),
+    };
+    const line =
+      "Process-manager outbox delivery failed with a redacted cause; stack frames attached";
+    if (dead && !hasCustomerFault) this.logger.error(fields, line);
+    else this.logger.warn(fields, line);
   }
 
   private logDispatchFailure({
@@ -775,12 +919,14 @@ export class OutboxDispatcherService {
     dead,
     errorType,
     errorMessage,
+    hasCustomerFault,
   }: {
     message: LeasedOutboxMessageRecord;
     attempt: number;
     dead: boolean;
     errorType: string;
     errorMessage: string;
+    hasCustomerFault: boolean;
   }): void {
     // Intentionally retain this opaque operational ID for delivery diagnostics.
     const fields = {
@@ -797,7 +943,10 @@ export class OutboxDispatcherService {
       errorType,
       errorMessage,
     };
-    if (dead) {
+    if (dead && hasCustomerFault) {
+      // The customer's own setup refused the delivery; nothing for on-call to act on.
+      this.logger.warn(fields, "Process-manager outbox message exhausted delivery attempts");
+    } else if (dead) {
       this.logger.error(fields, "Process-manager outbox message exhausted delivery attempts");
     } else {
       this.logger.warn(fields, "Process-manager outbox delivery failed; retry scheduled");

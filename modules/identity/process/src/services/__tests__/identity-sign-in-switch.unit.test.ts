@@ -61,6 +61,8 @@ describe("the identifier backfill and identity's sign-in switch", () => {
 
     await expect(migration.migrateTenant({ tenantId: USER_ID })).resolves.toMatchObject({
       status: "migrated",
+      report: { kind: "sign_in_switch_pinned" },
+      heldReason: "person",
     });
     expect(store.finalizedUsers.has(USER_ID)).toBe(false);
   });

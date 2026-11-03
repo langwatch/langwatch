@@ -985,9 +985,8 @@ Rule: The drawer's state is the address
 Rule: Deep links carry the partition hint
   A row click writes `drawer.t` with the trace's start time, and every
   per-trace read prunes ClickHouse partitions by it. A link from an API
-  response, a Slack message or an email used to carry the id alone, so the
-  drawer opened with every read scanning by id across every partition,
-  cold storage included, and sat on a skeleton for seconds.
+  response, a Slack message or an email may carry the id alone: the drawer then
+  reads by id, and the id index bounds each read server-side.
 
   @unit
   Scenario: A trace link built by the platform carries the trace timestamp
@@ -1013,11 +1012,11 @@ Rule: Deep links carry the partition hint
     And a t that is not a positive whole number is dropped
 
   @unit
-  Scenario: Sibling reads wait for the partition hint on a deep link
+  Scenario: The browser opens a trace by id alone
     Given the drawer opened from a link with no t
-    Then the header read runs without the hint and backfills it from its result
-    And the span tree, events, signals, full spans and span detail reads wait for the hint
-    And they run once the hint is known
+    Then the header, span tree, events, signals, full spans and span detail reads run at once
+    And they name the trace and send no occurredAtMs, so the id index bounds them server-side
+    And a drawer that already knows t, from the URL or a list row, sends it as occurredAtMs
 
   @unit
   Scenario: The evaluations read does not wait for the partition hint

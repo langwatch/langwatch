@@ -5,14 +5,11 @@ const DOOR_STATUSES: readonly OpsDoorStatus[] = [
 ];
 
 /**
- * Rate-limit bucket for the caller. `x-forwarded-for` is only trustworthy from
- * the hop nearest us, which is why this reads the LAST entry.
+ * Rate-limit bucket for the caller: the address the door resolved, never a forwarding header.
+ * An unresolved caller shares the one unknown bucket.
  */
-export function toCallerKey(forwardedFor: string | null): string {
-  const hops = forwardedFor?.split(",") ?? [];
-  const nearest = hops[hops.length - 1]?.trim();
-
-  return `ip:${nearest ?? "unknown"}`;
+export function toCallerKey(callerAddress: string | null): string {
+  return `ip:${callerAddress ?? "unknown"}`;
 }
 
 /** A handled error's status as a door writes it; one outside the door's codes answers 500. */

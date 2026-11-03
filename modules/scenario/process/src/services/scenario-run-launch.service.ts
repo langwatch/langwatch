@@ -94,6 +94,7 @@ export class ScenarioRunLaunchService {
       scenarioVersion: resolved.scenarioVersion,
       actor: input.actor,
       resolvedModels: prefetch.resolvedModels,
+      ...(input.keepData ? { keepData: true } : {}),
     });
 
     // The execution subscriber picks the queued event off the group queue and spawns the child.

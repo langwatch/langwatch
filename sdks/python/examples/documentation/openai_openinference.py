@@ -15,7 +15,7 @@ client = OpenAI()
 def generate_text_with_community_instrumentor(prompt: str):
     # No need to call autotrack explicitly, the community instrumentor handles OpenAI calls globally.
     response = client.chat.completions.create(
-        model="gpt-4.1-nano",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content

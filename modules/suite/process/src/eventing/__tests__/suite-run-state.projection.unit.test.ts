@@ -241,4 +241,29 @@ describe("suiteRunState fold projection", () => {
       expect(state.FinishedAt).toBeNull();
     });
   });
+
+  describe("when a run's setup failed", () => {
+    /**
+     * A run whose setup failed or timed out finishes ERROR with no verdict (ADR-180).
+     * @scenario "Setup failures are excluded from the suite roll-up"
+     */
+    it("leaves that run out of the pass-rate denominator", () => {
+      let state = projection.apply(projection.init(), createStartedEvent({ total: 3 }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({ scenarioRunId: "run-1", status: "SUCCESS", verdict: "success" }),
+      );
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({ scenarioRunId: "run-2", status: "FAILURE", verdict: "failure" }),
+      );
+      const notScored = createItemCompletedEvent({ scenarioRunId: "run-3", status: "ERROR" });
+      delete notScored.data.verdict;
+      state = projection.apply(state, notScored);
+
+      expect(state.GradedCount).toBe(2);
+      expect(state.PassedCount).toBe(1);
+      expect(state.PassRateBps).toBe(5000);
+    });
+  });
 });

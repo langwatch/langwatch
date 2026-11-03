@@ -2,7 +2,7 @@
  * What a new sign-up tells Customer.io.
  * @see specs/features/customer-io-nurturing-integration.feature
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   fireOrganizationCreated,
@@ -17,7 +17,23 @@ const SIGNUP = {
   organizationName: "Acme Corp",
 };
 
+afterEach(() => vi.useRealTimers());
+
 describe("fireSignup", () => {
+  describe("given a sign-up at a moment with milliseconds", () => {
+    describe("when the sign-up is identified", () => {
+      /** @scenario "Customer.io date attributes are sent as Unix seconds" */
+      it("decides to send createdAt as whole Unix seconds", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(1_792_664_000_123);
+
+        const calls = fireSignup({ ...SIGNUP, signUpData: {} });
+
+        expect(calls[0]).toMatchObject({ traits: { createdAt: 1_792_664_000 } });
+      });
+    });
+  });
+
   describe("given a person completing onboarding with their role and company size", () => {
     describe("when the onboarding flow completes", () => {
       /** @scenario "New signup identifies user with traits in Customer.io" */

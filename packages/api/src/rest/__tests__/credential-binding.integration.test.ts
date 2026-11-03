@@ -182,6 +182,7 @@ describe("permission targets in declared headers", () => {
       .withAddressing("literal", { v1Twin: false })
       .withCredential("browser")
       .post("/api/header-permission", "authorizeHeader")
+      .keepsRecords()
       .withInput(z.object({ projectId: z.string() }))
       .withHeaders(z.object({ "x-project-id": z.string().trim().min(1) }))
       .withPermission("playground:view", {

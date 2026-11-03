@@ -128,6 +128,8 @@ import {
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import { LangyConversationEventLogService } from "../features/conversation/services/langy-conversation-event-log.service.ts";
 import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
+import { LangyConfirmationAnswersService } from "../features/delete-confirmation/services/langy-confirmation-answers.service.ts";
+import { LangyDeleteConfirmationService } from "../features/delete-confirmation/services/langy-delete-confirmation.service.ts";
 import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
 import {
   LANGY_GITHUB_PRS_PER_DAY,
@@ -190,6 +192,8 @@ const relayLogger = createLogger("langwatch:langy:relay");
 type LangyAppDependencies = {
   langy: LangyService;
   internalDoor: RestIdentity;
+  /** The gate every Langy key's delete passes: a click on its card, or a refusal. */
+  deleteConfirmations: LangyDeleteConfirmationService;
   /** The rows the module keeps outside its event log, chosen at boot. */
   repositories: LangyRepositories;
   /**
@@ -306,6 +310,7 @@ export class LangyModule implements LangyApiContract {
       apiKeys: setup.dependencies.apiKeys,
       authz: setup.dependencies.authz,
       metrics: LangySessionKeyMetricsOtelService.create(),
+      bindings: setup.repositories.deleteConfirmations,
     });
     const built = LangyModule.#composeInfrastructure({
       setup,
@@ -332,6 +337,9 @@ export class LangyModule implements LangyApiContract {
       projects: setup.dependencies.projects,
     });
     const buffer = setup.repositories.tokenBuffer.open();
+    const confirmationAnswers = LangyConfirmationAnswersService.create({
+      confirmations: setup.repositories.deleteConfirmations,
+    });
     const runtime = LangyLocalControlRuntimeService.create({
       calls: setup.repositories.localCalls,
       userWaits: setup.repositories.localUserWaits,
@@ -342,6 +350,14 @@ export class LangyModule implements LangyApiContract {
       mintSessionKey: (input) => sessionKeys.mintForUser(input),
       events: commands,
       buffer,
+      onAnswered: (wait) => confirmationAnswers.recordAnswer(wait),
+    });
+    const deleteConfirmations = LangyDeleteConfirmationService.create({
+      confirmations: setup.repositories.deleteConfirmations,
+      answers: confirmationAnswers,
+      waits: runtime.waits,
+      localKeys: setup.repositories.localControlRequests,
+      conversations: langy,
     });
     const core = LocalControlSessionCoreService.create({
       apiKeys: setup.dependencies.apiKeys,
@@ -449,6 +465,7 @@ export class LangyModule implements LangyApiContract {
       langy,
       uiActionDoor,
       internalDoor: door,
+      deleteConfirmations,
       repositories: setup.repositories,
       presence: setup.dependencies.presence,
       turnBounds,
@@ -482,6 +499,7 @@ export class LangyModule implements LangyApiContract {
       panelConversations: LangyPanelConversationService.create({
         access,
         langy,
+        confirmations: deleteConfirmations,
         turnBounds,
         rateLimits: setup.repositories.rateLimits,
         presence: setup.dependencies.presence,
@@ -660,6 +678,11 @@ export class LangyModule implements LangyApiContract {
     return buildLangyMaintenancePipeline({
       virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
     });
+  }
+
+  /** The confirmation gate the process's REST host asks before a Langy key's delete runs. */
+  get deleteConfirmations(): LangyDeleteConfirmationService {
+    return this.dependencies.deleteConfirmations;
   }
 
   get internalDoor(): RestIdentity {

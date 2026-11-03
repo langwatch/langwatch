@@ -6,6 +6,18 @@ import { createClient } from "@clickhouse/client";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { customAlphabet } from "nanoid";
 
+export {
+  type ExplainQuery,
+  partsAfterPartitionPruning,
+  partsInExplain,
+} from "./partitionPruning.ts";
+export {
+  idIndexedClientDouble,
+  readyIdIndexedClientDouble,
+  type ScriptedStatements,
+} from "./idIndexedClientDouble.ts";
+export { type VendorStatements, vendorQueryClient } from "./vendorQueryClient.ts";
+
 /**
  * The ClickHouse image every container-backed test starts, here and in
  * globalSetup.ts. One symbol rather than one string per call site, so a version

@@ -810,10 +810,13 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
 
         const attempt = async (name: string) => {
           try {
+            // Both read created.version; without it, a save that starts after the
+            // other commits reads the new version and is rightly accepted too.
             await experiments.saveWorkbenchState({
               projectId,
               id: created.experimentId,
               state: state(name),
+              expectedVersion: created.version,
               actor: { label: "user" },
             });
             return { name, code: "no_error" };
@@ -853,6 +856,7 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
               projectId,
               id: created.experimentId,
               state: state(name),
+              expectedVersion: created.version,
               actor: { label: "user" },
             });
             return { code: "no_error", meta: {} as Record<string, unknown> };

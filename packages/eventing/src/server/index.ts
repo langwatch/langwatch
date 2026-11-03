@@ -52,6 +52,14 @@ export type {
 } from "./clickhouse-client-resolver.ts";
 export type { EventingProcessPersistenceDatabase } from "./process-persistence.database.ts";
 export {
+  EVENT_LOG_ID_INDEX,
+  type EventLogIdIndex,
+  type EventLogIndexReadiness,
+  type EventLogOccurredRange,
+  eventLogOccurredRange,
+  eventLogIdIndexReadiness,
+} from "./tables/event-log-id-index.ts";
+export {
   createEventingRetentionConfiguration,
   type EventingRetentionConfiguration,
   EventingServerRuntime,

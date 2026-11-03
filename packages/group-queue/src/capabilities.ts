@@ -1,11 +1,14 @@
+import { sendPreparedInOrder } from "./boundedStaging.ts";
 import type {
   GroupQueueDefinition,
   GroupQueueDependencies,
+  GroupQueueGroupBatching,
   GroupQueueHandlerContext,
   GroupQueueRuntimeDefinition,
   JobDelivery,
   ListedRun,
   QueueSendOptions,
+  QueueSendResult,
 } from "./contracts.ts";
 import { GroupQueueProcessor } from "./groupQueue.ts";
 
@@ -33,6 +36,9 @@ function validateDependencies<Payload extends Record<string, unknown>, Destinati
     confirmedDeathThreshold: dependencies.policy?.confirmedDeathThreshold,
     quarantineFailureThreshold: dependencies.policy?.quarantineFailureThreshold,
     bisectionSplitBudget: dependencies.policy?.bisectionSplitBudget,
+    settleWindowMs: dependencies.policy?.settleWindowMs,
+    groupBatchMaxGroups: dependencies.policy?.groupBatchMaxGroups,
+    groupBatchMaxBytes: dependencies.policy?.groupBatchMaxBytes,
   })) {
     if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
       throw new Error(`Group Queue ${name} must be a non-negative integer`);
@@ -44,17 +50,23 @@ function runtimeDefinition<Payload extends Record<string, unknown>, Destination>
   definition,
   process,
   processBatch,
+  processGroups,
+  groupBatchRoutes,
   dependencies,
 }: {
   definition: GroupQueueDefinition<Payload>;
   process: GroupQueueRuntimeDefinition<Payload>["process"];
   processBatch?: GroupQueueRuntimeDefinition<Payload>["processBatch"];
+  processGroups?: GroupQueueRuntimeDefinition<Payload>["processGroups"];
+  groupBatchRoutes?: GroupQueueRuntimeDefinition<Payload>["groupBatchRoutes"];
   dependencies: GroupQueueDependencies<Payload, Destination>;
 }): GroupQueueRuntimeDefinition<Payload> {
   return {
     name: definition.transportName,
     process,
     processBatch,
+    processGroups,
+    groupBatchRoutes,
     groupKey: (payload) => assertRuleResult("groupBy", definition.groupBy(payload)),
     identify: (payload) => assertRuleResult("identify", definition.identify(payload)),
     score: definition.score,
@@ -122,6 +134,18 @@ export class GroupQueueProducer<Payload extends Record<string, unknown>, Destina
     await this.#processor.sendBatch(decoded, options);
   }
 
+  /** Stages each payload as `send` would, in bounded batches; one answer per payload, in order. */
+  sendEach(
+    payloads: readonly Payload[],
+    options?: QueueSendOptions<Payload>,
+  ): Promise<QueueSendResult[]> {
+    return sendPreparedInOrder({
+      inputs: payloads,
+      prepare: (payload) => this.definition.payload.parse(payload),
+      send: (decoded) => this.#processor.sendEach(decoded, options),
+    });
+  }
+
   waitUntilReady(): Promise<void> {
     return this.#processor.waitUntilReady();
   }
@@ -172,6 +196,8 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>, Destina
   handleBatch(options: {
     each: (payload: Payload, context: GroupQueueHandlerContext) => Promise<void>;
     batch: (payloads: Payload[], context: GroupQueueHandlerContext) => Promise<void>;
+    /** Ready groups of one handler and tenant in one call (ARCHITECTURE §9). */
+    groups?: GroupQueueGroupBatching<Payload>;
   }): RunningGroupQueueConsumer<Payload, Destination> {
     if (!this.definition.coalescing) {
       throw new Error(
@@ -184,6 +210,7 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>, Destina
   private start(handlers: {
     each: (payload: Payload, context: GroupQueueHandlerContext) => Promise<void>;
     batch?: (payloads: Payload[], context: GroupQueueHandlerContext) => Promise<void>;
+    groups?: GroupQueueGroupBatching<Payload>;
   }): RunningGroupQueueConsumer<Payload, Destination> {
     const abort = new AbortController();
     const context = (delivery?: JobDelivery): GroupQueueHandlerContext => ({
@@ -207,6 +234,17 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>, Destina
               await handlers.batch!(decoded, context(delivery));
             }
           : undefined,
+        processGroups: handlers.groups
+          ? async (entries) => {
+              await handlers.groups!.run(
+                entries.map((entry) => ({
+                  payloads: entry.payloads.map((payload) => this.definition.payload.parse(payload)),
+                  context: context(entry.delivery),
+                })),
+              );
+            }
+          : undefined,
+        groupBatchRoutes: handlers.groups?.routes,
       }),
       this.#dependencies.redis,
       processorOptions(this.#dependencies, true),

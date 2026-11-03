@@ -1,6 +1,44 @@
-import type { Event } from "../domain/types.ts";
+import { z } from "zod";
+
+import { EventSchema, type Event } from "../domain/types.ts";
 import type { DeduplicationConfig } from "../queues/queue.types.ts";
 import type { ExecutionTarget } from "../runtime.types.ts";
+
+/**
+ * A compact projection-subscriber job (ADR-069): the event's scheduling identity and the
+ * subscriber's own body, never the event's data or the fold state.
+ */
+export const compactSubscriberJobSchema = z.object({
+  event: EventSchema.pick({
+    id: true,
+    aggregateId: true,
+    aggregateType: true,
+    tenantId: true,
+    createdAt: true,
+    occurredAt: true,
+    type: true,
+  }),
+  job: z.unknown(),
+});
+
+export type CompactSubscriberJob = z.infer<typeof compactSubscriberJobSchema>;
+
+/** What a compact job's handler is told: whose job it is, never the event's content. */
+export interface CompactSubscriberJobContext {
+  tenantId: string;
+  aggregateId: string;
+}
+
+/**
+ * A projection subscriber's compact job: `stage` derives the body, `handle` parses and runs it.
+ * `stageOnSend` false queues the full delivery, which `stage` turns into the body when it runs,
+ * so workers that read compact bodies ship before any worker queues one.
+ */
+export interface CompactSubscriberJobDispatch<E extends Event = Event, FoldState = unknown> {
+  stageOnSend: boolean;
+  stage: (event: E, context: SubscriberDispatchContext<FoldState>) => unknown;
+  handle: (job: unknown, context: CompactSubscriberJobContext) => Promise<void>;
+}
 
 /**
  * INTERNAL dispatch-plane context for a subscriber's handle function.
@@ -57,6 +95,8 @@ export interface SubscriberDispatchDefinition<E extends Event = Event, FoldState
   shouldDispatch?(event: E, context: SubscriberDispatchContext<FoldState>): boolean;
   /** Side-effect handler called after fold succeeds */
   handle: (event: E, context: SubscriberDispatchContext<FoldState>) => Promise<void>;
+  /** Present when the subscriber's job has a compact body; `handle` stages a full delivery. */
+  compactJob?: CompactSubscriberJobDispatch<E, FoldState>;
   /** Optional configuration */
   options?: SubscriberDispatchOptions;
 }

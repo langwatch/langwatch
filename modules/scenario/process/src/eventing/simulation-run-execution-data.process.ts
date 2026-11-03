@@ -148,6 +148,8 @@ export const executeRunIntentSchema = z.object({
   startedByUserId: z.string().optional(),
   /** The API key that member started it with, which also bounds the run's key. */
   startedByApiKeyId: z.string().optional(),
+  /** Skip the agent's teardown so the run's test data stays (ADR-180). */
+  keepData: z.boolean().optional(),
 });
 export type ExecuteRunIntent = z.infer<typeof executeRunIntentSchema>;
 
@@ -162,6 +164,12 @@ export const finishRunIntentSchema = z.object({
   projectId: z.string(),
   status: z.string(),
   error: z.string().optional(),
+  /**
+   * When the outcome became true, in business time (stall deadline, cancel grace deadline, or
+   * the event that made the run unexecutable), so a run caught up long after it died is not
+   * finished "today". Optional so intents already in the outbox parse; those finish now.
+   */
+  outcomeAtMs: z.number().optional(),
 });
 export type FinishRunIntent = z.infer<typeof finishRunIntentSchema>;
 
@@ -235,6 +243,8 @@ export const simulationRunProcessEventViewSchema = z.object({
   startedByUserId: z.string().nullable().default(null),
   /** The API key the starter used, from the same namespace; null for a session or nobody. */
   startedByApiKeyId: z.string().nullable().default(null),
+  /** "Rerun and keep data", from the same namespace; defaulted so older inbox rows still parse. */
+  keepData: z.boolean().default(false),
 });
 export type SimulationRunProcessEventView = z.infer<typeof simulationRunProcessEventViewSchema>;
 

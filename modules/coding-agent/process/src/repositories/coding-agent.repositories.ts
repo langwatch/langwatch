@@ -14,7 +14,7 @@ export interface CodingAgentProjectionRepositories {
   readonly sessionEvents: CodingAgentSessionEventRepository;
 }
 
-/** The projections plus the fold's own scratch: its context memo and its cache. */
+/** The projections plus the fold's own scratch (its context memo and cache) and the index fill. */
 export interface CodingAgentRepositories extends CodingAgentProjectionRepositories {
   readonly sessionContextMemo: CodingAgentSessionContextMemoRepository;
   readonly sessionFoldCache: CodingAgentSessionFoldCacheRepository;

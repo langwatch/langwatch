@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 
 import { upgradeStateLine, versionLine } from "../../model/upgrade-labels.ts";
 import type { UpgradeStatusView, UpgradeStepView } from "../../model/upgrade-view.ts";
+import { UpgradeNotice } from "../elements/upgrade-notice.tsx";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 import { UpgradePendingSteps } from "./upgrade-pending-steps.tsx";
 
@@ -143,17 +144,22 @@ export function UpgradesOverview({
   sharedInstall = true,
   onOpenOrganizations,
 }: UpgradesOverviewProps) {
+  const notices = status.notices.map((notice) => <UpgradeNotice key={notice.id} notice={notice} />);
   if (status.reason === "no-upgrade-recorded" && !hasRuns) {
     return (
-      <NoDataInfoBlock
-        title="No release upgrade recorded"
-        description="This installation has not recorded an upgrade yet. The worker records it when it runs the first upgrade."
-        icon={<DatabaseZap />}
-      />
+      <Stack gap={6}>
+        {notices}
+        <NoDataInfoBlock
+          title="No release upgrade recorded"
+          description="This installation has not recorded an upgrade yet. The worker records it when it runs the first upgrade."
+          icon={<DatabaseZap />}
+        />
+      </Stack>
     );
   }
   return (
     <Stack gap={6}>
+      {notices}
       <Stack gap={3}>
         <Heading size="md" data-testid="upgrade-version">
           {versionLine(status.version)}

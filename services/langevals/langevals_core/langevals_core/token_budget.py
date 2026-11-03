@@ -12,6 +12,7 @@ from typing import Optional
 import litellm
 
 from langevals_core.base_evaluator import (
+    DEFAULT_MAX_TOKENS,
     MAX_TOKENS_HARD_LIMIT,
     EvaluationResultSkipped,
 )
@@ -43,10 +44,10 @@ def count_tokens(model: str, text: str) -> int:
     return len(litellm.encode(model=model, text=text))  # type: ignore
 
 
-def judge_token_budget(model: str, max_tokens: int) -> int:
-    """The evaluator's max tokens setting, capped by the hard limit and by the
-    model's own input window less room for the answer."""
-    budget = min(max_tokens, MAX_TOKENS_HARD_LIMIT)
+def judge_token_budget(model: str, max_tokens: Optional[int]) -> int:
+    """The evaluator's max tokens setting (DEFAULT_MAX_TOKENS when unset), capped
+    by the hard limit and by the model's own input window less room for the answer."""
+    budget = min(max_tokens or DEFAULT_MAX_TOKENS, MAX_TOKENS_HARD_LIMIT)
     try:
         window = litellm.get_model_info(model).get("max_input_tokens")
     except Exception:
@@ -148,7 +149,7 @@ def fit_contexts(model: str, contexts: list[str], budget: int) -> tuple[list[str
 def fit_judge_content(
     *,
     model: str,
-    max_tokens: int,
+    max_tokens: Optional[int],
     reserved_texts: list[str],
     input: Optional[str] = None,
     output: Optional[str] = None,

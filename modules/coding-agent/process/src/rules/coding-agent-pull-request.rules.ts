@@ -45,3 +45,11 @@ export function pullRequestIdentity(pullRequest: GithubPullRequest): {
     prMergedAtMs: pullRequest.prMergedAt?.getTime() ?? null,
   };
 }
+
+/**
+ * A cost made only of usage no price list covers is unknown, never a confident zero. No usage
+ * at all says nothing about the price, so the recorded cost stands.
+ */
+export function isCostUnknown(usage: readonly { priced: boolean }[]): boolean {
+  return usage.length > 0 && usage.every((each) => !each.priced);
+}

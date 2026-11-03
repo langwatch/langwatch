@@ -8,7 +8,11 @@ const paths = {
 
 describe("predep configuration controls", () => {
   it("injects the legacy bundled-Postgres decision before system detection", async () => {
-    const predep = makePostgresPredep({ aiGatewayDevBuild: false, forceBundledPostgres: true });
+    const predep = makePostgresPredep({
+      aiGatewayDevBuild: false,
+      forceBundledPostgres: true,
+      appArchive: undefined,
+    });
 
     await expect(predep.detect(paths)).resolves.toMatchObject({
       installed: false,

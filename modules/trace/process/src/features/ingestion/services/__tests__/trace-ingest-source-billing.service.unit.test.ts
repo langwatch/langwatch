@@ -100,7 +100,11 @@ describe("TraceIngestSourceBillingService", () => {
       expect(markerOf(policies.traces.resourceAttributes)).toEqual({ stringValue: "true" });
       expect(markerOf(policies.logs.resourceAttributes)).toEqual({ stringValue: "true" });
       expect(markerOf(policies.metrics.resourceAttributes)).toBeUndefined();
-      expect(policies.traces.allowedTraceScopeNames).toEqual(["github.copilot", "@github/copilot"]);
+      expect(policies.traces.allowedTraceScopeNames).toEqual([
+        "github.copilot",
+        "@github/copilot",
+        "copilot-chat",
+      ]);
     });
   });
 

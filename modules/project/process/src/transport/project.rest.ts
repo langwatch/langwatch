@@ -137,6 +137,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   })
 
   .patch("/:id", "updateProject")
+  .keepsRecords()
   .withParams(projectRestParamsSchema)
   .withInput(projectRestUpdateSchema)
   .withPermission("project:update", { at: "route", param: "projectId", field: "id" })
@@ -180,6 +181,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   })
   .withMiddlewareContext(projectRestCaller)
   .withAudit("management.project.archive-by-id")
+  .withoutConfirmation("Langy keys cannot hold project:delete")
   .handle(async ({ app, input, scope }, caller) => {
     await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
     const project = await archiveProject({ app, id: input.id, organizationId: scope.id });
@@ -209,6 +211,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .handle(async () => refuseBaseKeyToApiToken())
 
   .post("/:id/regenerate-api-key", "regenerateProjectApiKey")
+  .keepsRecords()
   .withoutAudit("always refused, writes nothing")
   .withParams(projectRestParamsSchema)
   .withInput(projectRestRegenerateApiKeyInputSchema)

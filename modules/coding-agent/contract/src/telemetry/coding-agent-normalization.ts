@@ -2,6 +2,7 @@
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
 
+import { splitLeadingContextBlocks } from "../leading-context.ts";
 import type {
   CodingAgent,
   CodingAgentEvent,
@@ -9,6 +10,7 @@ import type {
   CodingAgentSignal,
   TokenType,
 } from "./coding-agent-definition.ts";
+import { pickString } from "./coding-agent-span.ts";
 import { CODING_AGENT_REGISTRY } from "./index.ts";
 
 /** Detect agent from record name (reliable signal), not scope (varies by vendor). */
@@ -270,8 +272,12 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "gen_ai.usage.cache_read.input_tokens",
   "gen_ai.usage.cache_creation.input_tokens",
   "codex.turn.token_usage.non_cached_input_tokens",
+  // The GenAI tool span's own name for the tool it ran (Copilot's execute_tool).
+  "gen_ai.tool.name",
   // Codex's tool_result events spell the MCP server as a bare `mcp_server`.
   "mcp_server",
+  // Grok names the server on its tool_result as `mcp_server_name`.
+  "mcp_server_name",
   "mcp_server.name",
   "mcp_tool.name",
   "plugin.name",
@@ -320,6 +326,13 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "ttft_ms",
   "type",
   "request_id",
+
+  // pi names every attribute under its own prefix and this lookup is exact, so
+  // an unlisted pi key is dropped on arrival (ADR-188). The fold reads pi's
+  // model, usage and tool facts through the `gen_ai.*` mirrors above, and the
+  // session key off the raw span, so pi's reported cost is the only pi key
+  // read here. Add one when a reader needs it.
+  "pi.ai.usage.cost",
 ];
 
 /**
@@ -349,16 +362,27 @@ export const SESSION_NAME_FACT_KEY = "langwatch.session.name";
  */
 export const WITHHELD_PROMPT_TEXT = "[REDACTED]";
 
+/** The GenAI semconv operation of a tool run span. */
+const GEN_AI_TOOL_RUN_OPERATION = "execute_tool";
+
 /** The most of a prompt that becomes a session's name. */
 const MAX_PROMPT_TITLE_CHARS = 120;
 
+/** Grok wraps every top-level prompt whole in this tag; the human's words are inside it. */
+const USER_QUERY_WRAPPER = /^\s*<user_query>([\s\S]*)<\/user_query>\s*$/;
+
+/** The human's words out of a Grok-wrapped prompt; any other text comes back unchanged. */
+export function unwrapUserQuery(text: string): string {
+  return USER_QUERY_WRAPPER.exec(text)?.[1]?.trim() ?? text;
+}
+
 /**
- * A session name out of a prompt's text, or null when it can't name one: withheld text, an
- * empty string, or a machine-injected turn (agents wrap notifications as user turns, and a
- * session named `<task-notification>` names nothing). Otherwise the first line, capped.
+ * A session name out of a prompt's first line, or null for withheld text, nothing, or a
+ * machine-injected turn (`<task-notification>` names nothing). Complete context blocks put
+ * before the human's words (Copilot's `<current_datetime>`) are peeled first.
  */
 export function deriveSessionTitleFromPrompt(text: string): string | null {
-  const trimmed = text.trim();
+  const trimmed = splitLeadingContextBlocks(unwrapUserQuery(text)).body.trim();
   if (trimmed === "" || trimmed === WITHHELD_PROMPT_TEXT) return null;
   if (trimmed.startsWith("<")) return null;
   const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? "";
@@ -481,6 +505,11 @@ export function deriveToolName({
 
   const name = spanName ?? "";
   if (name.length === 0) return null;
+  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute.
+  if (name.split(" ", 1)[0] === GEN_AI_TOOL_RUN_OPERATION) {
+    const declared = pickFirstString(attrs, ["gen_ai.tool.name"]);
+    if (declared !== null) return declared;
+  }
   for (const agent of CODING_AGENT_REGISTRY) {
     const tool = agent.extractToolNameFromSpanName?.(name) ?? null;
     if (tool !== null) return tool;
@@ -510,10 +539,35 @@ export function parseMcpToolName(
   return { server, tool };
 }
 
+/** What a tool run was: a call to an MCP server, or one of the agent's own tools. */
+export type ToolCallOrigin =
+  | { kind: "mcp"; server: string; tool: string | null }
+  | { kind: "builtin" };
+
+/**
+ * The server an agent named wins over the one inside an `mcp__<server>__<tool>` name.
+ * Grok names the server apart and the tool `<server>__<tool>`, so the prefix comes off.
+ */
+export function classifyToolCall({
+  toolName,
+  server,
+}: {
+  toolName: string | null;
+  server: string | null;
+}): ToolCallOrigin {
+  const named = parseMcpToolName(toolName);
+  if (named !== null) return { kind: "mcp", server: server ?? named.server, tool: named.tool };
+  if (server === null) return { kind: "builtin" };
+  const prefix = `${server}__`;
+  const tool = toolName?.startsWith(prefix) ? toolName.slice(prefix.length) : toolName;
+  return { kind: "mcp", server, tool: tool !== null && tool.length > 0 ? tool : null };
+}
+
+/** Flat keys at ingest; nested by their dots once the trace read hands a span over. */
 function pickFirstString(attrs: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
-    const value = attrs[key];
-    if (typeof value === "string" && value.length > 0) return value;
+    const value = pickString(attrs, key);
+    if (value !== null) return value;
   }
   return null;
 }

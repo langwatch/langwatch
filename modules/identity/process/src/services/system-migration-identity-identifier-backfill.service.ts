@@ -61,9 +61,14 @@ export class IdentityIdentifierBackfillMigrationService implements SystemMigrati
       return { status: "finalized", report: { kind: "already_proven" } };
     }
     const outcome = await this.backfill.migrateUser({ userId: tenantId });
-    if (outcome.status !== "finalized") return outcome;
+    if (outcome.status === "migrated") {
+      // Unproven: only the person confirming the address moves it (Alex, 2026-10-06, "Adopt gap").
+      return outcome.report.kind === "unproven_account"
+        ? { ...outcome, heldReason: "person" }
+        : outcome;
+    }
     if (await this.latch.recordProven({ userId: tenantId, at: nowInstant() })) return outcome;
-    // An operator pinned the user off while this pass ran; the pin wins and the user stays held.
-    return { status: "migrated", report: { kind: "sign_in_switch_pinned" } };
+    // An operator pinned the user off while this pass ran; the pin wins until an operator lifts it.
+    return { status: "migrated", report: { kind: "sign_in_switch_pinned" }, heldReason: "person" };
   }
 }

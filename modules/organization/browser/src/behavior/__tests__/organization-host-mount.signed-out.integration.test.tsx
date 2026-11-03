@@ -12,7 +12,8 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,7 +30,11 @@ vi.mock("../organization-api.ts", () => ({
   },
 }));
 
+import { useOrganizationHost } from "../../model/organization-host.ts";
 import OrganizationHostMount from "../organization-host-mount.tsx";
+
+/** How many times the host asked the session host service to end the session. */
+let signOutsAsked = 0;
 
 class TestSession extends UiSession {
   constructor(private readonly actor: UiActor | null) {
@@ -47,6 +52,11 @@ class TestSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
+
+  override signOut(): Promise<void> {
+    signOutsAsked += 1;
+    return Promise.resolve();
+  }
 }
 
 class SignedOutScope extends UiScope {
@@ -55,7 +65,17 @@ class SignedOutScope extends UiScope {
   }
 }
 
-function renderOnSignIn(actor: UiActor | null) {
+/** A settings screen's own sign-out control, which asks its host rather than the address bar. */
+function SignOutControl() {
+  const host = useOrganizationHost();
+  return (
+    <button type="button" onClick={() => host.signOut()}>
+      Sign out
+    </button>
+  );
+}
+
+function renderOnSignIn(actor: UiActor | null, children?: ReactNode) {
   const services = {
     ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
@@ -67,7 +87,7 @@ function renderOnSignIn(actor: UiActor | null) {
     <MemoryRouter initialEntries={["/auth/signin"]}>
       <QueryClientProvider client={new QueryClient()}>
         <UiHostServicesContextProvider value={services}>
-          <OrganizationHostMount />
+          <OrganizationHostMount>{children}</OrganizationHostMount>
         </UiHostServicesContextProvider>
       </QueryClientProvider>
     </MemoryRouter>,
@@ -79,6 +99,7 @@ const asked = () => scopeGraph.mock.calls.some(([, options]) => options?.enabled
 afterEach(() => {
   cleanup();
   scopeGraph.mockClear();
+  signOutsAsked = 0;
 });
 
 describe("given the organization host mounted above the sign-in page", () => {
@@ -97,6 +118,20 @@ describe("given the organization host mounted above the sign-in page", () => {
       renderOnSignIn({ id: "user-1", name: "Reader", email: "reader@example.com", image: null });
 
       expect(asked()).toBe(true);
+    });
+  });
+
+  describe("when a screen below it uses its own sign-out control", () => {
+    /** @scenario "A screen's sign-out control ends the session through the one owner of sign-out" */
+    it("asks the session host service to sign out, rather than navigating by hand", () => {
+      renderOnSignIn(
+        { id: "user-1", name: "Reader", email: "reader@example.com", image: null },
+        <SignOutControl />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+      expect(signOutsAsked).toBe(1);
     });
   });
 });

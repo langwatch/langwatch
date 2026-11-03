@@ -37,6 +37,27 @@ afterEach(async () => {
 });
 
 describe("connectAgent()", () => {
+  describe("when the agent declares scenario hooks", () => {
+    it("types the hook params from the definition map", () => {
+      const agent = connectAgent(
+        {
+          name: "typed-hooks",
+          enabled: false,
+          parameters: { loyaltyTier: { options: ["none", "gold"], default: "none" } },
+        },
+        async () => "ok",
+      );
+      agent.scenario.setup(async (_run, params) => {
+        expectTypeOf(params.loyaltyTier).toEqualTypeOf<"none" | "gold">();
+        return {};
+      });
+      agent.scenario.teardown(async (_run, state, params) => {
+        expectTypeOf(state).toEqualTypeOf<Record<string, unknown> | null>();
+        expectTypeOf(params.loyaltyTier).toEqualTypeOf<"none" | "gold">();
+      });
+    });
+  });
+
   describe("when parameters are a definition map", () => {
     /** @scenario "The handler params are typed from the definition map" */
     it("types params from options, type and default", () => {

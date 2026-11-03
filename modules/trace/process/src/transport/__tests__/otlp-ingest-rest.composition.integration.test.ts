@@ -1,4 +1,5 @@
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import { ClientAddress } from "@langwatch/api/policy";
 /**
  * @vitest-environment node
  * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
@@ -25,6 +26,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
@@ -142,24 +144,22 @@ function apiKeyDirectory(
  */
 function deployment(
   access: OtlpAccess = {},
-  handoff: { fails?: boolean; failingSpanIds?: Set<string> } = {},
+  handoff: { fails?: boolean; failingSpanIds?: Set<string>; lostReplySpanIds?: Set<string> } = {},
 ) {
   const recordedSpans: RecordSpanCommandData[] = [];
   const markedUsed: string[] = [];
   const peers = unreachablePeers();
 
-  const commands: TraceProcessingCommands = {
+  const commands: TraceProcessingCommands = fakeTraceProcessingCommands({
     recordSpan: async (data) => {
       if (handoff.fails || handoff.failingSpanIds?.has(data.span.spanId)) {
         throw new Error("queue unavailable");
       }
       recordedSpans.push(data);
+      // Staged, but the answer never came back: the queue's outcome is unknown.
+      if (handoff.lostReplySpanIds?.has(data.span.spanId)) throw new Error("reply lost");
     },
-    changeTraceName: async () => undefined,
-    addAnnotation: async () => undefined,
-    removeAnnotation: async () => undefined,
-    assignTopic: async () => undefined,
-  };
+  });
 
   const canonicalisation = TraceCanonicalisationService.create();
   const app = TraceModule.fromDependencies(
@@ -247,7 +247,17 @@ function deployment(
       for (const [name, value] of Object.entries({ "X-Auth-Token": TOKEN, ...headers })) {
         if (value !== null) sent[name] = value;
       }
-      return family.request(path, { method: "POST", headers: sent, body: JSON.stringify(body) });
+      const request = new Request(`http://localhost${path}`, {
+        method: "POST",
+        headers: sent,
+        body: JSON.stringify(body),
+      });
+      // As the process's mux does, behind a declared ingress at 10.0.0.1.
+      ClientAddress.fromTrustedProxies({ addresses: ["10.0.0.0/8"] }).handle({
+        request,
+        socketAddress: "10.0.0.1",
+      });
+      return family.request(request);
     }
 
     // Nothing mounted: the same 404 an exporter met while this family was
@@ -393,6 +403,33 @@ describe("given the trace module as a process composes it", () => {
     });
   });
 
+  describe("given a batch where the queue staged one span but its answer was lost", () => {
+    const lostSpanId = "a1b2c3d4e5f60711";
+
+    describe("when the exporter resends it", () => {
+      /** @scenario A span whose staging answer was lost is sent again under the same identity */
+      it("answers the first export as retryable and hands the resent span off again", async () => {
+        const lostReplySpanIds = new Set([lostSpanId]);
+        const { post, recordedSpans } = deployment({}, { lostReplySpanIds });
+
+        const first = await post("/api/otel/v1/traces", otlpTraceBody(3));
+        lostReplySpanIds.clear();
+        const resend = await post("/api/otel/v1/traces", otlpTraceBody(3));
+
+        expect([first.status, resend.status]).toEqual([503, 200]);
+        const handedOff = recordedSpans.map(({ tenantId, span }) => ({
+          tenantId,
+          traceId: span.traceId,
+          spanId: span.spanId,
+        }));
+        const lost = handedOff.filter(({ spanId }) => spanId === lostSpanId);
+        expect(lost).toHaveLength(2);
+        expect(lost[1]).toEqual(lost[0]);
+        expect(handedOff.filter(({ spanId }) => spanId !== lostSpanId)).toHaveLength(2);
+      });
+    });
+  });
+
   describe("when the export carries no credential at all", () => {
     /** @scenario "The OTLP receiver refuses an unauthenticated exporter" */
     it("refuses with 401 and records nothing", async () => {
@@ -429,6 +466,7 @@ describe("given the trace module as a process composes it", () => {
       doorLog.lines.filter((line) => line.msg?.startsWith("Authentication failed"));
 
     /** @scenario A request with no credential header is logged with its fingerprint */
+    /** @scenario "Authentication diagnostics record the resolved address" */
     it("carries the request's fingerprint and says no empty token was sent", async () => {
       const { post } = deployment();
       doorLog.lines.length = 0;
@@ -448,7 +486,7 @@ describe("given the trace module as a process composes it", () => {
         method: "POST",
         userAgent: "otel-exporter/1.2",
         traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
-        forwardedFor: "203.0.113.9",
+        clientAddress: "203.0.113.9",
         hasEmptyAuthToken: false,
       });
     });

@@ -86,6 +86,7 @@ import { EvaluationModelCascadeService } from "../features/execution/services/ev
 import { EvaluationSettingsRecoverySwitchService } from "../features/execution/services/evaluation-settings-recovery-switch.service.ts";
 import { EvaluationSpanDigestService } from "../features/execution/services/evaluation-span-digest.service.ts";
 import { EvaluationMonitorLookupService } from "../features/monitors/services/evaluation-monitor-lookup.service.ts";
+import { MonitorErrorRateService } from "../features/monitors/services/monitor-error-rate.service.ts";
 import { MonitorTrendService } from "../features/monitors/services/monitor-trend.service.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
@@ -413,6 +414,8 @@ export class EvaluationModule implements EvaluationApiContract {
     });
     const execution = EvaluationExecutionService.create({
       traces: dependencies.traces,
+      runs: repositories.runs,
+      authz: dependencies.authz,
       spanDigest: EvaluationSpanDigestService.create(dependencies.traces),
       modelEnvResolver: EvaluatorModelEnvService.create({
         modelProviders: dependencies.modelProviders,
@@ -432,6 +435,7 @@ export class EvaluationModule implements EvaluationApiContract {
       evaluators: dependencies.evaluators,
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
       judges: dependencies.judges,
+      decisionModels: dependencies.modelProviders,
       installEnvironment: environment.read(),
       telemetry,
     });
@@ -504,6 +508,12 @@ export class EvaluationModule implements EvaluationApiContract {
         executionReceipt: EvaluationExecutionReceiptService.create({
           execution,
           costs,
+        }),
+        retryWindowMs: config.evaluatorRetryWindowMinutes * 60_000,
+        retries: commands,
+        monitorErrorRates: MonitorErrorRateService.create({
+          counts: repositories.monitorErrorRates,
+          lifecycle,
         }),
       }),
       eventing: EvaluationProcessingStoresAdapter.create({

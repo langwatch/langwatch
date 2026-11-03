@@ -6,10 +6,12 @@ import { z } from "zod";
 
 import { licenseCustomerSchema, licenseTermsInputSchema } from "./issued-license.ts";
 
-/** Absent keeps every row: the console asks for active, non-internal rows by default. */
+/** Absent keeps every row: the console asks for active customer licenses by default. */
 const issuedLicenseFiltersSchemaDefinition = z.object({
-  onlyActive: z.boolean().optional(),
-  hideInternal: z.boolean().optional(),
+  /** Active, or the rest: revoked, superseded or expired. */
+  status: z.enum(["active", "inactive"]).optional(),
+  /** Customers', or internal: issued to our own domains or a name reserved for testing. */
+  audience: z.enum(["customer", "internal"]).optional(),
 });
 export type IssuedLicenseFilters = z.infer<typeof issuedLicenseFiltersSchemaDefinition>;
 

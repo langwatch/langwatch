@@ -5,6 +5,7 @@ import {
   simulationRunCancelRequestedEventDataSchema,
   simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
+  simulationRunHooksRecordedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
@@ -109,6 +110,22 @@ const RecordCutAtLimitCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-cut-at-limit`,
 });
 
+const RecordHooksCommand = defineCommand({
+  commandType: "lw.simulation_run.record_hooks",
+  eventType: "lw.simulation_run.hooks_recorded",
+  eventVersion: "2026-10-16",
+  aggregateType: "simulation_run",
+  schema: simulationRunHooksRecordedEventDataSchema,
+  aggregateId: (d) => d.scenarioRunId,
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:recordHooks`,
+  spanAttributes: (d) => ({
+    "payload.scenarioRun.id": d.scenarioRunId,
+    "payload.hooks.setup.status": d.hooks.setup?.status ?? "none",
+    "payload.hooks.teardown.status": d.hooks.teardown?.status ?? "none",
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-hooks`,
+});
+
 const CancelRunCommand = defineCommand({
   commandType: "lw.simulation_run.cancel",
   eventType: "lw.simulation_run.cancel_requested",
@@ -170,6 +187,7 @@ export class SimulationProcessingCommandsAdapter {
   readonly deleteRun = DeleteRunCommand;
   readonly recordAgentInstance = RecordAgentInstanceCommand;
   readonly recordCutAtLimit = RecordCutAtLimitCommand;
+  readonly recordHooks = RecordHooksCommand;
   readonly archiveSet = ArchiveSetCommand;
 
   private constructor() {}

@@ -1,16 +1,16 @@
 /** VirtualizedTableRows via spacer rows; non-virtualized render for small tables. */
 import { ListTable } from "@langwatch/design-system/list-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Fragment, type ReactNode, type RefObject, useCallback } from "react";
+import { Fragment, type ReactNode, type RefObject, useEffect, useReducer } from "react";
 
 interface Props {
   count: number;
   rowHeight: number;
   columnCount: number;
   /**
-   * Ref to the scrolling element. A ref, not stateful `HTMLElement | null`,
-   * keeps the DOM node out of React state - react-virtual reads `.current`
-   * lazily from its layout effects, picking it up after commit with no render.
+   * Ref to the scrolling element. When the scroller mounts in the same commit,
+   * its ref is still null in react-virtual's layout effect; one re-render after
+   * commit lets the virtualizer attach to it.
    */
   scrollContainerRef: RefObject<HTMLElement | null>;
   renderRow: (index: number) => ReactNode;
@@ -37,17 +37,22 @@ export function VirtualizedTableRows({
 }: Props) {
   const shouldVirtualize = count > threshold;
 
-  const getScrollElement = useCallback(() => scrollContainerRef.current, [scrollContainerRef]);
-  const estimateSize = useCallback(() => rowHeight, [rowHeight]);
+  const [, attachScroller] = useReducer((attempts: number) => attempts + 1, 0);
 
   const virtualizer = useVirtualizer({
     count,
-    getScrollElement,
-    estimateSize,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => rowHeight,
     overscan,
     enabled: shouldVirtualize,
     getItemKey,
   });
+
+  useEffect(() => {
+    if (shouldVirtualize && virtualizer.scrollElement !== scrollContainerRef.current) {
+      attachScroller();
+    }
+  }, [scrollContainerRef, shouldVirtualize, virtualizer.scrollElement]);
 
   if (!shouldVirtualize) {
     const rows: ReactNode[] = [];

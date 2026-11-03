@@ -12,7 +12,9 @@ import {
   isLatestAlias,
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
+  isDecisionModelId,
   isModelRole,
+  MODEL_ROLES,
   ModelDefaultValidationError,
   modelProviders,
   normalizeRoutingHandle,
@@ -26,7 +28,25 @@ import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { ModelProviderCredentialProbe } from "../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import { isDecisionDefaultKey } from "../rules/decision-model.rules.ts";
 import type { ModelProviderManagedGateway } from "./managed-model-provider-gateway.service.ts";
+
+/** Says why a newly picked model may not be the default stored under `key`. */
+function refuseDefault({ key, value }: { key: string; value: string }): never {
+  if (isDecisionDefaultKey(key)) {
+    throw new ModelDefaultValidationError(
+      `"${value}" is not a decision model. Pick one from the Instant Evals list.`,
+    );
+  }
+  if (isDecisionModelId(value)) {
+    throw new ModelDefaultValidationError(
+      `"${value}" is a decision model and can only be the Instant Evals default.`,
+    );
+  }
+  throw new ModelDefaultValidationError(
+    `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
+  );
+}
 
 /** Registry/SDK boundary. Provider SDKs and environment configuration stay behind this port. */
 export abstract class ModelProviderCatalog {
@@ -105,16 +125,22 @@ export abstract class ModelProviderCatalog {
   staticCostRates(): readonly ModelCostRate[] {
     return getStaticModelCostRates();
   }
-  sanitizeDefaultConfig(input: Record<string, unknown>): Record<string, string> {
-    const valid = new Set<string>([
-      "DEFAULT",
-      "FAST",
-      "LANGY",
-      "EMBEDDINGS",
-      ...allFeatures().map((feature) => feature.key),
-    ]);
+  /**
+   * Drops unknown and empty keys, refuses a newly picked restricted model. A
+   * restricted model already stored is dropped (and `droppedRestricted` set):
+   * it predates the restriction, and refusing it would block every other key.
+   */
+  sanitizeDefaultConfig({
+    config,
+    stored = {},
+  }: {
+    config: Record<string, unknown>;
+    stored?: Record<string, string>;
+  }): { config: Record<string, string>; droppedRestricted: boolean } {
+    const valid = new Set<string>([...MODEL_ROLES, ...allFeatures().map((feature) => feature.key)]);
     const clean: Record<string, string> = {};
-    for (const [key, value] of Object.entries(input)) {
+    let droppedRestricted = false;
+    for (const [key, value] of Object.entries(config)) {
       if (!valid.has(key) || typeof value !== "string" || value.length === 0) {
         continue;
       }
@@ -125,16 +151,16 @@ export abstract class ModelProviderCatalog {
             findFeatureByKey(key)[0] &&
             isModelAllowedForFeature({ modelId: value, featureKey: key }),
           );
-      if (!allowed) {
-        throw new ModelDefaultValidationError(
-          `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
-        );
+      if (!allowed && stored[key] === value) {
+        droppedRestricted = true;
+        continue;
       }
+      if (!allowed) refuseDefault({ key, value });
 
       clean[key] = value;
     }
 
-    return clean;
+    return { config: clean, droppedRestricted };
   }
   normalizeRoutingHandle(input: string | null): string | null {
     return normalizeRoutingHandle(input);

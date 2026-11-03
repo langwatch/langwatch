@@ -1,4 +1,7 @@
-import { LangevalsClusteringError } from "@langwatch/evaluation-contract";
+import {
+  LangevalsClusteringError,
+  type LangevalsClusteringFailureCode,
+} from "@langwatch/evaluation-contract";
 import { CLUSTERING_ERROR_CODES } from "@langwatch/topic-contract";
 /**
  * Regression: langevals call needs deadline to avoid outliving the lease.
@@ -130,6 +133,7 @@ describe("topic clustering langevals requests", () => {
         const deps = fakeRunnerDeps();
         const refusal = new LangevalsClusteringError({
           mode: "batch",
+          status: 500,
           statusText: "Internal Server Error",
           body: "boom",
         });
@@ -144,6 +148,57 @@ describe("topic clustering langevals requests", () => {
           isUserActionable: false,
         });
         expect(error).toMatchObject({ message: refusal.message });
+      });
+    });
+  });
+
+  describe("given langevals named the failure with a code in its error detail", () => {
+    const refusedWith = async (failureCode: LangevalsClusteringFailureCode | undefined) => {
+      const deps = fakeRunnerDeps();
+      deps.evaluations.requestTopicClustering.mockRejectedValue(
+        new LangevalsClusteringError({
+          mode: "batch",
+          status: 422,
+          statusText: "Unprocessable Entity",
+          body: "{}",
+          failureCode,
+        }),
+      );
+      return fetchTopicsBatchClustering(deps, "proj-1", batchParams).catch(
+        (caught: unknown) => caught,
+      );
+    };
+
+    describe("when the provider rejected the credentials", () => {
+      /** @scenario "A model provider refusal named by the clustering service is the customer's to fix" */
+      it("fails the page as a provider-authentication failure the customer can fix", async () => {
+        expect(classifyClusteringError(await refusedWith("model_provider_auth_failed"))).toEqual({
+          code: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
+          isUserActionable: true,
+        });
+      });
+    });
+
+    describe("when the refusal names no provider code, or a request the provider called malformed", () => {
+      /** @scenario "A clustering service failure without a provider code stays ours" */
+      it.each([undefined, "model_provider_bad_request" as const])(
+        "fails the page as a clustering-service fault (code %s)",
+        async (failureCode) => {
+          expect(classifyClusteringError(await refusedWith(failureCode))).toEqual({
+            code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
+            isUserActionable: false,
+          });
+        },
+      );
+    });
+
+    describe("when the provider rate limited the project", () => {
+      /** @scenario "A model provider rate limit named by the clustering service is the customer's to fix" */
+      it("fails the page as a provider-quota failure the customer can fix", async () => {
+        expect(classifyClusteringError(await refusedWith("model_provider_rate_limited"))).toEqual({
+          code: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,
+          isUserActionable: true,
+        });
       });
     });
   });

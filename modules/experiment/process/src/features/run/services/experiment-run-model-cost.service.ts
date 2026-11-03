@@ -4,6 +4,10 @@ import {
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import {
+  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+} from "@opentelemetry/semantic-conventions/incubating";
 
 import {
   customRateAttributesOf,
@@ -19,8 +23,11 @@ export abstract class ExperimentModelCost {
   abstract findTokenPrice(input: {
     projectId: string;
     model: string;
+    /** The provider's prompt total, cached tokens included. */
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
   }): Promise<number | undefined>;
 }
 
@@ -45,16 +52,33 @@ export class ExperimentRunModelCostService extends ExperimentModelCost {
     model,
     inputTokens,
     outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
   }: {
     projectId: string;
     model: string;
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
   }): Promise<number | undefined> {
+    const customRates = await this.customRateAttributes({ projectId, model });
+    // The cost cascade prices fresh input and cache counts as disjoint, but the
+    // gateway's prompt total includes the cached tokens: take them out here, once.
+    // A negative remainder means the counts disagree: keep the full prompt total.
+    const fresh = inputTokens - cacheReadTokens - cacheCreationTokens;
     const priced = this.modelProviders.estimateCost({
-      attrs: await this.customRateAttributes({ projectId, model }),
+      attrs: {
+        ...customRates,
+        ...(cacheReadTokens > 0
+          ? { [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: cacheReadTokens }
+          : {}),
+        ...(cacheCreationTokens > 0
+          ? { [ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: cacheCreationTokens }
+          : {}),
+      },
       model,
-      promptTokens: inputTokens,
+      promptTokens: fresh < 0 ? inputTokens : fresh,
       completionTokens: outputTokens,
     });
 

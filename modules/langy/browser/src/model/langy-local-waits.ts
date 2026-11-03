@@ -465,6 +465,23 @@ export function routeLangyChoiceAnswer({
 }
 
 /**
+ * Whether answering a card in place also has to start the next turn. A card no tool call raised
+ * is one the platform asked itself (a confirmation card), and it outlives its turn: answered
+ * while no turn runs, nobody is waiting on it, so the answer rides the send path as well.
+ */
+export function langyAnswerStartsNextTurn({
+  turnRunning,
+  blockId,
+  waitId,
+}: {
+  turnRunning: boolean;
+  blockId: string;
+  waitId: string;
+}): boolean {
+  return !turnRunning && toolCallIdOfQuestionBlock(blockId) === waitId;
+}
+
+/**
  * What a refused question answer means. `langy_wait_expired` refuses every settled wait: one
  * that ended unanswered falls back to the next user message, one already answered (a second
  * click, or the terminal first) only settles the card, so no extra turn starts.

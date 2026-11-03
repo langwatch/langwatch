@@ -108,3 +108,15 @@ Feature: Queue group state visibility
     When the tiles render
     Then each states it is measured over the recent completed-jobs sample
     And that the sample is not a time window
+
+  # ── Long tables ───────────────────────────────────────────────────────
+  # The blocked, dead-letter and groups tables virtualize above 30 rows. The
+  # scroller mounts in the same commit as the rows, so its ref is still empty
+  # when the virtualizer first looks for it.
+
+  @integration
+  Scenario: A virtualized ops table shows its rows on first open
+    Given the rows element the blocked, dead-letter and groups tables share holds 424 rows
+    When the table mounts together with its scroller
+    Then the first rows render
+    And no more rows render than the viewport and its overscan hold

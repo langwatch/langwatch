@@ -43,7 +43,7 @@ const SPAN_ROW = {
 
 describe("given a trace whose spans back a derivation", () => {
   describe("when the repository reads them", () => {
-    it("pins the read to the tenant, the trace and the partition window", async () => {
+    it("pins the read to the tenant, the trace and the id index's bound", async () => {
       const ch = client([SPAN_ROW]);
       const repository = TraceDerivationSpanClickHouseRepository.create({
         resolveClient: async () => ch as never,
@@ -58,7 +58,10 @@ describe("given a trace whose spans back a derivation", () => {
       const call = ch.query.mock.calls[0]![0] as Required<ChQuery>;
       expect(call.query).toContain("WHERE t.TenantId = {tenantId:String}");
       expect(call.query).toContain("AND t.TraceId = {traceId:String}");
-      expect(call.query).toContain("AND t.StartTime BETWEEN");
+      expect(call.query).toContain("{{idBound:stored_spans.TraceId:traceId:t}}");
+      expect(ch.query.mock.calls[0]![0]).toMatchObject({
+        idBound: { occurredAtHint: 1_700_000_000_000, fallback: "unbounded" },
+      });
       expect(call.query_params).toMatchObject({
         tenantId: "project-1",
         traceId: "trace-1",

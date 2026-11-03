@@ -5,9 +5,17 @@ import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LwqlAppOwnedDrift } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import type { LwqlUnconfirmedSinceRepository } from "../../repositories/langwatch-ql-unconfirmed-since.repository.ts";
+import { MemoryLwqlUnconfirmedSinceRepository } from "../../repositories/memory/memory.langwatch-ql-unconfirmed-since.repository.ts";
+import {
+  collectionUnconfirmedError,
+  LWQL_COLLECTION_UNCONFIRMED,
+} from "../../rules/langwatch-ql-collection-probe.rules.ts";
 import type { LwqlAccessModelOwner } from "../../rules/langwatch-ql-config-store.rules.ts";
 import {
   LWQL_RECONVERGENCE_PROCESS_NAME,
+  LWQL_UNCONFIRMED_ALERT_AFTER_MS,
+  LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS,
   runLwqlReconvergence,
 } from "../analytics-lwql-reconvergence.intent.ts";
 import { buildLwqlReconvergence } from "../analytics-lwql-reconvergence.pipeline.ts";
@@ -106,9 +114,96 @@ function workerOver(
     findDrift: () => world.findDrift(),
     convergeAppOwned: () => world.convergeAppOwned(),
     fillKeyMap,
+    unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
     ...overrides,
   });
   return { check, converge, fillKeyMap };
+}
+
+const staleEngineTable: LwqlAppOwnedDrift = { ...healthy, clickHouse: ["annotations_pg"] };
+
+function unconfirmed(): Error {
+  return collectionUnconfirmedError({
+    read: "collection",
+    engineTables: 1,
+    cause: Object.assign(new Error("Code: 614. DB::Exception: connection failed"), {
+      code: "614",
+    }),
+  });
+}
+
+/** PostgreSQL refusing a converge as a role without CREATEROLE does. */
+function postgresRefusal(): Error {
+  return Object.assign(new Error("permission denied"), { code: "P2010", meta: { code: "42501" } });
+}
+
+/**
+ * `workers` fresh workers sharing one clock, taking the slots' checks in turn; with
+ * `postgresRefuses`, every check also finds a PostgreSQL gap whose converge is refused.
+ */
+function fleet({
+  workers,
+  postgresRefuses = false,
+}: {
+  workers: number;
+  postgresRefuses?: boolean;
+}) {
+  const world = { now: FIRST_SLOT, converged: false };
+  const unconfirmedSince = MemoryLwqlUnconfirmedSinceRepository.create();
+  const postgres = postgresRefuses ? [{ view: "lwql_agents", absent: true }] : [];
+  const checks = Array.from({ length: workers }, () =>
+    runLwqlReconvergence({
+      probe: () => Promise.resolve("config_store"),
+      converge: () => Promise.resolve(),
+      findDrift: async () => (world.converged ? healthy : { ...staleEngineTable, postgres }),
+      convergeAppOwned: (half) =>
+        Promise.reject(half.clickHouse.length === 0 ? postgresRefusal() : unconfirmed()),
+      fillKeyMap: () => Promise.resolve(),
+      unconfirmedSince,
+      now: () => world.now,
+    }),
+  );
+  /** The error-level messages of the next slot's check. */
+  const alertsOfNextCheck = async () => {
+    const slot = (world.now - FIRST_SLOT) / LWQL_RECONVERGENCE_INTERVAL_MS;
+    logCalls.length = 0;
+    await checks[slot % workers]?.(wakeOnce);
+    world.now += LWQL_RECONVERGENCE_INTERVAL_MS;
+    return logCalls.filter((call) => call.level === "error").map((call) => call.message);
+  };
+  return { world, alertsOfNextCheck };
+}
+
+/** A clock whose calls never answer. */
+function silentRedis(): LwqlUnconfirmedSinceRepository {
+  return Object.assign(MemoryLwqlUnconfirmedSinceRepository.create(), {
+    mark: () => new Promise<number>(() => undefined),
+    clear: () => new Promise<void>(() => undefined),
+  });
+}
+
+/** One check over `drift` and a clock that never answers, run on fake timers. */
+async function checkWithSilentRedis(drift: LwqlAppOwnedDrift, convergeFails: boolean) {
+  vi.useFakeTimers();
+  try {
+    const done = runLwqlReconvergence({
+      probe: () => Promise.resolve("config_store"),
+      converge: () => Promise.resolve(),
+      findDrift: () => Promise.resolve(drift),
+      convergeAppOwned: () => (convergeFails ? Promise.reject(unconfirmed()) : Promise.resolve()),
+      fillKeyMap: () => Promise.resolve(),
+      unconfirmedSince: silentRedis(),
+      now: () => FIRST_SLOT,
+    })(wakeOnce);
+    let settled = false;
+    void done.then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await done;
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
 beforeEach(() => {
@@ -198,6 +293,7 @@ describe("given a check over the app-owned objects", () => {
         findDrift: () => Promise.resolve(drift),
         convergeAppOwned,
         fillKeyMap: () => Promise.resolve(),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       })(wakeOnce);
 
       expect(convergeAppOwned).toHaveBeenCalledWith(drift);
@@ -213,6 +309,7 @@ describe("given a check over the app-owned objects", () => {
         findDrift: () => Promise.reject(new Error("ECONNREFUSED")),
         convergeAppOwned,
         fillKeyMap: () => Promise.resolve(),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       })(wakeOnce);
 
       expect(convergeAppOwned).not.toHaveBeenCalled();
@@ -300,6 +397,92 @@ describe("given a check over the app-owned objects", () => {
     });
   });
 
+  describe("when checks keep leaving engine tables on their old credentials", () => {
+    /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+    it.each([1, 3, 12])(
+      "warns until 15 minutes after the first failed check, then alerts, across %i workers",
+      async (workers) => {
+        const { world, alertsOfNextCheck } = fleet({ workers });
+        const quiet = LWQL_UNCONFIRMED_ALERT_AFTER_MS / LWQL_RECONVERGENCE_INTERVAL_MS;
+
+        for (let slot = 0; slot < quiet; slot++) {
+          expect(await alertsOfNextCheck()).toEqual([]);
+          expect(logCalls).toContainEqual(expect.objectContaining({ level: "warn" }));
+        }
+        expect(world.now - FIRST_SLOT).toBe(LWQL_UNCONFIRMED_ALERT_AFTER_MS);
+        expect(await alertsOfNextCheck()).toEqual([ALERT]);
+        expect(logCalls).toContainEqual(
+          expect.objectContaining({
+            level: "error",
+            fields: expect.objectContaining({
+              error_signature: `614:${LWQL_COLLECTION_UNCONFIRMED}:${LWQL_COLLECTION_UNCONFIRMED}`,
+            }),
+          }),
+        );
+      },
+    );
+
+    /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+    it("repeats the alert hourly while it holds", async () => {
+      const { world, alertsOfNextCheck } = fleet({ workers: 1 });
+      const alerted: unknown[] = [];
+
+      while (world.now < FIRST_SLOT + LWQL_UNCONFIRMED_ALERT_AFTER_MS + HOUR + HOUR / 2) {
+        alerted.push(...(await alertsOfNextCheck()));
+      }
+
+      expect(alerted).toEqual([ALERT, ALERT]);
+    });
+
+    /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+    it("starts the clock again after a check converges the tables", async () => {
+      const { world, alertsOfNextCheck } = fleet({ workers: 2 });
+
+      for (let slot = 0; slot < 3; slot++) await alertsOfNextCheck();
+      world.converged = true;
+      await alertsOfNextCheck();
+      world.converged = false;
+
+      for (let slot = 0; slot < 3; slot++) expect(await alertsOfNextCheck()).toEqual([]);
+      expect(await alertsOfNextCheck()).toEqual([ALERT]);
+    });
+
+    /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+    it("alerts 15 minutes after the first failed check while PostgreSQL fails every check too", async () => {
+      const { alertsOfNextCheck } = fleet({ workers: 1, postgresRefuses: true });
+      const quiet = LWQL_UNCONFIRMED_ALERT_AFTER_MS / LWQL_RECONVERGENCE_INTERVAL_MS;
+
+      for (let slot = 0; slot < quiet; slot++) {
+        expect(await alertsOfNextCheck()).not.toContain(ALERT);
+      }
+      expect(await alertsOfNextCheck()).toContain(ALERT);
+    });
+
+    describe("when Redis does not answer, as its offline queue does while it is down", () => {
+      /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+      it("gives up on reading the clock after the timeout and alerts at once", async () => {
+        await checkWithSilentRedis(staleEngineTable, true);
+
+        expect(
+          logCalls.filter((call) => call.level === "error").map((call) => call.message),
+        ).toEqual([ALERT]);
+      });
+
+      /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+      it("gives up on clearing the clock after the timeout and ends the check without an alert", async () => {
+        await checkWithSilentRedis(staleEngineTable, false);
+
+        expect(logCalls.filter((call) => call.level === "error")).toEqual([]);
+        expect(logCalls).toContainEqual(
+          expect.objectContaining({
+            level: "warn",
+            message: "lwql could not clear the unconfirmed-collection clock",
+          }),
+        );
+      });
+    });
+  });
+
   describe("when PostgreSQL refuses its half", () => {
     const refusal = () =>
       Object.assign(new Error("permission denied"), { code: "P2010", meta: { code: "42501" } });
@@ -322,6 +505,7 @@ describe("given a check over the app-owned objects", () => {
           converged.push(half);
         },
         fillKeyMap: () => Promise.resolve(),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       })(wakeOnce);
 
       expect(logCalls.filter((call) => call.level === "error")).toEqual([
@@ -354,6 +538,7 @@ describe("given a check over the app-owned objects", () => {
           }),
         convergeAppOwned,
         fillKeyMap: () => Promise.resolve(),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       });
 
       for (let checks = 0; checks < 3; checks++) await check(wakeOnce);
@@ -383,6 +568,26 @@ describe("given a check over the app-owned objects", () => {
     });
 
     /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("fills in the same check when its converge rebuilt the key map but another object failed", async () => {
+      const missing = new Set(["api_key_tenants", "agents_pg"]);
+      const { check, fillKeyMap } = workerOver(clickHouseWorld({ missing: [] }), {
+        findDrift: async () => ({
+          clickHouse: [...missing],
+          postgres: [],
+          isKeyMapMissing: missing.has("api_key_tenants"),
+        }),
+        convergeAppOwned: async () => {
+          missing.delete("api_key_tenants");
+          throw new Error("Code: 614. DB::Exception: connection failed");
+        },
+      });
+
+      await check(wakeOnce);
+
+      expect(fillKeyMap).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
     it("still probes when the fill fails, then fails the check so the outbox delivers it again", async () => {
       const probe = vi.fn(() => Promise.resolve<LwqlAccessModelOwner>("sql_store"));
       const refused = new Error("ECONNREFUSED");
@@ -392,6 +597,7 @@ describe("given a check over the app-owned objects", () => {
         findDrift: () => Promise.resolve(healthy),
         convergeAppOwned: () => Promise.resolve(),
         fillKeyMap: () => Promise.reject(refused),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       });
 
       await expect(check({ fillKeyMap: true })).rejects.toMatchObject({ cause: refused });
@@ -413,6 +619,7 @@ describe("given a check over the app-owned objects", () => {
         ),
         convergeAppOwned: vi.fn(() => Promise.resolve()),
         fillKeyMap: vi.fn(fillKeyMap),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       };
       return { deps, done: runLwqlReconvergence(deps)(wakeOnce, { attempt: 2 }) };
     }
@@ -451,6 +658,7 @@ describe("given the pipeline's check, delivered by its outbox", () => {
   }) {
     const fill = { failuresLeft: failures, runs: 0 };
     const processManager = buildLwqlReconvergence({
+      unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       app: {
         probeLwqlAccessModelOwner: () => Promise.resolve("config_store"),
         convergeLwqlAccessModel: () => Promise.resolve(),
@@ -565,6 +773,7 @@ describe("given the SQL-mode owner probe", () => {
         findDrift: () => Promise.resolve(healthy),
         convergeAppOwned: () => Promise.resolve(),
         fillKeyMap: () => Promise.resolve(),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       })(wakeOnce),
     };
   };
@@ -597,6 +806,7 @@ describe("given the SQL-mode owner probe", () => {
       findDrift: () => Promise.resolve(healthy),
       convergeAppOwned: () => Promise.resolve(),
       fillKeyMap: () => Promise.resolve(),
+      unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
     })(wakeOnce);
     order.push("intent resolved");
     expect(order).toEqual(["converged", "intent resolved"]);

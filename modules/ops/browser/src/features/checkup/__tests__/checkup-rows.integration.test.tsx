@@ -139,6 +139,7 @@ describe("UsageReportSection", () => {
             canManage
             isSaving={false}
             onSwitch={onSwitch}
+            onAutoSend={() => undefined}
           />
         </DesignSystemProvider>,
       );
@@ -155,6 +156,7 @@ describe("UsageReportSection", () => {
       const hostname = screen.getByTestId<HTMLInputElement>("checkup-switch-hostname-input");
       expect(optional.checked).toBe(true);
       expect(hostname.checked).toBe(false);
+      expect(screen.queryByTestId("checkup-switch-upgrade-diagnostics")).toBeNull();
 
       fireEvent.click(optional);
       await waitFor(() => {
@@ -162,6 +164,44 @@ describe("UsageReportSection", () => {
       });
 
       expect(screen.getByText(/connect\.langwatch\.ai/)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("UsageReportSection upgrade diagnostics switch", () => {
+  describe("when an administrator switches off upgrade diagnostics", () => {
+    /** @scenario "An admin switches off sending upgrade diagnostics on Checkup" */
+    it("shows the switch on by default and asks for automatic sending off", async () => {
+      const onAutoSend = vi.fn();
+      render(
+        <DesignSystemProvider forcedTheme="light">
+          <UsageReportSection
+            report={{
+              payload: { event: "daily_usage_stats" },
+              switches: { optional: true, hostname: true },
+              endpoint: "https://connect.langwatch.ai/v1/stats",
+              disabled: false,
+              schemaVersion: 2,
+              nextReportAt: null,
+            }}
+            canManage
+            isSaving={false}
+            onSwitch={() => undefined}
+            autoSend={{ enabled: true }}
+            onAutoSend={onAutoSend}
+          />
+        </DesignSystemProvider>,
+      );
+
+      const diagnostics = screen.getByTestId<HTMLInputElement>(
+        "checkup-switch-upgrade-diagnostics-input",
+      );
+      expect(diagnostics.checked).toBe(true);
+
+      fireEvent.click(diagnostics);
+      await waitFor(() => {
+        expect(onAutoSend).toHaveBeenCalledWith(false);
+      });
     });
   });
 });
@@ -183,6 +223,7 @@ describe("given the checkup answered verdicts only", () => {
             canManage
             isSaving={false}
             onSwitch={() => undefined}
+            onAutoSend={() => undefined}
           />
         </DesignSystemProvider>,
       );

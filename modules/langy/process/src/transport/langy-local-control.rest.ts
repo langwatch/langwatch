@@ -51,6 +51,7 @@ function localControlRest(mount: LangyControlMount) {
     .handle(({ app, actor }) => app.listLocalControlRequests({ actor }))
 
     .post(`/api/langy/control${mount}/requests/:requestId/approve`, "approveLangyControlRequest")
+    .keepsRecords()
     .withAudit("langy.approveLocalControlRequest")
     .withPermission("langy:create")
     .withParams(langyControlIdParamsSchema)
@@ -69,6 +70,7 @@ function localControlRest(mount: LangyControlMount) {
     )
 
     .post(`/api/langy/control${mount}/requests/:requestId/cancel`, "cancelLangyControlRequest")
+    .keepsRecords()
     .withAudit("langy.cancelLocalControlRequest")
     .withPermission("langy:create")
     .withParams(langyControlIdParamsSchema)

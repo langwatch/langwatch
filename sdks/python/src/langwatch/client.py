@@ -13,6 +13,7 @@ from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -29,6 +30,21 @@ import opentelemetry.trace
 from opentelemetry.util._once import Once
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+def _default_otlp_compression() -> Compression | None:
+    """Gzip, unless an OTEL_EXPORTER_OTLP_*COMPRESSION variable is set.
+
+    An explicit argument beats the environment in the OTel exporter, so gzip
+    is passed only when neither variable is set; None defers to them.
+    """
+    for name in (
+        "OTEL_EXPORTER_OTLP_COMPRESSION",
+        "OTEL_EXPORTER_OTLP_TRACES_COMPRESSION",
+    ):
+        if os.getenv(name, "").strip():
+            return None
+    return Compression.Gzip
 
 
 def _skip_open_telemetry_setup_from_env() -> bool:
@@ -747,6 +763,7 @@ class Client(LangWatchClientProtocol):
             endpoint=f"{Client._endpoint_url}/api/otel/v1/traces",
             headers=headers,
             timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
+            compression=_default_otlp_compression(),
         )
 
         # Wrap the exporter with conditional logic

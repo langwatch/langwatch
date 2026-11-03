@@ -86,7 +86,11 @@ function bootIngestDoors(assertWithinUsageLimit: EntitlementApi["assertWithinUsa
   }));
   const app = createTraceAppHarness({
     ingestCredential: createApiFixture<TraceIngestCredentialService>({
-      resolveForCollector: async () => ({ project: PROJECT, markUsed: () => undefined }),
+      resolveForCollector: async () => ({
+        project: PROJECT,
+        markUsed: () => undefined,
+        key: { kind: "api_key", apiKeyId: "key_collector", ownerUserId: null },
+      }),
       resolveForOtlp: async () => OTLP_CREDENTIAL,
       markOtlpCredentialUsed: () => undefined,
     }),

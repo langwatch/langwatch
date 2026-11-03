@@ -51,6 +51,9 @@
     },
     {
       "path": "../authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../clickhouse-client/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).

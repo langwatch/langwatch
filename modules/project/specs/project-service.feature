@@ -248,6 +248,15 @@ Feature: Shared project service
     Then no fact is recorded and no checkpoint is saved
     And the report counts the facts it would record
 
+  @unit @regression
+  Scenario: The project facts step skips a project whose team or organization is gone
+    Given a stored project whose team was deleted, one whose organization was deleted, and a live project
+    When the project:record-created-facts step runs
+    Then the step completes and records the live project's facts
+    And nothing is recorded for the two orphaned projects
+    And the report counts the two as skipped orphans and names their ids
+    And the saved checkpoint moves past them, so a resumed run does not read them again
+
   @unit
   Scenario: The project facts step stops between pages when the worker stops it
     Given a project:record-created-facts step whose run has been aborted

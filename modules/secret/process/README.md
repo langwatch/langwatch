@@ -167,7 +167,7 @@ type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-re
 
 Replace a project secret value
 
-Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:102`.
+Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:103`.
 
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 
@@ -185,7 +185,7 @@ type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-re
 
 Delete a project secret
 
-Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:119`.
+Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:121`.
 
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 

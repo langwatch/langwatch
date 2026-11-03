@@ -1,6 +1,6 @@
 ---
 name: code-search
-description: "Pick the right tool to find code in this repository: ripgrep when you know the word, sgrep (search by meaning) when an index is ready, ripgrep while an index builds, gopls and tslsp for exact references. Use when someone says 'find where', 'search the code', 'which file handles', 'grep for', 'sgrep', 'semantic search', 'search by meaning', 'index the repo', 'is the index ready', 'code search', or before sweeping an unfamiliar area of the tree."
+description: "Pick the right tool to find code in this repository: ripgrep when you know the word, sgrep (search by meaning) when an index is ready, ripgrep while an index builds, gopls and `rush ts` for exact references. Use when someone says 'find where', 'search the code', 'which file handles', 'grep for', 'sgrep', 'semantic search', 'search by meaning', 'index the repo', 'is the index ready', 'code search', or before sweeping an unfamiliar area of the tree."
 user-invocable: true
 argument-hint: '[status <dir> | query <dir> "<question>" | index <dir>]'
 ---
@@ -9,15 +9,15 @@ argument-hint: '[status <dir> | query <dir> "<question>" | index <dir>]'
 
 Measured on this repository, 2026-10-14 (busy host, so times are rough):
 
-| Tool               | Setup                      | Per search | Finds the right code                 |
-| ------------------ | -------------------------- | ---------- | ------------------------------------ |
-| `rg`               | none                       | 0.06-0.8 s | given the word, in non-ignored files |
-| `git grep`         | none                       | 0.07-2.4 s | same; tracked files only             |
-| `grep -r`          | none                       | 18-34 s    | same, but walks every `node_modules` |
-| sgrep, no index    | n/a                        | won't run  | n/a                                  |
-| sgrep, indexed     | `modules/` 26 min, ~500 MB | 0.1-0.3 s  | about half, by meaning               |
-| gopls `references` | none                       | 4-15 s     | exact                                |
-| tslsp `references` | none                       | times out  | not usable for lookups here          |
+| Tool                 | Setup                      | Per search               | Finds the right code                 |
+| -------------------- | -------------------------- | ------------------------ | ------------------------------------ |
+| `rg`                 | none                       | 0.06-0.8 s               | given the word, in non-ignored files |
+| `git grep`           | none                       | 0.07-2.4 s               | same; tracked files only             |
+| `grep -r`            | none                       | 18-34 s                  | same, but walks every `node_modules` |
+| sgrep, no index      | n/a                        | won't run                | n/a                                  |
+| sgrep, indexed       | `modules/` 26 min, ~500 MB | 0.1-0.3 s                | about half, by meaning               |
+| gopls `references`   | none                       | 4-15 s                   | exact                                |
+| `rush ts references` | none                       | ~30 s cold, then seconds | exact; needs file and line           |
 
 ## Which tool
 
@@ -41,8 +41,9 @@ need every caller of a Go symbol, exactly? ──▶ gopls references file.go:li
   wrong or empty, so the helper refuses (exit 3) and you use `rg`. sgrep answers roughly half
   the "where is X done" questions; treat its hits as leads and confirm them with `rg`.
 - **While an index builds, use `rg`.** Don't wait for it.
-- **Exact references:** `gopls references` for Go. For TypeScript renames and moves, tslsp is
-  still the tool (`rename`, `rename_file`); its read commands time out on this monorepo.
+- **Exact references:** `gopls references` for Go. `rush ts references --file F --line N --symbol S`
+  for TypeScript, and `rush ts rename` / `rename-file` for renames and moves. Always give the file
+  and line: a lookup by name alone loads every project and is slow here.
 - sgrep skips tests, generated and vendored files itself; pass `-t` to include tests.
 - `rg` skips the generated files listed in the root `.rgignore` (lockfiles, snapshots, generated
   clients and READMEs). Searching for something that only lives there, such as a handled-error

@@ -457,7 +457,9 @@ export default function ModelProvidersScreen() {
         </AddModelProviderMenu>
       </PageLayout.Header>
 
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      {/* Stretch, not start: a ListTable has no width of its own, so under `start` the providers
+          table shrank to its content while Default models below ran full width. */}
+      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
         <Text color="fg.muted">
           The AI providers your projects call, and the default models they use.
         </Text>

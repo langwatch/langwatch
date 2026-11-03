@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/mcp-server",
-  "version": "2.1.0",
+  "version": "3.1.0",
   "description": "An MCP server for Langwatch.",
   "license": "MIT",
   "author": "",
@@ -40,10 +40,10 @@
     "prepublish": "pnpm run build",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.js",
-    "test:scenario": "vitest run --config vitest.scenario.config.js"
+    "test:scenario": "vitest run --config vitest.scenario.config.js",
+    "smoke": "vitest run --config vitest.smoke.config.js"
   },
   "dependencies": {
-    "@langwatch/evaluator-contract": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
     "zod": "catalog:"
   },
@@ -51,6 +51,7 @@
     "@ai-sdk/anthropic": "catalog:",
     "@anthropic-ai/claude-code": "2.1.228",
     "@langwatch/egress": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "@langwatch/scenario": "catalog:",
@@ -71,6 +72,6 @@
     "zod-validation-error": "catalog:"
   },
   "engines": {
-    "node": ">=22"
+    "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
   }
 }

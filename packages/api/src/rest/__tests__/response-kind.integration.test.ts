@@ -136,6 +136,7 @@ const objects = defineRestRouter(ObjectApi)
   )
 
   .post("/scim/Users", "createScimUser")
+  .keepsRecords()
   .withRawBody("text")
   .withAccess(publicRoute({ reason: "SCIM presents its own bearer token" }))
   .withResponse("protocol", { produces: "application/scim+json", because: SCIM_REASON })

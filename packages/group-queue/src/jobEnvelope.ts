@@ -180,7 +180,8 @@ function mergeMachinery(
   const hasRouting =
     typeof header.p === "string" || typeof header.t === "string" || typeof header.n === "string";
   if (!header.m && !hasRouting) return body;
-  const merged: Record<string, unknown> = { ...body, ...header.m };
+  // The body was just parsed for this call alone, so it takes the machinery in place.
+  const merged = Object.assign(body, header.m);
   if (typeof header.p === "string") merged.__pipelineName = header.p;
   if (typeof header.t === "string") merged.__jobType = header.t;
   if (typeof header.n === "string") merged.__jobName = header.n;
@@ -348,14 +349,10 @@ export async function encodeJobEnvelope<Destination>({
   delete machinery.__jobName;
   if (Object.keys(machinery).length > 0) header.m = machinery;
 
-  const {
-    bytes,
-    codec,
-    json: payloadJson,
-  } = encodePayload(payload, {
+  const encoded = encodePayload(payload, {
     msgpackEnabled: payloadCodec === "msgpack",
   });
-  const payloadBytes = bytes.length;
+  const { codec, json: payloadJson, byteLength: payloadBytes } = encoded;
   assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
   header.s = payloadBytes;
 
@@ -365,6 +362,7 @@ export async function encodeJobEnvelope<Destination>({
         "Group Queue needs a tenant id and tiered blob storage for an offloaded payload",
       );
     }
+    const bytes = encoded.codec === "msgpack" ? encoded.bytes : Buffer.from(payloadJson);
     const ref = await tieredBlobs.put({
       projectId,
       data: await compress(bytes, compression),
@@ -381,7 +379,7 @@ export async function encodeJobEnvelope<Destination>({
     ENVELOPE_PREFIX_V2,
     header,
     await inlineBody({
-      json: payloadJson ?? bytes.toString("utf-8"),
+      json: payloadJson,
       jsonBytes: payloadBytes,
       header,
       compression,
@@ -616,10 +614,7 @@ export function splitEnvelope(value: string): {
       reason: "malformed_envelope",
     });
   }
-  // Prefix and length digits are ASCII, so lenEnd is the same offset in bytes
-  // and code units; the header itself must be sliced as bytes to match Lua.
-  const buf = Buffer.from(value, "utf8");
-  const headerJson = buf.subarray(lenEnd + 1, lenEnd + 1 + headerLen).toString("utf8");
+  const { headerJson, body } = sliceEnvelope({ value, headerStart: lenEnd + 1, headerLen });
   // Guarded like the body parses: a corrupt header makes V8 echo raw bytes
   // back, and the header carries `m.__context` (traceId/userId/projectId)
   // that would reach the drop log via the raw-Error path (strips only
@@ -639,8 +634,31 @@ export function splitEnvelope(value: string): {
       reason: "malformed_envelope",
     });
   }
+  return { header, body };
+}
+
+/**
+ * `headerStart` is the same offset in bytes and code units (prefix and digits are
+ * ASCII). The header length counts bytes, as Lua does: a code-unit slice measuring
+ * that many bytes is all ASCII, which spares copying the whole value to a buffer.
+ */
+function sliceEnvelope({
+  value,
+  headerStart,
+  headerLen,
+}: {
+  value: string;
+  headerStart: number;
+  headerLen: number;
+}): { headerJson: string; body: string } {
+  const headerEnd = headerStart + headerLen;
+  const asciiHeader = value.slice(headerStart, headerEnd);
+  if (asciiHeader.length === headerLen && Buffer.byteLength(asciiHeader, "utf8") === headerLen) {
+    return { headerJson: asciiHeader, body: value.slice(headerEnd) };
+  }
+  const buf = Buffer.from(value, "utf8");
   return {
-    header,
-    body: buf.subarray(lenEnd + 1 + headerLen).toString("utf8"),
+    headerJson: buf.subarray(headerStart, headerEnd).toString("utf8"),
+    body: buf.subarray(headerEnd).toString("utf8"),
   };
 }

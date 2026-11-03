@@ -62,6 +62,26 @@ Feature: Triggering online evaluations from an ingested trace
     Then it is the same number
 
   @unit
+  Scenario: A trace whose summary has not folded retries the trigger a bounded number of times
+    Given a span or an origin resolution for a trace
+    And the trace's summary has not folded when the settle window ends
+    When the evaluation trigger runs below the retry bound, or on a delivery carrying no attempt
+    Then no evaluation is dispatched and the job fails so the queue retries it
+
+  @unit
+  Scenario: A trace whose summary never folds completes at the retry bound
+    Given a span or an origin resolution for a trace whose summary has still not folded
+    When the evaluation trigger runs on the bounding attempt
+    Then no evaluation is dispatched and the job completes with a warning
+    And no further retry is scheduled, because unbounded retries blocked a queue group per such trace
+
+  @unit
+  Scenario: A trace whose summary has folded is evaluated on any attempt
+    Given a span for a trace whose summary has folded
+    When the evaluation trigger runs on a first attempt or on the bounding attempt
+    Then the evaluation is dispatched
+
+  @unit
   Scenario: A synthetic event span never re-triggers evaluation
     Given a synthetic feedback span posted through the track-event route
     When the relevance guard runs

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EventBus } from "../../src/services/event-bus.ts";
 import { startLangwatch } from "../../src/services/langwatch.ts";
+import type * as NodeDeps from "../../src/services/node-deps.ts";
 import type { RuntimeContext, RuntimeEvent } from "../../src/shared/runtime-contract.ts";
 
 const { stop, supervise, probe, probedUrls } = vi.hoisted(() => {
@@ -13,7 +14,9 @@ const { stop, supervise, probe, probedUrls } = vi.hoisted(() => {
   return {
     stop,
     supervise: vi.fn(
-      (_args: { spec: { args: string[]; cwd?: string; env: Record<string, string> } }) => ({
+      (_args: {
+        spec: { command: string; args: string[]; cwd?: string; env: Record<string, string> };
+      }) => ({
         name: "langwatch",
         pid: 1,
         stop,
@@ -24,13 +27,14 @@ const { stop, supervise, probe, probedUrls } = vi.hoisted(() => {
   };
 });
 
-// A real directory with its node_modules, so the launcher skips the one-time install.
+// A real directory standing in for the app tree's apps/backend.
 let backendDir = "";
 
 vi.mock("../../src/services/spawn.ts", () => ({ supervise }));
-vi.mock("../../src/services/node-deps.ts", () => ({
+vi.mock("../../src/services/node-deps.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof NodeDeps>()),
   locateBackendDir: () => backendDir,
-  resolvePnpm: async () => ({ command: "pnpm", args: [] }),
+  resolvePnpm: async () => ({ command: "/tmp/.langwatch-test/bin/pnpm", args: [] }),
 }));
 vi.mock("../../src/services/health.ts", () => ({
   httpGetCheck: (url: string) => {
@@ -51,6 +55,7 @@ function fakeCtx(): RuntimeContext {
       aigateway: 5563,
       langyagent: 5564,
       workerHealth: 5565,
+      backend: 5566,
       postgres: 6560,
       redis: 6561,
       clickhouseHttp: 6562,
@@ -76,7 +81,7 @@ function fakeCtx(): RuntimeContext {
     userEnv: {},
     orchestrator: {
       browser: { openEnabled: true, continuousIntegration: false },
-      development: { aiGatewayDevBuild: false, forceBundledPostgres: false },
+      development: { aiGatewayDevBuild: false, forceBundledPostgres: false, appArchive: undefined },
     },
   };
 }
@@ -119,13 +124,29 @@ describe("startLangwatch", () => {
       expect(spawned().args).toEqual(["run", "start"]);
     });
 
+    /** @scenario "The backend starts through pnpm" */
+    it("runs the start script with the bundled pnpm and keeps it on PATH", async () => {
+      await startLangwatch(fakeCtx(), new EventBus(), {});
+
+      expect(spawned().command).toBe("/tmp/.langwatch-test/bin/pnpm");
+      expect(spawned().args).toEqual(["run", "start"]);
+      expect(spawned().env.PATH?.startsWith("/tmp/.langwatch-test/bin:")).toBe(true);
+    });
+
+    /** @scenario "Starting twice reuses compiled modules" */
+    it("points Node's compile cache under the LangWatch home", async () => {
+      await startLangwatch(fakeCtx(), new EventBus(), {});
+
+      expect(spawned().env.NODE_COMPILE_CACHE).toBe("/tmp/.langwatch-test/cache/node-compile");
+    });
+
     /** @scenario "The backend runs the api and the worker as one process" */
-    it("binds the api to the langwatch port and the worker's health door to its own slot", async () => {
+    it("binds the api to the internal backend port and the worker's health door to its own slot", async () => {
       await startLangwatch(fakeCtx(), new EventBus(), { WORKER_METRICS_PORT: "2999" });
 
       expect(spawned().env).toMatchObject({
-        API_PORT: "5560",
-        PORT: "5560",
+        API_PORT: "5566",
+        PORT: "5566",
         WORKER_METRICS_PORT: "5565",
       });
     });
@@ -146,7 +167,7 @@ describe("startLangwatch", () => {
 
       await startLangwatch(fakeCtx(), bus, {});
 
-      expect(probedUrls).toEqual(["http://127.0.0.1:5560/api/health"]);
+      expect(probedUrls).toEqual(["http://127.0.0.1:5566/api/health"]);
       expect(events.map((e) => e.type)).toEqual(["starting", "healthy"]);
     });
   });

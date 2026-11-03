@@ -63,3 +63,14 @@ Feature: Stuck queue groups are cleared by the app, not by a script
   Scenario: The Queue screen says when no stuck groups were found
     Given a reap found nothing stranded
     Then the operator reads that no stuck groups were found
+
+  # Dead-letter entries expire on their own, but the index naming their group
+  # does not. Listing the dead-letter groups drops a member once a check in the
+  # same step confirms none of its jobs, values or error remain.
+  @integration
+  Scenario: Listing dead-letter groups forgets the ones whose entries expired
+    Given a dead-letter index member whose entries have all expired
+    And a dead-lettered group that still holds a job
+    When an operator lists the dead-letter groups
+    Then the expired member leaves the index and the list
+    And the live group is still listed

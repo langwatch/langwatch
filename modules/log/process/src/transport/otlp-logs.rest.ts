@@ -21,7 +21,11 @@ import {
   readCorrectedPath,
   type OtlpDoorAnswer,
 } from "@langwatch/otlp";
-import { otlpIngestCredentialSchema, type OtlpIngestCredential } from "@langwatch/otlp/door";
+import {
+  otlpIngestCredentialSchema,
+  otlpIngestKeyOf,
+  type OtlpIngestCredential,
+} from "@langwatch/otlp/door";
 import { resolveRequestBound } from "@langwatch/plans";
 import { TraceApi } from "@langwatch/trace-contract";
 
@@ -53,7 +57,12 @@ export const otlpLogsDoor = defineRestDoor("otlp_ingest", {
       const { apiKeyId } = resolution.identity;
       const actor = apiKeyId ? { type: "api_key" as const, id: apiKeyId } : null;
 
-      return { actor, scope: { tier: "project", id: resolution.project.id }, session: resolution };
+      return {
+        actor,
+        scope: { tier: "project", id: resolution.project.id },
+        session: resolution,
+        key: otlpIngestKeyOf(resolution.identity),
+      };
     } catch (error) {
       if (!isIngestDoorRefusal(error)) throw error;
 
@@ -116,6 +125,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
   .withCredential("otlp_ingest")
 
   .post("/api/otel/v1/logs", "ingestOtlpLogs")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
   .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })

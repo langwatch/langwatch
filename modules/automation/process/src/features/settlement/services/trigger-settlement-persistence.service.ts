@@ -1,12 +1,14 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
+import { DispatchError, pMapLimited } from "@langwatch/eventing";
+import { refusesRetry } from "@langwatch/group-queue";
+import { createLogger, createWarnThrottle } from "@langwatch/observability";
 
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../../../repositories/automation-settlement-read.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
+import { isCustomerConfigurationRefusal } from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationPersistActionService } from "../../runaway/services/persist-action.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
@@ -14,6 +16,7 @@ import type { AutomationSettlementObservability } from "./automation-settlement-
 
 const logger = createLogger("langwatch:automation:settlement-persistence");
 const CONFIRM_CONCURRENCY = 4;
+const REFUSAL_LOG_WINDOW_MS = 60 * 60 * 1000;
 const CLAIM_RETRY_DELAYS_MS = [200, 500];
 
 type PersistenceComposition = {
@@ -38,6 +41,8 @@ type PersistPage = {
 };
 
 export class TriggerSettlementPersistenceService {
+  private readonly refusalLog = createWarnThrottle(REFUSAL_LOG_WINDOW_MS);
+
   private constructor(private readonly composition: PersistenceComposition) {}
 
   static create(composition: PersistenceComposition): TriggerSettlementPersistenceService {
@@ -238,7 +243,29 @@ export class TriggerSettlementPersistenceService {
   }
 
   private recordTraceFailure(page: PersistPage, traceId: string, error: unknown): void {
-    const retryable = isDispatchError(error) ? error.retryable : true;
+    const retryable = !refusesRetry(error);
+    if (!retryable && isCustomerConfigurationRefusal(error)) {
+      const suppressedRefusals = this.refusalLog.claim({
+        key: `${page.triggerId}:${error.code}`,
+        now: this.composition.clock.now().epochMilliseconds,
+      });
+      if (suppressedRefusals === undefined) return;
+      logger.warn(
+        {
+          projectId: page.projectId,
+          triggerId: page.triggerId,
+          traceId,
+          code: error.code,
+          fault: error.fault,
+          error: error.message,
+          suppressedRefusals,
+        },
+        "Persist dispatch refused by the automation's saved configuration; not retrying",
+      );
+
+      return;
+    }
+
     if (retryable) {
       page.retryableFailures.push(error);
 
@@ -288,9 +315,9 @@ export class TriggerSettlementPersistenceService {
     throw representative;
   }
 
+  /** Reported once, through the process's error capture. */
   private capture(error: unknown, context: Record<string, unknown>): void {
     const handled = error instanceof Error ? error : new Error(String(error));
-    logger.error({ ...context, error: handled.message }, "Persist dispatch failed terminally");
     this.composition.observability.capture(handled, context);
   }
 }

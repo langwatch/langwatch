@@ -50,6 +50,7 @@ function consumer({ resolveDeferredOrigin }: Pick<Reactions, "resolveDeferredOri
     projectMetadata: noop,
     spanStorageBroadcast: noop,
     broadcastDisabled: false,
+    writeCompactOriginJobs: false,
   });
 }
 

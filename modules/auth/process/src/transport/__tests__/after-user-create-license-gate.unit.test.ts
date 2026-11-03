@@ -70,6 +70,7 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     flagPendingSsoSetup: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
+    clearPasswordResetRequirement: unused,
     ...members,
   };
 }
@@ -81,7 +82,7 @@ function organizationRepo(organization: SsoDomainOrganization | null) {
     findBySsoDomain: vi
       .fn<SsoDomainOrganizations["findBySsoDomain"]>()
       .mockResolvedValue(organization),
-    createSsoDomainMembership: vi.fn<SsoDomainOrganizations["createSsoDomainMembership"]>(),
+    createMembership: vi.fn<SsoDomainOrganizations["createMembership"]>(),
   };
   return {
     double: hooksRepo({}),
@@ -113,7 +114,6 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
         federation,
         invites: new StubInvites(),
         announcements: new StubAnnouncements(),
-        authzGrants: {} as never,
         arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
         ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
           record: async () => undefined,
@@ -125,6 +125,6 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
     });
 
     expect(mocks.findBySsoDomain).not.toHaveBeenCalled();
-    expect(mocks.createSsoDomainMembership).not.toHaveBeenCalled();
+    expect(mocks.createMembership).not.toHaveBeenCalled();
   });
 });

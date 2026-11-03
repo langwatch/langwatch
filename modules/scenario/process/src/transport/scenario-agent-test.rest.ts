@@ -28,6 +28,7 @@ export const scenarioAgentTestRest = defineRestRouter(ScenarioApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/v1/agents/:id/test", "testAgent")
+  .keepsRecords()
   .withSharedPath({
     owner: "agent",
     reason: "agent test door served by scenario while the cut lands (R10)",

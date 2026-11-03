@@ -28,8 +28,21 @@ export type ProvisioningFailureLevel = "error" | "warn";
 export interface LwqlClickHouseInventory {
   /** Each named table or view present. */
   readonly relations: readonly string[];
+  /** Each present relation's comment, by name; empty where it has none. */
+  readonly comments: Readonly<Record<string, string>>;
+  /** Each present relation's column names, by name. */
+  readonly columns: Readonly<Record<string, readonly string[]>>;
   /** The named SQL user-defined functions present. */
   readonly functions: readonly string[];
+}
+
+/** The PostgreSQL connection values a probe dials with, outside any named collection. */
+export interface LwqlPostgresCredentials {
+  readonly host: string;
+  readonly port: number;
+  readonly database: string;
+  readonly user: string;
+  readonly password: string;
 }
 
 /**
@@ -53,12 +66,33 @@ export abstract class LangWatchQLProvisioningRepository {
     configStoreEntities?: readonly ConfigStoreLwqlEntity[];
     failureLevel?: ProvisioningFailureLevel;
   }): Promise<RunClickHouseStatementsResult>;
-  /** Two catalog reads; throws when ClickHouse is unreachable. */
+  /** Catalog reads of the relations, their columns and the functions; throws if unreachable. */
   abstract readInventory(input: {
     database: string;
     relations: readonly string[];
     functions: readonly string[];
   }): Promise<LwqlClickHouseInventory>;
+  /**
+   * Reads through the `postgresql` table function, which dials with the collection's values as
+   * loaded now (never a table's cached pool); with `cluster`, on every replica. Throws on failure.
+   */
+  abstract probePostgresCollection(input: {
+    collection: string;
+    relation: string;
+    /**
+     * The PostgreSQL schema holding the approved view. An unqualified name resolves through the
+     * role's search_path, which provisioning never sets, so the default can exclude this schema.
+     */
+    schema: string;
+    cluster: string | undefined;
+  }): Promise<void>;
+  /** The same read with explicit values; throws when they do not authenticate. */
+  abstract probePostgresCredentials(input: {
+    credentials: LwqlPostgresCredentials;
+    relation: string;
+    schema: string;
+    cluster: string | undefined;
+  }): Promise<void>;
   abstract inventoryConfigStore(input: {
     names: LwqlAccessModelIdentity;
   }): Promise<ConfigStoreLwqlEntity[]>;

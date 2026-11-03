@@ -19,7 +19,7 @@ const traceHeaderReadInputSchema = z.object({
   tenantId: z.string().optional(),
   /**
    * Approximate trace timestamp (ms since epoch), used as a partition-pruning
-   * hint. Omitting it makes the read walk every partition, cold S3 included.
+   * hint. Omitting it is fine: the id index bounds the read server-side.
    */
   occurredAtMs: z.number().int().optional(),
   /** Resolve offloaded (ADR-022) input/output in full. Costs one extra spans read. */

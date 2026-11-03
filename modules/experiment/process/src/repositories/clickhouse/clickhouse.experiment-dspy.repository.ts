@@ -1,3 +1,4 @@
+import type { IdBoundOptions } from "@langwatch/clickhouse-client";
 import {
   experimentDspyStepSchema,
   experimentDspyStepSummarySchema,
@@ -45,6 +46,7 @@ export type ExperimentDspyClickHouseClient = {
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
+    idBound?: IdBoundOptions;
   }): Promise<ExperimentDspyClickHouseResult>;
 };
 
@@ -122,7 +124,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return;
-      const existing = await this.findWithClient(client, input);
+      const existing = await this.findWithClient({ client, input });
       const examples = mergeByHash<ExperimentDspyExample>(existing?.examples ?? [], input.examples);
       const llmCalls = mergeByHash<ExperimentDspyLlmCall>(existing?.llmCalls ?? [], input.llmCalls);
       const summary = llmSummary(llmCalls);
@@ -185,17 +187,20 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
             toString(argMax(LlmCallsTotalTokens, UpdatedAt)) AS LlmCallsTotalTokens,
             argMax(LlmCallsTotalCost, UpdatedAt) AS LlmCallsTotalCost,
             toString(toUnixTimestamp64Milli(min(CreatedAt))) AS CreatedAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND ExperimentId = {experimentId:String}
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ExperimentId = {experimentId:String}
+            {{idBound:dspy_steps.ExperimentId:experimentId:t}}
           GROUP BY TenantId, ExperimentId, RunId, StepIndex
           ORDER BY CreatedAt ASC
           LIMIT 10000
         `,
-        query_params: input,
+        query_params: { ...input },
         format: "JSONEachRow",
+        idBound: { fallback: "unbounded" },
       });
-      const rows = dspySummaryRowsSchema.parse(await result.json());
+      const found = await result.json();
+      const rows = dspySummaryRowsSchema.parse(found);
       return experimentDspyStepSummariesSchema.parse(
         rows.map((row) => ({
           tenantId: row.TenantId,
@@ -225,7 +230,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return null;
-      const step = await this.findWithClient(client, input);
+      const step = await this.findWithClient({ client, input });
       return step === null ? null : experimentDspyStepSchema.parse(step);
     } catch (error) {
       this.options.telemetry.warn(
@@ -236,10 +241,14 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     }
   }
 
-  private async findWithClient(
-    client: ExperimentDspyClickHouseClient,
-    input: ExperimentDspyStepLookup,
-  ): Promise<ExperimentDspyStep | null> {
+  private async findWithClient({
+    client,
+    input,
+  }: {
+    client: ExperimentDspyClickHouseClient;
+    input: ExperimentDspyStepLookup;
+  }): Promise<ExperimentDspyStep | null> {
+    const { tenantId, experimentId, runId, stepIndex } = input;
     const result = await client.query({
       query: `
         SELECT
@@ -266,6 +275,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
           AND t.ExperimentId = {experimentId:String}
           AND t.RunId = {runId:String}
           AND t.StepIndex = {stepIndex:String}
+          {{idBound:dspy_steps.ExperimentId,RunId:experimentId,runId:t}}
           AND (t.TenantId, t.ExperimentId, t.RunId, t.StepIndex, t.UpdatedAt) IN (
             SELECT TenantId, ExperimentId, RunId, StepIndex, max(UpdatedAt)
             FROM ${TABLE_NAME}
@@ -273,14 +283,17 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
               AND ExperimentId = {experimentId:String}
               AND RunId = {runId:String}
               AND StepIndex = {stepIndex:String}
+              {{idBound:dspy_steps.ExperimentId,RunId:experimentId,runId}}
             GROUP BY TenantId, ExperimentId, RunId, StepIndex
           )
         LIMIT 1
       `,
-      query_params: input,
+      query_params: { tenantId, experimentId, runId, stepIndex },
       format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
     });
-    const row = dspyRowsSchema.parse(await result.json())[0];
+    const found = await result.json();
+    const row = dspyRowsSchema.parse(found)[0];
     if (!row) return null;
     return {
       tenantId: row.TenantId,

@@ -13,20 +13,28 @@ import {
   Button,
   Heading,
   HStack,
+  Icon,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
-import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, CircleSlash, Inbox } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import type { ScenarioRunState } from "../../../behavior/simulations/use-run-state-stream.ts";
+import { type RunHooksView, runHooksViewOf } from "../../../model/run-hooks.ts";
 import { hasNoResults } from "../../../model/scenario-run-status.utils.ts";
 import { CopyIdChip } from "../../elements/copy-id-chip.tsx";
 import { CutAtLimitBadge, isCutAtLimitOf } from "../../elements/cut-at-limit-badge.tsx";
 import { ParameterRow, SECRET_VALUE_MASK } from "../../elements/parameter-row.tsx";
 import { RunCriteriaChip } from "../../elements/run-criteria-chip.tsx";
 import { RunDetailSection } from "../../elements/run-detail-section.tsx";
+import {
+  HOOK_TAG_TONE,
+  NoHooksBand,
+  SetupBand,
+  TeardownBand,
+} from "../../elements/run-hook-bands.tsx";
 import { ScenarioRunActions } from "../../elements/scenario-run-actions.tsx";
 import { ScenarioRunStatusIcon } from "../../elements/scenario-run-status-icon.tsx";
 import { SimulationConsole } from "../../elements/simulation-console/simulation-console.tsx";
@@ -42,17 +50,21 @@ function formatResultsForCopy(results: unknown): string {
 
 function RunDetailChips({
   scenarioState,
+  hooks,
   timeAgo,
   isArchived,
   copyableIds,
 }: {
   scenarioState: ScenarioRunState;
+  hooks: RunHooksView;
   timeAgo: string | undefined;
   isArchived: boolean;
   copyableIds: readonly { label: string; value: string }[] | undefined;
 }) {
   return (
     <HStack w="100%" gap={1.5} flexWrap="wrap">
+      {hooks.notScored && <Chip value="Not scored" tone="neutral" />}
+      {hooks.tag && <Chip value={hooks.tag.text} tone={HOOK_TAG_TONE[hooks.tag.tone]} />}
       {scenarioState.results && !hasNoResults(scenarioState.status) && (
         <RunCriteriaChip
           metCriteria={scenarioState.results.metCriteria ?? []}
@@ -117,6 +129,7 @@ export function RunDetailView({
     isRunning,
     setScenarioEditorOpen,
     handleRunAgainClick,
+    handleRunAgainKeepingData,
     firstTraceId,
     handleOpenInTraces,
     dejaView,
@@ -142,6 +155,14 @@ export function RunDetailView({
   // state via the shared conversation-expand context (Traces V2 mechanism).
   const [expandAllMessages, setExpandAllMessages] = useState(false);
 
+  const hooks = runHooksViewOf({
+    metadata: scenarioState.metadata,
+    status: scenarioState.status,
+  });
+  const openHookTrace = (traceId: string) => openDrawer("traceV2Details", { traceId });
+  const hasSetupBand = hooks.setup !== null || hooks.noHooks;
+  const showsNoResponse = shouldShowNoResponse && !hooks.notScored;
+
   return (
     <>
       <VStack
@@ -162,7 +183,11 @@ export function RunDetailView({
       >
         <HStack w="100%" justify="space-between" gap={2.5} minWidth={0} paddingEnd={8}>
           <HStack gap={3} flex={1} minWidth={0}>
-            <ScenarioRunStatusIcon status={scenarioState.status} />
+            {hooks.notScored ? (
+              <Icon as={CircleSlash} color="fg.muted" boxSize="16px" aria-label="Not scored" />
+            ) : (
+              <ScenarioRunStatusIcon status={scenarioState.status} />
+            )}
             <Heading size="sm" truncate title={displayTitle}>
               {displayTitle}
             </Heading>
@@ -173,6 +198,7 @@ export function RunDetailView({
               scenario={scenarioData}
               isRunning={isRunning}
               onRunAgain={handleRunAgainClick}
+              onRunAgainKeepingData={hooks.teardown ? handleRunAgainKeepingData : null}
               onEditScenario={() => setScenarioEditorOpen(true)}
               onOpenThread={
                 firstTraceId && !hasNoResults(scenarioState.status)
@@ -199,6 +225,7 @@ export function RunDetailView({
             with the Traces V2 drawer header */}
         <RunDetailChips
           scenarioState={scenarioState}
+          hooks={hooks}
           timeAgo={timeAgo}
           isArchived={Boolean(scenarioData?.archivedAt)}
           copyableIds={copyableIds}
@@ -207,13 +234,16 @@ export function RunDetailView({
 
       {/* Body — accordion sections, Traces V2 drawer language */}
       <Accordion.Root multiple value={openSections} onValueChange={(e) => setOpenSections(e.value)}>
+        {hooks.setup && <SetupBand result={hooks.setup} onOpenTrace={openHookTrace} />}
+        {hooks.noHooks && <NoHooksBand />}
+
         {/* Conversation — hidden when empty (e.g. stalled runs) */}
         {hasConversation && (
           <RunDetailSection
             value="conversation"
             title="Conversation"
             count={conversationCount}
-            isFirst
+            isFirst={!hasSetupBand}
             actions={
               <ConversationExpandButton
                 expandAllMessages={expandAllMessages}
@@ -242,8 +272,8 @@ export function RunDetailView({
 
         {/* No-response — explicit empty state when a finished run
             produced no messages (agent under test returned nothing). */}
-        {shouldShowNoResponse && (
-          <RunDetailSection value="no-response" title="Conversation" isFirst>
+        {showsNoResponse && (
+          <RunDetailSection value="no-response" title="Conversation" isFirst={!hasSetupBand}>
             <VStack
               align="center"
               justify="center"
@@ -263,37 +293,45 @@ export function RunDetailView({
           </RunDetailSection>
         )}
 
+        {hooks.teardown && <TeardownBand result={hooks.teardown} onOpenTrace={openHookTrace} />}
+
         <RunDetailSection
           value="results"
           title="Results"
           count={criteria?.total}
-          isFirst={!hasConversation && !shouldShowNoResponse}
+          isFirst={!hasConversation && !showsNoResponse && !hasSetupBand && !hooks.teardown}
         >
-          <Box
-            borderRadius="xl"
-            overflow="hidden"
-            borderWidth="1px"
-            borderColor="border.muted"
-            boxShadow="sm"
-          >
-            <SimulationConsole
-              results={scenarioState.results}
-              scenarioName={scenarioState.name ?? undefined}
-              status={scenarioState.status}
-              durationInMs={scenarioState.durationInMs}
-              titleBarActions={
-                scenarioState.results ? (
-                  <CopyButton
-                    value={formatResultsForCopy(scenarioState.results)}
-                    label="Results"
-                    size="2xs"
-                    color="fg.subtle"
-                    _hover={{ color: "fg.subtle", bg: "bg.panel" }}
-                  />
-                ) : undefined
-              }
-            />
-          </Box>
+          {hooks.notScored ? (
+            <Text fontSize="sm" color="fg.muted" data-testid="run-not-scored">
+              Not scored. Setup did not finish, so no turn ran and no pass rate counts this run.
+            </Text>
+          ) : (
+            <Box
+              borderRadius="xl"
+              overflow="hidden"
+              borderWidth="1px"
+              borderColor="border.muted"
+              boxShadow="sm"
+            >
+              <SimulationConsole
+                results={scenarioState.results}
+                scenarioName={scenarioState.name ?? undefined}
+                status={scenarioState.status}
+                durationInMs={scenarioState.durationInMs}
+                titleBarActions={
+                  scenarioState.results ? (
+                    <CopyButton
+                      value={formatResultsForCopy(scenarioState.results)}
+                      label="Results"
+                      size="2xs"
+                      color="fg.subtle"
+                      _hover={{ color: "fg.subtle", bg: "bg.panel" }}
+                    />
+                  ) : undefined
+                }
+              />
+            </Box>
+          )}
         </RunDetailSection>
 
         {parameters.length + secretParameterNames.length > 0 && (

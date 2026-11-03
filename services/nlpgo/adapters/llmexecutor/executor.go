@@ -593,6 +593,14 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 			CompletionTokens int `json:"completion_tokens"`
 			TotalTokens      int `json:"total_tokens"`
 			ReasoningTokens  int `json:"reasoning_tokens"`
+			// Anthropic-style top-level counts, in case a provider passes them through.
+			CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+			CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+			PromptTokensDetails      struct {
+				CachedTokens      int `json:"cached_tokens"`
+				CachedReadTokens  int `json:"cached_read_tokens"`
+				CachedWriteTokens int `json:"cached_write_tokens"`
+			} `json:"prompt_tokens_details"`
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -603,6 +611,15 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 	}
 	choice := raw.Choices[0]
 
+	// The gateway emits cached_read_tokens and cached_write_tokens, plus
+	// cached_tokens (their sum). Plain OpenAI sends only cached_tokens (a read).
+	details := raw.Usage.PromptTokensDetails
+	cacheRead := max(details.CachedReadTokens, raw.Usage.CacheReadInputTokens)
+	cacheWrite := max(details.CachedWriteTokens, raw.Usage.CacheCreationInputTokens)
+	if cacheRead == 0 && cacheWrite == 0 {
+		cacheRead = details.CachedTokens
+	}
+
 	out := &app.LLMResponse{
 		ToolCalls: choice.Message.ToolCalls,
 		Usage: app.Usage{
@@ -610,6 +627,9 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 			CompletionTokens: raw.Usage.CompletionTokens,
 			TotalTokens:      raw.Usage.TotalTokens,
 			ReasoningTokens:  raw.Usage.ReasoningTokens,
+
+			CacheReadInputTokens:     cacheRead,
+			CacheCreationInputTokens: cacheWrite,
 		},
 		Raw:        body,
 		DurationMS: durationMS,

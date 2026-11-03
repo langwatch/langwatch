@@ -12,6 +12,7 @@ import {
   evaluatorConfigSchema,
   type TargetConfig,
   targetConfigSchema,
+  MAX_CONCURRENCY,
 } from "../../experiment-workbench.ts";
 
 /**
@@ -189,7 +190,7 @@ const executionRequestSchemaDefinition = z
     targets: z.array(targetConfigSchema),
     evaluators: z.array(evaluatorConfigSchema),
     scope: executionScopeSchema,
-    concurrency: z.number().min(1).max(24).optional(),
+    concurrency: z.number().min(1).max(MAX_CONCURRENCY).optional(),
     /** Inline row data to evaluate instead of a saved or attached dataset (row-first). */
     data: z.array(z.record(z.string(), z.unknown())).max(EXPERIMENT_INLINE_ROWS_MAX).optional(),
     /** Saved platform dataset id to load and evaluate. Mutually exclusive with data. */
@@ -241,9 +242,9 @@ export const abortExperimentRunResponseSchema: AbortExperimentRunResponseSchema 
   abortExperimentRunResponseSchemaDefinition;
 
 /**
- * Optional run inputs accepted as a JSON body by the run API and the workflow
- * evaluate endpoint: inline data, a dataset id, override parameters, and a
- * row-index subset. `data` and `dataset_id` are mutually exclusive.
+ * Optional run inputs accepted as a JSON body by the experiment run API: inline
+ * data, a dataset id, override parameters, a row-index subset, and a per-run
+ * concurrency. `data` and `dataset_id` are mutually exclusive.
  */
 const runInputsBodySchemaDefinition = z
   .object({
@@ -251,6 +252,8 @@ const runInputsBodySchemaDefinition = z
     dataset_id: z.string().optional(),
     parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
     row_indices: z.array(z.number().int().nonnegative()).optional(),
+    /** Cells in flight at once for this run only; never saved to the experiment. */
+    concurrency: z.number().int().min(1).max(MAX_CONCURRENCY).optional(),
   })
   .refine((b) => !(b.data && b.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",

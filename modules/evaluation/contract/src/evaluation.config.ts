@@ -59,6 +59,13 @@ export const evaluationConfig = Config.define((c) => ({
   azureContentSafetyEndpoint: c.env("AZURE_CONTENT_SAFETY_ENDPOINT", z.string().optional()),
   enablePresidio: c.env("LANGWATCH_ENABLE_PRESIDIO", z.string().optional()),
   enableLingua: c.env("LANGWATCH_ENABLE_LINGUA", z.string().optional()),
+  // How long an evaluation keeps retrying while the evaluator service is down before it is
+  // recorded as an error. At most 120: the group queue gives up after 25 attempts (about 2.6h
+  // with its 10-minute backoff cap), and a longer window would block the group instead.
+  evaluatorRetryWindowMinutes: c.env(
+    "LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES",
+    positiveInteger.max(120).default(120),
+  ),
   foldCacheTtlSeconds,
 }));
 

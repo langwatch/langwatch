@@ -69,3 +69,16 @@ Feature: Open suite runs are caught up with scenario's runs after the cut
     Given a tenant's suite runs started in many weeks
     When the replay sweep reads the tenant's open runs
     Then the read is declared a full scan, since a run started in any week can still be open
+
+  @unit
+  Scenario: A scenario run stamped with an unknown target type does not stop the replay
+    Given an open suite run whose batch holds a scenario run stamped with a target type the platform does not know
+    When the replay step runs
+    Then the scenario run is read with no target and the suite run is caught up
+
+  @unit
+  Scenario: An open suite run whose scenario runs do not read is skipped and counted
+    Given two open suite runs, one whose batch's scenario runs cannot be read at all
+    When the replay step runs
+    Then the unreadable suite run is skipped, logged and counted in the report
+    And the other suite run is caught up

@@ -17,6 +17,7 @@ import {
   TARGET_REF_EXPR,
   TARGET_STAMP_KEY_EXPR,
 } from "../clickhouse.result-atoms.repository.ts";
+import { RUN_NOT_SCORED_EXPR } from "../simulation-clickhouse.repository.ts";
 import { mapStatus } from "../simulation-run.mapper.ts";
 
 const buildAtomFilters = (
@@ -66,6 +67,18 @@ describe("the outcome of a status", () => {
 
 describe("buildAtomFilters", () => {
   const base = { projectId: "proj", startDate: 1_000_000 };
+
+  describe("when the filter asks for failed or not-scored runs", () => {
+    /** @scenario "Server-side pass rates leave out a run whose setup failed" */
+    it("keeps a run whose setup failed out of the failures and in the not-scored list", () => {
+      const failed = buildAtomFilters({ ...base, outcome: "failed" });
+      const notScored = buildAtomFilters({ ...base, outcome: "not_scored" });
+
+      expect(failed.volatileClause).toContain(`NOT ${RUN_NOT_SCORED_EXPR}`);
+      expect(notScored.volatileClause).toContain(RUN_NOT_SCORED_EXPR);
+      expect(RUN_NOT_SCORED_EXPR).toContain("'langwatch', 'hooks', 'setup', 'status'");
+    });
+  });
 
   describe("when no end date is given", () => {
     /**

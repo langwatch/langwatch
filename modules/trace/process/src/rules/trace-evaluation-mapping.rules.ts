@@ -137,10 +137,16 @@ export function mapTraceEvaluationsToLegacyEvaluations(
       details: te.details,
       error: te.error ? { has_error: true as const, message: te.error, stacktrace: [] } : null,
       inputs: te.inputs,
+      ...(te.attempts === undefined || te.attempts === 0
+        ? {}
+        : { attempts: te.attempts, last_attempt_error: te.lastAttemptError }),
       timestamps: {
         inserted_at: te.timestamps.scheduledAt,
         started_at: te.timestamps.startedAt,
         finished_at: te.timestamps.completedAt,
+        ...(te.attempts === undefined || te.attempts === 0
+          ? {}
+          : { last_attempt_at: te.lastAttemptAt, next_attempt_at: te.nextAttemptAt }),
       },
     }));
   }

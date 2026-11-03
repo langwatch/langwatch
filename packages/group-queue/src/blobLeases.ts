@@ -17,7 +17,8 @@ local now = redis.call("TIME")
 local nowMs = (tonumber(now[1]) * 1000) + math.floor(tonumber(now[2]) / 1000)
 `;
 
-const TAKE_LUA = `${REDIS_NOW_MS_LUA}
+const TAKE_LUA = `#!lua
+${REDIS_NOW_MS_LUA}
 local ttlSeconds = tonumber(ARGV[2])
 local deadlineMs = nowMs + (ttlSeconds * 1000)
 redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
@@ -32,7 +33,8 @@ return deadlineMs
 // KEYS[3] (the Redis-tier blob) is passed only for the redis tier, so the S3
 // tier never co-slots a key that does not exist. Returns 1 when the release
 // left nothing holding the blob and put it on the grace window, else 0.
-const RELEASE_LUA = `${GQ_BLOB_GRACE_LUA}${REDIS_NOW_MS_LUA}
+const RELEASE_LUA = `#!lua flags=allow-oom
+${GQ_BLOB_GRACE_LUA}${REDIS_NOW_MS_LUA}
 redis.call("ZREM", KEYS[1], ARGV[1])
 redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
 -- Remove the mirrored legacy token but deliberately retain the migration guard.
@@ -47,7 +49,8 @@ return graced
 // blob went onto the grace window, else 0. A same-blob transfer (a retry whose
 // re-encode kept the hash) leaves KEYS[1] == KEYS[2], so the replacement lease
 // is already in that set when the helper runs and the grace window is withheld.
-const TRANSFER_LUA = `${GQ_BLOB_GRACE_LUA}${REDIS_NOW_MS_LUA}
+const TRANSFER_LUA = `#!lua flags=allow-oom
+${GQ_BLOB_GRACE_LUA}${REDIS_NOW_MS_LUA}
 local ttlSeconds = tonumber(ARGV[3])
 local deadlineMs = nowMs + (ttlSeconds * 1000)
 redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
@@ -66,7 +69,8 @@ end
 return gqGraceExpireIfUnleased(KEYS[2], KEYS[4], #KEYS == 5 and KEYS[5] or "")
 `;
 
-const COUNT_LIVE_LUA = `${REDIS_NOW_MS_LUA}
+const COUNT_LIVE_LUA = `#!lua flags=allow-oom
+${REDIS_NOW_MS_LUA}
 redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
 local count = redis.call("ZCARD", KEYS[1])
 if count == 0 then redis.call("DEL", KEYS[1]) end

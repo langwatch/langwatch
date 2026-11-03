@@ -228,10 +228,10 @@ describe.skipIf(!clickHouseConfigured)("ClickHouseTraceAttributedRollupRepositor
         spendUsdStr: string;
         requests: string;
         lastActivityMs: string;
-        mostUsedTarget: string;
+        models: string[];
       }>(
         `SELECT actor, toString(sum(spendUsd)) AS spendUsdStr, toString(count()) AS requests,
-        toString(toUnixTimestamp64Milli(max(occurredAt))) AS lastActivityMs, any(model) AS mostUsedTarget
+        toString(toUnixTimestamp64Milli(max(occurredAt))) AS lastActivityMs, groupUniqArray(model) AS models
       FROM (SELECT ts.Attributes[{userKey:String}] AS actor, coalesce(ts.TotalCost, 0) AS spendUsd,
           ts.OccurredAt AS occurredAt, arrayElement(ts.Models, 1) AS model
         FROM trace_summaries ts WHERE ${GOVERNED} AND ts.Attributes[{userKey:String}] != '' AND ${dedup(RANGE)})
@@ -248,15 +248,18 @@ describe.skipIf(!clickHouseConfigured)("ClickHouseTraceAttributedRollupRepositor
         limit: 5,
         offset: 0,
       });
+      // `any(model)` picks an arbitrary row per actor, and two queries can
+      // pick differently, so the model is checked as one of the actor's own.
       expect(answer).toEqual(
         old.map((r) => ({
           value: r.actor,
           spentUsd: r.spendUsdStr,
           requests: Number(r.requests),
           lastOccurredAtMs: Number(r.lastActivityMs),
-          firstModel: r.mostUsedTarget,
+          firstModel: expect.any(String),
         })),
       );
+      answer.forEach((r, i) => expect(old[i]?.models).toContain(r.firstModel));
       expect(answer.map((r) => r.value).toSorted()).toEqual(["u1", "u2"]);
     },
   );

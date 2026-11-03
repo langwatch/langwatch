@@ -16,6 +16,9 @@ const FRAME_CAP_RATIO = 2;
 /** The `session` value an agent keeps per conversation, in bytes. */
 export const SESSION_MAX_BYTES = 64 * 1024;
 
+/** A scenario hook's `state`, or teardown's returned object, in bytes: the session cap. */
+export const STATE_MAX_BYTES = SESSION_MAX_BYTES;
+
 /** Every cap that derives from the envelope cap, resolved together. */
 export interface RelayPayloadCaps {
   /** The relay request body and the call envelope, in bytes. */
@@ -24,6 +27,8 @@ export interface RelayPayloadCaps {
   resultBytes: number;
   /** The `session` value alone, in bytes. */
   sessionBytes: number;
+  /** The `state` value alone, in bytes. */
+  stateBytes: number;
   /** One WebSocket frame, in bytes; never below the envelope cap. */
   frameBytes: number;
 }
@@ -41,6 +46,7 @@ export function relayPayloadCaps(overrideMb?: number): RelayPayloadCaps {
     envelopeBytes,
     resultBytes: Math.floor(envelopeBytes * RESULT_CAP_RATIO),
     sessionBytes: SESSION_MAX_BYTES,
+    stateBytes: STATE_MAX_BYTES,
     frameBytes: Math.max(envelopeBytes, envelopeBytes * FRAME_CAP_RATIO),
   };
 }

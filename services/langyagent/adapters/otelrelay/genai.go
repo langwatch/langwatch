@@ -20,6 +20,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/pkg/providererr"
 )
 
 // The worker exports no OTLP: the wrapper is a thin stdio process and pi
@@ -115,6 +116,9 @@ type genAICall struct {
 	cacheReadTokens       int64
 	cacheCreationTokens   int64
 	cacheCreation1hTokens int64
+	// streamError is an in-stream error event's JSON payload, kept so the
+	// span records why a 200 stream failed.
+	streamError []byte
 
 	finishOnce sync.Once
 }
@@ -243,10 +247,17 @@ func (g *genAICall) bufferLine(part []byte) {
 
 func (g *genAICall) inspectSSELine(line []byte) {
 	payload, ok := bytes.CutPrefix(line, sseDataLinePrefix)
-	if !ok || !bytes.Contains(payload, []byte(`"usage"`)) {
+	if !ok {
 		return
 	}
-	g.takeUsage(payload)
+	if g.streamError == nil && bytes.Contains(payload, errorEventTypeMark) &&
+		gjson.GetBytes(payload, "type").Str == "error" {
+		g.streamError = append([]byte(nil), payload...)
+		return
+	}
+	if bytes.Contains(payload, []byte(`"usage"`)) {
+		g.takeUsage(payload)
+	}
 }
 
 // takeUsage reads the usage fields out of one JSON payload. Latest non-zero
@@ -360,10 +371,19 @@ func (g *genAICall) forwardSpan() {
 	if strings.HasPrefix(info.Model, codexModelPrefix) {
 		span.Attributes().PutStr(attrCostNonBillable, "true")
 	}
-	if g.isTransportFailure {
-		span.Attributes().PutStr("error.type", "transport_error")
+	if g.status > 0 {
+		span.Attributes().PutInt("http.response.status_code", int64(g.status))
 	}
-	if g.status >= 400 {
+	failed := g.status >= 400 || g.streamError != nil
+	switch {
+	case g.isTransportFailure:
+		span.Attributes().PutStr("error.type", "transport_error")
+	case g.streamError != nil:
+		g.recordFailure(span, g.streamError, 0)
+	case g.status >= 400:
+		g.recordFailure(span, g.jsonBody, g.status)
+	}
+	if failed {
 		span.Status().SetCode(ptrace.StatusCodeError)
 	} else {
 		span.Status().SetCode(ptrace.StatusCodeOk)
@@ -390,6 +410,27 @@ func (g *genAICall) forwardSpan() {
 				zap.Error(err))
 		}
 	}()
+}
+
+// recordFailure states on the span why the call failed: the error's own type
+// and the account cause the proxy classified. Provider prose can quote a key
+// back in shapes no list covers, so the only message recorded is the
+// gateway's own governance message. status is 0 for an in-stream error.
+func (g *genAICall) recordFailure(span ptrace.Span, body []byte, status int) {
+	attrs := span.Attributes()
+	if code := providerErrorCode(body); code != "" {
+		attrs.PutStr("error.type", string(code))
+	}
+	cause, hasCause := accountCauseReason(status, body)
+	if hasCause {
+		attrs.PutStr("langwatch.langy.error_cause", string(cause))
+	}
+	message := gjson.GetBytes(body, "error.message").Str
+	if message != providererr.GatewayAccountExhaustedMessage {
+		return
+	}
+	attrs.PutStr("error.message", message)
+	span.Status().SetMessage(message)
 }
 
 // randomSpanID mints a fresh non-zero span id for a synthesized span.

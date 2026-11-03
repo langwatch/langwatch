@@ -9,6 +9,7 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRequestContext,
+  type RestConfirmation,
   type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
@@ -26,7 +27,24 @@ import {
 } from "@langwatch/monitor-contract";
 import { z } from "zod";
 
+import { monitorWriterOf } from "../rules/monitor-actor.rules.ts";
+import { monitorDrawerPath } from "../rules/monitor-auto-pause.rules.ts";
+
 const notFound = documentedResponses({ 404: badRequestSchema });
+
+/**
+ * The click a monitor route asks a Langy key for, named from the monitor itself. A disable asks
+ * only when the call turns the monitor off; turning it on removes nothing.
+ */
+function monitorConfirmation(action: "delete" | "disable"): RestConfirmation<MonitorApi> {
+  return {
+    resource: "monitor",
+    action,
+    idParam: "id",
+    ...(action === "disable" ? { when: (input) => input.enabled === false } : {}),
+    name: async ({ app, projectId, id }) => (await app.findById({ id, projectId }))?.name,
+  };
+}
 
 /** Where an online evaluation opens in the platform. */
 function monitorWire(params: {
@@ -52,9 +70,14 @@ function monitorWire(params: {
     threadIdleTimeout: monitor.threadIdleTimeout,
     createdAt: monitor.createdAt.toISOString(),
     updatedAt: monitor.updatedAt.toISOString(),
+    autoPausedAt: monitor.autoPausedAt ? monitor.autoPausedAt.toISOString() : null,
+    autoPausedReason: monitor.autoPausedReason ?? null,
+    evaluatorLabel: monitor.evaluatorLabel ?? null,
+    createdById: monitor.createdById ?? null,
+    updatedById: monitor.updatedById ?? null,
     platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
-      path: `/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
+      path: monitorDrawerPath(monitor.id),
     }),
   };
 }
@@ -111,6 +134,7 @@ export function createMonitorsRest(): Readonly<{
       // hierarchy, so no existing caller loses access. Deletion stays on
       // `:manage` below, where the destructive line sits.
       .post("/", "postApiMonitors")
+      .keepsRecords()
       .withAudit("monitors.create")
       .withInput(monitorRestCreateInputSchema)
       .withPermission("evaluations:create")
@@ -121,11 +145,12 @@ export function createMonitorsRest(): Readonly<{
         description: "Create a new online evaluation monitor",
       })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope }, project) =>
+      .handle(async ({ app, input, scope, actor }, project) =>
         monitorWire({
           app,
           projectSlug: project.projectSlug,
           monitor: await app.create({
+            ...monitorWriterOf(actor),
             projectId: scope.id,
             name: input.name,
             checkType: input.checkType,
@@ -139,6 +164,7 @@ export function createMonitorsRest(): Readonly<{
             ...(input.threadIdleTimeout === undefined
               ? {}
               : { threadIdleTimeout: input.threadIdleTimeout }),
+            ...(input.evaluatorLabel === undefined ? {} : { evaluatorLabel: input.evaluatorLabel }),
           }),
         }),
       )
@@ -148,6 +174,8 @@ export function createMonitorsRest(): Readonly<{
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestUpdateInputSchema)
       .withPermission("evaluations:update")
+      // An update that switches the monitor off is a disable, and the toggle's click covers it.
+      .withConfirmation(monitorConfirmation("disable"))
       .withOutput(monitorRestResponseSchema)
       .withDocs({
         tags: ["Monitors"],
@@ -155,13 +183,13 @@ export function createMonitorsRest(): Readonly<{
         responses: notFound,
       })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope }, project) => {
+      .handle(async ({ app, input, scope, actor }, project) => {
         const { id, ...changes } = input;
 
         return monitorWire({
           app,
           projectSlug: project.projectSlug,
-          monitor: await app.patch({ id, projectId: scope.id, changes }),
+          monitor: await app.patch({ id, projectId: scope.id, changes, ...monitorWriterOf(actor) }),
         });
       })
 
@@ -171,6 +199,7 @@ export function createMonitorsRest(): Readonly<{
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestToggleInputSchema)
       .withPermission("evaluations:update")
+      .withConfirmation(monitorConfirmation("disable"))
       .withOutput(monitorRestToggledSchema)
       .withDocs({
         tags: ["Monitors"],
@@ -188,6 +217,7 @@ export function createMonitorsRest(): Readonly<{
       .withAudit("monitors.delete")
       .withParams(monitorRestIdParamsSchema)
       .withPermission("evaluations:manage")
+      .withConfirmation(monitorConfirmation("delete"))
       .withOutput(monitorRestDeletedSchema)
       .withDocs({
         tags: ["Monitors"],

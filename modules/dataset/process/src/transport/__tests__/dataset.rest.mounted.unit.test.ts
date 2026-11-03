@@ -13,6 +13,7 @@ import {
   DatasetNotFoundError,
   DatasetPageTooLargeError,
   DatasetTooLargeToReadInlineError,
+  InvalidColumnError,
   DatasetNotReadyError,
   DATASET_DEFAULT_LIMITS,
   type DatasetApi,
@@ -705,10 +706,11 @@ describe("the mounted dataset REST family", () => {
     it("answers 400 when an entry names a column the dataset does not have", async () => {
       const { send } = mount({
         batchCreateRecords: vi.fn(async () => {
-          throw domainError(
-            "InvalidColumnError",
-            'Invalid column "foo". Valid columns: input, output',
-          );
+          throw new InvalidColumnError({
+            columnName: "foo",
+            datasetName: "my-dataset",
+            validColumns: ["input", "output"],
+          });
         }) as never,
       });
 

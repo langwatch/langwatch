@@ -1,5 +1,9 @@
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
+  idIndexedClientDouble,
+  type ScriptedStatements,
+} from "@langwatch/clickhouse-client/testing";
+import {
   clickHouseClientDouble,
   clickHouseQueryClientDouble,
 } from "@langwatch/test-harness/client-doubles/clickhouse";
@@ -14,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { createFoldState } from "../../../eventing/__tests__/trace-subscriber.fixtures.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 
 const authorization = ownProof({ projectId: "tenant-1" });
@@ -73,26 +78,19 @@ function makeRepo(responder: (sql: string) => unknown[]) {
   const resolvedFor: (string | undefined)[] = [];
   const boundTenants: string[] = [];
   const declaredFullScans: string[] = [];
-  const client = clickHouseQueryClientDouble({
-    query: vi.fn(
-      async ({
-        sql,
-        params,
-        tenantId,
-        SKIP_COLD_SCAN_CHECK,
-      }: {
-        sql: string;
-        params?: Record<string, unknown>;
-        tenantId: string;
-        SKIP_COLD_SCAN_CHECK?: true;
-      }) => {
-        queries.push(sql);
-        if (SKIP_COLD_SCAN_CHECK === true) declaredFullScans.push(sql);
-        parameters.push(params ?? {});
-        boundTenants.push(tenantId);
-        return { rows: responder(sql) };
-      },
-    ),
+  const client = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(
+        async ({ sql, params, tenantId, SKIP_COLD_SCAN_CHECK }) => {
+          queries.push(sql);
+          if (SKIP_COLD_SCAN_CHECK === true) declaredFullScans.push(sql);
+          parameters.push(params ?? {});
+          boundTenants.push(tenantId);
+          return { rows: responder(sql) };
+        },
+      ),
+    },
   });
   return {
     repo: TraceSummaryClickHouseRepository.create({

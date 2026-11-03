@@ -79,6 +79,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── the control request the card renders ──────────────────────────────────
 
   .post("/api/langy/local/requests", "langyLocalCreateRequest")
+  .keepsRecords()
   .withAudit("langy.createLocalRequest")
   .withAccess(LOCAL_ACCESS)
   .withInput(langyLocalCreateRequestBodySchema)
@@ -96,6 +97,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── one local tool call ───────────────────────────────────────────────────
 
   .post("/api/langy/local/calls", "langyLocalStartCall")
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withAccess(LOCAL_ACCESS)
   // `langyLocalStartCallRequestSchema` intersects a discriminated union, which
@@ -128,6 +130,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   )
 
   .post("/api/langy/local/calls/:callId/cancel", "langyLocalCancelCall")
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withAccess(LOCAL_ACCESS)
   .withParams(langyLocalCallIdParamsSchema)
@@ -145,6 +148,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── the question the worker asks ──────────────────────────────────────────
 
   .post("/api/langy/waits", "langyLocalStartWait")
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withAccess(LOCAL_ACCESS)
   .withInput(langyLocalStartWaitRequestSchema)

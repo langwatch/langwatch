@@ -13,6 +13,7 @@ function notices(send: (data: unknown) => Promise<void>) {
     recordSessionStarted: { send },
     recordSsoAutoAdded: { send },
     recordSignedUp: { send },
+    recordAppPageOpened: { send },
   });
   return { service, reportError };
 }

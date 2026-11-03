@@ -82,6 +82,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
         DEFAULT: snapshot.effective.DEFAULT ?? null,
         FAST: snapshot.effective.FAST ?? null,
         EMBEDDINGS: snapshot.effective.EMBEDDINGS ?? null,
+        INSTANT_EVALS: snapshot.effective.INSTANT_EVALS ?? null,
       },
       configs: snapshot.configs.map((config) => ({
         id: config.id,
@@ -94,6 +95,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   })
 
   .post("/", "postApiModelDefaults")
+  .keepsRecords()
   .withAudit("modelProvider.saveDefaultModelsConfig")
   .withInput(createModelDefaultConfigInputSchema)
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
@@ -101,7 +103,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .withMiddlewareContext(modelDefaultsRestCredential)
   .withDocs({
     description:
-      "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
+      "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher scope.",
     responses: baseResponses,
   })
   .handle(async ({ app, input, scope }, credential) => {
@@ -123,6 +125,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   })
 
   .put("/:id", "putApiModelDefaultsById")
+  .keepsRecords()
   .withAudit("modelProvider.saveDefaultModelsConfig")
   .withParams(modelDefaultsRestParamsSchema)
   .withInput(updateModelDefaultConfigInputSchema)
@@ -158,6 +161,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
 
   .delete("/:id", "deleteApiModelDefaultsById")
   .withAudit("modelProvider.deleteDefaultModelsConfig")
+  .withoutConfirmation("Langy keys cannot hold project:manage")
   .withParams(modelDefaultsRestParamsSchema)
   .withOutput(z.void())
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)

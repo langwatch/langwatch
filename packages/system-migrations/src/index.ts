@@ -17,6 +17,7 @@ export {
   type HeldReason,
   isHeldTenantFailed,
   isTerminalTenantStatus,
+  isWaitingOnPerson,
   type MigrationPassSummary,
   TENANT_MIGRATION_STATUSES,
   type TenantMigrationOutcome,

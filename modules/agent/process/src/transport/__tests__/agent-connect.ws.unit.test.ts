@@ -88,6 +88,20 @@ describe("detectResultCapViolation", () => {
       expect(detectResultCapViolation({ output: "ok", session: { id: "s1" }, caps })).toBeNull();
     });
   });
+
+  describe("when the state is above the state cap", () => {
+    it("names the state cap", () => {
+      const state = { rows: "z".repeat(caps.stateBytes + 10) };
+      expect(detectResultCapViolation({ output: "ok", session: undefined, state, caps })).toEqual({
+        what: "state",
+        sizeBytes: expect.any(Number),
+        limitBytes: caps.stateBytes,
+      });
+      expect(
+        detectResultCapViolation({ output: "ok", session: undefined, state: { id: 1 }, caps }),
+      ).toBeNull();
+    });
+  });
 });
 
 describe("ConnectGateway without Redis", () => {
@@ -534,6 +548,7 @@ describe("AgentSessionService.findCallForSession", () => {
         instanceId: "inst_1",
         replyTo: "pod_solo",
         envelope: {
+          kind: "turn",
           callId: "call_1",
           agentId: "agent_b",
           threadId: "thread_1",

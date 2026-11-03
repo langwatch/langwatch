@@ -691,6 +691,40 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
     });
   });
 
+  describe("when a blocking data step logs a line and then fails", () => {
+    /** @scenario "A blocking step's log lines are kept with its attempt" */
+    it("keeps the line and the failure on the step row, with the error redacted", async () => {
+      await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
+      const failing = defineMigrationStep({
+        id: "dataset:copy-keys",
+        kind: "data",
+        mode: "blocking",
+        description: "copies the keys",
+        run: async ({ log }) => {
+          log.info("copied a page", { afterId: "key_3" });
+          throw new Error("refused by postgres://lw:s3cretpass@db:5432/app");
+        },
+      });
+
+      const outcome = await run(
+        runnerFor({
+          release: "3.21.0",
+          applier: fakeApplier({ release: "3.21.0" }),
+          codeSteps: [failing],
+        }),
+      );
+
+      expect(outcome.code).not.toBe("done");
+      const { rows } = await scratch.postgres.query<{ log_tail: string[]; last_error: string }>(
+        `SELECT "log_tail", "last_error" FROM "_langwatch_upgrade_step" WHERE "id" = 'dataset:copy-keys'`,
+      );
+      const [row] = rows;
+      expect(row?.log_tail.some((line) => line.includes("info copied a page"))).toBe(true);
+      expect(row?.log_tail.at(-1)).toContain("warn blocking step failed");
+      expect(JSON.stringify(row)).not.toContain("s3cretpass");
+    });
+  });
+
   describe("when a background step failed before this run", () => {
     /** @scenario "An upgrade run resets failed background steps to pending" */
     it("sets it pending in the preflight with its error and checkpoint kept", async () => {

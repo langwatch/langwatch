@@ -11,6 +11,7 @@ import type { LangyLocalPresenceRepository } from "../../../repositories/langy-l
 import type { LangyLocalUserWaitRepository } from "../../../repositories/langy-local-user-wait.repository.ts";
 import type { LocalCallBuffer } from "../../../rules/langy-local-call-record.rules.ts";
 import type {
+  StoredUserWait,
   UserWaitBuffer,
   UserWaitEvents,
 } from "../../../rules/langy-local-user-wait-record.rules.ts";
@@ -43,6 +44,9 @@ export type LocalControlRepositories = {
 
 type Timing = { offlineWaitMs?: number; pollIntervalMs?: number; now?: () => number };
 
+/** Told every answered card, so a confirmation card's click is recorded where it is spent. */
+type AnswerListener = { onAnswered?: (wait: StoredUserWait) => Promise<void> };
+
 /** One process's local control, built over its repositories and workspace channel. */
 export class LangyLocalControlRuntimeService implements LocalControlRuntime {
   /**
@@ -56,7 +60,8 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
       mintSessionKey: ControlRequestKeyMinter;
       events: UserWaitEvents;
       buffer: UserWaitBuffer & LocalCallBuffer;
-    } & Timing,
+    } & Timing &
+      AnswerListener,
   ): LangyLocalControlRuntimeService {
     return new LangyLocalControlRuntimeService(input);
   }
@@ -78,6 +83,7 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     mintSessionKey,
     events,
     buffer,
+    onAnswered,
     ...timing
   }: LocalControlRepositories & {
     workspace: LangyLocalWorkspaceChannel;
@@ -85,7 +91,8 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     mintSessionKey: ControlRequestKeyMinter;
     events: UserWaitEvents;
     buffer: UserWaitBuffer & LocalCallBuffer;
-  } & Timing) {
+  } & Timing &
+    AnswerListener) {
     const { offlineWaitMs, pollIntervalMs, now } = timing;
     const clock = now ? { now } : {};
     const polling = pollIntervalMs !== undefined ? { pollIntervalMs } : {};
@@ -106,6 +113,7 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
       events,
       buffer,
       sendPermission: (args) => dispatcher.sendPermission(args),
+      ...(onAnswered ? { onAnswered } : {}),
       ...clock,
       ...polling,
     });

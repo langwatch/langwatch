@@ -60,10 +60,6 @@ export class RunawayContainmentService {
     const dayBucket = Math.floor(now.epochMilliseconds / 86_400_000);
     try {
       this.runaway.onCeilingBreach();
-      this.runaway.error(
-        { projectId, triggerId: trigger.id, cap, count: input.count, skipped },
-        "Automation passed its daily ceiling on confirmed matches; further matches are being skipped for the rest of the UTC day",
-      );
       if (
         (await this.runaway.claimOnce(
           `automation-containment-check:${trigger.id}`,
@@ -72,6 +68,11 @@ export class RunawayContainmentService {
       ) {
         return;
       }
+      // After the claim: every match past the ceiling breaches, so this logs once per window.
+      this.runaway.warn(
+        { projectId, triggerId: trigger.id, cap, count: input.count, skipped },
+        "Automation passed its daily ceiling on confirmed matches; further matches are being skipped for the rest of the UTC day",
+      );
 
       if (await this.isMisconfigured(input)) {
         await this.pauseAndNotify(input, now, dayBucket);
@@ -219,5 +220,6 @@ export abstract class AutomationRunawaySignals {
   abstract onAutoPaused(reason: string): void;
   abstract onContainmentFailed(): void;
   abstract error(fields: Record<string, unknown>, message: string): void;
+  abstract warn(fields: Record<string, unknown>, message: string): void;
   abstract info(fields: Record<string, unknown>, message: string): void;
 }

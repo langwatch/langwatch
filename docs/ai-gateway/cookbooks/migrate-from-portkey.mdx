@@ -10,7 +10,7 @@ sidebarTitle: Migrate from Portkey
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Virtual key (a stored provider credential)                     | A row under **Settings > Model Providers**. See [Providers](/ai-gateway/providers/overview).                                                                                                                        |
 | API key sent as `x-portkey-api-key`                            | A [virtual key](/ai-gateway/virtual-keys), sent as `Authorization: Bearer vk-lw-...`.                                                                                                                               |
-| `x-portkey-virtual-key` or `x-portkey-provider` on the request | The `provider/` prefix on the model name, for example `openai/gpt-5-mini`. See [Model naming](/ai-gateway/model-naming).                                                                                            |
+| `x-portkey-virtual-key` or `x-portkey-provider` on the request | The `provider/` prefix on the model name, for example `openai/gpt-6-luna`. See [Model naming](/ai-gateway/model-naming).                                                                                            |
 | Config with `strategy.mode: "fallback"` and ordered `targets`  | A [routing policy](/ai-gateway/governance/routing-policies): an ordered list of provider rows a key tries.                                                                                                          |
 | `retry.attempts` in a config                                   | `fallback.maxAttempts` in the key configuration, default 3. The gateway decides which failures move to the next provider; that list is not configurable.                                                            |
 | `cache.mode: "simple"`                                         | Provider prompt caching passes through, and [cache rules](/ai-gateway/cache-control) force or disable it per model, key or tag.                                                                                     |
@@ -48,7 +48,7 @@ Virtual key: Routing = that policy
 
 </CodeGroup>
 
-Model aliases on the policy map a name your code sends to the model each provider serves, for example `gpt-5-mini` to `azure/acme-mini-eu`. See [Model aliases](/ai-gateway/model-aliases).
+Model aliases on the policy map a name your code sends to the model each provider serves, for example `gpt-6-luna` to `azure/acme-mini-eu`. See [Model aliases](/ai-gateway/model-aliases).
 
 ## 3. Create the virtual keys
 
@@ -80,7 +80,7 @@ client = OpenAI(
     api_key=LANGWATCH_VIRTUAL_KEY,
 )
 response = client.chat.completions.create(
-    model="openai/gpt-5-mini",
+    model="openai/gpt-6-luna",
     messages=[...],
     user="cust_8841",
     extra_headers={"X-LangWatch-Metadata": '{"plan": "pro"}'},

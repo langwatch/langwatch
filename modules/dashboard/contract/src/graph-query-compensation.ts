@@ -11,6 +11,18 @@ const DAY_SCALE_MINUTES = 1440;
 /** The hourly bucket a missing or mangled stored `timeScale` degrades to, never NaN. */
 const FALLBACK_SCALE_MINUTES = 60;
 
+/**
+ * A stored `timeScale` as the query schema accepts it. The chart builder saved text ("60") for
+ * years, so whole-number text reads as that number. Anything else, absent included, is null:
+ * the caller decides whether that degrades to a default or refuses the chart.
+ */
+export function parseStoredTimeScale(value: unknown): "full" | number | null {
+  if (value === "full") return "full";
+  const parsed = typeof value === "string" && /^\s*\d+\s*$/.test(value) ? Number(value) : value;
+  const isUsable = typeof parsed === "number" && Number.isInteger(parsed) && parsed > 0;
+  return isUsable ? parsed : null;
+}
+
 function normalizeNumericTimeScale(value: unknown): number {
   const parsed = typeof value === "string" ? parseInt(value, 10) : value;
   const isUsable = typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0;

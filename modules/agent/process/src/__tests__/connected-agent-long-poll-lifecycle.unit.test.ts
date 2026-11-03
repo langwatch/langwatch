@@ -113,6 +113,42 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     });
   });
 
+  describe("when an instance answers a turn with neither an output nor an error", () => {
+    /** @scenario "A result frame carries either an output or an error" */
+    /** @scenario "The platform checks a result against the kind of call it answers" */
+    it("fails the call as a result LangWatch cannot read", async () => {
+      const runtime = ConnectedAgentRuntimeService.create({
+        podId: "pod_solo",
+        state: MemoryConnectedAgentStateRepository.create(),
+        relay: MemoryConnectedAgentRelayChannel.create(),
+      });
+      const transport = createLongPollFixture({
+        runtime,
+        agents: registeringAgentService(),
+        publicBaseUrl: "https://example.test",
+        replicaCount: 1,
+        pollWaitMs: 2_000,
+      });
+      const { token, dispatchAgent, call } = await registerInstance(transport);
+
+      const outcome = runtime.dispatcher.dispatch({ projectId, agent: dispatchAgent, call });
+      const poll = await transport.poll({ credentials, token, inFlightCallIds: [] });
+      const callId = poll.frames[0]!.callId;
+      await transport.frames({
+        credentials,
+        token,
+        frames: [
+          { type: "ack", protocol: PROTOCOL_VERSION, callId },
+          { type: "result", protocol: PROTOCOL_VERSION, callId },
+        ],
+      });
+
+      await expect(outcome).rejects.toMatchObject({ code: "agent_call_failed" });
+      await transport.close();
+      vi.restoreAllMocks();
+    });
+  });
+
   describe("when the relay request is aborted for an instance that acknowledged by poll", () => {
     /** @scenario "A cancel reaches a polling instance" */
     it("answers the next poll with a cancel frame for that call", async () => {

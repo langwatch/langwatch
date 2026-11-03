@@ -513,10 +513,11 @@ func PlayVolumeName(number int, engine string) string {
 
 // playImages pins the sandbox container images. ClickHouse reuses the exact
 // image the shared managed server runs; Postgres matches the major version the
-// repo targets; Redis is the plain upstream image.
+// repo targets; Redis is the upstream Valkey image, a drop-in that ships
+// valkey-cli.
 const (
 	playPostgresImage = "postgres:16"
-	playRedisImage    = "redis:7"
+	playRedisImage    = "valkey/valkey:9.1"
 )
 
 // playPostgresShell starts the sandbox's dedicated Postgres and waits for it
@@ -560,7 +561,7 @@ func playRedisShell(number, hostPort int) string {
 	return fmt.Sprintf(
 		"docker rm -f %s >/dev/null 2>&1 || true\n"+
 			"docker run -d --name %s -v %s:/data -p 127.0.0.1:%d:6379 %s\n"+
-			"for i in $(seq 1 30); do docker exec %s redis-cli ping 2>/dev/null | grep -q PONG && exit 0; sleep 1; done\n"+
+			"for i in $(seq 1 30); do docker exec %s valkey-cli ping 2>/dev/null | grep -q PONG && exit 0; sleep 1; done\n"+
 			"echo 'play redis did not become ready' >&2; exit 1",
 		name, name, vol, hostPort, playRedisImage, name)
 }

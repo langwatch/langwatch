@@ -100,6 +100,12 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
     return route.kind === "shared" ? this.shared() : this.resolveOrganization(route.organizationId);
   }
 
+  /** The organisation a tenant belongs to, from the router's cache. */
+  organizationOf(tenantId: string): Promise<string> {
+    this.assertOpen();
+    return this.router.organizationOf(tenantId);
+  }
+
   /**
    * The one server a declared tenant set is answered on: its organisation's. A set spanning
    * organisations is refused, since no single server holds every tenant's rows.

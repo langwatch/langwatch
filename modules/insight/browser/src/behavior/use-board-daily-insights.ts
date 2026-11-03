@@ -16,7 +16,12 @@ import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { currentTimeZone } from "@langwatch/time";
 import { useCallback, useEffect, useRef } from "react";
 
-import { defaultRunSettings, requestedRunOf, runTimeWords } from "../model/daily-run.ts";
+import {
+  defaultRunSettings,
+  requestedRunOf,
+  runTimeWords,
+  TEMPLATE_BOARD_NOTE,
+} from "../model/daily-run.ts";
 import { type InsightHostApi, useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
 
@@ -32,6 +37,19 @@ const RUN_NOT_STARTED = "Couldn't start the run";
 
 /** A hint can reach the tab before the worker stored the row it names; these outlast that gap. */
 export const REQUESTED_RUN_REREAD_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
+
+/** No run reads a From LangWatch board yet, so its toast says so instead of a promise. */
+function turnedOnWords({
+  kind,
+  settings,
+}: {
+  kind: InsightRunBoard["kind"];
+  settings: InsightRunSettings;
+}): string {
+  return kind === "template"
+    ? TEMPLATE_BOARD_NOTE
+    : `Langy reads this board every day ${runTimeWords(settings)}.`;
+}
 
 /** Langy's panel opens on `?langyConversation=` wherever a project page is. */
 function openInLangy({ host, conversationId }: { host: InsightHostApi; conversationId: string }) {
@@ -166,7 +184,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     write({
       next: (current) => ({ ...current, state: "on", settings, offReason: null }),
       send: (handlers) => configure.mutate({ projectId, board, ...settings }, handlers),
-      done: `${done} Langy reads this board every day ${runTimeWords(settings)}.`,
+      done: `${done} ${turnedOnWords({ kind: board.kind, settings })}`,
       fallbackTitle,
     });
   const turnOffWith = ({ done, fallbackTitle }: { done: string; fallbackTitle: string }) =>
@@ -218,11 +236,5 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
         },
       ),
     openInLangy: (conversationId: string) => openInLangy({ host, conversationId }),
-    /** "No thanks" on the offer: an off, so the board never asks again. */
-    decline: () =>
-      turnOffWith({
-        done: "OK. Langy will not ask again for this board.",
-        fallbackTitle: "Couldn't save your answer",
-      }),
   };
 }

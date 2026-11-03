@@ -160,7 +160,7 @@ export class WorkflowStudioDispatchService {
     input: WorkflowStudioDispatchInput,
   ): Promise<void> {
     const decoder = new TextDecoder();
-    const isAborted = input.isAborted;
+    const isAborted = input.isAborted && notAbortedWhenUnreadable(input.isAborted);
     let buffered = "";
     let frames = 0;
     let streamDone = false;
@@ -293,6 +293,23 @@ function reportAsStudioEvent(error: unknown, input: WorkflowStudioDispatchInput)
   }
 
   input.onEvent({ type: "error", payload: { message } } as StudioServerEvent);
+}
+
+/**
+ * The stop flag lives in Redis and is polled on a timer: a read that fails counts as "not
+ * stopped" (warned once per run), since a rejection out of the poll is unhandled and exits the
+ * worker. Spec: modules/workflow/specs/studio-lambda-stream.feature
+ */
+function notAbortedWhenUnreadable(isAborted: () => Promise<boolean>): () => Promise<boolean> {
+  let warned = false;
+  return () =>
+    isAborted().catch((error: unknown) => {
+      if (!warned) {
+        warned = true;
+        logger.warn({ error }, "Could not read the stop flag, treating the run as not stopped");
+      }
+      return false;
+    });
 }
 
 /**

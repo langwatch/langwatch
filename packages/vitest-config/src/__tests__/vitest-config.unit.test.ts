@@ -1,3 +1,7 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +9,9 @@ import {
   defineModuleVitestConfig,
   moduleVitestTestOptions,
 } from "../vitest-config.ts";
+
+// An empty root, so asking for isolation has no test files to split.
+const root = mkdtempSync(join(tmpdir(), "vitest-config-"));
 
 describe("moduleVitestTestOptions", () => {
   describe("given the node kind", () => {
@@ -63,7 +70,7 @@ describe("moduleVitestTestOptions", () => {
     });
 
     it("leaves the worker count alone when the suite keeps isolation", () => {
-      const test = moduleVitestTestOptions({ kind: "node", isolate: true }) ?? {};
+      const test = moduleVitestTestOptions({ kind: "node", isolate: true, root }) ?? {};
 
       expect("maxWorkers" in test).toBe(false);
     });
@@ -71,7 +78,7 @@ describe("moduleVitestTestOptions", () => {
 
   describe("when the caller overrides the defaults", () => {
     it("honours an explicit isolate over the kind's default", () => {
-      expect(moduleVitestTestOptions({ kind: "node", isolate: true })?.isolate).toBe(true);
+      expect(moduleVitestTestOptions({ kind: "node", isolate: true, root })?.isolate).toBe(true);
       expect(moduleVitestTestOptions({ kind: "jsdom", isolate: false })?.isolate).toBe(false);
     });
 

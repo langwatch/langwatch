@@ -26,9 +26,14 @@ export function instantEvalGuardrailCheckOver({
   costs?: EvaluationCostRecord[];
 }): Pick<EvaluationApi, "checkGuardrail"> {
   const execution = EvaluationExecutionService.create({
+    runs: { findTraceEvaluations: async () => [] },
+    authz: {
+      authorizeInternal: async () => {
+        throw new Error("these cases read no earlier evaluations");
+      },
+    },
     traces: {
       readTracesWithSpans: unreachable("a trace read"),
-      readEvaluations: unreachable("a trace read"),
       readThreadsTraces: unreachable("a thread read"),
     },
     spanDigest: { format: unreachable("a span digest"), formatThread: unreachable("a thread") },
@@ -37,6 +42,7 @@ export function instantEvalGuardrailCheckOver({
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: { run: unreachable("a workflow") },
     judges,
+    decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     installEnvironment: {},
   });
   const check = EvaluationGuardrailCheckService.create({

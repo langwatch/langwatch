@@ -203,6 +203,7 @@ def test_kwargs_receives_every_turn_field():
         "new_messages": call.new_messages,
         "thread_id": "thread-1",
         "session": {"id": "s"},
+        "state": None,
         "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
     }
 
@@ -566,6 +567,7 @@ def test_registration_frame_carries_the_agent_options():
         "concurrency": 10,
         "timeoutMs": 300000,
         "sticky": True,
+        "hooks": {"setup": False, "teardown": False},
     }
 
 

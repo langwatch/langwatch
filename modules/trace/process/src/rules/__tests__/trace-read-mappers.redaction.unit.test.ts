@@ -266,6 +266,37 @@ describe("redactV2Content", () => {
       });
     });
 
+    describe("when the viewer cannot see captured input and a custom attribute rule applies", () => {
+      /** @scenario "Media references of hidden content stay dropped when attribute rules apply" */
+      it("keeps the reserved input attribute dropped", () => {
+        const out = redactV2Content(withRefs(), {
+          canSeeCapturedInput: false,
+          canSeeCapturedOutput: true,
+          hiddenAttributes: [{ pattern: "service.name", visibleTo: "Admins" }],
+        });
+
+        expect(out.attributes?.["langwatch.reserved.media_refs.input"]).toBeUndefined();
+        expect(out.attributes?.["service.name"]).toBe("[REDACTED] (visible to Admins)");
+      });
+    });
+
+    describe("when the viewer cannot see captured input carried in an attribute", () => {
+      /** @scenario "Hidden input is replaced whole in the attributes that carry it" */
+      it("replaces that attribute with a placeholder naming the audience", () => {
+        const out = redactV2Content(
+          { ...withRefs(), attributes: { "langwatch.input": "voice call", "service.name": "x" } },
+          {
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: true,
+            capturedInputVisibleTo: "Admins",
+          },
+        );
+
+        expect(out.attributes?.["langwatch.input"]).toBe("[REDACTED] (visible to Admins)");
+        expect(out.attributes?.["service.name"]).toBe("x");
+      });
+    });
+
     describe("when the viewer cannot see captured output", () => {
       it("drops the output refs and reserved output attribute", () => {
         const out = redactV2Content(withRefs(), {

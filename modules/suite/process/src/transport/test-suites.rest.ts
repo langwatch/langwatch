@@ -6,6 +6,7 @@ import {
   projectRequestContext,
   type RestDoorCredential,
   type RestTransportDeclaration,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 /**
  * The `/api/v1/test-suites` REST family: the suites scenarios are filed into,
@@ -239,6 +240,7 @@ export function createTestSuitesRest(): Readonly<{
     )
 
     .post("/", "createTestSuite")
+    .keepsRecords()
     .withInput(testSuiteCreateInputSchema)
     .withPermission("scenarios:create")
     .withAudit("suites.testSuites.create")
@@ -285,6 +287,7 @@ export function createTestSuitesRest(): Readonly<{
     )
 
     .patch("/:id", "updateTestSuite")
+    .keepsRecords()
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteUpdateInputSchema)
     .withPermission("scenarios:update")
@@ -310,6 +313,17 @@ export function createTestSuitesRest(): Readonly<{
     .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:manage")
     .withAudit("suites.testSuites.archive")
+    .withConfirmation({
+      resource: "test suite",
+      action: "delete",
+      idParam: "id",
+      name: ({ app, projectId, id }) =>
+        nameUnlessMissing({
+          read: app.getByIdOrTestSuite({ id, projectId }),
+          missing: SuiteNotFoundError,
+          nameOf: (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
+        }),
+    })
     .withOutput(testSuiteArchiveResultSchema)
     .withDocs({
       tags: ["Test Suites"],
@@ -320,6 +334,7 @@ export function createTestSuitesRest(): Readonly<{
     .handle(({ app, input, scope }) => archiveTestSuite({ app, id: input.id, projectId: scope.id }))
 
     .post("/:id/run", "runTestSuite")
+    .keepsRecords()
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteRunInputSchema)
     .withPermission("scenarios:create")

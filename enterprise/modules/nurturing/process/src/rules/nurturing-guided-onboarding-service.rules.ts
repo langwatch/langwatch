@@ -15,6 +15,8 @@ import {
 } from "@langwatch/onboarding-contract";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
+import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
+
 /**
  * One campaign trigger per path. Marketing runs one campaign off each of
  * these, so the names are part of the contract with Customer.io and never
@@ -169,7 +171,7 @@ export function fireGuidedOnboardingProgress({
           userId,
           traits: {
             guided_onboarding_completed_paths: completedPaths,
-            guided_onboarding_completed_at: nowInstant().toString({ fractionalSecondDigits: 3 }),
+            guided_onboarding_completed_at: unixSecondsOf(nowInstant().epochMilliseconds),
           },
         },
         {

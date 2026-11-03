@@ -66,6 +66,20 @@ Feature: GroupQueue poison-group park guard
     And a later death is still counted against the group
 
   @integration
+  Scenario: a worker's release names the claim it belongs to
+    Given a claim marker a worker recorded with its current claim
+    When the same worker releases it naming an earlier claim
+    Then the marker and its death count survive
+    And a release naming the current claim, or naming none as an older caller does, removes it
+
+  @unit
+  Scenario: an outcome releases the claim marker only inside its own fenced step
+    Given a claimed job under the poison guard
+    When it completes, is re-staged for a retry or blocks its group, with its claim intact or lost
+    Then the outcome carries the claim's token
+    And no separate marker release is sent
+
+  @integration
   Scenario: a worker that cannot report itself as running enforces nothing
     Given a worker that is temporarily unable to report itself as running
     When it claims a group already one death short of the threshold

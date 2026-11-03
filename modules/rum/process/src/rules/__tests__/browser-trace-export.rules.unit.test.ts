@@ -116,17 +116,16 @@ describe("a browser trace export", () => {
 
 describe("the door's caller key", () => {
   it("names a caller by its claimed session, capped at 64 characters", () => {
-    expect(rumCallerKey({ session: "s".repeat(80), forwardedFor: "1.1.1.1" })).toBe(
+    expect(rumCallerKey({ session: "s".repeat(80), callerAddress: "203.0.113.9" })).toBe(
       `session:${"s".repeat(64)}`,
     );
   });
 
-  /** @scenario "A caller with no session is named by the nearest proxy's address" */
-  it("names a caller with no session by the last forwarded-for hop", () => {
-    expect(rumCallerKey({ session: undefined, forwardedFor: "6.6.6.6, 10.0.0.1 , 10.0.0.2" })).toBe(
-      "ip:10.0.0.2",
+  it("names a caller with no session by the address the door resolved", () => {
+    expect(rumCallerKey({ session: undefined, callerAddress: "203.0.113.9" })).toBe(
+      "ip:203.0.113.9",
     );
-    expect(rumCallerKey({ session: undefined, forwardedFor: undefined })).toBe("ip:unknown");
+    expect(rumCallerKey({ session: undefined, callerAddress: null })).toBe("ip:unknown");
   });
 });
 

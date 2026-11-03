@@ -65,6 +65,7 @@ Feature: Identity owns the switch that puts a user on the identifier sign-in pat
     Given a user an operator rolled back while the backfill ran
     When the backfill would finalize them
     Then the switch stays off and the user stays held
+    And the hold waits on a person, an operator lifting the pin, not on a proof
 
   @unit
   Scenario: An operator's rollback pins identity's sign-in switch off

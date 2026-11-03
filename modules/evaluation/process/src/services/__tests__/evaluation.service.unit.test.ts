@@ -1,6 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Protections, TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -57,6 +57,9 @@ class FakeRepository extends EvaluationRunRepository {
     _input: Parameters<EvaluationRunRepository["findByTraceId"]>[0],
   ): Promise<EvaluationRunData[]> {
     return this.value ? [this.value] : [];
+  }
+  async findTraceEvaluations(): Promise<TraceEvaluationData[]> {
+    return [];
   }
   async findInputs(): Promise<EvaluationInputsRead | null> {
     return null;

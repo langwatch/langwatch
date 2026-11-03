@@ -59,7 +59,7 @@ export type BatchSummary = {
   batchRunId: string;
   totalCount: number;
   passCount: number; // SUCCESS
-  failCount: number; // FAILED | FAILURE | ERROR | CANCELLED
+  failCount: number; // FAILED | FAILURE | ERROR | CANCELLED, less runs not scored (ADR-180)
   runningCount: number; // IN_PROGRESS | PENDING | QUEUED | RUNNING
   settledCount: number; // every status outside the running list
   stalledCount: number; // STALLED

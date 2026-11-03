@@ -26,6 +26,7 @@ import {
   mapTraceMetadata,
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
+import { offloadedFieldKey } from "../../rules/trace-offload-recall.rules.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type {
@@ -93,8 +94,6 @@ const storedSpanRowSchema: z.ZodType<StoredSpanRow> = z.looseObject({
 });
 
 const storedSpanRowsSchema = z.array(storedSpanRowSchema);
-
-type PayloadReference = { traceId: string; eventId: string; field: string };
 
 /** Full-record reader with package-owned normalized mapping and bounded recall. */
 export class ClickHouseTraceFullRecordRepository extends TraceFullRecordRepository {
@@ -205,6 +204,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     );
   }
 
+  /** Bounded by the id index once ready; an id it has never seen reads unbounded, as before. */
   private async summary(
     client: TraceClickHouseClient,
     input: TraceFullReadInput,
@@ -214,10 +214,11 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
         TimeToFirstTokenMs, TotalDurationMs, TotalPromptTokenCount, TotalCompletionTokenCount, TotalCost, TokensEstimated,
         toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs, toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
         toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs FROM trace_summaries WHERE TenantId = {tenantId:String}
-        AND TraceId = {traceId:String} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} GROUP BY TenantId, TraceId) LIMIT 1`,
+        AND TraceId = {traceId:String} {{idBound:trace_summaries.TraceId:traceId}} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} {{idBound:trace_summaries.TraceId:traceId}} GROUP BY TenantId, TraceId) LIMIT 1`,
       query_params: { tenantId: input.tenantId, traceId: input.traceId },
       format: "JSONEachRow",
+      idBound: { occurredAtHint: input.occurredAtMs ?? null, onMiss: "unbounded" },
     });
     return summaryRowsSchema.parse(await result.json())[0] ?? null;
   }
@@ -232,6 +233,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
         ? "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})"
         : "";
       const result = await client.query({
+        // ID_BOUND_SKIP: bounded by the summary's own occurred time, which the read above found.
         query: `SELECT SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote, Sampled,
           toUnixTimestamp64Milli(StartTime) AS StartTimeMs, toUnixTimestamp64Milli(EndTime) AS EndTimeMs, DurationMs,
           SpanName, SpanKind, ResourceAttributes, SpanAttributes, StatusCode, StatusMessage, ScopeName, ScopeVersion,
@@ -277,38 +279,26 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       row,
       original: deserializeStoredAttributes(row.SpanAttributes),
     }));
-    const reads = new Map<string, PayloadReference>();
-    for (const plan of plans) {
-      for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(plan.original)) {
-        reads.set(ClickHouseTraceFullRecordRepository.referenceKey(plan.row.TraceId, reference), {
-          traceId: plan.row.TraceId,
-          eventId: reference.eventId,
-          field: reference.field,
-        });
-      }
-    }
-    const values = new Map<string, string | null>();
-    await ClickHouseTraceFullRecordRepository.mapWithConcurrency(
-      [...reads.entries()],
-      PAYLOAD_READ_CONCURRENCY,
-      async ([key, reference]) => {
-        try {
-          values.set(key, await this.payloads.read({ tenantId, ...reference }));
-        } catch {
-          values.set(key, null);
-        }
-      },
+    const references = plans.flatMap(({ row, original }) =>
+      ClickHouseTraceFullRecordRepository.eventReferences(original).map(({ eventId, field }) => ({
+        traceId: row.TraceId,
+        eventId,
+        field,
+      })),
     );
+    const outcomes = await this.payloads.recall({
+      tenantId,
+      references,
+      concurrency: PAYLOAD_READ_CONCURRENCY,
+    });
 
     return plans.map(({ row, original }) => {
       const attributes = withoutEventReferences(original);
       let recalled = false;
       for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(original)) {
-        const value = values.get(
-          ClickHouseTraceFullRecordRepository.referenceKey(row.TraceId, reference),
-        );
-        if (value !== null && value !== void 0) {
-          attributes[reference.attrKey] = deserializeStoredValue(value);
+        const outcome = outcomes.get(offloadedFieldKey({ traceId: row.TraceId, ...reference }));
+        if (outcome?.ok) {
+          attributes[reference.attrKey] = deserializeStoredValue(outcome.value);
           recalled = true;
         }
       }
@@ -351,13 +341,6 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
   private static ownString(value: object, key: string): string | null {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     return typeof descriptor?.value === "string" ? descriptor.value : null;
-  }
-
-  private static referenceKey(
-    traceId: string,
-    reference: { eventId: string; field: string },
-  ): string {
-    return `${traceId}\u0000${reference.eventId}\u0000${reference.field}`;
   }
 
   private static summaryContent(value: string | null): { type: string; value: string } | null {

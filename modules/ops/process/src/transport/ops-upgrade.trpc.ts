@@ -50,6 +50,18 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input }) => app.retryUpgradeStep({ id: input.id }))
 
+    .procedure("getDiagnostics")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getUpgradeStepDiagnostics({ id: input.id }))
+
+    .procedure("diagnosticsAvailability")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.getUpgradeDiagnosticsAvailability())
+
+    .procedure("sendDiagnostics")
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input }) => app.sendUpgradeStepDiagnostics({ bundle: input.bundle }))
+
     .procedure("listSystemMigrations")
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.listSystemMigrations())

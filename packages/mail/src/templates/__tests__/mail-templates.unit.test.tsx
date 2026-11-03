@@ -108,7 +108,8 @@ describe.each(everyFixture)(
       it("carries every link address the props gave it", async () => {
         const { html } = await renderMailTemplate(template, props);
         for (const link of linksIn(props)) {
-          expect(html).toContain(link);
+          // An attribute carries `&` escaped, so a link with a query string reads `&amp;`.
+          expect(html).toContain(link.replaceAll("&", "&amp;"));
         }
       });
 

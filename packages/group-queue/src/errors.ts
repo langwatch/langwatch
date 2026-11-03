@@ -40,6 +40,29 @@ export class GroupQueueConfigurationError extends GroupQueueError {
   }
 }
 
+/**
+ * A send refused because this queue's drain has finished. During shutdown it is
+ * expected (a job whose drain overran its budget is still running), and the caller
+ * keeps the work for re-drive, so callers may log it below error level.
+ */
+export class QueueStagingClosedError extends GroupQueueError {
+  constructor({
+    queueName,
+    operation,
+  }: {
+    queueName: string;
+    operation: "send" | "sendBatch" | "sendEach";
+  }) {
+    super({ queueName, operation, message: "Cannot send to queue after its drain has finished" });
+    this.name = "QueueStagingClosedError";
+  }
+}
+
+/** By name, not class, so a second copy of this package still recognises it. */
+export function isQueueStagingClosed(error: unknown): boolean {
+  return error instanceof Error && error.name === "QueueStagingClosedError";
+}
+
 export class NonRetryableGroupQueueError extends Error {
   readonly retryable = false;
 
@@ -60,13 +83,35 @@ export class HandBackGroupQueueError extends Error {
   }
 }
 
+/** Fault kinds a refusal names when its cause may pass on its own (HandledError's vocabulary). */
+const TRANSIENT_FAULTS: ReadonlySet<unknown> = new Set([
+  "platform",
+  "presumed_platform",
+  "provider",
+]);
+
+/**
+ * An error that says `retryable: false` (a HandledError, a DispatchError) fails the same way on
+ * every attempt, unless it names a platform or provider fault or a 429 or unattributed 5xx
+ * status: there `retryable: false` is only HandledError's default, so it still retries (ADR-027).
+ */
+export function refusesRetry(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if (Reflect.get(error, "retryable") !== false) return false;
+  const fault = Reflect.get(error, "fault");
+  const status = Reflect.get(error, "httpStatus");
+  if (status === 429 || TRANSIENT_FAULTS.has(fault)) return false;
+  return !(fault === undefined && typeof status === "number" && status >= 500);
+}
+
 export function defaultFailureDecision(error: unknown): {
   retryable: boolean;
   retryAfterMs?: number;
 } {
   if (
     error instanceof NonRetryableGroupQueueError ||
-    (error instanceof GroupQueueError && !error.retryable)
+    (error instanceof GroupQueueError && !error.retryable) ||
+    refusesRetry(error)
   ) {
     return { retryable: false };
   }

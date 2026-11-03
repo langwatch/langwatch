@@ -33,3 +33,33 @@ describe("detectPlatform", () => {
     });
   });
 });
+
+describe("unsupportedHostReason", () => {
+  describe("when Node is older than 24", () => {
+    /** @scenario "Node older than 24 is refused with a clear message" */
+    it("says LangWatch needs Node 24 or newer", async () => {
+      const { unsupportedHostReason } = await import("../src/shared/platform.ts");
+      expect(unsupportedHostReason({ nodeVersion: "22.11.0", platform: "darwin-arm64" })).toContain(
+        "LangWatch needs Node 24 or newer",
+      );
+    });
+  });
+
+  describe("when Linux runs on musl", () => {
+    /** @scenario "Linux on musl is refused with a clear message" */
+    it("points at the Docker image instead", async () => {
+      const { unsupportedHostReason } = await import("../src/shared/platform.ts");
+      expect(
+        unsupportedHostReason({ nodeVersion: "24.4.0", platform: "linux-x64-musl" }),
+      ).toContain("Run the Docker image instead");
+    });
+  });
+
+  describe("when Node 24 runs on a glibc Linux or macOS", () => {
+    it("finds nothing to refuse", async () => {
+      const { unsupportedHostReason } = await import("../src/shared/platform.ts");
+      expect(unsupportedHostReason({ nodeVersion: "24.4.0", platform: "linux-arm64" })).toBeNull();
+      expect(unsupportedHostReason({ nodeVersion: "v25.0.0", platform: "darwin-x64" })).toBeNull();
+    });
+  });
+});

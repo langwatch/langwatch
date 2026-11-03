@@ -8,6 +8,7 @@ import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
+import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rules.ts";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   LangWatchQLPostgresMappingService,
@@ -125,6 +126,11 @@ export class LangWatchQLPostgresViewsService {
     );
   }
 
+  /** The ClickHouse PostgreSQL-engine tables the catalog maps, each named once. */
+  engineTableNames(views: readonly LangWatchQLViewDefinition[] = LWQL_VIEW_CATALOG): string[] {
+    return [...new Set(catalogShapes.postgresViews(views).map((view) => view.sourceTable))];
+  }
+
   /**
    * The PostgreSQL-engine tables mapping each approved view into the LangWatchQL database, as
    * ClickHouse statements. Run before {@link lwqlViewSetupStatements}, which builds the
@@ -133,12 +139,18 @@ export class LangWatchQLPostgresViewsService {
   engineTableStatements({
     names,
     collection,
+    schema,
     views = LWQL_VIEW_CATALOG,
+    credentialFingerprint,
   }: {
     names: LangWatchQLNames;
     /** Named collection holding the PostgreSQL credentials. */
     collection: string;
+    /** The app PostgreSQL schema the engine tables read from. */
+    schema: string;
     views?: readonly LangWatchQLViewDefinition[];
+    /** The collection values' fingerprint, once ClickHouse is known to hold them. */
+    credentialFingerprint?: string;
   }): string[] {
     return catalogShapes.postgresViews(views).map((view) =>
       postgresMapping.engineTableStatement({
@@ -146,10 +158,12 @@ export class LangWatchQLPostgresViewsService {
         table: view.sourceTable,
         columns: view.columns.map((column) => ({
           name: column.name,
-          type: column.type,
+          type: postgresEngineColumnType(column.type),
         })),
         collection,
         postgresRelation: view.postgres.approvedView,
+        schema,
+        ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
       }),
     );
   }

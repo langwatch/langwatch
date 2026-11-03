@@ -6,6 +6,7 @@
  */
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { createTestLogger } from "@langwatch/test-harness";
 import { fromDate } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -87,17 +88,26 @@ function factsStep() {
   });
   const step = ProjectFactsBackfillService.create({
     projects: {
-      findBackfillPage: async ({ afterId, limit }) =>
-        rows.filter((row) => afterId === null || row.id > afterId).slice(0, limit),
+      findBackfillPage: async ({ afterId, limit }) => {
+        const projects = rows.filter((row) => afterId === null || row.id > afterId).slice(0, limit);
+        return projects.map((project) => ({ kind: "whole", project }));
+      },
     },
     lifecycle: notice,
+    logger: createTestLogger().logger,
   });
   const runStep = () =>
     step.recordExisting({
       dryRun: false,
       signal: new AbortController().signal,
       afterProjectId: null,
-      countedBefore: { projects: 0, departmentAssignments: 0, presenceSettings: 0 },
+      countedBefore: {
+        projects: 0,
+        departmentAssignments: 0,
+        presenceSettings: 0,
+        skippedOrphans: 0,
+        orphanProjectIds: [],
+      },
       onPageDone: async () => {},
     });
   const loseNextCreated = async ({ projectId }: { projectId: string }) => {

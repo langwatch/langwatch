@@ -61,7 +61,7 @@ Production quality signals live in monitors (online evaluation) and their evalua
 
 ```bash
 langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
-langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch monitor get <idOrSlugOrName> -o json     # one monitor's config and recent state
 langwatch evaluator list -o json         # the evaluators the monitors run
 ```
 

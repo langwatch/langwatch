@@ -46,3 +46,39 @@ Feature: A module reacts to a peer pipeline's events from its own side
     Then the lane's filter is handed each event's data parsed with the contract's schema
     And only the event the filter takes would mint a job
     And data the schema refuses is staged, so the handler's parse fails as it would unfiltered
+
+  # Batching (ADR-066): a peer subscriber that declares handleBatch takes every delivery as a
+  # batch, and may ask the queue to drain a backed-up group's due jobs into one call.
+
+  @unit
+  Scenario: A batch peer subscriber receives a backed-up group in one call
+    Given a module declares a batch peer subscriber that coalesces up to three events
+    When the queue drains two due events of one group together
+    Then the subscriber is called once with both, in queue order
+    And each carries its data parsed with the contract's schema and the context a single delivery gets
+
+  @unit
+  Scenario: A single delivery reaches a batch peer subscriber as a batch of one
+    Given a module declares a batch peer subscriber
+    When the queue delivers one event on its own
+    Then the subscriber is called with a batch holding only that event
+
+  @unit
+  Scenario: An event the contract refuses fails its whole batch
+    Given a module declares a batch peer subscriber
+    When a batch holds an event whose data the contract's schema refuses
+    Then the batch fails without calling the subscriber, so the queue splits it and retries
+
+  @unit
+  Scenario: A peer subscriber that handles one event at a time cannot ask to coalesce
+    Given a module declares a peer subscriber with handle
+    When it asks the queue to coalesce more than one event
+    Then the declaration is refused naming the subscriber's lane
+    And an event subscriber registered with coalescing but no batch handler is refused too
+
+  @unit
+  Scenario: A batch subscriber's lane asks the queue to coalesce
+    Given an event subscriber with a batch handler that coalesces up to three events
+    When its queue lane is registered
+    Then the lane coalesces up to three jobs and takes a batch
+    And a batch the queue hands it calls the batch handler once, with each event's context and the delivery attempt

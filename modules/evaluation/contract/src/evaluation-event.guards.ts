@@ -1,10 +1,12 @@
 import {
+  EVALUATION_ATTEMPT_FAILED_EVENT_TYPE,
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_SCHEDULED_EVENT_TYPE,
   EVALUATION_STARTED_EVENT_TYPE,
 } from "./evaluation-event.constants.ts";
 import type {
+  EvaluationAttemptFailedEvent,
   EvaluationCompletedEvent,
   EvaluationProcessingEvent,
   EvaluationReportedEvent,
@@ -46,4 +48,13 @@ export function isEvaluationReportedEvent(
   event: EvaluationProcessingEvent,
 ): event is EvaluationReportedEvent {
   return event.type === EVALUATION_REPORTED_EVENT_TYPE;
+}
+
+/**
+ * Type guard for EvaluationAttemptFailedEvent.
+ */
+export function isEvaluationAttemptFailedEvent(
+  event: EvaluationProcessingEvent,
+): event is EvaluationAttemptFailedEvent {
+  return event.type === EVALUATION_ATTEMPT_FAILED_EVENT_TYPE;
 }

@@ -15,10 +15,13 @@ import { z } from "zod";
 
 import type { TraceModule } from "../app/trace.app.ts";
 import {
+  compactDeferredOriginJobSchema,
   DEFERRED_ORIGIN_DEDUP,
   DEFERRED_ORIGIN_DELAY_MS,
   DEFERRED_ORIGIN_SUBSCRIBER_NAME,
+  isDeferredOriginJobStale,
   needsOriginResolution,
+  stageDeferredOriginJob,
 } from "./deferred-origin.subscriber.ts";
 import {
   PROJECT_METADATA_WINDOW_MS,
@@ -58,6 +61,8 @@ interface TraceProcessingReactions {
     context: TriggerContext<unknown>,
   ) => Promise<void>;
   broadcastDisabled: boolean;
+  /** `WRITE_COMPACT_ORIGIN_JOBS` in production: false queues main's full-event body. */
+  writeCompactOriginJobs: boolean;
 }
 
 const deferredOriginJobSchema = z.object({ tenantId: z.string(), traceId: z.string() });
@@ -99,12 +104,20 @@ export function buildTraceProcessingConsumer(
       when: (event, context) => needsOriginResolution({ event, foldState: context.state }),
       delay: DEFERRED_ORIGIN_DELAY_MS,
       dedup: DEFERRED_ORIGIN_DEDUP,
-      handler: (event, context) =>
-        reactions.resolveDeferredOrigin({
-          tenantId: context.tenantId,
-          traceId: context.aggregateId,
-          occurredAtMs: event.occurredAt,
-        }),
+      job: {
+        schema: compactDeferredOriginJobSchema,
+        stage: (event, context) =>
+          stageDeferredOriginJob({
+            event,
+            tenantId: context.tenantId,
+            traceId: context.aggregateId,
+          }),
+        stageOnSend: reactions.writeCompactOriginJobs,
+        handler: async (job) => {
+          if (isDeferredOriginJobStale(job)) return;
+          await reactions.resolveDeferredOrigin(job);
+        },
+      },
     })
     .withProjectionSubscriber("trackedEventSync", {
       fold: "traceSummary",

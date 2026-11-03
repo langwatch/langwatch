@@ -4,11 +4,14 @@ import {
   type AnalyticsEvaluationReadMetrics,
   type AnalyticsEvaluationRow,
 } from "@langwatch/analytics-contract";
+import type { QueryRequest } from "@langwatch/clickhouse-client";
+import { idIndexedClientDouble } from "@langwatch/clickhouse-client/testing";
 import { SecurityError } from "@langwatch/eventing";
 import type * as observabilityModule from "@langwatch/observability";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
+import { ANALYTICS_ID_INDEXES } from "../clickhouse.analytics-id-indexes.database.ts";
 import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse.analytics-persistence.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse.analytics-persistence.repository.ts";
 
@@ -62,6 +65,20 @@ function repository(
     resolveClient: async () => client,
     defaultRetentionDays: () => 30,
     readMetrics: metrics,
+    // Reads by id go through the routed client; here it answers from the same scripted client.
+    clickhouse: idIndexedClientDouble({
+      indexes: ANALYTICS_ID_INDEXES,
+      driver: {
+        execute: async (request: QueryRequest) => {
+          const result = await client.query({
+            query: request.sql,
+            query_params: request.params ?? {},
+            format: "JSONEachRow",
+          });
+          return { rows: await result.json() };
+        },
+      },
+    }),
   });
 }
 
@@ -215,7 +232,7 @@ describe("AnalyticsEvaluationRepository", () => {
     expect(client.query).toHaveBeenCalledWith(
       expect.objectContaining({
         query: expect.stringContaining(
-          "ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,\n            length(AppliedEventIds) DESC",
+          "ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,\n          length(AppliedEventIds) DESC",
         ),
       }),
     );

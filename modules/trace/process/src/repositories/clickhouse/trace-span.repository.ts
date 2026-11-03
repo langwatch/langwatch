@@ -1,5 +1,9 @@
 import type { Authorization } from "@langwatch/authorization";
-import { type AuthorizedClickHouse, tenantScope } from "@langwatch/clickhouse-client";
+import {
+  type AuthorizedClickHouse,
+  type IdBoundOptions,
+  tenantScope,
+} from "@langwatch/clickhouse-client";
 import { nowInstant } from "@langwatch/time";
 import {
   evaluationTraceEventSchema,
@@ -19,9 +23,10 @@ import {
 import { chString, chStringMap } from "./stored-span-row.mapper.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
+/** Where a tree read is bounded by the stored_spans id index (id-index plan §4). */
+const STORED_SPANS_ID_BOUND = "{{idBound:stored_spans.TraceId:traceId}}";
 const evaluationTraceSpansSchema = evaluationTraceSpanSchema.array();
 const evaluationTraceEventsSchema = evaluationTraceEventSchema.array();
-const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 
@@ -92,6 +97,7 @@ const summarySelect = `
 `;
 
 /** The dedup election under the proof's fence; the tree reads never name a tenant (ADR-177). */
+// ID_BOUND_SKIP: a dedup subquery fragment; its statement carries the marker.
 const fencedDedupInTuple = (extraInnerWhere: string): string => `
   (TenantId, TraceId, SpanId, UpdatedAt) IN (
     SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
@@ -133,6 +139,11 @@ const occurredAtRowSchema = z.looseObject({ occurredAtMs: numeric.nullable() });
 
 const occurredAtRowsSchema = z.array(occurredAtRowSchema);
 
+/** An evaluation read's bound: its time first, else the stored_spans index once ready. */
+function evaluationBound(input: { occurredAtMs?: number | undefined }): IdBoundOptions {
+  return { occurredAtHint: input.occurredAtMs ?? null, fallback: "unbounded" };
+}
+
 /** Concrete, tenant-scoped span-tree persistence for ClickHouse. */
 export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository {
   private constructor(private readonly clickhouse: AuthorizedClickHouse) {
@@ -149,10 +160,6 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     occurredAtMs?: number;
   }): Promise<EvaluationTraceSpan[]> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const window =
-      input.occurredAtMs === void 0
-        ? ""
-        : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
     const result = await client.query({
       query: `
         SELECT
@@ -162,29 +169,16 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         FROM ${STORED_SPANS_TABLE}
         WHERE ${tenantScope("StartTime")}
           AND TraceId = {traceId:String}
-          ${window}
-          AND ${fencedDedupInTuple(window)}
+          ${STORED_SPANS_ID_BOUND}
+          AND ${fencedDedupInTuple(STORED_SPANS_ID_BOUND)}
         ORDER BY StartTime ASC
         LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
-      query_params: {
-        traceId: input.traceId,
-        ...(input.occurredAtMs === void 0
-          ? {}
-          : {
-              fromMs: input.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-              toMs: input.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
-            }),
-      },
+      query_params: { traceId: input.traceId },
       format: "JSONEachRow",
+      idBound: evaluationBound(input),
     });
     const rows = evaluationSpanRowsSchema.parse(await result.json());
-    if (rows.length === 0 && input.occurredAtMs !== void 0) {
-      return this.findEvaluationSpans({
-        authorization: input.authorization,
-        traceId: input.traceId,
-      });
-    }
     return evaluationTraceSpansSchema.parse(
       rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationSpan(row)),
     );
@@ -196,10 +190,6 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     occurredAtMs?: number;
   }): Promise<EvaluationTraceEvent[]> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const window =
-      input.occurredAtMs === void 0
-        ? ""
-        : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
     const result = await client.query({
       query: `
         SELECT event_name AS EventType, event_attrs AS Attributes
@@ -211,8 +201,8 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
           FROM ${STORED_SPANS_TABLE}
           WHERE ${tenantScope("StartTime")}
             AND TraceId = {traceId:String}
-            ${window}
-            AND ${fencedDedupInTuple(window)}
+            ${STORED_SPANS_ID_BOUND}
+            AND ${fencedDedupInTuple(STORED_SPANS_ID_BOUND)}
         )
         ARRAY JOIN
           Events_Timestamp AS event_timestamp,
@@ -221,24 +211,11 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         WHERE event_name != 'exception'
         ORDER BY event_timestamp DESC
       `,
-      query_params: {
-        traceId: input.traceId,
-        ...(input.occurredAtMs === void 0
-          ? {}
-          : {
-              fromMs: input.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-              toMs: input.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
-            }),
-      },
+      query_params: { traceId: input.traceId },
       format: "JSONEachRow",
+      idBound: evaluationBound(input),
     });
     const rows = evaluationEventRowsSchema.parse(await result.json());
-    if (rows.length === 0 && input.occurredAtMs !== void 0) {
-      return this.findEvaluationEvents({
-        authorization: input.authorization,
-        traceId: input.traceId,
-      });
-    }
     return evaluationTraceEventsSchema.parse(
       rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationEvent(row)),
     );
@@ -285,38 +262,36 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     occurredAtMs?: number;
   }): Promise<TraceSpanPage> {
     if (input.cursor) {
-      return this.queryPage(input, void 0);
+      return this.queryPage(input, undefined);
     }
 
-    const occurredAtMs =
-      input.occurredAtMs ??
-      (await this.resolveTraceOccurredAtMs(input.authorization, input.traceId));
-    if (occurredAtMs === void 0) {
-      return this.queryPage(input, void 0);
-    }
-
-    const bounded = await this.queryPage(input, occurredAtMs - DEFAULT_PARTITION_WINDOW_MS);
-    return bounded.rows.length > 0 ? bounded : this.queryPage(input, void 0);
+    // Lower bound only: a live trace can run past any upper bound a hint would set.
+    return this.queryPage(input, {
+      occurredAtHint: input.occurredAtMs ?? null,
+      fallback: "unbounded",
+      openEnded: true,
+      resolveHint: () => this.resolveTraceOccurredAtMs(input.authorization, input.traceId),
+    });
   }
 
   async findSummarySince(input: {
     authorization: Authorization;
     traceId: string;
     sinceUpdatedAtMs: number;
+    occurredAtMs?: number;
   }): Promise<TraceSpanSummaryRecord[]> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    // Deliberately unbounded by the occurred-at hint: a live trace can run
-    // past any fixed window. `UpdatedAt` is not the partition key, but the
-    // tenant/trace prefix remains selective and preserves the old route's
-    // behaviour for in-place span updates.
+    // `UpdatedAt` is not the partition key, so the trace-id marker bounds the
+    // read from below only: a live trace can run past any upper bound.
     const sinceFilter = "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const result = await client.query({
       query: `
         SELECT ${summarySelect}
         FROM ${STORED_SPANS_TABLE}
         WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+          ${STORED_SPANS_ID_BOUND}
           ${sinceFilter}
-          AND ${fencedDedupInTuple(sinceFilter)}
+          AND ${fencedDedupInTuple(`${STORED_SPANS_ID_BOUND} ${sinceFilter}`)}
         ORDER BY StartTimeMs ASC
         LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
@@ -325,6 +300,12 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         sinceUpdatedAtMs: input.sinceUpdatedAtMs,
       },
       format: "JSONEachRow",
+      idBound: {
+        occurredAtHint: input.occurredAtMs ?? null,
+        fallback: "unbounded",
+        openEnded: true,
+        resolveHint: () => this.resolveTraceOccurredAtMs(input.authorization, input.traceId),
+      },
     });
     return spanSummaryRowsSchema
       .parse(await result.json())
@@ -339,15 +320,16 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       cursor?: SpanTreeCursor;
       occurredAtMs?: number;
     },
-    lowerBoundMs: number | undefined,
+    idBound: IdBoundOptions | undefined,
   ): Promise<TraceSpanPage> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
     const cursor = input.cursor
       ? "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
       : "";
-    const timeFilter =
-      lowerBoundMs !== void 0 ? "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})" : "";
+    // A cursor page is bounded by the cursor's own start, so it reads no index.
+    const timeFilter = idBound === undefined ? "" : STORED_SPANS_ID_BOUND;
     const result = await client.query({
+      // ID_BOUND_SKIP: a first page carries the marker in timeFilter; a cursor page, its cursor.
       query: `
         SELECT ${summarySelect}
         FROM ${STORED_SPANS_TABLE}
@@ -367,13 +349,9 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
               cursorSpan: input.cursor.spanId,
             }
           : {}),
-        ...(lowerBoundMs !== void 0
-          ? {
-              fromMs: lowerBoundMs,
-            }
-          : {}),
       },
       format: "JSONEachRow",
+      ...(idBound === undefined ? {} : { idBound }),
     });
     const rows = spanSummaryRowsSchema.parse(await result.json());
     const mapped = rows.map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
@@ -404,6 +382,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     const windowPredicate =
       input.sinceMs === void 0 ? "" : "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})";
     const result = await client.query({
+      // ID_BOUND_SKIP: the not-ready hint resolver; the index path never runs it.
       query: `
         SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
         FROM trace_summaries

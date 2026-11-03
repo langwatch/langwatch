@@ -114,6 +114,8 @@ The **Result** column of the table shows `Passed`, `Failed`, `Running` or `Evalu
 <img className="block" src="/images/agent-testing/run-drawer-unreachable.png" alt="The conversation drawer of a run whose target could not be reached, with the error" />
 </Frame>
 
+A run whose setup hook failed shows **Not scored**: no turn ran, and the run does not count towards the pass rate. The drawer shows the setup error. See [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks#what-happens-when-a-hook-fails).
+
 A criterion the judge could not decide is inconclusive. A criterion about an internal action goes inconclusive when the agent's traces did not arrive; see [Linking your traces](/agent-testing/linking-your-traces#when-traces-do-not-arrive).
 
 Also check: [Run plans](/agent-testing/run-plans), [Compare agents](/agent-testing/compare-agents), [Run from CI](/agent-testing/run-from-ci) for the batch API behind the same runs.

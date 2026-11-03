@@ -1,4 +1,8 @@
-import type { ClickHouseColumns, ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseColumns,
+  type ClickHouseQueryClient,
+  type IdBoundOptions,
+} from "@langwatch/clickhouse-client";
 
 import type {
   ExperimentEventingClickHouseClient,
@@ -31,11 +35,13 @@ export class ClickHouseExperimentSession implements ExperimentEventingClickHouse
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
+    idBound?: IdBoundOptions;
   }): Promise<ExperimentEventingClickHouseResult> {
     const request = {
       tenantId: this.tenantId,
       sql: input.query,
       params: input.query_params,
+      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
     };
     return { json: async <T>() => (await this.clickhouse.query<T>(request)).rows };
   }

@@ -1185,3 +1185,180 @@ Morgan Ellis",
   "text": "🌱 Prospective subscription interest · Triggered by Morgan Ellis · Organization: Acme Robotics · Plan: GROWTH_SEAT_EVENT · Customer: Morgan Ellis",
 }
 `;
+
+exports[`given the Slack notice registry > when upgrade-diagnostics / an automatic repo… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Upgrade step trace:backfill-span-costs failed on 3.23.0",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "Fills the cost of every span stored before costs were recorded.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Company*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Release*
+3.23.0",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Step*
+\`trace:backfill-span-costs\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Attempt*
+2",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Sent*
+automatically",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*First report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Latest report*
+<!date^1792403600^{date_short_pretty} at {time}|2026-10-19T09:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Instance*
+\`instance_7c1f0e\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "upgrade-diagnostics_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/cloud/self-hosted-instances?instance=shi_1",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Upgrade step trace:backfill-span-costs failed on 3.23.0 · Fills the cost of every span stored before costs were recorded. · Company: Acme Robotics · Release: 3.23.0 · Step: trace:backfill-span-costs · Attempt: 2 · Sent: automatically · First report: 2026-10-19T08:53Z · Latest report: 2026-10-19T09:53Z · Instance: instance_7c1f0e",
+}
+`;
+
+exports[`given the Slack notice registry > when upgrade-diagnostics / an unlicensed nam… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Upgrade step licensing:copy-organization-licenses failed on an unknown release",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Company*
+Unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Release*
+unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Step*
+\`licensing:copy-organization-licenses\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Attempt*
+1",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Sent*
+by the operator",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*First report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Latest report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Instance*
+\`instance_7c1f0e\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "upgrade-diagnostics_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/cloud/self-hosted-instances",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Upgrade step licensing:copy-organization-licenses failed on an unknown release · Company: Unknown · Release: unknown · Step: licensing:copy-organization-licenses · Attempt: 1 · Sent: by the operator · First report: 2026-10-19T08:53Z · Latest report: 2026-10-19T08:53Z · Instance: instance_7c1f0e",
+}
+`;

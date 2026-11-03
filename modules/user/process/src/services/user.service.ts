@@ -28,6 +28,7 @@ import {
   type RemoveUserAvatarInput,
   type SetUserAvatarInput,
   type SetUserHomePathInput,
+  type PasswordHolder,
   type SetFirstUserPasswordInput,
   type SetFirstUserPasswordResult,
   type UpdateUserEmailInput,
@@ -228,6 +229,36 @@ export class UserService {
     const parsed = userIdInputSchema.parse(input);
 
     return this.repository.hasPassword(parsed.id);
+  }
+
+  /** Addresses are matched lower-cased on both sides, so a stored mixed-case address is found. */
+  async findPasswordHolders({
+    emails,
+  }: {
+    emails: readonly string[] | null;
+  }): Promise<PasswordHolder[]> {
+    const wanted =
+      emails === null
+        ? null
+        : [...new Set(emails.map((email) => email.trim().toLowerCase()))].filter(Boolean);
+    if (wanted?.length === 0) return [];
+    const rows = await this.repository.findPasswordHolders({ emails: wanted });
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      markedForReset: row.passwordResetRequiredAt !== null,
+    }));
+  }
+
+  async markPasswordResetRequired({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<{ marked: number }> {
+    if (userIds.length === 0) return { marked: 0 };
+    return {
+      marked: await this.repository.markPasswordResetRequired({ ids: userIds, at: this.now() }),
+    };
   }
 
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {

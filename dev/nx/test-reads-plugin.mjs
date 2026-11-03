@@ -17,6 +17,7 @@ export const reads = {
     "docs/pricing.mdx",
     "docs/self-hosting/connect.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
+    "docs/self-hosting/data-and-telemetry.mdx",
   ],
   "@langwatch/agent-process": [
     "modules/agent/**/*",
@@ -32,7 +33,7 @@ export const reads = {
     "modules/dashboard/process/src/**/*",
     "modules/topic/process/src/**/*",
   ],
-  "@langwatch/scenario-process": ["infra/docker/Dockerfile"],
+  "@langwatch/scenario-process": ["infra/docker/Dockerfile", "infra/docker/prune-runtime-tree.sh"],
   "@langwatch/stored-object-process": [
     "modules/stored-object/**/*",
     "modules/scenario/process/src/transport/scenario-event.rest.ts",
@@ -104,7 +105,7 @@ export const reads = {
   "@langwatch/automation-contract": ["modules/automation/**/*"],
   "@langwatch/config": ["packages/browser/src/wire/public-config.ts"],
   "@langwatch/mail": ["skills/tracing/SKILL.mdx"],
-  "@langwatch/mcp-server": ["feature-map.json"],
+  "@langwatch/mcp-server": ["feature-map.json", "docs/features/querying-your-data.mdx"],
   "@langwatch/plans": ["packages/prisma-client/prisma/schema.prisma"],
   "@langwatch/langy-process": [
     "specs/langy/langy-frame-auth.vectors.json",
@@ -114,7 +115,9 @@ export const reads = {
   "@langwatch/analytics-browser": [
     "apps/ui/public/images/dashboards/templates/**/*",
     "pnpm-workspace.yaml",
+    "modules/analytics/process/src/langwatch-ql/__tests__/fixtures/stock-widget-queries.json",
   ],
+  "@langwatch/dashboard-process": ["docs/features/dashboards.mdx"],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
@@ -187,6 +190,7 @@ export const reads = {
     "skills/{package.json,tsconfig*.json}",
     "tools/dev-runtime/package.json",
     "tools/devscripts/ensurebuilt.go",
+    "dev/dogfood/langy/package.json",
     "dev/dogfood/acme-support/typescript/package.json",
     "dev/scripts/**/*",
     "dev/tests/*/package.json",
@@ -198,12 +202,19 @@ export const reads = {
     "pnpm-workspace.yaml",
     "tools/seedgen/runner/package.json",
     "infra/docker/compat/platform-app/package.json",
+    "infra/docker/Dockerfile",
+    "infra/docker/prune-runtime-tree.sh",
+    "infra/docker/check-links.mjs",
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
-  "@langwatch/analytics-contract": ["dev/scripts/build-charts-lib.mjs"],
+  "@langwatch/analytics-contract": [
+    "dev/scripts/build-charts-lib.mjs",
+    "docs/features/querying-your-data.mdx",
+  ],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
+  "@langwatch/docs-site": ["docs/**/*", "skills/_compiled/**/*"],
 };
 
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);

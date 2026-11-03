@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.call_connected_agent_body_kind import CallConnectedAgentBodyKind
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from ..models.call_connected_agent_body_new_messages_item import CallConnectedAgentBodyNewMessagesItem
     from ..models.call_connected_agent_body_params import CallConnectedAgentBodyParams
     from ..models.call_connected_agent_body_run import CallConnectedAgentBodyRun
+    from ..models.call_connected_agent_body_state_type_0 import CallConnectedAgentBodyStateType0
 
 
 T = TypeVar("T", bound="CallConnectedAgentBody")
@@ -31,6 +33,12 @@ class CallConnectedAgentBody:
             is.
         traceparent (str | Unset): The W3C trace context the agent adopts, so its spans join this turn's trace.
         run (CallConnectedAgentBodyRun | Unset): The simulation run this turn belongs to, if any.
+        kind (CallConnectedAgentBodyKind | Unset): A turn, or a scenario run's setup or teardown hook. Defaults to a
+            turn.
+        state (CallConnectedAgentBodyStateType0 | None | Unset): The scenario run's test data: what setup returned, or a
+            turn's latest update.
+        timeout_ms (int | Unset): A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own
+            timeout.
     """
 
     messages: list[CallConnectedAgentBodyMessagesItem]
@@ -40,9 +48,14 @@ class CallConnectedAgentBody:
     session: Any | Unset = UNSET
     traceparent: str | Unset = UNSET
     run: CallConnectedAgentBodyRun | Unset = UNSET
+    kind: CallConnectedAgentBodyKind | Unset = UNSET
+    state: CallConnectedAgentBodyStateType0 | None | Unset = UNSET
+    timeout_ms: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.call_connected_agent_body_state_type_0 import CallConnectedAgentBodyStateType0
+
         messages = []
         for messages_item_data in self.messages:
             messages_item = messages_item_data.to_dict()
@@ -69,6 +82,20 @@ class CallConnectedAgentBody:
         if not isinstance(self.run, Unset):
             run = self.run.to_dict()
 
+        kind: str | Unset = UNSET
+        if not isinstance(self.kind, Unset):
+            kind = self.kind.value
+
+        state: dict[str, Any] | None | Unset
+        if isinstance(self.state, Unset):
+            state = UNSET
+        elif isinstance(self.state, CallConnectedAgentBodyStateType0):
+            state = self.state.to_dict()
+        else:
+            state = self.state
+
+        timeout_ms = self.timeout_ms
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -88,6 +115,12 @@ class CallConnectedAgentBody:
             field_dict["traceparent"] = traceparent
         if run is not UNSET:
             field_dict["run"] = run
+        if kind is not UNSET:
+            field_dict["kind"] = kind
+        if state is not UNSET:
+            field_dict["state"] = state
+        if timeout_ms is not UNSET:
+            field_dict["timeoutMs"] = timeout_ms
 
         return field_dict
 
@@ -97,6 +130,7 @@ class CallConnectedAgentBody:
         from ..models.call_connected_agent_body_new_messages_item import CallConnectedAgentBodyNewMessagesItem
         from ..models.call_connected_agent_body_params import CallConnectedAgentBodyParams
         from ..models.call_connected_agent_body_run import CallConnectedAgentBodyRun
+        from ..models.call_connected_agent_body_state_type_0 import CallConnectedAgentBodyStateType0
 
         d = dict(src_dict)
         messages = []
@@ -135,6 +169,32 @@ class CallConnectedAgentBody:
         else:
             run = CallConnectedAgentBodyRun.from_dict(_run)
 
+        _kind = d.pop("kind", UNSET)
+        kind: CallConnectedAgentBodyKind | Unset
+        if isinstance(_kind, Unset):
+            kind = UNSET
+        else:
+            kind = CallConnectedAgentBodyKind(_kind)
+
+        def _parse_state(data: object) -> CallConnectedAgentBodyStateType0 | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                state_type_0 = CallConnectedAgentBodyStateType0.from_dict(data)
+
+                return state_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(CallConnectedAgentBodyStateType0 | None | Unset, data)
+
+        state = _parse_state(d.pop("state", UNSET))
+
+        timeout_ms = d.pop("timeoutMs", UNSET)
+
         call_connected_agent_body = cls(
             messages=messages,
             new_messages=new_messages,
@@ -143,6 +203,9 @@ class CallConnectedAgentBody:
             session=session,
             traceparent=traceparent,
             run=run,
+            kind=kind,
+            state=state,
+            timeout_ms=timeout_ms,
         )
 
         call_connected_agent_body.additional_properties = d

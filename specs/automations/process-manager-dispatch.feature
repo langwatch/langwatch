@@ -66,6 +66,17 @@ Feature: Automation dispatch on the process-manager substrate
     When the process wakes at the window boundary
     Then exactly one notify-digest intent is written for both traces
 
+  # Each wake used to drain only what was due by the instant it was armed
+  # for, so a backed-up trigger drained one boundary per wake and re-armed
+  # into a wake already due, which every worker then raced for.
+  @unit
+  Scenario: A late wake drains every overdue match in one commit
+    Given matches pending at several dispatch boundaries
+    When the settlement wake is handled after all of those boundaries have passed
+    Then one commit dispatches every overdue match, persist matches in bounded pages
+    And each intent keeps the message key its boundary or page contents derive
+    And the next wake is armed at the earliest boundary still in the future
+
   # One outbox message per matched trace melted under match storms: each
   # message paid the full fixed cost (trigger row, claim check, plan cap,
   # project row) and the dispatcher drains sequentially, so a burst of

@@ -567,3 +567,28 @@ func TestWrittenErrorsCarryRemediationForTheClientToRender(t *testing.T) {
 			"%s is promoted to a first-class field and must not also sit in meta", promoted)
 	}
 }
+
+// @scenario "A request the client abandoned is logged at info, not as a platform fault"
+func TestWriteErrorNamesAClientCancelAsAbandoned(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	w, logs := observedWriteErrorResponse(t, ctx, fmt.Errorf("dispatch: %w", context.Canceled))
+
+	entry := requireSingleFailureLog(t, logs)
+	assert.Equal(t, zapcore.InfoLevel, entry.Level)
+	fields := entry.ContextMap()
+	assert.Equal(t, string(domain.ErrRequestAbandoned), fields["code"])
+	assert.Equal(t, "customer", fields["fault"])
+	assert.Equal(t, 499, w.Code)
+	assert.Equal(t, string(domain.ErrRequestAbandoned), w.Header().Get(herr.HandledErrorHeader))
+}
+
+// @scenario "A request the client abandoned is logged at info, not as a platform fault"
+func TestWriteErrorKeepsACancelRaisedWhileTheRequestIsLive(t *testing.T) {
+	w, logs := observedWriteErrorResponse(t, context.Background(), fmt.Errorf("dispatch: %w", context.Canceled))
+
+	entry := requireSingleFailureLog(t, logs)
+	assert.Equal(t, zapcore.ErrorLevel, entry.Level)
+	assert.NotEqual(t, string(domain.ErrRequestAbandoned), entry.ContextMap()["code"])
+	assert.NotEqual(t, 499, w.Code)
+}

@@ -3,10 +3,11 @@
  * @vitest-environment node
  * Spec: enterprise/modules/governance/specs/governance-deploy-steps.feature
  */
-import { ASSISTANT_KINDS } from "@langwatch/enterprise-governance-contract";
+
 import { ORGANIZATION_ID_PAGE_LIMIT } from "@langwatch/organization-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { CODING_ASSISTANT_BILLING_SOURCE_TYPES } from "../../features/cost/rules/coding-assistant-billing.rules.ts";
 import { MemoryCostAttributionPolicyRepository } from "../../repositories/memory/memory.cost-attribution-policy.repository.ts";
 import {
   bootGovernanceWorker,
@@ -62,7 +63,10 @@ describe("given a worker installing governance", () => {
           { after: "org_b", limit: ORGANIZATION_ID_PAGE_LIMIT },
         ]);
         expect(saves).toEqual([{ afterOrganizationId: "org_b" }, { afterOrganizationId: "org_c" }]);
-        expect(report).toMatchObject({ organizations: 3, recorded: 3 * ASSISTANT_KINDS.length });
+        expect(report).toMatchObject({
+          organizations: 3,
+          recorded: 3 * CODING_ASSISTANT_BILLING_SOURCE_TYPES.length,
+        });
         await expect(
           billedFacts({ organizationId: "org_b", sourceType: "codex" }),
         ).resolves.toEqual([true]);
@@ -177,6 +181,7 @@ describe("given a worker installing governance", () => {
       const saves: Record<string, unknown>[] = [];
       try {
         const run = step(STEP_ID).run({
+          log: { info: () => undefined, warn: () => undefined },
           checkpoint: { resumeFrom: null, save: async ({ report }) => void saves.push(report) },
           dryRun: false,
           signal: new AbortController().signal,

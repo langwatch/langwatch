@@ -14,6 +14,7 @@ import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,
 } from "../../rules/analytics-payload-blocklist.rules.ts";
+import type { AnalyticsTableReadScope } from "../analytics.repository.ts";
 import {
   collectStringValues,
   EVAL_METRIC_KEYS,
@@ -287,24 +288,28 @@ interface PickAnalyticsTableInput {
 }
 
 /**
+ * The one metric source every series shares, or `mixed` when there are none, they mix, or one is
+ * unknown: the legacy trace builder is the only path that can mix trace and eval reads.
+ */
+function seriesSource(series: AnalyticsSeries[]): AnalyticsMetricSource | "mixed" {
+  if (!series || series.length === 0) return "mixed";
+  const sources = new Set(series.map((s) => classifyMetricSource(s.metric)));
+  const [only] = sources;
+  return sources.size === 1 && only !== undefined ? only : "mixed";
+}
+
+/**
  * Decide which ClickHouse table serves a `getTimeseries` query: source-
  * aware (all series must share one metric source, else the trace legacy
  * table), then rollup -> slim -> legacy fallback in that order per source.
  */
-export function pickAnalyticsTable(input: PickAnalyticsTableInput): AnalyticsTable {
-  // Empty series → can't route confidently; fall back to the broad legacy.
-  if (!input.series || input.series.length === 0) return "trace_summaries";
-
-  // Determine the source. All series must agree.
-  const sources = new Set<AnalyticsMetricSource | undefined>(
-    input.series.map((s) => classifyMetricSource(s.metric)),
-  );
-  // Mixed source or unknown → conservative fallback to the legacy trace
-  // table; the legacy builder is the only path that can mix trace + eval
-  // reads (and unknown-source metrics route through it today).
-  if (sources.size !== 1) return "trace_summaries";
-  const source = Array.from(sources)[0];
-  if (source === undefined) return "trace_summaries";
+export function pickAnalyticsTable(
+  input: PickAnalyticsTableInput,
+  scope: AnalyticsTableReadScope = {},
+): AnalyticsTable {
+  const source = seriesSource(input.series);
+  if (source === "mixed") return "trace_summaries";
+  if (scope.readsMembers && source === "evaluation") return legacyFallbackFor(source);
 
   // Pipeline (per-user/per-thread/per-customer) aggregations require
   // trace-level dim values that change after the spans land — those reads

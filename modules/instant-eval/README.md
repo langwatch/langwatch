@@ -29,15 +29,16 @@ Anything else instant-eval needs belongs to another module and is reached throug
 
 ## Peers (static dependencies)
 
-| Name            | Token             | Module                                    |
-| --------------- | ----------------- | ----------------------------------------- |
-| `analytics`     | `AnalyticsApi`    | [analytics](../analytics/README.md)       |
-| `authz`         | `AuthzApi`        | [authz](../authz/README.md)               |
-| `featureFlags`  | `FeatureFlagApi`  | [feature-flag](../feature-flag/README.md) |
-| `gateway`       | `GatewayApi`      | [gateway](../gateway/README.md)           |
-| `organizations` | `OrganizationApi` | [organization](../organization/README.md) |
-| `plans`         | `EntitlementApi`  | [entitlement](../entitlement/README.md)   |
-| `traces`        | `TraceApi`        | [trace](../trace/README.md)               |
+| Name             | Token              | Module                                        |
+| ---------------- | ------------------ | --------------------------------------------- |
+| `analytics`      | `AnalyticsApi`     | [analytics](../analytics/README.md)           |
+| `authz`          | `AuthzApi`         | [authz](../authz/README.md)                   |
+| `featureFlags`   | `FeatureFlagApi`   | [feature-flag](../feature-flag/README.md)     |
+| `gateway`        | `GatewayApi`       | [gateway](../gateway/README.md)               |
+| `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
+| `organizations`  | `OrganizationApi`  | [organization](../organization/README.md)     |
+| `plans`          | `EntitlementApi`   | [entitlement](../entitlement/README.md)       |
+| `traces`         | `TraceApi`         | [trace](../trace/README.md)                   |
 
 ## Who depends on instant-eval
 

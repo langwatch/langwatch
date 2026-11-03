@@ -165,6 +165,8 @@ export type ExecutionState = {
     completion_tokens?: number;
     total_tokens?: number;
     reasoning_tokens?: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
     model?: string;
   };
   /**
@@ -411,6 +413,8 @@ const executionStateSchema = z.looseObject({
       completion_tokens: z.number().optional(),
       total_tokens: z.number().optional(),
       reasoning_tokens: z.number().optional(),
+      cache_read_input_tokens: z.number().optional(),
+      cache_creation_input_tokens: z.number().optional(),
       model: z.string().optional(),
     })
     .optional(),

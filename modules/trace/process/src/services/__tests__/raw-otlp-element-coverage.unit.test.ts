@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 
 import { canonicalisation } from "./canonicalisation/test-helpers.ts";
 import codexBSpan from "./fixtures/codex-b.session-task-turn.json";
+import copilotCliBSpan from "./fixtures/copilot-cli-b.chat.json";
+import copilotVscodeBSpan from "./fixtures/copilot-vscode-b.chat.cache-read.json";
 import geminiBSpan from "./fixtures/gemini-b.llm-call.json";
 import opencodeBSpan from "./fixtures/opencode-b.do-stream.json";
 
@@ -108,6 +110,44 @@ const TOOLS: {
       "session id": "present",
       "input content": "absent",
       "output content": "absent",
+    },
+  },
+  {
+    name: "copilot-cli-B (github.copilot chat span, CLI 1.0.100)",
+    attrs: () => canonicalizeSpan(copilotCliBSpan),
+    absentReason: {
+      "cache read": "this captured call wrote the cache; reads land on the turn's later calls",
+      "input content": "the CLI exports message bodies only when content capture is opted into",
+      "output content": "the CLI exports message bodies only when content capture is opted into",
+    },
+    expected: {
+      model: "present",
+      "input tokens": "present",
+      "output tokens": "present",
+      cost: "present",
+      "cache read": "absent",
+      "cache write": "present",
+      "session id": "present",
+      "input content": "absent",
+      "output content": "absent",
+    },
+  },
+  {
+    name: "copilot-vscode-B (copilot-chat chat span, VS Code Copilot Chat 0.67, cache-read call)",
+    attrs: () => canonicalizeSpan(copilotVscodeBSpan),
+    absentReason: {
+      "cache write": "Copilot Chat reports cache reads only, no cache-creation count",
+    },
+    expected: {
+      model: "present",
+      "input tokens": "present",
+      "output tokens": "present",
+      cost: "present",
+      "cache read": "present",
+      "cache write": "absent",
+      "session id": "present",
+      "input content": "present",
+      "output content": "present",
     },
   },
   {

@@ -282,6 +282,31 @@ export interface ProcessStore {
   }): Promise<DueWake[]>;
 
   /**
+   * Claims due wakes for one worker, oldest first: each instance's nextWakeAt moves to `now +
+   * leaseDurationMs`, revision untouched, so concurrent callers get disjoint batches. `wakeAt` is
+   * the due time before the claim; a claim nobody commits or releases fires when its lease ends.
+   */
+  leaseDueWakes(params: {
+    now: number;
+    limit: number;
+    leaseDurationMs: number;
+    /** Restrict the claim to process managers mounted here. */
+    processNames?: readonly string[];
+  }): Promise<DueWake[]>;
+
+  /**
+   * Hands a claimed wake back unhandled: nextWakeAt returns to `wakeAt` only while the row still
+   * holds the claim's lease end at the claimed revision. Every commit moves the revision, so one
+   * that re-armed the wake, even at the lease end, is never overwritten.
+   */
+  releaseWakeClaim(params: {
+    ref: ProcessRef;
+    revision: number;
+    wakeAt: number;
+    claimedUntil: number;
+  }): Promise<{ applied: boolean }>;
+
+  /**
    * Retention for high-frequency recurring intents (ADR-052): deletes
    * DISPATCHED rows of one processName finished before `before`. Pending/dead
    * rows are never touched — dead is the operator's failure record, pending is work.

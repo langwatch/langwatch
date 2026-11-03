@@ -105,3 +105,48 @@ export function turnWaitsKey(conversationId: string, turnId: string): string {
 export function workspaceChannel(conversationId: string): string {
   return `${PREFIX}:workspace:${conversationId}`;
 }
+
+/** The record one confirmation is about: a click covers exactly this, and nothing near it. */
+export interface ConfirmTarget {
+  projectId: string;
+  conversationId: string;
+  resource: string;
+  action: string;
+  id: string;
+}
+
+/**
+ * The braces are a Redis hash tag: every key of one conversation lands on one slot, so a bulk
+ * request can spend all its clicks in one script, or none, on a cluster too.
+ */
+function confirmTargetPath({ projectId, conversationId, resource, action, id }: ConfirmTarget) {
+  return `{${projectId}:${conversationId}}:${resource}:${action}:${id}`;
+}
+
+/**
+ * The conversation one Langy key works for. A delete it asks for shows its card there, and only
+ * a click there covers it.
+ */
+export function confirmKeyBindingKey(apiKeyId: string): string {
+  return `${PREFIX}:confirm_key:${apiKeyId}`;
+}
+
+/** One unspent Yes click: present means the next matching request may run, once. */
+export function confirmGrantKey(target: ConfirmTarget): string {
+  return `${PREFIX}:confirm_grant:${confirmTargetPath(target)}`;
+}
+
+/** The card already asking about one record, so a retry raises no second card. */
+export function confirmCardKey(target: ConfirmTarget): string {
+  return `${PREFIX}:confirm_card:${confirmTargetPath(target)}`;
+}
+
+/** Held while one request raises the card for a record, so requests racing it raise no second. */
+export function confirmRaiseKey(target: ConfirmTarget): string {
+  return `${PREFIX}:confirm_raise:${confirmTargetPath(target)}`;
+}
+
+/** Set by a card's first answer, so the click and its message fallback grant once between them. */
+export function confirmClaimKey(waitId: string): string {
+  return `${PREFIX}:confirm_claim:${waitId}`;
+}

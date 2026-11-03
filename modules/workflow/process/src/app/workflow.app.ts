@@ -194,6 +194,7 @@ export interface WorkflowLineageReads {
     projectId: string;
     workflowId: string;
     unarchive?: boolean;
+    by: WorkflowCaller;
   }): Promise<WorkflowCascadeArchive>;
 }
 
@@ -350,6 +351,7 @@ function composeEngine(setup: WorkflowSetup): WorkflowEngine {
     cache: setup.repositories.nlpLambdaArns,
     resolver: engine.resolver,
     imageUri: engine.imageUri,
+    imageOrder: engine.imageOrder,
     configFingerprint: engine.configFingerprint,
     logger,
   });
@@ -1258,12 +1260,11 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
    * evaluators it backs from the archived fact, and monitor deletes their
    * monitors from evaluator's, after a lag (plan §7).
    */
-  async cascadeArchive(input: {
-    projectId: string;
-    workflowId: string;
-    unarchive?: boolean;
-  }): Promise<WorkflowCascadeArchive> {
-    const archived = await this.#infrastructure.lineage.cascadeArchive(input);
+  async cascadeArchive(
+    input: { projectId: string; workflowId: string; unarchive?: boolean },
+    by: WorkflowCaller,
+  ): Promise<WorkflowCascadeArchive> {
+    const archived = await this.#infrastructure.lineage.cascadeArchive({ ...input, by });
     this.#recordArchiveChange(input);
     return archived;
   }

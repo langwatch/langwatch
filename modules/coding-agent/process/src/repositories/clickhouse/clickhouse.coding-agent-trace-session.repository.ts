@@ -13,6 +13,13 @@ import {
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
 
+/** The columns the by-trace read selects. */
+interface TraceSessionReadRow {
+  TraceId: string;
+  SessionId: string;
+  OccurredAt: string;
+}
+
 const logger = createLogger("langwatch:app-layer:coding-agent:trace-session-repository");
 
 interface ClickHouseWriteRecord {
@@ -87,7 +94,8 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
 
   /**
    * The mapping row for one trace. IN-tuple dedup (max(UpdatedAt) per key), never FINAL.
-   * The closing `ORDER BY` is not decoration (ADR-071 sequencing step 4). A
+   * The closing `ORDER BY` is not decoration (ADR-071 sequencing step 4). With the id index
+   * on, both the scan and its dedup subquery read only the range the trace's rows span.
    */
   async findByTraceId({
     tenantId,
@@ -100,11 +108,7 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
     );
-    const { rows } = await this.clickhouse.query<{
-      TraceId: string;
-      SessionId: string;
-      OccurredAt: string;
-    }>({
+    const { rows } = await this.clickhouse.query<TraceSessionReadRow>({
       tenantId,
       table: TABLE_NAME,
       kind: "read",
@@ -113,17 +117,20 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
+          {{idBound:coding_agent_trace_sessions.TraceId:traceId}}
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND TraceId = {traceId:String}
+              {{idBound:coding_agent_trace_sessions.TraceId:traceId}}
             GROUP BY TenantId, TraceId
           )
         ORDER BY SessionId != TraceId DESC, OccurredAt DESC, SessionId ASC
         LIMIT 1
       `,
       params: { tenantId, traceId },
+      idBound: { fallback: "unbounded" },
     });
 
     const first = rows[0];

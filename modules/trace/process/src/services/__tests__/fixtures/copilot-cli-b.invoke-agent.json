@@ -1,0 +1,192 @@
+{
+	"scopeName": "github.copilot",
+	"spanName": "invoke_agent",
+	"vendorVersion": "1.0.100-1",
+	"resourceAttributes": {
+		"service.version": "1.0.100-1",
+		"service.name": "github-copilot"
+	},
+	"attributes": {
+		"gen_ai.operation.name": "invoke_agent",
+		"gen_ai.provider.name": "github",
+		"gen_ai.conversation.id": "00000000-0000-4000-8000-000000000001",
+		"enduser.pseudo.id": "00000000000000000000000000000001",
+		"github.copilot.context.mcp_server_names": "[\"044b1506a3324f1f6e3b3a2c3a00b4ff8cd8ea489ccbc1c11dacf6043161ea42\"]",
+		"github.copilot.agent.type": "builtin",
+		"gen_ai.response.finish_reasons": [
+			"stop"
+		],
+		"gen_ai.usage.input_tokens": 51325,
+		"gen_ai.usage.output_tokens": 88,
+		"github.copilot.cost": 3.0,
+		"github.copilot.nano_aiu": 253341500.0,
+		"github.copilot.turn_count": 3
+	},
+	"events": [
+		{
+			"name": "github.copilot.mcp.server.lifecycle",
+			"attributes": {
+				"github.copilot.mcp.server.state": "discovered",
+				"github.copilot.mcp.server.name_hash": "044b1506a3324f1f6e3b3a2c3a00b4ff8cd8ea489ccbc1c11dacf6043161ea42",
+				"github.copilot.mcp.server.source": "builtin"
+			}
+		},
+		{
+			"name": "github.copilot.mcp.server.lifecycle",
+			"attributes": {
+				"github.copilot.mcp.server.state": "initialized",
+				"github.copilot.mcp.server.name_hash": "044b1506a3324f1f6e3b3a2c3a00b4ff8cd8ea489ccbc1c11dacf6043161ea42",
+				"github.copilot.mcp.server.source": "builtin"
+			}
+		},
+		{
+			"name": "github.copilot.user.message",
+			"attributes": {
+				"github.copilot.user.message.source": "user",
+				"github.copilot.user.message.interaction_id": "00000000-0000-4000-8000-000000000003",
+				"github.copilot.user.message.turn_id": "0"
+			}
+		},
+		{
+			"name": "github.copilot.hook.start",
+			"attributes": {
+				"github.copilot.hook.type": "sessionStart",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000004"
+			}
+		},
+		{
+			"name": "github.copilot.hook.end",
+			"attributes": {
+				"github.copilot.hook.type": "sessionStart",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000004",
+				"github.copilot.hook.duration": 0.022947833
+			}
+		},
+		{
+			"name": "github.copilot.session.usage_info",
+			"attributes": {
+				"github.copilot.token_limit": 272000,
+				"github.copilot.current_tokens": 18413,
+				"github.copilot.messages_length": 3
+			}
+		},
+		{
+			"name": "github.copilot.hook.start",
+			"attributes": {
+				"github.copilot.hook.type": "preToolUse",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000005",
+				"github.copilot.hook.tool_names": "[\"rg\"]"
+			}
+		},
+		{
+			"name": "github.copilot.hook.end",
+			"attributes": {
+				"github.copilot.hook.type": "preToolUse",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000005",
+				"github.copilot.hook.tool_names": "[\"rg\"]",
+				"github.copilot.hook.decision": "allow",
+				"github.copilot.hook.duration": 0.022139667
+			}
+		},
+		{
+			"name": "github.copilot.hook.start",
+			"attributes": {
+				"github.copilot.hook.type": "postToolUse",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000006",
+				"github.copilot.hook.tool_names": "[\"rg\"]"
+			}
+		},
+		{
+			"name": "github.copilot.hook.end",
+			"attributes": {
+				"github.copilot.hook.type": "postToolUse",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000006",
+				"github.copilot.hook.tool_names": "[\"rg\"]",
+				"github.copilot.hook.decision": "allow",
+				"github.copilot.hook.duration": 0.032932583
+			}
+		},
+		{
+			"name": "github.copilot.session.usage_info",
+			"attributes": {
+				"github.copilot.token_limit": 272000,
+				"github.copilot.current_tokens": 18485,
+				"github.copilot.messages_length": 5
+			}
+		},
+		{
+			"name": "github.copilot.hook.start",
+			"attributes": {
+				"github.copilot.hook.type": "preToolUse",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000007",
+				"github.copilot.hook.tool_names": "[\"bash\"]"
+			}
+		},
+		{
+			"name": "github.copilot.hook.end",
+			"attributes": {
+				"github.copilot.hook.type": "preToolUse",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000007",
+				"github.copilot.hook.tool_names": "[\"bash\"]",
+				"github.copilot.hook.decision": "allow",
+				"github.copilot.hook.duration": 0.016271042
+			}
+		},
+		{
+			"name": "github.copilot.hook.start",
+			"attributes": {
+				"github.copilot.hook.type": "postToolUse",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000008",
+				"github.copilot.hook.tool_names": "[\"bash\"]"
+			}
+		},
+		{
+			"name": "github.copilot.hook.end",
+			"attributes": {
+				"github.copilot.hook.type": "postToolUse",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000008",
+				"github.copilot.hook.tool_names": "[\"bash\"]",
+				"github.copilot.hook.decision": "allow",
+				"github.copilot.hook.duration": 0.014812708
+			}
+		},
+		{
+			"name": "github.copilot.session.usage_info",
+			"attributes": {
+				"github.copilot.token_limit": 272000,
+				"github.copilot.current_tokens": 18573,
+				"github.copilot.messages_length": 7
+			}
+		},
+		{
+			"name": "github.copilot.hook.start",
+			"attributes": {
+				"github.copilot.hook.type": "agentStop",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000009"
+			}
+		},
+		{
+			"name": "github.copilot.hook.end",
+			"attributes": {
+				"github.copilot.hook.type": "agentStop",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000009",
+				"github.copilot.hook.duration": 0.020105708
+			}
+		},
+		{
+			"name": "github.copilot.hook.start",
+			"attributes": {
+				"github.copilot.hook.type": "sessionEnd",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000010"
+			}
+		},
+		{
+			"name": "github.copilot.hook.end",
+			"attributes": {
+				"github.copilot.hook.type": "sessionEnd",
+				"github.copilot.hook.invocation_id": "00000000-0000-4000-8000-000000000010",
+				"github.copilot.hook.duration": 0.016875
+			}
+		}
+	]
+}

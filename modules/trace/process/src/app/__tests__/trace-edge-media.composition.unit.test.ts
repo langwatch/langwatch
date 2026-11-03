@@ -16,6 +16,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
@@ -49,13 +50,9 @@ function compose({
     canonicalisation: TraceCanonicalisationService.create(),
     blobStore,
     dedup: MemoryTraceSpanDedupRepository.create(),
-    commands: {
+    commands: fakeTraceProcessingCommands({
       recordSpan: async (data) => void recorded.push(data),
-      changeTraceName: async () => undefined,
-      addAnnotation: async () => undefined,
-      removeAnnotation: async () => undefined,
-      assignTopic: async () => undefined,
-    },
+    }),
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no broadcast fabric in this test");

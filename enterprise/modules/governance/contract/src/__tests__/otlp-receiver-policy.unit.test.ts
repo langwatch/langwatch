@@ -34,6 +34,8 @@ describe("Governance receiver policy", () => {
     "copilot_cli",
     "copilot_app",
     "copilot_vscode",
+    "grok_cli",
+    "pi_cli",
   ])("classifies coding source %s", (sourceType) => {
     expect(originForIngestSourceType(sourceType)).toBe("coding_agent");
   });
@@ -122,6 +124,7 @@ describe("Governance receiver policy", () => {
 
   /** @scenario Foreign OTLP traffic on a copilot_vscode key is dropped at the receiver */
   /** @scenario "VS Code policy excludes inherited telemetry" */
+  /** @scenario "Copilot Chat's copilot-chat scope counts as Copilot's own on a copilot_vscode key" */
   it.each(["traces", "metrics"] as const)(
     "filters foreign VS Code %s scopes and removes empty groups",
     (signal) => {
@@ -132,6 +135,7 @@ describe("Governance receiver policy", () => {
       const groups = [
         { scope: { name: "github.copilot" } },
         { scope: { name: "@github/copilot" } },
+        { scope: { name: "copilot-chat" } },
         { scope: { name: "customer.service" } },
         {},
       ];
@@ -153,8 +157,32 @@ describe("Governance receiver policy", () => {
       expect(scopes?.map((scope) => scope?.scope?.name)).toEqual([
         "github.copilot",
         "@github/copilot",
+        "copilot-chat",
       ]);
       expect(signal === "traces" ? request.resourceSpans : request.resourceMetrics).toHaveLength(1);
+    },
+  );
+
+  /** @scenario "Copilot Chat's copilot-chat scope counts as Copilot's own on a copilot_vscode key" */
+  it.each(["copilot_cli", "copilot_app"])(
+    "applies no scope filter on a %s key, so a copilot-chat span is kept",
+    (sourceType) => {
+      const policy = buildIngestKeyReceiverPolicies({ ...identity, sourceType }, true).traces;
+      const request: OtlpReceiverRequest = {
+        resourceSpans: [
+          { scopeSpans: [{ scope: { name: "copilot-chat" } }, { scope: { name: "custom" } }] },
+        ],
+      };
+
+      expect(policy.allowedTraceScopeNames).toBeUndefined();
+      expect(
+        applyOtlpReceiverPolicy({ request, signal: "traces", apiKeyId: "key", policy })
+          .droppedScopes,
+      ).toBe(0);
+      expect(request.resourceSpans?.[0]?.scopeSpans?.map((scope) => scope?.scope?.name)).toEqual([
+        "copilot-chat",
+        "custom",
+      ]);
     },
   );
 
@@ -187,5 +215,186 @@ describe("Governance receiver policy", () => {
     ).toBe(0);
     expect(request.resourceSpans?.[0]?.scopeSpans?.[0]?.scope?.name).toBe("custom");
     expect(request.resourceLogs?.[0]?.scopeLogs?.[0]?.scope?.name).toBe("custom");
+  });
+
+  /** One Grok log record and one metric batch, as grok 1.0.70's exporter sends them. */
+  function grokExport({ forgedSource }: { forgedSource?: string } = {}): OtlpReceiverRequest {
+    const resource = {
+      attributes: [
+        { key: "service.name", value: { stringValue: "grok-cli" } },
+        ...(forgedSource
+          ? [{ key: "langwatch.source", value: { stringValue: forgedSource } }]
+          : []),
+      ],
+    };
+    return {
+      resourceLogs: [
+        {
+          resource,
+          scopeLogs: [
+            {
+              scope: { name: "ai.xai.grok_code" },
+              logRecords: [{ attributes: [] }],
+            },
+          ],
+        },
+      ],
+      resourceMetrics: [
+        {
+          resource,
+          scopeMetrics: [{ scope: { name: "ai.xai.grok_code" }, metrics: [] }],
+        },
+      ],
+    };
+  }
+
+  describe("given a Grok export under a grok_cli key", () => {
+    const policies = buildIngestKeyReceiverPolicies(
+      { organizationId: "org_1", sourceType: "grok_cli" },
+      false,
+    );
+
+    /** @scenario A Grok log record ingested under its own key carries the coding-agent origin */
+    it("stamps a Grok log record as coding-agent activity", () => {
+      const request = grokExport();
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "logs",
+        apiKeyId: "key_grok",
+        policy: policies.logs,
+      });
+
+      expect(attributes(request, "logs")[0]).toMatchObject({
+        "langwatch.source": "grok_cli",
+        "langwatch.origin": "coding_agent",
+        "langwatch.organization_id": "org_1",
+        "langwatch.api_key.id": "key_grok",
+      });
+    });
+
+    /** @scenario Grok metrics are stamped the same way as its logs */
+    it("stamps a Grok metric batch the same way", () => {
+      const request = grokExport();
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "metrics",
+        apiKeyId: "key_grok",
+        policy: policies.metrics,
+      });
+
+      expect(attributes(request, "metrics")[0]).toMatchObject({
+        "langwatch.source": "grok_cli",
+        "langwatch.origin": "coding_agent",
+      });
+    });
+
+    /** @scenario Provenance keys Grok sends itself are stripped before the key's are stamped */
+    it("replaces a provenance key the export claimed for itself", () => {
+      const request = grokExport({ forgedSource: "claude_code" });
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "logs",
+        apiKeyId: "key_grok",
+        policy: policies.logs,
+      });
+
+      const sources = (request.resourceLogs?.[0]?.resource?.attributes ?? []).filter(
+        (attribute) => attribute.key === "langwatch.source",
+      );
+      expect(sources.map((attribute) => attribute.value?.stringValue)).toEqual(["grok_cli"]);
+    });
+
+    /** @scenario Wrapper resource attributes Grok drops are not relied on */
+    it("attributes from the key alone, with no wrapper resource attribute present", () => {
+      const request = grokExport();
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "logs",
+        apiKeyId: "key_grok",
+        policy: policies.logs,
+      });
+
+      expect(attributes(request, "logs")[0]).toMatchObject({
+        "service.name": "grok-cli",
+        "langwatch.source": "grok_cli",
+        "langwatch.organization_id": "org_1",
+      });
+    });
+  });
+
+  /** One pi harness span, as pi's own exporter sends it. */
+  function piHarnessRun(): OtlpReceiverRequest {
+    return {
+      resourceSpans: [
+        {
+          scopeSpans: [
+            {
+              scope: { name: "@earendil-works/pi-agent-core" },
+              spans: [{ attributes: [{ key: "pi.session.id", value: { stringValue: "s-1" } }] }],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  /** @scenario "A pi span ingested under its own key carries the coding-agent origin" */
+  it("stamps a pi span ingested on a pi_cli key as coding-agent activity", () => {
+    const policies = buildIngestKeyReceiverPolicies(
+      { organizationId: "org_1", sourceType: "pi_cli" },
+      false,
+    );
+    const request = piHarnessRun();
+
+    const result = applyOtlpReceiverPolicy({
+      request: request,
+      signal: "traces",
+      apiKeyId: "key_pi",
+      policy: policies.traces,
+    });
+
+    expect(attributes(request, "traces")[0]).toMatchObject({
+      "langwatch.source": "pi_cli",
+      "langwatch.origin": "coding_agent",
+      "langwatch.organization_id": "org_1",
+      "langwatch.api_key.id": "key_pi",
+    });
+    // pi exports only its own spans, so no scope restriction is applied and none is dropped.
+    expect(policies.traces.allowedTraceScopeNames).toBeUndefined();
+    expect(result.droppedScopes).toBe(0);
+  });
+
+  /** @scenario "pi spans sent with another source's key do not pass as pi's" */
+  it("rewrites a forged pi source on an unrelated source's key", () => {
+    const policies = buildIngestKeyReceiverPolicies(
+      { organizationId: "org_1", sourceType: "otel_generic" },
+      false,
+    );
+    const request = piHarnessRun();
+    const group = request.resourceSpans?.[0];
+    if (group) {
+      group.resource = {
+        attributes: [
+          { key: "langwatch.source", value: { stringValue: "pi_cli" } },
+          { key: "langwatch.origin", value: { stringValue: "coding_agent" } },
+        ],
+      };
+    }
+
+    applyOtlpReceiverPolicy({
+      request: request,
+      signal: "traces",
+      apiKeyId: "key_other",
+      policy: policies.traces,
+    });
+
+    expect(attributes(request, "traces")[0]).toMatchObject({
+      "langwatch.source": "otel_generic",
+      "langwatch.origin": "ai_tool",
+    });
   });
 });
