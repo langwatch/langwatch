@@ -71,6 +71,12 @@ Feature: An invited person without an account gets in by any method
       And it still carries the invitation to return to
 
     @integration
+    Scenario: A spend that never reached the server keeps the token for a reload
+      Given a person opening a confirmation link
+      When the request to spend it never reaches the server
+      Then the address bar still carries the token, so a reload can spend it
+
+    @integration
     Scenario: A dead confirmation link in a browser already signed in goes on
       Given a browser that is already signed in
       When a confirmation link it opens is refused as already used

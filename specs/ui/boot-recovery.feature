@@ -17,7 +17,7 @@ Feature: The application recovers from files a lossy link dropped while it boots
       Given the page has not shown yet
       When a script or stylesheet the server's page names fails to load
       Then the page reloads
-      And it says "Slow connection, retrying (1 of 6)..." while it waits
+      And it says "Still loading, retrying (1 of 6)..." while it waits
 
     @unit
     Scenario: A chunk that outlived its retries before the first page reloads the page
@@ -76,6 +76,14 @@ Feature: The application recovers from files a lossy link dropped while it boots
       When a script outside the application's asset files fails to load
       Then the page does not reload
       And it says nothing about retrying
+
+    @unit
+    Scenario: The build marks the application's own files for the boot recovery
+      Given the page the build writes, with a script the edge added before the application's own
+      When the build marks the page's tags
+      Then every tag that loads one of the application's built files is marked
+      And no other tag is
+      And a marked tag is marked once, however often the page passes through
 
   Rule: Once the first page shows, the recovery stands down
 

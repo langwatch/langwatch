@@ -49,6 +49,7 @@ async function spendSignUpLink({
   callbackUrl,
   decide,
   resolveEnrollment,
+  onAnswered,
   onSignedIn,
   onAccountReady,
   onProofSpent,
@@ -57,12 +58,19 @@ async function spendSignUpLink({
   callbackUrl: string | undefined;
   decide: Decide;
   resolveEnrollment: ResolveEnrollment;
+  /** The server answered, so the token is spent or refused: nothing is left to ask again. */
+  onAnswered: () => void;
   onSignedIn: (email: string) => void;
   onAccountReady: (email: string) => void;
   onProofSpent: (email: string) => void;
 }): Promise<void> {
-  const { email, accountCreated, accountExists, addressProof, signedIn } =
-    await confirmSignUpAddress({ token });
+  const answer = await confirmSignUpAddress({ token }).catch((failure: unknown) => {
+    // A request that never reached the server spent nothing: a reload may ask again.
+    if (!(failure instanceof TypeError)) onAnswered();
+    throw failure;
+  });
+  onAnswered();
+  const { email, accountCreated, accountExists, addressProof, signedIn } = answer;
   // The link opened the session: a full navigation, so everything cached as signed out goes.
   if (signedIn) {
     onSignedIn(email);
@@ -260,15 +268,14 @@ export function VerificationFirstSignUp() {
       callbackUrl,
       decide,
       resolveEnrollment,
+      onAnswered: () => dropQueryParameter("verify"),
       onSignedIn: setSignedInAs,
       onAccountReady: (email) => {
         setVerifiedEmail(email);
         setAccountIsReady(true);
       },
       onProofSpent: setProofRecoveryEmail,
-    })
-      .catch(setLinkError)
-      .finally(() => dropQueryParameter("verify"));
+    }).catch(setLinkError);
   }, [verifyToken, callbackUrl, decide, resolveEnrollment]);
 
   const handOff = useSignedInHandOff({ signedInAs, verifyToken, linkError, callbackUrl });

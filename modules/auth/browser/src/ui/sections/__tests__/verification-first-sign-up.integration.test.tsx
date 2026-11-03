@@ -641,6 +641,22 @@ describe("given the sign-up screen", () => {
     });
   });
 
+  describe("when the spend never reached the server", () => {
+    /** @scenario "A spend that never reached the server keeps the token for a reload" */
+    it("leaves the token in the address bar", async () => {
+      const query = "verify=a-token&callbackUrl=%2Finvite%2Faccept%3FinviteCode%3Dabc";
+      window.history.replaceState(null, "", `/auth/signup?${query}`);
+      searchParamsRef.current = new URLSearchParams(query);
+      completeVerificationMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+      renderScreen();
+
+      await waitFor(() => expect(completeVerificationMock).toHaveBeenCalledTimes(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(window.location.search).toContain("verify=a-token");
+    });
+  });
+
   describe("when a browser already signed in opens a link refused as used", () => {
     /** @scenario "A dead confirmation link in a browser already signed in goes on" */
     it("says they are signed in and goes on to where the link was taking them", async () => {
