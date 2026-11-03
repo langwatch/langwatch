@@ -38,6 +38,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "✗ %s\n", problem)
 	}
 	if len(problems) > 0 {
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/release-lock.feature")
 		os.Exit(1)
 	}
 	fmt.Println("✓ uv.lock follows the Python SDK release")
