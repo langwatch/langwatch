@@ -3,16 +3,17 @@ import path from "node:path";
 
 import { Temporal } from "@langwatch/time";
 
+import { REPOSITORY_URL } from "../../../lib/repository.ts";
 import { releaseSchema, type Release } from "../model/release.ts";
 
 export const RELEASES_SLUG = "changelog";
 const PUBLISHED = 5;
 const WHATS_NEW = 3;
-const LEFT_OUT_HEADING = "## Releases left out of this copy";
+const LEFT_OUT_HEADING = "## About this copy";
 const LEFT_OUT_NOTE =
-  "Earlier recent releases are left out of this Markdown copy to keep it short. " +
-  "The [changelog page](/changelog) shows the newest releases, and the " +
-  "[repository CHANGELOG](https://github.com/langwatch/langwatch/blob/main/CHANGELOG.md) " +
+  "This copy shows only the newest releases, to keep it short. " +
+  `The [changelog page](/${RELEASES_SLUG}) lists the recent ones, and the ` +
+  `[repository CHANGELOG](${REPOSITORY_URL}/blob/main/CHANGELOG.md) ` +
   "holds every release.";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;

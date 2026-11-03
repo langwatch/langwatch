@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { approximateTokens } from "../../../lib/page-tokens.ts";
+import { REPOSITORY_URL } from "../../../lib/repository.ts";
 import { canonicalUrl, docsUrl } from "../../../lib/site-path.ts";
 import { resolveOperation } from "../../api-reference/compile.ts";
 import {
@@ -148,7 +149,7 @@ function operationMarkdown({ operation }: { operation: Operation }) {
   return sections.filter(Boolean).join("\n\n");
 }
 
-const SOURCE_REPOSITORY = "https://github.com/langwatch/langwatch/blob/main/docs";
+const SOURCE_REPOSITORY = `${REPOSITORY_URL}/blob/main/docs`;
 const SNIPPET_IMPORT = /^import\s+([A-Z]\w*)\s+from\s+["'](\/snippets\/[^"']+\.mdx)["'];?\s*$/;
 /** A snippet compiles on its own, so a fence it leaves open ends with it; an empty one goes. */
 function closeFence({ source }: { source: string }) {
@@ -269,14 +270,14 @@ export function pageMarkdown({
   pageTokens?: number;
 }) {
   const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
-  const exportOf = (releaseCount?: number) =>
+  const exportOf = ({ releaseCount }: { releaseCount?: number } = {}) =>
     exportMarkdown({ docsRoot, slug, instructions, source, releaseCount });
   if (slug !== RELEASES_SLUG || pageTokens === undefined) return exportOf();
   for (let count = readReleases({ docsRoot }).length; count > 1; count--) {
-    const markdown = exportOf(count);
+    const markdown = exportOf({ releaseCount: count });
     if (approximateTokens({ text: markdown }) <= pageTokens) return markdown;
   }
-  return exportOf(1);
+  return exportOf({ releaseCount: 1 });
 }
 
 function exportMarkdown({

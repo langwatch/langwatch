@@ -64,8 +64,11 @@ export type FormFactor = z.infer<typeof formFactor>;
 
 export const DEFAULT_BUDGETS_FILE = new URL("./budgets.json", import.meta.url);
 
-export function readBudgets({ file = DEFAULT_BUDGETS_FILE }: { file?: URL | string } = {}) {
-  return budgetsSchema.parse(JSON.parse(readFileSync(file, "utf8")));
+/** The budgets in `file`, or by default the committed ones (the import `PAGE_TOKENS` reads). */
+export function readBudgets({ file }: { file?: URL | string } = {}) {
+  return budgetsSchema.parse(
+    file === undefined ? budgetsFile : JSON.parse(readFileSync(file, "utf8")),
+  );
 }
 
 /**

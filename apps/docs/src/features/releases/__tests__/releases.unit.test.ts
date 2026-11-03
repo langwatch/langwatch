@@ -41,7 +41,7 @@ describe("when a release note links both its pull request and its commit", () =>
   });
 });
 
-const leftOut = "## Releases left out of this copy";
+const leftOut = "## About this copy";
 
 function changelogProject({ changelog }: { changelog: string }) {
   const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-budget-"));
@@ -190,31 +190,37 @@ describe("when only some of the older releases fit the page token budget", () =>
       dispose();
     }
   }
-  const tokens = (text: string) => approximateTokens({ text });
+  const tokens = ({ text }: { text: string }) => approximateTokens({ text });
 
   /** @scenario "Keep the changelog Markdown export within the page token budget" */
   it("keeps the newest releases that fit and notes the rest are left out", () => {
     // The note's real cost: a one-token budget keeps the newest release plus the left-out section.
     const noteCost =
-      tokens(exportOf({ changelog: all, pageTokens: 1 })) -
-      tokens(
-        exportOf({ changelog: release({ version: "3.0.0", day: "21" }), pageTokens: Infinity }),
-      );
-    const twoFit = tokens(exportOf({ changelog: newestTwo, pageTokens: Infinity })) + noteCost + 1;
-    expect(tokens(exportOf({ changelog: all, pageTokens: Infinity }))).toBeGreaterThan(twoFit);
+      tokens({ text: exportOf({ changelog: all, pageTokens: 1 }) }) -
+      tokens({
+        text: exportOf({
+          changelog: release({ version: "3.0.0", day: "21" }),
+          pageTokens: Infinity,
+        }),
+      });
+    const twoFit =
+      tokens({ text: exportOf({ changelog: newestTwo, pageTokens: Infinity }) }) + noteCost + 1;
+    expect(tokens({ text: exportOf({ changelog: all, pageTokens: Infinity }) })).toBeGreaterThan(
+      twoFit,
+    );
     const markdown = exportOf({ changelog: all, pageTokens: twoFit });
     expect(markdown).toContain("## Release v3.0.0");
     expect(markdown).toContain("## Release v2.9.0");
     expect(markdown).not.toContain("## Release v2.8.0");
     expect(markdown).toContain(leftOut);
-    expect(tokens(markdown)).toBeLessThanOrEqual(twoFit);
+    expect(tokens({ text: markdown })).toBeLessThanOrEqual(twoFit);
   });
 
   /** @scenario "Keep the changelog Markdown export within the page token budget" */
   it("keeps every release and adds no note when they all fit", () => {
     const markdown = exportOf({
       changelog: all,
-      pageTokens: tokens(exportOf({ changelog: all, pageTokens: Infinity })),
+      pageTokens: tokens({ text: exportOf({ changelog: all, pageTokens: Infinity }) }),
     });
     for (const version of ["3.0.0", "2.9.0", "2.8.0"])
       expect(markdown).toContain(`## Release v${version}`);
