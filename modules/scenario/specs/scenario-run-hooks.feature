@@ -423,6 +423,12 @@ Feature: Scenario run hooks: setup and teardown
       When the run is prefetched
       Then the step carries a refusal naming the row limit, not the 64 KiB cap
 
+    @unit
+    Scenario: A Connector step whose dataset was deleted fails before it runs
+      Given a setup step bound to a dataset that no longer exists
+      When the run is prefetched
+      Then the step carries a refusal saying its dataset no longer exists
+
     # Off on the hosted product until the WebAssembly runner lands; self-hosted and local stay on.
     @unit
     Scenario: A hosted project without the Connector release flag does not run Connector steps

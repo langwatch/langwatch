@@ -494,6 +494,7 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       expect(refusal.connector.setup.refusal).not.toContain("KiB");
     });
 
+    /** @scenario "A Connector step whose dataset was deleted fails before it runs" */
     it("packs a refusal when the bound dataset is gone", async () => {
       const service = serviceAnswering({
         agent: withConnector({ setup: { ...step, datasetId: "dataset_gone" } }),
