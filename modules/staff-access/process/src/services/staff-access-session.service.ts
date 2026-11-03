@@ -4,6 +4,7 @@ import type { StaffAccessScope } from "@langwatch/authz-contract";
 import {
   STAFF_ACCESS_PRINCIPAL,
   STAFF_ACCESS_REVOKE_ALL_CONFIRMATION,
+  StaffAccessAlreadyEndedError,
   StaffAccessConfirmationMismatchError,
   StaffAccessNotFoundError,
   type StaffAccessSessionView,
@@ -65,10 +66,15 @@ export class StaffAccessSessionService {
     return { ended: true };
   }
 
-  /** Any operator may end any session. */
+  /**
+   * Any operator may end any session or undecided request.
+   * @throws {StaffAccessAlreadyEndedError} when it already ended
+   */
   async revokeSession({ userId, requestId }: { userId: string; requestId: string }): Promise<void> {
     const row = await this.rowOf({ id: requestId });
-    await this.endSession({ row, byUserId: userId, cause: "revoked_by_operator" });
+    if (!(await this.endSession({ row, byUserId: userId, cause: "revoked_by_operator" }))) {
+      throw new StaffAccessAlreadyEndedError();
+    }
   }
 
   /** @throws {StaffAccessConfirmationMismatchError} unless the operator typed "revoke all" */
@@ -149,7 +155,10 @@ export class StaffAccessSessionService {
     const [current] = await this.deps.requests.findById({ id: row.id });
     const apiKeyId = current?.apiKeyId ?? row.apiKeyId;
     if (apiKeyId) await this.deps.apiKeys.revokeStaffAccessKey({ apiKeyId });
-    await this.recordEnd({ row, action: "staffAccess.revoked", byUserId, cause });
+    // An undecided request never reached the customer, so only an approved one is audited there.
+    if ((current?.approvedAt ?? row.approvedAt) !== null) {
+      await this.recordEnd({ row, action: "staffAccess.revoked", byUserId, cause });
+    }
     return true;
   }
 

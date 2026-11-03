@@ -2,15 +2,9 @@ import { type Instant, Temporal } from "@langwatch/time";
 
 import type {
   StaffAccessApproval,
-  StaffAccessChallengeRepository,
-  StaffAccessChallengeRow,
-  StaffAccessEventRepository,
-  StaffAccessEventRow,
   StaffAccessRedemption,
   StaffAccessRequestRepository,
   StaffAccessRequestRow,
-  StaffAccessRequesterRepository,
-  StaffAccessRequesterRow,
 } from "../staff-access.repository.ts";
 
 function isAfter(moment: Instant, at: Instant): boolean {
@@ -19,93 +13,6 @@ function isAfter(moment: Instant, at: Instant): boolean {
 
 function newestFirst(a: { createdAt: Instant }, b: { createdAt: Instant }): number {
   return Temporal.Instant.compare(b.createdAt, a.createdAt);
-}
-
-export class MemoryStaffAccessRequesterRepository implements StaffAccessRequesterRepository {
-  readonly #rows = new Map<string, StaffAccessRequesterRow>();
-
-  static create(): MemoryStaffAccessRequesterRepository {
-    return new MemoryStaffAccessRequesterRepository();
-  }
-
-  async create(row: StaffAccessRequesterRow): Promise<void> {
-    this.#rows.set(row.id, row);
-  }
-
-  async findByLookupId({ lookupId }: { lookupId: string }): Promise<StaffAccessRequesterRow[]> {
-    return [...this.#rows.values()].filter((row) => row.lookupId === lookupId);
-  }
-
-  async findById({ id }: { id: string }): Promise<StaffAccessRequesterRow[]> {
-    const row = this.#rows.get(id);
-    return row ? [row] : [];
-  }
-
-  async findByOwner({ ownerUserId }: { ownerUserId: string }): Promise<StaffAccessRequesterRow[]> {
-    return [...this.#rows.values()]
-      .filter((row) => row.ownerUserId === ownerUserId)
-      .toSorted(newestFirst);
-  }
-
-  async touch({ id, at }: { id: string; at: Instant }): Promise<void> {
-    const row = this.#rows.get(id);
-    if (row) this.#rows.set(id, { ...row, lastUsedAt: at });
-  }
-
-  async revoke({
-    id,
-    ownerUserId,
-    at,
-  }: {
-    id: string;
-    ownerUserId: string;
-    at: Instant;
-  }): Promise<boolean> {
-    const row = this.#rows.get(id);
-    if (!row || row.ownerUserId !== ownerUserId || row.revokedAt) return false;
-    this.#rows.set(id, { ...row, revokedAt: at });
-    return true;
-  }
-}
-
-export class MemoryStaffAccessChallengeRepository implements StaffAccessChallengeRepository {
-  readonly #rows = new Map<string, StaffAccessChallengeRow>();
-
-  static create(): MemoryStaffAccessChallengeRepository {
-    return new MemoryStaffAccessChallengeRepository();
-  }
-
-  async create(row: StaffAccessChallengeRow): Promise<void> {
-    this.#rows.set(row.id, row);
-  }
-
-  async findOpen({
-    userId,
-    purpose,
-    at,
-  }: {
-    userId: string;
-    purpose: string;
-    at: Instant;
-  }): Promise<StaffAccessChallengeRow[]> {
-    return [...this.#rows.values()]
-      .filter(
-        (row) =>
-          row.userId === userId &&
-          row.purpose === purpose &&
-          row.usedAt === null &&
-          isAfter(row.expiresAt, at),
-      )
-      .toSorted(newestFirst)
-      .slice(0, 5);
-  }
-
-  async claim({ id, at }: { id: string; at: Instant }): Promise<boolean> {
-    const row = this.#rows.get(id);
-    if (!row || row.usedAt !== null || !isAfter(row.expiresAt, at)) return false;
-    this.#rows.set(id, { ...row, usedAt: at });
-    return true;
-  }
 }
 
 export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRepository {
@@ -165,7 +72,7 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
     return this.#all().filter(
       (row) =>
         row.revokedAt === null &&
-        ((row.status === "approved" && isAfter(row.expiresAt, at)) ||
+        (((row.status === "pending" || row.status === "approved") && isAfter(row.expiresAt, at)) ||
           (row.status === "redeemed" &&
             row.accessExpiresAt !== null &&
             isAfter(row.accessExpiresAt, at))),
@@ -256,7 +163,11 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
     cause: string;
   }): Promise<boolean> {
     const row = this.#rows.get(id);
-    if (!row || !["approved", "redeemed"].includes(row.status) || row.revokedAt !== null) {
+    if (
+      !row ||
+      !["pending", "approved", "redeemed"].includes(row.status) ||
+      row.revokedAt !== null
+    ) {
       return false;
     }
     this.#rows.set(id, {
@@ -284,40 +195,5 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
 
   #all(): StaffAccessRequestRow[] {
     return [...this.#rows.values()];
-  }
-}
-
-export class MemoryStaffAccessEventRepository implements StaffAccessEventRepository {
-  readonly #rows = new Map<string, StaffAccessEventRow>();
-  /** A test turns this on to prove a failed trail write refuses the request. */
-  refuseWrites = false;
-
-  static create(): MemoryStaffAccessEventRepository {
-    return new MemoryStaffAccessEventRepository();
-  }
-
-  async create(row: StaffAccessEventRow): Promise<void> {
-    if (this.refuseWrites) throw new Error("the trail store refused the write");
-    this.#rows.set(row.id, row);
-  }
-
-  async finish(input: {
-    id: string;
-    status: number;
-    errorCode: string | null;
-    durationMs: number;
-  }): Promise<void> {
-    const row = this.#rows.get(input.id);
-    if (!row) return;
-    this.#rows.set(input.id, {
-      ...row,
-      status: input.status,
-      errorCode: input.errorCode,
-      durationMs: input.durationMs,
-    });
-  }
-
-  async findByRequest({ requestId }: { requestId: string }): Promise<StaffAccessEventRow[]> {
-    return [...this.#rows.values()].filter((row) => row.requestId === requestId);
   }
 }

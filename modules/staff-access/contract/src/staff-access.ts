@@ -11,8 +11,6 @@ import { STAFF_ACCESS_SCOPES } from "@langwatch/authz-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const STAFF_ACCESS_FEATURE_ID = "staff-access" as const;
-
 /** The system flag that, with cloud ops, opens every staff access surface. */
 export const STAFF_ACCESS_FLAG = "ops_agent_access_enabled" as const;
 
@@ -118,7 +116,6 @@ export const staffAccessOverviewSchema: StaffAccessOverviewSchema =
 export type StaffAccessOverview = z.infer<typeof staffAccessOverviewSchema>;
 
 export const staffAccessAssertionOptionsSchema = passkeyAssertionOptionsSchema;
-export const staffAccessAssertionSchema = passkeyAssertionResponseSchema;
 
 const staffAccessEnrolInputSchemaDefinition = z.object({
   name: z.string().trim().min(1).max(STAFF_ACCESS_REQUESTER_NAME_MAX_LENGTH),

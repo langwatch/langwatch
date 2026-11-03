@@ -122,7 +122,7 @@ export interface StaffAccessRequestRepository {
   findByOpsTokenLookupId(input: { lookupId: string }): Promise<StaffAccessRequestRow[]>;
   /** Created since `since`, newest first, at most `limit`. */
   findRecent(input: { since: Instant; limit: number }): Promise<StaffAccessRequestRow[]>;
-  /** Approved or redeemed, not revoked, and not past its window. */
+  /** Pending, approved or redeemed, not revoked, and not past its window. */
   findLive(input: { at: Instant }): Promise<StaffAccessRequestRow[]>;
   /** Redeemed, never revoked, past its hour, and not yet audited as ended. */
   findEndedUnaudited(input: { at: Instant; limit: number }): Promise<StaffAccessRequestRow[]>;
@@ -138,7 +138,7 @@ export interface StaffAccessRequestRepository {
     hashedOpsToken: string | null;
     opsTokenLookupId: string | null;
   }): Promise<void>;
-  /** approved or redeemed -> revoked, once; the revoke is its own end-of-session audit. */
+  /** pending, approved or redeemed -> revoked, once; the revoke is its own end-of-session audit. */
   revoke(input: {
     id: string;
     at: Instant;

@@ -10,6 +10,7 @@ import {
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -102,6 +103,7 @@ export class StaffAccessModule implements StaffAccessApiContract {
     const notices = StaffAccessNoticeService.create({
       ops: dependencies.ops,
       notifications: dependencies.notifications,
+      renderer: ReactEmailMailRenderer.create(),
     });
     this.#availability = StaffAccessAvailabilityService.create({
       ops: dependencies.ops,
@@ -135,7 +137,7 @@ export class StaffAccessModule implements StaffAccessApiContract {
       users: dependencies.users,
       notices,
       sessions: this.#sessions,
-      publicBaseUrl: config.publicBaseUrl ?? "",
+      publicBaseUrl: config.publicBaseUrl ?? null,
       now,
     });
     this.#opsRead = StaffAccessOpsReadService.create({

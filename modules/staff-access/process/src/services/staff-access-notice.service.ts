@@ -1,3 +1,4 @@
+import type { MailRender } from "@langwatch/mail";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OpsApi } from "@langwatch/ops-contract";
@@ -7,22 +8,20 @@ const logger = createLogger("langwatch:staff-access:notice");
 /** One line of the notice: a label and the plain value it shows. */
 type NoticeLine = Readonly<{ label: string; value: string }>;
 
+type StaffAccessNoticeDeps = {
+  ops: Pick<OpsApi, "listPlatformOperators">;
+  notifications: Pick<NotificationService, "sendEmail">;
+  renderer: Pick<MailRender, "renderStaffAccessNotice">;
+};
+
 /**
  * Tells every other platform operator what one operator just did with staff access, so no
  * enrolment or approval goes unseen. A failed send is logged and never undoes the action.
  */
 export class StaffAccessNoticeService {
-  private constructor(
-    private readonly deps: {
-      ops: Pick<OpsApi, "listPlatformOperators">;
-      notifications: Pick<NotificationService, "sendEmail">;
-    },
-  ) {}
+  private constructor(private readonly deps: StaffAccessNoticeDeps) {}
 
-  static create(deps: {
-    ops: Pick<OpsApi, "listPlatformOperators">;
-    notifications: Pick<NotificationService, "sendEmail">;
-  }): StaffAccessNoticeService {
+  static create(deps: StaffAccessNoticeDeps): StaffAccessNoticeService {
     return new StaffAccessNoticeService(deps);
   }
 
@@ -44,20 +43,17 @@ export class StaffAccessNoticeService {
         (operator) => operator.userId !== actingUserId && operator.email,
       );
       if (others.length === 0) return;
-      const actingName = acting?.name ?? acting?.email ?? actingUserId;
-      const rows = [{ label: "Operator", value: actingName }, ...lines]
-        .map(
-          ({ label, value }) =>
-            `<tr><th align="left">${escape(label)}</th><td>${escape(value)}</td></tr>`,
-        )
-        .join("");
-      const html = `<p>${escape(subject)}</p><table>${rows}</table>`;
+      const rendered = await this.deps.renderer.renderStaffAccessNotice({
+        headline: subject,
+        operatorName: acting?.name ?? acting?.email ?? actingUserId,
+        details: [...lines],
+      });
       await Promise.all(
         others.map((operator) =>
           this.deps.notifications.sendEmail({
             to: operator.email ?? "",
-            subject,
-            html,
+            subject: rendered.subject,
+            html: rendered.html,
             idempotencyKey: `${idempotencyKey}:${operator.userId}`,
           }),
         ),
@@ -66,13 +62,4 @@ export class StaffAccessNoticeService {
       logger.warn({ error, subject }, "the staff access notice to other operators was not sent");
     }
   }
-}
-
-function escape(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }

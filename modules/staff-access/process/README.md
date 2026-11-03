@@ -314,12 +314,12 @@ Contract `../contract/src/staff-access.trpc.ts:23`, router `src/transport/staff-
 // staffAccess.overview
 // Input: inline, ../contract/src/staff-access.trpc.ts:25
 type Input = unknown;
-type Output = z.infer<typeof staffAccessOverviewSchema>; // ../contract/src/staff-access.ts:117
+type Output = z.infer<typeof staffAccessOverviewSchema>; // ../contract/src/staff-access.ts:115
 
 // staffAccess.enrolOptions
 // Input: inline, ../contract/src/staff-access.trpc.ts:29
 type Input = unknown;
-// Output: staffAccessAssertionOptionsSchema, ../contract/src/staff-access.ts:120
+// Output: staffAccessAssertionOptionsSchema, ../contract/src/staff-access.ts:118
 interface Output {
   challenge: string;
   rpId: string;
@@ -333,8 +333,8 @@ interface Output {
 }
 
 // staffAccess.enrol
-type Input = z.infer<typeof staffAccessEnrolInputSchema>; // ../contract/src/staff-access.ts:131
-// Output: staffAccessEnrolledSchema, ../contract/src/staff-access.ts:143
+type Input = z.infer<typeof staffAccessEnrolInputSchema>; // ../contract/src/staff-access.ts:128
+// Output: staffAccessEnrolledSchema, ../contract/src/staff-access.ts:140
 interface Output {
   requesterKey: string;
   requester: {
@@ -348,49 +348,49 @@ interface Output {
 }
 
 // staffAccess.revokeRequester
-// Input: staffAccessRequesterIdInputSchema, ../contract/src/staff-access.ts:151
+// Input: staffAccessRequesterIdInputSchema, ../contract/src/staff-access.ts:148
 interface Input {
   requesterId: string;
 }
-// Output: staffAccessOkSchema, ../contract/src/staff-access.ts:197
+// Output: staffAccessOkSchema, ../contract/src/staff-access.ts:194
 interface Output {
   ok: true;
 }
 
 // staffAccess.getApprovalRequest
-// Input: staffAccessRequestIdInputSchema, ../contract/src/staff-access.ts:157
+// Input: staffAccessRequestIdInputSchema, ../contract/src/staff-access.ts:154
 interface Input {
   requestId: string;
 }
-type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:104
+type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:102
 
 // staffAccess.approvalOptions
-// Input: staffAccessApprovalChoiceSchema, ../contract/src/staff-access.ts:169
+// Input: staffAccessApprovalChoiceSchema, ../contract/src/staff-access.ts:166
 interface Input {
   requestId: string;
   spendApproved: boolean;
   typedOrganizationName?: string;
 }
-type Output = z.infer<typeof staffAccessAssertionOptionsSchema>; // ../contract/src/staff-access.ts:120
+type Output = z.infer<typeof staffAccessAssertionOptionsSchema>; // ../contract/src/staff-access.ts:118
 
 // staffAccess.approve
-type Input = z.infer<typeof staffAccessApproveInputSchema>; // ../contract/src/staff-access.ts:180
-type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:104
+type Input = z.infer<typeof staffAccessApproveInputSchema>; // ../contract/src/staff-access.ts:177
+type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:102
 
 // staffAccess.deny
-type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:157
-type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:104
+type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:154
+type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:102
 
 // staffAccess.revokeSession
-type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:157
-type Output = z.infer<typeof staffAccessOkSchema>; // ../contract/src/staff-access.ts:197
+type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:154
+type Output = z.infer<typeof staffAccessOkSchema>; // ../contract/src/staff-access.ts:194
 
 // staffAccess.revokeAll
-// Input: staffAccessRevokeAllInputSchema, ../contract/src/staff-access.ts:188
+// Input: staffAccessRevokeAllInputSchema, ../contract/src/staff-access.ts:185
 interface Input {
   confirmation: string;
 }
-// Output: staffAccessRevokedCountSchema, ../contract/src/staff-access.ts:194
+// Output: staffAccessRevokedCountSchema, ../contract/src/staff-access.ts:191
 interface Output {
   revoked: number;
 }

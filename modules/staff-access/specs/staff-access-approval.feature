@@ -55,6 +55,12 @@ Feature: Ops agent access approval
     Then it is refused 429 with "staff_access_rate_limited"
 
   @integration
+  Scenario: A request is refused when the deployment has no public base URL
+    Given the deployment sets no BASE_HOST
+    When the agent asks for access
+    Then it is refused 503 with "staff_access_not_configured"
+
+  @integration
   Scenario: The approval page opens only for the requester's owner
     Given the agent of Olivia has a pending request
     When Pedro, another platform operator, opens the approval

@@ -18,8 +18,8 @@ import {
 } from "@langwatch/staff-access-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import type { MemoryStaffAccessEventRepository } from "../../repositories/memory/memory.staff-access-event.repository.ts";
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
-import type { MemoryStaffAccessEventRepository } from "../../repositories/memory/memory.staff-access.repository.ts";
 import { PostgresStaffAccessRepositories } from "../../repositories/prisma/prisma.staff-access.repositories.ts";
 import type { StaffAccessRepositories } from "../../repositories/staff-access.repositories.ts";
 import {
@@ -161,6 +161,8 @@ function scenarios(backend: Backend): void {
           90 * 24 * 60 * 60 * 1000,
         );
         expect(w.state.mail.map((mail) => mail.to)).toEqual([`${PEDRO}@langwatch.test`]);
+        expect(w.state.mail[0]?.subject).toBe("An operator enrolled an agent for staff access");
+        expect(w.state.mail[0]?.html).toContain("laptop agent");
         const overview = await w.app.overview(w.operator(OLIVIA));
         expect(JSON.stringify(overview)).not.toContain(enrolled.requesterKey);
       });
@@ -226,6 +228,17 @@ function scenarios(backend: Backend): void {
 
         const refused = await ask().catch((error: { code: string; httpStatus: number }) => error);
         expect(refused).toMatchObject({ code: "staff_access_rate_limited", httpStatus: 429 });
+      });
+
+      /** @scenario "A request is refused when the deployment has no public base URL" */
+      it("refuses the request with 503 when no approval link can be built", async () => {
+        const w = staffAccessWorld({ repositories: backend.repositories(), publicBaseUrl: "" });
+        const agent = await w.enrol();
+
+        const refused = await w.app
+          .createRequest({ session: agent.session, body: requestBody({ scopes: ["ops:read"] }) })
+          .catch((error: { code: string; httpStatus: number }) => error);
+        expect(refused).toMatchObject({ code: "staff_access_not_configured", httpStatus: 503 });
       });
 
       it("refuses an organization that does not exist as not found", async () => {
@@ -541,6 +554,42 @@ function scenarios(backend: Backend): void {
         await expect(codeOf(w.app.staffAccessGate.admit(gateRequest({ apiKeyId })))).resolves.toBe(
           "staff_access_expired",
         );
+      });
+
+      /** @scenario "Revoking an undecided request means it can no longer be approved" */
+      it("ends a pending request so it cannot be approved, with no customer audit row", async () => {
+        const w = world();
+        const { requestId } = await pending(w, ["org:metadata"]);
+
+        await w.app.revokeSession({ ...w.operator(PEDRO), requestId });
+
+        await expect(
+          codeOf(w.approve({ choice: { requestId, spendApproved: false } })),
+        ).resolves.toBe("request_not_pending");
+        expect(w.state.audit.filter((row) => row.targetId === requestId)).toEqual([]);
+      });
+
+      /** @scenario "Revoking a session that already ended is refused" */
+      it("refuses to revoke a session its agent already ended", async () => {
+        const w = world();
+        const { agent, requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        await w.app.endSession({ session: agent.session, requestId });
+
+        await expect(
+          codeOf(w.app.revokeSession({ ...w.operator(PEDRO), requestId })),
+        ).resolves.toBe("staff_access_already_ended");
+      });
+
+      /** @scenario "The kill switch also ends undecided requests" */
+      it("ends pending requests too", async () => {
+        const w = world();
+        const { requestId } = await pending(w, ["org:metadata"]);
+
+        await w.app.revokeAll({ ...w.operator(PEDRO), confirmation: "revoke all" });
+
+        await expect(
+          codeOf(w.approve({ choice: { requestId, spendApproved: false } })),
+        ).resolves.toBe("request_not_pending");
       });
 
       /** @scenario "The kill switch revokes every live key" */

@@ -146,3 +146,29 @@ export class StaffAccessConfirmationMismatchError extends HandledError {
     this.name = "StaffAccessConfirmationMismatchError";
   }
 }
+
+export class StaffAccessAlreadyEndedError extends HandledError {
+  declare readonly code: "staff_access_already_ended";
+
+  constructor() {
+    super("staff_access_already_ended", "This staff access session already ended.", {
+      httpStatus: 409,
+      fault: "customer",
+      ...remediation("staff_access_already_ended"),
+    });
+    this.name = "StaffAccessAlreadyEndedError";
+  }
+}
+
+export class StaffAccessNotConfiguredError extends HandledError {
+  declare readonly code: "staff_access_not_configured";
+
+  constructor() {
+    super(
+      "staff_access_not_configured",
+      "Staff access needs the public base URL to build its approval link.",
+      { httpStatus: 503, fault: "platform", ...remediation("staff_access_not_configured") },
+    );
+    this.name = "StaffAccessNotConfiguredError";
+  }
+}

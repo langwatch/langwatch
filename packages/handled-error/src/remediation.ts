@@ -1121,6 +1121,12 @@ const registry = {
   already_redeemed: {
     tips: ["Request access again from the agent"],
   },
+  staff_access_not_configured: {
+    tips: ["Set the public base URL (BASE_HOST) on this deployment"],
+  },
+  staff_access_already_ended: {
+    tips: ["Refresh the page to see the session's current state"],
+  },
   staff_access_confirmation_mismatch: {
     tips: ['Type "revoke all" exactly'],
   },

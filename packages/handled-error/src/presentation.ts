@@ -2744,6 +2744,16 @@ const presentations = {
     describe: () =>
       "An approved request gives out its key once, and this one was already redeemed.",
   },
+  staff_access_not_configured: {
+    title: "Staff access is not set up on this server",
+    describe: () =>
+      "The server has no public base URL, so it cannot build the approval link an operator opens.",
+  },
+  staff_access_already_ended: {
+    title: "This session already ended",
+    describe: () =>
+      "The session was revoked, expired or ended by its agent, so there is nothing to revoke.",
+  },
   staff_access_confirmation_mismatch: {
     title: "Confirmation did not match",
     describe: () => "Type the words exactly as shown to revoke every staff session.",

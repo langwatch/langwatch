@@ -8,6 +8,10 @@ import {
   renderMonitorAutoPausedEmail,
 } from "../templates/monitor-auto-paused-email.tsx";
 import {
+  renderStaffAccessNoticeEmail,
+  type StaffAccessNoticeEmailProps,
+} from "../templates/staff-access-notice-email.tsx";
+import {
   renderTriggerDigestEmail,
   type TriggerDigestMail,
 } from "../templates/trigger-digest-email.tsx";
@@ -53,5 +57,11 @@ export class ReactEmailMailRenderer extends MailRender {
     input: MonitorAutoPausedEmailProps,
   ): Promise<{ subject: string; html: string }> {
     return renderMonitorAutoPausedEmail(input);
+  }
+
+  renderStaffAccessNotice(
+    input: StaffAccessNoticeEmailProps,
+  ): Promise<{ subject: string; html: string }> {
+    return renderStaffAccessNoticeEmail(input);
   }
 }

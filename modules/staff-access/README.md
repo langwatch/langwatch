@@ -16,14 +16,14 @@ Staff access lets a platform operator's coding agent reach production for one ho
 
 ## What staff-access owns
 
-| Kind            | Name                        | Declared at                                                              |
-| --------------- | --------------------------- | ------------------------------------------------------------------------ |
-| Postgres table  | `StaffAccessRequester`      | `process/src/repositories/prisma/prisma.staff-access.repository.ts:34`   |
-| Postgres table  | `StaffAccessChallenge`      | `process/src/repositories/prisma/prisma.staff-access.repository.ts:103`  |
-| Postgres table  | `StaffAccessRequest`        | `process/src/repositories/prisma/prisma.staff-access.repository.ts:155`  |
-| Postgres table  | `StaffAccessEvent`          | `process/src/repositories/prisma/prisma.staff-access.repository.ts:353`  |
-| Stores required | prisma                      | `process/src/repositories/prisma/prisma.staff-access.repositories.ts:16` |
-| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/staff-access.config.ts:5`                                  |
+| Kind            | Name                        | Declared at                                                                      |
+| --------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| Postgres table  | `StaffAccessChallenge`      | `process/src/repositories/prisma/prisma.staff-access-challenge.repository.ts:17` |
+| Postgres table  | `StaffAccessEvent`          | `process/src/repositories/prisma/prisma.staff-access-event.repository.ts:14`     |
+| Postgres table  | `StaffAccessRequest`        | `process/src/repositories/prisma/prisma.staff-access-request.repository.ts:19`   |
+| Postgres table  | `StaffAccessRequester`      | `process/src/repositories/prisma/prisma.staff-access-requester.repository.ts:17` |
+| Stores required | prisma                      | `process/src/repositories/prisma/prisma.staff-access.repositories.ts:14`         |
+| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/staff-access.config.ts:5`                                          |
 
 Anything else staff-access needs belongs to another module and is reached through its `*Api`.
 

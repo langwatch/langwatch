@@ -19,6 +19,7 @@ import {
   StaffAccessInvalidCodeVerifierError,
   StaffAccessNotFoundError,
   StaffAccessOrganizationNameMismatchError,
+  StaffAccessNotConfiguredError,
   StaffAccessRateLimitedError,
   StaffAccessRequestExpiredError,
   StaffAccessRequestNotApprovedError,
@@ -71,7 +72,8 @@ type RequestDeps = Readonly<{
   users: Pick<UserApi, "findById">;
   notices: StaffAccessNoticeService;
   sessions: StaffAccessSessionService;
-  publicBaseUrl: string;
+  /** Null when the deployment has none: requests are then refused, since no link can be built. */
+  publicBaseUrl: string | null;
   now: () => Instant;
 }>;
 
@@ -94,7 +96,10 @@ export class StaffAccessRequestService {
     return new StaffAccessRequestService(deps);
   }
 
-  /** @throws {StaffAccessRateLimitedError} past five requests in an hour */
+  /**
+   * @throws {StaffAccessRateLimitedError} past five requests in an hour
+   * @throws {StaffAccessNotConfiguredError} when the deployment has no public base URL
+   */
   async createRequest({
     requesterId,
     ownerUserId,
@@ -106,6 +111,8 @@ export class StaffAccessRequestService {
     body: StaffAccessRequestBody;
     ipAddress: string | null;
   }): Promise<StaffAccessRequestCreated> {
+    const { publicBaseUrl } = this.deps;
+    if (!publicBaseUrl) throw new StaffAccessNotConfiguredError();
     const at = this.deps.now();
     const recent = await this.deps.requests.countSince({
       requesterId,
@@ -151,7 +158,7 @@ export class StaffAccessRequestService {
     await this.deps.requests.create(row);
     return {
       requestId: row.id,
-      approvalUrl: `${this.deps.publicBaseUrl.replace(/\/+$/, "")}/ops/agents/approve/${row.id}`,
+      approvalUrl: `${publicBaseUrl.replace(/\/+$/, "")}/ops/agents/approve/${row.id}`,
       expiresAt: isoText(row.expiresAt),
     };
   }

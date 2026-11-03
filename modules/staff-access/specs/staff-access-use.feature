@@ -76,6 +76,25 @@ Feature: Using ops agent access
     Then it is refused
 
   @integration
+  Scenario: Revoking an undecided request means it can no longer be approved
+    Given a pending request from Olivia's agent on ACME
+    When Pedro revokes it
+    Then Olivia's approval is refused as no longer pending
+    And ACME's audit log holds no row for it
+
+  @integration
+  Scenario: Revoking a session that already ended is refused
+    Given a session Olivia's agent already ended
+    When Pedro revokes it
+    Then he is refused with "staff_access_already_ended"
+
+  @integration
+  Scenario: The kill switch also ends undecided requests
+    Given a pending request from Olivia's agent on ACME
+    When an operator revokes all agent access
+    Then Olivia's approval is refused as no longer pending
+
+  @integration
   Scenario: The kill switch revokes every live key
     Given two live sessions
     When an operator revokes all agent access

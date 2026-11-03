@@ -69,7 +69,13 @@ function challengeOf(response: PasskeyAssertionResponse): string {
 
 export type StaffAccessWorld = ReturnType<typeof staffAccessWorld>;
 
-export function staffAccessWorld({ repositories }: { repositories: StaffAccessRepositories }) {
+export function staffAccessWorld({
+  repositories,
+  publicBaseUrl = "https://app.langwatch.test",
+}: {
+  repositories: StaffAccessRepositories;
+  publicBaseUrl?: string;
+}) {
   const state = {
     at: Temporal.Instant.from("2026-11-02T10:00:00Z") as Instant,
     cloudOps: true,
@@ -201,7 +207,7 @@ export function staffAccessWorld({ repositories }: { repositories: StaffAccessRe
 
   const app = StaffAccessModule.create({
     repositories,
-    config: { publicBaseUrl: "https://app.langwatch.test" },
+    config: { publicBaseUrl },
     dependencies: {
       ops,
       featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => state.flag }),

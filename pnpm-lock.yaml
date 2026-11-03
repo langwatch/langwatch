@@ -15021,6 +15021,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../packages/mail
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../notification/contract
