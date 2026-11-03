@@ -16,6 +16,7 @@ import {
   DatasetChunkCountMissingError,
   DatasetNotReadyError,
   DatasetTooLargeToSearchError,
+  type DatasetColumnRenames,
 } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
@@ -390,18 +391,21 @@ export class DatasetContentService implements DatasetContent {
     name,
     slug,
     columnTypes,
+    columnRenames,
   }: {
     dataset: Dataset;
     projectId: string;
     name: string;
     slug: string;
     columnTypes: Dataset["columnTypes"];
+    columnRenames?: DatasetColumnRenames;
   }): Promise<Dataset> {
     const updated = await this.chunks.migrateColumns({
       dataset,
       projectId,
       oldColumnTypes: dataset.columnTypes,
       newColumnTypes: columnTypes,
+      ...(columnRenames ? { columnRenames } : {}),
       name,
       slug,
       storage: this.storage,

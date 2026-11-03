@@ -6,6 +6,7 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
 import {
+  datasetColumnRenamesSchema,
   datasetRecordFormSchema,
   datasetRecordInputSchema,
   newDatasetEntriesSchema,
@@ -26,6 +27,7 @@ const DATASET_RECORD_IDS_MAX = resolveRequestBound("datasetBatchMax", "ENTERPRIS
 const datasetApiUpsertBaseInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetRecords: z.array(datasetRecordInputSchema).optional(),
+  columnRenames: datasetColumnRenamesSchema.optional(),
 });
 export interface DatasetApiUpsertBaseInputSchema extends Named<
   typeof datasetApiUpsertBaseInputSchemaDefinition

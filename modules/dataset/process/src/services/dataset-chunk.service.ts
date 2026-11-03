@@ -4,7 +4,7 @@
  * advisory lock (Decision 9 / I-COUNT); this class keeps append, edit and locate.
  */
 
-import { type DatasetColumns } from "@langwatch/dataset-contract";
+import { type DatasetColumnRenames, type DatasetColumns } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
@@ -369,6 +369,7 @@ export class DatasetChunkService {
     projectId: string;
     oldColumnTypes: DatasetColumns;
     newColumnTypes: DatasetColumns;
+    columnRenames?: DatasetColumnRenames;
     name: string;
     slug: string;
     storage: DatasetChunkRepository;

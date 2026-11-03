@@ -541,3 +541,12 @@ Feature: Dataset editor
     Then the renamed column comes back with its original id
     And the added column comes back without one
     And the saved column list carries no ids
+
+  @unit
+  Scenario: A save that deletes one column and renames another keeps the renamed column's values
+    Given a saved dataset with columns "first" and "second", each holding values
+    When one save deletes "first" and renames "second" to "renamed"
+    Then the save names the rename from "second" to "renamed"
+    And every row of "renamed" holds the values "second" held
+    And the values of "first" are gone
+    And a save that names no renames pairs leftover columns by position, as before

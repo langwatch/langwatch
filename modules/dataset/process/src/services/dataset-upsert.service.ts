@@ -70,6 +70,7 @@ export class DatasetUpsertService {
         name,
         slug: existing.slug,
         columnTypes: parsed.columnTypes,
+        ...(parsed.columnRenames ? { columnRenames: parsed.columnRenames } : {}),
       });
     }
 

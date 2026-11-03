@@ -29,8 +29,8 @@ import { type FieldErrors, type Resolver, useFieldArray, useForm } from "react-h
 import { z } from "zod";
 
 import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
+import { columnRenamesOf, recordsBySource, withSources } from "../../../model/column-renames.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
-import { tryToMapPreviousColumnsToNewColumns } from "../../../model/workflow/studio-dataset.utils.ts";
 import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
 
 export interface AddDatasetDrawerProps {
@@ -79,9 +79,12 @@ export const drawerDatasetColumnSchema = z.object({
   ...datasetColumnSchema.shape,
   id: z.string().optional(),
 });
+/** A form column also keeps the stored name it was loaded as, which names a rename. */
 const drawerFormSchema = z.object({
   ...datasetRecordFormSchema.shape,
-  columnTypes: z.array(drawerDatasetColumnSchema),
+  columnTypes: z.array(
+    z.object({ ...drawerDatasetColumnSchema.shape, source: z.string().optional() }),
+  ),
 });
 type FormValues = z.infer<typeof drawerFormSchema>;
 
@@ -176,14 +179,11 @@ function upsertInputOf({
     datasetId: datasetToSave?.datasetId,
     name: data.name,
     columnTypes,
+    ...(datasetToSave?.datasetId ? { columnRenames: columnRenamesOf(data.columnTypes) } : {}),
   };
   if (!datasetToSave?.datasetRecords) return base;
 
-  const remapped = tryToMapPreviousColumnsToNewColumns(
-    datasetToSave.datasetRecords,
-    withoutCallerIds(datasetToSave.columnTypes),
-    columnTypes,
-  );
+  const remapped = recordsBySource(datasetToSave.datasetRecords, data.columnTypes);
   return {
     ...base,
     datasetRecords: convertDatasetRecordsToColumnTypes(remapped, columnTypes),
@@ -192,6 +192,10 @@ function upsertInputOf({
 
 const withoutCallerIds = (columns: DrawerDatasetColumn[]): DatasetColumns =>
   columns.map(({ name, type }) => ({ name, type }));
+
+/** The form's columns as the caller sees them: its ids kept, the loaded names dropped. */
+const withoutSources = (columns: FormValues["columnTypes"]): DrawerDatasetColumn[] =>
+  columns.map(({ source: _source, ...column }) => column);
 
 /** The saved columns, in submitted order, each with the caller's id it was saved from. */
 const withCallerIds = ({
@@ -223,7 +227,7 @@ function resetDrawerForm({
     return () => undefined;
   }
   const timeout = setTimeout(() => {
-    reset({ name: datasetToSave.name ?? "", columnTypes: datasetToSave.columnTypes });
+    reset({ name: datasetToSave.name ?? "", columnTypes: withSources(datasetToSave.columnTypes) });
   }, 0);
   return () => clearTimeout(timeout);
 }
@@ -248,7 +252,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   } = useForm<FormValues>({
     defaultValues: {
       name: props.datasetToSave?.name ?? "",
-      columnTypes: props.datasetToSave?.columnTypes ?? initialColumns,
+      columnTypes: props.datasetToSave
+        ? withSources(props.datasetToSave.columnTypes)
+        : initialColumns,
     },
     resolver: validateDatasetForm,
   });
@@ -336,7 +342,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       props.onSuccess?.({
         datasetId: props.datasetToSave?.datasetId ?? "",
         name: data.name,
-        columnTypes: data.columnTypes,
+        columnTypes: withoutSources(data.columnTypes),
       });
       reset();
       onClose();

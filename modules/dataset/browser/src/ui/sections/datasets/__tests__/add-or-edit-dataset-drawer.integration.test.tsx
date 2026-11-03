@@ -31,10 +31,6 @@ vi.mock("@langwatch/browser-host/errors", () => ({
   showErrorToast: () => void 0,
 }));
 
-vi.mock("../../../../model/workflow/studio-dataset.utils.ts", () => ({
-  tryToMapPreviousColumnsToNewColumns: (records: unknown) => records,
-}));
-
 /**
  * The mutation, answering the way tRPC does: `mutate` runs the caller's own
  * `onSuccess` with the written row. That callback is where the crash lived, so
@@ -193,6 +189,7 @@ describe("given the dataset editor opened on columns that carry the caller's ids
 
   describe("when the reader renames a saved dataset's column and saves", () => {
     /** @scenario "The dataset editor hands back each edited column with the caller's id for it" */
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
     it("saves plain columns and hands back the saved ones with the caller's ids", async () => {
       const saved = vi.fn();
       created.mockClear();
@@ -207,6 +204,7 @@ describe("given the dataset editor opened on columns that carry the caller's ids
         { name: "test2", type: "string" },
         { name: "extra", type: "string" },
       ]);
+      expect(created.mock.calls[0]?.[0].columnRenames).toEqual([{ from: "test", to: "test2" }]);
       expect(saved.mock.calls[0]?.[0].columnTypes).toEqual([
         { id: "input_0", name: "input", type: "string" },
         { id: "test_1", name: "test2", type: "string" },

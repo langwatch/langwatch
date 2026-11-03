@@ -38,6 +38,21 @@ export const datasetColumnsSchema: DatasetColumnsSchema = datasetColumnsSchemaDe
 export type DatasetColumn = z.infer<typeof datasetColumnSchema>;
 export type DatasetColumns = z.infer<typeof datasetColumnsSchema>;
 
+/**
+ * Which old column each renamed column came from. Sent, values move by these
+ * renames and unchanged names only, never by position; omitted, leftover
+ * columns pair by position as before.
+ */
+const datasetColumnRenamesSchemaDefinition = z.array(
+  z.object({ from: z.string().min(1), to: z.string().min(1) }).strict(),
+);
+export interface DatasetColumnRenamesSchema extends Named<
+  typeof datasetColumnRenamesSchemaDefinition
+> {}
+export const datasetColumnRenamesSchema: DatasetColumnRenamesSchema =
+  datasetColumnRenamesSchemaDefinition;
+export type DatasetColumnRenames = z.infer<typeof datasetColumnRenamesSchema>;
+
 export const datasetJsonSchema: z.ZodType<
   string | number | boolean | null | { [key: string]: unknown } | unknown[]
 > = z.lazy(() =>
@@ -363,6 +378,7 @@ const upsertDatasetInputSchemaDefinition = z
     columnTypes: datasetColumnsSchema,
     datasetId: z.string().min(1).optional(),
     datasetRecords: z.array(datasetRecordInputSchema).optional(),
+    columnRenames: datasetColumnRenamesSchema.optional(),
   })
   .strict();
 export interface UpsertDatasetInputSchema extends Named<
