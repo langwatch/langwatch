@@ -73,7 +73,7 @@ describe("formatLoginCeremony", () => {
       it("falls back when an empty tools array is supplied", () => {
         const lines = formatLoginCeremony({ ...baseInput, tools: [] });
         const toolLines = lines.filter(isToolCommand);
-        expect(toolLines).toHaveLength(8);
+        expect(toolLines).toHaveLength(9);
       });
     });
   });
