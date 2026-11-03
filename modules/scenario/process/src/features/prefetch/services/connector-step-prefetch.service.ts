@@ -110,10 +110,13 @@ export class ConnectorStepPrefetchService {
     });
     if (!page) return { refusal: "The Connector step's dataset no longer exists." };
     const rows = page.datasetRecords.map(({ entry }) => entry);
-    const isOverCap =
-      page.count > rows.length ||
-      Buffer.byteLength(JSON.stringify(rows), "utf8") > CONNECTOR_ROWS_MAX_BYTES;
-    if (!isOverCap) return { rows };
+    if (page.count > rows.length) {
+      return {
+        refusal: `The Connector step's dataset has more than the ${DATASET_PAGE_LIMIT_MAX} rows a step may receive.`,
+      };
+    }
+    if (Buffer.byteLength(JSON.stringify(rows), "utf8") <= CONNECTOR_ROWS_MAX_BYTES)
+      return { rows };
     return {
       refusal: `The Connector step's dataset is over the ${CONNECTOR_ROWS_MAX_BYTES / 1024} KiB a step may receive.`,
     };

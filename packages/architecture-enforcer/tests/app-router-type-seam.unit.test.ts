@@ -15,8 +15,9 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * 1,540 with `pnpm ensure:built`; 1,561 with ADR-185; 1,562 with ADR-190; 1,563 with the
- * agent contract's config/connector.ts. A ceiling, not a target: say why before raising it.
+ * 1,540 with `pnpm ensure:built`; 1,561 with ADR-185; 1,562 with ADR-190; 1,564 with ADR-194:
+ * the agent contract's config/connector.ts and the feature-flag contract's
+ * scenario-connector-steps.ts. A ceiling, not a target: say why before raising it.
  */
 const CEILING = 1_564;
 

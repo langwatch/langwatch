@@ -640,6 +640,7 @@ describe("the run state in the template context", () => {
   });
 
   describe("given a state that names another host", () => {
+    /** @scenario "The run state cannot decide the host a turn is sent to" */
     it("refuses to render the url, so the host cannot receive the header secrets", () => {
       expect(() =>
         renderUrlTemplate({

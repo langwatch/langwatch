@@ -247,6 +247,13 @@ export function connectorStepAnswer({
     const returned = { ...rest, ...(state === undefined ? {} : { state }) };
     return Object.keys(returned).length > 0 ? { state: returned } : {};
   }
+  const unknownKeys = Object.keys(rest);
+  if (unknownKeys.length > 0) {
+    // A bare `{"accountId": ...}` would otherwise record ok with an empty state.
+    throw new ConnectorStepError({
+      message: `The setup step must return { state, secrets? }; it also returned: ${unknownKeys.join(", ")}.`,
+    });
+  }
   if (state !== undefined && state !== null && !isObject(state)) {
     throw new ConnectorStepError({ message: "The setup step's state must be a JSON object." });
   }

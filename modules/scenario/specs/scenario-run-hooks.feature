@@ -399,6 +399,11 @@ Feature: Scenario run hooks: setup and teardown
       Then setup records "failed" naming the cap
 
     @unit
+    Scenario: A Connector setup that answers outside the state shape fails setup
+      Given a setup step that returns {"accountId": "acc_1"} instead of a state
+      Then setup records "failed" naming the expected { state, secrets? } shape
+
+    @unit
     Scenario: A Connector step that names a missing secret fails before it runs
       Given a setup step that names a secret the project does not have
       When setup is called

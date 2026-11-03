@@ -180,6 +180,13 @@ describe("connectorStepAnswer()", () => {
     ).toThrow(/64 KiB/);
   });
 
+  /** @scenario "A Connector setup that answers outside the state shape fails setup" */
+  it("fails a setup that returns keys other than state and secrets, naming them", () => {
+    expect(() => connectorStepAnswer({ kind: "setup", outputs: { accountId: "acc_1" } })).toThrow(
+      /\{ state, secrets\? \}.*accountId/,
+    );
+  });
+
   it("fails a setup whose state is not an object or whose secrets are not strings", () => {
     expect(() => connectorStepAnswer({ kind: "setup", outputs: { state: [1] } })).toThrow(
       /JSON object/,

@@ -28,11 +28,13 @@ type Answers = {
   secretReads?: string[][];
   /** The dataset entries a Connector step's bound dataset holds; null when it is gone. */
   datasetEntries?: Record<string, unknown>[] | null;
+  /** The dataset's total row count when it holds more than the page returned. */
+  datasetCount?: number;
   /** Whether the project's runs may execute Connector steps; defaults to released. */
   connectorsReleased?: boolean;
 };
 
-function datasetPageOf(entries: Record<string, unknown>[]): DatasetPage {
+function datasetPageOf(entries: Record<string, unknown>[], count = entries.length): DatasetPage {
   return {
     id: "dataset_personas",
     name: "Personas",
@@ -45,7 +47,7 @@ function datasetPageOf(entries: Record<string, unknown>[]): DatasetPage {
       createdAt: new Date(0),
       updatedAt: new Date(0),
     })),
-    count: entries.length,
+    count,
     page: 1,
     limit: 1000,
     totalPages: 1,
@@ -137,7 +139,7 @@ function serviceAnswering(answers: Answers = {}) {
 
   const datasets = createApiFixture<DatasetApi>({
     findDatasetPage: async () =>
-      answers.datasetEntries ? datasetPageOf(answers.datasetEntries) : null,
+      answers.datasetEntries ? datasetPageOf(answers.datasetEntries, answers.datasetCount) : null,
   });
 
   return ScenarioTargetPrefetchService.create({
@@ -474,6 +476,21 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
         connector: { setup: { refusal: expect.stringContaining("64 KiB") } },
       });
       expect(adapter).not.toHaveProperty("connector.setup.rows");
+    });
+
+    it("packs a refusal naming the row limit when the dataset has more rows than a page", async () => {
+      const service = serviceAnswering({
+        agent: withConnector({ setup: { ...step, datasetId: "dataset_personas" } }),
+        datasetEntries: [{ persona: "gold" }],
+        datasetCount: 1001,
+      });
+
+      const refusal = (await fetchFor(service, "http")) as {
+        connector: { setup: { refusal: string } };
+      };
+
+      expect(refusal.connector.setup.refusal).toMatch(/more than the \d+ rows/);
+      expect(refusal.connector.setup.refusal).not.toContain("KiB");
     });
 
     it("packs a refusal when the bound dataset is gone", async () => {
