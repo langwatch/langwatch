@@ -339,6 +339,93 @@ describe("durable hand-off", () => {
     });
   });
 
+  describe("given a state projection that missed a re-send the log read collapses into an earlier copy", () => {
+    type Requested = { count: number; lastRequestedAt: number | null };
+
+    const setUp = () => {
+      const handoffStore = InMemoryProcessStore.createForTesting();
+      const held: { row?: StoredProjection<Requested> } = {};
+      const projection: StateProjectionDefinition<Requested, Event> = {
+        name: "requestedRow",
+        version: "2026-09-29",
+        eventTypes: [],
+        init: () => ({ count: 0, lastRequestedAt: null }),
+        apply: (state, event) => ({ count: state.count + 1, lastRequestedAt: event.occurredAt }),
+        store: {
+          get: async () =>
+            held.row ? { kind: "folded", projection: held.row } : { kind: "empty" },
+          store: async (stored) => {
+            held.row = stored;
+          },
+        },
+      };
+      const store = vi.spyOn(projection.store, "store");
+      const harness = serviceWith({
+        handoffStore,
+        stateProjections: [sealStateProjection(projection)],
+      });
+      return { ...harness, held, store };
+    };
+
+    /** A first request applied, and the projection's next update refused once. */
+    const afterAppliedRequestThenRefusal = async () => {
+      const harness = setUp();
+      const first = { ...appendedAt(1_000), occurredAt: 1_000, idempotencyKey: "bootstrap" };
+      await harness.service.storeEvents([first], { tenantId });
+      harness.store.mockRejectedValueOnce(new Error("postgres refused"));
+      return { ...harness, first };
+    };
+
+    /** The log read: ascending, first row per idempotency key, as `deduplicateEvents` keeps it. */
+    const readingFirstCopyOnly = (
+      eventStore: ReturnType<typeof setUp>["eventStore"],
+      hidden: readonly string[],
+    ) => {
+      const getEvents = eventStore.getEvents.bind(eventStore);
+      vi.spyOn(eventStore, "getEvents").mockImplementation(async (input) =>
+        (await getEvents(input)).filter((event) => !hidden.includes(event.id)),
+      );
+    };
+
+    /** @scenario "A state projection that missed a re-send under a held key rebuilds from the log's copy" */
+    it("folds the re-send in at its own position instead of waiting for its id", async () => {
+      const { service, eventStore, drain, held } = await afterAppliedRequestThenRefusal();
+      const resend = { ...appendedAt(2_000), occurredAt: 2_000, idempotencyKey: "bootstrap" };
+      await service.storeEvents([resend], { tenantId });
+      readingFirstCopyOnly(eventStore, [resend.id]);
+
+      const redriven = await drain(Date.now());
+
+      expect(redriven.dispatched).toHaveLength(1);
+      expect(held.row?.state).toEqual({ count: 2, lastRequestedAt: resend.occurredAt });
+      expect(held.row?.cursor.eventId).toBe(resend.id);
+    });
+
+    it("rebuilds from the log alone once the read returns the re-send itself", async () => {
+      const { service, eventStore, drain, held } = await afterAppliedRequestThenRefusal();
+      const resend = { ...appendedAt(2_000), occurredAt: 2_000, idempotencyKey: "bootstrap" };
+      await service.storeEvents([resend], { tenantId });
+      // A merge in the same partition keeps the newer row (the highest EventTimestamp).
+      vi.spyOn(eventStore, "getEvents").mockResolvedValue([resend]);
+
+      await drain(Date.now());
+
+      expect(held.row?.state).toEqual({ count: 1, lastRequestedAt: resend.occurredAt });
+    });
+
+    it("still retries a missed event whose key the log does not hold yet", async () => {
+      const { service, eventStore, drain, held, first } = await afterAppliedRequestThenRefusal();
+      const other = { ...appendedAt(2_000), occurredAt: 2_000, idempotencyKey: "manual:2000" };
+      await service.storeEvents([other], { tenantId });
+      readingFirstCopyOnly(eventStore, [other.id]);
+
+      const redriven = await drain(Date.now());
+
+      expect(redriven.dispatched).toHaveLength(0);
+      expect(held.row?.state).toEqual({ count: 1, lastRequestedAt: first.occurredAt });
+    });
+  });
+
   describe("given a global map projection on a registry that is not routing", () => {
     /** @scenario "A global lane missed while the registry is closed is re-driven once it routes" */
     it("re-drives the global lane once the registry routes", async () => {

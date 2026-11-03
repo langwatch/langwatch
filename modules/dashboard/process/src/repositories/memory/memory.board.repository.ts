@@ -1,6 +1,6 @@
 import {
-  boardSchema,
   DashboardNotFoundError,
+  dashboardSchema,
   type DashboardScope,
   type DashboardStar,
   type StarredDashboard,
@@ -55,11 +55,10 @@ export class MemoryBoardRepository implements BoardRepository {
     createdById?: string | null;
     scope?: DashboardScope;
   }): Promise<BoardRecord> {
-    const board = boardSchema.parse({
+    const board = dashboardSchema.parse({
       ...input,
       order: 0,
       description: null,
-      excludedOrigins: null,
       createdById: input.createdById ?? null,
       scope: input.scope ?? "PROJECT",
       organizationId: null,
@@ -76,7 +75,7 @@ export class MemoryBoardRepository implements BoardRepository {
     data: BoardUpdate;
   }): Promise<BoardRecord> {
     const board = this.#requireBoard(input);
-    const updated = boardSchema.parse({
+    const updated = dashboardSchema.parse({
       ...board,
       ...Object.fromEntries(Object.entries(input.data).filter(([, value]) => value !== undefined)),
       updatedAt: this.#database.now(),

@@ -1,25 +1,60 @@
 // Package codeblock executes user-authored Python code in an isolated
-// subprocess. The subprocess is the bundled `runner.py` helper; nlpgo
-// pipes the code+inputs over stdin and reads a structured result from
-// a tmp file. Timeout is enforced from Go via context cancellation.
+// subprocess. The subprocess is the bundled `runner.py` helper, which asks
+// nlpgo for the code+inputs and writes a structured result to a tmp file.
+// Timeout is enforced from Go via context cancellation.
+//
+// On the multi-tenant cloud many customers' code blocks run in one nlpgo
+// container, so an execution has to be isolated from the others and not just
+// from the engine. Four properties carry that, and each is a test in this
+// package:
+//
+//   - The runner and the `dspy` stand-in are never written to disk. They
+//     travel from the engine's memory to the interpreter over argv and the
+//     payload, and the runner drops the working directory from sys.path, so no
+//     code the interpreter loads comes from a place user code can write.
+//   - Nothing an execution starts outlives it. The interpreter leads its own
+//     process group, every exit path kills the group, and a descendant that
+//     detached from it is found as a child of the engine and killed too (see
+//     processtree_linux.go).
+//   - Each execution works in a directory of its own, with a random name
+//     inside a root that cannot be listed, removed when the execution ends.
+//   - One execution cannot read another's process. The interpreter is handed
+//     nothing of the run, makes itself non-dumpable and then asks for its
+//     payload over a socket answered by the pid the kernel reports for the
+//     process connecting (see payloadchannel_linux.go).
+//
+// What this does not do is give an execution its own UID, PID namespace or
+// cgroup. All three would be stronger: a per-execution UID would make the
+// filesystem and /proc barriers kernel-enforced rather than a matter of
+// unguessable names. None is reachable from the shipped container, which runs
+// as a non-root user with every capability dropped, no_new_privs on, a
+// read-only root filesystem and a read-only cgroupfs — so CAP_SETUID,
+// CLONE_NEWPID (blocked by the default seccomp profile without CAP_SYS_ADMIN)
+// and a writable cgroup subtree are all out of reach. Granting any of them
+// would weaken the container more than it hardens the sandbox.
 //
 // See specs/nlp-go/code-block.feature and _shared/contract.md §7.
 package codeblock
 
 import (
-	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
 	_ "embed"
+
+	"go.uber.org/zap"
 )
 
 //go:embed runner.py
@@ -63,9 +98,9 @@ type Options struct {
 	//   - non-nil empty  → pass nothing (maximally locked down)
 	//   - populated      → pass exactly those names, when present
 	//
-	// A project's own secrets reach user code via Request.Secrets (piped
-	// over stdin into the `secrets` namespace), never via the environment,
-	// so withholding the environment does not break the secrets contract.
+	// A project's own secrets reach user code via Request.Secrets (they ride
+	// in the payload, into the `secrets` namespace), never via the
+	// environment, so withholding it does not break the secrets contract.
 	//
 	// The one credential that does travel in the environment is the run's
 	// sandbox key; see Request.SandboxAPIKey.
@@ -76,6 +111,17 @@ type Options struct {
 	// an endpoint with no key, gives agent code half a credential and one
 	// failure it cannot read.
 	SandboxEndpoint string
+	// Logger reports what teardown could not finish. Optional: a nil logger
+	// discards those reports rather than failing an execution.
+	Logger *zap.Logger
+}
+
+// logger is the configured logger or a sink, so callers never branch.
+func (o Options) logger() *zap.Logger {
+	if o.Logger == nil {
+		return zap.NewNop()
+	}
+	return o.Logger
 }
 
 // defaultEnvAllowlist is the environment passed into the code-block
@@ -84,13 +130,16 @@ type Options struct {
 // and deliberately excludes every credential-bearing variable in the pod.
 // Being an allowlist, any secret env var added to the deployment in future
 // is withheld automatically without a code change here.
+//
+// TMPDIR is deliberately not on it. The runner points it at the execution's
+// own directory before any user code runs, so copying the deployment's value
+// would only name the engine's temp root in a place every execution can read.
 var defaultEnvAllowlist = []string{
 	"PATH",
 	"HOME",
 	"LANG",
 	"LC_ALL",
 	"LC_CTYPE",
-	"TMPDIR",
 	"PYTHONPATH",
 	"PYTHONHOME",
 	"PYTHONHASHSEED",
@@ -105,22 +154,29 @@ var defaultEnvAllowlist = []string{
 
 // Executor runs code blocks via a Python subprocess.
 //
-// The runner sources are held as bytes in the engine's own memory, not as a
-// path on disk the subprocess shares. Execute writes them out fresh for each
-// execution, into a directory belonging to that execution alone, and removes
-// the directory afterwards. That is what makes the runner one execution runs
-// independent of anything an earlier execution did: user code and the runner
-// run as the same user, so a file the subprocess can read is a file it can
-// also rewrite, and the only copy it cannot reach is the one it never sees.
+// The runner sources are held as bytes in the engine's own memory and reach
+// the interpreter over argv and in the payload it asks for, never as a file.
+// User code and the interpreter run as the same user, so a file the subprocess
+// can read is a file it can also rewrite; the only copy it cannot reach is the
+// one that was never on the filesystem. The execution's own directory
+// therefore holds no code at all, and what one execution runs cannot depend on
+// what another wrote.
 type Executor struct {
 	opts           Options
 	runnerSource   []byte
 	fakeDspySource []byte
+	// scratchRoot holds this process's per-execution directories. Created
+	// once, because its mode is what keeps them from being enumerated.
+	scratchRoot string
+	// payload is how an execution's payload reaches its interpreter, nil
+	// where there is no channel and the payload goes on stdin.
+	payload *payloadChannel
 }
 
-// New builds an Executor, resolving the runner sources it will write for
+// New builds an Executor, reading the runner sources it holds in memory for
 // every execution: the embedded copies, or the files named by
-// Options.RunnerPath when a dev run overrides them.
+// Options.RunnerPath when a dev run overrides them. Neither is ever written to
+// disk; both travel to the interpreter over argv and in the payload.
 func New(opts Options) (*Executor, error) {
 	if opts.Python == "" {
 		opts.Python = "python3"
@@ -145,9 +201,9 @@ func New(opts Options) (*Executor, error) {
 			return nil, fmt.Errorf("codeblock: read runner %q: %w", opts.RunnerPath, err)
 		}
 		runnerSource = loaded
-		// runner.py imports fake_dspy from its own directory, so an
-		// override of one is an override of the pair. A dev checkout that
-		// carries only the runner keeps the embedded stand-in.
+		// The stand-in travels in the payload the runner reads, so an
+		// override of the runner is an override of the pair. A dev checkout
+		// that carries only the runner keeps the embedded stand-in.
 		sibling := filepath.Join(filepath.Dir(opts.RunnerPath), "fake_dspy.py")
 		if loaded, err := os.ReadFile(sibling); err == nil {
 			fakeDspySource = loaded
@@ -155,51 +211,98 @@ func New(opts Options) (*Executor, error) {
 			return nil, fmt.Errorf("codeblock: read fake_dspy %q: %w", sibling, err)
 		}
 	}
+	// From here on this process spawns user code, so it takes on being the
+	// reaper for the descendants that detach from an execution, and takes its
+	// own /proc files away from the user they run as.
+	enableProcessHardening()
+	// A channel the runner asks for its payload on, so nothing of the run is
+	// in the interpreter when it starts. Where there is one there is no
+	// acceptable fallback: a payload on stdin is readable out of /proc by
+	// another execution in the moment before the runner hides itself, so an
+	// engine that cannot bind the socket refuses to serve code blocks.
+	channel, err := newPayloadChannel()
+	if err != nil {
+		return nil, err
+	}
+	scratchRoot, err := newScratchRoot()
+	if err != nil {
+		channel.close()
+		return nil, err
+	}
 	return &Executor{
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
+		scratchRoot:    scratchRoot,
+		payload:        channel,
 	}, nil
 }
 
-// runnerFileMode is read-only even for the owner. User code runs as the same
-// user and can chmod it back, so this stops a careless write rather than a
-// deliberate one; the per-execution directory is what makes the rewrite
-// pointless either way.
-const runnerFileMode = 0o400
+// scratchRootMode is write and execute for the owner, and nothing else. The
+// engine can create and remove execution directories inside it; a process that
+// does not already know an execution's directory name cannot list the root to
+// learn one, and the names are random. Everything in the container runs as the
+// same user, so this is a barrier against discovery, not against a process
+// that sets out to remove it — that one needs the per-execution UID the
+// package doc explains we cannot have here.
+const scratchRootMode = 0o300
 
-// newRunDir creates the directory for one execution and materializes the
-// runner pair into it. The caller removes the directory when the execution
-// ends, which also disposes of whatever the user's code wrote inside it.
+// scratchRootSweep bounds the clearing of a stale root to once per process: a
+// second Executor must not remove the directories of the executions the first
+// one is running.
+var scratchRootSweep sync.Once
+
+// newScratchRoot creates the root this process's execution directories live
+// in, under TMPDIR (an emptyDir with a size limit in the chart, so a code
+// block that writes too much fills its own volume and not the node).
+//
+// One root per engine process, named after its pid. A container that restarts
+// comes back with the same pid on an emptyDir that survived it, so the root is
+// emptied once per process before any execution runs: nothing is ever read out
+// of it, but directories a crashed engine never removed would otherwise count
+// against the volume's size limit for as long as the pod lives.
+func newScratchRoot() (string, error) {
+	root := filepath.Join(os.TempDir(), fmt.Sprintf("nlpgo-codeblock-%d", os.Getpid()))
+	scratchRootSweep.Do(func() { removeRunDir(root) })
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return "", fmt.Errorf("codeblock: scratch root: %w", err)
+	}
+	if err := os.Chmod(root, scratchRootMode); err != nil {
+		return "", fmt.Errorf("codeblock: scratch root mode: %w", err)
+	}
+	return root, nil
+}
+
+// newRunDir creates the working directory for one execution, with a random
+// name inside the engine's scratch root. No code is written into it — the
+// runner and the stand-in travel in memory — so the only files it ever holds
+// are the result file and whatever user code writes. The caller removes it
+// when the execution ends.
 func (e *Executor) newRunDir() (string, error) {
-	dir, err := os.MkdirTemp("", "nlpgo-codeblock-run-*")
+	dir, err := os.MkdirTemp(e.scratchRoot, "run-")
 	if err != nil {
 		return "", fmt.Errorf("codeblock: run dir: %w", err)
-	}
-	for name, source := range map[string][]byte{
-		"runner.py":    e.runnerSource,
-		"fake_dspy.py": e.fakeDspySource,
-	} {
-		if err := os.WriteFile(filepath.Join(dir, name), source, runnerFileMode); err != nil {
-			_ = os.RemoveAll(dir)
-			return "", fmt.Errorf("codeblock: write %s: %w", name, err)
-		}
 	}
 	return dir, nil
 }
 
 // removeRunDir disposes of one execution's directory.
 //
-// A plain RemoveAll is not enough: unlinking a file needs write permission on
-// the directory holding it, so user code that chmods its own run directory (or
-// any directory it created inside) read-only makes the removal fail and leaves
-// the tree on disk. The next execution still gets a fresh directory, so the
-// isolation property holds either way, but a long-lived engine process would
-// accumulate them until the volume filled. Restoring owner write permission on
-// the way down costs one walk and removes the only failure mode user code can
-// arrange for itself.
+// Two reasons it is not one RemoveAll of the whole path. RemoveAll opens the
+// PARENT directory to unlink from it, and the parent is the scratch root,
+// which has no read permission — that is what stops one execution enumerating
+// another's. Emptying the directory first and then removing it by name needs
+// only write and execute on the root, which the engine has.
+//
+// The second is user code chmodding a directory it created inside its own
+// read-only: unlinking a file needs write permission on the directory holding
+// it, so the removal fails and the tree stays on disk. The next execution
+// still gets a fresh directory, so the isolation property holds either way,
+// but a long-lived engine process would accumulate them until the volume
+// filled. Restoring owner write permission on the way down costs one walk and
+// removes the only failure mode user code can arrange for itself.
 func removeRunDir(dir string) {
-	if err := os.RemoveAll(dir); err == nil {
+	if err := emptyAndRemove(dir); err == nil {
 		return
 	}
 	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
@@ -215,7 +318,21 @@ func removeRunDir(dir string) {
 		}
 		return nil
 	})
-	_ = os.RemoveAll(dir)
+	_ = emptyAndRemove(dir)
+}
+
+// emptyAndRemove removes everything inside dir, then dir itself.
+func emptyAndRemove(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if err := os.RemoveAll(filepath.Join(dir, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return os.Remove(dir)
 }
 
 // Request is what the engine hands to the executor per node invocation.
@@ -314,23 +431,48 @@ func (e *Executor) childEnv() []string {
 	return env
 }
 
-// withSandboxCredential appends the run's LangWatch credential to env, or
-// returns env unchanged.
+// sandboxCredential names the LangWatch variables user code reads, or nothing.
 //
 // Both halves or neither: a key with no endpoint sends the call to the wrong
 // instance, and an endpoint with no key gets a 401 the agent cannot act on.
 // LANGWATCH_SKIP_OTEL_SETUP rides along because the run already reports this
 // row, so a second exporter inside it would only spend the runner's time
 // budget.
-func withSandboxCredential(env []string, apiKey, endpoint string) []string {
+//
+// These travel in the payload and are put into the environment by the runner,
+// not handed to exec. A variable exec is given is in the process's initial
+// environment, which another process running as the same user can read out of
+// /proc for as long as the run lasts; one the runner sets afterwards is not
+// there at all. User code reads it from os.environ either way.
+func sandboxCredential(apiKey, endpoint string) map[string]string {
 	if apiKey == "" || endpoint == "" {
-		return env
+		return map[string]string{}
 	}
-	return append(env,
-		"LANGWATCH_API_KEY="+apiKey,
-		"LANGWATCH_ENDPOINT="+endpoint,
-		"LANGWATCH_SKIP_OTEL_SETUP=true",
-	)
+	return map[string]string{
+		"LANGWATCH_API_KEY":         apiKey,
+		"LANGWATCH_ENDPOINT":        endpoint,
+		"LANGWATCH_SKIP_OTEL_SETUP": "true",
+	}
+}
+
+// runnerEnv is what the runner puts into its own environment before any user
+// code runs: the run's credential, its scratch directory, and the token
+// teardown recognizes the run's processes by.
+//
+// TMPDIR is set here rather than handed to exec so the deployment's own TMPDIR
+// cannot send the subprocess's scratch files to a location shared with other
+// executions, and so the directory's name is not sitting in a place another
+// execution can read. Python reads it when something first asks for a
+// temporary file, which is always after this.
+func runnerEnv(credential map[string]string, runDir, token string) map[string]string {
+	env := map[string]string{
+		"TMPDIR":       runDir,
+		runTokenEnvVar: token,
+	}
+	for name, value := range credential {
+		env[name] = value
+	}
+	return env
 }
 
 // Execute runs the request. Wall-clock timeout kills the subprocess.
@@ -348,63 +490,124 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// One directory per execution, holding the runner pair and the result
-	// file, removed on the way out. Nothing the user's code writes here
-	// survives to be read, imported or executed by a later run.
+	// One directory per execution, holding the result file and whatever user
+	// code writes, removed on the way out. It carries no code, so there is
+	// nothing in it a later execution could be made to load.
 	runDir, err := e.newRunDir()
 	if err != nil {
 		return nil, err
 	}
 	defer removeRunDir(runDir)
 
-	runnerPath := filepath.Join(runDir, "runner.py")
 	resultPath := filepath.Join(runDir, "result.json")
+	token, err := newRunToken()
+	if err != nil {
+		return nil, err
+	}
+	// The result file is in a directory another execution should not know
+	// about, so the nonce is what makes reading it safe anyway: a process that
+	// did learn the path can write the file, but not a file this execution
+	// will accept.
+	nonce, err := newRunToken()
+	if err != nil {
+		return nil, err
+	}
 
+	// Everything the run needs that is worth hiding goes here rather than into
+	// the environment or the command line, both of which another process
+	// running as the same user can read out of /proc: the project's secrets
+	// (as before), the run's credential, the run token, the scratch directory
+	// and the path of the result file.
 	payload, err := json.Marshal(map[string]any{
-		"code":    req.Code,
-		"inputs":  req.Inputs,
-		"outputs": req.DeclaredOutputs,
-		"secrets": req.Secrets,
-		"params":  req.Params,
+		"code":        req.Code,
+		"inputs":      req.Inputs,
+		"outputs":     req.DeclaredOutputs,
+		"secrets":     req.Secrets,
+		"params":      req.Params,
+		"dspy_stub":   string(e.fakeDspySource),
+		"result_path": resultPath,
+		"work_dir":    runDir,
+		"nonce":       nonce,
+		"env":         runnerEnv(sandboxCredential(req.SandboxAPIKey, e.opts.SandboxEndpoint), runDir, token),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
 	}
 
-	cmd := exec.CommandContext(runCtx, e.opts.Python, runnerPath, resultPath) //nolint:gosec // runnerPath is this execution's own copy of the engine's embedded runner
+	// The runner is passed as source on the command line rather than as a
+	// path: a file next to the user's working directory is a file the user's
+	// code can rewrite. `-s` keeps the per-user site directory out of
+	// sys.path; the working directory is dropped by the runner itself, which
+	// runs before any user code. PYTHONPATH is left alone because it is how
+	// both runtime images reach the curated sandbox libraries.
+	// The command line carries no path belonging to the run: it is readable
+	// from /proc by any process running as the same user, non-dumpable or not,
+	// so a path here is a path every other execution learns.
+	cmd := exec.CommandContext(runCtx, e.opts.Python, "-s", "-c", string(e.runnerSource)) //nolint:gosec // the source is the engine's own embedded runner, not user input
 	// Withhold the pod environment from user code. cmd.Env is always set to
 	// a non-nil slice so exec never falls back to inheriting os.Environ();
-	// see childEnv. Project secrets travel via the request payload, not here.
-	// The run's own sandbox credential is the one exception, and it is added
-	// only when the run carries both halves of it.
-	//
-	// TMPDIR is pointed at this execution's directory last, after the
-	// allowlist copy, so the deployment's own TMPDIR cannot send the
-	// subprocess's scratch files to a location shared with other executions.
-	cmd.Env = append(withSandboxCredential(
-		e.childEnv(),
-		req.SandboxAPIKey,
-		e.opts.SandboxEndpoint,
-	), "TMPDIR="+runDir)
-	// Relative paths in user code resolve inside the disposable directory
-	// rather than the engine's working directory. Python already puts the
-	// script's own directory on sys.path, so imports are unaffected.
-	cmd.Dir = runDir
-	cmd.Stdin = bytes.NewReader(payload)
+	// see childEnv. What the run itself carries — secrets, its credential, its
+	// token, its directory — travels in the payload and is put into the
+	// environment by the runner, where another execution cannot read it.
+	cmd.Env = append(e.childEnv(), e.payload.channelEnv()...)
+	// Started outside the run's directory, and the runner moves into it from
+	// the payload before any user code runs. A working directory is readable
+	// from /proc in the moment before the runner is hidden, so starting in the
+	// run's own directory would hand its name to anything watching.
+	cmd.Dir = "/"
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	var stderrBuf bytes.Buffer
-	cmd.Stderr = &stderrBuf
+
+	// Without a payload channel (a developer's macOS checkout) the payload
+	// goes on stdin as it used to. With one, the interpreter is handed no
+	// stdin at all and asks for its payload once it is hidden.
+	var stdin io.WriteCloser
+	if e.payload == nil {
+		if stdin, err = cmd.StdinPipe(); err != nil {
+			return nil, fmt.Errorf("codeblock: stdin pipe: %w", err)
+		}
+	}
+
+	// stderr goes to a file rather than to a buffer, so exec hands the child a
+	// descriptor instead of a pipe it copies in a goroutine. A process that
+	// detaches from the execution inherits that descriptor and would otherwise
+	// hold the pipe open, and with it Wait, for as long as it kept running —
+	// past the timeout the whole executor exists to enforce.
+	stderrFile, err := newRunnerStderr(e.scratchRoot)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = stderrFile.Close() }()
+	cmd.Stderr = stderrFile
+	// Backstop for the same class of hang on the stdin pipe, which exec still
+	// copies in a goroutine: a child that never reads its input while
+	// something it started holds the read end open.
+	cmd.WaitDelay = 2 * time.Second
 
 	started := time.Now()
-	runErr := cmd.Run()
+	runErr := runningChildren.start(cmd, payload)
+	if runErr == nil {
+		pid := cmd.Process.Pid
+		if stdin != nil {
+			_, _ = stdin.Write(payload)
+			_ = stdin.Close()
+		}
+		runErr = cmd.Wait()
+		runningChildren.release(pid)
+		// Every exit path, not only the timeout: an execution that returned
+		// an output or raised can have left a process running just as one
+		// that ran out of time can. Setpgid makes the interpreter the leader
+		// of its group, so its pid is the group id.
+		terminateRunTree(runScope{
+			pid:   pid,
+			pgid:  pid,
+			token: token,
+			dir:   runDir,
+		}, e.opts.logger())
+	}
 	elapsed := time.Since(started)
 
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
-	if timedOut && cmd.Process != nil {
-		// Make sure the process group is gone — CommandContext kills
-		// the leader but children of user code may linger.
-		_ = killGroup(cmd.Process.Pid)
-	}
+	stderrText := readRunnerStderr(stderrFile)
 
 	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
 		var parsed struct {
@@ -413,8 +616,12 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			Stderr     string         `json:"stderr"`
 			DurationMS int64          `json:"duration_ms"`
 			Error      *Error         `json:"error"`
+			Nonce      string         `json:"nonce"`
 		}
-		if err := json.Unmarshal(data, &parsed); err == nil {
+		// A result is this execution's own or it is nothing: the nonce came in
+		// on the payload, so a file written by anything that did not read the
+		// payload cannot carry it, and is not read as an output here.
+		if err := json.Unmarshal(data, &parsed); err == nil && parsed.Nonce == nonce {
 			res := &Result{
 				Outputs:    parsed.Outputs,
 				Stdout:     parsed.Stdout,
@@ -436,14 +643,14 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
 			TimedOut:   true,
-			Stderr:     stderrBuf.String(),
+			Stderr:     stderrText,
 			Error:      &Error{Type: TimeoutType, Message: "code_block_timeout"},
 		}, nil
 	}
 	if runErr != nil {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
-			Stderr:     stderrBuf.String(),
+			Stderr:     stderrText,
 			Error: &Error{
 				Type:    RunnerErrorType,
 				Message: runErr.Error(),
@@ -452,15 +659,59 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
-		Stderr:     stderrBuf.String(),
+		Stderr:     stderrText,
 		Error:      &Error{Type: RunnerErrorType, Message: "empty_result"},
 	}, nil
 }
 
-func killGroup(pid int) error {
-	pgid, err := syscall.Getpgid(pid)
+// maxRunnerStderr bounds what is read back from the subprocess's stderr. The
+// runner captures the user's own stderr into the result file, so this stream
+// carries interpreter-level diagnostics and a cap costs nothing — except to
+// code that writes gigabytes to its descriptor, which is why there is one.
+const maxRunnerStderr = 64 << 10
+
+// newRunnerStderr opens the file the interpreter's own stderr goes to, in the
+// engine's scratch root and unlinked at once.
+//
+// Not in the run's directory: a descriptor exec hands the interpreter can be
+// cloned through /proc in the moment before the runner hides itself, and the
+// name of that descriptor would then name the run's directory. Unlinked
+// because a file with no name is a file another execution cannot open even
+// knowing where it was.
+func newRunnerStderr(scratchRoot string) (*os.File, error) {
+	file, err := os.CreateTemp(scratchRoot, "stderr-")
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("codeblock: stderr file: %w", err)
 	}
-	return syscall.Kill(-pgid, syscall.SIGKILL)
+	if err := os.Remove(file.Name()); err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("codeblock: stderr file: %w", err)
+	}
+	return file, nil
+}
+
+// readRunnerStderr reads what the subprocess wrote to its stderr, for the
+// paths where the runner never produced a result file and that text is the
+// only account of why. The file has no name, so it is read back through the
+// descriptor the executor still holds.
+func readRunnerStderr(file *os.File) string {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return ""
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxRunnerStderr))
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// newRunToken mints the value every process in one execution carries in its
+// environment, so teardown can tell a process that detached from this
+// execution from one belonging to another.
+func newRunToken() (string, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return "", fmt.Errorf("codeblock: run token: %w", err)
+	}
+	return hex.EncodeToString(raw), nil
 }

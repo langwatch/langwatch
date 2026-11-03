@@ -168,7 +168,7 @@ describe("given the analytics host mounted over the project in scope", () => {
   });
 
   describe("when the scope graph holds the project in a personal workspace", () => {
-    /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
+    /** @scenario "A personal project's Analytics reads keep Langy's turns" */
     it.each([
       { workspace: "a personal workspace", isPersonal: true },
       { workspace: "a team", isPersonal: false },

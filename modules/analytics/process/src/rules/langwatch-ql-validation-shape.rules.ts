@@ -261,6 +261,8 @@ export interface NodeRule {
 export interface ValidatedLangWatchQL extends AcceptedLangWatchQL {
   /** Whether the statement declares the reserved time-window parameters. */
   readonly followsTimeWindow: boolean;
+  /** Whether the parsed statement declares {dashboard_context_sources:Array(String)}. */
+  readonly followsSources: boolean;
   /**
    * The values to execute with — the caller's, plus the window this surface
    * injected for the reserved names the statement declares.

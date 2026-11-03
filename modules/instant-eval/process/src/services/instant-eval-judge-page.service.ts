@@ -5,7 +5,11 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalSpentPriceUsd,
+  isInstantEvalSpendBillable,
+  NANO_USD_PER_USD,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -65,6 +69,8 @@ const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
   skipped: 0,
   inputTokens: 0,
   requests: 0,
+  costNanoUsd: 0,
+  routedInputTokens: 0,
   cursor: null,
   cursorSpanId: null,
   hasNextPage: false,
@@ -187,7 +193,7 @@ export class InstantEvalJudgePageService {
     await this.budget.assertWithinBudget({
       projectId,
       reservationId: runId,
-      inFlightUsd: this.#spentSoFarUsd(loaded.row.tokens),
+      inFlightUsd: this.#spentSoFarUsd(loaded.row),
     });
 
     const startedPage = this.now();
@@ -303,18 +309,14 @@ export class InstantEvalJudgePageService {
   }
 
   /**
-   * What this run has already spent, priced the way its finish prices it. Read
-   * off the run row rather than tracked here: the process that judges page six
-   * need not be the one that judged page five, and the row is what they share.
+   * What the run has spent so far, off the run row the judging processes share. The row keeps no
+   * routed token count, so every token is also priced at the published rate: never below the bill.
    */
-  #spentSoFarUsd(inputTokens: number): number {
-    if (inputTokens <= 0) return 0;
+  #spentSoFarUsd({ tokens, costUsd }: { tokens: number; costUsd: number }): number {
+    const costNanoUsd = Math.round(costUsd * NANO_USD_PER_USD);
+    if (!isInstantEvalSpendBillable({ inputTokens: tokens, costNanoUsd })) return 0;
     const { pricing } = this.judge;
-
-    return instantEvalPriceUsd({
-      costUsd: instantEvalCostUsd({ inputTokens, pricing }),
-      pricing,
-    });
+    return instantEvalSpentPriceUsd({ inputTokens: tokens, costNanoUsd, pricing });
   }
 
   /** The page's texts, judged, with a cancel or the lease able to stop it. */
@@ -484,6 +486,8 @@ function outcomeFor({
     ...counters,
     inputTokens: usage.inputTokens,
     requests: usage.requests,
+    costNanoUsd: usage.costNanoUsd,
+    routedInputTokens: usage.routedInputTokens,
     cursor: cursor.traceId,
     // Empty when the statement has one row per trace, which is what tells the
     // next key pass to compare the trace alone.
