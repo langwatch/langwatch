@@ -129,8 +129,12 @@ func LockProblems(lock, pyproject, manifestVersion string) []string {
 }
 
 func versionProblems(lockVersion, pyproject, manifestVersion string) []string {
+	projectVersion := projectVersionOf(pyproject)
+	if projectVersion == "" {
+		return []string{"sdks/python/pyproject.toml has no static [project] version; the release cannot bump a dynamic one"}
+	}
 	problems := []string{}
-	if projectVersionOf(pyproject) != lockVersion {
+	if projectVersion != lockVersion {
 		problems = append(problems, fmt.Sprintf("uv.lock is out of step with pyproject.toml (lock %q); %s", lockVersion, fix))
 	}
 	if manifestVersion != lockVersion {
