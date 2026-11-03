@@ -639,6 +639,7 @@ describe("when a PostgreSQL-backed view lacks a column over a current engine tab
       endpoint: { host: "postgres", port: 5432, database: "langwatch" },
       readerPassword: READER_PASSWORD,
     },
+    schema: "public",
   });
   const drift = selfProvisioning.findDrift({
     names: NAMES,
