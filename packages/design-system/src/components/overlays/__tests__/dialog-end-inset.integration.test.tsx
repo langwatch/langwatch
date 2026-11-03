@@ -15,7 +15,7 @@ function renderOpenDialog() {
       body
     </Dialog>,
   );
-  return screen.getByTestId("dialog").parentElement as HTMLElement;
+  return screen.getByTestId("dialog");
 }
 
 function rulesFor(element: HTMLElement) {
@@ -29,20 +29,24 @@ function rulesFor(element: HTMLElement) {
 /**
  * Only drawers yield the docked side panel's room; a dialog stays centred in the whole window.
  */
-describe("given a docked side panel keeps room on the right edge", () => {
+describe("given a docked side panel reserves no room from a dialog", () => {
   afterEach(() => {
     setDrawerEndInset(0);
     cleanup();
   });
 
-  it("keeps the dialog centred in the whole window, since only drawers make room for the panel", () => {
+  /** @scenario "A modal dialog ignores a docked panel's room and stays centred" */
+  it("adds no end padding to the dialog positioner", () => {
     setDrawerEndInset(412);
-    const css = rulesFor(renderOpenDialog());
+    const css = rulesFor(renderOpenDialog().parentElement as HTMLElement);
     expect(css).not.toContain("412px");
     expect(css).not.toContain("padding-inline-end");
   });
 
-  it("keeps the full window when no panel is docked", () => {
-    expect(rulesFor(renderOpenDialog())).not.toContain("padding-inline-end:412px");
+  /** @scenario "A modal dialog ignores a docked panel's room and stays centred" */
+  it("reduces the dialog's maximum width by the panel's width from md up", () => {
+    setDrawerEndInset(412);
+    const css = rulesFor(renderOpenDialog());
+    expect(css).toContain("- 412px");
   });
 });

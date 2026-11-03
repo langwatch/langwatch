@@ -150,7 +150,10 @@ const DIALOG_WIDTH: Record<DialogSize, string> = {
   document: "64rem",
 };
 
-/** The size cap, kept clear of a docked panel's room from the md breakpoint up. */
+/**
+ * The size cap: from md up it shrinks by a docked panel's width, so a centred dialog is not
+ * mostly hidden under it; it does not fully clear the panel.
+ */
 function dialogMaxWidth({ size, endInset }: { size: DialogSize; endInset: number }) {
   const cap = (room: string) => `min(${DIALOG_WIDTH[size]}, calc(100vw - 2rem${room}))`;
   if (endInset <= 0) return cap("");

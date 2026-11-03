@@ -119,6 +119,12 @@ Feature: Drawer and dialog shapes
     And the footer keeps its padding above the device's safe area
 
   @integration
+  Scenario: A modal dialog ignores a docked panel's room and stays centred
+    Given a docked side panel and a dialog opened over it
+    Then the dialog's positioner adds no end padding for the panel
+    And from the md breakpoint up the dialog's maximum width is reduced by the panel's width
+
+  @integration
   Scenario: A dialog can stand centred and keeps its size
     Given a dialog asking for a centred placement and a named size
     Then the frame is centred and carries that size
