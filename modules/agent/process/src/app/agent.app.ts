@@ -203,14 +203,14 @@ export class AgentModule implements AgentApi {
   async getById(
     input: GetAgentInput & { viewerUserId?: string | null } & AgentVersionSelector,
   ): Promise<AgentOverview> {
-    const { agent, version } = await this.#versions.resolve({
+    const { agent, pinned } = await this.#versions.resolve({
       projectId: input.projectId,
       address: input.id,
       label: input.label,
       version: input.version,
     });
     const [enriched] = await this.#enrich([agent], input);
-    return { ...enriched!, version };
+    return { ...enriched!, version: pinned ?? enriched!.version };
   }
 
   listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersions> {

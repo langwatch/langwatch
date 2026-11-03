@@ -22,6 +22,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
+import { agentVersionChanged } from "../../rules/agent-version-change.rules.ts";
 import { versionMayCopy } from "../../rules/agent-version-snapshot.rules.ts";
 import type {
   AgentPresenceInput,
@@ -375,7 +376,7 @@ export class MemoryAgentRepository implements AgentRepository {
     await this.backfillFirstVersion({ agent, createdById: agent.createdById ?? null });
   }
 
-  /** Appends the next version; a row holding a typed-in credential is never copied. */
+  /** Appends the next version when the row changed; a typed-in credential is never copied. */
   async #appendVersion(input: {
     agent: Agent;
     author: AgentWriteAuthor | undefined;
@@ -383,14 +384,15 @@ export class MemoryAgentRepository implements AgentRepository {
   }): Promise<void> {
     const { agent } = input;
     if (!(await versionMayCopy(agent))) return;
-    const latest = this.#versions
+    const [latest] = this.#versions
       .filter((row) => row.agentId === agent.id)
-      .reduce((max, row) => Math.max(max, row.version), 0);
+      .toSorted((left, right) => right.version - left.version);
+    if (!agentVersionChanged({ latest: latest ?? null, after: agent })) return;
     this.#versions.push({
       id: generate("agentversion").toString(),
       agentId: agent.id,
       projectId: agent.projectId,
-      version: latest + 1,
+      version: (latest?.version ?? 0) + 1,
       name: agent.name,
       type: agent.type,
       config: structuredClone({ ...agent.config }),

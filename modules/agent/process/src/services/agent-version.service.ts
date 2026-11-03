@@ -26,7 +26,8 @@ import type { AgentRepository, AgentVersionRecord } from "../repositories/agent.
 import { versionMayCopy } from "../rules/agent-version-snapshot.rules.ts";
 
 /** An agent as one of its versions holds it; `version` is null for a connected agent. */
-type ResolvedAgentVersion = { agent: Agent; version: number | null };
+/** `pinned` is the version a label or number selected; null when the head was read. */
+type ResolvedAgentVersion = { agent: Agent; pinned: number | null };
 
 const BACKFILL_PAGE = 200;
 
@@ -111,15 +112,9 @@ export class AgentVersionService {
       if (label !== void 0 || version !== void 0) {
         throw new AgentVersionUnsupportedError({ agentId: agent.id });
       }
-      return { agent, version: null };
+      return { agent, pinned: null };
     }
-    if (label === void 0 && version === void 0) {
-      const latest = await this.#repository.latestVersionNumbers({
-        projectId: input.projectId,
-        ids: [agent.id],
-      });
-      return { agent, version: latest.get(agent.id) ?? null };
-    }
+    if (label === void 0 && version === void 0) return { agent, pinned: null };
 
     const row = await this.#versionAt({ agent, label, version });
     return {
@@ -130,7 +125,7 @@ export class AgentVersionService {
         config: parseAgentConfig(row.type, row.config),
         workflowId: row.workflowId,
       }),
-      version: row.version,
+      pinned: row.version,
     };
   }
 

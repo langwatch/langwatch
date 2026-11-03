@@ -36,6 +36,13 @@ Feature: Agent versions and deploy labels
     Then the agent has versions 1, 2 and 3, each with the config written
     And a credential move against a row that changed since it read is refused
 
+  @integration @unit
+  Scenario: A write that changes nothing appends no version
+    Given an agent bound to a workflow at version 1
+    When a user saves the same name and config
+    And the workflow sync rewrites the same config
+    Then the agent still has only version 1
+
   @unit
   Scenario: An update by an API key records the key as the author kind
     Given an agent "Support bot" at version 1

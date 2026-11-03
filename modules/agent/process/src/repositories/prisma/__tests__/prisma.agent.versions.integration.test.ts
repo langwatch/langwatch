@@ -172,6 +172,40 @@ describe.skipIf(!databaseUrl)("Prisma agent versions", () => {
     ]);
   });
 
+  /** @scenario "A write that changes nothing appends no version" */
+  it("appends no version when a save or a workflow sync writes the same content", async () => {
+    const sameAgentId = `${namespace}-same`;
+    const workflowId = `${namespace}-same-workflow-id`;
+    await repository.create({
+      id: sameAgentId,
+      projectId,
+      name: "Steady bot",
+      type: "signature",
+      config: configAt("v1"),
+      workflowId,
+      author: userAuthor,
+    });
+    await repository.update({
+      id: sameAgentId,
+      projectId,
+      name: "Steady bot",
+      type: "signature",
+      config: configAt("v1"),
+      workflowId,
+      commitMessage: "Nothing new",
+      author: userAuthor,
+    });
+    await repository.updateWorkflowConfig({
+      id: sameAgentId,
+      projectId,
+      workflowId,
+      config: configAt("v1"),
+    });
+
+    const versions = await repository.findVersions({ projectId, agentId: sameAgentId });
+    expect(versions.map((row) => [row.version, row.commitMessage])).toEqual([[1, null]]);
+  });
+
   /** @scenario "Existing agents get version 1 from their current config" */
   it("backfills version 1 for an agent written before versions existed, once", async () => {
     const oldId = `${namespace}-old`;

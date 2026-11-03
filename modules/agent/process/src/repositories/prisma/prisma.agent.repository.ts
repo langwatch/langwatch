@@ -32,6 +32,7 @@ import type { Prisma } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
+import { agentVersionChanged } from "../../rules/agent-version-change.rules.ts";
 import { versionMayCopy } from "../../rules/agent-version-snapshot.rules.ts";
 import type {
   AgentRepository,
@@ -660,7 +661,7 @@ export class PrismaAgentRepository
     });
   }
 
-  /** Appends the next version; a row holding a typed-in credential is never copied. */
+  /** Appends the next version when the row changed; a typed-in credential is never copied. */
   async #appendVersion(input: {
     transaction: VersionTransaction;
     agent: {
@@ -679,8 +680,9 @@ export class PrismaAgentRepository
     const latest = await transaction.agentVersion.findFirst({
       where: { projectId: agent.projectId, agentId: agent.id },
       orderBy: { version: "desc" },
-      select: { version: true },
+      select: { version: true, name: true, type: true, config: true, workflowId: true },
     });
+    if (!agentVersionChanged({ latest, after: agent })) return;
     await transaction.agentVersion.create({
       data: {
         id: generate("agentversion").toString(),
