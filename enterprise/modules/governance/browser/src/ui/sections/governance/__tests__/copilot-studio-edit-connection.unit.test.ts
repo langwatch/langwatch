@@ -134,9 +134,29 @@ describe("given a Copilot Studio source opened for editing", () => {
     expect(toaster.toasts).toEqual([
       expect.objectContaining({
         type: "error",
-        description: expect.stringMatching(/all three/),
+        description: expect.stringMatching(/missing its tenant ID\..*all three/),
       }),
     ]);
+    // The address is filled in, so the refusal must not send the admin looking for it.
+    expect(toaster.toasts[0]?.description).not.toMatch(/environment URL/);
+  });
+
+  it("names every registration field still missing", () => {
+    const { toaster } = submit({
+      environmentUrl: ENVIRONMENT,
+      credentialsTenantId: "",
+      credentialsClientId: "new-client",
+      credentialsClientSecret: "",
+    });
+
+    expect(toaster.toasts[0]?.description).toMatch(/missing its tenant ID and client secret\./);
+  });
+
+  it("asks only for the environment URL when that is what is missing", () => {
+    const { submission, toaster } = submit({ environmentUrl: "" });
+
+    expect(submission).toBeNull();
+    expect(toaster.toasts[0]?.description).toBe("The environment URL is required.");
   });
 
   /** @scenario "A billing app registration typed without the main one is refused" */

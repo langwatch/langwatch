@@ -277,15 +277,27 @@ export function copilotStudioRefusalCopy(
     return "The environment URL is required, plus all three parts of the app registration: tenant ID, client ID and client secret.";
   }
   const p = c.parserConfig;
-  const registrationIsBlank = [
-    p.credentialsTenantId,
-    p.credentialsClientId,
-    p.credentialsClientSecret,
-  ].every((value) => (value ?? "").trim().length === 0);
-  if (registrationIsBlank && Object.keys(copilotAzureBillingFrom(p).credentials).length > 0) {
+  if (!normalizeEnvironmentUrl(p.environmentUrl ?? "")) return "The environment URL is required.";
+  const registration: readonly (readonly [string | undefined, string])[] = [
+    [p.credentialsTenantId, "tenant ID"],
+    [p.credentialsClientId, "client ID"],
+    [p.credentialsClientSecret, "client secret"],
+  ];
+  const missing = registration
+    .filter(([value]) => (value ?? "").trim().length === 0)
+    .map(([, label]) => label);
+  if (
+    missing.length === registration.length &&
+    Object.keys(copilotAzureBillingFrom(p).credentials).length > 0
+  ) {
     return "The billing app registration client ID and secret are stored together with the app registration, so enter them with the tenant ID, client ID and client secret, or clear both billing fields to keep the current credentials.";
   }
-  return "The environment URL is required. Leave the tenant ID, client ID and client secret all blank to keep the current app registration, or enter all three to replace it.";
+  return `The app registration is missing its ${joinFieldLabels(missing)}. Leave the tenant ID, client ID and client secret all blank to keep the current app registration, or enter all three to replace it.`;
+}
+
+function joinFieldLabels(labels: readonly string[]): string {
+  if (labels.length <= 1) return labels.join("");
+  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
 }
 
 function InventoryHeader() {
