@@ -669,6 +669,9 @@ export interface LwqlPrismaRows {
     readonly updatedAt: "DateTime";
     readonly autoPausedAt: "DateTime?";
     readonly autoPausedReason: "String?";
+    readonly evaluatorLabel: "String?";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
   };
   readonly Cost: {
     readonly id: "String";
@@ -1539,6 +1542,33 @@ export interface LwqlPrismaRows {
     readonly archivedAt: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
+  };
+  readonly AgentVersion: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly agentId: "String";
+    readonly version: "Int";
+    readonly name: "String";
+    readonly type: "String";
+    readonly config: "Json";
+    readonly workflowId: "String?";
+    readonly commitMessage: "String?";
+    readonly authorId: "String?";
+    readonly authorKind: "String?";
+    readonly createdAt: "DateTime";
+  };
+  readonly AgentVersionLabel: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly agentId: "String";
+    readonly label: "String";
+    readonly versionId: "String";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
   };
   readonly Evaluator: {
     readonly id: "String";
@@ -1550,6 +1580,33 @@ export interface LwqlPrismaRows {
     readonly workflowId: "String?";
     readonly copiedFromEvaluatorId: "String?";
     readonly archivedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
+  };
+  readonly EvaluatorVersion: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly evaluatorId: "String";
+    readonly version: "Int";
+    readonly name: "String";
+    readonly type: "String";
+    readonly config: "Json";
+    readonly workflowId: "String?";
+    readonly commitMessage: "String?";
+    readonly authorId: "String?";
+    readonly authorKind: "String?";
+    readonly createdAt: "DateTime";
+  };
+  readonly EvaluatorVersionLabel: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly evaluatorId: "String";
+    readonly label: "String";
+    readonly versionId: "String";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };

@@ -38,7 +38,7 @@ Feature: A connected agent is a column in the workbench
     Given the person adds "support-agent" as a target
     Then the column reads "input"
     And the column offers "model" and "plan" as optional inputs
-    And a parameter with no value keeps the agent's own default
+    And a parameter left unmapped keeps the agent's own default
 
   @unit
   Scenario: A parameter value reaches the agent as its declared type
@@ -46,6 +46,37 @@ Feature: A connected agent is a column in the workbench
     When the row runs
     Then the call carries the parameter "model" with the value "gpt-5"
     And a name the agent does not declare is not sent
+
+  # A dataset column can be left empty on purpose so CI fills it at run time.
+  # A column the dataset has is always sent, empty or not; only a column the
+  # dataset does not have counts as missing.
+  @unit
+  Scenario: A text parameter mapped to an empty column is sent as empty text
+    Given a dataset with the columns "input" and "environment"
+    And no row has a value in "environment"
+    And a connected agent column with "plan" mapped to "environment"
+    When the row runs
+    Then the call carries the parameter "plan" with an empty value
+
+  @unit
+  Scenario: A parameter mapped to a column the dataset does not have is left out
+    Given a connected agent column with "plan" mapped to the column "environment"
+    And the dataset has no "environment" column
+    When the row runs
+    Then the call does not carry "plan", so the agent's own default applies
+
+  @unit
+  Scenario: An empty cell for a number, a boolean or a fixed choice keeps the default
+    Given a connected agent column with "model", "max_tools" and "verbose" mapped to empty cells
+    When the row runs
+    Then the call carries none of them, because an empty cell is not a value of their type
+
+  @unit
+  Scenario: A run parameter fills a column left empty in every row
+    Given a dataset whose "environment" column is empty in every row
+    And a connected agent column with "plan" mapped to "environment"
+    When the run is started with the parameter "environment" set to "staging"
+    Then every row's call carries the parameter "plan" with the value "staging"
 
   @unit
   Scenario: The answer is text, whatever shape the function returned
