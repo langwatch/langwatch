@@ -143,23 +143,23 @@ function applySavedRead({
   });
   const sameRows = isDeepEqual(refreshed, dataset.savedRecords);
   if (sameRows && isDeepEqual(cut, dataset.savedRecordsCut)) return true;
+  // A refresh is no edit, so it takes no undo step, nor opens the window that folds the next edit.
+  untracked(() => setSavedDatasetRecords(dataset.id, refreshed, cut));
+  if (sameRows) carryCutThroughHistory({ tabId: dataset.id, cut });
+  // Undo must not step back onto rows the dataset no longer holds.
+  else useEvaluationsV3Store.temporal.getState().clear();
+  return true;
+}
+
+function untracked(write: () => void) {
   const temporal = useEvaluationsV3Store.temporal.getState();
-  if (!sameRows) {
-    setSavedDatasetRecords(dataset.id, refreshed, cut);
-    // Undo must not step back onto rows the dataset no longer holds.
-    temporal.clear();
-    return true;
-  }
-  // Only the row count changed: that is no edit, so it takes no undo step.
   const wasTracking = temporal.isTracking;
   if (wasTracking) temporal.pause();
   try {
-    setSavedDatasetRecords(dataset.id, refreshed, cut);
+    write();
   } finally {
     if (wasTracking) temporal.resume();
   }
-  carryCutThroughHistory({ tabId: dataset.id, cut });
-  return true;
 }
 
 /** Undo and Redo restore edits, never a row count the dataset has since moved past. */

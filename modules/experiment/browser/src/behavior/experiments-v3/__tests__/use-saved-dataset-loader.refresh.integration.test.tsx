@@ -111,6 +111,25 @@ describe("given a workbench showing a saved dataset", () => {
     });
   });
 
+  describe("when the read refetches with other rows and the user edits right after", () => {
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("can undo that edit", async () => {
+      const { hint } = openWorkbench();
+      await waitFor(() => expect(shown()).toHaveLength(2));
+      // Past the store's 100 ms window that folds rapid changes into one undo step.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      server.rows = [{ id: "r1", entry: { question: "a-EDITED" } }];
+      await hint();
+      await waitFor(() => expect(shown()).toHaveLength(1));
+      const before = useEvaluationsV3Store.getState().name;
+      act(() => useEvaluationsV3Store.getState().setName("renamed"));
+      act(() => performUndo());
+
+      expect(useEvaluationsV3Store.getState().name).toBe(before);
+    });
+  });
+
   describe("when the dataset grows past the loaded page and the loaded rows stay the same", () => {
     let hint: () => Promise<void>;
     const cutTotal = () => useEvaluationsV3Store.getState().datasets[0]?.savedRecordsCut?.totalRows;
