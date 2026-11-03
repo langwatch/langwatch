@@ -1,13 +1,14 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 /**
  * @see specs/studio/nlp-lambda-cleanup.feature
  * The sweep of the studio's quiet per-project NLP engines, run through the
  * module's own scheduled process manager over the AWS account its fleet secret names.
  */
 // @vitest-environment node
-import type { AgentApi } from "@langwatch/agent-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -93,7 +94,11 @@ async function appWith(fleetSecret?: string): Promise<WorkflowModule> {
     config,
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets,
-    channels: await HttpWorkflowChannels.create({ config, secrets }),
+    channels: await HttpWorkflowChannels.create({
+      config,
+      secrets,
+      bound: { spend: createApiFixture<GatewayApi>() },
+    }),
     repositories: MemoryWorkflowRepositories.create(),
   });
 }

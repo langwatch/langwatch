@@ -109,7 +109,7 @@ export class LangevalsClusteringService {
         usage: raw.usage,
         projectId: input.projectId,
         requestType: "topic_clustering",
-        requestKey: generate("topicclustering").toString(),
+        requestKey: input.requestKey ?? generate("topicclustering").toString(),
         durationMs: performance.now() - startedAt,
       });
     }

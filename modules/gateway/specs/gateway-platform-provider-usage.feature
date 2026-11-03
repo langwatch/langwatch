@@ -42,21 +42,51 @@ Feature: Platform calls on stored provider credentials land on the spend ledger
     And the platform writes it to the ledger as topic_clustering spend
 
   @unit
+  Scenario: A retried topic clustering page reports its provider usage under the same request id
+    Given a clustering page of an outbox run that langevals answered
+    When the page is retried and langevals answers again
+    Then both reports carry the request id of that run and page
+    And the ledger keeps one row for it
+
+  @unit
   Scenario: A ledger that cannot take the usage never fails the evaluation
     Given the spend pipeline refuses the usage
     When an evaluation answers with a verdict
     Then the verdict is returned unchanged
     And the refusal is logged with every figure it carried
 
-  @unimplemented
-  Scenario: A workflow or playground call through the in-process gateway lands on the ledger
-    Given a studio workflow node or playground prompt running on stored credentials in nlpgo
-    When the provider answers
+  @unit
+  Scenario: A platform feature or playground call through the execution proxy lands on the ledger
+    Given a LangWatch feature or the prompt playground calling a model on stored credentials through nlpgo
+    When the provider answers, generated or streamed
     Then its usage lands on the ledger under the project and provider row
+    And the provider's response id keys the row
 
-  @unimplemented
+  @unit
+  Scenario: A studio workflow's LLM nodes on stored credentials land on the ledger
+    Given a studio workflow whose LLM node runs on the project's stored provider credentials
+    When the engine reports the node's token usage on a streamed run, an evaluated row or a synchronous answer
+    Then that usage lands on the ledger as workflow spend under the project and the node's model
+    And its request id names the trace, workflow, node and model, so a repeat is one row
+    And cached prompt tokens are counted apart from the fresh input tokens
+
+  @unit
+  Scenario: An evaluated studio row reports its LLM usage on its own progress event
+    Given a studio evaluation over a dataset whose rows run an LLM node
+    When each row finishes
+    Then that row's progress event carries the node's token usage under the row's own trace id
+
+  @unit
+  Scenario: A ledger refusal never fails the workflow
+    Given the spend pipeline refuses or fails on a workflow node's usage
+    When the workflow run answers
+    Then the run's events and answer reach the caller unchanged
+    And the refusal is logged with every figure it carried
+
+  @unit
   Scenario: An own Instant Evals decision model records the provider tokens it used
     Given an organization judging with its own decision model
     When a classification answers
-    Then the provider tokens land on the ledger as decision model spend
-    And the Instant Evals customer price stays unchanged
+    Then the provider tokens land on the ledger as instant_eval_decision_model spend
+    And the Instant Evals customer price stays zero
+    And a ledger refusal is logged and keeps the verdict

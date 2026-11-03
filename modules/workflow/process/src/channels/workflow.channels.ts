@@ -1,3 +1,4 @@
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { Secret } from "@langwatch/secrets";
 
 import type { WorkflowNlpRuntime } from "../app/workflow.app.ts";
@@ -43,7 +44,11 @@ type WorkflowLambdaEngine = Readonly<{
   close(): void;
 }>;
 
+/** Where an engine run's provider usage is written: the gateway's spend ledger (ADR-193). */
+export type WorkflowProviderSpend = Pick<GatewayApi, "recordProviderUsage">;
+
 /** Every channel workflow holds, as the container hands them to the module class. */
 export interface WorkflowChannels {
   readonly engine: WorkflowSingleEngine | WorkflowLambdaEngine;
+  readonly spend: WorkflowProviderSpend;
 }

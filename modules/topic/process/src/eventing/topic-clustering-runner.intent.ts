@@ -366,22 +366,27 @@ const batchClusterTraces = async ({
     return { kind: "not_configured" };
   }
   const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
-  const fetched = await fetchTopicsBatchClustering(deps, projectId, {
-    project_id: projectId,
-    litellm_params: await deps.models.prepareLitellmParams({
-      model: topicModel.model,
-      modelProvider: topicModel.modelProvider,
-      projectId,
-    }),
-    embeddings_litellm_params: {
-      ...(await deps.models.prepareLitellmParams({
-        model: embeddingsModel.model,
-        modelProvider: embeddingsModel.modelProvider,
+  const fetched = await requestClustering(deps, {
+    projectId,
+    mode: "batch",
+    ...requestKeyOf(runContext),
+    params: {
+      project_id: projectId,
+      litellm_params: await deps.models.prepareLitellmParams({
+        model: topicModel.model,
+        modelProvider: topicModel.modelProvider,
         projectId,
-      })),
-      dimensions: OPENAI_EMBEDDING_DIMENSION,
+      }),
+      embeddings_litellm_params: {
+        ...(await deps.models.prepareLitellmParams({
+          model: embeddingsModel.model,
+          modelProvider: embeddingsModel.modelProvider,
+          projectId,
+        })),
+        dimensions: OPENAI_EMBEDDING_DIMENSION,
+      },
+      traces,
     },
-    traces,
   });
 
   if (fetched.kind === "not_configured") {
@@ -440,24 +445,29 @@ const incrementalClustering = async ({
     return { kind: "not_configured" };
   }
   const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
-  const fetched = await fetchTopicsIncrementalClustering(deps, projectId, {
-    project_id: projectId,
-    litellm_params: await deps.models.prepareLitellmParams({
-      model: topicModel.model,
-      modelProvider: topicModel.modelProvider,
-      projectId,
-    }),
-    embeddings_litellm_params: {
-      ...(await deps.models.prepareLitellmParams({
-        model: embeddingsModel.model,
-        modelProvider: embeddingsModel.modelProvider,
+  const fetched = await requestClustering(deps, {
+    projectId,
+    mode: "incremental",
+    ...requestKeyOf(runContext),
+    params: {
+      project_id: projectId,
+      litellm_params: await deps.models.prepareLitellmParams({
+        model: topicModel.model,
+        modelProvider: topicModel.modelProvider,
         projectId,
-      })),
-      dimensions: OPENAI_EMBEDDING_DIMENSION,
+      }),
+      embeddings_litellm_params: {
+        ...(await deps.models.prepareLitellmParams({
+          model: embeddingsModel.model,
+          modelProvider: embeddingsModel.modelProvider,
+          projectId,
+        })),
+        dimensions: OPENAI_EMBEDDING_DIMENSION,
+      },
+      traces,
+      topics,
+      subtopics,
     },
-    traces,
-    topics,
-    subtopics,
   });
 
   if (fetched.kind === "not_configured") {
@@ -635,6 +645,10 @@ function assignmentOccurredAt(traceOccurredAtMs: number | undefined): number {
     ? traceOccurredAtMs
     : nowInstant().epochMilliseconds;
 }
+
+/** The outbox page a clustering call serves, so a retried page reports its spend once. */
+const requestKeyOf = (runContext: ClusteringRunContext | undefined): { requestKey?: string } =>
+  runContext ? { requestKey: `run:${runContext.runId}:page-${runContext.page}` } : {};
 
 export const fetchTopicsBatchClustering = (
   deps: TopicClusteringRunnerDeps,

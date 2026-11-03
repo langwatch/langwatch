@@ -128,6 +128,7 @@ import { WorkflowLinkedRowsService } from "../services/workflow-linked-rows.serv
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
 import { WorkflowPermissionService } from "../services/workflow-permission.service.ts";
 import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
+import { WorkflowProviderSpendService } from "../services/workflow-provider-spend.service.ts";
 import { WorkflowPublicationService } from "../services/workflow-publication.service.ts";
 import { WorkflowSignalsService } from "../services/workflow-signals.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
@@ -523,7 +524,8 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       dispatchKeyFloorMs: dispatchKeyFloorMs({ onLambda: engine.fleet !== undefined }),
     });
     const attachmentLimits = WorkflowEngineAttachmentLimitService.create({ datasets });
-    const nlpRuntime = attachmentLimits.limitedRuntime(engine.runtime);
+    const spend = WorkflowProviderSpendService.create({ spend: setup.channels.spend });
+    const nlpRuntime = spend.meteredRuntime(attachmentLimits.limitedRuntime(engine.runtime));
     const ids = KsuidWorkflowId.create();
     const workflows = WorkflowService.create({
       repository: setup.repositories.workflows,
@@ -543,6 +545,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     const studioDispatch = WorkflowStudioDispatchService.create({
       stream: attachmentLimits.limitedStream(engine.stream),
       modelProviders,
+      spend,
     });
 
     return new WorkflowModule({

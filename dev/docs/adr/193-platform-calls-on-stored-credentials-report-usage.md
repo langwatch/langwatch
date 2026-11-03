@@ -50,14 +50,21 @@ for the hosted cloud.
 ## Consequences
 
 - Evaluators, guardrails, batch evaluations and topic clustering land on the ledger under
-  `request_type` `evaluation` and `topic_clustering`.
-- A ledger failure is logged with every figure and never fails the evaluation.
-- Not yet covered: nlpgo calls (workflow nodes, playground, scenario judge, platform features through
-  `/go/proxy/v1`) and an organization's own Instant Evals decision model. Both are `@unimplemented`
-  in `modules/gateway/specs/gateway-platform-provider-usage.feature`. The nlpgo path follows the same
-  shape: the dispatcher records usage per request and the TypeScript caller writes it.
-- Entries abandoned at the langevals batch deadline, and clustering requests that fail after
-  embedding, return no usage.
+  `request_type` `evaluation` and `topic_clustering`. A topic clustering page keys its usage on
+  its outbox run and page, so a retried page is one row.
+- LangWatch features and the prompt playground that call through the execution proxy
+  (`/go/proxy/v1`) are metered by a middleware on the model handle model-provider builds, under
+  `platform`, keyed by the provider's response id.
+- Studio workflow LLM nodes land under `workflow`: the stream's finished node states and the
+  synchronous answer carry each node's tokens, and a dataset evaluation's progress event carries
+  each row's. The key is trace, workflow, node and model.
+- An organization's own Instant Evals decision model records the provider's tokens under
+  `instant_eval_decision_model`, so they never count against the Instant Evals free budget.
+- A ledger failure is logged with every figure and never fails the call.
+- Not covered: scenario agents that the scenario child sends straight to nlpgo on deployments
+  without per-project engines, and the Test Connection ping. Entries abandoned at the langevals
+  batch deadline, clustering requests that fail after embedding and cancelled workflow rows return
+  no usage.
 
 ## References
 

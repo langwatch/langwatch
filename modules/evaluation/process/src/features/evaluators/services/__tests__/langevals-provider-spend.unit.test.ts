@@ -71,6 +71,44 @@ describe("LangevalsClusteringService provider usage", () => {
       }),
     ]);
   });
+
+  /** @scenario A retried topic clustering page reports its provider usage under the same request id */
+  it("keys the usage on the page it serves, so a retry repeats the same request id", async () => {
+    const ledger = MemoryProviderSpendChannel.create();
+    const service = LangevalsClusteringService.create({
+      endpoint: "https://langevals.example",
+      langevals: answering({
+        topics: [],
+        subtopics: [],
+        traces: [],
+        cost: { amount: 0, currency: "USD" },
+        usage: [EMBEDDINGS_USAGE],
+      }),
+      staging: noStaging,
+      spend: LangevalsProviderSpendService.create({ spend: ledger }),
+    });
+    const attempt = () =>
+      service.request({
+        projectId: "project-1",
+        signal: new AbortController().signal,
+        requestKey: "run:run-7:page-2",
+        mode: "batch",
+        params: {
+          project_id: "project-1",
+          litellm_params: { model: "openai/gpt-5-mini" },
+          embeddings_litellm_params: { model: "openai/text-embedding-3-large" },
+          traces: [],
+        },
+      });
+
+    await attempt();
+    await attempt();
+
+    expect(ledger.recorded.map((entry) => entry.requestId)).toEqual([
+      "topic_clustering:run:run-7:page-2:openai/text-embedding-3-large",
+      "topic_clustering:run:run-7:page-2:openai/text-embedding-3-large",
+    ]);
+  });
 });
 
 describe("LangevalsEvaluatorService provider usage", () => {

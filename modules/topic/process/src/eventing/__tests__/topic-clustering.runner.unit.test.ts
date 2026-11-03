@@ -61,6 +61,20 @@ describe("clusterTopicsForProject", () => {
       expect(body?.traces[0]?.input).toBe("User message 0");
     });
 
+    /** @scenario A retried topic clustering page reports its provider usage under the same request id */
+    it("names the outbox run and page it serves, so a retry reports its usage once", async () => {
+      const deps = depsReading({ page: tracePage(12) });
+      const page = { projectId: "proj-1", runContext: { runId: "run-7", page: 2 } };
+
+      await clusterTopicsForProject(deps, page);
+      await clusterTopicsForProject(deps, page);
+
+      const keys = deps.evaluations.requestTopicClustering.mock.calls.map(
+        ([request]) => request.requestKey,
+      );
+      expect(keys).toEqual(["run:run-7:page-2", "run:run-7:page-2"]);
+    });
+
     it("passes the cursor through to trace", async () => {
       const deps = depsReading({ page: tracePage(0) });
       const searchAfter: [number, string] = [1_700_000_000_000, "trace-xyz"];

@@ -30,7 +30,11 @@ import type {
   InstantEvalClassifierChannel,
   InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
-import type { InstantEvalDecisionModelChannel } from "../channels/instant-eval-decision-model.channel.ts";
+import type {
+  InstantEvalDecisionModelAnswer,
+  InstantEvalDecisionModelChannel,
+} from "../channels/instant-eval-decision-model.channel.ts";
+import type { InstantEvalProviderSpend } from "../channels/instant-eval-judge.channels.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
 import { instantEvalJudgeBudgetOf } from "../rules/instant-eval-judge-budget.rules.ts";
 import {
@@ -44,6 +48,9 @@ const defaultLogger: Logger = createLogger("langwatch:instant-eval-judge:judge")
 /** The two levels the judge call logs at, injected so a test can read them. */
 type InstantEvalJudgeLogger = Pick<Logger, "warn" | "error">;
 
+/** Its own request type, so the tokens never count against the Instant Evals free budget. */
+const OWN_DECISION_MODEL_REQUEST_TYPE = "instant_eval_decision_model";
+
 const PROJECT_UNKNOWN_MESSAGE =
   "Instant Evals has not learned this project yet, so it judged nothing.";
 const NOT_CONFIGURED_MESSAGE =
@@ -55,6 +62,8 @@ type InstantEvalJudgeServiceDeps = Readonly<{
   classifier: InstantEvalClassifierChannel | undefined;
   /** An organization's own decision model, unmetered and uncapped (ADR-182 decision 7). */
   decisionModels: InstantEvalDecisionModelChannel;
+  /** Where an own model's provider tokens are written; absent writes nothing (ADR-193). */
+  spend?: InstantEvalProviderSpend;
   /** Paces every classify send over the module's own rate buckets. */
   limiter: InstantEvalRateLimiter;
   /** Answers a call that carries a route. */
@@ -97,7 +106,18 @@ export class InstantEvalJudgeService {
   }: InstantEvalClassification): Promise<InstantEvalJudgement> {
     const signalArgs = signal ? [signal] : [];
     if (decisionModel) {
-      return this.deps.decisionModels.classify({ text, questions, decisionModel }, ...signalArgs);
+      const startedAt = this.deps.now().epochMilliseconds;
+      const { providerUsage, ...judgement } = await this.deps.decisionModels.classify(
+        { text, questions, decisionModel },
+        ...signalArgs,
+      );
+      await this.recordOwnModelUsage({
+        projectId,
+        model: decisionModel.model,
+        providerUsage,
+        startedAt,
+      });
+      return judgement;
     }
     const { classifier, limiter, router } = this.deps;
     // The router skips a missing classifier itself, and its table may never reach it.
@@ -106,6 +126,42 @@ export class InstantEvalJudgeService {
     }
     if (!classifier) return instantEvalSkipped("classifier_not_configured");
     return classifier.classify({ projectId, text, questions, limiter }, ...signalArgs);
+  }
+
+  /** Best effort: the provider already billed the call, so a ledger failure is only logged. */
+  private async recordOwnModelUsage({
+    projectId,
+    model,
+    providerUsage,
+    startedAt,
+  }: {
+    projectId: string;
+    model: string;
+    providerUsage: InstantEvalDecisionModelAnswer["providerUsage"];
+    startedAt: number;
+  }): Promise<void> {
+    if (!providerUsage || !this.deps.spend) return;
+    const occurredAt = this.deps.now().epochMilliseconds;
+    const entry = {
+      requestId: `${OWN_DECISION_MODEL_REQUEST_TYPE}:${this.deps.mintRequestId()}:${model}`,
+      projectId,
+      model,
+      requestType: OWN_DECISION_MODEL_REQUEST_TYPE,
+      usage: { input_tokens: providerUsage.inputTokens, output_tokens: providerUsage.outputTokens },
+      durationMs: occurredAt - startedAt,
+      occurredAt,
+    };
+    try {
+      const { status } = await this.deps.spend.recordProviderUsage(entry);
+      if (status !== "recorded") {
+        this.logger.error(
+          { ...entry, status },
+          "own decision model usage not written to the ledger",
+        );
+      }
+    } catch (error) {
+      this.logger.error({ ...entry, error }, "own decision model usage not written to the ledger");
+    }
   }
 
   async judge({ requestKey, ...call }: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
