@@ -1,3 +1,4 @@
+import { StaffAccessAuditUnavailableError } from "@langwatch/api";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type {
@@ -21,8 +22,6 @@ import {
   StaffAccessOrganizationNameMismatchError,
   StaffAccessNotConfiguredError,
   StaffAccessRateLimitedError,
-  StaffAccessRequestExpiredError,
-  StaffAccessRequestNotApprovedError,
   StaffAccessRequestNotPendingError,
   type StaffAccessApprovalView,
   type StaffAccessRedeemed,
@@ -40,7 +39,8 @@ import type {
 } from "../repositories/staff-access.repository.ts";
 import {
   approvalChallengeOf,
-  hasPassed,
+  assertPending,
+  assertRedeemable,
   isoText,
   later,
   mintToken,
@@ -234,21 +234,28 @@ export class StaffAccessRequestService {
 
     const approver = await this.deps.users.findById({ id: userId });
     if (row.organizationId) {
-      await this.deps.auditLog.record({
-        organizationId: row.organizationId,
-        userId,
-        actorUserId: userId,
-        action: "staffAccess.approved",
-        targetKind: "staffAccess",
-        targetId: row.id,
-        ...(row.requestIp ? { ipAddress: row.requestIp } : {}),
-        metadata: {
-          principal: STAFF_ACCESS_PRINCIPAL,
-          approvedBy: { id: userId, name: approver?.name ?? null, email: approver?.email ?? null },
-          reason: row.reason,
-          scopes: row.scopes,
-          spendApproved,
-          machine: row.machine,
+      await this.recordApproval({
+        id: row.id,
+        entry: {
+          organizationId: row.organizationId,
+          userId,
+          actorUserId: userId,
+          action: "staffAccess.approved",
+          targetKind: "staffAccess",
+          targetId: row.id,
+          ...(row.requestIp ? { ipAddress: row.requestIp } : {}),
+          metadata: {
+            principal: STAFF_ACCESS_PRINCIPAL,
+            approvedBy: {
+              id: userId,
+              name: approver?.name ?? null,
+              email: approver?.email ?? null,
+            },
+            reason: row.reason,
+            scopes: row.scopes,
+            spendApproved,
+            machine: row.machine,
+          },
         },
       });
     }
@@ -265,6 +272,31 @@ export class StaffAccessRequestService {
       idempotencyKey: `staff-access-approved:${row.id}`,
     });
     return this.approvalViewOf(await this.rowOf({ id: row.id }));
+  }
+
+  /**
+   * An approval the customer's audit log did not take must not stand: the request is ended
+   * without a customer row and the operator is refused.
+   * @throws {StaffAccessAuditUnavailableError} when the audit write fails
+   */
+  private async recordApproval({
+    id,
+    entry,
+  }: {
+    id: string;
+    entry: Parameters<AuditLogApi["record"]>[0];
+  }): Promise<void> {
+    try {
+      await this.deps.auditLog.record(entry);
+    } catch {
+      await this.deps.requests.revoke({
+        id,
+        at: this.deps.now(),
+        byUserId: entry.actorUserId ?? null,
+        cause: "approval_audit_failed",
+      });
+      throw new StaffAccessAuditUnavailableError();
+    }
   }
 
   async deny({
@@ -463,21 +495,4 @@ export class StaffAccessRequestService {
       spendOffered: scopes.includes("org:support"),
     };
   }
-}
-
-/** @throws when the request is no longer pending or its ten minutes passed */
-function assertPending({ row, at }: { row: StaffAccessRequestRow; at: Instant }): void {
-  if (row.status !== "pending") throw new StaffAccessRequestNotPendingError();
-  if (hasPassed({ moment: row.expiresAt, at })) throw new StaffAccessRequestExpiredError();
-}
-
-/** @throws when the request was redeemed, lapsed or is not approved */
-function assertRedeemable({ row, at }: { row: StaffAccessRequestRow; at: Instant }): void {
-  if (row.redeemedAt !== null || row.status === "redeemed") {
-    throw new StaffAccessAlreadyRedeemedError();
-  }
-  const undecidedOrApproved = row.status === "pending" || row.status === "approved";
-  if (undecidedOrApproved && hasPassed({ moment: row.expiresAt, at }))
-    throw new StaffAccessRequestExpiredError();
-  if (row.status !== "approved") throw new StaffAccessRequestNotApprovedError();
 }

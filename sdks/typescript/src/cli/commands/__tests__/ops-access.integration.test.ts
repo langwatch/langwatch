@@ -147,8 +147,9 @@ const route = ({ req, body }: { req: http.IncomingMessage; body: string }): Repl
     searchAuth = auth;
     return { status: 200, payload: { traces: [], pagination: { totalHits: 0 } } };
   }
-  const handler = staffRoutes[`${req.method} ${url}`];
-  if (!handler) return { status: 404, payload: { error: "not_found" } };
+  const key = `${req.method} ${url}`;
+  const handler = Object.hasOwn(staffRoutes, key) ? staffRoutes[key] : undefined;
+  if (typeof handler !== "function") return { status: 404, payload: { error: "not_found" } };
   if (auth !== `Bearer ${REQUESTER_KEY}`)
     return { status: 401, payload: { error: "unauthorized" } };
   return handler(body);

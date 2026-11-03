@@ -138,7 +138,10 @@ export interface StaffAccessRequestRepository {
     hashedOpsToken: string | null;
     opsTokenLookupId: string | null;
   }): Promise<void>;
-  /** pending, approved or redeemed -> revoked, once; the revoke is its own end-of-session audit. */
+  /**
+   * pending, approved or redeemed -> revoked, once; the revoke is its own end-of-session audit.
+   * False once the hour ran out or the end was audited: the sweep records a natural end.
+   */
   revoke(input: {
     id: string;
     at: Instant;

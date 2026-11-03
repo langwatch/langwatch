@@ -70,6 +70,5 @@ door accepts.
 
 ## References
 
-- `.claude/tmp/ops-agent-access-threat-model.md` (working threat model)
 - Specs: `modules/staff-access/specs/`
 - ADR-161 (impersonation scope), ADR-185 (docs session keys)

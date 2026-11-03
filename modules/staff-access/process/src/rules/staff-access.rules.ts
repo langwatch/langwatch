@@ -5,7 +5,13 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import type { StaffAccessScope } from "@langwatch/authz-contract";
-import type { StaffAccessRequestStatus } from "@langwatch/staff-access-contract";
+import {
+  StaffAccessAlreadyRedeemedError,
+  StaffAccessRequestExpiredError,
+  StaffAccessRequestNotApprovedError,
+  StaffAccessRequestNotPendingError,
+  type StaffAccessRequestStatus,
+} from "@langwatch/staff-access-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 
 export const STAFF_ACCESS_REQUEST_TTL_MS = 10 * 60 * 1000;
@@ -178,4 +184,28 @@ export function hasPassed({ moment, at }: { moment: Instant; at: Instant }): boo
 /** `at` moved forward by `ms` milliseconds. */
 export function later({ at, ms }: { at: Instant; ms: number }): Instant {
   return at.add({ milliseconds: ms });
+}
+
+/** The request fields the pending and redeemable checks read. */
+type DecisionRow = Readonly<{
+  status: string;
+  expiresAt: Instant;
+  redeemedAt: Instant | null;
+}>;
+
+/** @throws when the request is no longer pending or its ten minutes passed */
+export function assertPending({ row, at }: { row: DecisionRow; at: Instant }): void {
+  if (row.status !== "pending") throw new StaffAccessRequestNotPendingError();
+  if (hasPassed({ moment: row.expiresAt, at })) throw new StaffAccessRequestExpiredError();
+}
+
+/** @throws when the request was redeemed, lapsed or is not approved */
+export function assertRedeemable({ row, at }: { row: DecisionRow; at: Instant }): void {
+  if (row.redeemedAt !== null || row.status === "redeemed") {
+    throw new StaffAccessAlreadyRedeemedError();
+  }
+  const undecidedOrApproved = row.status === "pending" || row.status === "approved";
+  if (undecidedOrApproved && hasPassed({ moment: row.expiresAt, at }))
+    throw new StaffAccessRequestExpiredError();
+  if (row.status !== "approved") throw new StaffAccessRequestNotApprovedError();
 }

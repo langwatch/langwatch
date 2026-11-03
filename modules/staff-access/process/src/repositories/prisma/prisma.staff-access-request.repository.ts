@@ -193,7 +193,9 @@ export class PrismaStaffAccessRequestRepository
       UPDATE "StaffAccessRequest"
       SET "status" = 'revoked', "revokedAt" = ${toDate(at)}, "revokedByUserId" = ${byUserId},
           "revokeCause" = ${cause}, "endAuditedAt" = ${toDate(at)}
-      WHERE "id" = ${id} AND "status" IN ('pending', 'approved', 'redeemed') AND "revokedAt" IS NULL`;
+      WHERE "id" = ${id} AND "status" IN ('pending', 'approved', 'redeemed') AND "revokedAt" IS NULL
+        AND "endAuditedAt" IS NULL
+        AND ("accessExpiresAt" IS NULL OR "accessExpiresAt" > ${toDate(at)})`;
     return changed === 1;
   }
 

@@ -102,6 +102,15 @@ Feature: Ops agent access approval
     And every other platform operator is emailed
 
   @integration
+  Scenario: An approval the customer audit log did not take is ended
+    Given a pending request for "org:content" on "ACME"
+    And ACME's audit log refuses writes
+    When Olivia approves it with her passkey
+    Then it is refused with "staff_access_audit_unavailable"
+    And a redeem is refused with "request_not_approved"
+    And no key is minted
+
+  @integration
   Scenario: An expired request cannot be approved or redeemed
     Given a request created eleven minutes ago
     When Olivia approves it

@@ -83,6 +83,7 @@ export function staffAccessWorld({
     operators: [OLIVIA, PEDRO],
     passkeys: new Set([OLIVIA]),
     audit: [] as RecordAuditLogCommand[],
+    auditRefused: false,
     mail: [] as SendEmailCommand[],
     minted: [] as { apiKeyId: string; organizationId: string; kind: string; expiresAt: Date }[],
     revokedKeys: [] as string[],
@@ -194,6 +195,7 @@ export function staffAccessWorld({
 
   const auditLog = createApiFixture<AuditLogApi>({
     record: async (command) => {
+      if (state.auditRefused) throw new Error("audit log unavailable");
       state.audit.push(command);
       return { id: `audit_${state.audit.length}`, occurredAt: 0 };
     },

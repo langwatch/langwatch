@@ -580,6 +580,26 @@ function scenarios(backend: Backend): void {
         ).resolves.toBe("staff_access_already_ended");
       });
 
+      /** @scenario "Revoking a session whose hour ran out is refused" */
+      it("refuses to revoke an expired session, before and after the sweep audits it", async () => {
+        const w = world();
+        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        w.advance({ minutes: 61 });
+
+        await expect(
+          codeOf(w.app.revokeSession({ ...w.operator(PEDRO), requestId })),
+        ).resolves.toBe("staff_access_already_ended");
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        await expect(
+          codeOf(w.app.revokeSession({ ...w.operator(PEDRO), requestId })),
+        ).resolves.toBe("staff_access_already_ended");
+
+        const ends = w.state.audit.filter(
+          (row) => row.targetId === requestId && row.action !== "staffAccess.approved",
+        );
+        expect(ends.map((row) => row.action)).toEqual(["staffAccess.expired"]);
+      });
+
       /** @scenario "The kill switch also ends undecided requests" */
       it("ends pending requests too", async () => {
         const w = world();
@@ -772,6 +792,30 @@ describe("given a trail store that refuses writes", () => {
       .admit(gateRequest({ apiKeyId: w.state.minted[0]?.apiKeyId ?? "" }))
       .catch((error: { code: string; httpStatus: number }) => error);
     expect(refused).toMatchObject({ code: "staff_access_audit_unavailable", httpStatus: 503 });
+  });
+});
+
+describe("given a customer audit log that refuses the approval row", () => {
+  /** @scenario "An approval the customer audit log did not take is ended" */
+  it("refuses the approval with 503 and the agent can never redeem it", async () => {
+    const w = staffAccessWorld({ repositories: MemoryStaffAccessRepositories.create() });
+    const agent = await w.enrol();
+    const { requestId } = await w.app.createRequest({
+      session: agent.session,
+      body: requestBody({ scopes: ["org:content"] }),
+    });
+    w.state.auditRefused = true;
+
+    const refused = await codeOf(
+      w.approve({ choice: { requestId, spendApproved: false, typedOrganizationName: ACME.name } }),
+    );
+    const redeem = await codeOf(
+      w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER }),
+    );
+
+    expect(refused).toBe("staff_access_audit_unavailable");
+    expect(redeem).toBe("request_not_approved");
+    expect(w.state.minted).toEqual([]);
   });
 });
 

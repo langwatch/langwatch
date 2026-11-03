@@ -89,6 +89,13 @@ Feature: Using ops agent access
     Then he is refused with "staff_access_already_ended"
 
   @integration
+  Scenario: Revoking a session whose hour ran out is refused
+    Given a session whose hour ran out, before or after the sweep audited its end
+    When Pedro revokes it
+    Then he is refused with "staff_access_already_ended"
+    And the customer's audit log holds only its "staffAccess.expired" end
+
+  @integration
   Scenario: The kill switch also ends undecided requests
     Given a pending request from Olivia's agent on ACME
     When an operator revokes all agent access

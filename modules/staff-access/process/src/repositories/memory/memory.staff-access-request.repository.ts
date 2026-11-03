@@ -163,13 +163,9 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
     cause: string;
   }): Promise<boolean> {
     const row = this.#rows.get(id);
-    if (
-      !row ||
-      !["pending", "approved", "redeemed"].includes(row.status) ||
-      row.revokedAt !== null
-    ) {
-      return false;
-    }
+    if (!row || !["pending", "approved", "redeemed"].includes(row.status)) return false;
+    if (row.revokedAt !== null || row.endAuditedAt !== null) return false;
+    if (row.accessExpiresAt !== null && !isAfter(row.accessExpiresAt, at)) return false;
     this.#rows.set(id, {
       ...row,
       status: "revoked",
