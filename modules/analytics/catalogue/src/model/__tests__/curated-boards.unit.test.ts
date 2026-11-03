@@ -15,7 +15,7 @@ import {
 } from "../curated-boards.ts";
 
 describe("CURATED_BOARD_DEFINITIONS", () => {
-  /** @scenario "AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order" */
+  /** @scenario "AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order" */
   it("is Release check, Can I trust my numbers? and Where my agent breaks, in that order", () => {
     expect(CURATED_BOARD_DEFINITIONS.map(({ name }) => name)).toEqual([
       "Release check",
