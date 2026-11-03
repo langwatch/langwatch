@@ -423,6 +423,7 @@ describe("convergeLwqlAccessModel", () => {
   describe("when engine tables are to be rebuilt on the app's collection values", () => {
     const engineTables = selfProvisioning.engineTablesIn({ only: undefined });
     const [stale = "", absent = ""] = engineTables;
+    if (!stale || !absent) throw new Error("the catalog maps too few PostgreSQL datasets");
     const fingerprint = selfProvisioning.credentialFingerprint({
       names: NAMES,
       postgres: {
@@ -443,7 +444,7 @@ describe("convergeLwqlAccessModel", () => {
 
     /** @scenario "The collection probe reads the approved view in the app's PostgreSQL schema" */
     it("binds the app's PostgreSQL schema into both probe reads", async () => {
-      const clickHouse = clickHouseThat({ present: [stale ?? ""], schema: "langwatch_db" });
+      const clickHouse = clickHouseThat({ present: [stale], schema: "langwatch_db" });
 
       await check(clickHouse);
 
@@ -454,11 +455,13 @@ describe("convergeLwqlAccessModel", () => {
       expect(
         clickHouse.probed.every((probe) => String(probe.sql).includes("{schema:String}")),
       ).toBe(true);
+      expect(rebuilt(clickHouse, stale)).toEqual([
+        expect.stringContaining("schema='langwatch_db'"),
+      ]);
     });
 
     /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
     it("reads through the collection and with the app's own values, then rebuilds each stamped", async () => {
-      if (!stale || !absent) throw new Error("the catalog maps too few PostgreSQL datasets");
       const clickHouse = clickHouseThat({ present: [stale] });
 
       await check(clickHouse);
@@ -480,7 +483,6 @@ describe("convergeLwqlAccessModel", () => {
     it.each(["collection", "appCredentials"] as const)(
       "leaves a present engine table in place when the %s read fails, and still creates an absent one unstamped",
       async (failingProbe) => {
-        if (!stale || !absent) throw new Error("the catalog maps too few PostgreSQL datasets");
         const clickHouse = clickHouseThat({ present: [stale], failingProbe });
 
         await expect(check(clickHouse)).rejects.toMatchObject({

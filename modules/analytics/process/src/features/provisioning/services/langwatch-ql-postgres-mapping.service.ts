@@ -248,7 +248,6 @@ export class LangWatchQLPostgresMappingService {
     accessModel.assertNames(names);
     sqlText.assertIdentifier(collection, "named collection");
     sqlText.assertIdentifier(postgresRelation, "postgresRelation");
-    sqlText.assertIdentifier(schema, "schema");
     if (columns.length === 0) {
       throw new Error(
         `lwql provisioning: PostgreSQL-engine table "${table}" needs at least one column`,
