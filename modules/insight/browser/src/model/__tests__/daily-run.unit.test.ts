@@ -5,6 +5,7 @@
  */
 
 import {
+  INSIGHT_RUN_RETIRED_REASONS,
   INSIGHT_RUN_SKIP_REASONS,
   INSIGHT_SCHEDULE_OFF_REASONS,
   INSIGHT_SCHEDULE_STATES,
@@ -28,6 +29,9 @@ import {
   zoneChoices,
   zoneLabel,
 } from "../daily-run.ts";
+
+/** The reasons a skipped run may carry: today's and the retired ones old runs still hold. */
+const SKIPPED_REASONS = [...INSIGHT_RUN_SKIP_REASONS, ...INSIGHT_RUN_RETIRED_REASONS];
 
 const DAY_MS = 86_400_000;
 /** 12:34 in Amsterdam, in summer: the same calendar day there as in UTC. */
@@ -171,7 +175,7 @@ describe("given a board that is on", () => {
     );
 
     /** @scenario "The dropdown says how the last run ended" */
-    it.each(INSIGHT_RUN_SKIP_REASONS)("says a run skipped as %s did not run, and why", (reason) => {
+    it.each(SKIPPED_REASONS)("says a run skipped as %s did not run, and why", (reason) => {
       expect(SKIP_REASON_WORDS[reason]).not.toBe("");
       expect(words({ outcome: "skipped", reason })).toBe(
         `Did not run 12:34 · ${SKIP_REASON_WORDS[reason]}`,
@@ -179,9 +183,9 @@ describe("given a board that is on", () => {
     });
 
     /** @scenario "The dropdown says how the last run ended" */
-    it("has words of its own for every skip reason", () => {
-      const said = INSIGHT_RUN_SKIP_REASONS.map((reason) => SKIP_REASON_WORDS[reason]);
-      expect(new Set(said).size).toBe(INSIGHT_RUN_SKIP_REASONS.length);
+    it("has words of its own for every skip reason, retired ones included", () => {
+      const said = SKIPPED_REASONS.map((reason) => SKIP_REASON_WORDS[reason]);
+      expect(new Set(said).size).toBe(SKIPPED_REASONS.length);
     });
 
     /** @scenario "The dropdown says how the last run ended" */
@@ -192,9 +196,9 @@ describe("given a board that is on", () => {
     });
 
     /** @scenario "The dropdown says how the last run ended" */
-    it("says only that nothing was filed for a run skipped with a retired reason", () => {
+    it("says why a run recorded with the retired template_board reason did not run", () => {
       expect(words({ outcome: "skipped", reason: "template_board" })).toBe(
-        "Did not run 12:34 · nothing was filed",
+        "Did not run 12:34 · Langy could not read From LangWatch boards then",
       );
     });
   });

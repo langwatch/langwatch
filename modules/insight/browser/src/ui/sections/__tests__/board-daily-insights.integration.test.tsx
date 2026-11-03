@@ -7,6 +7,7 @@
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import {
+  INSIGHT_RUN_RETIRED_REASONS,
   INSIGHT_RUN_SKIP_REASONS,
   type InsightDailyRunSetting,
   type InsightEntry,
@@ -470,7 +471,7 @@ describe("given a member turned a board's daily run on", () => {
         { outcome: "failed", reason: "turn_failed" },
         `Failed ${RAN_AT} · nothing was filed, and the next run tries again`,
       ],
-      ...INSIGHT_RUN_SKIP_REASONS.map(
+      ...[...INSIGHT_RUN_SKIP_REASONS, ...INSIGHT_RUN_RETIRED_REASONS].map(
         (reason) =>
           [
             `was skipped as ${reason}`,

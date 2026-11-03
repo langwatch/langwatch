@@ -64,6 +64,14 @@ Feature: Editing a dashboard widget from an agent, and where each widget came fr
     And changing or deleting it is refused as not found
 
   @integration
+  Scenario: A From LangWatch widget is read under its own board's path only
+    Given a project key with analytics:view
+    When it gets a From LangWatch widget under the path of the board its template id names
+    Then it answers the widget's name and stored queries from the catalogue
+    When it gets the same widget under any other board's path
+    Then the request is refused as not found
+
+  @integration
   Scenario: A From LangWatch widget is refused without analytics:view
     Given a project key without analytics:view
     When it gets a From LangWatch widget by its template widget id

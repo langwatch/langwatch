@@ -4,6 +4,7 @@
  * `release_dashboards` is read per request.
  * @see modules/dashboard/specs/dashboards-v2.feature
  * @see specs/analytics/dashboard-rest-api.feature
+ * @see modules/dashboard/specs/dashboard-widget-mcp.feature
  * @vitest-environment node
  */
 import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
@@ -483,20 +484,47 @@ describe("given two Dashboards boards, one holding a widget", () => {
     });
   });
 
-  /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */
-  it("answers a From LangWatch widget reached through a board's path as not found", async () => {
-    const { board, send } = await twoBoards();
-    const [curated] = CURATED_BOARD_DEFINITIONS;
+  describe("and a From LangWatch board's widget", () => {
+    const [curated, otherTemplate] = CURATED_BOARD_DEFINITIONS;
     const [widget] = curated?.widgets ?? [];
-    if (!curated || !widget) throw new Error("No From LangWatch board ships a widget");
+    if (!curated || !otherTemplate || !widget) {
+      throw new Error("Two From LangWatch boards, the first with a widget, are expected");
+    }
     const id = templateWidgetId({ templateId: curated.templateId, key: widget.key });
+    const under = (dashboardId: string) =>
+      `${BOARDS}/${encodeURIComponent(dashboardId)}/widgets/${encodeURIComponent(id)}`;
 
-    const read = await send(
-      "dashboards",
-      `${BOARDS}/${board.id}/widgets/${encodeURIComponent(id)}`,
-    );
+    /** @scenario "A From LangWatch widget is read under its own board's path only" */
+    it("answers it under its own template's board, as the daily insights skill reads it", async () => {
+      const { send } = await twoBoards();
 
-    expect(refusal(read)).toEqual({ status: 404, code: "dashboard_widget_not_found" });
+      const read = await send("dashboards", under(curated.templateId));
+
+      expect({ status: read.status, json: read.json }).toMatchObject({
+        status: 200,
+        json: {
+          id,
+          name: widget.name,
+          definition: { queries: widget.definition.queries },
+          dashboardId: null,
+        },
+      });
+    });
+
+    /** @scenario "A From LangWatch widget is read under its own board's path only" */
+    it("answers it as not found under a stored board or another template's board", async () => {
+      const { board, send } = await twoBoards();
+
+      const [onStored, onOtherTemplate] = await Promise.all([
+        send("dashboards", under(board.id)),
+        send("dashboards", under(otherTemplate.templateId)),
+      ]);
+
+      expect({ onStored: refusal(onStored), onOtherTemplate: refusal(onOtherTemplate) }).toEqual({
+        onStored: { status: 404, code: "dashboard_widget_not_found" },
+        onOtherTemplate: { status: 404, code: "dashboard_widget_not_found" },
+      });
+    });
   });
 
   /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */

@@ -92,6 +92,7 @@ export type InsightRunQuietReason = (typeof INSIGHT_RUN_QUIET_REASONS)[number];
 
 /** Reasons no run records any more, still read from runs recorded before they retired. */
 export const INSIGHT_RUN_RETIRED_REASONS = ["template_board"] as const;
+export type InsightRunRetiredReason = (typeof INSIGHT_RUN_RETIRED_REASONS)[number];
 
 export const insightRunReasonSchema = z.enum([
   ...INSIGHT_RUN_SKIP_REASONS,
