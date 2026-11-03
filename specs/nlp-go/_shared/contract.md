@@ -376,19 +376,19 @@ Four further variables are read straight from the process environment rather tha
 
 ### Engine knobs (`NLPGO_ENGINE_` prefix)
 
-| Variable                                      | Default   | Read at                                                                                    |
-| --------------------------------------------- | --------- | ------------------------------------------------------------------------------------------ |
-| `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS`       | `15`      | `serve.go` `resolveStreamHeartbeat` → `httpapi.RouterDeps.StreamHeartbeat`                 |
-| `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`    | `720`     | `serve.go` `resolveStreamIdleTimeout` → `httpapi.RouterDeps.StreamIdleTimeout`             |
-| `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`     | `600`     | `cmd/root.go` `newCodeExecutor` → `codeblock.Options.DefaultTimeout`                       |
-| `NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS` | `false` | `cmd/root.go` `allowVisibleProcess` → `codeblock.Options.AllowVisibleProcess`; honored only on AWS Lambda (see §7) |
-| `NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS`     | `720`     | `cmd/root.go` `newHTTPExecutor` → `httpblock.Options.DefaultTimeout`                       |
-| `NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS` | `720`     | `cmd/root.go` `newAgentWorkflowRunner` → `agentblock.WorkflowRunnerOptions.DefaultTimeout` |
-| `NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS`      | `720`     | `cmd/root.go` `newEvaluatorExecutor` → `evaluatorblock.Options.DefaultTimeout`             |
-| `NLPGO_ENGINE_ALLOWED_PROXY_HOSTS`            | empty     | `cmd/root.go` — fallback used only when the bare `ALLOWED_PROXY_HOSTS` is empty            |
-| `NLPGO_ENGINE_EGRESS_STRICT_PUBLIC_ONLY`      | `false`   | `cmd/root.go` → `httpblock.SSRFOptions.StrictPublicOnly`                                   |
-| `NLPGO_ENGINE_SANDBOX_PYTHON`                 | `python3` | `cmd/root.go` `resolveSandboxPython` → `codeblock.Options.Python`                          |
-| `NLPGO_ENGINE_LANGWATCH_BASE_URL`             | empty     | `cmd/root.go` `resolveLangWatchBaseURL` → engine callbacks + code-block sandbox endpoint   |
+| Variable                                        | Default   | Read at                                                                                                            |
+| ----------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS`         | `15`      | `serve.go` `resolveStreamHeartbeat` → `httpapi.RouterDeps.StreamHeartbeat`                                         |
+| `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`      | `720`     | `serve.go` `resolveStreamIdleTimeout` → `httpapi.RouterDeps.StreamIdleTimeout`                                     |
+| `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`       | `600`     | `cmd/root.go` `newCodeExecutor` → `codeblock.Options.DefaultTimeout`                                               |
+| `NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS` | `false`   | `cmd/root.go` `allowVisibleProcess` → `codeblock.Options.AllowVisibleProcess`; honored only on AWS Lambda (see §7) |
+| `NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS`       | `720`     | `cmd/root.go` `newHTTPExecutor` → `httpblock.Options.DefaultTimeout`                                               |
+| `NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS`   | `720`     | `cmd/root.go` `newAgentWorkflowRunner` → `agentblock.WorkflowRunnerOptions.DefaultTimeout`                         |
+| `NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS`        | `720`     | `cmd/root.go` `newEvaluatorExecutor` → `evaluatorblock.Options.DefaultTimeout`                                     |
+| `NLPGO_ENGINE_ALLOWED_PROXY_HOSTS`              | empty     | `cmd/root.go` — fallback used only when the bare `ALLOWED_PROXY_HOSTS` is empty                                    |
+| `NLPGO_ENGINE_EGRESS_STRICT_PUBLIC_ONLY`        | `false`   | `cmd/root.go` → `httpblock.SSRFOptions.StrictPublicOnly`                                                           |
+| `NLPGO_ENGINE_SANDBOX_PYTHON`                   | `python3` | `cmd/root.go` `resolveSandboxPython` → `codeblock.Options.Python`                                                  |
+| `NLPGO_ENGINE_LANGWATCH_BASE_URL`               | empty     | `cmd/root.go` `resolveLangWatchBaseURL` → engine callbacks + code-block sandbox endpoint                           |
 
 ### The four block-timeout knobs are ceilings
 
