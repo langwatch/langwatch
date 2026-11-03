@@ -112,6 +112,21 @@ Feature: Twilio media relay on the AI Gateway
         | an id of 65 characters |
 
     @integration
+    Scenario Outline: An instance id outside the allowed set is refused before upgrade
+      When a licensed relay is opened with instance id <instance>
+      Then the response is 400
+      And no WebSocket is opened
+      And no relay slot is taken
+
+      Examples:
+        | instance              |
+        | an empty instance id  |
+        | a/b                   |
+        | org 1                 |
+        | org.1                 |
+        | an id of 65 characters |
+
+    @integration
     Scenario: An organization id of 64 allowed characters still opens a relay
       When a signed relay is opened for an id of 64 letters, digits, hyphens and underscores
       Then the first frame is the ready frame with a relay id
