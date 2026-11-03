@@ -1827,10 +1827,10 @@ prometheus:
     # Image configuration (prometheus-community default: prom/prometheus)
     ## @extra prometheus.server.image Image configuration.
     ## @param prometheus.server.image.repository [string, default: quay.io/prometheus/prometheus] Image repository.
-    ## @param prometheus.server.image.tag [string, default: v3.5.5] Image tag.
+    ## @param prometheus.server.image.tag [string, default: v3.11.3] Image tag.
     image:
       repository: quay.io/prometheus/prometheus
-      tag: v3.5.5
+      tag: v3.11.3
 
     # Number of Prometheus replicas
     # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
