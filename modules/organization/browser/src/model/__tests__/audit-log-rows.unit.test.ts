@@ -112,6 +112,71 @@ describe("given a row's actor fields", () => {
   });
 });
 
+describe("given a row LangWatch staff or an operator wrote", () => {
+  const noUser = { userId: null, user: null, actorUserId: null, actorUser: null, apiKeyId: null };
+
+  it("names LangWatch Support, with the approving operator and the reason", () => {
+    expect(
+      auditActor({
+        ...noUser,
+        actorUserId: "u_o",
+        actorUser: { id: "u_o", name: "Olivia", email: "olivia@langwatch.ai" },
+        action: "staffAccess.write",
+        staffAccess: { principal: "LangWatch Support", reason: "fix the broken evaluator" },
+      }),
+    ).toEqual({
+      kind: "staff",
+      principal: "LangWatch Support",
+      approvedBy: "olivia@langwatch.ai",
+      reason: "fix the broken evaluator",
+    });
+  });
+
+  it("keeps a staff row's own principal and reads no approver when none resolved", () => {
+    expect(
+      auditActor({
+        ...noUser,
+        action: "staffAccess.expired",
+        staffAccess: { principal: "LangWatch Staff Read", reason: null },
+      }),
+    ).toEqual({
+      kind: "staff",
+      principal: "LangWatch Staff Read",
+      approvedBy: null,
+      reason: null,
+    });
+  });
+
+  it("names the operator who started an impersonation, with the reason", () => {
+    expect(
+      auditActor({
+        userId: "op",
+        user: { id: "op", name: "Olivia", email: "olivia@langwatch.ai" },
+        actorUserId: null,
+        actorUser: null,
+        apiKeyId: null,
+        action: "admin/impersonate",
+        args: { userIdToImpersonate: "u1", reason: "reproduce a bug report" },
+      }),
+    ).toEqual({
+      kind: "operator",
+      id: "op",
+      name: "Olivia",
+      email: "olivia@langwatch.ai",
+      reason: "reproduce a bug report",
+    });
+  });
+
+  it.each([
+    ["staffAccess.approved", "Approved LangWatch staff access"],
+    ["staffAccess.expired", "LangWatch staff access ended"],
+    ["admin/impersonate", "Started impersonating a member"],
+    ["admin/impersonate.expired", "Impersonation ended"],
+  ])("reads %s as %s", (action, phrase) => {
+    expect(auditActionPhrase(action)).toBe(phrase);
+  });
+});
+
 const row = (id: string, overrides: Record<string, unknown> = {}) => ({
   id,
   userId: "u1",

@@ -7326,3 +7326,88 @@ model SignInProviderMount {
   lastAppliedEventId String
   updatedAt          DateTime @default(now()) @updatedAt
 }
+
+/// An operator's enrolled coding agent (ADR-192, staff-access module). Its key `lwsr_<lookupId>_<secret>`
+/// can only create staff access requests; the secret is stored as its HMAC.
+model StaffAccessRequester {
+  id           String    @id
+  ownerUserId  String
+  name         String
+  lookupId     String    @unique
+  hashedSecret String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([ownerUserId])
+}
+
+/// A single-use WebAuthn challenge staff access issued to one person, for one purpose.
+model StaffAccessChallenge {
+  id        String    @id
+  userId    String
+  purpose   String
+  challenge String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, purpose])
+}
+
+/// One staff access request and, once redeemed, the one-hour session it became.
+model StaffAccessRequest {
+  id                   String    @id
+  requesterId          String
+  ownerUserId          String
+  scopes               String[]
+  organizationId       String?
+  organizationName     String?
+  reason               String
+  codeChallenge        String
+  machine              String
+  requestIp            String?
+  status               String
+  expiresAt            DateTime
+  approvedAt           DateTime?
+  spendApproved        Boolean   @default(false)
+  approvalCredentialId String?
+  approvalSignature    String?
+  signedHash           String?
+  redeemedAt           DateTime?
+  pinnedIp             String?
+  apiKeyId             String?   @unique
+  hashedOpsToken       String?
+  opsTokenLookupId     String?   @unique
+  accessExpiresAt      DateTime?
+  revokedAt            DateTime?
+  revokedByUserId      String?
+  revokeCause          String?
+  endAuditedAt         DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([requesterId, createdAt])
+  @@index([status, accessExpiresAt])
+  @@index([createdAt])
+}
+
+/// The trail: one row per call a staff session made, written before its handler ran.
+model StaffAccessEvent {
+  id             String   @id
+  requestId      String
+  at             DateTime @default(now())
+  method         String
+  path           String
+  operation      String
+  permissions    String[]
+  organizationId String?
+  projectId      String?
+  status         Int?
+  errorCode      String?
+  durationMs     Int?
+  ipAddress      String?
+  userAgent      String?
+
+  @@index([requestId, at])
+}

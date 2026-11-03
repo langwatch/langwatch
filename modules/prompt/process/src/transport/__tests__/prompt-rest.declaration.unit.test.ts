@@ -22,7 +22,7 @@ describe("the prompts REST declaration", () => {
         route.method,
         route.path,
         route.operation,
-        route.permission,
+        route.permissions ?? route.permission,
       ]),
     ).toEqual([
       ["get", "/api/prompts", "getApiPrompts", "prompts:view"],
@@ -40,7 +40,12 @@ describe("the prompts REST declaration", () => {
       ],
       ["get", "/api/prompts/:id{.+}", "getApiPromptsById", "prompts:view"],
       ["post", "/api/prompts", "postApiPrompts", "prompts:create"],
-      ["post", "/api/prompts/:id{.+?}/sync", "postApiPromptsByIdSync", "prompts:manage"],
+      [
+        "post",
+        "/api/prompts/:id{.+?}/sync",
+        "postApiPromptsByIdSync",
+        ["prompts:create", "prompts:update"],
+      ],
       ["put", "/api/prompts/:id{.+}", "putApiPromptsById", "prompts:update"],
       ["delete", "/api/prompts/:id{.+}", "deleteApiPromptsById", "prompts:manage"],
     ]);

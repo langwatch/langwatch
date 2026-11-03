@@ -57,6 +57,8 @@ export type CodingAgentPullRequestUsageRead = Readonly<{
 export interface CodingAgentUsageCount {
   readonly sessions: number;
   readonly firstSessionAt?: number;
+  /** The newest session's start, lifetime, whatever `since` says. */
+  readonly lastSessionAt?: number;
 }
 
 export interface CodingAgentApi {

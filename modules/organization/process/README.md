@@ -2026,7 +2026,7 @@ type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src
 
 // organization.getInvitedMemberIds
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
-// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:421
+// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:422
 interface Output {
   memberUserIds: string[];
   invitedUserIds: string[];
@@ -2088,7 +2088,7 @@ interface Input {
   targetKind?: string;
   targetId?: string;
 }
-type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:384
+type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:385
 ```
 
 ### `personalWorkspaceFeatures`

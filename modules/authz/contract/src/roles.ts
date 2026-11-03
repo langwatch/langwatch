@@ -209,7 +209,11 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
 const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];
 
 /** What the platform-operator role carries; no other grant confers these. */
-export const PLATFORM_OPERATOR_PERMISSIONS: readonly AuthzPermission[] = ["ops:view", "ops:manage"];
+export const PLATFORM_OPERATOR_PERMISSIONS: readonly AuthzPermission[] = [
+  "ops:view",
+  "ops:manage",
+  "opsRead:view",
+];
 
 const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   viewer: new Set(VIEWER),

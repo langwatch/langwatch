@@ -8,6 +8,7 @@ import type { AuthSessionCacheRepository } from "../../repositories/auth-session
 import type {
   AuthSessionRepository,
   BrowserSessionRecord,
+  LapsedImpersonation,
   SessionExpiry,
   StoredBrowserSession,
 } from "../../repositories/auth-session.repository.ts";
@@ -106,6 +107,14 @@ class Sessions implements AuthSessionRepository {
   async writeImpersonation(): Promise<void> {}
 
   async clearImpersonation(): Promise<void> {}
+
+  async findLapsedImpersonations(): Promise<readonly LapsedImpersonation[]> {
+    return [];
+  }
+
+  async clearLapsedImpersonation(): Promise<boolean> {
+    return false;
+  }
 
   async findAmrForSession(): Promise<string[]> {
     return [];

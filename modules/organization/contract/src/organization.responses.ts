@@ -2,7 +2,7 @@ import type { Named } from "@langwatch/module";
 /** Contract schemas for the organization feature's tRPC responses. */
 import { z } from "zod";
 
-import { auditChannelSchema } from "./organization.ts";
+import { auditChannelSchema, auditStaffAccessMetadataSchema } from "./organization.ts";
 
 /** A write with nothing else to report. */
 const organizationWriteAckSchemaDefinition = z.object({ success: z.literal(true) }).strict();
@@ -367,6 +367,7 @@ const organizationAuditLogEntrySchema = z
       .nullable(),
     channel: auditChannelSchema.nullable(),
     apiKeyId: z.string().nullable(),
+    staffAccess: auditStaffAccessMetadataSchema.nullable(),
   })
   .strict();
 

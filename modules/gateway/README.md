@@ -49,6 +49,6 @@ Anything else gateway needs belongs to another module and is reached through its
 
 ## Who depends on gateway
 
-[connect](../../enterprise/modules/connect/README.md), [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [webhook](../webhook/README.md) (as a peer).
+[connect](../../enterprise/modules/connect/README.md), [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [staff-access](../staff-access/README.md), [webhook](../webhook/README.md) (as a peer).
 
 <!-- readme:generated:end -->

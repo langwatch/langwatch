@@ -48,6 +48,8 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "login",
   "logout",
   "whoami",
+  // Staff access for the LangWatch ops agent (ADR-192): operator-only credential plumbing.
+  "ops",
   // User-global CLI configuration, not platform data.
   "config",
   // Browser openers / local shell helpers.

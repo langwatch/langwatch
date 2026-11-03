@@ -95,6 +95,7 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/share-process": "workspace:*",
     "@langwatch/slack-process": "workspace:*",
+    "@langwatch/staff-access-process": "workspace:*",
     "@langwatch/stored-object-process": "workspace:*",
     "@langwatch/suite-process": "workspace:*",
     "@langwatch/task": "workspace:*",

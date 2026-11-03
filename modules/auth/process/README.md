@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:26`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withEventing(impersonationExpiryEventing).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:27`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:105`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:106`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -86,6 +86,30 @@ Clears the claims, returning the session to its own user without ending it; idem
 
 ```typescript
 stopImpersonation(input: { sessionId: string }): Promise<void>;
+```
+
+#### `hasPasskey`
+
+Whether this person has registered at least one passkey.
+
+```typescript
+hasPasskey(input: { userId: string }): Promise<boolean>;
+```
+
+#### `passkeyAssertionOptions`
+
+The WebAuthn request options for this person's own passkeys over a caller-chosen base64url challenge, user verification required. Refuses `unknown_credential` when they hold none.
+
+```typescript
+passkeyAssertionOptions(input: { userId: string; challenge: string; }): Promise<PasskeyAssertionOptions>;
+```
+
+#### `verifyPasskeyAssertion`
+
+Verifies a signature over exactly that challenge by one of this person's passkeys, with user verification, and advances its counter. Throws `passkey_assertion_refused` otherwise.
+
+```typescript
+verifyPasskeyAssertion(input: { userId: string; challenge: string; response: PasskeyAssertionResponse; }): Promise<{ credentialId: string }>;
 ```
 
 #### `verifyBrowserSession`
@@ -911,6 +935,14 @@ Declared at `src/eventing/auth.pipeline.ts:33`.
 | --------------- | ---------------- | ------------------------------------------------------------------------------------- | ---------------------------------- |
 | process manager | `signInLockReap` | every 1 h (`SIGN_IN_LOCK_REAP_INTERVAL_MS = 60 * 60 * 1000`); intents `reap` (outbox) | `src/eventing/auth.pipeline.ts:38` |
 
+### Pipeline `impersonation_maintenance` (aggregate `global`)
+
+Declared at `src/eventing/impersonation-expiry.pipeline.ts:37`.
+
+| Kind            | Name                  | Handles                                                                                      | Declared at                                        |
+| --------------- | --------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| process manager | `impersonationExpiry` | every 10 min (`IMPERSONATION_EXPIRY_INTERVAL_MS = 10 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/impersonation-expiry.pipeline.ts:42` |
+
 ### Tasks
 
 Run by the tasks process, before serve.
@@ -924,7 +956,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:276`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:280`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -934,7 +966,7 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:279`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:283`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |

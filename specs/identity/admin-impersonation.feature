@@ -76,3 +76,36 @@ Feature: Who an administrator may borrow access from
     When they try to set or change that account's password
     Then the request is refused as not available while impersonating
     And no credential is written on the account
+
+  # ── What the customer sees ─────────────────────────────────────────────
+  #
+  # An impersonation reaches a customer's data, so the customer's own audit
+  # log says so: every organization the subject belongs to gets the start,
+  # and the end. A window that is stopped is cleared there and then; one
+  # that runs out is found by a scheduled sweep, audited as expired and
+  # cleared, so no window ends without a row.
+  @unit
+  Scenario: Each organization the target belongs to sees the impersonation start
+    Given the target belongs to two organizations
+    When the operator starts impersonating them
+    Then each organization's audit log records the start with the operator and the reason
+
+  @integration
+  Scenario: An impersonation that runs out is audited and cleared
+    Given an impersonation window that passed without a stop
+    When the expiry sweep runs
+    Then each organization the subject belongs to records it as expired, with the operator as the actor
+    And the session no longer carries the impersonation claims
+
+  @integration
+  Scenario: An expired impersonation is recorded once
+    Given an impersonation window the sweep has already recorded as expired
+    When the sweep runs again before the claims are cleared
+    Then no second expiry row is written
+
+  @integration
+  Scenario: A live impersonation is left alone by the expiry sweep
+    Given an impersonation window that has not yet run out
+    When the expiry sweep runs
+    Then nothing is recorded and the claims stay
+

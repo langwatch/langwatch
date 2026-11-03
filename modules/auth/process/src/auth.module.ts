@@ -8,6 +8,7 @@ import { AuthModule } from "./app/auth.app.ts";
 import { authChannels } from "./channels/auth-channels.registry.ts";
 import { authLifecycleEventing } from "./eventing/auth-lifecycle.pipeline.ts";
 import { authEventing } from "./eventing/auth.pipeline.ts";
+import { impersonationExpiryEventing } from "./eventing/impersonation-expiry.pipeline.ts";
 import { authRepositories } from "./repositories/auth-repositories.registry.ts";
 import { ApiDoorService } from "./services/api-door.service.ts";
 import { ClearStalePendingSsoSetupTask } from "./tasks/clear-stale-pending-sso-setup.task.ts";
@@ -30,6 +31,7 @@ export const authProcessModule: PublishedProcessModule<"auth", AuthApi, AuthServ
     .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
     .withEventing(authEventing)
     .withEventing(authLifecycleEventing)
+    .withEventing(impersonationExpiryEventing)
     .provideMiddlewareContext({ callerAddress: callerAddressOfRequest })
     .withTasks(({ app, repositories, dependencies }) => [
       ClearStalePendingSsoSetupTask.create({

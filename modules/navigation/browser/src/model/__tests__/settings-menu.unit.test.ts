@@ -241,6 +241,16 @@ describe("given an operator", () => {
       );
     });
 
+    it("offers Agent access only to a cloud platform administrator", () => {
+      expect(adminHrefsIn({ hasOpsAccess: true, hasCloudOps: true })).not.toContain("/ops/agents");
+      expect(adminHrefsIn({ hasOpsAccess: true, isPlatformAdmin: true })).not.toContain(
+        "/ops/agents",
+      );
+      expect(
+        adminHrefsIn({ hasOpsAccess: true, hasCloudOps: true, isPlatformAdmin: true }),
+      ).toContain("/ops/agents");
+    });
+
     /** @scenario "A developer's local stack offers the Feature Flags page" */
     it("offers Feature flags on a local development stack without cloud ops", () => {
       expect(adminHrefsIn({ hasOpsAccess: true, hosting: "local" })).toContain(

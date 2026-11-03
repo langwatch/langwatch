@@ -34,6 +34,7 @@ export const experimentWorkflowEvaluationRest = defineRestRouter(ExperimentApi)
   .withCredential("project")
 
   .post("/:id/evaluate", "postApiWorkflowsByIdEvaluate")
+  .spends()
   .keepsRecords()
   .withSharedPath(WORKFLOW_NAMESPACE)
   .withParams(experimentWorkflowEvaluateParamsSchema)

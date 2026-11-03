@@ -63,6 +63,7 @@ export const instantEvalRest = defineRestRouter(InstantEvalApi)
   .withAddressing("v1-only")
 
   .post("/", "createInstantEvalRun")
+  .spends()
   .keepsRecords()
   .withoutAudit("run, not a change")
   .withPermission("analytics:manage")

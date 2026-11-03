@@ -45,6 +45,9 @@ import {
   type DocsSessionKeyMinted,
   type DocsSessionRevoked,
   type MintDocsSessionKeyInput,
+  type MintStaffAccessKeyInput,
+  type RevokeStaffAccessKeyInput,
+  type StaffAccessKeyMinted,
   type RevokeDocsSessionKeysInput,
 } from "@langwatch/api-key-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
@@ -77,6 +80,7 @@ import {
   type VisibleProjectsQuery,
 } from "../services/project-provisioning.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
+import { StaffAccessKeyService } from "../services/staff-access-key.service.ts";
 import type { ApiKeyOrganizationsDoorApi } from "../transport/api-key-organizations.rest.ts";
 import type { ApiKeyProjectsDoorApi } from "../transport/api-key-projects.rest.ts";
 
@@ -231,6 +235,11 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       projects: setup.dependencies.projects,
       docsOrigins: docsOriginsOf(setup.config),
     });
+    const staffAccessKeys = StaffAccessKeyService.create({
+      apiKeys: service,
+      lifecycle: service,
+      repository: setup.repositories.apiKeys,
+    });
     const ingestionKeys = IngestionKeyMintService.create({ apiKeys: service });
     const provisioning = ProjectProvisioningService.create({
       apiKeys: service,
@@ -248,6 +257,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       runKeys,
       sandboxKeys,
       docsSessionKeys,
+      staffAccessKeys,
       ingestionKeys,
       provisioning,
       organizationProvisioning,
@@ -260,6 +270,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     runKeys: RunKeyMintService;
     sandboxKeys: AgentSandboxKeyService;
     docsSessionKeys: DocsSessionKeyService;
+    staffAccessKeys: StaffAccessKeyService;
     ingestionKeys: IngestionKeyMintService;
     provisioning: ProjectProvisioningService;
     organizationProvisioning: OrganizationProvisioningService;
@@ -269,6 +280,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     this.#runKeys = deps.runKeys;
     this.#sandboxKeys = deps.sandboxKeys;
     this.#docsSessionKeys = deps.docsSessionKeys;
+    this.#staffAccessKeys = deps.staffAccessKeys;
     this.#ingestionKeys = deps.ingestionKeys;
     this.#provisioning = deps.provisioning;
     this.#organizationProvisioning = deps.organizationProvisioning;
@@ -279,6 +291,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   readonly #runKeys: RunKeyMintService;
   readonly #sandboxKeys: AgentSandboxKeyService;
   readonly #docsSessionKeys: DocsSessionKeyService;
+  readonly #staffAccessKeys: StaffAccessKeyService;
   readonly #ingestionKeys: IngestionKeyMintService;
   readonly #provisioning: ProjectProvisioningService;
   readonly #organizationProvisioning: OrganizationProvisioningService;
@@ -319,6 +332,12 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   }
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked> {
     return this.#docsSessionKeys.revoke(input);
+  }
+  mintStaffAccessKey(input: MintStaffAccessKeyInput): Promise<StaffAccessKeyMinted> {
+    return this.#staffAccessKeys.mint(input);
+  }
+  revokeStaffAccessKey(input: RevokeStaffAccessKeyInput): Promise<void> {
+    return this.#staffAccessKeys.revoke(input);
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

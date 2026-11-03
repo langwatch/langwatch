@@ -123,9 +123,14 @@ export function restRouteDocumentation({
     options.security = [{}, ...securityRequirement(reaches)];
   }
   // Every other documented operation states its own scheme: inheriting the default advertised
-  // `project_api_key` on 626 of 659 operations (2026-09-21). `browser` and `licence_token` have no
-  // presentable scheme, so they keep the family's own.
-  else if (reaches && reaches !== "browser" && reaches !== "licence_token") {
+  // `project_api_key` on 626 of 659 operations (2026-09-21). `browser`, `licence_token` and
+  // `staff_access` have no presentable scheme, so they keep the family's own.
+  else if (
+    reaches &&
+    reaches !== "browser" &&
+    reaches !== "licence_token" &&
+    reaches !== "staff_access"
+  ) {
     options.security = [...securityRequirement(reaches)];
   }
 
@@ -479,6 +484,7 @@ export const CREDENTIAL_CLASS_BY_DOOR = {
   cli_token: "cli_access_token",
   otlp_ingest: "project_api_key",
   licence_token: "internal",
+  staff_access: "internal",
   browser: "session",
   internal_secret: "internal_secret",
   public: "none",

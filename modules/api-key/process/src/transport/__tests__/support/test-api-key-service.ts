@@ -28,6 +28,8 @@ export class TestApiKeyService implements ApiKeyApi {
   mintAgentSandboxKey = unsupported<ApiKeyApi["mintAgentSandboxKey"]>();
   mintDocsSessionKey = unsupported<ApiKeyApi["mintDocsSessionKey"]>();
   revokeDocsSessionKeys = unsupported<ApiKeyApi["revokeDocsSessionKeys"]>();
+  mintStaffAccessKey = unsupported<ApiKeyApi["mintStaffAccessKey"]>();
+  revokeStaffAccessKey = unsupported<ApiKeyApi["revokeStaffAccessKey"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
   getOrgTeams = unsupported<ApiKeyApi["getOrgTeams"]>();

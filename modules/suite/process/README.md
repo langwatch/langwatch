@@ -250,7 +250,7 @@ type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-
 
 Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found.
 
-Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:202`.
+Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:203`.
 
 Answers at `/api/v1/run-plans/:id`.
 
@@ -266,7 +266,7 @@ type Response = z.infer<typeof runPlanWireSchema>; // ../contract/src/suite-rest
 
 Run a plan again
 
-Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:217`.
+Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:218`.
 
 Answers at `/api/v1/run-plans/:id/run`.
 
@@ -285,7 +285,7 @@ type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-
 
 Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are.
 
-Permission `scenarios:manage`. Declared at `src/transport/run-plans.rest.ts:243`.
+Permission `scenarios:manage`. Declared at `src/transport/run-plans.rest.ts:245`.
 
 Answers at `/api/v1/run-plans/:id`.
 
@@ -401,7 +401,7 @@ type Response = z.infer<typeof suiteRunResultSchema>; // ../contract/src/suite-r
 
 Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction.
 
-Permission `scenarios:manage`. Declared at `src/transport/suites-alias.rest.ts:546`.
+Permission `scenarios:manage`. Declared at `src/transport/suites-alias.rest.ts:547`.
 
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 

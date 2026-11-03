@@ -183,7 +183,11 @@ export const prismaTableCatalogue = {
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
   "WebPushVapidKey": "WebPushVapidKey",
-  "SignInProviderMount": "SignInProviderMount"
+  "SignInProviderMount": "SignInProviderMount",
+  "StaffAccessRequester": "StaffAccessRequester",
+  "StaffAccessChallenge": "StaffAccessChallenge",
+  "StaffAccessRequest": "StaffAccessRequest",
+  "StaffAccessEvent": "StaffAccessEvent"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -3029,6 +3033,72 @@ export const prismaModelFieldCatalogue = {
     "mounted",
     "lastAppliedEventId",
     "updatedAt"
+  ],
+  "StaffAccessRequester": [
+    "id",
+    "ownerUserId",
+    "name",
+    "lookupId",
+    "hashedSecret",
+    "expiresAt",
+    "revokedAt",
+    "lastUsedAt",
+    "createdAt"
+  ],
+  "StaffAccessChallenge": [
+    "id",
+    "userId",
+    "purpose",
+    "challenge",
+    "expiresAt",
+    "usedAt",
+    "createdAt"
+  ],
+  "StaffAccessRequest": [
+    "id",
+    "requesterId",
+    "ownerUserId",
+    "scopes",
+    "organizationId",
+    "organizationName",
+    "reason",
+    "codeChallenge",
+    "machine",
+    "requestIp",
+    "status",
+    "expiresAt",
+    "approvedAt",
+    "spendApproved",
+    "approvalCredentialId",
+    "approvalSignature",
+    "signedHash",
+    "redeemedAt",
+    "pinnedIp",
+    "apiKeyId",
+    "hashedOpsToken",
+    "opsTokenLookupId",
+    "accessExpiresAt",
+    "revokedAt",
+    "revokedByUserId",
+    "revokeCause",
+    "endAuditedAt",
+    "createdAt"
+  ],
+  "StaffAccessEvent": [
+    "id",
+    "requestId",
+    "at",
+    "method",
+    "path",
+    "operation",
+    "permissions",
+    "organizationId",
+    "projectId",
+    "status",
+    "errorCode",
+    "durationMs",
+    "ipAddress",
+    "userAgent"
   ]
 } as const;
 
@@ -3630,7 +3700,11 @@ export const prismaRelationCatalogue = {
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
   "WebPushVapidKey": {},
-  "SignInProviderMount": {}
+  "SignInProviderMount": {},
+  "StaffAccessRequester": {},
+  "StaffAccessChallenge": {},
+  "StaffAccessRequest": {},
+  "StaffAccessEvent": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

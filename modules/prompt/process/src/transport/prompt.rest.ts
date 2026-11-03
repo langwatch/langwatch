@@ -383,7 +383,9 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAudit("prompts.syncFromSource")
   .withParams(idParamsSchema)
   .withInput(syncInputSchema)
-  .withPermission("prompts:manage", { legacyKey: "legacy_project_key_prompts_write" })
+  .withPermission(["prompts:create", "prompts:update"], {
+    legacyKey: "legacy_project_key_prompts_write",
+  })
   .withOutput(promptSyncResultSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
