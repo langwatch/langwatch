@@ -10,7 +10,6 @@ import {
 import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
-import { useDrawerEndInset } from "../../../overlays/drawer-inset.ts";
 import { firstFocusable } from "../../../overlays/focusable.ts";
 import { registerOpenModal } from "../../../overlays/modal-stack.ts";
 import { BOUNDED_BODY, OverlayBodyState } from "../../../overlays/overlay-body.tsx";
@@ -151,13 +150,11 @@ const DIALOG_WIDTH: Record<DialogSize, string> = {
 };
 
 /**
- * The size cap: from md up it shrinks by a docked panel's width, so a centred dialog is not
- * mostly hidden under it; it does not fully clear the panel.
+ * The size cap, bounded by the viewport. A docked panel does not narrow it: a modal dims and
+ * blurs the whole page, so the dialog may sit over the panel.
  */
-function dialogMaxWidth({ size, endInset }: { size: DialogSize; endInset: number }) {
-  const cap = (room: string) => `min(${DIALOG_WIDTH[size]}, calc(100vw - 2rem${room}))`;
-  if (endInset <= 0) return cap("");
-  return { base: cap(""), md: cap(` - ${endInset}px`) };
+function dialogMaxWidth({ size }: { size: DialogSize }) {
+  return `min(${DIALOG_WIDTH[size]}, calc(100vw - 2rem))`;
 }
 
 const FOOTER_DIVIDER = {
@@ -514,7 +511,6 @@ export function Dialog({
 }: DialogProps) {
   // By id, not a ref: a resuming focus trap calls this mid-commit, while React has refs detached.
   const contentId = React.useId();
-  const endInset = useDrawerEndInset();
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
   const closable = dismissible && !busy;
   const cancel =
@@ -600,7 +596,7 @@ export function Dialog({
     >
       <DialogContent
         ref={contentRef}
-        maxWidth={dialogMaxWidth({ size, endInset })}
+        maxWidth={dialogMaxWidth({ size })}
         width="full"
         maxHeight={
           heightLimit === "reading" ? "min(85vh, calc(100dvh - 4rem))" : "calc(100dvh - 4rem)"
