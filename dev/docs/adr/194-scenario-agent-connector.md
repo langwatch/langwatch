@@ -99,16 +99,17 @@ This plugs into the lifecycle on main (ADR-180) and does not change it: `Scenari
 
 ### Isolation and egress
 
-Blocks run only in nlpgo's code-block sandbox, never in the worker or the child. The Connector adds no egress exposure beyond a code agent on cloud: the runner is fenced at the infrastructure level (outbound HTTPS and DNS only, plus private AWS service endpoints; no database, cache or internal load balancer ports). The app-level fence is not built (`specs/security/tenant-aware-egress-isolation.feature`, `@unimplemented`), and self-hosted Python can still open any socket. A fence is follow-up work. The WebAssembly runtime (https://github.com/langwatch/langwatch/pull/8991) is not a precondition.
+Blocks run only in nlpgo's code-block sandbox, never in the worker or the child. The Connector adds no egress exposure beyond a code agent on cloud: the runner is fenced at the infrastructure level by port, not by address: outbound 443 is open to every address, plus DNS and the private AWS service endpoints, and no database, cache or other internal port (`langwatch-saas` `infrastructure/langwatch_nlp_lambda.tf:178-197`). Inside the network, 443 reaches the AWS endpoints and the cluster API (both need IAM the runner's role lacks) and the app's load balancer (needs the same login as the public address). The app-level fence is not built (`specs/security/tenant-aware-egress-isolation.feature`, `@unimplemented`), and self-hosted Python can still open any socket. A fence is follow-up work. The WebAssembly runtime (https://github.com/langwatch/langwatch/pull/8991) is not a precondition.
 
-**Gate:** the product flag `release_scenario_connector_steps`. Self-hosted: always on. Cloud: the flag decides. When off, the connector agent's hooks and calls record "Connector steps are not released for this project yet.", the run ends `ERROR` and Not scored, and no code-runner call is made.
+**Gate:** the product flag `release_scenario_connector_steps` (the owner asked for the Connector behind a feature flag). Whether it gates self-hosted too, and its cloud default, are open questions below. When off, the connector agent's hooks and calls record "Connector steps are not released for this project yet.", the run ends `ERROR` and Not scored, and no code-runner call is made.
 
 ### Open questions for the owner
 
-Both stay open. This ADR does not decide them.
+They stay open. This ADR does not decide them.
 
 - **The HTTP hooks chain.** Close https://github.com/langwatch/langwatch/pull/8956, https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195, and https://github.com/langwatch/langwatch/issues/8955? The Connector no longer needs them: it does not touch the HTTP agent. The cost of keeping them open is a customer-hosted hooks transport that nobody has asked for.
-- **The cloud default of the flag.** Proposal: on by default, the flag kept as an off switch.
+- **Self-hosted gate.** Does the flag gate self-hosted too? Proposal: yes, default on there, so it can be switched off anywhere.
+- **The cloud default of the flag.** Proposal: off, turned on per project, until code blocks get an address fence. Cost: each cloud project needs turning on.
 
 ## What is reused, and from where
 
