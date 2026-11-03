@@ -10,7 +10,8 @@ export const DATASET_VERSION_RETENTION_PROCESS_NAME = "datasetVersionRetention" 
 /** How often the retention sweep walks every dataset's history. */
 export const DATASET_VERSION_RETENTION_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
-export const datasetVersionRetentionStateSchema = z.object({ lastSweepAt: z.number().nullable() });
+/** The schedule decides when a sweep runs, so the process keeps no state of its own. */
+export const datasetVersionRetentionStateSchema = z.object({});
 type DatasetVersionRetentionState = z.infer<typeof datasetVersionRetentionStateSchema>;
 
 export const datasetVersionRetentionIntentSchema = z.object({ scheduledFor: z.number().int() });
@@ -21,6 +22,6 @@ export const datasetVersionRetentionWake: WakeHandler<
   DatasetVersionRetentionState,
   RetentionIntents
 > = (_state, ctx) => ({
-  state: { lastSweepAt: ctx.at },
+  state: {},
   intents: [ctx.intent("sweep", `sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });

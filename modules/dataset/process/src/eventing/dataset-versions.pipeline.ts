@@ -100,7 +100,7 @@ export function buildDatasetVersionsPipeline(work: DatasetVersionWork): DatasetV
     )
     .withProcessManager(DATASET_VERSION_RETENTION_PROCESS_NAME, (pm) =>
       pm
-        .state(datasetVersionRetentionStateSchema, { lastSweepAt: null })
+        .state(datasetVersionRetentionStateSchema, {})
         .schedule({ everyMs: DATASET_VERSION_RETENTION_INTERVAL_MS })
         .onWake(datasetVersionRetentionWake)
         .intent("sweep", datasetVersionRetentionIntentSchema, async ({ scheduledFor }) => {
