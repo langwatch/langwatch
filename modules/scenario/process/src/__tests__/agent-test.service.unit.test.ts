@@ -322,7 +322,7 @@ describe("AgentTestService.sendTurn", () => {
       const { service } = serviceFor({
         connected: overviewOf(agent, "offline"),
         secrets: createApiFixture<SecretApi>({ getValuesByName }),
-        datasets: { findDatasetPage },
+        datasets: createApiFixture<DatasetApi>({ findDatasetPage }),
       });
 
       await service.sendTurn({ projectId: "proj_1", agent, message: "ping", actor });
