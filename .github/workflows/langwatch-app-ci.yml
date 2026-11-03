@@ -158,6 +158,8 @@ jobs:
               - '.github/workflows/codeql.yml'
               - '.github/workflows/clickhouse-serverless.yml'
               - '.github/.release-please-manifest.json'
+              # Read by cmd/releaselock in ci-scripts-test.
+              - '.github/release-please-config.json'
               - '.github/scripts/**'
               # ci-scripts-test reads this workflow's path filters and its
               # re-tag step, so an edit to the workflow alone must reach it.
@@ -1500,6 +1502,15 @@ jobs:
 
       - name: Test when release pull requests refresh
         run: node --test --experimental-strip-types .github/scripts/release-please-timer.test.ts
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Check that the Python SDK release keeps uv.lock in step
+        run: go run ./cmd/releaselock
 
   ci-self-test:
     needs: changes
