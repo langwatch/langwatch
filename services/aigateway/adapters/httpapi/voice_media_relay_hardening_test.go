@@ -184,6 +184,38 @@ func TestSignedRelayOpensForAnOrganisationIDOfTheAllowedSet(t *testing.T) {
 	}
 }
 
+// @scenario "An instance id outside the allowed set is refused before upgrade"
+func TestLicensedRelayRefusesAnInstanceIDOutsideTheAllowedSet(t *testing.T) {
+	t.Parallel()
+	cases := []struct{ name, instance string }{
+		{"empty", ""},
+		{"a slash", "a/b"},
+		{"a space", "org 1"},
+		{"a dot", "org.1"},
+		{"65 characters", strings.Repeat("a", 65)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := newMRGateway(t)
+
+			conn, resp, err := g.dialRelay(licensedHeaderFor(tc.instance))
+
+			t.Run("no WebSocket is opened", func(t *testing.T) {
+				assert.Nil(t, conn)
+				require.Error(t, err)
+			})
+			t.Run("the response is 400", func(t *testing.T) {
+				require.NotNil(t, resp)
+				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			})
+			t.Run("no relay slot is taken", func(t *testing.T) {
+				assert.Zero(t, g.hub.Active())
+			})
+		})
+	}
+}
+
 // ---------------------------------------------------------------------------
 // A scope's total relays are capped
 // ---------------------------------------------------------------------------

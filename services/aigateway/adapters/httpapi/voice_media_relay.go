@@ -87,7 +87,16 @@ func licensedRelayHandler(deps RouterDeps) http.HandlerFunc {
 			}))
 			return
 		}
-		openRelay(deps, "instance:"+strings.TrimSpace(r.Header.Get(headerInstanceID)))(w, r)
+		instanceID := strings.TrimSpace(r.Header.Get(headerInstanceID))
+		if !orgIDPattern.MatchString(instanceID) {
+			deps.MediaRelay.RecordRefusedAuth()
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "the instance id must be 1 to 64 letters, digits, hyphens or underscores",
+				"fault":   "customer",
+			}))
+			return
+		}
+		openRelay(deps, "instance:"+instanceID)(w, r)
 	}
 }
 
