@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Workflow application.
 
-Peers call these through the token, declared at `../contract/src/workflow.api.ts:171`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/workflow.api.ts:173`; nothing else in this package is public.
 
 #### `executeComponent`
 

@@ -80,6 +80,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
         endpoint: decisionModel.endpoint,
         authorization: authorizationHeaderOf(decisionModel),
         body,
+        isOwnModel: !isBilledToLangWatch,
         signal,
       });
       if (sent.kind === "answered") {
@@ -113,11 +114,13 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     endpoint,
     authorization,
     body,
+    isOwnModel,
     signal,
   }: {
     endpoint: string;
     authorization: Readonly<Record<string, string>>;
     body: string;
+    isOwnModel: boolean;
     signal: AbortSignal | undefined;
   }): Promise<
     | Readonly<{ kind: "answered"; body: unknown }>
@@ -147,7 +150,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
       return {
         kind: "failed",
         status: response.status,
-        failure: decisionFailureOf({ status: response.status }),
+        failure: decisionFailureOf({ status: response.status, isOwnModel }),
         retryAfter: response.headers.get("retry-after"),
       };
     } catch (error) {
