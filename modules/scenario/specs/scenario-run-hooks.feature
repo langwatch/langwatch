@@ -417,6 +417,12 @@ Feature: Scenario run hooks: setup and teardown
       Then the code runner is not called
       And setup records "failed" naming the cap
 
+    @unit
+    Scenario: A Connector step whose dataset has more rows than a page fails before it runs
+      Given a setup step bound to a dataset with more rows than one page holds
+      When the run is prefetched
+      Then the step carries a refusal naming the row limit, not the 64 KiB cap
+
     # Off on the hosted product until the WebAssembly runner lands; self-hosted and local stay on.
     @unit
     Scenario: A hosted project without the Connector release flag does not run Connector steps

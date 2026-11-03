@@ -478,6 +478,7 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       expect(adapter).not.toHaveProperty("connector.setup.rows");
     });
 
+    /** @scenario "A Connector step whose dataset has more rows than a page fails before it runs" */
     it("packs a refusal naming the row limit when the dataset has more rows than a page", async () => {
       const service = serviceAnswering({
         agent: withConnector({ setup: { ...step, datasetId: "dataset_personas" } }),
