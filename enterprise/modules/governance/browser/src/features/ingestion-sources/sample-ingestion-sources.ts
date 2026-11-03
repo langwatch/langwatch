@@ -79,12 +79,12 @@ const SAMPLE_INSTANCE_STATES = [
     lastEventAgoMs: 5 * 24 * HOUR_MS,
     configComplaints: ["Environment URL: Invalid URL"],
   },
-] as const satisfies ReadonlyArray<{
+] as const satisfies readonly {
   status: string;
   errorCount: number;
   lastEventAgoMs: number | null;
   configComplaints?: readonly string[];
-}>;
+}[];
 
 /**
  * The cadence a scheduled row shows under its protocol chip.

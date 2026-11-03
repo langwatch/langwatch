@@ -2,12 +2,9 @@
  * @vitest-environment node
  */
 /**
- * A pull configuration its adapter's schema refuses never becomes a row, for an adapter other
- * than Copilot Studio. Spec: specs/governance/edit-pull-source-config.feature
- *
- * Runs the real `IngestionSourceService` and its validation over the memory twin of the
- * ingestion-source table, so it needs no datastore: the save path is what is under test, and
- * the Prisma half of a write is covered by `ingestion-source-token-at-rest.integration.test.ts`.
+ * A pull config its adapter refuses never becomes a row. Spec: edit-pull-source-config.feature
+ * Uses the memory twin of the source table; the Prisma half of a write is covered by
+ * `ingestion-source-token-at-rest.integration.test.ts`.
  */
 import type {
   InternalProject,

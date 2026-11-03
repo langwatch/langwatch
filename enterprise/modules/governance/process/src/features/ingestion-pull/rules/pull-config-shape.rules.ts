@@ -28,18 +28,16 @@ const PULL_CONFIG_SCHEMAS: ReadonlyMap<string, z.ZodType> = new Map<string, z.Zo
  * The credentials an adapter cannot sign in without, by the form's name for each. The config
  * schemas leave `credentials` out because the stored form is sealed, so this is checked apart.
  */
-const REQUIRED_CREDENTIALS: ReadonlyMap<string, ReadonlyArray<readonly [string, string]>> = new Map(
+const REQUIRED_CREDENTIALS: ReadonlyMap<string, readonly (readonly [string, string])[]> = new Map([
   [
+    COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
     [
-      COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
-      [
-        ["tenantId", "tenant ID"],
-        ["clientId", "client ID"],
-        ["clientSecret", "client secret"],
-      ],
+      ["tenantId", "tenant ID"],
+      ["clientId", "client ID"],
+      ["clientSecret", "client secret"],
     ],
   ],
-);
+]);
 
 /** The form's names for the fields an adapter can refuse, so a refusal points at what to fix. */
 const FIELD_LABELS: Readonly<Record<string, string>> = {
@@ -91,10 +89,12 @@ export function findPullCredentialComplaints(
   if (!required) return [];
 
   const credentials = parserConfig?.credentials;
-  const sent = credentials !== null && typeof credentials === "object" ? credentials : {};
+  const sent = new Map<string, unknown>(
+    credentials !== null && typeof credentials === "object" ? Object.entries(credentials) : [],
+  );
   const missing = required
     .filter(([key]) => {
-      const value: unknown = Reflect.get(sent, key);
+      const value = sent.get(key);
       return typeof value !== "string" || value.trim().length === 0;
     })
     .map(([, label]) => label);

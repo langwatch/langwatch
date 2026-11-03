@@ -220,12 +220,7 @@ function SourcePullStatus({ source }: { source: Source }) {
         )}
         {pull?.hasMore && (
           <Text fontSize="sm" color="fg.muted">
-            More history remains.
-            {retrying
-              ? " The next scheduled pull continues from the saved checkpoint."
-              : isLive
-                ? " Fix the connection to continue."
-                : " Resume the source to continue."}
+            More history remains. {moreHistoryFollowUp({ retrying, isLive })}
           </Text>
         )}
       </VStack>
@@ -238,6 +233,13 @@ function pullErrorFollowUp({ retrying, isLive }: { retrying: boolean; isLive: bo
   if (retrying) return "The next scheduled pull will retry.";
   if (isLive) return "Pulls keep failing until the connection is fixed.";
   return "This source is disabled.";
+}
+
+/** How the remaining history gets pulled, in the words the checkpoint line closes on. */
+function moreHistoryFollowUp({ retrying, isLive }: { retrying: boolean; isLive: boolean }): string {
+  if (retrying) return "The next scheduled pull continues from the saved checkpoint.";
+  if (isLive) return "Fix the connection to continue.";
+  return "Resume the source to continue.";
 }
 
 /**
