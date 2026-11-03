@@ -6,7 +6,7 @@ The server half of [dataset](../README.md). Datasets and their records: creating
 
 ## Installation
 
-`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).provideMiddlewareContext(…).withEventing(datasetNormalizationEventing).withEventing(datasetVersionsEventing).withMigrations(…)`, `src/dataset.module.ts:19`.
+`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).provideMiddlewareContext(…).withEventing(datasetNormalizationEventing).withEventing(datasetVersionsEventing).withMigrations(…)`, `src/dataset.module.ts:20`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

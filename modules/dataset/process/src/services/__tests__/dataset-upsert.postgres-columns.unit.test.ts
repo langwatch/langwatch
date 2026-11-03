@@ -164,7 +164,7 @@ describe("given a dataset whose records are stored in Postgres", () => {
   });
 
   describe("when another column edit commits right after this one releases the lock", () => {
-    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+    /** @scenario "A dataset save does not undo a column edit that committed while it ran" */
     it("keeps the later edit's columns: the name update writes no columns", async () => {
       const { service, records, database, stored } = await seeded();
       const later = [{ name: "later", type: "string" }] as const;
@@ -190,7 +190,7 @@ describe("given a dataset whose records are stored in Postgres", () => {
   });
 
   describe("when a column edit commits while a rename-only save is in flight", () => {
-    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+    /** @scenario "A dataset save does not undo a column edit that committed while it ran" */
     it("keeps the column edit's columns: the rename writes no columns", async () => {
       const { service, repository, database, stored } = await seeded();
       const later = [{ name: "later", type: "string" }] as const;

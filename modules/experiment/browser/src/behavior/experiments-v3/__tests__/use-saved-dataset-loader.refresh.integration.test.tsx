@@ -16,6 +16,8 @@ const { server } = vi.hoisted(() => ({
   server: {
     columns: ["question"],
     rows: [] as { id: string; entry: Record<string, string> }[],
+    /** Rows the dataset holds beyond the loaded page; zero is a whole read. */
+    unloaded: 0,
   },
 }));
 
@@ -34,9 +36,9 @@ vi.mock("@langwatch/dataset-client", () => ({
             queryFn: async () => ({
               columnTypes: server.columns.map((name) => ({ name, type: "string" })),
               datasetRecords: server.rows.map((row) => ({ ...row, entry: { ...row.entry } })),
-              truncated: false,
+              truncated: server.unloaded > 0,
               loadedRows: server.rows.length,
-              totalRows: server.rows.length,
+              totalRows: server.rows.length + server.unloaded,
             }),
           }),
       },
@@ -75,6 +77,7 @@ function openWorkbench() {
 const shown = () => useEvaluationsV3Store.getState().datasets[0]?.savedRecords;
 
 beforeEach(() => {
+  server.unloaded = 0;
   server.columns = ["question"];
   server.rows = [
     { id: "r1", entry: { question: "a" } },
@@ -104,6 +107,25 @@ describe("given a workbench showing a saved dataset", () => {
           { id: "r2", question: "b" },
           { id: "r3", question: "c" },
         ]),
+      );
+    });
+  });
+
+  describe("when the dataset grows past the loaded page and the loaded rows stay the same", () => {
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("updates how many rows the dataset holds", async () => {
+      server.unloaded = 1;
+      const { hint } = openWorkbench();
+      await waitFor(() => expect(shown()).toHaveLength(2));
+
+      server.unloaded = 5;
+      await hint();
+
+      await waitFor(() =>
+        expect(useEvaluationsV3Store.getState().datasets[0]?.savedRecordsCut).toEqual({
+          loadedRows: 2,
+          totalRows: 7,
+        }),
       );
     });
   });

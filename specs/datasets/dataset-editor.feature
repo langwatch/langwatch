@@ -552,6 +552,14 @@ Feature: Dataset editor
     And a save that names no renames pairs leftover columns by position, as before
     And this holds whether the rows are stored in Postgres, in chunked files or in a single file from an earlier release
 
+  @unit
+  Scenario: A dataset save does not undo a column edit that committed while it ran
+    Given a saved dataset with columns "input" and "expected_output"
+    And a save that renames the dataset is running
+    When another save commits the columns "later" before the first save writes the name
+    Then the dataset has the new name
+    And its columns are still "later"
+
   @integration @unit
   Scenario: A record write that arrives during a column edit waits for it and is refused when keyed by a removed column
     Given a saved dataset with columns "input" and "expected_output"

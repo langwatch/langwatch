@@ -141,10 +141,11 @@ function applySavedRead({
     current: dataset.savedRecords,
     pending: dataset.datasetId ? store.pendingSavedChanges[dataset.datasetId] : undefined,
   });
-  if (isDeepEqual(refreshed, dataset.savedRecords)) return true;
+  const sameRows = isDeepEqual(refreshed, dataset.savedRecords);
+  if (sameRows && isDeepEqual(cut, dataset.savedRecordsCut)) return true;
   setSavedDatasetRecords(dataset.id, refreshed, cut);
   // Undo must not step back onto rows the dataset no longer holds.
-  useEvaluationsV3Store.temporal.getState().clear();
+  if (!sameRows) useEvaluationsV3Store.temporal.getState().clear();
   return true;
 }
 
