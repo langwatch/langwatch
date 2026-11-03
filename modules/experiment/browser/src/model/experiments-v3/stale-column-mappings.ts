@@ -95,3 +95,24 @@ export const withRenamedColumnMappings = ({
         ? { ...mapping, sourceField: to }
         : mapping,
   });
+
+/** The wiring with each dataset mapping reading a renamed column reading its new name. */
+export const withRenamedColumnsMappings = ({
+  wiring,
+  datasetId,
+  renames,
+}: {
+  wiring: Wiring;
+  datasetId: string;
+  /** Old column name to new, all applied at once so a swap swaps. */
+  renames: ReadonlyMap<string, string>;
+}): Wiring =>
+  editWiring({
+    wiring,
+    datasetId,
+    edit: (mapping) => {
+      if (mapping.type !== "source") return mapping;
+      const renamed = renames.get(mapping.sourceField);
+      return renamed === undefined ? mapping : { ...mapping, sourceField: renamed };
+    },
+  });

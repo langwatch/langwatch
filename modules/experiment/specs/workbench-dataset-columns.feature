@@ -17,3 +17,18 @@ Feature: Workbench dataset column edits
     Given a saved dataset whose records are loaded in the workbench
     When I edit the columns and rename one
     Then the loaded records show their values under the new name
+
+  @unit
+  Scenario: A pending saved-dataset cell edit follows a column rename
+    Given a cell edit on a saved dataset that has not synced yet
+    When the columns drawer renames that cell's column before the sync runs
+    Then the queued edit is saved under the new column name
+    And a queued value for a column the same save deleted is dropped
+
+  @unit
+  Scenario: Columns drawer edits carry mappings to renamed columns and clear those to deleted ones
+    Given a runner and an evaluator whose inputs read dataset columns
+    When one save in the columns drawer renames a column and deletes another
+    Then the inputs that read the renamed column read its new name
+    And the inputs that read the deleted column are cleared
+    And swapping two columns' names swaps the inputs that read them

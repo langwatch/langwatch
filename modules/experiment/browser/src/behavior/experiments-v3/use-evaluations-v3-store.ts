@@ -40,6 +40,7 @@ import {
   withoutInlineColumn,
   withoutPendingChange,
   withoutSelectedRows,
+  withEditedDatasetColumns,
   withSavedRecordEdit,
 } from "../../model/experiments-v3/workbench-dataset-edits.ts";
 import { loadedWorkbenchState } from "../../model/experiments-v3/workbench-loaded-state.ts";
@@ -302,6 +303,7 @@ type DatasetCellsActions = Pick<
   | "removeColumn"
   | "renameColumn"
   | "removeMappingsToMissingColumns"
+  | "applyDatasetColumnsEdit"
   | "updateColumnType"
   | "getRowCount"
   | "getCellValue"
@@ -370,6 +372,10 @@ const datasetCellsSlice = (set: StoreSet, get: StoreGet): DatasetCellsActions =>
 
   removeMappingsToMissingColumns: ({ datasetId, targetId }) => {
     set((state) => withoutStaleMappings({ state, datasetId, targetId }));
+  },
+
+  applyDatasetColumnsEdit: ({ datasetId, edited }) => {
+    set((state) => withEditedDatasetColumns({ state, datasetId, edited }));
   },
 
   updateColumnType: (datasetId, columnId, type) => {
