@@ -19,6 +19,7 @@ export const ASSISTANT_KINDS = [
   "opencode",
   "cursor",
   "github_copilot",
+  "grok",
   "custom",
 ] as const;
 export const assistantKindSchema = z.enum(ASSISTANT_KINDS);
@@ -31,6 +32,7 @@ export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<Record<AssistantKind, Platform
   opencode: "opencode",
   cursor: "cursor",
   github_copilot: "copilot",
+  grok: "grok",
 };
 
 const codingAssistantConfigSchemaDefinition = z.object({

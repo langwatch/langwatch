@@ -11,6 +11,7 @@ export const codingAgentSchema = z.enum([
   "codex",
   "gemini_cli",
   "copilot",
+  "grok",
   "unknown",
 ]);
 
@@ -163,6 +164,15 @@ export interface CodingAgentDefinition {
 
   /** Events-only telemetry: session fold gets model calls and tool runs from LOG events. */
   logsOnly?: boolean;
+
+  /**
+   * The log event's `input_tokens` already includes `cache_read_tokens`. The log-facts rule
+   * restates it as fresh input, since the fold sums the buckets as disjoint (Claude's shape).
+   */
+  logInputIncludesCacheRead?: boolean;
+
+  /** The log attribute carrying cost in micro-dollars; restated as `cost_usd` before the fold. */
+  logCostUsdMicrosAttribute?: string;
 
   /**
    * For agents naming spans `{gen_ai.operation.name} {target}`: the operation behind each session

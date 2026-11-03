@@ -114,7 +114,11 @@ export const prismaTableCatalogue = {
   "CustomRole": "CustomRole",
   "Notification": "Notification",
   "Agent": "Agent",
+  "AgentVersion": "AgentVersion",
+  "AgentVersionLabel": "AgentVersionLabel",
   "Evaluator": "Evaluator",
+  "EvaluatorVersion": "EvaluatorVersion",
+  "EvaluatorVersionLabel": "EvaluatorVersionLabel",
   "Scenario": "Scenario",
   "ScenarioVersion": "ScenarioVersion",
   "SimulationSuite": "SimulationSuite",
@@ -1018,7 +1022,10 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "autoPausedAt",
-    "autoPausedReason"
+    "autoPausedReason",
+    "evaluatorLabel",
+    "createdById",
+    "updatedById"
   ],
   "Cost": [
     "id",
@@ -2004,6 +2011,33 @@ export const prismaModelFieldCatalogue = {
     "lastSeenAt",
     "archivedAt",
     "createdAt",
+    "updatedAt",
+    "createdById",
+    "updatedById"
+  ],
+  "AgentVersion": [
+    "id",
+    "projectId",
+    "agentId",
+    "version",
+    "name",
+    "type",
+    "config",
+    "workflowId",
+    "commitMessage",
+    "authorId",
+    "authorKind",
+    "createdAt"
+  ],
+  "AgentVersionLabel": [
+    "id",
+    "projectId",
+    "agentId",
+    "label",
+    "versionId",
+    "createdById",
+    "updatedById",
+    "createdAt",
     "updatedAt"
   ],
   "Evaluator": [
@@ -2022,6 +2056,33 @@ export const prismaModelFieldCatalogue = {
     "monitors",
     "gatewayGuardrails",
     "archivedAt",
+    "createdAt",
+    "updatedAt",
+    "createdById",
+    "updatedById"
+  ],
+  "EvaluatorVersion": [
+    "id",
+    "projectId",
+    "evaluatorId",
+    "version",
+    "name",
+    "type",
+    "config",
+    "workflowId",
+    "commitMessage",
+    "authorId",
+    "authorKind",
+    "createdAt"
+  ],
+  "EvaluatorVersionLabel": [
+    "id",
+    "projectId",
+    "evaluatorId",
+    "label",
+    "versionId",
+    "createdById",
+    "updatedById",
     "createdAt",
     "updatedAt"
   ],
@@ -3493,6 +3554,8 @@ export const prismaRelationCatalogue = {
     "copiedFrom": "Agent",
     "copiedAgents": "Agent"
   },
+  "AgentVersion": {},
+  "AgentVersionLabel": {},
   "Evaluator": {
     "project": "Project",
     "workflow": "Workflow",
@@ -3501,6 +3564,8 @@ export const prismaRelationCatalogue = {
     "monitors": "Monitor",
     "gatewayGuardrails": "GatewayGuardrail"
   },
+  "EvaluatorVersion": {},
+  "EvaluatorVersionLabel": {},
   "Scenario": {
     "project": "Project",
     "testSuite": "SimulationSuite",

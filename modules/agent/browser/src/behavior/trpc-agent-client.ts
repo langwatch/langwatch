@@ -9,6 +9,8 @@ import {
   agentCopyCreatedSchema,
   agentCopySchema,
   agentHistoryEntrySchema,
+  agentLabelSchema,
+  agentVersionsSchema,
   agentPushToCopiesSchema,
   agentSchema,
   agentSyncFromSourceSchema,
@@ -16,6 +18,8 @@ import {
   findLinkedWorkflowIds,
   relatedAgentEntitiesSchema,
   type AgentApiAgentInput,
+  type AssignAgentLabelInput,
+  type RemoveAgentLabelInput,
   type CreateAgentCommand,
   type UpdateAgentCommand,
 } from "@langwatch/agent-contract";
@@ -113,5 +117,26 @@ export class TrpcAgentClient implements AgentClient {
   async getHistory(input: AgentHistoryInput) {
     const output = await this.rpc.query("agents.getHistory", input);
     return agentHistoryEntriesSchema.parse(Array.isArray(output) ? output.map(withDates) : output);
+  }
+
+  async listVersions(input: AgentHistoryInput) {
+    const output = (await this.rpc.query("agents.listVersions", input)) as {
+      versions?: unknown[];
+      labels?: unknown[];
+    };
+    return agentVersionsSchema.parse({
+      ...output,
+      versions: output.versions?.map(withDates),
+      labels: output.labels?.map(withDates),
+    });
+  }
+
+  async assignLabel(input: AssignAgentLabelInput) {
+    const output = await this.rpc.mutate("agents.assignLabel", input);
+    return agentLabelSchema.parse(withDates(output));
+  }
+
+  async removeLabel(input: RemoveAgentLabelInput) {
+    await this.rpc.mutate("agents.removeLabel", input);
   }
 }

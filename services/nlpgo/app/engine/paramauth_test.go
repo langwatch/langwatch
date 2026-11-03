@@ -82,4 +82,12 @@ func TestRedactSecrets(t *testing.T) {
 		assert.Empty(t, redactSecrets("", secrets))
 		assert.Equal(t, "x", redactSecrets("x", nil))
 	})
+
+	t.Run("scrubs the JSON-escaped form a runner writes to stored stderr", func(t *testing.T) {
+		secret := "pa\"ss\nwo\\rd\u00e9"
+		stderr := `{"stderr": "pa\"ss\nwo\\rd\u00e9"}`
+		got := redactSecrets(stderr, map[string]string{"K": secret})
+		assert.NotContains(t, got, "wo")
+		assert.Contains(t, got, "[redacted]")
+	})
 }

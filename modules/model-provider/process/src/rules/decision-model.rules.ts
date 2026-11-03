@@ -5,11 +5,12 @@
  */
 
 import {
-  DECISION_PROVIDER_ACCOUNT_FIELDS,
+  azureResourceOf,
   findDecisionModel,
   findModelProviderDefinition,
   INSTANT_EVAL_DECISION_FEATURE_KEY,
   isOwnDecisionModelId,
+  type DecisionModelEntry,
   type DecisionModelResolution,
 } from "@langwatch/model-provider-contract";
 
@@ -42,6 +43,34 @@ function normalizeText(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
 
+type EndpointFill =
+  | Readonly<{ kind: "filled"; endpoint: string }>
+  | Readonly<{ kind: "missing" }>
+  | Readonly<{ kind: "invalid" }>;
+
+/** Fills each `{name}` from the row; an Azure resource must sit on Azure's own hosts. */
+function fillEndpoint({
+  entry,
+  customKeys,
+}: {
+  entry: DecisionModelEntry & { endpoint: string };
+  customKeys: DecisionProviderRow["customKeys"];
+}): EndpointFill {
+  let endpoint = entry.endpoint;
+  for (const [name, param] of Object.entries(entry.endpointParams ?? {})) {
+    const raw = normalizeText(customKeys?.[param.field]);
+    if (!raw) return { kind: "missing" };
+    if (param.read === "value") {
+      endpoint = endpoint.replace(`{${name}}`, encodeURIComponent(raw));
+      continue;
+    }
+    const azure = azureResourceOf(raw);
+    if (azure.kind === "not_azure") return { kind: "invalid" };
+    endpoint = endpoint.replace(`{${name}}`, azure.resource);
+  }
+  return { kind: "filled", endpoint };
+}
+
 /** The flag is the caller's to ask; this answers for an organization that has it. */
 export function decisionModelResolutionOf({
   model,
@@ -59,22 +88,28 @@ export function decisionModelResolutionOf({
     return { kind: "own_unavailable", model: entry.id, reason: "provider_disabled" };
 
   const keyField = findModelProviderDefinition(entry.provider)?.apiKey;
-  const accountField = DECISION_PROVIDER_ACCOUNT_FIELDS[entry.provider];
   const apiKey = keyField ? normalizeText(row.customKeys?.[keyField]) : undefined;
-  const accountId = accountField ? normalizeText(row.customKeys?.[accountField]) : undefined;
-  const needsAccount = entry.endpoint.includes("{accountId}");
-  if (!apiKey || (needsAccount && !accountId)) {
+  const filled = fillEndpoint({
+    entry: { ...entry, endpoint: entry.endpoint },
+    customKeys: row.customKeys,
+  });
+  if (!apiKey || filled.kind === "missing") {
     return { kind: "own_unavailable", model: entry.id, reason: "key_missing" };
   }
+  if (filled.kind !== "filled") {
+    return { kind: "own_unavailable", model: entry.id, reason: "endpoint_invalid" };
+  }
 
+  const deployment = entry.providerModelField
+    ? normalizeText(row.customKeys?.[entry.providerModelField])
+    : undefined;
   return {
     kind: "own",
     model: entry.id,
     wire: entry.wire,
-    providerModel: entry.providerModel,
-    endpoint: needsAccount
-      ? entry.endpoint.replace("{accountId}", encodeURIComponent(accountId ?? ""))
-      : entry.endpoint,
+    providerModel: deployment ?? entry.providerModel,
+    endpoint: filled.endpoint,
+    authHeader: entry.authHeader ?? "bearer",
     apiKey,
   };
 }

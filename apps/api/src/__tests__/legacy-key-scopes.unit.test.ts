@@ -56,6 +56,7 @@ describe("the routes each legacy project key scope flag opens", () => {
         ],
         "legacy_project_key_evaluations": [
           "GET evaluators /",
+          "GET evaluators /:evaluatorId/versions",
           "GET evaluators /:idOrSlug",
           "POST evaluations-legacy /api/evaluations/:evaluator/:subpath/evaluate",
           "POST evaluations-legacy /api/evaluations/:evaluator/evaluate",
