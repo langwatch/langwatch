@@ -1,7 +1,23 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
+import { loadReleaseBaseline } from "../baseline.ts";
 import { loadReleases, parseManifests } from "../manifest-loader.ts";
 import { ManifestLoadError } from "../manifest.ts";
+import { releaseManifestGaps } from "../stamp.ts";
+
+const CHANGELOG = fileURLToPath(new URL("../../../../../CHANGELOG.md", import.meta.url));
+const RELEASE_PLEASE_MANIFEST = fileURLToPath(
+  new URL("../../../../../.github/.release-please-manifest.json", import.meta.url),
+);
+
+/** The platform releases the root changelog names. */
+function changelogReleases(): string[] {
+  const headings = readFileSync(CHANGELOG, "utf8").matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm);
+  return [...headings].map((match) => match[1] ?? "");
+}
 
 function manifestFile({ name, release, ids }: { name: string; release: string; ids: string[] }) {
   return {
@@ -86,6 +102,67 @@ describe("loadReleases()", () => {
         "3.18.1",
         ...chain.slice(0, -1),
       ]);
+    });
+  });
+});
+
+describe("the shipped manifests against the changelog", () => {
+  describe("when every release after the baseline is looked up", () => {
+    /** @scenario "Every release in the changelog after the baseline has a manifest" */
+    it("finds a manifest for each, following the release before it", () => {
+      const { manifests } = loadReleases();
+      const released = changelogReleases();
+      const current = JSON.parse(readFileSync(RELEASE_PLEASE_MANIFEST, "utf8"))["."] as string;
+
+      expect(released).toContain(current);
+      expect(released.length).toBeGreaterThan(50);
+      expect(
+        releaseManifestGaps({
+          released,
+          baseline: loadReleaseBaseline().release,
+          manifests,
+        }),
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("releaseManifestGaps()", () => {
+  const manifest = (release: string, previous: string) => ({ release, previous });
+
+  describe("when a shipped release has no manifest", () => {
+    /** @scenario "Every release in the changelog after the baseline has a manifest" */
+    it("names it, the release before it, and the command that stamps it", () => {
+      const gaps = releaseManifestGaps({
+        released: ["3.22.0", "3.18.1", "3.21.0", "3.20.1"],
+        baseline: "3.18.1",
+        manifests: [manifest("3.20.1", "3.18.1"), manifest("3.22.0", "3.21.0")],
+      });
+
+      expect(gaps.map(({ release, previous }) => ({ release, previous }))).toEqual([
+        { release: "3.21.0", previous: "3.20.1" },
+      ]);
+      const stamp =
+        "git fetch -q origin 'refs/tags/langwatch@v*:refs/tags/langwatch@v*' && " +
+        'pnpm --filter @langwatch/architecture-enforcer print:table-owners --out "$PWD/table-owners.json"' +
+        " && node --disable-warning=ExperimentalWarning --experimental-transform-types" +
+        " packages/upgrade/scripts/stamp-release.ts --release 3.21.0 --previous 3.20.1" +
+        " --table-owners table-owners.json";
+      expect(gaps[0]?.stamp).toBe(stamp);
+      expect(gaps[0]?.stampShipped).toBe(`${stamp} --tree langwatch@v3.21.0`);
+    });
+  });
+
+  describe("when a manifest follows the wrong release", () => {
+    /** @scenario "Every release in the changelog after the baseline has a manifest" */
+    it("names it as a gap", () => {
+      const gaps = releaseManifestGaps({
+        released: ["3.20.1", "3.21.0"],
+        baseline: "3.18.1",
+        manifests: [manifest("3.20.1", "3.18.1"), manifest("3.21.0", "3.19.0")],
+      });
+
+      expect(gaps.map(({ release }) => release)).toEqual(["3.21.0"]);
     });
   });
 });

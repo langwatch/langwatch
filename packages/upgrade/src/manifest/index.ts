@@ -14,11 +14,12 @@ export {
   gooseStepId,
   ownerFromTables,
   prismaStepId,
+  releaseManifestGaps,
   stampRelease,
   tablesTouched,
   treeStepIds,
 } from "./stamp.ts";
-export type { DeclaredStepSource, ReleaseTreeSteps } from "./stamp.ts";
+export type { DeclaredStepSource, ReleaseManifestGap, ReleaseTreeSteps } from "./stamp.ts";
 export {
   loadReleaseBaseline,
   parseReleaseBaseline,

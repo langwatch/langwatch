@@ -1,4 +1,4 @@
-import type { ManifestStep, ReleaseManifest } from "./manifest.ts";
+import { compareReleases, type ManifestStep, type ReleaseManifest } from "./manifest.ts";
 
 /** What one tree (working tree or release tag) holds: SQL file names and declared code steps. */
 export interface ReleaseTreeSteps {
@@ -128,4 +128,66 @@ export function ownerFromTables({
   const owners = new Set([...tables].map((table) => tableOwners.get(table) ?? null));
   if (owners.size !== 1) return null;
   return [...owners][0] ?? null;
+}
+
+/** A shipped release with no manifest, or one following the wrong release, and how to stamp it. */
+export type ReleaseManifestGap = {
+  release: string;
+  previous: string;
+  /** Stamps from the working tree: a release PR, before its tag exists. */
+  stamp: string;
+  /** Stamps from the release tag: a release that already shipped. */
+  stampShipped: string;
+};
+
+/** The shell commands that stamp `release`, reading `tree` when it names a tag. */
+function stampCommand({
+  release,
+  previous,
+  tree,
+}: {
+  release: string;
+  previous: string;
+  tree?: string;
+}): string {
+  return (
+    "git fetch -q origin 'refs/tags/langwatch@v*:refs/tags/langwatch@v*' && " +
+    'pnpm --filter @langwatch/architecture-enforcer print:table-owners --out "$PWD/table-owners.json" && ' +
+    "node --disable-warning=ExperimentalWarning --experimental-transform-types " +
+    `packages/upgrade/scripts/stamp-release.ts --release ${release} --previous ${previous} ` +
+    `--table-owners table-owners.json${tree ? ` --tree ${tree}` : ""}`
+  );
+}
+
+/**
+ * Each release after `baseline` that has no manifest, or one that does not follow the release
+ * before it; `released` is every platform release shipped, in any order.
+ */
+export function releaseManifestGaps({
+  released,
+  baseline,
+  manifests,
+}: {
+  released: readonly string[];
+  baseline: string;
+  manifests: readonly Pick<ReleaseManifest, "release" | "previous">[];
+}): ReleaseManifestGap[] {
+  const chain = released
+    .filter((release) => compareReleases({ left: release, right: baseline }) > 0)
+    .toSorted((left, right) => compareReleases({ left, right }));
+
+  return chain.flatMap((release, index) => {
+    const previous = chain[index - 1] ?? baseline;
+    const manifest = manifests.find((each) => each.release === release);
+    if (manifest?.previous === previous) return [];
+
+    return [
+      {
+        release,
+        previous,
+        stamp: stampCommand({ release, previous }),
+        stampShipped: stampCommand({ release, previous, tree: `langwatch@v${release}` }),
+      },
+    ];
+  });
 }
