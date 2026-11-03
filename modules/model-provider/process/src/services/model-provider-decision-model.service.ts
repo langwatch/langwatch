@@ -157,7 +157,7 @@ export class ModelProviderDecisionModelService {
     return decisionModelResolutionOf({ model, row: row ?? undefined });
   }
 
-  /** The decision models a config on these scopes may hold: own ones only if all scopes run them. */
+  /** Decision models a config on these scopes may hold: own ones only if every scope runs them. */
   async listPickableForScopes({
     projectId,
     scopes,
