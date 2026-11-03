@@ -110,6 +110,13 @@ Feature: An invited person without an account gets in by any method
       And the browser goes on to where the link was taking it
 
     @integration
+    Scenario: A member opening an invitation they already accepted goes in
+      Given a person signed in whose invitation was already accepted
+      When they open the invitation link again
+      Then they are not offered to join again
+      And the browser goes on into LangWatch
+
+    @integration
     Scenario: A dead confirmation link in a browser already signed in goes on
       Given a browser that is already signed in
       When a confirmation link it opens is refused as already used
