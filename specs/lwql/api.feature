@@ -1089,7 +1089,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # additive and never revoke, so a view only the newer catalog has keeps its
   # SELECT. A newer deploy that only removed a column is put back to the older
   # view by an older worker, and the newer worker accepts the extra column: the
-  # view stops flapping, until the next deploy. The check compares column names
+  # view settles on the union of the columns both catalogs need, so it stops
+  # flapping until the next deploy. The check compares column names
   # only, and a repair rewrites the whole view from the older worker's catalog,
   # so it can also revert a newer deploy's type, expression, dedup or filter
   # change, which the newer worker does not detect. Ship such a change in two
@@ -1116,6 +1117,22 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the reconvergence check runs
     Then it names that view as drift, and the converge replaces it with CREATE OR REPLACE VIEW
     And it does so even when the named collection cannot be confirmed, before raising that
+
+  # A PostgreSQL-backed view reads the columns of its engine table, which a deploy
+  # whose bridge failed left on the older catalog under current credentials.
+  @unit
+  Scenario: The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column
+    Given a PostgreSQL-backed view lacks a column this worker's catalog declares
+    And its engine table is stamped with the current credentials
+    When the reconvergence check runs
+    Then it names that engine table as drift along with the view
+    And the converge rebuilds the engine table before the view, only once the named collection is confirmed
+
+  @unit
+  Scenario: The reconvergence check reads a present view with no column data as unknown, not as drift
+    Given a view is present but the column read returns no columns for it
+    When the reconvergence check runs
+    Then it does not name that view as drift
 
   @unit
   Scenario: The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place

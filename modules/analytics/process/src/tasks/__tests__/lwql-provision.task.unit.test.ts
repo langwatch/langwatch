@@ -596,6 +596,67 @@ describe("convergeLwqlAccessModel", () => {
   });
 });
 
+describe("when a PostgreSQL-backed view lacks a column over a current engine table", () => {
+  const view = LWQL_VIEW_CATALOG.find((entry) => entry.postgres !== undefined);
+  if (!view) throw new Error("the catalog maps no PostgreSQL dataset");
+  const present = [view.sourceTable, view.name];
+  const fingerprint = selfProvisioning.credentialFingerprint({
+    names: NAMES,
+    postgres: {
+      endpoint: { host: "postgres", port: 5432, database: "langwatch" },
+      readerPassword: READER_PASSWORD,
+    },
+  });
+  const drift = selfProvisioning.findDrift({
+    names: NAMES,
+    relations: present,
+    functions: [],
+    found: {
+      relations: present,
+      functions: [],
+      comments: {
+        [view.sourceTable]: LangWatchQLPostgresMappingService.create().credentialComment({
+          fingerprint,
+        }),
+      },
+      columns: { [view.name]: view.columns.slice(1).map((column) => column.name) },
+    },
+    credentialFingerprint: fingerprint,
+  });
+  const converge = (clickHouse: ReturnType<typeof clickHouseThat>) =>
+    convergeLwqlAccessModel({
+      database: postgresThat({ refuses: false }).database,
+      plan: clickHouse.plan,
+      failOnError: true,
+      only: { clickHouse: drift.objects, postgres: [], isKeyMapMissing: false },
+    });
+  const rebuilt = (clickHouse: ReturnType<typeof clickHouseThat>) =>
+    clickHouse.ran.findIndex(
+      (s) => s.includes(`.${view.sourceTable} (`) && s.includes("ENGINE = PostgreSQL"),
+    );
+
+  /** @scenario "The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column" */
+  it("names the engine table, then rebuilds it stamped before replacing the view", async () => {
+    expect(drift.objects).toEqual(present);
+    const clickHouse = clickHouseThat({ present });
+
+    await converge(clickHouse);
+
+    const replacesView = new RegExp(`^CREATE OR REPLACE VIEW [^ .]+\\.${view.name}\\n`);
+    const engineAt = rebuilt(clickHouse);
+    expect(clickHouse.ran[engineAt]).toContain(fingerprint);
+    expect(clickHouse.ran.findIndex((s) => replacesView.test(s))).toBeGreaterThan(engineAt);
+  });
+
+  /** @scenario "The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column" */
+  it("leaves the engine table in place while the named collection cannot be confirmed", async () => {
+    const clickHouse = clickHouseThat({ present, failingProbe: "collection" });
+
+    await expect(converge(clickHouse)).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
+    expect(rebuilt(clickHouse)).toBe(-1);
+  });
+});
+
 describe("when a view a deploy left stale drifts while the collection cannot be confirmed", () => {
   const [engineTable] = selfProvisioning.engineTablesIn({ only: undefined });
   if (!engineTable) throw new Error("the catalog maps no PostgreSQL engine table");
@@ -698,14 +759,16 @@ describe("findLwqlAppOwnedDrift", () => {
   });
 
   /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
-  it("names each view that lacks a column this worker's catalog declares, and nothing else", async () => {
+  it("names each view that lacks a column this worker's catalog declares, and the engine table under a PostgreSQL one", async () => {
     const drift = await presentWith({ columns: catalogColumns.filter((c) => c !== "Source") });
-
-    expect(drift.clickHouse).toEqual(
-      LWQL_VIEW_CATALOG.filter((view) => view.columns.some((c) => c.name === "Source")).map(
-        (view) => view.name,
-      ),
+    const lacking = LWQL_VIEW_CATALOG.filter((view) =>
+      view.columns.some((c) => c.name === "Source"),
     );
+
+    expect(drift.clickHouse).toEqual([
+      ...lacking.flatMap((view) => (view.postgres ? [view.sourceTable] : [])),
+      ...lacking.map((view) => view.name),
+    ]);
     expect(drift.clickHouse).toContain("trace_metrics");
   });
 

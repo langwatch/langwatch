@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
-import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
+import { LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
   LangWatchQLAccessModelService,
@@ -401,9 +401,9 @@ export class LangWatchQLSelfProvisioningService {
   }
 
   /**
-   * Each expected relation absent; an engine table not stamped with the current credentials
-   * (#8858); a view lacking a column this catalog declares, never one with extra columns, which
-   * are a newer deploy's (#9245); then each app function absent.
+   * Each relation absent; an engine table not on the current credentials (#8858); a view
+   * lacking a catalog column, never one with extra columns (#9245), and the engine table under
+   * such a PostgreSQL-backed one; each app function absent. A view without column data is unknown.
    */
   findDrift({
     names,
@@ -432,13 +432,24 @@ export class LangWatchQLSelfProvisioningService {
       engineTables.includes(name) && found.comments[name] !== current;
     // Only a missing column is drift, never an extra one (specs/lwql/api.feature, rolling deploys).
     const lacksColumns = (name: string) => {
-      const view = LWQL_VIEW_CATALOG.find((entry) => entry.name === name);
-      const held = found.columns[name] ?? [];
-      return !!view && view.columns.some((column) => !held.includes(column.name));
+      const view = pickLwqlViewByName(name);
+      const held = found.columns[name];
+      return !!view && !!held && view.columns.some((column) => !held.includes(column.name));
     };
+    // A PostgreSQL-backed view reads its engine table's columns, so that table is rebuilt too.
+    const widened = new Set(
+      catalogShapes
+        .postgresViews(LWQL_VIEW_CATALOG)
+        .filter((view) => lacksColumns(view.name))
+        .map((view) => view.sourceTable),
+    );
     const objects = [
       ...relations.filter(
-        (name) => !found.relations.includes(name) || isStale(name) || lacksColumns(name),
+        (name) =>
+          !found.relations.includes(name) ||
+          isStale(name) ||
+          lacksColumns(name) ||
+          widened.has(name),
       ),
       ...functions.filter((name) => !found.functions.includes(name)),
     ];

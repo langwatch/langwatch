@@ -298,6 +298,21 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
     });
   });
 
+  /** @scenario "The reconvergence check reads a present view with no column data as unknown, not as drift" */
+  it("names no view whose columns the read did not return", () => {
+    const comments = Object.fromEntries(relations.map((name) => [name, current]));
+
+    expect(
+      selfProvisioning.findDrift({
+        names: NAMES,
+        relations,
+        functions: ["lwql_trace"],
+        found: { relations, functions: ["lwql_trace"], comments, columns: {} },
+        credentialFingerprint: fingerprint,
+      }),
+    ).toEqual({ objects: [], isKeyMapMissing: false });
+  });
+
   describe("when an engine table was built on other credentials, or before it was stamped", () => {
     const engineTables = relations.filter((name) => name.endsWith("_pg"));
     const [rotated, unstamped] = engineTables;
