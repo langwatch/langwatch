@@ -33,8 +33,8 @@ export const agentProcessModule: PublishedProcessModule<"agent", AgentApi, Agent
     )
     .withEventing(agentLifecycleEventing)
     .withEventing(agentWorkflowFieldsEventing)
-    .withMigrations(({ dependencies, repositories }) => {
-      const moveHttpCredentials = defineMigrationStep({
+    .withMigrations(({ dependencies, repositories }) => [
+      defineMigrationStep({
         id: "agent:move-http-credentials-to-secrets",
         kind: "data",
         mode: "background",
@@ -55,13 +55,13 @@ export const agentProcessModule: PublishedProcessModule<"agent", AgentApi, Agent
             onProjectDone: (report) => checkpoint.save({ report }),
           });
         },
-      });
-      // Version 1 copies the config, so it must read the row after its credentials moved.
-      const backfillVersions = defineMigrationStep({
+      }),
+      // Version 1 copies the config, so it runs after the credentials moved out of it.
+      defineMigrationStep({
         id: "agent:backfill-versions",
         kind: "data",
         mode: "background",
-        after: [moveHttpCredentials],
+        after: ["agent:move-http-credentials-to-secrets"],
         description:
           "Records version 1 of every agent written before versions existed, with its creator from the audit log.",
         needsOldWritersGone: true,
@@ -79,9 +79,8 @@ export const agentProcessModule: PublishedProcessModule<"agent", AgentApi, Agent
             onPage: (report) => checkpoint.save({ report }),
           });
         },
-      });
-      return [moveHttpCredentials, backfillVersions];
-    })
+      }),
+    ])
     // The connect caller is what the project door resolved; the rest are request headers.
     .provideMiddlewareContext({
       projectRequestContext: projectRequestContextOf,
