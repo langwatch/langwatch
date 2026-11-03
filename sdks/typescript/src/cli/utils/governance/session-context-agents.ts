@@ -158,6 +158,7 @@ export const SESSION_CONTEXT_AGENTS = {
   },
   pi: {
     hookArgument: "pi",
+    displayName: "pi",
     agent: "pi",
     keySourceTypes: ["pi_cli"],
     keySourceType: only("pi_cli"),
