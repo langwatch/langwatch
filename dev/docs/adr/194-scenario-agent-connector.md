@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-02
 
-**Status:** Proposed
+**Status:** Accepted (2026-11-03)
 
 ## Context
 
@@ -56,6 +56,7 @@ We will add a **Connector** to the HTTP agent: an optional setup step and teardo
   - `state` is sent to teardown only.
 - Setup returns `{ state, secrets? }`.
   - `state` (a JSON object, 64 KiB cap) is the run's state, as in ADR-180. HTTP turn templates read it as `{{ state }}` and `{{ state.NAME }}`; the simulated user and the judge see it each turn; teardown receives it; the run records it.
+  - State never chooses where a turn goes: a URL template whose host comes from `state` is refused, so setup cannot point the run's secrets at another host. State may fill the path and query.
   - `secrets` (name to string) are **run-scoped secrets**: they override a project secret of the same name for this run only, as secret run parameters already do. Turn templates read them as `{{ secrets.NAME }}`, and teardown receives them. They are never recorded, never shown to the simulated user or the judge, and scrubbed from every error (`scrubKnownSecrets`, `apps/scenario-child/src/rules/execution-error.rules.ts:349`). A throwaway account's password or token goes here, not in `state`.
 - Teardown returns an optional object, which the run shows. It never changes the score.
 - An HTTP turn cannot change the state, as ADR-188 settled.
@@ -65,8 +66,7 @@ We will add a **Connector** to the HTTP agent: an optional setup step and teardo
 - Steps run only in nlpgo's code-block sandbox, never in the worker or the scenario child.
 - Steps are Python code blocks on today's nlpgo runner, sent by the scenario child as one `execute_sync` POST each, the same transport code agents use in scenarios. Other languages come when the runtime offers them.
 - **There is no app-level network fence for steps, and none is a precondition.** The app-level fence is not built (see Context). Cloud already fences the runner at the infrastructure level: outbound HTTPS and DNS only, plus the private AWS service endpoints. So a step can call public HTTPS APIs, which the Connector needs, and cannot reach platform data stores. A step adds no egress exposure beyond what a code agent already has on cloud. There, code blocks run in per-project NLP Lambdas whose IAM role covers only their own log groups and VPC network interfaces. A fence (code-block egress through the tenant-aware egress service) is follow-up work.
-- **Gate:** the product flag `release_scenario_connector_steps`. Self-hosted: steps always run. Cloud: the flag decides. When it is off, setup records "Connector steps are not released for this project yet.", the run ends `ERROR` and Not scored, and no code-runner call is made.
-- **Open question for the owner:** the cloud default of the flag. Proposal: on by default, the flag kept as an off switch. Not decided.
+- **Gate:** the product flag `release_scenario_connector_steps`. Self-hosted: steps always run. Cloud: steps run by default, and the flag is an off switch per project. When it is turned off for a project, setup records "Connector steps are not released for this project yet.", the run ends `ERROR` and Not scored, and no code-runner call is made. The owner chose on by default on 2026-11-03: cloud already fences the runner (above), so the flag stays only as a way to stop steps for one project.
 - Each step has the ADR-180 budget: 60 s. The child aborts the execute call at the budget, and the code block's own `timeout_ms` is set just under it, so nlpgo stops the code first and reports why. The operator's code-block ceiling can lower it, never raise it. A timeout records `timed_out`.
 - No retries, as in ADR-180.
 
@@ -83,7 +83,7 @@ These are unchanged from ADR-180:
 
 ### Fate of the HTTP-agent hooks chain (ADR-188)
 
-**Superseded, with its run-side pieces kept.** Close https://github.com/langwatch/langwatch/pull/8956 (ADR-188), https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195, and close https://github.com/langwatch/langwatch/issues/8955 with a link here. Phase 1 below ports these parts of https://github.com/langwatch/langwatch/pull/9193, with their tests:
+**Superseded, with its run-side pieces kept** (the owner's call, 2026-11-03). Close https://github.com/langwatch/langwatch/pull/8956 (ADR-188), https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195, and close https://github.com/langwatch/langwatch/issues/8955 with a link here. Phase 1 below ports these parts of https://github.com/langwatch/langwatch/pull/9193, with their tests:
 
 - `{{ state }}` and `{{ state.NAME }}` in HTTP turn templates (`modules/scenario/contract/src/http-template-engine.ts`);
 - the HTTP-agent hook fields in the target prefetch;
