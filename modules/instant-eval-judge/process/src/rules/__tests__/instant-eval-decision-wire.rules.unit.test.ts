@@ -187,4 +187,12 @@ describe("decisionFailureOf", () => {
   ] as const)("maps %i to a %s %s", (status, kind, reason) => {
     expect(decisionFailureOf({ status })).toEqual({ kind, reason });
   });
+
+  /** @scenario "A model or deployment the account does not hold is skipped as not configured" */
+  it("maps 404 to a final classifier_not_configured, so the run is not failed over it", () => {
+    expect(decisionFailureOf({ status: 404 })).toEqual({
+      kind: "final",
+      reason: "classifier_not_configured",
+    });
+  });
 });

@@ -1,7 +1,8 @@
 /**
  * The Instant Evals column: which decision model a project runs on, and whether an organization
- * may store one on its own key (ADR-182 decisions 4 and 5). The answer is kept a minute per
- * project, so a page of rows or a busy monitor asks the scope chain once.
+ * may store one on its own key (ADR-182 decisions 4 and 5). The answer is kept five seconds per
+ * project: a page of rows or a busy monitor asks the scope chain once, and a saved model or key
+ * is what the next run is judged on.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 
@@ -39,7 +40,7 @@ type DecisionModelOptions = Readonly<{
   now?: () => Instant;
 }>;
 
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 5_000;
 const MAX_CACHED_PROJECTS = 10_000;
 
 type CachedResolution = Readonly<{

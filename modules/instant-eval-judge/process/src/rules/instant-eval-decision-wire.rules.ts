@@ -146,7 +146,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * What one failed send means (ADR-182 decision 9): a refused key is never retried, a rate limit
- * or an outage is retried, and anything else is the request's own fault.
+ * or an outage is retried, and anything else is the request's own fault. A 404 is a model or
+ * deployment the account does not hold (Azure's `DeploymentNotFound`): a setting to fix, not a
+ * failure to retry the run over.
  */
 export type DecisionFailure =
   | Readonly<{ kind: "final"; reason: InstantEvalSkipReason }>
@@ -155,6 +157,7 @@ export type DecisionFailure =
 export function decisionFailureOf({ status }: { status: number }): DecisionFailure {
   if (status === 401 || status === 403) return { kind: "final", reason: "classifier_key_invalid" };
   if (status === 402) return { kind: "final", reason: "classifier_key_invalid" };
+  if (status === 404) return { kind: "final", reason: "classifier_not_configured" };
   if (status === 413) return { kind: "final", reason: "classifier_input_too_large" };
   if (status === 429) return { kind: "retry", reason: "classifier_rate_limited" };
   if (status >= 500) return { kind: "retry", reason: "classifier_provider_unavailable" };

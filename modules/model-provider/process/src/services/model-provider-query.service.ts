@@ -129,6 +129,10 @@ export class ModelProviderQueryService {
     return Object.fromEntries(selected.map((provider) => [provider.provider, provider]));
   }
 
+  /**
+   * The row the project runs on for this provider key, picked as the settings page lists it:
+   * enabled first, then the narrowest scope, so a project key beats an older organization one.
+   */
   async findProviderForProject(input: {
     projectId: string;
     provider: string;
@@ -136,23 +140,17 @@ export class ModelProviderQueryService {
     const parsed = modelProviderListProjectInputSchema.parse({
       projectId: input.projectId,
     });
-    return this.options.scopes
-      .getProjectScopes(parsed.projectId)
-      .then((projectScopes) =>
-        this.options.repository.getByProviderForProject({
-          projectScopes,
-          provider: input.provider,
-        }),
-      )
-      .catch((error: unknown) => {
-        if (
-          HandledError.isHandled(error) &&
-          (error.code === "project_not_found" || error.code === "model_provider_not_found")
-        ) {
-          return null;
-        }
-        throw error;
-      });
+    const chain = await this.getProjectScopeChain(parsed.projectId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
+      throw error;
+    });
+    if (!chain) return null;
+
+    const rows = await this.options.repository.findForProject(chain);
+    const candidates = rows
+      .filter((row) => row.provider === input.provider)
+      .toSorted((left, right) => this.compareProjectProviders(left, right, chain));
+    return candidates[0] ?? null;
   }
 
   async getByIdForProject(input: { id: string; projectId: string }): Promise<ModelProvider> {
