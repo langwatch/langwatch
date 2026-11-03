@@ -14,7 +14,7 @@ import {
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions (gpt-6-luna)",
+  label: "OpenAI Decisions API",
 };
 
 describe("modelSelectionFrom", () => {

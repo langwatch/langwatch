@@ -159,6 +159,22 @@ describe("WorkflowsApiService.run", () => {
     });
   });
 
+  describe("given a dataset version", () => {
+    describe("when the run completes", () => {
+      it("includes dataset_version in the evaluate body", async () => {
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(evaluateResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const service = makeService();
+        await service.run("workflow_123", { datasetVersion: 2, pollInterval: 0 });
+
+        expect(await requestAt(0).clone().json()).toEqual({ dataset_version: 2 });
+      });
+    });
+  });
+
   describe("given the workflow is unknown", () => {
     describe("when the evaluate call returns 404", () => {
       it("throws a WorkflowsApiError with operation context", async () => {

@@ -242,5 +242,15 @@ describe.skipIf(!DB_URL)("given a verified single sign-on connection", () => {
         }),
       ).not.toBeNull();
     });
+
+    /** @scenario "A single sign-on account keeps the issuer the connection verified" */
+    it("stores their account under the issuer the connection verified", async () => {
+      const account = await prisma.account.findFirst({
+        where: { provider: PROVIDER_ID, providerAccountId: SUBJECT },
+        select: { issuer: true },
+      });
+
+      expect(account?.issuer).toBe(provider.issuer);
+    });
   });
 });

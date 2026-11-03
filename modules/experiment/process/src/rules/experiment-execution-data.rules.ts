@@ -2,8 +2,6 @@
  * Pure shaping of the data a run loads: dataset rows and columns, and the keys
  * loaded targets are cached under.
  */
-import { DATASET_PAGE_LIMIT_MAX } from "@langwatch/dataset-contract";
-
 /** The column type a parameter value writes into the dataset. */
 function parameterColumnType(value: string | number | boolean): string {
   if (typeof value === "number") return "number";
@@ -100,6 +98,30 @@ export const rowsFromInlineData = (data: Record<string, unknown>[]): LoadedDatas
 };
 
 /**
+ * Every row with a key for each text column the dataset declares: a cell with no
+ * value reads as empty text, so a column left empty on purpose still reaches the
+ * target. Other column types and undeclared keys are never added.
+ * @see specs/experiments-v3/execution-inputs.feature
+ */
+export const fillDeclaredColumns = ({
+  rows,
+  columns,
+}: {
+  rows: Record<string, unknown>[];
+  columns: { name: string; type?: string }[];
+}): Record<string, unknown>[] => {
+  const textColumns = columns.filter((column) => column.type === "string");
+  if (textColumns.length === 0) return rows;
+  return rows.map((row) => {
+    const missing = textColumns.filter((column) => row[column.name] === undefined);
+    if (missing.length === 0) return row;
+    const filled = { ...row };
+    for (const column of missing) filled[column.name] = "";
+    return filled;
+  });
+};
+
+/**
  * Applies caller-provided parameters as constant columns across every row.
  */
 export function applyParametersToRows({
@@ -165,25 +187,14 @@ export function promptLoadKey(target: { promptId?: string; promptVersionNumber?:
   return `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
 }
 
+/** The loaded-agents key: the agent id, plus the deploy label when the target pins one. */
+export function agentLoadKey(target: { dbAgentId?: string; agentLabel?: string }): string {
+  return target.agentLabel
+    ? `${target.dbAgentId ?? ""}@${target.agentLabel}`
+    : (target.dbAgentId ?? "");
+}
+
 /** The bytes one row holds, as the JSON it is stored and sent as. */
 export function rowBytesOf(entry: Record<string, unknown>): number {
   return Buffer.byteLength(JSON.stringify(entry) ?? "");
-}
-
-/** The bytes one page of a saved dataset is sized to hold while a run reads it. */
-const SAVED_DATASET_PAGE_TARGET_BYTES = 8 * 1024 * 1024;
-
-/**
- * How many rows a run asks for per page of a saved dataset: as many as fit the
- * page target at the size of the largest sampled row, so a dataset of large
- * rows is read a few at a time and one of small rows in full pages.
- */
-export function savedDatasetPageRows(sample: Record<string, unknown>[]): number {
-  if (sample.length === 0) return DATASET_PAGE_LIMIT_MAX;
-  const largestRowBytes = Math.max(1, ...sample.map(rowBytesOf));
-
-  return Math.min(
-    DATASET_PAGE_LIMIT_MAX,
-    Math.max(1, Math.floor(SAVED_DATASET_PAGE_TARGET_BYTES / largestRowBytes)),
-  );
 }

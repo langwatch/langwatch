@@ -211,11 +211,22 @@ describe("ModelProviderDecisionModelService.resolve", () => {
       expect(lookups).toEqual(["proj_1"]);
     });
 
-    it("asks again once the minute has passed", async () => {
+    it("answers from the first lookup within five seconds", async () => {
       const { service, lookups, advance } = harness({ stored: OPENAI_DECISIONS });
 
       await service.resolve({ projectId: "proj_1" });
-      advance(60_001);
+      advance(4_999);
+      await service.resolve({ projectId: "proj_1" });
+
+      expect(lookups).toEqual(["proj_1"]);
+    });
+
+    /** @scenario "A saved decision model or key judges the next run" */
+    it("asks again once five seconds have passed", async () => {
+      const { service, lookups, advance } = harness({ stored: OPENAI_DECISIONS });
+
+      await service.resolve({ projectId: "proj_1" });
+      advance(5_001);
       await service.resolve({ projectId: "proj_1" });
 
       expect(lookups).toEqual(["proj_1", "proj_1"]);
@@ -318,7 +329,7 @@ describe("ModelProviderDecisionModelService.listPickable", () => {
       LANGWATCH_DECISION_MODEL_ID,
       OPENAI_DECISIONS,
     ]);
-    expect(offered[1]?.label).toBe("OpenAI Decisions (gpt-6-luna)");
+    expect(offered[1]?.label).toBe("OpenAI Decisions API");
   });
 
   /** @scenario "A provider is asked for once however many of its models the catalogue holds" */
