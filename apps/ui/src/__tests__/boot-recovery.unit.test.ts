@@ -167,6 +167,23 @@ describe("given the page has not shown yet", () => {
     });
   });
 
+  describe("when a script outside the application's asset files fails", () => {
+    /** @scenario "A script the server's page names that is not the application's code does not reload the page" */
+    it("leaves the page alone", () => {
+      const page = bootPage();
+      const injected = addTag(
+        '<script type="module" async src="https://app.example/.webmcp/bridge.js"></script>',
+      );
+
+      page.fail(injected);
+      finishParsing();
+      page.fail(injected);
+
+      expect(page.location.reload).not.toHaveBeenCalled();
+      expect(statusText()).toBe("");
+    });
+  });
+
   describe("when a chunk fails after its retries", () => {
     /** @scenario "A chunk that outlived its retries before the first page reloads the page" */
     it("takes the failure and reloads", () => {

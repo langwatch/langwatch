@@ -22,7 +22,9 @@ const {
   hardRedirectMock,
   searchParamsRef,
   publicEnvRef,
+  sessionRef,
 } = vi.hoisted(() => ({
+  sessionRef: { current: null as { user: { id: string; email: string | null } } | null },
   requestVerificationMock: vi.fn(),
   completeVerificationMock: vi.fn(),
   enrollmentMock: vi.fn(),
@@ -108,7 +110,7 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
     ...actual,
     signIn: signInMock,
     navigate: navigateMock,
-    useSession: () => ({ data: null }),
+    useSession: () => ({ data: sessionRef.current }),
     authClient: {
       ...actual.authClient,
       passkey: { addPasskey: addPasskeyMock },
@@ -158,6 +160,7 @@ describe("given the sign-up screen", () => {
     vi.clearAllMocks();
     searchParamsRef.current = new URLSearchParams("");
     publicEnvRef.current = { IS_SAAS: true };
+    sessionRef.current = null;
     requestVerificationMock.mockResolvedValue({ sent: true });
     routeMock.mockResolvedValue(localPicker);
     enrollmentMock.mockResolvedValue({
@@ -611,6 +614,53 @@ describe("given the sign-up screen", () => {
       expect(screen.queryByTestId("method-picker")).toBeNull();
       expect(container.querySelector('input[type="password"]')).toBeNull();
       expect(completeVerificationMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a link that carries the invitation has been spent", () => {
+    /** @scenario "The spent token leaves the address bar" */
+    it("takes the token off the address bar and keeps the invitation", async () => {
+      const query = "verify=a-token&callbackUrl=%2Finvite%2Faccept%3FinviteCode%3Dabc";
+      window.history.replaceState(null, "", `/auth/signup?${query}`);
+      searchParamsRef.current = new URLSearchParams(query);
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof-1",
+        signedIn: false,
+      });
+
+      renderScreen();
+
+      await waitFor(() => expect(window.location.search).not.toContain("verify="));
+      expect(new URLSearchParams(window.location.search).get("callbackUrl")).toBe(
+        "/invite/accept?inviteCode=abc",
+      );
+      expect(completeVerificationMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a browser already signed in opens a link refused as used", () => {
+    /** @scenario "A dead confirmation link in a browser already signed in goes on" */
+    it("says they are signed in and goes on to where the link was taking them", async () => {
+      sessionRef.current = { user: { id: "user_sam", email: "sam@acme.com" } };
+      searchParamsRef.current = new URLSearchParams(
+        "verify=used-token&callbackUrl=%2Finvite%2Faccept%3FinviteCode%3Dabc",
+      );
+      completeVerificationMock.mockRejectedValue({
+        code: "identity_verification_used",
+        status: 410,
+      });
+
+      renderScreen();
+
+      expect(await screen.findByTestId("signed-in-handoff")).toHaveTextContent(
+        "You're signed in as sam@acme.com. Taking you to LangWatch.",
+      );
+      expect(screen.queryByText("That confirmation link no longer works")).toBeNull();
+      expect(screen.queryByRole("button", { name: /send a new link/i })).toBeNull();
+      expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept?inviteCode=abc");
     });
   });
 

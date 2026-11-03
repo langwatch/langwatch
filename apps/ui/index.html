@@ -106,13 +106,16 @@
           if (splashNote) return splashNote.remove();
           document.addEventListener("DOMContentLoaded", dropSplashNote, { once: true });
         }
-        // Only the tags the server sent count: the parser has inserted them all by
-        // "interactive", and no script of ours has run yet.
+        // Only the application's own files the server sent count: the parser has inserted
+        // them all by "interactive". A script a proxy or the edge adds is not the app's code,
+        // and a blocked one must not reload the page over and over.
         function isBootTag(el) {
           var tag = el && el.tagName;
-          var boot =
-            (tag === "SCRIPT" && el.src) || (tag === "LINK" && /\bstylesheet\b/.test(el.rel));
-          return Boolean(boot) && (parsed === null || parsed.indexOf(el) !== -1);
+          var url =
+            (tag === "SCRIPT" && el.src) ||
+            (tag === "LINK" && /\bstylesheet\b/.test(el.rel) && el.href);
+          if (!url || String(url).indexOf("/assets/") === -1) return false;
+          return parsed === null || parsed.indexOf(el) !== -1;
         }
         function onResourceError(event) {
           if (isBootTag(event.target)) retry();

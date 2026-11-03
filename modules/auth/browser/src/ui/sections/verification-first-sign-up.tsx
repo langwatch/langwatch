@@ -4,7 +4,8 @@ import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
-import { signIn } from "../../behavior/auth-client.tsx";
+import { signIn, useSession } from "../../behavior/auth-client.tsx";
+import { dropQueryParameter } from "../../behavior/browser-navigation.ts";
 import { confirmSignUpAddress } from "../../behavior/confirm-sign-up-address.ts";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
@@ -160,6 +161,40 @@ async function resendLink({
 }
 
 /**
+ * The card's hand-off into the app, once the person is in: the link signed them in, or
+ * a dead link opened in a browser already signed in (the link worked, then the page
+ * loaded again), which is not a failure to show.
+ */
+function useSignedInHandOff({
+  signedInAs,
+  verifyToken,
+  linkError,
+  callbackUrl,
+}: {
+  signedInAs: string | null;
+  verifyToken: string | null | undefined;
+  linkError: unknown;
+  callbackUrl: string | undefined;
+}): { email: string | null; message: string } | null {
+  const { data: session } = useSession();
+  const signedIn = Boolean(verifyToken && linkError && session);
+  useEffect(() => {
+    if (signedIn) hardRedirect(callbackUrl ?? JOIN_BEFORE_CREATE_PATH);
+  }, [signedIn, callbackUrl]);
+  if (signedInAs) {
+    return { email: signedInAs, message: `${signedInAs} is confirmed. Taking you to LangWatch.` };
+  }
+  if (!signedIn) return null;
+  const email = session?.user.email || null;
+  return {
+    email,
+    message: email
+      ? `You're signed in as ${email}. Taking you to LangWatch.`
+      : "You're signed in. Taking you to LangWatch.",
+  };
+}
+
+/**
  * Sign-up (D13, ADR-117 §6): address, link, proof, then password. The account
  * is created only by spending the proof the link returned. An address with an
  * account already becomes the log-in step, pre-filled, not a wall.
@@ -215,13 +250,12 @@ export function VerificationFirstSignUp() {
   });
   const { enrollment, failedLink, resolveEnrollment } = proofEnrollment;
 
-  // The emailed link is spent once, on arrival. Guarded by a ref rather than
-  // by request state because the token is single-use: a second attempt would
-  // fail on a link that worked.
+  // The emailed link is spent once, on arrival: the spend is shared per token across
+  // remounts, and the token leaves the address bar so a reload cannot spend it again.
   useEffect(() => {
     if (!verifyToken || spent.current) return;
     spent.current = true;
-    spendSignUpLink({
+    void spendSignUpLink({
       token: verifyToken,
       callbackUrl,
       decide,
@@ -232,8 +266,12 @@ export function VerificationFirstSignUp() {
         setAccountIsReady(true);
       },
       onProofSpent: setProofRecoveryEmail,
-    }).catch(setLinkError);
+    })
+      .catch(setLinkError)
+      .finally(() => dropQueryParameter("verify"));
   }, [verifyToken, callbackUrl, decide, resolveEnrollment]);
+
+  const handOff = useSignedInHandOff({ signedInAs, verifyToken, linkError, callbackUrl });
 
   const instanceMethods = useInstanceMethods({ decide, verifyToken });
 
@@ -266,8 +304,8 @@ export function VerificationFirstSignUp() {
   usePublishFrontDoorStage({
     door: "signup",
     depth: signUpDepth({
-      verifiedEmail: signedInAs ?? verifiedEmail,
-      accountIsReady: accountIsReady || signedInAs !== null,
+      verifiedEmail: handOff?.email ?? verifiedEmail,
+      accountIsReady: accountIsReady || handOff !== null,
       addressProof,
       welcomeBackEmail,
       sentTo,
@@ -310,14 +348,12 @@ export function VerificationFirstSignUp() {
   }
 
   // The navigation is already under way; this is the card it leaves behind meanwhile.
-  if (signedInAs) {
+  if (handOff) {
     return (
       <AuthCard title="You're in">
         <HStack gap={3}>
           <SuccessPulse label="Signed in" />
-          <Text data-testid="signed-in-handoff">
-            {signedInAs} is confirmed. Taking you to LangWatch.
-          </Text>
+          <Text data-testid="signed-in-handoff">{handOff.message}</Text>
         </HStack>
       </AuthCard>
     );

@@ -68,6 +68,15 @@ Feature: The application recovers from files a lossy link dropped while it boots
       When a stylesheet the application added itself fails to load
       Then the page does not reload
 
+    # Customer report: an edge-injected helper script that a browser blocked reloaded every
+    # page seven times, which also re-ran one-shot steps such as spending a sign-up link.
+    @unit
+    Scenario: A script the server's page names that is not the application's code does not reload the page
+      Given the page has not shown yet
+      When a script outside the application's asset files fails to load
+      Then the page does not reload
+      And it says nothing about retrying
+
   Rule: Once the first page shows, the recovery stands down
 
     @unit
