@@ -81,6 +81,7 @@ Feature: A package's integration suite runs in CI when it declares one
       When the packages are split over the shards
       Then a heavy package counts for all of its seconds and a light one for its share of the concurrency
       And a shard's integration and browser lanes count at full weight, one suite at a time
+      And each script adds its own recorded seconds to its own lane
 
     @unit
     Scenario: Every shard computes the same split
@@ -96,7 +97,7 @@ Feature: A package's integration suite runs in CI when it declares one
 
     @unit
     Scenario: A malformed weights file is refused
-      Given a weights line that is not "<package>  <seconds>" with a positive number
+      Given a weights line that is not "<package>  <script>  <seconds>" with a positive number
       When the package suites job starts
       Then it fails instead of splitting by guesswork
 

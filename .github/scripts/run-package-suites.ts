@@ -188,23 +188,23 @@ export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency
   load.alone + Math.max(load.shared / concurrency, load.integration, load.browser);
 
 /**
- * `load` with one package added. The weights file records a package, not its
- * scripts, so a light package's weight is spread evenly over its scripts' lanes.
+ * `load` with one package added. Each script adds its own seconds to its lane, so
+ * a light package with one slow integration suite loads the integration lane, not
+ * a share of it.
  */
 export const withPackage = ({
   load,
-  weight,
-  scripts,
+  seconds,
 }: {
   load: ShardLoad;
-  weight: number;
-  scripts: readonly string[];
+  seconds: ReadonlyMap<string, number>;
 }): ShardLoad => {
+  const weight = [...seconds.values()].reduce((sum, each) => sum + each, 0);
   if (weight >= HEAVY_SECONDS) return { ...load, alone: load.alone + weight };
   const next = { ...load, shared: load.shared + weight };
-  for (const script of scripts) {
+  for (const [script, each] of seconds) {
     const lane = laneOf(script);
-    if (lane !== "shared") next[lane] += weight / scripts.length;
+    if (lane !== "shared") next[lane] += each;
   }
   return next;
 };
@@ -216,22 +216,25 @@ export const withPackage = ({
  */
 export const balanceByWallTime = <T extends { name: string; scripts: readonly string[] }>({
   items,
-  weightOf,
+  scriptSeconds,
   concurrency,
   total,
 }: {
   items: readonly T[];
-  weightOf: (item: T) => number;
+  scriptSeconds: (item: T, script: string) => number;
   concurrency: number;
   total: number;
 }): { groups: T[][]; walls: number[] } => {
   const loads: ShardLoad[] = Array.from({ length: total }, () => ({ ...EMPTY_LOAD }));
   const groupOf = new Map<string, number>();
   const byWeight = items
-    .map((item) => ({ item, weight: weightOf(item) }))
+    .map((item) => {
+      const seconds = new Map(item.scripts.map((script) => [script, scriptSeconds(item, script)]));
+      return { item, seconds, weight: [...seconds.values()].reduce((sum, each) => sum + each, 0) };
+    })
     .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
-  for (const { item, weight } of byWeight) {
-    const candidates = loads.map((load) => withPackage({ load, weight, scripts: item.scripts }));
+  for (const { item, seconds } of byWeight) {
+    const candidates = loads.map((load) => withPackage({ load, seconds }));
     const walls = candidates.map((load) => wallTimeOf({ load, concurrency }));
     const best = walls.indexOf(Math.min(...walls));
     groupOf.set(item.name, best);
@@ -243,32 +246,33 @@ export const balanceByWallTime = <T extends { name: string; scripts: readonly st
   };
 };
 
-/** Seconds a package costs when the weights file does not name it. */
+/** Seconds a script costs when the weights file does not name it. */
 export const DEFAULT_WEIGHT_SECONDS = 5;
 
 /**
- * Parses the weights file. A line is `<package>  <seconds>`, optionally followed
- * by `# note`. A bad line is an error: one that silently parsed to nothing would
- * put the split back to guessing.
+ * Parses the weights file. A line is `<package>  <script>  <seconds>`, optionally
+ * followed by `# note`. A bad line is an error: one that silently parsed to nothing
+ * would put the split back to guessing.
  */
 export const parseWeights = (
   source: string,
   file: string,
-): { weights: Map<string, number>; errors: string[] } => {
-  const weights = new Map<string, number>();
+): { weights: Map<string, Map<string, number>>; errors: string[] } => {
+  const weights = new Map<string, Map<string, number>>();
   const errors: string[] = [];
   source.split("\n").forEach((raw, index) => {
     const line = (raw.includes("#") ? raw.slice(0, raw.indexOf("#")) : raw).trim();
     if (line === "") return;
-    const match = /^(\S+)\s+(\d+(?:\.\d+)?)$/.exec(line);
-    const seconds = match ? Number(match[2]) : Number.NaN;
-    if (!match || !Number.isFinite(seconds) || seconds <= 0 || weights.has(match[1])) {
+    const match = /^(\S+)\s+(\S+)\s+(\d+(?:\.\d+)?)$/.exec(line);
+    const seconds = match ? Number(match[3]) : Number.NaN;
+    const scripts = match ? weights.get(match[1]!) : undefined;
+    if (!match || !Number.isFinite(seconds) || seconds <= 0 || scripts?.has(match[2]!)) {
       errors.push(
-        `::error file=${file},line=${index + 1}::'${line}' is not '<package>  <seconds>' with a positive number, once per package.`,
+        `::error file=${file},line=${index + 1}::'${line}' is not '<package>  <script>  <seconds>' with a positive number, once per script.`,
       );
       return;
     }
-    weights.set(match[1], seconds);
+    weights.set(match[1]!, (scripts ?? new Map()).set(match[2]!, seconds));
   });
   return { weights, errors };
 };
@@ -423,20 +427,21 @@ const withLanes = ({
 /**
  * What one shard runs: the lanes this leg admits, split over `shard.total` by wall
  * time, and this shard's share as jobs, heaviest package first. `weightOf` is the
- * lane share the split used; the runner judges heaviness by it too.
+ * sum of the kept scripts' seconds that the split used; the runner judges heaviness
+ * by it too.
  */
 export const planShard = ({
   packages,
   lanes,
   shard,
-  weightOf,
+  scriptSeconds,
   concurrency,
   excluded,
 }: {
   packages: readonly DiscoveredPackage[];
   lanes: LaneFilter;
   shard: { index: number; total: number };
-  weightOf: (pkg: DiscoveredPackage) => number;
+  scriptSeconds: (pkg: DiscoveredPackage, script: string) => number;
   concurrency: number;
   excluded: Map<string, string>;
 }): {
@@ -446,22 +451,15 @@ export const planShard = ({
   weightOf: (pkg: DiscoveredPackage) => number;
 } => {
   const items = withLanes({ packages, lanes });
-  // The weights file records whole packages, so a leg that keeps some suites pays their share.
-  const scriptCount = new Map(packages.map((pkg) => [pkg.name, pkg.scripts.length]));
-  const laneWeightOf = (pkg: DiscoveredPackage): number =>
-    (weightOf(pkg) * pkg.scripts.length) / (scriptCount.get(pkg.name) ?? pkg.scripts.length);
-  const split = balanceByWallTime({
-    items,
-    weightOf: laneWeightOf,
-    concurrency,
-    total: shard.total,
-  });
+  const weightOf = (pkg: DiscoveredPackage): number =>
+    pkg.scripts.reduce((sum, script) => sum + scriptSeconds(pkg, script), 0);
+  const split = balanceByWallTime({ items, scriptSeconds, concurrency, total: shard.total });
   const assigned = split.groups[shard.index - 1] ?? [];
   return {
     assigned,
     seconds: split.walls[shard.index - 1] ?? 0,
-    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf: laneWeightOf }), excluded),
-    weightOf: laneWeightOf,
+    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
+    weightOf,
   };
 };
 
@@ -835,8 +833,10 @@ if (isEntrypoint()) {
     }
   }
   // An excluded package runs nothing, so it adds nothing to a shard's time.
-  const weightOf = (pkg: DiscoveredPackage): number =>
-    excluded.has(pkg.name) ? 0 : (parsedWeights.weights.get(pkg.name) ?? DEFAULT_WEIGHT_SECONDS);
+  const scriptSeconds = (pkg: DiscoveredPackage, script: string): number =>
+    excluded.has(pkg.name)
+      ? 0
+      : (parsedWeights.weights.get(pkg.name)?.get(script) ?? DEFAULT_WEIGHT_SECONDS);
   let concurrency: number;
   try {
     concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);
@@ -852,7 +852,14 @@ if (isEntrypoint()) {
     process.exit(1);
   }
   // Every shard reads the same concurrency and lanes from the job's env, so they agree.
-  const plan = planShard({ packages: reached, lanes, shard, weightOf, concurrency, excluded });
+  const plan = planShard({
+    packages: reached,
+    lanes,
+    shard,
+    scriptSeconds,
+    concurrency,
+    excluded,
+  });
   const { assigned } = plan;
   console.log(`Lanes: ${lanes} (PACKAGE_SUITES_LANES).`);
   console.log(

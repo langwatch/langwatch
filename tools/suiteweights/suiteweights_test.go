@@ -34,6 +34,8 @@ func m(pkg, script string, seconds float64, cached bool) Measurement {
 	return Measurement{Package: pkg, Script: script, Seconds: seconds, Cached: cached}
 }
 
+func k(pkg, script string) ScriptKey { return ScriptKey{Package: pkg, Script: script} }
+
 // @scenario "A suite Nx replayed from its cache does not make it look cheap"
 func TestWeighIgnoresCacheReplaysWhenARealRunExists(t *testing.T) {
 	weights := Weigh([][]Measurement{
@@ -42,38 +44,47 @@ func TestWeighIgnoresCacheReplaysWhenARealRunExists(t *testing.T) {
 		{m("a", "test", 3, true)},
 	}, nil)
 
-	assert.InDelta(t, 90.0, weights["a"], 0.001)
+	assert.InDelta(t, 90.0, weights[k("a", "test")], 0.001)
 }
 
 // @scenario "A suite only ever replayed from the cache still has a weight"
 func TestWeighFallsBackToReplaysWhenNothingRanForReal(t *testing.T) {
 	weights := Weigh([][]Measurement{{m("a", "test", 4, true)}, {m("a", "test", 6, true)}}, nil)
 
-	assert.InDelta(t, 5.0, weights["a"], 0.001)
+	assert.InDelta(t, 5.0, weights[k("a", "test")], 0.001)
 }
 
 // @scenario "A package only ever replayed from the cache keeps its committed weight"
 func TestWeighKeepsTheCommittedWeightOfAPackageNoRunExecuted(t *testing.T) {
-	previous := ParseWeights("# header\n@x/sims  28\n@x/ran  90  # note\n")
+	previous := ParseWeights("# header\n@x/sims  test  28\n@x/sims  test:browser  12\n@x/ran  test  90  # note\n")
 
 	weights := Weigh([][]Measurement{
 		{m("@x/sims", "test", 2, true), m("@x/ran", "test", 40, false)},
 		{m("@x/sims", "test", 3, true), m("@x/ran", "test", 50, false)},
 	}, previous)
 
-	assert.InDelta(t, 28.0, weights["@x/sims"], 0.001)
-	assert.InDelta(t, 45.0, weights["@x/ran"], 0.001)
+	assert.InDelta(t, 28.0, weights[k("@x/sims", "test")], 0.001)
+	assert.InDelta(t, 12.0, weights[k("@x/sims", "test:browser")], 0.001)
+	assert.InDelta(t, 45.0, weights[k("@x/ran", "test")], 0.001)
 }
 
-// @scenario "A package's weight is the median of its runs, summed over its scripts"
-func TestWeighSumsTheMedianOfEachScript(t *testing.T) {
+// @scenario "A package's weight is the median of its runs, kept per script"
+func TestWeighKeepsTheMedianOfEachScriptApart(t *testing.T) {
 	weights := Weigh([][]Measurement{
 		{m("a", "test", 50, false), m("a", "test:integration", 274, false)},
 		{m("a", "test", 40, false), m("a", "test:integration", 404, false)},
 		{m("a", "test", 60, false), m("a", "test:integration", 300, false)},
 	}, nil)
 
-	assert.InDelta(t, 350.0, weights["a"], 0.001)
+	assert.InDelta(t, 50.0, weights[k("a", "test")], 0.001)
+	assert.InDelta(t, 300.0, weights[k("a", "test:integration")], 0.001)
+}
+
+// @scenario "The file lists each script with its own seconds"
+func TestParseWeightsReadsPackageScriptAndSeconds(t *testing.T) {
+	got := ParseWeights("# h\n@x/a  test  161\n@x/a  test:browser  15 # n\nbad line\n@x/b  test\n@x/c  test  0\n")
+
+	assert.Equal(t, map[ScriptKey]float64{k("@x/a", "test"): 161, k("@x/a", "test:browser"): 15}, got)
 }
 
 type fakeSource struct {
@@ -157,8 +168,11 @@ func TestARunMissingAShardIsNotComplete(t *testing.T) {
 }
 
 // @scenario "The file is written heaviest first and names its runs"
-func TestRenderListsHeaviestFirstAndNamesTheRuns(t *testing.T) {
-	out := Render(map[string]float64{"@x/b": 120.4, "@x/a": 120.2, "@x/c": 300, "@x/tiny": 9.4}, []int64{11, 22})
+func TestRenderListsHeaviestScriptFirstAndNamesTheRuns(t *testing.T) {
+	out := Render(map[ScriptKey]float64{
+		k("@x/b", "test"): 120.4, k("@x/a", "test:browser"): 120.2, k("@x/a", "test"): 120.3,
+		k("@x/c", "test"): 300, k("@x/tiny", "test"): 9.4,
+	}, []int64{11, 22})
 
 	var body []string
 	for _, line := range strings.Split(out, "\n") {
@@ -166,7 +180,9 @@ func TestRenderListsHeaviestFirstAndNamesTheRuns(t *testing.T) {
 			body = append(body, line)
 		}
 	}
-	assert.Equal(t, []string{"@x/c  300", "@x/a  120", "@x/b  120"}, body)
+	assert.Equal(t, []string{
+		"@x/c  test  300", "@x/a  test  120", "@x/a  test:browser  120", "@x/b  test  120",
+	}, body)
 	assert.Contains(t, out, "main runs 11, 22")
 }
 

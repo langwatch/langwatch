@@ -70,6 +70,16 @@ Feature: The real-browser test lane runs, and only where React is
       Then one leg runs every browser suite and no other suite
       And every other leg runs every suite except the browser suites
 
+    # The weights file records seconds per script, so a leg weighs a package by the
+    # suites it keeps: a 161s jsdom suite beside a 15s browser suite is 161s on the
+    # no-browser leg (heavy, so it runs alone) and 15s on the browser leg.
+    @unit
+    Scenario: A leg weighs a package by the seconds of the suites it keeps
+      Given a package with a slow jsdom suite and a short browser suite
+      When each leg plans its shard
+      Then the no-browser leg weighs the package as the jsdom suite alone
+      And the browser leg weighs it as the browser suite alone
+
     @unit
     Scenario: Without a lane filter every lane runs
       Given the package suites run with no lane filter set

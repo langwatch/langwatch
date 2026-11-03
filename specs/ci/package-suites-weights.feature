@@ -43,10 +43,11 @@ Feature: The package-suites weights are refreshed by a command
       Then it keeps the committed weight rather than the replay's seconds
 
     @unit
-    Scenario: A package's weight is the median of its runs, summed over its scripts
+    Scenario: A package's weight is the median of its runs, kept per script
       Given a package whose unit and integration scripts were measured in three runs
       When the weights are computed
-      Then its weight is the median of each script plus the median of the other
+      Then each script has its own weight, the median of its runs
+      And the scheduler weighs the package as the sum of the scripts a leg keeps
 
   Rule: only complete, green runs are measured
 
@@ -77,9 +78,16 @@ Feature: The package-suites weights are refreshed by a command
   Rule: the file says where its numbers came from
 
     @unit
+    Scenario: The file lists each script with its own seconds
+      Given a weights file with lines "<package>  <script>  <seconds>"
+      When it is read
+      Then each line is the weight of that script of that package
+      And a line of any other shape is skipped
+
+    @unit
     Scenario: The file is written heaviest first and names its runs
-      Given weights for several packages
+      Given weights for several package scripts
       When the file is rendered
-      Then the packages are listed heaviest first, ties by name
-      And packages under the listing threshold are left to the default
+      Then the scripts are listed heaviest first, ties by package then script
+      And scripts under the listing threshold are left to the default
       And the header names the runs the numbers came from
