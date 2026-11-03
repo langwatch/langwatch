@@ -47,13 +47,13 @@ Feature: The application recovers from files a lossy link dropped while it boots
     Scenario: Six reloads in a row that fetch nothing new give up
       Given six reloads in a row fetched no new code
       When the next load fails
-      Then the page says "Could not load. Check your connection." with a "Try again" button
+      Then the page says "LangWatch could not load. Reload the page, or try another browser if it keeps happening." with a "Try again" button
       And it does not reload by itself
 
     @unit
     Scenario: Giving up clears the loading screen's progress note
       Given the loading screen says "Connected. Opening LangWatch…"
-      When the page gives up and says "Could not load. Check your connection."
+      When the page gives up and says "LangWatch could not load. Reload the page, or try another browser if it keeps happening."
       Then the loading screen no longer says it is connected
 
     @unit

@@ -268,7 +268,9 @@ describe("given earlier reloads", () => {
       page.chunkFailed();
 
       expect(page.location.reload).not.toHaveBeenCalled();
-      expect(statusText()).toContain("Could not load. Check your connection.");
+      expect(statusText()).toContain(
+        "LangWatch could not load. Reload the page, or try another browser if it keeps happening.",
+      );
       expect(status()?.querySelector("button")?.textContent).toBe("Try again");
       expect(page.saved()).toBeNull();
     });
@@ -288,7 +290,9 @@ describe("given earlier reloads", () => {
 
       expect(document.getElementById("lw-boot-note")).toBeNull();
       expect(document.body.textContent).not.toContain("Connected");
-      expect(statusText()).toContain("Could not load. Check your connection.");
+      expect(statusText()).toContain(
+        "LangWatch could not load. Reload the page, or try another browser if it keeps happening.",
+      );
     });
   });
 

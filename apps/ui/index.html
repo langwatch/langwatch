@@ -97,7 +97,10 @@
           }
           write(null);
           dropSplashNote();
-          say("Could not load. Check your connection.", true);
+          say(
+            "LangWatch could not load. Reload the page, or try another browser if it keeps happening.",
+            true,
+          );
         }
         // The loading screen's note (vite/boot-splash.ts) may say "Connected"; it must not
         // stand under the failure. Before the body is parsed, wait for the note to exist.
