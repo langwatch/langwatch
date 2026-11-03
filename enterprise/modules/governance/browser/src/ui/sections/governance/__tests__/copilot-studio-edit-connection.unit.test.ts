@@ -139,6 +139,28 @@ describe("given a Copilot Studio source opened for editing", () => {
     ]);
   });
 
+  /** @scenario "A billing app registration typed without the main one is refused" */
+  it("refuses a billing pair typed while the app registration is left blank, naming the billing fields", () => {
+    const { submission, toaster } = submit({
+      environmentUrl: ENVIRONMENT,
+      azureSubscriptionId: "bbbbbbbb-0000-4000-8000-000000000002",
+      azureBillingUsesSameApp: "false",
+      credentialsTenantId: "",
+      credentialsClientId: "",
+      credentialsClientSecret: "",
+      credentialsBillingClientId: "billing-client",
+      credentialsBillingClientSecret: "billing-secret",
+    });
+
+    expect(submission).toBeNull();
+    expect(toaster.toasts).toEqual([
+      expect.objectContaining({
+        type: "error",
+        description: expect.stringMatching(/billing app registration client ID and secret/),
+      }),
+    ]);
+  });
+
   it("replaces the app registration when all three are entered", () => {
     const { submission } = submit({
       environmentUrl: ENVIRONMENT,

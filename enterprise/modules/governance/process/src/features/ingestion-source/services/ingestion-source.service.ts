@@ -210,6 +210,7 @@ export class IngestionSourceService {
     };
     this.destinations.assertAllowed(requestedParserConfig);
     this.validation.assertPullConfig(requestedParserConfig);
+    this.validation.assertPullCredentials(requestedParserConfig);
     await this.assertOttlParses(requestedParserConfig);
     const { providerAccountId } = await this.parserConfigs.assertClaimsAreFree({
       organizationId: input.organizationId,
@@ -266,6 +267,9 @@ export class IngestionSourceService {
       cursorMustNotMove = reportMoves || environmentMoves;
       this.destinations.assertAllowed(incoming);
       this.validation.assertPullConfig(incoming);
+      if (input.parserConfig.credentials !== undefined) {
+        this.validation.assertPullCredentials(incoming);
+      }
       await this.assertOttlParses(incoming);
       this.parserConfigs.assertRepointAllowed({ existing, incoming });
       const { providerAccountId } = await this.parserConfigs.assertClaimsAreFree({

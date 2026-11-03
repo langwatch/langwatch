@@ -11,7 +11,10 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { findPullConfigComplaints } from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
+import {
+  findPullConfigComplaints,
+  findPullCredentialComplaints,
+} from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
 import { isSameEnvironment } from "../../microsoft/rules/dataverse-environment-service.rules.ts";
 
 export class IngestionSourceValidationService {
@@ -115,6 +118,19 @@ export class IngestionSourceValidationService {
   }
 
   /**
+   * The credentials a save sends of its own, whole: a create, or an edit replacing them. An edit
+   * that sends none keeps the stored ones and is not asked for them again.
+   */
+  assertPullCredentials(parserConfig: Record<string, unknown>): void {
+    const complaints = findPullCredentialComplaints(parserConfig);
+    if (complaints.length === 0) {
+      return;
+    }
+
+    throw new GovernanceValidationError(complaints.join(" "), { formErrors: complaints });
+  }
+
+  /**
    * Whether this update moves a conversation source to another environment. Refused once the
    * source has pulled, since its cursor is a position in the old environment's history; before
    * that, `true` tells the caller to pin the write to the cursor it read.
@@ -140,8 +156,11 @@ export class IngestionSourceValidationService {
     }
 
     const message =
-      "This source has already read conversations from its environment, so the environment is " +
-      "fixed. Archive this source and create a new one to read another environment.";
+      next === undefined
+        ? "This source has already read conversations from its environment. An update that " +
+          "replaces the configuration has to carry the same environment address rather than omit it."
+        : "This source has already read conversations from its environment, so the environment is " +
+          "fixed. Archive this source and create a new one to read another environment.";
 
     throw new GovernanceValidationError(message, { formErrors: [message] });
   }

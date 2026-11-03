@@ -224,9 +224,7 @@ function resolvePullConfig(
     copilot_studio_dataverse: [
       () => buildCopilotStudioDataversePullConfig(composer, { shouldRequireCredentials }),
       "Missing required Copilot Studio fields",
-      shouldRequireCredentials
-        ? "The environment URL is required, plus all three parts of the app registration: tenant ID, client ID and client secret."
-        : "The environment URL is required. Leave the tenant ID, client ID and client secret all blank to keep the current app registration, or enter all three to replace it.",
+      copilotStudioRefusalCopy(composer, { shouldRequireCredentials }),
     ],
     openai_admin: [
       () => buildOpenAiAdminPullConfig(composer, { shouldRequireCredentials }),
@@ -264,6 +262,30 @@ function resolvePullConfig(
     return { pullConfig: pullConfig as Record<string, unknown> };
   }
   return { pullConfig: pullAdapter ? { adapter: pullAdapter } : null };
+}
+
+/**
+ * Why `buildCopilotStudioDataversePullConfig` refused, in the form's own field names. The billing
+ * pair is named on its own: typed without the app registration it would replace the stored
+ * credentials with half of them, and a refusal naming only the registration hides why.
+ */
+export function copilotStudioRefusalCopy(
+  c: ComposerState,
+  { shouldRequireCredentials }: { shouldRequireCredentials: boolean },
+): string {
+  if (shouldRequireCredentials) {
+    return "The environment URL is required, plus all three parts of the app registration: tenant ID, client ID and client secret.";
+  }
+  const p = c.parserConfig;
+  const registrationIsBlank = [
+    p.credentialsTenantId,
+    p.credentialsClientId,
+    p.credentialsClientSecret,
+  ].every((value) => (value ?? "").trim().length === 0);
+  if (registrationIsBlank && Object.keys(copilotAzureBillingFrom(p).credentials).length > 0) {
+    return "The billing app registration client ID and secret are stored together with the app registration, so enter them with the tenant ID, client ID and client secret, or clear both billing fields to keep the current credentials.";
+  }
+  return "The environment URL is required. Leave the tenant ID, client ID and client secret all blank to keep the current app registration, or enter all three to replace it.";
 }
 
 function InventoryHeader() {
@@ -2054,6 +2076,12 @@ interface FieldDef {
    */
   secret?: boolean;
   /**
+   * What a secret field says on the edit form, where it opens blank. Absent
+   * means the one-key hint: blank keeps it, a value replaces it. A secret that
+   * is only replaced together with others says so here instead.
+   */
+  editHint?: string;
+  /**
    * True for fields most admins never need: rendered inside a collapsed
    * "Advanced" group so the form leads with the required path. Leaving
    * every advanced field untouched must always produce a working source.
@@ -2468,6 +2496,16 @@ function azureOneAppChosen(values: Record<string, string>): boolean {
   });
 }
 
+/**
+ * The Copilot Studio secrets' edit hints. The app registration is stored as
+ * one sealed set, so it is kept or replaced whole (#9275): the generic "leave
+ * blank to keep the current key" would invite replacing one value of three.
+ */
+const COPILOT_REGISTRATION_EDIT_HINT =
+  "Leave the tenant ID, client ID and client secret all blank to keep the current app registration. To replace it, enter all three together, and enter the billing client ID and secret again if the bill has its own app registration.";
+const COPILOT_BILLING_EDIT_HINT =
+  "Leave blank to keep the current billing app registration. It is stored with the main app registration, so to change it, also enter the tenant ID, client ID and client secret.";
+
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
   // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
@@ -2548,6 +2586,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       required: true,
       secret: true,
+      editHint: COPILOT_REGISTRATION_EDIT_HINT,
       group: "Connection",
     },
     {
@@ -2568,6 +2607,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       required: true,
       secret: true,
+      editHint: COPILOT_REGISTRATION_EDIT_HINT,
       group: "Conversation access",
     },
     {
@@ -2577,6 +2617,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "The app needs a Dataverse application user in this environment with read access to the conversation transcript and bot tables. No directory permission is required.",
       required: true,
       secret: true,
+      editHint: COPILOT_REGISTRATION_EDIT_HINT,
       group: "Conversation access",
     },
     {
@@ -2607,6 +2648,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription: it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
       secret: true,
+      editHint: COPILOT_BILLING_EDIT_HINT,
       group: "Billing",
       visibleWhen: (values) => !azureOneAppChosen(values),
     },
@@ -2615,6 +2657,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       label: "Billing app registration client secret",
       placeholder: "(value pasted from the Azure portal)",
       secret: true,
+      editHint: COPILOT_BILLING_EDIT_HINT,
       group: "Billing",
       visibleWhen: (values) => !azureOneAppChosen(values),
     },
@@ -3504,7 +3547,8 @@ export function parserFieldPresentation({
     // form would suggest they have to — and re-typing a key they do not have
     // to hand is how a working source gets archived and recreated instead.
     hint: keepsStoredSecret
-      ? "Leave blank to keep the current key. Enter a new one only to replace it."
+      ? (field.editHint ??
+        "Leave blank to keep the current key. Enter a new one only to replace it.")
       : field.hint,
     placeholder: keepsStoredSecret ? "Unchanged" : field.placeholder,
   };

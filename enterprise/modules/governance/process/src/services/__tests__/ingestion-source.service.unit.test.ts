@@ -10,7 +10,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
+import {
+  findPullConfigComplaints,
+  findPullCredentialComplaints,
+} from "../../features/ingestion-pull/rules/pull-config-shape.rules.ts";
 import { PullDestinationService } from "../../features/ingestion-pull/services/pull-destination.service.ts";
+import { IngestionSourceReadService } from "../../features/ingestion-source/services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
@@ -20,6 +25,7 @@ import type {
   IngestionSourceLifecycleChannel,
 } from "../../features/ingestion-source/services/ingestion-source.service.ts";
 import { IngestionSourceService } from "../../features/ingestion-source/services/ingestion-source.service.ts";
+import { MemoryIngestionPullRunRepository } from "../../repositories/memory/memory.ingestion-pull-run.repository.ts";
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
@@ -426,7 +432,7 @@ describe("IngestionSourceService", () => {
           parserConfig: {
             environmentUrl,
             azureSubscriptionId: BILL_B,
-            credentials: { clientId: "c", clientSecret: "s", ...billing },
+            credentials: { tenantId: "t", clientId: "c", clientSecret: "s", ...billing },
           },
         }),
       ).rejects.toThrow(/Archive this source and create a new one/);
@@ -444,7 +450,7 @@ describe("IngestionSourceService", () => {
           parserConfig: {
             environmentUrl,
             azureSubscriptionId: BILL_A,
-            credentials: { clientId: "c", clientSecret: "s", ...billing },
+            credentials: { tenantId: "t", clientId: "c", clientSecret: "s", ...billing },
           },
         }),
       ).rejects.toThrow(/already read the bill/);
@@ -481,7 +487,7 @@ describe("IngestionSourceService", () => {
         parserConfig: {
           environmentUrl,
           azureSubscriptionId: BILL_B,
-          credentials: { clientId: "c", clientSecret: "s", ...billing },
+          credentials: { tenantId: "t", clientId: "c", clientSecret: "s", ...billing },
         },
       });
       expect(repository.updateInput).not.toBeNull();
@@ -883,6 +889,146 @@ describe("IngestionSourceService", () => {
           expect.objectContaining({ cursor: null }),
         );
       });
+
+      /** @scenario "An update that omits the environment address of a pulled source is told to carry it" */
+      it("tells an update that omits the address to carry it, rather than calling it a move", async () => {
+        const { service, repository } = harness();
+        repository.row = source({
+          sourceType: "copilot_studio_dataverse",
+          parserConfig: copilot(),
+          pollerCursor: pulled,
+        });
+        const { environmentUrl: _omitted, ...withoutEnvironment } = copilot();
+
+        const refusal = service.updateSource({
+          id: "source-1",
+          organizationId: "org-1",
+          parserConfig: withoutEnvironment,
+        });
+
+        await expect(refusal).rejects.toThrow(/carry the same environment address/);
+        await expect(refusal).rejects.not.toThrow(/Archive this source/);
+        expect(repository.updateInput).toBeNull();
+      });
+    });
+
+    describe("when it is created without its app registration", () => {
+      /** @scenario "A Copilot Studio source cannot be created without its app registration" */
+      it("refuses the create, names what is missing, and stores nothing", async () => {
+        const { service, repository } = harness();
+
+        const refusal = service.createSource({
+          organizationId: "org-1",
+          sourceType: "copilot_studio_dataverse",
+          name: "Copilot",
+          pullConfig: copilot({ credentials: undefined }),
+          pullSchedule: "*/15 * * * *",
+          actorUserId: "user-1",
+        });
+
+        await expect(refusal).rejects.toMatchObject({
+          code: "validation_error",
+          meta: {
+            formErrors: [
+              expect.stringMatching(/App registration: .*missing tenant ID, client ID and client secret/),
+            ],
+          },
+        });
+        expect(repository.create).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A Copilot Studio source cannot be created without its app registration" */
+      it("refuses credentials still in their sealed form, which carry no registration", () => {
+        expect(
+          findPullCredentialComplaints(copilot({ credentials: "enc:v1:aaaa:bbbb:cccc" })),
+        ).toHaveLength(1);
+      });
+    });
+
+    describe("when an update replaces the app registration", () => {
+      const stored = () =>
+        source({ sourceType: "copilot_studio_dataverse", parserConfig: copilot() });
+
+      /** @scenario "A replacement app registration is checked as a whole" */
+      it("refuses credentials without a client secret and writes nothing", async () => {
+        const { service, repository } = harness();
+        repository.row = stored();
+
+        await expect(
+          service.updateSource({
+            id: "source-1",
+            organizationId: "org-1",
+            parserConfig: copilot({ credentials: { tenantId: "t2", clientId: "c2" } }),
+          }),
+        ).rejects.toThrow(/missing client secret/);
+        expect(repository.updateInput).toBeNull();
+      });
+
+      /** @scenario "A replacement app registration is checked as a whole" */
+      it("keeps the stored registration when the update sends no credentials", async () => {
+        const { service, repository } = harness();
+        repository.row = stored();
+        const { credentials: _kept, ...withoutCredentials } = copilot();
+
+        await service.updateSource({
+          id: "source-1",
+          organizationId: "org-1",
+          parserConfig: withoutCredentials,
+        });
+
+        expect(repository.updateInput?.parserConfig?.credentials).toEqual({
+          tenantId: "t",
+          clientId: "c",
+          clientSecret: "s",
+        });
+      });
+    });
+
+    describe("when a source stored before save-time checks is read", () => {
+      /** @scenario "A stored configuration its adapter refuses is reported on the source" */
+      it("carries what the adapter refuses on the source the admin reads", async () => {
+        const { service, repository, projects } = harness();
+        repository.row = source({
+          sourceType: "copilot_studio_dataverse",
+          parserConfig: copilot({ environmentUrl: "org12345.crm.dynamics.com" }),
+        });
+        const reads = IngestionSourceReadService.create({
+          sources: service,
+          pullRuns: MemoryIngestionPullRunRepository.create(),
+          projects,
+        });
+
+        const [listed] = await reads.list("org-1");
+
+        expect(listed?.configComplaints).toEqual([expect.stringMatching(/^Environment URL: /)]);
+      });
+
+      it("carries nothing for a configuration the adapter reads", async () => {
+        const { service, repository, projects } = harness();
+        repository.row = source({
+          sourceType: "copilot_studio_dataverse",
+          parserConfig: copilot(),
+        });
+        const reads = IngestionSourceReadService.create({
+          sources: service,
+          pullRuns: MemoryIngestionPullRunRepository.create(),
+          projects,
+        });
+
+        const [listed] = await reads.list("org-1");
+
+        expect(listed?.configComplaints).toEqual([]);
+      });
+    });
+  });
+
+  describe("given an adapter named after an inherited object property", () => {
+    /** @scenario "An adapter name that is not registered is never read as one" */
+    it("applies no schema and refuses nothing on that account", () => {
+      for (const adapter of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+        expect(findPullConfigComplaints({ adapter })).toEqual([]);
+        expect(findPullCredentialComplaints({ adapter })).toEqual([]);
+      }
     });
   });
 });

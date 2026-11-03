@@ -12,6 +12,7 @@ import {
   type PullRunSummary,
   sourcePullStatus,
 } from "../../ingestion-pull/rules/source-pull-status.rules.ts";
+import { findPullConfigComplaints } from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
 import { IngestionSourceService } from "./ingestion-source.service.ts";
 
 /**
@@ -108,6 +109,7 @@ export class IngestionSourceReadService {
         cursor: row.pollerCursor,
         pullRun,
       }),
+      configComplaints: findPullConfigComplaints(row.parserConfig),
       traceProjectId,
       traceProjectArchived: traceProjectId ? !live.has(traceProjectId) : false,
       lastEventAt: row.lastEventAt,

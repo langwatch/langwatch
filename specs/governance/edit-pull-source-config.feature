@@ -66,6 +66,38 @@ Feature: Edit the configuration of a pull-mode ingestion source
       # the form let through was stored and then failed every scheduled run,
       # with the source still reporting it was waiting for its first event.
 
+    @integration
+    Scenario: A Databricks Genie configuration its adapter refuses is not stored
+      Given an admin creating a Databricks Genie source
+      When its "Read history from" value is a bare date the adapter's schema refuses
+      Then the save is refused and names the "Read history from" field
+      And no source is stored
+
+    @unit
+    Scenario: An adapter name that is not registered is never read as one
+      Given a configuration whose adapter is named "constructor"
+      When it is checked against the adapters' schemas
+      Then no schema is applied and nothing is refused on that account
+
+    @unit
+    Scenario: A stored configuration its adapter refuses is reported on the source
+      Given a pull source stored before its adapter's schema was checked at save time
+      And its configuration is one that schema refuses
+      When an admin reads the source
+      Then the source carries what the adapter refuses about it
+
+    @integration
+    Scenario: A source holding a configuration its adapter refuses says to fix the connection
+      Given a pull source whose stored configuration its adapter refuses
+      And its last pull failed
+      When the admin opens the source
+      Then the page names what the adapter refuses
+      And tells the admin to fix the connection with Edit
+      And does not say the next scheduled pull will retry
+      # Retrying a configuration the adapter refuses fails the same way every
+      # time, so "the next scheduled pull will retry" left the admin waiting on
+      # a fix only they could make.
+
     @unit
     Scenario: An invalid cron expression is rejected at save time
       When the admin enters a pull schedule of "not a cron"
@@ -189,6 +221,43 @@ Feature: Edit the configuration of a pull-mode ingestion source
       Given a Copilot Studio source that has completed at least one pull
       When the admin submits the same environment with a trailing slash
       Then the save is accepted
+
+    @unit
+    Scenario: An update that omits the environment address of a pulled source is told to carry it
+      Given a Copilot Studio source that has completed at least one pull
+      When an update replaces the configuration without an environment address
+      Then the save is refused
+      And the refusal says the configuration has to carry the same environment address
+
+    @unit
+    Scenario: A Copilot Studio source cannot be created without its app registration
+      Given a Copilot Studio configuration with a valid environment address
+      When it is created without a tenant ID, client ID or client secret
+      Then the save is refused before it is stored
+      And the refusal names the missing parts of the app registration
+
+    @unit
+    Scenario: A replacement app registration is checked as a whole
+      Given a Copilot Studio source
+      When an update sends credentials without a client secret
+      Then the save is refused before it is stored
+      And an update that sends no credentials at all keeps the stored ones
+
+    @unit
+    Scenario: A billing app registration typed without the main one is refused
+      Given a Copilot Studio source that reads its bill with its own app registration
+      When the admin enters a billing client ID and secret but leaves the tenant ID, client ID and client secret empty
+      And saves the form
+      Then the save is refused before it is sent
+      And the refusal names the billing fields
+
+    @integration
+    Scenario: The edit drawer shows the stored connection with its secrets blank
+      Given a Copilot Studio source that has completed at least one pull
+      When the admin opens the edit drawer
+      Then the environment address, tenant ID, client ID and client secret fields are shown
+      And the three secret fields are empty and say they are replaced together
+      And the environment address is read-only, with a note saying why
 
   Rule: Copy that does not apply to a pull source is not shown
 
