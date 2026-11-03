@@ -779,7 +779,8 @@ func parseImageEditMultipart(w http.ResponseWriter, r *http.Request) error {
 	}
 	// Memory threshold: files up to 10 MB stay in memory, larger ones spill
 	// to a temp file ParseMultipartForm cleans up on r.Body close.
-	//nolint:gosec // G120: prepareRequestBody already wrapped r.Body in a MaxBytesReader at maxImageEditBodyBytes
+	// G120 does not fire here: prepareRequestBody already wrapped r.Body in
+	// a MaxBytesReader at maxImageEditBodyBytes.
 	err := r.ParseMultipartForm(10 << 20)
 	if err == nil {
 		return nil
@@ -1149,7 +1150,8 @@ func readElevenLabsForm(w http.ResponseWriter, r *http.Request) error {
 	}
 	// Memory threshold: parts up to 10 MB stay in memory, larger ones spill to
 	// a temp file ParseMultipartForm cleans up on r.Body close.
-	//nolint:gosec // G120: prepareRequestBody already wrapped r.Body in a MaxBytesReader at maxBytes
+	// G120 does not fire here: prepareRequestBody already wrapped r.Body in
+	// a MaxBytesReader at maxBytes.
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
 			return herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
