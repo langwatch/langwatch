@@ -100,7 +100,10 @@ async function projectWithBothBoards({
           servedDoors: true as const,
           confirmations: {
             confirm: async ({ resource, targets }) => {
-              cards.push({ resource, names: await Promise.all(targets.map((t) => t.name())) });
+              // Like Langy's gate: a target whose name reads undefined is gone and shows no card.
+              const names = await Promise.all(targets.map((t) => t.name()));
+              const shown = names.filter((name) => name !== undefined);
+              if (shown.length > 0) cards.push({ resource, names: shown });
             },
           },
         }
