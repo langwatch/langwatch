@@ -775,6 +775,13 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.listDecisionModelsForProject(input);
   }
 
+  listDecisionModelsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<readonly BuiltInModel[]> {
+    return this.#modelProviders.listDecisionModelsForScopes(input);
+  }
+
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;
