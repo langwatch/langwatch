@@ -1565,7 +1565,7 @@ function registerEvaluatorCommands(program: Command): void {
       .option("--version <number>", "Version to point the label at (defaults to the latest)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (reference: string, label: string, options: { version?: string }) => {
-      const { evaluatorDeployCommand: impl } = await import("./commands/evaluators/versions.js");
+      const { evaluatorDeployCommand: impl } = await import("./commands/evaluators/deploy.js");
       return impl(reference, label, options);
     },
   );
@@ -1576,7 +1576,7 @@ function registerEvaluatorCommands(program: Command): void {
       .description("Remove a deploy label from an evaluator")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (reference: string, label: string) => {
-      const { evaluatorUndeployCommand: impl } = await import("./commands/evaluators/versions.js");
+      const { evaluatorUndeployCommand: impl } = await import("./commands/evaluators/undeploy.js");
       return impl(reference, label);
     },
   );
@@ -2004,7 +2004,7 @@ function registerAgentCommands(program: Command): void {
       .option("--version <number>", "Version to point the label at (defaults to the latest)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, label: string, options: { version?: string }) => {
-      const { agentDeployCommand: impl } = await import("./commands/agents/versions.js");
+      const { agentDeployCommand: impl } = await import("./commands/agents/deploy.js");
       return impl(id, label, options);
     },
   );
@@ -2015,7 +2015,7 @@ function registerAgentCommands(program: Command): void {
       .description("Remove a deploy label from an agent")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, label: string) => {
-      const { agentUndeployCommand: impl } = await import("./commands/agents/versions.js");
+      const { agentUndeployCommand: impl } = await import("./commands/agents/undeploy.js");
       return impl(id, label);
     },
   );

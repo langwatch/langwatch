@@ -11,11 +11,9 @@ vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env" })),
 }));
 
-import {
-  evaluatorDeployCommand,
-  evaluatorUndeployCommand,
-  evaluatorVersionsCommand,
-} from "../versions";
+import { evaluatorDeployCommand } from "../deploy";
+import { evaluatorUndeployCommand } from "../undeploy";
+import { evaluatorVersionsCommand } from "../versions";
 
 const versionRow = (version: number, labels: string[]) => ({
   id: `version_${version}`,
