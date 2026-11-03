@@ -1,8 +1,11 @@
 import { EvaluatorDeployedLabelProtectedError } from "@langwatch/evaluator-contract";
+import { createLogger } from "@langwatch/observability";
 
 import type { EvaluatorDeletionFactsService } from "./evaluator-deletion-facts.service.ts";
 import type { EvaluatorVersionService } from "./evaluator-version.service.ts";
 import type { EvaluatorService } from "./evaluator.service.ts";
+
+const logger = createLogger("langwatch:evaluator:workflow-archive-cascade");
 
 /**
  * Archives the live evaluators a workflow backed once workflow records its archive (§9, plan §7).
@@ -25,7 +28,7 @@ export class EvaluatorWorkflowArchiveService {
   /** Records the deleted fact before the archive, so a retry after a failed record finds it. */
   async archiveForWorkflow(input: { workflowId: string; projectId: string }): Promise<void> {
     for (const evaluator of await this.deps.evaluators.findByWorkflow(input)) {
-      if (!(await this.#mayArchive({ projectId: input.projectId, evaluatorId: evaluator.id }))) {
+      if (!(await this.#mayArchive({ ...input, evaluatorId: evaluator.id }))) {
         continue;
       }
       await this.deps.deletionFacts.recordEvaluatorDeleted({
@@ -36,13 +39,25 @@ export class EvaluatorWorkflowArchiveService {
     }
   }
 
-  async #mayArchive(input: { projectId: string; evaluatorId: string }): Promise<boolean> {
+  async #mayArchive(input: {
+    projectId: string;
+    workflowId: string;
+    evaluatorId: string;
+  }): Promise<boolean> {
     try {
-      await this.deps.versions.assertDeletable({ ...input, caller: undefined });
+      await this.deps.versions.assertDeletable({
+        projectId: input.projectId,
+        evaluatorId: input.evaluatorId,
+        caller: undefined,
+      });
       return true;
     } catch (error) {
-      if (error instanceof EvaluatorDeployedLabelProtectedError) return false;
-      throw error;
+      if (!(error instanceof EvaluatorDeployedLabelProtectedError)) throw error;
+      logger.warn(
+        { ...input, labels: error.meta?.labels },
+        "deployed evaluator kept live when its workflow was archived",
+      );
+      return false;
     }
   }
 }
