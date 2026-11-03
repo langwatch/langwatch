@@ -23,6 +23,9 @@
 //     payload over a socket answered by the pid the kernel reports for the
 //     process connecting (see payloadchannel_linux.go).
 //
+// The one exception is visible-process mode, AWS Lambda only: the hide step is
+// skipped and /proc stays readable between invocations (contract.md §7).
+//
 // What this does not do is give an execution its own UID, PID namespace or
 // cgroup. All three would be stronger: a per-execution UID would make the
 // filesystem and /proc barriers kernel-enforced rather than a matter of
@@ -115,6 +118,10 @@ type Options struct {
 	// an endpoint with no key, gives agent code half a credential and one
 	// failure it cannot read.
 	SandboxEndpoint string
+	// AllowVisibleProcess lets code blocks run when the platform refuses to hide
+	// the engine's /proc files. The caller decides whether the platform is one
+	// that may ask for this (AWS Lambda); see cmd/root.go.
+	AllowVisibleProcess bool
 	// Logger reports what teardown could not finish. Optional: a nil logger
 	// discards those reports rather than failing an execution.
 	Logger *zap.Logger
@@ -175,6 +182,63 @@ type Executor struct {
 	// payload is how an execution's payload reaches its interpreter, nil
 	// where there is no channel and the payload goes on stdin.
 	payload *payloadChannel
+	// mode is decided once in New; see hideMode.
+	mode hideMode
+	// refusal is what the platform answered to PR_SET_DUMPABLE, kept so the
+	// disabled error can name it.
+	refusal syscall.Errno
+}
+
+// AllowVisibleProcessSetting is the operator variable that lets code blocks run
+// when the hide step is refused (AWS Lambda only).
+const AllowVisibleProcessSetting = "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
+
+// hideMode says how the engine's own /proc files are protected.
+type hideMode string
+
+const (
+	// hideStrict: PR_SET_DUMPABLE took; the runner must hide itself too.
+	hideStrict hideMode = "strict"
+	// hideVisibleProcess: the platform refused it and the operator allowed that.
+	hideVisibleProcess hideMode = "visible-process"
+	// hideDisabled: refused and not allowed; code blocks are not served.
+	hideDisabled hideMode = "disabled"
+
+	hideModeEnvVar = "NLPGO_CODE_BLOCK_HIDE"
+)
+
+// hideModeFor is the one definition of a refusal: only EPERM, Lambda's, may be
+// overridden by the operator; any other errno disables code blocks. runner.py
+// mirrors the EPERM rule for its own prctl; both must stay in step.
+func hideModeFor(refusal syscall.Errno, allow bool) hideMode {
+	switch {
+	case refusal == 0:
+		return hideStrict
+	case refusal == syscall.EPERM && allow:
+		return hideVisibleProcess
+	}
+	return hideDisabled
+}
+
+// resolveHideMode decides the mode and logs it once. A refusal never fails New:
+// the other block types must keep working.
+func resolveHideMode(allow bool, logger *zap.Logger) hideMode {
+	mode := hideModeFor(hideRefusal, allow)
+	if mode == hideStrict {
+		logger.Info("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)))
+	} else {
+		logger.Warn("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)), zap.String("refusal", hideRefusal.Error()), zap.Int("errno", int(hideRefusal)))
+	}
+	return mode
+}
+
+// disabledMessage names the refusal, and offers the operator setting only
+// where it can help: a refusal other than EPERM is not overridable.
+func disabledMessage(refusal syscall.Errno) string {
+	if refusal != syscall.EPERM {
+		return "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE) (" + refusal.Error() + "), so the engine cannot hide its process files from user code"
+	}
+	return "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; on AWS Lambda only, " + AllowVisibleProcessSetting + "=true runs them anyway"
 }
 
 // New builds an Executor, reading the runner sources it holds in memory for
@@ -234,6 +298,8 @@ func New(opts Options) (*Executor, error) {
 		return nil, err
 	}
 	return &Executor{
+		mode:           resolveHideMode(opts.AllowVisibleProcess, opts.logger()),
+		refusal:        hideRefusal,
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
@@ -435,6 +501,22 @@ func (e *Executor) childEnv() []string {
 	return env
 }
 
+// runEnv is the final environment of the interpreter. The hide flag is
+// stripped from everything else and added last, so only the engine's own
+// mode can ever tell the runner to skip its hide step.
+func runEnv(env []string, mode hideMode) []string {
+	out := make([]string, 0, len(env)+1)
+	for _, kv := range env {
+		if !strings.HasPrefix(kv, hideModeEnvVar+"=") {
+			out = append(out, kv)
+		}
+	}
+	if mode == hideVisibleProcess {
+		out = append(out, hideModeEnvVar+"=best-effort")
+	}
+	return out
+}
+
 // sandboxCredential names the LangWatch variables user code reads, or nothing.
 //
 // Both halves or neither: a key with no endpoint sends the call to the wrong
@@ -481,6 +563,9 @@ func runnerEnv(credential map[string]string, runDir, token string) map[string]st
 
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
+	if e.mode == hideDisabled {
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: disabledMessage(e.refusal)}}, nil
+	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape
 	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS by writing a bigger number into
@@ -553,7 +638,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// see childEnv. What the run itself carries — secrets, its credential, its
 	// token, its directory — travels in the payload and is put into the
 	// environment by the runner, where another execution cannot read it.
-	cmd.Env = append(e.childEnv(), e.payload.channelEnv()...)
+	cmd.Env = runEnv(append(e.childEnv(), e.payload.channelEnv()...), e.mode)
 	// Started outside the run's directory, and the runner moves into it from
 	// the payload before any user code runs. A working directory is readable
 	// from /proc in the moment before the runner is hidden, so starting in the
