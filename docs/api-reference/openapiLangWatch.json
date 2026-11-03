@@ -7534,7 +7534,7 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                      "pattern": "^[A-Z][A-Z0-9_]*$"
                                     }
                                   },
                                   "datasetId": {
@@ -7565,7 +7565,7 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                      "pattern": "^[A-Z][A-Z0-9_]*$"
                                     }
                                   },
                                   "datasetId": {
