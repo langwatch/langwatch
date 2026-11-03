@@ -359,11 +359,11 @@ export interface WorkflowApi {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowRelatedEntities>;
-  cascadeArchive(input: {
-    projectId: string;
-    workflowId: string;
-    unarchive?: boolean;
-  }): Promise<WorkflowCascadeArchive>;
+  /** A deployed agent among those it archives needs `agents:deploy` of `by`. */
+  cascadeArchive(
+    input: { projectId: string; workflowId: string; unarchive?: boolean },
+    by: WorkflowCaller,
+  ): Promise<WorkflowCascadeArchive>;
 
   // -- the Optimization Studio's publication flags --------------------------
 

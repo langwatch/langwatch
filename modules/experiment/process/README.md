@@ -728,7 +728,7 @@ Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy
 Answers at `/api/evaluations/v3/execute`.
 
 ```typescript
-type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:219
+type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:220
 // Response: inline, src/transport/experiment-v3-legacy.rest.ts:172
 type Response = unknown;
 ```
@@ -740,12 +740,12 @@ Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy
 Answers at `/api/evaluations/v3/abort`.
 
 ```typescript
-// Body: abortExperimentRunRequestSchema, ../contract/src/workbench/execution/types.ts:230
+// Body: abortExperimentRunRequestSchema, ../contract/src/workbench/execution/types.ts:231
 interface Body {
   projectId: string;
   runId: string;
 }
-// Response: abortExperimentRunResponseSchema, ../contract/src/workbench/execution/types.ts:241
+// Response: abortExperimentRunResponseSchema, ../contract/src/workbench/execution/types.ts:242
 interface Response {
   success: true;
   runId: string;
@@ -897,7 +897,7 @@ Permission `evaluations:manage`. Hidden from the OpenAPI document. Declared at `
 Answers at `/api/experiments/execute`, `/api/v1/experiments/execute`; also, undocumented, `/api/experiments/2026-08-07/execute`, `/api/v1/experiments/2026-08-07/execute`, `/api/experiments/latest/execute`, `/api/v1/experiments/latest/execute`.
 
 ```typescript
-type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:219
+type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:220
 // Response: inline, src/transport/experiment-workbench-run.rest.ts:29
 type Response = unknown;
 ```
@@ -909,8 +909,8 @@ Permission `evaluations:manage`. Hidden from the OpenAPI document. Declared at `
 Answers at `/api/experiments/abort`, `/api/v1/experiments/abort`; also, undocumented, `/api/experiments/2026-08-07/abort`, `/api/v1/experiments/2026-08-07/abort`, `/api/experiments/latest/abort`, `/api/v1/experiments/latest/abort`.
 
 ```typescript
-type Body = z.infer<typeof abortExperimentRunRequestSchema>; // ../contract/src/workbench/execution/types.ts:230
-type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract/src/workbench/execution/types.ts:241
+type Body = z.infer<typeof abortExperimentRunRequestSchema>; // ../contract/src/workbench/execution/types.ts:231
+type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract/src/workbench/execution/types.ts:242
 ```
 
 ### `experimentWorkflowEvaluationRest`

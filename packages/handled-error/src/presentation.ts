@@ -78,6 +78,47 @@ const str = (error: HandledErrorShape, key: string, fallback: string): string =>
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/** Whose limit a `budget_exceeded` names, by the gateway's `budget_scope`. */
+const BUDGET_SCOPE_OWNERS: Readonly<Record<string, string>> = {
+  organization: "Your organization's",
+  team: "Your team's",
+  project: "This project's",
+  virtual_key: "This key's",
+  principal: "Your personal",
+  group: "Your group's",
+  attributed_user: "This end user's",
+};
+
+/** The headline's period word, by the gateway's `budget_window`. */
+const BUDGET_WINDOW_ADJECTIVES: Readonly<Record<string, string>> = {
+  minute: "per-minute",
+  hour: "hourly",
+  day: "daily",
+  week: "weekly",
+  month: "monthly",
+};
+
+/** When a blocked window opens again. No calendar boundary: a budget can carry its own cycle anchor. */
+const BUDGET_WINDOW_RESETS: Readonly<Record<string, string>> = {
+  minute: "Requests are blocked until its per-minute window resets.",
+  hour: "Requests are blocked until its hourly window resets.",
+  day: "Requests are blocked until its daily window resets.",
+  week: "Requests are blocked until its weekly window resets.",
+  month: "Requests are blocked until its monthly window resets.",
+  total: "This limit never resets, so requests stay blocked until it is raised.",
+  manual: "Requests are blocked until an admin resets or raises it.",
+};
+
+/** One enumerated budget `meta` value mapped through a word table; unknown values map to nothing. */
+const budgetMetaWord = (
+  error: HandledErrorShape,
+  key: string,
+  words: Readonly<Record<string, string>>,
+): string | undefined => {
+  const value = str(error, key, "").toLowerCase();
+  return Object.hasOwn(words, value) ? words[value] : undefined;
+};
+
 /** The request field that sets each list name, which the supplied-parameter copy points at. */
 const LIST_REQUEST_FIELDS: Readonly<Record<string, string>> = {
   dashboard_context_sources: "sources",
@@ -882,6 +923,33 @@ const presentations = {
       return `No process running ${name} is connected.${where} Start the process, or name the environment as connected:${name}@<environment>.`;
     },
   },
+  agent_deployed_label_protected: {
+    title: "This agent is deployed",
+    describe: (error) => {
+      const labels = strList(error, "labels").join(", ") || "a label";
+      return `A deploy label (${labels}) points at this agent, so archiving it needs the deploy permission. Remove the labels first, or ask someone who can deploy agents.`;
+    },
+  },
+  agent_label_invalid: {
+    title: "That label name can't be used",
+    describe: () =>
+      'A label starts with a lowercase letter, holds only lowercase letters, digits, hyphens or underscores, is not a number and is not "latest".',
+  },
+  agent_version_not_found: {
+    title: "That agent version doesn't exist",
+    describe: () =>
+      "No version of this agent matches that label or number. The label may have been removed, or the version belongs to another agent.",
+  },
+  agent_version_selector_conflict: {
+    title: "Pick a label or a version, not both",
+    describe: () =>
+      "Ask for the agent by one label, one version number, or neither for the latest.",
+  },
+  agent_version_unsupported: {
+    title: "Connected agents have no versions here",
+    describe: () =>
+      "A connected agent is versioned by the code that registers it, so it carries no versions or deploy labels in LangWatch.",
+  },
   agent_not_found: {
     title: "Agent not found",
     describe: () =>
@@ -1012,6 +1080,28 @@ const presentations = {
       "Copying an online evaluation needs permission to manage evaluations in the project it comes from. Ask an administrator there for access.",
   },
   evaluator_not_found: { title: "Evaluator not found" },
+  evaluator_deployed_label_protected: {
+    title: "This evaluator is deployed",
+    describe: (error) => {
+      const labels = strList(error, "labels").join(", ") || "a label";
+      return `A deploy label (${labels}) points at this evaluator, so deleting it needs the deploy permission. Remove the labels first, or ask someone who can deploy evaluators.`;
+    },
+  },
+  evaluator_label_invalid: {
+    title: "That label name can't be used",
+    describe: () =>
+      'A label starts with a lowercase letter, holds only lowercase letters, digits, hyphens or underscores, is not a number and is not "latest".',
+  },
+  evaluator_version_not_found: {
+    title: "That evaluator version doesn't exist",
+    describe: () =>
+      "No version of this evaluator matches that label or number. The label may have been removed, or the version belongs to another evaluator.",
+  },
+  evaluator_version_selector_conflict: {
+    title: "Pick a label or a version, not both",
+    describe: () =>
+      "Ask for the evaluator by one label, one version number, or neither for the latest.",
+  },
   evaluator_source_permission_denied: {
     title: "You can't copy from that project",
     describe: () =>
@@ -5188,8 +5278,21 @@ const presentations = {
       "Codex runs on your OpenAI account, and its sign-in has expired. Sign in again to keep using it.",
   },
   budget_exceeded: {
-    title: "You've reached your spending limit",
-    describe: () => "Raise the limit in settings to keep going.",
+    // The gateway's 402. `budget_scope` and `budget_window` are enumerated, so
+    // the headline names whose limit ran out and the body says when it resets.
+    title: "Your AI spending limit is reached",
+    titleFor: (error) => {
+      const owner = budgetMetaWord(error, "budget_scope", BUDGET_SCOPE_OWNERS);
+      if (!owner) return undefined;
+      const period = budgetMetaWord(error, "budget_window", BUDGET_WINDOW_ADJECTIVES);
+      return `${owner} ${period ? `${period} ` : ""}AI spending limit is reached`;
+    },
+    describe: (error) => {
+      const reset =
+        budgetMetaWord(error, "budget_window", BUDGET_WINDOW_RESETS) ??
+        "Requests are blocked until the limit is raised.";
+      return `${reset} An admin can raise it in AI Gateway budgets.`;
+    },
   },
   end_user_required: {
     title: "This key needs a user on every request",

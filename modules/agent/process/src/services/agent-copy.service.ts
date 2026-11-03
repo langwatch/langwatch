@@ -113,6 +113,7 @@ export class AgentCopyService {
         projectId: copy.projectId,
         name: source.name,
         config: configForCopy({ source, targetProjectId: copy.projectId, current }),
+        commitMessage: "Pushed from the source agent",
       });
     }
 
@@ -138,6 +139,7 @@ export class AgentCopyService {
       projectId: input.projectId,
       name: source.name,
       config: configForCopy({ source, targetProjectId: input.projectId, current }),
+      commitMessage: "Synced from the source agent",
     });
 
     return { ok: true as const };

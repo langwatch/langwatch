@@ -34,6 +34,7 @@ describe("Governance receiver policy", () => {
     "copilot_cli",
     "copilot_app",
     "copilot_vscode",
+    "grok_cli",
   ])("classifies coding source %s", (sourceType) => {
     expect(originForIngestSourceType(sourceType)).toBe("coding_agent");
   });
@@ -213,5 +214,114 @@ describe("Governance receiver policy", () => {
     ).toBe(0);
     expect(request.resourceSpans?.[0]?.scopeSpans?.[0]?.scope?.name).toBe("custom");
     expect(request.resourceLogs?.[0]?.scopeLogs?.[0]?.scope?.name).toBe("custom");
+  });
+
+  /** One Grok log record and one metric batch, as grok 1.0.70's exporter sends them. */
+  function grokExport({ forgedSource }: { forgedSource?: string } = {}): OtlpReceiverRequest {
+    const resource = {
+      attributes: [
+        { key: "service.name", value: { stringValue: "grok-cli" } },
+        ...(forgedSource
+          ? [{ key: "langwatch.source", value: { stringValue: forgedSource } }]
+          : []),
+      ],
+    };
+    return {
+      resourceLogs: [
+        {
+          resource,
+          scopeLogs: [
+            {
+              scope: { name: "ai.xai.grok_code" },
+              logRecords: [{ attributes: [] }],
+            },
+          ],
+        },
+      ],
+      resourceMetrics: [
+        {
+          resource,
+          scopeMetrics: [{ scope: { name: "ai.xai.grok_code" }, metrics: [] }],
+        },
+      ],
+    };
+  }
+
+  describe("given a Grok export under a grok_cli key", () => {
+    const policies = buildIngestKeyReceiverPolicies(
+      { organizationId: "org_1", sourceType: "grok_cli" },
+      false,
+    );
+
+    /** @scenario A Grok log record ingested under its own key carries the coding-agent origin */
+    it("stamps a Grok log record as coding-agent activity", () => {
+      const request = grokExport();
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "logs",
+        apiKeyId: "key_grok",
+        policy: policies.logs,
+      });
+
+      expect(attributes(request, "logs")[0]).toMatchObject({
+        "langwatch.source": "grok_cli",
+        "langwatch.origin": "coding_agent",
+        "langwatch.organization_id": "org_1",
+        "langwatch.api_key.id": "key_grok",
+      });
+    });
+
+    /** @scenario Grok metrics are stamped the same way as its logs */
+    it("stamps a Grok metric batch the same way", () => {
+      const request = grokExport();
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "metrics",
+        apiKeyId: "key_grok",
+        policy: policies.metrics,
+      });
+
+      expect(attributes(request, "metrics")[0]).toMatchObject({
+        "langwatch.source": "grok_cli",
+        "langwatch.origin": "coding_agent",
+      });
+    });
+
+    /** @scenario Provenance keys Grok sends itself are stripped before the key's are stamped */
+    it("replaces a provenance key the export claimed for itself", () => {
+      const request = grokExport({ forgedSource: "claude_code" });
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "logs",
+        apiKeyId: "key_grok",
+        policy: policies.logs,
+      });
+
+      const sources = (request.resourceLogs?.[0]?.resource?.attributes ?? []).filter(
+        (attribute) => attribute.key === "langwatch.source",
+      );
+      expect(sources.map((attribute) => attribute.value?.stringValue)).toEqual(["grok_cli"]);
+    });
+
+    /** @scenario Wrapper resource attributes Grok drops are not relied on */
+    it("attributes from the key alone, with no wrapper resource attribute present", () => {
+      const request = grokExport();
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "logs",
+        apiKeyId: "key_grok",
+        policy: policies.logs,
+      });
+
+      expect(attributes(request, "logs")[0]).toMatchObject({
+        "service.name": "grok-cli",
+        "langwatch.source": "grok_cli",
+        "langwatch.organization_id": "org_1",
+      });
+    });
   });
 });

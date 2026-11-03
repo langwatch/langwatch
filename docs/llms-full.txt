@@ -2781,6 +2781,97 @@ A provider's own error is forwarded with the provider's status and body, under `
 
 ---
 
+# FILE: ./ai-gateway/api/decisions.mdx
+
+---
+title: POST /v1/decisions
+description: OpenAI Decisions API through the LangWatch AI Gateway.
+sidebarTitle: Decisions
+---
+
+## Endpoint
+
+```http
+POST /v1/decisions
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: application/json
+```
+
+The body is an OpenAI Decisions API request: an `input` and a list of typed `questions`. The gateway resolves `model` through the virtual key, then forwards the body to the OpenAI provider bound to the key, with the resolved model and the provider's API key in place of the virtual key. The answer comes back as OpenAI wrote it.
+
+## Request
+
+```bash
+curl https://gateway.langwatch.ai/v1/decisions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-6-luna",
+    "input": "Can the deploy agent read the production database password?",
+    "questions": [
+      {
+        "type": "choice",
+        "name": "release",
+        "instructions": "Decide whether to release the secret.",
+        "choices": [
+          { "value": "allow", "description": "Release it" },
+          { "value": "deny", "description": "Keep it" }
+        ]
+      },
+      { "type": "predicate", "name": "requester_backs_it", "instructions": "Does the requester back the request?" }
+    ]
+  }'
+```
+
+## Response
+
+```json
+{
+  "answers": [
+    {
+      "type": "choice",
+      "name": "release",
+      "choice": "allow",
+      "probabilities": [
+        { "value": "allow", "probability": 0.9 },
+        { "value": "deny", "probability": 0.1 }
+      ],
+      "confidence": 0.9
+    },
+    { "type": "predicate", "name": "requester_backs_it", "probability": 0.8 }
+  ],
+  "usage": { "input_tokens": 1234 }
+}
+```
+
+## Which providers serve it
+
+Only an OpenAI provider. A key with no OpenAI provider answers `400 model_provider_not_bound`. The request goes to the provider's base URL: with none set it goes to `https://api.openai.com`, and with `https://eu.api.openai.com` (with or without `/v1`) it goes to OpenAI's EU endpoint.
+
+## Metering and tracing
+
+Budgets are checked before the call; a key over its budget answers `402 budget_exceeded` and the provider is not called. `usage.input_tokens` and `usage.output_tokens` are charged at the model's price, on the key's spend and budgets.
+
+The trace span records the model, provider, status, latency, token usage and cost. It never records the `input`, the `questions` or the `answers`.
+
+Guardrails are separate from tracing. When the key has guardrails, the request body goes to the guardrail check and its evaluator can record what it scores. For private input, use a key without guardrails. See [Guardrails boundaries](/ai-gateway/guardrails#boundaries).
+
+## End-user attribution
+
+The `X-LangWatch-End-User-Id` header names the end user for spend and per-user budgets. Without it, the body's `safety_identifier` is used.
+
+## Streaming
+
+This endpoint does not stream.
+
+## Errors
+
+Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `bad_request` (all `400`), `budget_exceeded` (`402`) and `payload_too_large` (`413`, a body over the gateway's request size cap). The checks every gateway route runs can also answer, depending on the key's settings: `end_user_required`, `rate_limited`, `policy_violation`, `guardrail_blocked`, `guardrail_upstream_unavailable`. The full table is on [Errors](/ai-gateway/api/errors).
+
+A provider's own error is forwarded with its status and body. When a call runs long enough for a keep-alive byte, the response carries `X-LangWatch-Heartbeat-Active: true` and the status is already `200`; a later error then arrives in the body, so read the body for an `error` key.
+
+---
+
 # FILE: ./ai-gateway/api/elevenlabs.mdx
 
 ---
@@ -8507,6 +8598,7 @@ The gateway then gives you, on every request it authenticates:
 | Responses API                | `POST /v1/responses`                                            | OpenAI      |
 | Messages                     | `POST /v1/messages`                                             | Anthropic   |
 | Embeddings                   | `POST /v1/embeddings`                                           | OpenAI      |
+| Decisions                    | `POST /v1/decisions`                                            | OpenAI      |
 | Speech                       | `POST /v1/audio/speech`                                         | OpenAI      |
 | Transcription                | `POST /v1/audio/transcriptions`                                 | OpenAI      |
 | Image generation             | `POST /v1/images/generations`                                   | OpenAI      |
@@ -9254,9 +9346,9 @@ The gateway calls `https://api.doubleword.ai` as an OpenAI-compatible endpoint.
 
 ## Model names
 
-Write `doubleword/<model>`. Doubleword model ids keep the vendor slash and casing Doubleword uses, for example `doubleword/deepseek-ai/DeepSeek-V4.1-Flash`, `doubleword/Qwen/Qwen3-Embedding-8B` or `doubleword/openai/gpt-oss-120b`. Only the first segment names the provider, and the rest is sent to Doubleword as is.
+Write `doubleword/<model>`. Doubleword model ids keep the vendor slash and casing Doubleword uses, for example `doubleword/deepseek-ai/DeepSeek-V4.1-Flash` or `doubleword/Qwen/Qwen3-Embedding-8B`. Only the first segment names the provider, and the rest is sent to Doubleword as is.
 
-Always keep the `doubleword/` prefix. A bare `openai/gpt-oss-120b` names the OpenAI provider, not Doubleword.
+Always keep the `doubleword/` prefix. Without it the gateway infers the provider from the model name, which may not pick Doubleword.
 
 ## Send a request
 
@@ -42770,7 +42862,7 @@ On a self-hosted install, Dashboards stays off until an operator turns it on in
 ## Your first dashboard
 
 Opening Dashboards opens your dashboard called "My dashboard", and it starts in your
-starred dashboards. If you have no such dashboard yet, LangWatch makes one for you. It
+pinned dashboards. If you have no such dashboard yet, LangWatch makes one for you. It
 starts at the scope Only me, so only you see it. You can change its scope like
 any other dashboard's (see [Who can see a dashboard](#who-can-see-a-dashboard)).
 
@@ -42781,8 +42873,8 @@ The sidebar lists, in order:
 - **Your dashboards**: your "My dashboard" first, then the project's other
   dashboards by name. The **+** next to the heading makes a blank dashboard at once and
   opens it.
-- **Starred**: the dashboards you starred, in your own order. Stars are yours alone.
-  The menu of a starred dashboard has Move up and Move down.
+- **Pinned**: the dashboards you pinned, in your own order. Pins are yours alone.
+  The menu of a pinned dashboard has Move up and Move down.
 - **From your organisation**: the heading reads "From" and your organisation's
   name. It lists the dashboards that other projects of your organisation set to
   Organization, by name, and shows only when there is such a dashboard.
@@ -42792,9 +42884,9 @@ The sidebar lists, in order:
 A dashboard set to Only me has a small lock next to its name, and a dashboard set to
 Organization has a building. A Project dashboard has no mark.
 
-The **⋮** menu of a dashboard offers Star or Unstar, Rename, Duplicate and Delete.
+The **⋮** menu of a dashboard offers Pin or Unpin, Rename, Duplicate and Delete.
 On a dashboard you made it also offers the three scope choices. On a dashboard you
-cannot edit it offers Star or Unstar and **Duplicate to edit**. "My dashboard"
+cannot edit it offers Pin or Unpin and **Duplicate to edit**. "My dashboard"
 cannot be renamed or deleted.
 
 ## Start from a template
@@ -42917,9 +43009,9 @@ cannot. Everyone else sees the scope as a badge. Who can edit or delete a dashbo
 does not change: that still follows your role's analytics permissions.
 
 LangWatch asks you to confirm a change only when somebody loses the dashboard: when
-you set a dashboard to Only me that other members starred, and when you lower a
+you set a dashboard to Only me that other members pinned, and when you lower a
 dashboard from Organization. Every other change happens at once, and the note that
-follows has an **Undo**. Other members' stars are kept, and come back if you
+follows has an **Undo**. Other members' pins are kept, and come back if you
 widen the scope again.
 
 The project where a dashboard was made owns it. An Organization dashboard can be edited
@@ -63941,7 +64033,7 @@ Langy runs on the model providers your project has enabled. Every provider excep
 | xAI              | API key                                              |                                                                                                                                       |
 | Cerebras         | API key                                              |                                                                                                                                       |
 | Groq             | API key                                              |                                                                                                                                       |
-| Doubleword       | API key                                              | Open-weight models such as DeepSeek, Qwen, GLM and gpt-oss.                                                                           |
+| Doubleword       | API key                                              | Open-weight models such as DeepSeek, Qwen, GLM and Kimi.                                                                           |
 | Voyage           | API key                                              | Embeddings.                                                                                                                           |
 | Custom (LiteLLM) | API key or endpoint                                  | Any provider reachable through LiteLLM.                                                                                               |
 
@@ -67013,7 +67105,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.21.0 # x-release-please-version
+    targetRevision: 3.22.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -67068,7 +67160,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.21.0 # x-release-please-version
+      targetRevision: 3.22.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -67472,7 +67564,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.21.0 # x-release-please-version
+VERSION=3.22.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -67488,13 +67580,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.21.0" # x-release-please-version
+    tag: "3.22.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.21.0" # x-release-please-version
+    tag: "3.22.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.21.0" # x-release-please-version
+    tag: "3.22.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -72324,7 +72416,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.21.0 \
+  --version 3.22.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -73129,6 +73221,15 @@ openapi: "GET /api/v1/agents"
 
 ---
 
+# FILE: ./api-reference/agents/list-an-agent-s-versions.mdx
+
+---
+title: "List an agent's versions"
+openapi: "GET /api/v1/agents/{agentId}/versions"
+---
+
+---
+
 # FILE: ./api-reference/agents/list-poll.mdx
 
 ---
@@ -73151,11 +73252,29 @@ Manage AI agent configurations. Create, update, and organize agents that are tra
 
 ---
 
+# FILE: ./api-reference/agents/point-a-deploy-label-at-an-agent-version.mdx
+
+---
+title: "Point a deploy label at an agent version"
+openapi: "PUT /api/v1/agents/{agentId}/labels/{label}"
+---
+
+---
+
 # FILE: ./api-reference/agents/put-update-agents.mdx
 
 ---
 title: "Update Agents (PUT)"
 openapi: "PUT /api/v1/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/agents/remove-a-deploy-label-from-an-agent.mdx
+
+---
+title: "Remove a deploy label from an agent"
+openapi: "DELETE /api/v1/agents/{agentId}/labels/{label}"
 ---
 
 ---
@@ -73887,11 +74006,29 @@ openapi: "DELETE /api/v1/evaluators/{id}"
 
 ---
 
+# FILE: ./api-reference/evaluators-config/delete-labels.mdx
+
+---
+title: "Remove a deploy label from an evaluator"
+openapi: "DELETE /api/v1/evaluators/{evaluatorId}/labels/{label}"
+---
+
+---
+
 # FILE: ./api-reference/evaluators-config/get-evaluators.mdx
 
 ---
 title: "Get a specific evaluator by ID or slug"
 openapi: "GET /api/v1/evaluators/{idOrSlug}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/get-versions.mdx
+
+---
+title: "Get Versions"
+openapi: "GET /api/v1/evaluators/{evaluatorId}/versions"
 ---
 
 ---
@@ -73923,6 +74060,15 @@ Manage evaluator configurations for your project. Create, update, and organize e
 ---
 title: "Update an existing evaluator"
 openapi: "PUT /api/v1/evaluators/{id}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/update-labels.mdx
+
+---
+title: "Update Labels"
+openapi: "PUT /api/v1/evaluators/{evaluatorId}/labels/{label}"
 ---
 
 ---

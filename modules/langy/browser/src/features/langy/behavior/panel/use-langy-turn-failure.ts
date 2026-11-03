@@ -15,6 +15,7 @@ import {
 } from "../../model/logic/outlived-turn-error.ts";
 import {
   explainLangyError,
+  GATEWAY_BUDGETS_HREF,
   type LangyErrorPresentation,
   MODEL_PROVIDERS_SETTINGS_HREF,
   readLangyStreamError,
@@ -22,7 +23,13 @@ import {
 } from "../logic/langy-error-explainer.ts";
 import { turnHadSideEffects, useLangyTurnRecovery } from "../use-langy-turn-recovery.ts";
 
-type ErrorActionKind = "connect-github" | "configure-model" | "reconnect-codex" | "retry";
+type ErrorActionKind = NonNullable<LangyErrorPresentation["action"]>["kind"];
+
+/** The error actions that open a settings page. */
+const SETTINGS_ACTION_HREFS: Partial<Record<ErrorActionKind, string>> = {
+  "configure-model": MODEL_PROVIDERS_SETTINGS_HREF,
+  "open-budgets": GATEWAY_BUDGETS_HREF,
+};
 
 /**
  * The turn's failure: the LIVE one, else the DURABLE one off the conversation fold (so a refresh
@@ -90,10 +97,10 @@ export function useLangyTurnFailure({
   routerRef.current = router;
   const onErrorAction = useCallback(
     (kind: ErrorActionKind) => {
-      if (kind === "reconnect-codex") setReconnectCodex(true);
+      const href = SETTINGS_ACTION_HREFS[kind];
       // router.push keeps the panel mounted, so the failed turn is still there to retry.
-      else if (kind === "configure-model")
-        void routerRef.current.push(MODEL_PROVIDERS_SETTINGS_HREF);
+      if (href) void routerRef.current.push(href);
+      else if (kind === "reconnect-codex") setReconnectCodex(true);
       else if (kind === "retry") retryTurn();
     },
     [retryTurn],

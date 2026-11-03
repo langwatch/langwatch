@@ -318,7 +318,7 @@ describe("ModelProviderDecisionModelService.listPickable", () => {
       LANGWATCH_DECISION_MODEL_ID,
       OPENAI_DECISIONS,
     ]);
-    expect(offered[1]?.label).toBe("OpenAI Decisions (gpt-6-luna)");
+    expect(offered[1]?.label).toBe("OpenAI Decisions API");
   });
 
   /** @scenario "A provider is asked for once however many of its models the catalogue holds" */

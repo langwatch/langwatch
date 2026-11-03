@@ -66,6 +66,9 @@ describe("the monitors REST family", () => {
           updatedAt: "2026-08-24T00:00:00.000Z",
           autoPausedAt: null,
           autoPausedReason: null,
+          evaluatorLabel: null,
+          createdById: null,
+          updatedById: null,
           platformUrl:
             "https://app.langwatch.test/project-one/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=monitor-1",
         },
