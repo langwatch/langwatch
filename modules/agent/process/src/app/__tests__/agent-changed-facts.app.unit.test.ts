@@ -4,6 +4,11 @@
  */
 import { describe, expect, it } from "vitest";
 
+import {
+  contextOf,
+  lanesOf,
+  versionSavedEvent,
+} from "../../eventing/__tests__/agent-workflow-fields.fixture.ts";
 import { createAgentAppFixture } from "./agent.fixture.ts";
 
 const reference = { id: "agent_1", projectId: "project_1" };
@@ -66,8 +71,87 @@ describe("the agent changed fact", () => {
       ["agent_1", "project_1"],
       ["agent_1", "project_1"],
       [copy.id, "project_2"],
+      ["agent_1", "project_1"],
       [copy.id, "project_2"],
+      ["agent_1", "project_1"],
       [copy.id, "project_2"],
+      ["agent_1", "project_1"],
     ]);
+  });
+
+  /** @scenario "Every write to an agent records that it changed" */
+  it("is recorded for each linked agent a workflow's new fields are written into", async () => {
+    const { app, changedFacts } = createAgentAppFixture();
+    await app.create({
+      id: "agent_workflow",
+      projectId: "project_1",
+      name: "Workflow agent",
+      type: "workflow",
+      config: { workflow_id: "workflow_1" },
+      workflowId: "workflow_1",
+    });
+    changedFacts.length = 0;
+    const lanes = lanesOf(app.workflowFieldsPipeline());
+    const event = versionSavedEvent({
+      fields: { inputFields: [], outputFields: [], fieldsResolved: true },
+    });
+
+    await lanes.versionSaved.handle(event, contextOf(event));
+
+    expect(written(changedFacts)).toEqual([
+      { agentId: "agent_workflow", projectId: "project_1", tenantId: "project_1" },
+    ]);
+  });
+
+  /** @scenario "Every write to an agent records that it changed" */
+  it("is recorded on a push for the copies it wrote and for the source", async () => {
+    const { app, changedFacts } = await httpAgent();
+    const kept = await app.createCopy({
+      sourceAgentId: "agent_1",
+      sourceProjectId: "project_1",
+      targetProjectId: "project_2",
+    });
+    await app.createCopy({
+      sourceAgentId: "agent_1",
+      sourceProjectId: "project_1",
+      targetProjectId: "project_3",
+    });
+    changedFacts.length = 0;
+
+    await app.pushToCopies({
+      sourceAgentId: "agent_1",
+      sourceProjectId: "project_1",
+      copyIds: [kept.id],
+    });
+
+    expect(written(changedFacts)).toEqual([
+      { agentId: kept.id, projectId: "project_2", tenantId: "project_2" },
+      { agentId: "agent_1", projectId: "project_1", tenantId: "project_1" },
+    ]);
+  });
+});
+
+describe("when the agent changed fact cannot be sent", () => {
+  /** @scenario "A committed agent write still succeeds when its changed fact cannot be recorded" */
+  it("still saves and returns the change", async () => {
+    const { app } = await httpAgent();
+    const failing = {
+      send: async () => {
+        throw new Error("queue unavailable");
+      },
+      sendBatch: async () => {},
+      close: async () => {},
+      waitUntilReady: async () => {},
+    };
+    app.connectLifecycleCommands({ recordAgentArchived: failing, recordAgentChanged: failing });
+    const url = "https://new.example.test/chat";
+
+    const updated = await app.update({
+      ...reference,
+      config: { name: "Support bot", url, method: "POST" },
+      caller: ada,
+    });
+
+    expect(updated.config).toMatchObject({ url });
   });
 });
