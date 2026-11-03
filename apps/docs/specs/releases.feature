@@ -5,7 +5,7 @@ Feature: Useful release updates in the documentation
   Scenario: Read published release notes
     Given the repository changelog has dated releases and an unreleased section
     When the site reads release notes at build time
-    Then it selects the five newest published releases
+    Then it selects up to the five newest published releases
     And the latest summary comes from its features or fixes
     And version, date and full notes link to the changelog page
     And the changelog page shows those notes and links on to the self-hosting upgrade notes
@@ -46,3 +46,12 @@ Feature: Useful release updates in the documentation
     Then the note keeps the pull request link and drops the commit link beside it
     But a note whose only link is its commit keeps that link
     And the changelog's Markdown export fits the page token budget agents read within
+
+  @unit
+  Scenario: Keep the changelog within the page token budget
+    Given the newest releases hold more notes than the 8,000 token page budget
+    When the changelog page is built
+    Then it shows the newest releases that fit, always at least the newest one
+    And the older releases link leads to the rest
+    But when the newest release alone is over the budget
+    Then its notes are cut at a whole line and end with a link to its full notes on its release page

@@ -1,10 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { parseReleases, readReleases, withReleaseNotes } from "../compile/releases.ts";
+import {
+  CHANGELOG_TOKENS,
+  parseReleases,
+  readReleases,
+  withReleaseNotes,
+} from "../compile/releases.ts";
 
 const compare = "https://github.com/langwatch/langwatch/compare/v1...v2";
 const source = `# Changelog
@@ -119,5 +124,80 @@ describe("when a page asks for the latest releases", () => {
     } finally {
       rmSync(project, { recursive: true, force: true });
     }
+  });
+});
+
+/** A release whose notes hold `lines` fix entries of about 100 characters each. */
+const bigRelease = ({ version, lines }: { version: string; lines: number }) => {
+  const tag = `https://github.com/langwatch/langwatch/compare/langwatch@v0.0.1...langwatch@v${version}`;
+  const fixes = Array.from(
+    { length: lines },
+    (_, index) =>
+      `* **area:** fix number ${index} of release ${version}, written long enough to count`,
+  ).join("\n");
+  return `## [${version}](${tag}) (2026-10-0${version.split(".")[1]})\n### Bug Fixes\n${fixes}\n`;
+};
+
+const changelogOf = ({ source }: { source: string }) => {
+  const project = mkdtempSync(path.join(os.tmpdir(), "docs-changelog-budget-"));
+  const docsRoot = path.join(project, "docs");
+  mkdirSync(docsRoot);
+  try {
+    writeFileSync(path.join(project, "CHANGELOG.md"), source);
+    return withReleaseNotes({
+      source: "Intro\n\n<ReleaseNotes />\n\n## Older releases\n\n[Full changelog](https://x)",
+      slug: "changelog",
+      docsRoot,
+    });
+  } finally {
+    rmSync(project, { recursive: true, force: true });
+  }
+};
+
+describe("when the newest releases are too long for one page", () => {
+  /** @scenario "Keep the changelog within the page token budget" */
+  it("keeps the newest releases that fit and leaves the rest to the older releases link", () => {
+    const page = changelogOf({
+      source: ["3.5.0", "3.4.0", "3.3.0", "3.2.0", "3.1.0"]
+        .map((version) => bigRelease({ version, lines: 100 }))
+        .join(""),
+    });
+
+    expect(Math.ceil(page.length / 4)).toBeLessThanOrEqual(CHANGELOG_TOKENS);
+    expect(page).toContain("## Release v3.5.0");
+    expect(page).toContain("## Release v3.4.0");
+    expect(page).not.toContain("## Release v3.1.0");
+    expect(page).not.toContain("Read the full notes");
+    expect(page).toContain("## Older releases");
+  });
+
+  /** @scenario "Keep the changelog within the page token budget" */
+  it("cuts the newest release's notes and links its release page when it alone is too long", () => {
+    const page = changelogOf({
+      source:
+        bigRelease({ version: "3.9.0", lines: 600 }) + bigRelease({ version: "3.8.0", lines: 5 }),
+    });
+
+    expect(Math.ceil(page.length / 4)).toBeLessThanOrEqual(CHANGELOG_TOKENS);
+    expect(page).toContain("## Release v3.9.0");
+    expect(page).toContain("fix number 0 of release 3.9.0");
+    expect(page).not.toContain("fix number 599 of release 3.9.0");
+    expect(page).not.toContain("## Release v3.8.0");
+    expect(page).toContain(
+      "[Read the full notes](https://github.com/langwatch/langwatch/releases/tag/langwatch@v3.9.0).",
+    );
+    expect(page).toContain("## Older releases");
+  });
+
+  /** @scenario "Keep the changelog within the page token budget" */
+  it("fits the repository's own changelog page", () => {
+    const docsRoot = path.resolve(__dirname, "../../../../../../docs");
+    const page = withReleaseNotes({
+      source: readFileSync(path.join(docsRoot, "changelog.mdx"), "utf8"),
+      slug: "changelog",
+      docsRoot,
+    });
+    expect(page).toContain("## Release v");
+    expect(Math.ceil(page.length / 4)).toBeLessThanOrEqual(CHANGELOG_TOKENS);
   });
 });

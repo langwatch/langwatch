@@ -8,6 +8,9 @@ import { releaseSchema, type Release } from "../model/release.ts";
 export const RELEASES_SLUG = "changelog";
 const PUBLISHED = 5;
 const WHATS_NEW = 3;
+/** Under the audit's 8,000 page tokens (budgets.json), with room for the export's own framing. */
+export const CHANGELOG_TOKENS = 7_500;
+const RELEASES_URL = "https://github.com/langwatch/langwatch/releases";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
 const cache = new Map<string, { modified: number; entries: Release[] }>();
@@ -119,13 +122,50 @@ export function withReleaseNotes({
   }
   const entries = readReleases({ docsRoot });
   if (!entries.length) return source.replace(NOTES_TAG, "");
-  const notes = entries
-    .map(
-      ({ version, label, body, compare }) =>
-        `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
-    )
-    .join("\n");
-  if (NOTES_TAG.test(source)) return source.replace(NOTES_TAG, () => notes);
-  const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/)?.[0] ?? "";
-  return `${frontmatter}\n${notes}\n${source.slice(frontmatter.length)}`;
+  const place = (notes: string) => {
+    if (NOTES_TAG.test(source)) return source.replace(NOTES_TAG, () => notes);
+    const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/)?.[0] ?? "";
+    return `${frontmatter}\n${notes}\n${source.slice(frontmatter.length)}`;
+  };
+  const fits = (notes: string) => tokensOf({ text: place(notes) }) <= CHANGELOG_TOKENS;
+  const sections = entries.map((entry) => releaseSection({ entry }));
+  const [newest] = entries;
+  if (newest && !fits(sections[0] ?? "")) {
+    const room = CHANGELOG_TOKENS * 4 - place("").length;
+    return place(releaseSection({ entry: newest, maxLength: room }));
+  }
+  let shown = 1;
+  for (; shown < sections.length; shown += 1) {
+    const wider = sections.slice(0, shown + 1).join("\n");
+    if (!fits(wider)) break;
+  }
+  return place(sections.slice(0, shown).join("\n"));
+}
+
+const tokensOf = ({ text }: { text: string }) => Math.ceil(text.length / 4);
+
+/** The GitHub release a changelog entry was tagged as, from the end of its compare link. */
+function releaseUrlOf({ compare }: Pick<Release, "compare">) {
+  const tag = compare.split("...").at(-1);
+  return tag && tag !== compare ? `${RELEASES_URL}/tag/${tag}` : RELEASES_URL;
+}
+
+/**
+ * One release on the changelog page. With `maxLength`, whole lines of its notes are kept while
+ * the section fits, followed by a link to the full notes on its release page.
+ */
+function releaseSection({ entry, maxLength }: { entry: Release; maxLength?: number }) {
+  const { version, label, body, compare } = entry;
+  const heading = `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n`;
+  const notes = escapeMdx({ text: body });
+  if (maxLength === undefined) return `${heading}${notes}\n`;
+  const more = `\n\n[Read the full notes](${releaseUrlOf({ compare })}).\n`;
+  const kept: string[] = [];
+  let length = heading.length + more.length;
+  for (const line of notes.split("\n")) {
+    if (length + line.length + 1 > maxLength) break;
+    kept.push(line);
+    length += line.length + 1;
+  }
+  return `${heading}${kept.join("\n").trimEnd()}${more}`;
 }
