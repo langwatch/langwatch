@@ -28,6 +28,7 @@ app:
   - ".github/workflows/codeql.yml"
   - ".github/workflows/clickhouse-serverless.yml"
   - ".github/.release-please-manifest.json"
+  - ".github/release-please-config.json"
   - ".github/scripts/**"
   - ".github/workflows/publish-docker-ecr.yml"
   - ".github/actions/detect-changes/**"
