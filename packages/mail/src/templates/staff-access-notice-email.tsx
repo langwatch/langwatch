@@ -26,9 +26,7 @@ export const StaffAccessNoticeEmail = ({
       {`${operatorName} just used staff access. Every other platform operator gets this email.`}
     </Paragraph>
     <DetailTable rows={[{ label: "Operator", value: operatorName }, ...details]} />
-    <FinePrint>
-      If you did not expect this, end every session from Ops, Agent access.
-    </FinePrint>
+    <FinePrint>If you did not expect this, end every session from Ops, Agent access.</FinePrint>
   </EmailLayout>
 );
 

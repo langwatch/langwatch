@@ -53,5 +53,6 @@ Feature: Useful release updates in the documentation
     When the changelog page is built
     Then it shows the newest releases that fit, always at least the newest one
     And the older releases link leads to the rest
+    And the home page's "What's new" links a release left off the page to its GitHub release
     But when the newest release alone is over the budget
     Then its notes are cut at a whole line and end with a link to its full notes on its release page

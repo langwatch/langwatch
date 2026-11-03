@@ -177,7 +177,9 @@ describe.skipIf(!databaseUrl)("PasskeyAssertionService over Postgres", () => {
     });
 
     it("refuses a person who holds no passkey", async () => {
-      await expect(service.hasPasskey({ userId: `${namespace}-unregistered` })).resolves.toBe(false);
+      await expect(service.hasPasskey({ userId: `${namespace}-unregistered` })).resolves.toBe(
+        false,
+      );
       await expect(
         service.options({ userId: `${namespace}-unregistered`, challenge: freshChallenge() }),
       ).rejects.toMatchObject({

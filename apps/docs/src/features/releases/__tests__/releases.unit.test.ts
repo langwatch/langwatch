@@ -191,6 +191,30 @@ describe("when the newest releases are too long for one page", () => {
   });
 
   /** @scenario "Keep the changelog within the page token budget" */
+  it("links a release the changelog has no room for to its GitHub release instead", () => {
+    const project = mkdtempSync(path.join(os.tmpdir(), "docs-whats-new-budget-"));
+    const docsRoot = path.join(project, "docs");
+    mkdirSync(docsRoot);
+    try {
+      writeFileSync(
+        path.join(project, "CHANGELOG.md"),
+        ["3.3.0", "3.2.0", "3.1.0"].map((version) => bigRelease({ version, lines: 140 })).join(""),
+      );
+      writeFileSync(path.join(docsRoot, "changelog.mdx"), "Intro\n\n<ReleaseNotes />\n");
+      const shown = withReleaseNotes({ source: "<ReleaseNotes />", slug: "changelog", docsRoot });
+      const home = withReleaseNotes({ source: "<WhatsNew />", slug: "introduction", docsRoot });
+
+      expect(shown).not.toContain("## Release v3.1.0");
+      expect(home).toContain("[v3.3.0](/changelog#release-v330)");
+      expect(home).toContain(
+        "[v3.1.0](https://github.com/langwatch/langwatch/releases/tag/langwatch@v3.1.0)",
+      );
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  /** @scenario "Keep the changelog within the page token budget" */
   it("fits the repository's own changelog page", () => {
     const docsRoot = fileURLToPath(new URL("../../../../../../docs", import.meta.url));
     const page = withReleaseNotes({

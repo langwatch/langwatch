@@ -13,7 +13,7 @@ export const CHANGELOG_TOKENS = 7_500;
 const RELEASES_URL = "https://github.com/langwatch/langwatch/releases";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
-const cache = new Map<string, { modified: number; entries: Release[] }>();
+const cache = new Map<string, { modified: string; entries: Release[] }>();
 
 /** The repository CHANGELOG.md beside the docs root. */
 export function changelogPath({ docsRoot }: { docsRoot: string }) {
@@ -95,13 +95,24 @@ function whatsNew({ entries }: { entries: Release[] }) {
   return `## What’s new\n\n<div className="docs-whats-new">\n\n${items}\n\n</div>\n\n[Read the changelog](/${RELEASES_SLUG})\n`;
 }
 
+/**
+ * The newest releases, each linking to its notes on the changelog page or, when the page has no
+ * room for them, to its GitHub release.
+ */
 export function readReleases({ docsRoot }: { docsRoot: string }) {
   const file = changelogPath({ docsRoot });
   if (!existsSync(file)) return [];
-  const modified = statSync(file).mtimeMs;
+  const page = path.join(docsRoot, `${RELEASES_SLUG}.mdx`);
+  const modified = `${statSync(file).mtimeMs}:${existsSync(page) ? statSync(page).mtimeMs : 0}`;
   const cached = cache.get(file);
   if (cached?.modified === modified) return cached.entries;
-  const entries = parseReleases({ source: readFileSync(file, "utf8") });
+  const parsed = parseReleases({ source: readFileSync(file, "utf8") });
+  const { shown } = existsSync(page)
+    ? changelogFit({ source: readFileSync(page, "utf8"), entries: parsed })
+    : { shown: parsed.length };
+  const entries = parsed.map((entry, index) =>
+    index < shown ? entry : { ...entry, href: releaseUrlOf(entry) },
+  );
   cache.set(file, { modified, entries });
   return entries;
 }
@@ -122,6 +133,11 @@ export function withReleaseNotes({
   }
   const entries = readReleases({ docsRoot });
   if (!entries.length) return source.replace(NOTES_TAG, "");
+  return changelogFit({ source, entries }).page;
+}
+
+/** The changelog page with the newest releases that fit its token budget, always the newest. */
+function changelogFit({ source, entries }: { source: string; entries: Release[] }) {
   const place = (notes: string) => {
     if (NOTES_TAG.test(source)) return source.replace(NOTES_TAG, () => notes);
     const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/)?.[0] ?? "";
@@ -130,16 +146,17 @@ export function withReleaseNotes({
   const fits = (notes: string) => tokensOf({ text: place(notes) }) <= CHANGELOG_TOKENS;
   const sections = entries.map((entry) => releaseSection({ entry }));
   const [newest] = entries;
-  if (newest && !fits(sections[0] ?? "")) {
+  if (!newest) return { page: place(""), shown: 0 };
+  if (!fits(sections[0] ?? "")) {
     const room = CHANGELOG_TOKENS * 4 - place("").length;
-    return place(releaseSection({ entry: newest, maxLength: room }));
+    return { page: place(releaseSection({ entry: newest, maxLength: room })), shown: 1 };
   }
   let shown = 1;
   for (; shown < sections.length; shown += 1) {
     const wider = sections.slice(0, shown + 1).join("\n");
     if (!fits(wider)) break;
   }
-  return place(sections.slice(0, shown).join("\n"));
+  return { page: place(sections.slice(0, shown).join("\n")), shown };
 }
 
 const tokensOf = ({ text }: { text: string }) => Math.ceil(text.length / 4);
