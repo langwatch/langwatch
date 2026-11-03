@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -30,7 +31,7 @@ func DefinedScripts(root string) (func(ScriptKey) bool, error) {
 }
 
 // workspaceManifests lists the package.json of every package the globs of
-// pnpm-workspace.yaml match; negated globs are skipped.
+// pnpm-workspace.yaml match, less the directories a negated glob matches.
 func workspaceManifests(root string) ([]string, error) {
 	source, err := os.ReadFile(filepath.Join(root, "pnpm-workspace.yaml"))
 	if err != nil {
@@ -42,21 +43,51 @@ func workspaceManifests(root string) ([]string, error) {
 	if err := yaml.Unmarshal(source, &workspace); err != nil {
 		return nil, err
 	}
-	var manifests []string
-	for _, glob := range workspace.Packages {
-		if strings.HasPrefix(glob, "!") {
-			continue
-		}
-		found, err := filepath.Glob(filepath.Join(root, glob, "package.json"))
+	return matchGlobs(root, workspace.Packages)
+}
+
+// matchGlobs lists the manifests the plain globs match, less those of
+// directories a negated glob matches.
+func matchGlobs(root string, globs []string) ([]string, error) {
+	var included, excluded []string
+	for _, glob := range globs {
+		pattern, negated := strings.CutPrefix(glob, "!")
+		found, err := globManifests(root, pattern)
 		if err != nil {
 			return nil, err
 		}
-		manifests = append(manifests, found...)
+		if negated {
+			excluded = append(excluded, found...)
+		} else {
+			included = append(included, found...)
+		}
 	}
-	return manifests, nil
+	return slices.DeleteFunc(included, func(m string) bool { return slices.Contains(excluded, m) }), nil
 }
 
-// manifestScripts reads one package.json: the package name and its script names.
+// globManifests lists the package.json files one workspace glob matches.
+func globManifests(root, glob string) ([]string, error) {
+	return filepath.Glob(filepath.Join(root, glob, "package.json"))
+}
+
+// scriptsFor mirrors scriptsFor in .github/scripts/run-package-suites.ts:
+// the scripts the gate runs, so only those can carry a weight.
+func scriptsFor(scripts map[string]string) []string {
+	var chosen []string
+	if _, ok := scripts["test:unit"]; ok {
+		chosen = append(chosen, "test:unit")
+	} else if _, ok := scripts["test"]; ok {
+		chosen = append(chosen, "test")
+	}
+	for _, lane := range []string{"test:integration", "test:browser"} {
+		if _, ok := scripts[lane]; ok {
+			chosen = append(chosen, lane)
+		}
+	}
+	return chosen
+}
+
+// manifestScripts reads one package.json: the package name and the scripts the gate runs.
 func manifestScripts(path string) (name string, scripts []string, err error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -69,8 +100,5 @@ func manifestScripts(path string) (name string, scripts []string, err error) {
 	if err := json.Unmarshal(raw, &pkg); err != nil {
 		return "", nil, err
 	}
-	for script := range pkg.Scripts {
-		scripts = append(scripts, script)
-	}
-	return pkg.Name, scripts, nil
+	return pkg.Name, scriptsFor(pkg.Scripts), nil
 }

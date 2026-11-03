@@ -113,3 +113,19 @@ Feature: The package-suites weights are refreshed by a command
       Then the scripts are listed heaviest first, ties by package then script
       And scripts under the listing threshold are left to the default
       And the header names the runs the numbers came from
+
+  Rule: a weight counts only while the gate still runs that script
+
+    @unit
+    Scenario: Workspace globs decide which packages define scripts
+      Given a workspace whose globs match packages at several depths
+      When the defined scripts are read
+      Then every matched package's scripts are defined
+      And a package under a negated glob defines nothing
+
+    @unit
+    Scenario: Only the scripts the gate runs are defined
+      Given a package with test, test:unit, test:integration, test:browser and build
+      When its defined scripts are chosen
+      Then test:unit wins over test, and integration and browser are kept
+      And build is not defined

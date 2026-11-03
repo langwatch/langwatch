@@ -2,6 +2,8 @@ package suiteweights
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -244,4 +246,39 @@ func TestParseJobsReadsIDConclusionAndName(t *testing.T) {
 	require.Error(t, err, "a short line is an error, not a skipped job")
 	_, err = parseJobs("x\tsuccess\tlint\n")
 	assert.Error(t, err)
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+}
+
+// @scenario "Workspace globs decide which packages define scripts"
+func TestDefinedScriptsFollowsWorkspaceGlobs(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "pnpm-workspace.yaml"),
+		"packages:\n  - packages/*\n  - modules/*/*\n  - '!packages/skip'\n")
+	writeFile(t, filepath.Join(root, "packages", "a", "package.json"), `{"name":"a","scripts":{"test":"x"}}`)
+	writeFile(t, filepath.Join(root, "packages", "skip", "package.json"), `{"name":"skip","scripts":{"test":"x"}}`)
+	writeFile(t, filepath.Join(root, "modules", "m", "process", "package.json"), `{"name":"m","scripts":{"test:integration":"x"}}`)
+	writeFile(t, filepath.Join(root, "other", "package.json"), `{"name":"other","scripts":{"test":"x"}}`)
+
+	defined, err := DefinedScripts(root)
+
+	require.NoError(t, err)
+	assert.True(t, defined(k("a", "test")))
+	assert.True(t, defined(k("m", "test:integration")))
+	assert.False(t, defined(k("skip", "test")), "negated glob excludes the package")
+	assert.False(t, defined(k("other", "test")), "unmatched dir is not a package")
+	assert.False(t, defined(k("a", "test:unit")))
+}
+
+// @scenario "Only the scripts the gate runs are defined"
+func TestScriptsForMirrorsTheGate(t *testing.T) {
+	all := map[string]string{"test": "a", "test:unit": "b", "test:integration": "c", "test:browser": "d", "build": "e"}
+
+	assert.ElementsMatch(t, []string{"test:unit", "test:integration", "test:browser"}, scriptsFor(all))
+	assert.Equal(t, []string{"test"}, scriptsFor(map[string]string{"test": "a", "build": "e"}))
+	assert.Empty(t, scriptsFor(map[string]string{"build": "e"}))
 }
