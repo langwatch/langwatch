@@ -90,6 +90,8 @@ spec:
             {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.langwatch_nlp) | nindent 12 }}
           image: "{{ .Values.images.langwatch_nlp.repository }}:{{ .Values.images.langwatch_nlp.tag }}"
           imagePullPolicy: "{{ .Values.images.langwatch_nlp.pullPolicy }}"
+          # The image runs whichever service its first argument names.
+          args: ["nlpgo"]
           ports:
             - name: http
               containerPort: {{ .Values.langwatch_nlp.service.port }}
