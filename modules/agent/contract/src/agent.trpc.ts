@@ -1,5 +1,12 @@
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
+import {
+  agentLabelSchema,
+  agentVersionsSchema,
+  assignAgentLabelInputSchema,
+  removeAgentLabelInputSchema,
+} from "./agent-version.ts";
 import { createAgentCommandSchema, updateAgentCommandSchema } from "./agent.commands.ts";
 import {
   agentCascadeArchiveSchema,
@@ -57,5 +64,17 @@ export const agentTrpc = defineTrpcContract("agents")
   .query("getHistory")
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentHistoryEntrySchema.array())
+
+  .query("listVersions")
+  .withInput(agentApiAgentReferenceInputSchema)
+  .withOutput(agentVersionsSchema)
+
+  .mutation("assignLabel")
+  .withInput(assignAgentLabelInputSchema)
+  .withOutput(agentLabelSchema)
+
+  .mutation("removeLabel")
+  .withInput(removeAgentLabelInputSchema)
+  .withOutput(z.void())
 
   .build();

@@ -118,6 +118,19 @@ Feature: An experiment run executes on its pipeline
     Then one more cell is sent, not two
 
   @unit
+  Scenario: A run's plan numbers its target cells row by row in the order the rows were asked for
+    Given an experiment with two targets
+    When a run over rows 2 and then 0 is planned
+    Then the cells are numbered row 2's targets first, then row 0's
+
+  @unit
+  Scenario: A run with a concurrency of one sends its cells one at a time in ordinal order
+    Given a run of four cells started with a concurrency of one
+    When each cell finishes in turn
+    Then the manager sends only the first cell at the start
+    And sends each next cell only after the one before it has finished
+
+  @unit
   Scenario: The run manager stops sending on abort and completes once its cells in flight finish
     Given a run asked to abort with one cell in flight
     When that cell finishes
@@ -250,6 +263,13 @@ Feature: An experiment run executes on its pipeline
     When the worker executes it
     Then at most two of its cells are in flight at any moment
     And every cell finishes and the run completes
+
+  @integration
+  Scenario: A sequential run executes one cell at a time in row order
+    Given a run over three rows and two targets started with a concurrency of one
+    When the worker executes it
+    Then each cell starts only after the cell before it has ended
+    And the cells run row by row, both targets of a row before the next row
 
   @integration
   Scenario: Comparison cells run only after every target cell has finished
