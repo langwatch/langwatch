@@ -11,6 +11,7 @@ import {
   exclusionNotices,
   failureAnnotations,
   heaviestFirst,
+  HEAVY_SECONDS,
   isHeavyPackage,
   jobsFor,
   laneOf,
@@ -959,6 +960,23 @@ void describe("given the lanes a leg of the job runs", () => {
         seconds([pkg("@fix/web", ["test", "test:integration", "test:browser"])], 300),
         seconds([pkg("@fix/web", ["test:browser"])], 100),
       );
+    });
+  });
+
+  void describe("when the runner asks how heavy a lane-filtered package is", () => {
+    /** @scenario "A heavy suite runs alone" */
+    void it("gets the same share the split used, so the split and the runner agree", () => {
+      const plan = planShard({
+        packages: [pkg("@fix/web", ["test", "test:browser"])],
+        lanes: "browser",
+        shard: { index: 1, total: 1 },
+        weightOf: () => 2 * HEAVY_SECONDS - 2,
+        concurrency: 2,
+        excluded: new Map(),
+      });
+      const [web] = plan.assigned;
+      assert.equal(plan.weightOf(web), HEAVY_SECONDS - 1);
+      assert.equal(isHeavyPackage({ weightOf: plan.weightOf, pkg: web }), false);
     });
   });
 

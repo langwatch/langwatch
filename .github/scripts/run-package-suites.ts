@@ -422,7 +422,8 @@ const withLanes = ({
 
 /**
  * What one shard runs: the lanes this leg admits, split over `shard.total` by wall
- * time, and this shard's share as jobs, heaviest package first.
+ * time, and this shard's share as jobs, heaviest package first. `weightOf` is the
+ * lane share the split used; the runner judges heaviness by it too.
  */
 export const planShard = ({
   packages,
@@ -438,7 +439,12 @@ export const planShard = ({
   weightOf: (pkg: DiscoveredPackage) => number;
   concurrency: number;
   excluded: Map<string, string>;
-}): { assigned: DiscoveredPackage[]; seconds: number; jobs: SuiteJob[] } => {
+}): {
+  assigned: DiscoveredPackage[];
+  seconds: number;
+  jobs: SuiteJob[];
+  weightOf: (pkg: DiscoveredPackage) => number;
+} => {
   const items = withLanes({ packages, lanes });
   // The weights file records whole packages, so a leg that keeps some suites pays their share.
   const scriptCount = new Map(packages.map((pkg) => [pkg.name, pkg.scripts.length]));
@@ -455,6 +461,7 @@ export const planShard = ({
     assigned,
     seconds: split.walls[shard.index - 1] ?? 0,
     jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf: laneWeightOf }), excluded),
+    weightOf: laneWeightOf,
   };
 };
 
@@ -887,7 +894,11 @@ if (isEntrypoint()) {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
-          ...workerEnvFor({ job, heavy: isHeavyPackage({ weightOf, pkg: job.pkg }), cores }),
+          ...workerEnvFor({
+            job,
+            heavy: isHeavyPackage({ weightOf: plan.weightOf, pkg: job.pkg }),
+            cores,
+          }),
         },
       }),
     log: (line) => console.log(line),
@@ -913,7 +924,7 @@ if (isEntrypoint()) {
       );
       return Promise.resolve(0);
     },
-    isHeavy: (pkg) => isHeavyPackage({ weightOf, pkg }),
+    isHeavy: (pkg) => isHeavyPackage({ weightOf: plan.weightOf, pkg }),
   });
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
     [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;
