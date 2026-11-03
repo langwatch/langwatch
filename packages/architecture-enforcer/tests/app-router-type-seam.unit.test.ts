@@ -17,9 +17,9 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 /**
  * 1,540 with `pnpm ensure:built` (#8795); 1,561 with ADR-185 (docs consent reads api-key config).
  * 1,562 with ADR-190: instant-eval-judge's api, config and pricing read its route contract.
- * A ceiling, not a target. Lower it when earned; never raise it without saying why.
- */
-const CEILING = 1_562;
+ * 1,565 with ADR-192: Grok's agent definition, tool-decision map and OTLP event-name walk.
+ * A ceiling, not a target. Lower it when earned; never raise it without saying why. */
+const CEILING = 1_565;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {
