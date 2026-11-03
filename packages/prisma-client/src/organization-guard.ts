@@ -386,7 +386,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // no customer content: only ids, domains, enums and credential references.
   "SsoConnection",
   "Subscription",
-  // Staff access (ADR-192): platform records about one organization, read across organizations
+  // Staff access (ADR-193): platform records about one organization, read across organizations
   // by the operator console, the gate (by key id) and the expiry sweep. The staff-access module
   // writes them only; no customer surface reads them.
   "StaffAccessRequest",

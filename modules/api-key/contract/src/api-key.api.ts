@@ -148,7 +148,7 @@ export interface ApiKeyApi {
    */
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked>;
   /**
-   * An approved staff agent's key (ADR-192): ownerless, system-managed, restricted to the staff
+   * An approved staff agent's key (ADR-193): ownerless, system-managed, restricted to the staff
    * bags at organization scope, expiring within the hour. Refuses any other permission.
    */
   mintStaffAccessKey(input: MintStaffAccessKeyInput): Promise<StaffAccessKeyMinted>;

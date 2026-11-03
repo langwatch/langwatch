@@ -364,7 +364,7 @@ function toolsGroup({
       ...(hasCloudOps || hosting === "local"
         ? [{ label: "Feature flags", href: "/ops/feature-flags", icon: Flag }]
         : []),
-      // Operators approving their coding agents' access to customers: cloud only (ADR-192).
+      // Operators approving their coding agents' access to customers: cloud only (ADR-193).
       ...(hasCloudOps && isPlatformAdmin
         ? [{ label: "Agent access", href: "/ops/agents", icon: BotMessageSquare }]
         : []),

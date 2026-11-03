@@ -1,4 +1,4 @@
-# ADR-192: Ops agent access through passkey-approved, one-hour keys
+# ADR-193: Ops agent access through passkey-approved, one-hour keys
 
 **Date:** 2026-11-02
 

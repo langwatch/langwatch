@@ -300,7 +300,7 @@ export const FEATURE_FLAGS = [
     envOverridable: false,
     family: "Ops",
     description:
-      "Opens ops agent access (ADR-192): operators enrol coding agents on /ops/agents and approve each one-hour access request with a passkey. Takes effect only where cloud ops is on. Off = every staff access route and procedure answers not found, and keys already minted are refused at the gate.",
+      "Opens ops agent access (ADR-193): operators enrol coding agents on /ops/agents and approve each one-hour access request with a passkey. Takes effect only where cloud ops is on. Off = every staff access route and procedure answers not found, and keys already minted are refused at the gate.",
   },
   {
     key: "release_dashboards",

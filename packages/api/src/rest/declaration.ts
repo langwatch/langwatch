@@ -257,7 +257,7 @@ export const DOOR_SCOPE_TIER = {
   cli_token: "organization",
   otlp_ingest: "project",
   licence_token: "organization",
-  // ADR-192: an approved staff agent's ops token. It reads across organizations, so it resolves
+  // ADR-193: an approved staff agent's ops token. It reads across organizations, so it resolves
   // no tenant; its routes ask only platform-tier permissions, which the door answers.
   staff_access: null,
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
@@ -1136,7 +1136,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
 
   /**
    * The route starts a run that spends the organization's money (models, evaluators). A staff
-   * key approved without spend is refused here (ADR-192); every new run route declares this.
+   * key approved without spend is refused here (ADR-193); every new run route declares this.
    */
   spends(): RouteBuilder<Api, S> {
     if (this.state.spends) throw new Error("REST route already declared spends()");

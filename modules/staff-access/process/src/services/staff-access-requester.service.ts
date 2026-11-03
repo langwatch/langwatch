@@ -47,7 +47,7 @@ type RequesterDeps = Readonly<{
 
 /**
  * An operator's enrolled agents: a passkey ceremony mints a 90-day `lwsr_` requester key, stored
- * only as a hash, which can create and redeem access requests and nothing else (ADR-192).
+ * only as a hash, which can create and redeem access requests and nothing else (ADR-193).
  */
 export class StaffAccessRequesterService {
   private constructor(private readonly deps: RequesterDeps) {}

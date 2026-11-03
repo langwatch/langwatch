@@ -13,7 +13,9 @@ import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
+import { SOURCE_TYPE_BY_TOOL } from "./utils/governance/otel-env-block";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
+import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
 import { trustLocalDevCa } from "./utils/localDevCa";
 import {
   applyOutputContext,
@@ -46,6 +48,7 @@ export const TOOL_WRAPPER_COMMANDS = [
   "cursor",
   "gemini",
   "opencode",
+  "grok",
 ] as const;
 
 /**
@@ -352,6 +355,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerCursorCommands(program);
   registerGeminiCommands(program);
   registerOpencodeCommands(program);
+  registerGrokCommands(program);
   registerCodingAssistantHelp(program);
   registerReportCommands(program);
   registerLogoutCommands(program);
@@ -663,7 +667,7 @@ function registerInstrumentCommands(program: Command): void {
     .description(
       "Write persistent telemetry wiring for a coding agent without launching it, so a plain `<tool>` run captures. Scope with --project (team project), --key (pasted ingest key, no login), or the default personal workspace.",
     )
-    .argument("<tool>", "claude|codex|gemini|opencode|copilot|code")
+    .argument("<tool>", Object.keys(SOURCE_TYPE_BY_TOOL).join("|"))
     .option(
       "--project <idOrSlug>",
       "scope telemetry to a team project (mints a project ingest key; needs login)",
@@ -781,6 +785,27 @@ function registerOpencodeCommands(program: Command): void {
     });
 }
 
+function registerGrokCommands(program: Command): void {
+  program
+    .command("grok", { hidden: true })
+    .description(
+      "Run `grok` (Grok CLI) with LangWatch telemetry (ingestion only: grok sets its model endpoints in config.toml, not the environment).",
+    )
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapGrok } = await import("./commands/wrap.js");
+        await wrapGrok(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+}
+
 function registerCodingAssistantHelp(program: Command): void {
   // A wrapper renders no result of its own, in any format: it hands the
   // terminal to the tool it runs. Registered as such so the auto-detected
@@ -805,6 +830,7 @@ function registerCodingAssistantHelp(program: Command): void {
       "  cursor          Run `cursor` routed through the gateway",
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
+      "  grok            Run `grok` (Grok CLI) with LangWatch telemetry",
       "  copilot-app     Set up capture for the standalone GitHub Copilot app",
       "  instrument      Write persistent telemetry wiring for a tool without launching it",
       "",
@@ -6047,7 +6073,7 @@ function registerDaemonCommands(program: Command): void {
 const collectScope = (value: string, previous: string[] = []): string[] => [...previous, value];
 
 function registerOpsCommands(program: Command): void {
-  // `langwatch ops *`: the LangWatch ops agent's passkey-approved staff access (ADR-192).
+  // `langwatch ops *`: the LangWatch ops agent's passkey-approved staff access (ADR-193).
   // Hidden: only LangWatch operators hold a requester key.
   const opsCmd = program
     .command("ops", { hidden: true })
@@ -6407,7 +6433,7 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
       .option("--session-id <id>", "declare for this session instead of resolving the live one")
       .option(
         "--agent <tool>",
-        "the agent the session belongs to: claude-code, codex, opencode or copilot",
+        `the agent the session belongs to: ${sessionContextHookArguments().join(", ")}`,
       ),
   ).action(async (options: { sessionId?: string; agent?: string }) => {
     try {

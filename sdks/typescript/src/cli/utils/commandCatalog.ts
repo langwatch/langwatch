@@ -48,7 +48,7 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "login",
   "logout",
   "whoami",
-  // Staff access for the LangWatch ops agent (ADR-192): operator-only credential plumbing.
+  // Staff access for the LangWatch ops agent (ADR-193): operator-only credential plumbing.
   "ops",
   // User-global CLI configuration, not platform data.
   "config",
@@ -89,6 +89,9 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   // VS Code launcher: `code` execs VS Code with Copilot Chat telemetry env,
   // returning no LangWatch result. ADR-039 §Extension #2.
   "code",
+  // Grok runner: execs grok with ingestion telemetry env, no gateway path and
+  // no LangWatch result of its own. ADR-192.
+  "grok",
   // Local capture setup for the standalone GitHub Copilot app: installs an
   // OS login agent on this machine, no platform resource to card.
   "copilot-app",

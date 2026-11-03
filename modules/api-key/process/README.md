@@ -84,7 +84,7 @@ revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRev
 
 #### `mintStaffAccessKey`
 
-An approved staff agent's key (ADR-192): ownerless, system-managed, restricted to the staff bags at organization scope, expiring within the hour. Refuses any other permission.
+An approved staff agent's key (ADR-193): ownerless, system-managed, restricted to the staff bags at organization scope, expiring within the hour. Refuses any other permission.
 
 ```typescript
 mintStaffAccessKey(input: MintStaffAccessKeyInput): Promise<StaffAccessKeyMinted>;

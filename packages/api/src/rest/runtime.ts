@@ -233,7 +233,7 @@ export type RestRuntimeMembers = Readonly<{
   confirmationLog?: RestConfirmationLog;
   /**
    * Where every request by an approved staff agent's key is recorded before its handler
-   * (ADR-192). Absent, a staff key is refused on every route rather than run unrecorded.
+   * (ADR-193). Absent, a staff key is refused on every route rather than run unrecorded.
    */
   staffAccess?: RestStaffAccessGate;
 }>;

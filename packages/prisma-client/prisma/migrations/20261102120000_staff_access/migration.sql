@@ -1,5 +1,5 @@
 -- IRREVERSIBLE: creates new tables; migrations never drop one, a drop is an operator step.
--- Ops agent access (ADR-192), owned by the staff-access module: enrolled agents, their passkey
+-- Ops agent access (ADR-193), owned by the staff-access module: enrolled agents, their passkey
 -- challenges, approval requests with the one-hour sessions they become, and the call trail.
 CREATE TABLE IF NOT EXISTS "StaffAccessRequester" (
     "id" TEXT NOT NULL,

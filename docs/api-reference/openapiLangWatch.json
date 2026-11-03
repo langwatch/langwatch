@@ -74009,6 +74009,22 @@
                             "allowOtelDirect"
                           ],
                           "additionalProperties": false
+                        },
+                        "grok": {
+                          "type": "object",
+                          "properties": {
+                            "allowVk": {
+                              "type": "boolean"
+                            },
+                            "allowOtelDirect": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "allowVk",
+                            "allowOtelDirect"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -74018,7 +74034,8 @@
                         "opencode",
                         "cursor",
                         "copilot",
-                        "code"
+                        "code",
+                        "grok"
                       ],
                       "additionalProperties": false
                     }

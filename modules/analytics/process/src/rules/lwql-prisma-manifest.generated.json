@@ -26393,7 +26393,7 @@
     {
       "name": "StaffAccessRequester",
       "tableName": "StaffAccessRequester",
-      "documentation": "An operator's enrolled coding agent (ADR-192, staff-access module). Its key `lwsr_<lookupId>_<secret>`\ncan only create staff access requests; the secret is stored as its HMAC.",
+      "documentation": "An operator's enrolled coding agent (ADR-193, staff-access module). Its key `lwsr_<lookupId>_<secret>`\ncan only create staff access requests; the secret is stored as its HMAC.",
       "primaryKey": [
         "id"
       ],

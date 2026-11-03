@@ -184,7 +184,7 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "manage"],
     scopes: ["organization"],
   },
-  // ADR-192. Allowlisted cross-organization reads an approved staff agent may make. Platform-tier
+  // ADR-193. Allowlisted cross-organization reads an approved staff agent may make. Platform-tier
   // only, like `ops`, and never `ops:view`: an agent token answers it from its approved session.
   opsRead: {
     actions: ["view"],

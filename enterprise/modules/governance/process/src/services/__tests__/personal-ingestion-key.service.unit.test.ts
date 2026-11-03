@@ -254,6 +254,14 @@ describe("PersonalIngestionKeyService", () => {
       expect(created).toMatchObject([{ parentApiKeyId: null }]);
     });
 
+    /** @scenario A personal ingest key can be minted for grok_cli */
+    it("mints for Grok, which the CLI wraps as grok_cli", async () => {
+      const { service, created } = await setup([login]);
+
+      await service.mint({ ...session, sourceType: "grok_cli", fromCliSession: true });
+      expect(created).toMatchObject([{ name: "Ingestion key (grok_cli)" }]);
+    });
+
     it("refuses a source no wrapped tool stamps", async () => {
       const { service } = await setup([]);
 

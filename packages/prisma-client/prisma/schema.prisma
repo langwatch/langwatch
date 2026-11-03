@@ -7329,7 +7329,7 @@ model SignInProviderMount {
   updatedAt          DateTime @default(now()) @updatedAt
 }
 
-/// An operator's enrolled coding agent (ADR-192, staff-access module). Its key `lwsr_<lookupId>_<secret>`
+/// An operator's enrolled coding agent (ADR-193, staff-access module). Its key `lwsr_<lookupId>_<secret>`
 /// can only create staff access requests; the secret is stored as its HMAC.
 model StaffAccessRequester {
   id           String    @id

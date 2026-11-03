@@ -1,5 +1,5 @@
 /**
- * Staff access keys (ADR-192): ownerless, system-managed, restricted to the staff bags at
+ * Staff access keys (ADR-193): ownerless, system-managed, restricted to the staff bags at
  * organization scope, hidden from listings, under names a customer may not take.
  * @vitest-environment node
  * @see modules/staff-access/specs/staff-access-use.feature
