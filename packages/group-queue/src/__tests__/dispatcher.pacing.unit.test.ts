@@ -1,6 +1,7 @@
 /**
  * The dispatcher's pace between claims: a claim that filled every free slot is followed at once,
- * one that found fewer jobs than it asked for pauses 25 ms. Spec: specs/claim-round-trips.feature.
+ * one that found fewer jobs than it asked for pauses 25 ms, and a full consumer claims again as a
+ * slot frees, with no queue signal. Spec: specs/claim-round-trips.feature.
  */
 import { createTestLogger } from "@langwatch/test-harness";
 import fastq from "fastq";
@@ -28,8 +29,14 @@ function job(id: number): DispatchResult {
   };
 }
 
-/** A dispatcher whose claims return `found(asked)` jobs; its jobs finish at once. */
-function startDispatcher({ found }: { found: (asked: number) => number }) {
+/** A dispatcher whose claims return `found(asked)` jobs; its jobs finish at once by default. */
+function startDispatcher({
+  found,
+  work = async () => {},
+}: {
+  found: (asked: number) => number;
+  work?: () => Promise<void>;
+}) {
   const asked: number[] = [];
   let made = 0;
   const scripts = {
@@ -52,18 +59,25 @@ function startDispatcher({ found }: { found: (asked: number) => number }) {
     },
     del: async (): Promise<number> => 0,
   };
+  const processingQueue = fastq.promise<unknown, DispatchResult, void>(work, SLOTS);
+  let slots = SLOTS;
   const dispatcher = new GroupQueueDispatcher({
     scripts,
-    processingQueue: fastq.promise<unknown, DispatchResult, void>(async () => {}, SLOTS),
+    processingQueue,
     blockingConnection,
     queueName: "{test}",
-    globalConcurrency: SLOTS,
+    globalConcurrency: () => slots,
     activeTtlSec: 300,
     signalTimeoutSec: 5,
     logger: createTestLogger().logger,
   });
   dispatcher.start();
-  return { asked, stop: () => dispatcher.requestShutdown() };
+  const grow = (to: number) => {
+    slots = to;
+    processingQueue.concurrency = to;
+    dispatcher.slotsChanged();
+  };
+  return { asked, grow, dispatcher, stop: () => dispatcher.requestShutdown() };
 }
 
 describe("GroupQueueDispatcher pacing", () => {
@@ -107,6 +121,63 @@ describe("GroupQueueDispatcher pacing", () => {
       await settle();
       expect(asked).toHaveLength(2);
       stop();
+    });
+  });
+
+  describe("given every slot taken and no queue signal to come", () => {
+    /** @scenario "A full consumer claims again as soon as one of its slots frees" */
+    it("claims for the freed slot without waiting for a signal", async () => {
+      const finish: (() => void)[] = [];
+      const { asked, stop } = startDispatcher({
+        found: (want) => want,
+        work: () => new Promise<void>((resolve) => finish.push(resolve)),
+      });
+
+      await settle();
+      expect(asked).toEqual([SLOTS]);
+
+      finish.shift()?.();
+      await settle();
+
+      expect(asked).toEqual([SLOTS, 1]);
+      stop();
+    });
+  });
+
+  describe("given every slot taken when the slot count grows", () => {
+    /** @scenario "A full consumer claims again as soon as one of its slots frees" */
+    it("claims for the new slots at once", async () => {
+      const { asked, grow, stop } = startDispatcher({
+        found: (want) => want,
+        work: () => new Promise<void>(() => {}),
+      });
+
+      await settle();
+      grow(SLOTS + 2);
+      await settle();
+
+      expect(asked).toEqual([SLOTS, 2]);
+      stop();
+    });
+  });
+
+  describe("given a claim's answer about the queue behind it", () => {
+    /** @scenario "A slot waiting on its next claim during a backlog counts as busy" */
+    it("reports a backlog after a claim that filled every slot, and none after a short one", async () => {
+      const full = startDispatcher({
+        found: (want) => want,
+        work: () => new Promise<void>(() => {}),
+      });
+      const short = startDispatcher({ found: () => 1 });
+
+      await settle();
+
+      expect(full.dispatcher.hasBacklog()).toBe(true);
+      expect(short.dispatcher.hasBacklog()).toBe(false);
+      full.dispatcher.pause();
+      expect(full.dispatcher.hasBacklog()).toBe(false);
+      full.stop();
+      short.stop();
     });
   });
 });

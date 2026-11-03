@@ -58,6 +58,8 @@ export class GroupQueueDispatcher {
   private wake: (() => void) | null = null;
   /** A listed-group dispatcher's own job finished since its last claim: it claims again at once. */
   private slotFreed = false;
+  /** The last claim found a job for every slot it asked for: more work is waiting. */
+  private backlogged = false;
   /** The open list that claims first next time, so each list leads in turn. */
   private nextList = 0;
   /** Each candidates set the last listed claim scanned, and the clock it scanned below. */
@@ -196,9 +198,24 @@ export class GroupQueueDispatcher {
     this.wake?.();
   }
 
+  /** Work is waiting for each slot that frees, so a slot between claims is not idle. */
+  hasBacklog(): boolean {
+    return this.backlogged && !this.paused;
+  }
+
+  /** The consumer's slot count changed: a full consumer may now have room to claim. */
+  slotsChanged(): void {
+    this.wakeForFreedSlot();
+  }
+
   private wakeForFreedSlot(): void {
     this.slotFreed = true;
     if (!this.paused) this.wake?.();
+  }
+
+  private async untilSlotFreed(): Promise<void> {
+    if (this.slotFreed || this.shutdownRequested || this.paused) return;
+    await this.untilWoken();
   }
 
   private untilWoken(): Promise<void> {
@@ -218,6 +235,9 @@ export class GroupQueueDispatcher {
 
   private async waitForSignal(): Promise<void> {
     if (this.listed) return this.pollListedGroups();
+    // Full, only a freed slot lets a claim through: a completion's signal can arrive before fastq
+    // frees its slot, and the cycle then clears it, so wait for the slot itself.
+    if (this.saturated()) return this.untilSlotFreed();
     const signalKey = this.params.scripts.getSignalKey();
     const untilDueMs = await this.untilEarliestDueMs();
     // A settling group comes due within one BRPOP floor; signals meanwhile stay listed.
@@ -460,8 +480,7 @@ export class GroupQueueDispatcher {
           "fastq push error (already handled in processWithRetries)",
         );
       });
-      // The shared signal is the main dispatcher's; a listed one wakes on its own freed slot.
-      if (this.listed) void run.finally(() => this.wakeForFreedSlot());
+      void run.finally(() => this.wakeForFreedSlot());
 
       gqJobsDispatchedTotal.inc({ queue_name: this.params.queueName }, claims.length);
     }
@@ -476,6 +495,7 @@ export class GroupQueueDispatcher {
       );
     }
 
+    this.backlogged = claimed >= maxJobs;
     return { requested: maxJobs, claimed };
   }
 }
