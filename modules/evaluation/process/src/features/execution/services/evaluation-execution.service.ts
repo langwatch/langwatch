@@ -363,9 +363,8 @@ export class EvaluationExecutionService {
       });
     }
 
-    // Native (in-process) evaluators skip the analysis service; both they and
-    // the remote ones run through the shared augmenter so redaction or drop at
-    // ingestion never hides a leak from the result.
+    // Native evaluators skip the analysis service; both kinds run through the shared
+    // augmenter so redaction or drop at ingestion never hides a leak from the result.
     if (isNativeEvaluatorType(builtInType)) {
       return this.runNativeEvaluation({
         builtInType,
