@@ -187,7 +187,7 @@ time. Its Markdown export keeps the newest releases only while the export fits t
 agent readiness page token budget (none, if the newest alone is over it), with a
 short note when some are left out, under an "About this copy" heading. llms-full.txt
 carries the changelog untrimmed on purpose, because the page token budget
-applies to per-page exports only. The changelog links on to the self-hosting
+applies to per-page exports only. The search index (src/features/search/compile/search-index.ts) is the second untrimmed caller, on purpose. The changelog links on to the self-hosting
 releases and upgrade pages. The home page's `<WhatsNew />` tag becomes a short
 list of the three newest, each linking to its changelog entry. The docs.json
 announcement and the release line both sit on paper with muted text; each leads

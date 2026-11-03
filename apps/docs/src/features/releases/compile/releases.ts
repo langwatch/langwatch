@@ -11,7 +11,7 @@ const PUBLISHED = 5;
 const WHATS_NEW = 3;
 const LEFT_OUT_HEADING = "## About this copy";
 const LEFT_OUT_NOTE =
-  "This copy leaves out some releases, to keep it short. " +
+  "This copy leaves out older releases, to keep it short. " +
   `The full [changelog page](/${RELEASES_SLUG}) lists the ${PUBLISHED} most recent releases, and the ` +
   `[repository CHANGELOG](${REPOSITORY_URL}/blob/main/CHANGELOG.md) ` +
   "holds every release.";

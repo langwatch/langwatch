@@ -277,7 +277,8 @@ export function pageMarkdown({
     const markdown = exportOf({ releaseCount: count });
     if (approximateTokens({ text: markdown }) <= pageTokens) return markdown;
   }
-  // Even the newest release can exceed the budget; the note alone always fits.
+  // Even the newest release can exceed the budget. Fall back to the note alone,
+  // and leave any remaining overage to the agent-readiness audit.
   return exportOf({ releaseCount: 0 });
 }
 
