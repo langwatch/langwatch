@@ -43,8 +43,15 @@ person spans that copy reveals into the first pass's findings.
    unknown word (ZORBEX ULTRA). This refuses WIDGET PRO, SEPA ACH, API KEY
    and invented brands, which pass the shape rule.
 4. The second pass is skipped when neither person nor location detection is
-   on, or when the text holds no such shape, so prose with OK, ID or USD costs
-   one pass. With location on and person off it asks for places only.
+   on, or when no rewritten word could join a name. A rewritten word joins one
+   when it sits beside another word, with no field end between them, and is
+   four or more letters or stands beside a second rewritten word. A field end
+   is a quote beside a colon, comma or semicolon, as in "method": "POST". Any
+   other gap (a space, comma, colon, quote, bracket or dash) may sit inside a
+   name, as in JOHN "JACK" WHITFIELD or Robert: MILLER. Prose with OK, ID or
+   USD and JSON with a quoted "POST" or "ERROR" cost one pass, since no span
+   of one word can pass rule 2. With location on and person off it asks for
+   places only.
 5. Only PERSON spans, and LOCATION spans when location is redacted, come out
    of the second pass. LOCATION is there because the model reads some
    surnames as places (Costa Pereira), so a person-only pass left them in
@@ -54,10 +61,11 @@ person spans that copy reveals into the first pass's findings.
 ## Rationale / Trade-offs
 
 Titlecasing restores the name cue on WHITFIELD and invents the same cue on
-ERP. The shape and name-word rules are what price that: a 49-string corpus
+ERP. The shape and name-word rules are what price that: a 54-string corpus
 of capitalised non-names (merchants, carriers, departments, SKUs, codes,
-headings, acronym prose, particle-shaped places) keeps two known false
-positives. One predates the second pass, and the other is a product line
+headings, acronym prose, particle-shaped places, non-places where a place
+would go) keeps two known false people and no false place added by the
+second pass. One predates the second pass, and the other is a product line
 named after its founder, which holds a name. The side-by-side clause lifted
 wholly capitalised names with a short word (AMY LEE) from 5 of 24 to 24 of
 24 and particle surnames (VAN DER BERG) from 2 of 24 to 21 of 24, the
@@ -93,7 +101,11 @@ Alternatives rejected:
   ordinary forename beside a capitalised surname back to where it started.
 
 A second spaCy pass costs CPU on the texts that carry a name-shaped capital
-run. The skip rule bounds that to those texts.
+run. The skip rule bounds that to those texts. The first skip rule fired on
+any rewritten word of four letters, so a trace with "method": "POST" took
+about twice the time (81.5 ms against 47.8 ms on a 1,365-character
+payload) for a pass that could not keep a span. Requiring a neighbouring
+word left the output of 3,100 recall and precision texts unchanged.
 
 ## Consequences
 
@@ -113,4 +125,4 @@ run. The skip rule bounds that to those texts.
 - Spec: `specs/evaluators/langevals-presidio-allcaps-person-names.feature`
 - End-to-end scenario: `specs/data-privacy/pii-redaction.feature`
 - Code: `services/langevals/evaluators/presidio/langevals_presidio/pii_detection.py`
-- Issues: langwatch/tasks#1049, #1055, #1057, #898
+- Issues: langwatch/tasks#1049, #1055, #1057, #898, langwatch/langwatch#9252
