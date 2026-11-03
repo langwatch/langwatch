@@ -43,6 +43,14 @@ Feature: The package-suites weights are refreshed by a command
       Then it keeps the committed weight rather than the replay's seconds
 
     @unit
+    Scenario: A script no run measured keeps its committed weight
+      Given the committed weights file names a script of a package that some run measured
+      And no sampled run measured that script
+      When the weights are computed
+      Then the script keeps its committed weight
+      And a package no run measured is dropped
+
+    @unit
     Scenario: A package's weight is the median of its runs, kept per script
       Given a package whose unit and integration scripts were measured in three runs
       When the weights are computed
@@ -56,6 +64,13 @@ Feature: The package-suites weights are refreshed by a command
       Given a main run where one package-suites shard failed
       When runs are collected
       Then that run is not measured and the next green one is
+
+    @unit
+    Scenario: The browser job is measured when present and must be green
+      Given a main run whose shards are green
+      When the package-suites browser job is also green
+      Then its log is measured with the shards
+      And when the browser job failed the run is skipped
 
     @unit
     Scenario: Too few green runs is an error rather than a thin file

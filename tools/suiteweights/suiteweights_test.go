@@ -68,6 +68,17 @@ func TestWeighKeepsTheCommittedWeightOfAPackageNoRunExecuted(t *testing.T) {
 	assert.InDelta(t, 45.0, weights[k("@x/ran", "test")], 0.001)
 }
 
+// @scenario "A script no run measured keeps its committed weight"
+func TestWeighKeepsAScriptNoRunExecutedWhenItsPackageRan(t *testing.T) {
+	previous := ParseWeights("@x/app  test  30\n@x/app  test:browser  70\n@x/gone  test  20\n")
+
+	weights := Weigh([][]Measurement{{m("@x/app", "test", 40, false)}}, previous)
+
+	assert.InDelta(t, 40.0, weights[k("@x/app", "test")], 0.001)
+	assert.InDelta(t, 70.0, weights[k("@x/app", "test:browser")], 0.001)
+	assert.NotContains(t, weights, k("@x/gone", "test"))
+}
+
 // @scenario "A package's weight is the median of its runs, kept per script"
 func TestWeighKeepsTheMedianOfEachScriptApart(t *testing.T) {
 	weights := Weigh([][]Measurement{
@@ -159,6 +170,18 @@ func TestCollectRefusesANonPositiveRunCount(t *testing.T) {
 
 		require.Error(t, err)
 	}
+}
+
+// @scenario "The browser job is measured when present and must be green"
+func TestSuiteJobsTakesAGreenBrowserJobAndRejectsAFailedOne(t *testing.T) {
+	jobs := shards(1, "success", "success")
+
+	got, ok := suiteJobs(append(jobs, Job{ID: 99, Name: "package-suites (browser)", Conclusion: "success"}))
+	assert.True(t, ok)
+	assert.Len(t, got, 3)
+
+	_, ok = suiteJobs(append(jobs, Job{ID: 99, Name: "package-suites (browser)", Conclusion: "failure"}))
+	assert.False(t, ok)
 }
 
 func TestARunMissingAShardIsNotComplete(t *testing.T) {
