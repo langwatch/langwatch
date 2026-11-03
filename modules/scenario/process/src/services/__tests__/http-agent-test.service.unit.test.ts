@@ -142,6 +142,40 @@ describe("HttpAgentTestService", () => {
       expect(sent[0]).not.toContain("unsaved-secret");
     });
 
+    it("reads no project secret a connector step's code references", async () => {
+      const requested: string[][] = [];
+      const withStepCode = agentOverviewSchema.parse({
+        ...storedAgent,
+        config: {
+          ...storedAgent.config,
+          connector: {
+            setup: {
+              language: "python" as const,
+              code: "key = '{{ secrets.HIDDEN_KEY }}'",
+              secretNames: [],
+            },
+          },
+        },
+      });
+      const service = HttpAgentTestService.create({
+        agents: createApiFixture<AgentApi>({ getById: async () => withStepCode }),
+        secrets: createApiFixture<SecretApi>({
+          getValuesByName: async ({ names }) => {
+            requested.push(names);
+            return {};
+          },
+        }),
+        workflows: createApiFixture<WorkflowApi>({
+          executeComponent: async () => ({ status: "success", outputs: { output: "pong" } }),
+        }),
+        traces: createApiFixture<TraceApi>({ recordCapturedSpan: async () => {} }),
+      });
+
+      await service.execute({ ...blank, agentId: withStepCode.id, url: savedUrl });
+
+      expect(requested.flat()).not.toContain("HIDDEN_KEY");
+    });
+
     /** @scenario A test call never traces a stored credential */
     it("traces the headers as typed, never the stored values", async () => {
       const { service, agent, spans } = testingSavedAgent();

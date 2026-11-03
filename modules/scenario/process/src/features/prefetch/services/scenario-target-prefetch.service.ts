@@ -1,5 +1,6 @@
 import {
   AgentNotFoundError,
+  connectorSchema,
   DEFAULT_CALL_TIMEOUT_MS,
   MAX_CALL_TIMEOUT_MS,
   type Agent,
@@ -24,10 +25,15 @@ import { referencedSecretNames, type SecretApi } from "@langwatch/secret-contrac
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
+import type { ConnectorStepsGate } from "../../../services/scenario-connector-steps-gate.service.ts";
 import type { ModelParamsFailureReason } from "../../../services/scenario-model-parameters.service.ts";
 import { ScenarioWorkflowAgentSecretsService } from "../../../services/scenario-workflow-agent-secrets.service.ts";
 import type { ScenarioWorkflowHydratorService } from "../../../services/scenario-workflow-hydrator.service.ts";
 import { ScenarioWorkflowMappingService } from "../../../services/scenario-workflow-mapping.service.ts";
+import {
+  ConnectorStepPrefetchService,
+  type ConnectorDatasetReader,
+} from "./connector-step-prefetch.service.ts";
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
 type HydrationFailure = {
@@ -40,22 +46,26 @@ export interface VoiceTargetReader {
   getVoiceTarget(input: { projectId: string; agentId: string }): Promise<VoiceAgentData>;
 }
 
+export type { ConnectorDatasetReader };
+
 export class ScenarioTargetPrefetchService {
   static create(options: {
     prompts: PromptApi;
     agents: AgentApi;
     workflows: WorkflowApi;
     secrets: SecretApi;
+    datasets: ConnectorDatasetReader;
+    connectorSteps: ConnectorStepsGate;
     workflowHydrator: ScenarioWorkflowHydratorService;
     legacyDefaultModel: string;
     langwatchEndpoint: string;
     voiceTargets: VoiceTargetReader | null;
   }): ScenarioTargetPrefetchService {
-    return new ScenarioTargetPrefetchService(
-      options,
-      ScenarioWorkflowMappingService.create(),
-      ScenarioWorkflowAgentSecretsService.create(options.agents),
-    );
+    return new ScenarioTargetPrefetchService(options, {
+      workflowMappings: ScenarioWorkflowMappingService.create(),
+      workflowAgentSecrets: ScenarioWorkflowAgentSecretsService.create(options.agents),
+      connectorSteps: ConnectorStepPrefetchService.create(options),
+    });
   }
 
   private constructor(
@@ -64,13 +74,18 @@ export class ScenarioTargetPrefetchService {
       agents: AgentApi;
       workflows: WorkflowApi;
       secrets: SecretApi;
+      datasets: ConnectorDatasetReader;
+      connectorSteps: ConnectorStepsGate;
       workflowHydrator: ScenarioWorkflowHydratorService;
       legacyDefaultModel: string;
       langwatchEndpoint: string;
       voiceTargets: VoiceTargetReader | null;
     },
-    private readonly workflowMappings: ScenarioWorkflowMappingService,
-    private readonly workflowAgentSecrets: ScenarioWorkflowAgentSecretsService,
+    private readonly collaborators: {
+      workflowMappings: ScenarioWorkflowMappingService;
+      workflowAgentSecrets: ScenarioWorkflowAgentSecretsService;
+      connectorSteps: ConnectorStepPrefetchService;
+    },
   ) {}
 
   async getTargetAdapter(input: {
@@ -242,13 +257,13 @@ export class ScenarioTargetPrefetchService {
 
     const config = parseResult.data;
 
-    // Loaded once for the whole run, the same way the code and workflow paths
-    // load them: the child process has no database access, so a secret the url,
-    // a header or an auth field references has to travel with the job.
+    // Loaded once for the whole run: the child has no database access, so a secret the url, a
+    // header or an auth field references travels with the job. Connector steps are left out: a
+    // step receives only the secrets it names, and only while the release is on.
     const secretValues = await this.executionSecrets({
       projectId,
       runSecretValues,
-      names: referencedSecretNames(config),
+      names: referencedSecretNames({ ...config, connector: undefined }),
     });
 
     return {
@@ -263,6 +278,11 @@ export class ScenarioTargetPrefetchService {
       sessionPath: config.sessionPath,
       scenarioMappings: config.scenarioMappings,
       secrets: secretValues,
+      ...(await this.collaborators.connectorSteps.connectorData({
+        projectId,
+        connector: config.connector,
+        runSecretValues,
+      })),
     };
   }
 
@@ -365,7 +385,10 @@ export class ScenarioTargetPrefetchService {
       };
     }
 
-    const dsl = await this.workflowAgentSecrets.fill({ dsl: hydrateResult.dsl, projectId });
+    const dsl = await this.collaborators.workflowAgentSecrets.fill({
+      dsl: hydrateResult.dsl,
+      projectId,
+    });
     const { inputs, outputs } = this.options.workflowHydrator.extractWorkflowIO(dsl);
 
     const secretValues = await this.executionSecrets({ projectId, runSecretValues });
@@ -382,7 +405,7 @@ export class ScenarioTargetPrefetchService {
       secrets: secretValues,
     };
 
-    this.workflowMappings.validate(data);
+    this.collaborators.workflowMappings.validate(data);
 
     return data;
   }
@@ -401,6 +424,7 @@ const HttpAgentConfigSchema = z.object({
   outputPath: z.string().optional(),
   sessionPath: z.string().optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  connector: connectorSchema.optional(),
 });
 
 /**

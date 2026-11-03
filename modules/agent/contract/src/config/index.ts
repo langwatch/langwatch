@@ -9,6 +9,7 @@ import { voiceAgentConfigSchema } from "./voice.ts";
 
 export * from "./code.ts";
 export * from "./connected.ts";
+export * from "./connector.ts";
 export * from "./http.ts";
 export * from "./signature.ts";
 export * from "./voice.ts";

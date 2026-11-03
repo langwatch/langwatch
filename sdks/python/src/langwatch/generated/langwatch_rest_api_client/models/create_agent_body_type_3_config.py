@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ..models.create_agent_body_type_3_config_auth_type_1 import CreateAgentBodyType3ConfigAuthType1
     from ..models.create_agent_body_type_3_config_auth_type_2 import CreateAgentBodyType3ConfigAuthType2
     from ..models.create_agent_body_type_3_config_auth_type_3 import CreateAgentBodyType3ConfigAuthType3
+    from ..models.create_agent_body_type_3_config_connector import CreateAgentBodyType3ConfigConnector
     from ..models.create_agent_body_type_3_config_dev_tunnel import CreateAgentBodyType3ConfigDevTunnel
     from ..models.create_agent_body_type_3_config_headers_item import CreateAgentBodyType3ConfigHeadersItem
     from ..models.create_agent_body_type_3_config_inputs_item import CreateAgentBodyType3ConfigInputsItem
@@ -49,6 +50,7 @@ class CreateAgentBodyType3Config:
         timeout_ms (float | Unset):
         scenario_mappings (CreateAgentBodyType3ConfigScenarioMappings | Unset):
         dev_tunnel (CreateAgentBodyType3ConfigDevTunnel | Unset):
+        connector (CreateAgentBodyType3ConfigConnector | Unset):
     """
 
     url: str
@@ -76,6 +78,7 @@ class CreateAgentBodyType3Config:
     timeout_ms: float | Unset = UNSET
     scenario_mappings: CreateAgentBodyType3ConfigScenarioMappings | Unset = UNSET
     dev_tunnel: CreateAgentBodyType3ConfigDevTunnel | Unset = UNSET
+    connector: CreateAgentBodyType3ConfigConnector | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -157,6 +160,10 @@ class CreateAgentBodyType3Config:
         if not isinstance(self.dev_tunnel, Unset):
             dev_tunnel = self.dev_tunnel.to_dict()
 
+        connector: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.connector, Unset):
+            connector = self.connector.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -200,6 +207,8 @@ class CreateAgentBodyType3Config:
             field_dict["scenarioMappings"] = scenario_mappings
         if dev_tunnel is not UNSET:
             field_dict["devTunnel"] = dev_tunnel
+        if connector is not UNSET:
+            field_dict["connector"] = connector
 
         return field_dict
 
@@ -209,6 +218,7 @@ class CreateAgentBodyType3Config:
         from ..models.create_agent_body_type_3_config_auth_type_1 import CreateAgentBodyType3ConfigAuthType1
         from ..models.create_agent_body_type_3_config_auth_type_2 import CreateAgentBodyType3ConfigAuthType2
         from ..models.create_agent_body_type_3_config_auth_type_3 import CreateAgentBodyType3ConfigAuthType3
+        from ..models.create_agent_body_type_3_config_connector import CreateAgentBodyType3ConfigConnector
         from ..models.create_agent_body_type_3_config_dev_tunnel import CreateAgentBodyType3ConfigDevTunnel
         from ..models.create_agent_body_type_3_config_headers_item import CreateAgentBodyType3ConfigHeadersItem
         from ..models.create_agent_body_type_3_config_inputs_item import CreateAgentBodyType3ConfigInputsItem
@@ -343,6 +353,13 @@ class CreateAgentBodyType3Config:
         else:
             dev_tunnel = CreateAgentBodyType3ConfigDevTunnel.from_dict(_dev_tunnel)
 
+        _connector = d.pop("connector", UNSET)
+        connector: CreateAgentBodyType3ConfigConnector | Unset
+        if isinstance(_connector, Unset):
+            connector = UNSET
+        else:
+            connector = CreateAgentBodyType3ConfigConnector.from_dict(_connector)
+
         create_agent_body_type_3_config = cls(
             url=url,
             field_library_ref=field_library_ref,
@@ -363,6 +380,7 @@ class CreateAgentBodyType3Config:
             timeout_ms=timeout_ms,
             scenario_mappings=scenario_mappings,
             dev_tunnel=dev_tunnel,
+            connector=connector,
         )
 
         create_agent_body_type_3_config.additional_properties = d

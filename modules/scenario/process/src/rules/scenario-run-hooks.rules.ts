@@ -10,8 +10,14 @@ import type {
   TargetAdapterData,
 } from "@langwatch/scenario-contract";
 
-/** Whether a run against this target calls a setup or a teardown hook. */
+/**
+ * Whether a run against this target calls a setup or a teardown hook: a connected agent's own
+ * (ADR-180), or an HTTP agent's Connector steps (ADR-194).
+ */
 export function adapterDeclaresHooks(adapterData: TargetAdapterData): boolean {
+  if (adapterData.type === "http") {
+    return Boolean(adapterData.connector?.setup || adapterData.connector?.teardown);
+  }
   if (adapterData.type !== "connected") return false;
   return Boolean(adapterData.hooks?.setup || adapterData.hooks?.teardown);
 }

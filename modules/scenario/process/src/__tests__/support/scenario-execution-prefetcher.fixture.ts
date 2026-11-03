@@ -1,5 +1,6 @@
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
@@ -414,6 +415,8 @@ export function createTestScenarioExecutionPrefetcherService(
           updatedBy: { name: null },
         })),
     }),
+    datasets: createApiFixture<DatasetApi>({}),
+    connectorSteps: { isEnabled: async () => true },
     traces: createApiFixture<TraceApi>({
       resolveIngestWaitTimeout: (input) =>
         deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),

@@ -15,11 +15,10 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * 1,540 with `pnpm ensure:built` (#8795); 1,561 with ADR-185 (docs consent reads api-key config).
- * 1,562 with ADR-190: instant-eval-judge's api, config and pricing read its route contract.
- * 1,565 with ADR-192: Grok's agent definition, tool-decision map and OTLP event-name walk.
- * A ceiling, not a target. Lower it when earned; never raise it without saying why. */
-const CEILING = 1_565;
+ * 1,540 with `pnpm ensure:built`; 1,561 ADR-185; 1,562 ADR-190; 1,565 ADR-192 (Grok agent).
+ * 1,567 with ADR-194: the agent contract's config/connector.ts and the feature-flag contract's
+ * scenario-connector-steps.ts. A ceiling, not a target: say why before raising it. */
+const CEILING = 1_567;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

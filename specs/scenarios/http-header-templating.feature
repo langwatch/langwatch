@@ -76,6 +76,14 @@ Feature: HTTP agent headers render templates and carry trace context
     Then the turn is refused, and the url template that reads the session
       inside the path still renders
 
+  # The run state comes from a Connector setup step, which anyone who can edit
+  # the agent can write, so it may fill the path but never choose the host.
+  @unit
+  Scenario: The run state cannot decide the host a turn is sent to
+    Given an http target whose url template reads "state.host"
+    When the run state names another host
+    Then the turn is refused, so that host never receives the header secrets
+
   @unit
   Scenario: A code execution receives the trace context in its params
     Given a code target

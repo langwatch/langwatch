@@ -13,6 +13,7 @@ import type {
   AgentTestTurnResult,
 } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -54,6 +55,7 @@ import {
 import type { ScenarioExecutionPrefetchConfig } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioTargetPrefetchService } from "../features/prefetch/services/scenario-target-prefetch.service.ts";
 import { ConnectedTargetService } from "./connected-target.service.ts";
+import type { ConnectorStepsGate } from "./scenario-connector-steps-gate.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
 import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
@@ -66,6 +68,7 @@ type AgentTestServiceOptions = {
   workflows: WorkflowApi;
   prompts: PromptApi;
   secrets: SecretApi;
+  datasets: Pick<DatasetApi, "findDatasetPage">;
   modelProviders: ModelProviderApi;
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;
@@ -90,6 +93,9 @@ function usableTimeouts({
 
 const NOT_TESTABLE_REASON = "Only HTTP, code, workflow and connected agents can be tested this way";
 
+/** An agent test calls no Connector step (ADR-194), so its prefetch reads no step secret or row. */
+const AGENT_TEST_CALLS_NO_STEP: ConnectorStepsGate = { isEnabled: async () => false };
+
 const connectedCallConfigSchema = z.looseObject({
   timeoutMs: z.number().int().positive().optional(),
   sticky: z.boolean().optional(),
@@ -112,6 +118,8 @@ export class AgentTestService {
       agents: options.agents,
       workflows: options.workflows,
       secrets: options.secrets,
+      datasets: options.datasets,
+      connectorSteps: AGENT_TEST_CALLS_NO_STEP,
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,

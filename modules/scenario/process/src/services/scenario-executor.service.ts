@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -23,6 +24,7 @@ import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
 import type { VoicePublicUrl } from "../features/voice/services/voice-public-url.service.ts";
 import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
+import { ScenarioConnectorStepsGateService } from "./scenario-connector-steps-gate.service.ts";
 import type { ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
 import { ScenarioExecutionService } from "./scenario-execution.service.ts";
 import { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
@@ -37,6 +39,7 @@ type ScenarioExecutorPeers = Readonly<{
   agents: AgentApi;
   prompts: PromptApi;
   secrets: SecretApi;
+  datasets: Pick<DatasetApi, "findDatasetPage">;
   traces: TraceApi;
   workflows: WorkflowApi;
   projects: ProjectApi;
@@ -128,6 +131,11 @@ export class ScenarioExecutorService {
       projects: peers.projects,
       modelProviders: peers.modelProviders,
       secrets: peers.secrets,
+      datasets: peers.datasets,
+      connectorSteps: ScenarioConnectorStepsGateService.create({
+        isSaas: config.isSaas,
+        featureFlags: peers.featureFlags,
+      }),
       traces: peers.traces,
       apiKeys: peers.apiKeys,
       voiceTargets: ScenarioVoiceTargetService.create({

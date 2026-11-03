@@ -197,6 +197,13 @@ export const FEATURE_FLAGS = [
       "Runs a project's non-voice scenario runs on the Go scenario runner shipped in the worker image instead of the Node scenario child. Off by default; enable per project or organization via the operator store. Voice runs always stay on the Node child, and a worker without the binary keeps every run on Node.",
   },
   {
+    key: "release_scenario_connector_steps",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Connector setup and teardown steps on an HTTP agent (ADR-194). Off by default on the hosted service until the WebAssembly code runner lands: a run of an agent with a Connector then fails its setup with a refusal and is not scored. Enable per project or organization via a targeting rule. A self-hosted or local deployment runs the steps whatever this says.",
+  },
+  {
     key: "release_voice_agents_enabled",
     scope: "PRODUCT",
     defaultValue: false,

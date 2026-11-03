@@ -9,6 +9,7 @@ import {
   CodeAgentDataSchema,
   ConnectedAgentDataSchema,
   type ExecuteSyncRoute,
+  type HttpAgentData,
   HttpAgentDataSchema,
   type LiteLLMParams,
   PromptConfigDataSchema,
@@ -24,13 +25,13 @@ import {
 } from "@langwatch/scenario-contract";
 import type { z } from "zod";
 
+import type { ScenarioCallRun } from "../rules/scenario-call-run.rules.ts";
+import { ScenarioConnectorHooksService } from "../services/scenario-connector-hooks.service.ts";
 import type { ExecuteSyncTransport } from "./execute-sync.channel.ts";
+import { HttpConnectorHookChannel } from "./http/http.connector-hook.channel.ts";
 import { childExecuteSyncTransport } from "./http/http.execute-sync.channel.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
-import {
-  type ConnectedCallRun,
-  HttpSerializedConnectedAgentChannel,
-} from "./http/http.serialized-connected-agent.channel.ts";
+import { HttpSerializedConnectedAgentChannel } from "./http/http.serialized-connected-agent.channel.ts";
 import {
   HttpSerializedHttpAgentChannel,
   type ScenarioHttp,
@@ -56,6 +57,30 @@ function executeSyncTransportOf({
   });
 }
 
+/** An HTTP agent's Connector steps as the run's hooks, run in the code runner (ADR-194). */
+function connectorHooksOf({
+  data,
+  input,
+}: {
+  data: HttpAgentData;
+  input: AgentAdapterBuildInput;
+}): { connectorHooks?: ScenarioConnectorHooksService } {
+  const { connector } = data;
+  if (!connector?.setup && !connector?.teardown) return {};
+  if (!input.projectApiKey) throw new Error("Connector steps require projectApiKey");
+  const transport = executeSyncTransportOf({ input, projectApiKey: input.projectApiKey });
+  return {
+    connectorHooks: ScenarioConnectorHooksService.create({
+      agentId: data.agentId,
+      connector,
+      channel: HttpConnectorHookChannel.create({ transport }),
+      projectApiKey: input.projectApiKey,
+      parameters: input.parameters,
+      run: input.run,
+    }),
+  };
+}
+
 /** The serialized description one agent adapter is built from. */
 export type AgentAdapterBuildInput = {
   adapterData: TargetAdapterData;
@@ -69,8 +94,8 @@ export type AgentAdapterBuildInput = {
   parameters?: RunParameterValues;
   httpPort?: ScenarioHttp;
   logger?: Logger;
-  /** The scenario run a connected agent's calls belong to; absent outside a scenario run. */
-  run?: ConnectedCallRun;
+  /** The scenario run a connected agent's calls and Connector steps name; absent outside one. */
+  run?: ScenarioCallRun;
 };
 
 /**
@@ -146,6 +171,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         parameters: input.parameters,
         httpPort: input.httpPort,
         logger: input.logger,
+        ...connectorHooksOf({ data, input }),
       }),
   }),
   code: runtime({

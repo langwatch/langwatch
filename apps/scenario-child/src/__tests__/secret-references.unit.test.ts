@@ -171,31 +171,19 @@ describe("secret references", () => {
     });
   });
 
-  describe("given a message that carries a resolved secret value", () => {
-    it("replaces every occurrence with the placeholder", () => {
+  describe("given a list of secret values rather than named secrets", () => {
+    it("replaces each value, the longer one first when one contains another", () => {
       expect(
-        ScenarioSecretReferenceAdapter.redact({
-          message: 'Get "https://api.test?token=tok-live-123": dial tcp, sent tok-live-123',
-          secrets: SECRETS,
+        ScenarioSecretReferenceAdapter.redactValues({
+          message: "sent tok-live-123-extended and tok-live-123",
+          values: ["tok-live-123", "tok-live-123-extended"],
         }),
-      ).toBe('Get "https://api.test?token=[redacted]": dial tcp, sent [redacted]');
+      ).toBe("sent [redacted] and [redacted]");
     });
 
-    it("leaves a message that carries none unchanged", () => {
+    it("ignores an empty value rather than replacing everything", () => {
       expect(
-        ScenarioSecretReferenceAdapter.redact({
-          message: "HTTP 500: upstream is down",
-          secrets: SECRETS,
-        }),
-      ).toBe("HTTP 500: upstream is down");
-    });
-
-    it("ignores an empty secret value rather than replacing everything", () => {
-      expect(
-        ScenarioSecretReferenceAdapter.redact({
-          message: "anything at all",
-          secrets: { EMPTY: "" },
-        }),
+        ScenarioSecretReferenceAdapter.redactValues({ message: "anything at all", values: [""] }),
       ).toBe("anything at all");
     });
   });

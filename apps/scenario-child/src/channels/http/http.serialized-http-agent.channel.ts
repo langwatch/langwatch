@@ -21,6 +21,7 @@ import { JSONPath } from "jsonpath-plus";
 
 import { applyAuthentication } from "../../rules/http-auth.rules.ts";
 import * as ScenarioSecretReferenceAdapter from "../../rules/scenario-secret-reference.rules.ts";
+import type { ScenarioConnectorHooksService } from "../../services/scenario-connector-hooks.service.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
 /** Response boundary required by serialized HTTP scenario targets. */
@@ -159,12 +160,15 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     logger?: Logger;
     parameters?: RunParameterValues;
     httpPort?: ScenarioHttp;
+    connectorHooks?: ScenarioConnectorHooksService;
   }): HttpSerializedHttpAgentChannel {
     return new HttpSerializedHttpAgentChannel(options);
   }
 
   role = AgentRole.AGENT;
 
+  /** The agent's Connector steps as the run's hooks (ADR-194), or null without a Connector. */
+  readonly connectorHooks: ScenarioConnectorHooksService | null;
   private readonly config: HttpAgentData;
   private readonly logger: Logger;
   private readonly parameters: RunParameterValues;
@@ -175,24 +179,41 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
     logger,
     parameters,
     httpPort,
+    connectorHooks,
   }: {
     config: HttpAgentData;
     logger?: Logger;
     /** The run's resolved values, read from url and body as `params.NAME`. */
     parameters?: RunParameterValues;
     httpPort?: ScenarioHttp;
+    /** Setup's state and run-scoped secrets reach the turn templates through it. */
+    connectorHooks?: ScenarioConnectorHooksService;
   }) {
     super();
     this.name = "SerializedHttpAgentAdapter";
     this.config = config;
     this.parameters = parameters ?? {};
     this.httpPort = httpPort;
+    this.connectorHooks = connectorHooks ?? null;
     this.logger = logger ?? createLogger("langwatch:scenarios:http-adapter");
   }
 
-  /** The project secrets this target may reference, never empty-undefined. */
+  /** The secrets this target may reference: the project's, then setup's run-scoped ones. */
   private get secrets(): Record<string, string> {
-    return this.config.secrets ?? {};
+    return { ...this.config.secrets, ...this.connectorHooks?.runSecrets };
+  }
+
+  /** Every value scrubbed from what this target shows, a shadowed project secret included. */
+  private get scrubbedValues(): string[] {
+    return [
+      ...Object.values(this.config.secrets ?? {}),
+      ...Object.values(this.connectorHooks?.runSecrets ?? {}),
+    ];
+  }
+
+  /** The state a turn template reads, bound only for an agent with a Connector. */
+  private get templateState(): { state?: Record<string, unknown> | null } {
+    return this.connectorHooks ? { state: this.connectorHooks.runState } : {};
   }
 
   async call(input: AgentInput): Promise<string> {
@@ -209,6 +230,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
         parameters: this.parameters,
         traceContext: { traceId, traceparent },
         session: this.sessionOf(input.threadId),
+        ...this.templateState,
       });
       const url = this.buildUrl(templateContext);
       const headers = this.buildRequestHeaders(templateContext, propagationHeaders);
@@ -218,7 +240,8 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
         threadId: input.threadId,
         session: this.extractSession(responseData),
       });
-      return this.extractResponseContent(responseData);
+      // A reply can echo a run secret, and it reaches the simulated user, the judge and the record.
+      return this.scrub(this.extractResponseContent(responseData));
     } catch (error) {
       throw this.scrubErrorChain(error);
     }
@@ -226,7 +249,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
 
   /** A message with every resolved secret value replaced by the placeholder. */
   private scrub(message: string): string {
-    return ScenarioSecretReferenceAdapter.redact({ message, secrets: this.secrets });
+    return ScenarioSecretReferenceAdapter.redactValues({ message, values: this.scrubbedValues });
   }
 
   /**
@@ -243,7 +266,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
    * Scrubs an error and everything it was caused by, in place.
    */
   private scrubErrorChain(error: unknown): unknown {
-    if (Object.keys(this.secrets).length === 0) return error;
+    if (this.scrubbedValues.length === 0) return error;
     const seen = new Set<unknown>();
     let current: unknown = error;
     while (current instanceof Error && !seen.has(current)) {

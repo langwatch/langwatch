@@ -89,3 +89,34 @@ describe("adapterDeclaresHooks()", () => {
     });
   });
 });
+
+describe("adapterDeclaresHooks() on an HTTP agent", () => {
+  const http = {
+    type: "http" as const,
+    agentId: "agent_http",
+    url: "https://shop.example.com/chat",
+    method: "POST",
+    headers: [],
+    secrets: {},
+  };
+  const step = { language: "python" as const, code: "x = 1", secretNames: [], secrets: {} };
+
+  describe("when the agent has no Connector", () => {
+    /** @scenario "An HTTP agent without a Connector and a code agent never call hooks" */
+    it("calls no hooks and needs no Node child", () => {
+      expect(adapterDeclaresHooks(http)).toBe(false);
+      expect(adapterDeclaresHooks({ ...http, connector: {} })).toBe(false);
+      expect(hookCallsEnvironment(http)).toEqual({});
+    });
+  });
+
+  describe("when the agent's Connector has a step", () => {
+    /** @scenario "A run of an HTTP agent with a Connector goes to the Node child" */
+    it("calls hooks, so the run goes to the Node child", () => {
+      expect(adapterDeclaresHooks({ ...http, connector: { setup: step } })).toBe(true);
+      expect(hookCallsEnvironment({ ...http, connector: { teardown: step } })).toEqual({
+        callsHooks: true,
+      });
+    });
+  });
+});

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { agentInputBindingSchema } from "../fields.ts";
 import { baseAgentConfigSchema } from "./code.ts";
+import { connectorSchema } from "./connector.ts";
 
 const httpHeaderSchemaDefinition = z.object({
   key: z.string(),
@@ -48,6 +49,8 @@ const httpAgentConfigSchemaDefinition = z.object({
       heartbeatAt: z.string().optional(),
     })
     .optional(),
+  /** Setup and teardown LangWatch runs around a scenario run (ADR-194). */
+  connector: connectorSchema.optional(),
 });
 export interface HttpAgentConfigSchema extends Named<typeof httpAgentConfigSchemaDefinition> {}
 export const httpAgentConfigSchema: HttpAgentConfigSchema = httpAgentConfigSchemaDefinition;

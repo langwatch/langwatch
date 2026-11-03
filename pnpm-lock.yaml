@@ -14244,6 +14244,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract

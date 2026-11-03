@@ -126,22 +126,20 @@ export function renderAuth({
 }
 
 /**
- * Replaces resolved secret values in message with placeholder. Scrub before
- * errors escape. Longest value first (one secret can contain another).
+ * Replaces each value in message with the placeholder, longest first (one value can contain
+ * another). A list, not a map: a run-scoped secret can shadow a project one of the same name.
  */
-export function redact({
+export function redactValues({
   message,
-  secrets,
+  values,
 }: {
   message: string;
-  secrets: Record<string, string>;
+  values: readonly string[];
 }): string {
   if (message === "") return message;
-  const values = Object.values(secrets)
-    .filter((value) => value !== "")
-    .toSorted((a, b) => b.length - a.length);
+  const ordered = values.filter((value) => value !== "").toSorted((a, b) => b.length - a.length);
   let redacted = message;
-  for (const value of values) {
+  for (const value of ordered) {
     redacted = redacted.split(value).join(REDACTED_PLACEHOLDER);
   }
   return redacted;

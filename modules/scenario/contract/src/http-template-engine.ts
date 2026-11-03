@@ -1,6 +1,7 @@
 /** Shared Liquid rendering for both persisted and serialised HTTP agents. */
 
 import { createSandboxedLiquid } from "@langwatch/automation-contract";
+import { Drop } from "liquidjs";
 
 import {
   type FieldMapping,
@@ -45,6 +46,36 @@ export class TemplateRenderError extends Error {
   }
 }
 
+/**
+ * The run's hook state (ADR-194): `{{ state }}` renders it whole as JSON, `{{ state.NAME }}` one
+ * key. The state sits in a private field so no template can read past its keys.
+ */
+export class RunStateValue extends Drop {
+  readonly #state: Record<string, unknown>;
+
+  constructor(state: Record<string, unknown>) {
+    super();
+    this.#state = state;
+  }
+
+  override liquidMethodMissing(key: string | number): unknown {
+    const name = String(key);
+    return Object.hasOwn(this.#state, name) ? this.#state[name] : undefined;
+  }
+
+  valueOf(): string {
+    return JSON.stringify(this.#state);
+  }
+
+  toString(): string {
+    return this.valueOf();
+  }
+
+  toJSON(): Record<string, unknown> {
+    return this.#state;
+  }
+}
+
 const identity = <T>(v: T): T => v;
 
 // Sandboxed engines: a customer body template must not be able to inline a
@@ -56,7 +87,9 @@ urlLiquid.registerFilter("raw", { handler: identity, raw: true });
 
 const bodyLiquid = createSandboxedLiquid({
   outputEscape: (value) =>
-    value instanceof RawJson ? value.toString() : escapeForJsonStringLiteral(value),
+    value instanceof RawJson || value instanceof RunStateValue
+      ? value.toString()
+      : escapeForJsonStringLiteral(value),
 });
 bodyLiquid.registerFilter("raw", { handler: identity, raw: true });
 
@@ -93,6 +126,7 @@ export function buildTemplateContext({
   parameters,
   traceContext,
   session,
+  state,
 }: {
   input: ScenarioInput;
   scenarioMappings?: Record<string, FieldMapping>;
@@ -100,6 +134,8 @@ export function buildTemplateContext({
   traceContext?: { traceId?: string; traceparent?: string };
   /** The session held for the thread; absent or null renders as empty. */
   session?: unknown;
+  /** The run's hook state, bound only for an agent with hooks; null renders as `{}`. */
+  state?: Record<string, unknown> | null;
 }): Record<string, unknown> {
   const lastUserMessage = findLastUserMessage(input);
   const inputIsStructured =
@@ -127,6 +163,9 @@ export function buildTemplateContext({
   }
   if (traceContext?.traceparent !== void 0) {
     base.traceparent = traceContext.traceparent;
+  }
+  if (state !== void 0) {
+    base.state = new RunStateValue(state ?? {});
   }
 
   const { mapped, sessionDerived } = resolveTemplateMappings({
@@ -194,10 +233,11 @@ function parseOrigin(url: string): string | null {
 }
 
 /**
- * Refuses a URL whose host the held session decided. The session is the agent's own answer
- * handed back on the next turn, so it is the one value in the context the agent fully controls.
+ * Refuses a URL whose host the held session or the run state decided. The session is the agent's
+ * own answer and the state is what setup returned; either choosing the host would send it the
+ * header secrets.
  */
-function assertSessionDidNotChooseTheHost({
+function assertSessionAndStateDidNotChooseTheHost({
   template,
   context,
   rendered,
@@ -207,12 +247,14 @@ function assertSessionDidNotChooseTheHost({
   rendered: string;
 }): void {
   const aliases = sessionDerivedKeysByContext.get(context) ?? [];
-  if (!("session" in context) && aliases.length === 0) return;
-  const blanked: Record<string, unknown> = { ...context, session: "" };
-  for (const alias of aliases) blanked[alias] = "";
-  const withoutSession = urlLiquid.parseAndRenderSync(template, blanked);
-  if (parseOrigin(rendered) !== parseOrigin(withoutSession)) {
-    throw new Error("the session of the agent cannot decide the host the turn is sent to");
+  const decided = ["session", "state", ...aliases].filter((key) => key in context);
+  if (decided.length === 0) return;
+  const blanked = { ...context, ...Object.fromEntries(decided.map((key) => [key, ""])) };
+  const withoutThem = urlLiquid.parseAndRenderSync(template, blanked);
+  if (parseOrigin(rendered) !== parseOrigin(withoutThem)) {
+    throw new Error(
+      "neither the session nor the run state can decide the host the turn is sent to",
+    );
   }
 }
 
@@ -236,7 +278,7 @@ export function renderUrlTemplate({
 }): string {
   try {
     const rendered = urlLiquid.parseAndRenderSync(template, context);
-    assertSessionDidNotChooseTheHost({ template, context, rendered });
+    assertSessionAndStateDidNotChooseTheHost({ template, context, rendered });
     return rendered;
   } catch (cause) {
     throw new TemplateRenderError({ field: "url", cause });

@@ -2021,6 +2021,24 @@ export interface operations {
                             connectedAt?: string;
                             heartbeatAt?: string;
                         };
+                        connector?: {
+                            setup?: {
+                                /** @enum {string} */
+                                language: "python";
+                                code: string;
+                                /** @default [] */
+                                secretNames?: string[];
+                                datasetId?: string;
+                            };
+                            teardown?: {
+                                /** @enum {string} */
+                                language: "python";
+                                code: string;
+                                /** @default [] */
+                                secretNames?: string[];
+                                datasetId?: string;
+                            };
+                        };
                     };
                 } | {
                     name: string;

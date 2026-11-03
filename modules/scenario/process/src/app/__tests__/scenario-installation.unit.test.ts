@@ -14,6 +14,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -119,6 +120,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       testPeer({ token: PromptApi, instance: createApiFixture<PromptApi>() }),
       testPeer({ token: SecretApi, instance: createApiFixture<SecretApi>() }),
       testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
+      testPeer({ token: DatasetApi, instance: createApiFixture<DatasetApi>() }),
       testPeer({
         token: FeatureFlagApi,
         instance: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),

@@ -10,6 +10,7 @@ import {
   type AgentOverview,
 } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -89,6 +90,8 @@ function prefetcher({ agent }: { agent: Agent | "missing" }) {
       list: async () => [],
       getValuesByName: async () => ({}),
     }),
+    datasets: createApiFixture<DatasetApi>({}),
+    connectorSteps: { isEnabled: async () => true },
     traces: createApiFixture<TraceApi>({}),
     apiKeys: createApiFixture<Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">>({
       mintRunKey: async () => "run-key",
