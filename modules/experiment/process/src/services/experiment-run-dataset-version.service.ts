@@ -6,6 +6,7 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 
+import { hasExperiment } from "../rules/experiment-run-key.rules.ts";
 import type { LoadedDatasetVersion } from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-dataset-version");
@@ -38,7 +39,7 @@ export class ExperimentRunDatasetVersionService {
       await this.datasets.linkRunVersions({
         projectId,
         runId,
-        experimentId: experimentId === "" ? null : experimentId,
+        experimentId: experimentId !== null && hasExperiment(experimentId) ? experimentId : null,
         versions: [{ datasetId: datasetVersion.datasetId, versionId: datasetVersion.versionId }],
       });
     } catch (error) {
