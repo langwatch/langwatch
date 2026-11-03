@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -191,7 +192,7 @@ describe("when the newest releases are too long for one page", () => {
 
   /** @scenario "Keep the changelog within the page token budget" */
   it("fits the repository's own changelog page", () => {
-    const docsRoot = path.resolve(__dirname, "../../../../../../docs");
+    const docsRoot = fileURLToPath(new URL("../../../../../../docs", import.meta.url));
     const page = withReleaseNotes({
       source: readFileSync(path.join(docsRoot, "changelog.mdx"), "utf8"),
       slug: "changelog",
