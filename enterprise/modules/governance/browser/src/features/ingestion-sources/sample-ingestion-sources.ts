@@ -47,7 +47,8 @@ const HOUR_MS = 60 * MINUTE_MS;
  * draw on screen at once: healthy sources at a range of arrival times, one
  * whose last runs all failed (three consecutive failures is what
  * `deriveSourceHealth` calls unhealthy, so that row reads "Pulls failing"), one
- * still waiting for its first event, and one an admin switched off.
+ * still waiting for its first event, one an admin switched off, and one holding a configuration
+ * its adapter refuses ("Connection needs fixing").
  *
  * The one exception the cycle cannot state is below: `errorCount` counts
  * consecutive PULL failures and nothing else writes it, so a push source
@@ -69,7 +70,18 @@ const SAMPLE_INSTANCE_STATES = [
   { status: "awaiting_first_event", errorCount: 0, lastEventAgoMs: null },
   { status: "active", errorCount: 0, lastEventAgoMs: 47 * MINUTE_MS },
   { status: "disabled", errorCount: 0, lastEventAgoMs: 4 * 24 * HOUR_MS },
-] as const;
+  {
+    status: "active",
+    errorCount: 3,
+    lastEventAgoMs: 5 * 24 * HOUR_MS,
+    configComplaints: ["Environment URL: Invalid URL"],
+  },
+] as const satisfies ReadonlyArray<{
+  status: string;
+  errorCount: number;
+  lastEventAgoMs: number | null;
+  configComplaints?: readonly string[];
+}>;
 
 /**
  * The cadence a scheduled row shows under its protocol chip.
@@ -96,6 +108,9 @@ export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
   // always zero. Showing "Pulls failing" over a source nothing polls would be
   // the sample inventing a state the product cannot reach.
   const errorCount = mode === "push" ? 0 : state.errorCount;
+  // A push source has no adapter to refuse its configuration, so only a pull row can need fixing.
+  const configComplaints: string[] =
+    mode === "push" || !("configComplaints" in state) ? [] : [...state.configComplaints];
   const lastEventAt =
     state.lastEventAgoMs === null
       ? null
@@ -113,6 +128,7 @@ export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
     parserConfig: {},
     status: state.status,
     errorCount,
+    configComplaints,
     lastSuccessAt: lastEventAt,
     // Unknown, which is what a connection nobody has made has read through
     // to. Naming either answer here would put a collection verdict on a

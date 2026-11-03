@@ -126,12 +126,19 @@ describe("given the Sources tab in sample mode", () => {
             sourceBadge({
               status: source.status,
               errorCount: source.errorCount,
+              configComplaints: source.configComplaints,
             }).label,
         ),
       );
 
       expect(drawn).toEqual(
-        new Set(["Active", "Pulls failing", "Awaiting first event", "Disabled"]),
+        new Set([
+          "Active",
+          "Pulls failing",
+          "Awaiting first event",
+          "Disabled",
+          "Connection needs fixing",
+        ]),
       );
       // Arrival times spread rather than clustering on one timestamp. Not
       // asserted as all-distinct: there are more rows than states, so the

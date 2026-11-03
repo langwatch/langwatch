@@ -259,6 +259,13 @@ Feature: Edit the configuration of a pull-mode ingestion source
       And the three secret fields are empty and say they are replaced together
       And the environment address is read-only, with a note saying why
 
+    @integration
+    Scenario: The Copilot Studio edit drawer moves the destination alongside the cadence
+      Given a Copilot Studio source that lands its conversations in one project
+      When the admin opens the edit drawer's Advanced group
+      Then the pull cadence and the destination picker are shown in that one group
+      And picking another project and saving carries that project in the update
+
   Rule: Copy that does not apply to a pull source is not shown
 
     # Hiding the rotate control itself for pull sources is an access decision,

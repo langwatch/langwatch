@@ -9,7 +9,7 @@
  * Drives the real `SourceEditDrawer`; only the tRPC client is replaced, by a double that answers
  * no reads, because the drawer's connection fields make none.
  */
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -70,7 +70,7 @@ const copilotSourceThatHasPulled: Source = {
   hasPollerCursor: true,
   pullSchedule: "*/15 * * * *",
   status: "active",
-  traceProjectId: null,
+  traceProjectId: "proj_analytics",
   traceProjectArchived: false,
   lastEventAt: null,
   archivedAt: null,
@@ -83,19 +83,30 @@ const copilotSourceThatHasPulled: Source = {
   lastSuccessAt: null,
 };
 
-const renderDrawer = () =>
+const DESTINATION_CTX = {
+  organizationId: ORG_ID,
+  organizationName: "Acme",
+  availableTeams: [
+    { id: "team_data", name: "Data" },
+    { id: "team_cx", name: "CX" },
+  ],
+  availableProjects: [
+    { id: "proj_analytics", name: "Analytics · Data", teamId: "team_data" },
+    { id: "proj_support", name: "Support · CX", teamId: "team_cx" },
+  ],
+};
+
+/** Exactly what the drawer submits, read off its own prop. */
+type UpdateInput = Parameters<Parameters<typeof SourceEditDrawer>[0]["onSubmit"]>[0];
+
+const renderDrawer = (onSubmit: (input: UpdateInput) => void = vi.fn()) =>
   renderWithGovernanceHost(
     <SourceEditDrawer
       organizationId={ORG_ID}
-      destinationCtx={{
-        organizationId: ORG_ID,
-        organizationName: "Acme",
-        availableTeams: [],
-        availableProjects: [],
-      }}
+      destinationCtx={DESTINATION_CTX}
       source={copilotSourceThatHasPulled}
       onClose={vi.fn()}
-      onSubmit={vi.fn()}
+      onSubmit={onSubmit}
       isPending={false}
     />,
     { host: fakeGovernanceHost() },
@@ -150,6 +161,48 @@ describe("given a Copilot Studio source that has completed a pull", () => {
 
       expect(screen.getByLabelText("Power Platform environment URL")).toHaveAttribute("readonly");
       expect(await popoverText("edit-source-notes")).toMatch(/environment is fixed/);
+    });
+  });
+});
+
+describe("given a Copilot Studio source that lands its conversations in Analytics", () => {
+  describe("when the admin opens the edit drawer's Advanced group", () => {
+    /** @scenario "The Copilot Studio edit drawer moves the destination alongside the cadence" */
+    it("shows the pull cadence and the destination picker in that one group", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      expect(screen.getAllByText("Advanced")).toHaveLength(1);
+      await user.click(screen.getByText("Advanced"));
+      const destination = await screen.findByTestId("ingestion-trace-destination");
+      const cadence = screen.getByTestId("cadence-field-info");
+
+      const group = destination.closest('[data-scope="collapsible"][data-part="content"]');
+      expect(group).not.toBeNull();
+      expect(group?.contains(cadence)).toBe(true);
+      expect(
+        within(within(destination).getByRole("combobox")).getByText("Analytics · Data"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "The Copilot Studio edit drawer moves the destination alongside the cadence" */
+    it("carries a newly picked project in the update", async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn<(input: UpdateInput) => void>();
+      renderDrawer(onSubmit);
+
+      await user.click(screen.getByText("Advanced"));
+      const destination = await screen.findByTestId("ingestion-trace-destination");
+      await user.click(within(destination).getByRole("combobox"));
+      await user.click(within(screen.getByRole("listbox")).getByText("Support · CX"));
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+        organizationId: ORG_ID,
+        id: "src_copilot",
+        traceProjectId: "proj_support",
+      });
     });
   });
 });
