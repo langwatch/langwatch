@@ -12,6 +12,7 @@ import {
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetUpload } from "../../app/dataset.app.ts";
+import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";
@@ -55,6 +56,13 @@ class Repo implements DatasetRepository {
   }
 }
 class Records implements DatasetRecordRepository {
+  withDatasetLock: DatasetRecordRepository["withDatasetLock"] = (_key, work) =>
+    work(
+      lockedView({
+        records: this,
+        columns: { columnTypes: async () => [], setColumnTypes: async () => undefined },
+      }),
+    );
   countByDataset = async () => [];
   async count(): Promise<number> {
     return 0;

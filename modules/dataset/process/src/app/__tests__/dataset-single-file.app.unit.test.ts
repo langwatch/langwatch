@@ -350,6 +350,61 @@ describe("a dataset in today's layout", () => {
   });
 });
 
+describe.each(storages)(
+  "a single-file dataset in $name, edited in the columns drawer",
+  (storage) => {
+    describe("when a save renames its column", () => {
+      /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+      it("re-keys every record in the file and stores the new columns", async () => {
+        const { app, datasetId, stored } = await setup(storage);
+
+        await app.upsertDataset({
+          projectId,
+          datasetId,
+          name: "Legacy Questions",
+          columnTypes: [{ name: "prompt", type: "string" }],
+          columnRenames: [{ from: "question", to: "prompt" }],
+        });
+
+        const file = (await stored()) as { id: string; entry: Record<string, unknown> }[];
+        expect(file.map((record) => record.entry)).toEqual([
+          { prompt: "What is LangWatch?" },
+          { prompt: "How are traces stored?" },
+          { prompt: "Where do datasets live?" },
+        ]);
+        const dataset = await app.getBySlugOrId({ projectId, slugOrId: datasetId });
+        expect(dataset.columnTypes).toEqual([{ name: "prompt", type: "string" }]);
+      });
+    });
+
+    describe("when a record write keyed by the column a rename removed arrives after it", () => {
+      /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+      it("refuses the write as stale and leaves the file as the rename wrote it", async () => {
+        const { app, datasetId, stored } = await setup(storage);
+        await app.upsertDataset({
+          projectId,
+          datasetId,
+          name: "Legacy Questions",
+          columnTypes: [{ name: "prompt", type: "string" }],
+          columnRenames: [{ from: "question", to: "prompt" }],
+        });
+
+        await expect(
+          app.upsertRecord({
+            projectId,
+            slugOrId: datasetId,
+            recordId: "rec_1",
+            updatedRecord: { question: "Edited" },
+            columns: ["question"],
+          }),
+        ).rejects.toMatchObject({ code: "dataset_stale_columns" });
+        const file = (await stored()) as { entry: Record<string, unknown> }[];
+        expect(file[0]?.entry).toEqual({ prompt: "What is LangWatch?" });
+      });
+    });
+  },
+);
+
 async function* bytesOf(content: string): AsyncGenerator<Uint8Array> {
   yield new TextEncoder().encode(content);
 }

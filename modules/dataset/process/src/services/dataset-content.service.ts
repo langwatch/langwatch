@@ -297,6 +297,7 @@ export class DatasetContentService implements DatasetContent {
       recordId: input.recordId,
       entry: input.updatedRecord,
       storage,
+      columns: input.columns,
     });
     return {
       record: toDatasetRecord({ id: input.recordId, entry: input.updatedRecord }, dataset),

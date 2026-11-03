@@ -437,6 +437,24 @@ describe("the mounted dataset REST family", () => {
       });
     });
 
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+    it("hands the column renames it was sent to the application", async () => {
+      const { send, stub } = mount({ upsertDataset: vi.fn(async () => dataset) as never });
+
+      const response = await send("PATCH", "/api/dataset/old-name", {
+        columnTypes: [{ name: "reference", type: "string" }],
+        columnRenames: [{ from: "expected_output", to: "reference" }],
+      });
+
+      expect(response.status).toBe(200);
+      expect(stub.upsertDataset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columnTypes: [{ name: "reference", type: "string" }],
+          columnRenames: [{ from: "expected_output", to: "reference" }],
+        }),
+      );
+    });
+
     /** @scenario "Update dataset does not enforce plan limits" */
     it("runs no allowance step, so a project at its ceiling still edits what it has", async () => {
       const { send } = mount();

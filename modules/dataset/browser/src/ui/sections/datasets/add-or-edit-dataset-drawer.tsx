@@ -4,12 +4,13 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { datasetClient, type DrawerDatasetColumn } from "@langwatch/dataset-client";
+import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetApiUpsertOutput,
   type DatasetColumns,
-  datasetColumnSchema,
+  type DrawerDatasetColumn,
   datasetRecordFormSchema,
+  drawerDatasetColumnSchema,
   type InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -74,11 +75,6 @@ export interface AddDatasetDrawerProps {
   isColumnsLocked?: boolean;
 }
 
-/** A drawer column: the contract's, plus the caller's id the contract schema would strip. */
-export const drawerDatasetColumnSchema = z.object({
-  ...datasetColumnSchema.shape,
-  id: z.string().optional(),
-});
 /** A form column also keeps the stored name it was loaded as, which names a rename. */
 const drawerFormSchema = z.object({
   ...datasetRecordFormSchema.shape,

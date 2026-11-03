@@ -1,6 +1,7 @@
 import {
   upsertDatasetInputSchema,
   DatasetNameTakenError,
+  DatasetStaleColumnsError,
   type Dataset,
   type UpsertDatasetInput,
 } from "@langwatch/dataset-contract";
@@ -76,13 +77,22 @@ export class DatasetUpsertService {
       });
     }
 
-    if (existing.contentLayout === "postgres" && !isSingleFileDataset(existing) && columnsChanged) {
+    if (isSingleFileDataset(existing) && options.singleFile && columnsChanged) {
+      await options.singleFile.updateColumns({
+        dataset: existing,
+        columnTypes: parsed.columnTypes,
+        columnRenames: parsed.columnRenames,
+      });
+    } else if (existing.contentLayout === "postgres" && columnsChanged) {
       await this.migrateRecordColumns({ dataset: existing, parsed });
     }
     return options.repository.update(update);
   }
 
-  /** Re-keys every Postgres record to the new columns, by the rule the chunked layout uses. */
+  /**
+   * Re-keys every Postgres record and stores the new columns in one transaction under the
+   * dataset's lock, which record writes also take, so no write lands between the two.
+   */
   private async migrateRecordColumns({
     dataset,
     parsed,
@@ -90,25 +100,33 @@ export class DatasetUpsertService {
     dataset: Dataset;
     parsed: ParsedUpsert;
   }): Promise<void> {
-    const { records } = this.deps.options;
     const key = { datasetId: dataset.id, projectId: dataset.projectId };
-    const stored: Awaited<ReturnType<typeof records.findPage>> = [];
-    let page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE });
-    stored.push(...page);
-    while (page.length === RECORD_PAGE_SIZE) {
-      page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE, cursorId: page.at(-1)!.id });
+    await this.deps.options.records.withDatasetLock(key, async (records) => {
+      const current = await records.columnTypes();
+      if (JSON.stringify(current) !== JSON.stringify(dataset.columnTypes)) {
+        throw new DatasetStaleColumnsError();
+      }
+      const stored: Awaited<ReturnType<typeof records.findPage>> = [];
+      let page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE });
       stored.push(...page);
-    }
-    if (stored.length === 0) return;
-    const remapped = mapPreviousColumnsToNewColumns({
-      records: stored.map((record) => record.entry),
-      previousColumns: dataset.columnTypes,
-      newColumns: parsed.columnTypes,
-      renames: parsed.columnRenames,
-    });
-    await records.replaceAll({
-      ...key,
-      entries: stored.map((record, index) => ({ ...remapped[index], id: record.id })),
+      while (page.length === RECORD_PAGE_SIZE) {
+        const cursorId = page.at(-1)!.id;
+        page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE, cursorId });
+        stored.push(...page);
+      }
+      const remapped = mapPreviousColumnsToNewColumns({
+        records: stored.map((record) => record.entry),
+        previousColumns: dataset.columnTypes,
+        newColumns: parsed.columnTypes,
+        renames: parsed.columnRenames,
+      });
+      if (stored.length > 0) {
+        await records.replaceAll({
+          ...key,
+          entries: stored.map((record, index) => ({ ...remapped[index], id: record.id })),
+        });
+      }
+      await records.setColumnTypes(parsed.columnTypes);
     });
   }
 

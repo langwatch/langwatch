@@ -39,6 +39,21 @@ export type DatasetColumn = z.infer<typeof datasetColumnSchema>;
 export type DatasetColumns = z.infer<typeof datasetColumnsSchema>;
 
 /**
+ * A columns-drawer column with the caller's own id for it. The drawer hands the id back on
+ * the column edited from it (renamed or retyped), and none on a new column.
+ */
+const drawerDatasetColumnSchemaDefinition = z.object({
+  ...datasetColumnSchemaDefinition.shape,
+  id: z.string().optional(),
+});
+export interface DrawerDatasetColumnSchema extends Named<
+  typeof drawerDatasetColumnSchemaDefinition
+> {}
+export const drawerDatasetColumnSchema: DrawerDatasetColumnSchema =
+  drawerDatasetColumnSchemaDefinition;
+export type DrawerDatasetColumn = z.infer<typeof drawerDatasetColumnSchema>;
+
+/**
  * Which old column each renamed column came from. Sent, values move by these
  * renames and unchanged names only, never by position; omitted, leftover
  * columns pair by position as before.
@@ -489,6 +504,11 @@ export type CreateDatasetRecordsInput = z.infer<typeof createDatasetRecordsInput
 const updateDatasetRecordInputSchemaDefinition = datasetRecordLookupInputSchema.safeExtend({
   recordId: z.string().min(1),
   updatedRecord: z.record(z.string(), z.unknown()),
+  /**
+   * The column names the record is keyed by, as the caller last read them. Sent, a write
+   * naming a column the dataset no longer has is refused with `dataset_stale_columns`.
+   */
+  columns: z.array(z.string()).optional(),
 });
 export interface UpdateDatasetRecordInputSchema extends Named<
   typeof updateDatasetRecordInputSchemaDefinition

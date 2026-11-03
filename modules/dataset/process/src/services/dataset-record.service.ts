@@ -27,6 +27,8 @@ import {
 } from "@langwatch/dataset-contract";
 
 import type { DatasetContent } from "../app/dataset.app.ts";
+import type { LockedDatasetRecords } from "../repositories/dataset-record.repository.ts";
+import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import {
   assertPageWithinLimit,
@@ -333,32 +335,51 @@ export class DatasetRecordService {
       return content.upsertRecord({ dataset, input: parsed });
     }
 
-    try {
-      return {
-        record: await this.options.records.update({
-          id: parsed.recordId,
-          datasetId: dataset.id,
-          projectId: parsed.projectId,
-          entry: sanitizedEntry(parsed.updatedRecord),
-        }),
-        created: false,
-      };
-    } catch (error) {
-      if (!isDatasetRecordNotFound(error)) {
-        throw error;
+    return this.lockedRecords({ dataset, columns: parsed.columns }, async (records) => {
+      try {
+        return {
+          record: await records.update({
+            id: parsed.recordId,
+            datasetId: dataset.id,
+            projectId: parsed.projectId,
+            entry: sanitizedEntry(parsed.updatedRecord),
+          }),
+          created: false,
+        };
+      } catch (error) {
+        if (!isDatasetRecordNotFound(error)) {
+          throw error;
+        }
       }
-    }
 
-    const [record] = await this.options.records.createMany({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      entries: [{ id: parsed.recordId, ...sanitizedEntry(parsed.updatedRecord) }],
+      const [record] = await records.createMany({
+        datasetId: dataset.id,
+        projectId: parsed.projectId,
+        entries: [{ id: parsed.recordId, ...sanitizedEntry(parsed.updatedRecord) }],
+      });
+      if (!record) {
+        throw new Error("Dataset record creation returned no record");
+      }
+
+      return { record, created: true };
     });
-    if (!record) {
-      throw new Error("Dataset record creation returned no record");
-    }
+  }
 
-    return { record, created: true };
+  /**
+   * Runs a Postgres record write under the dataset's lock, the one a column edit holds, after
+   * refusing a write keyed by a column that edit removed.
+   */
+  private lockedRecords<T>(
+    { dataset, columns }: { dataset: Dataset; columns?: readonly string[] | undefined },
+    write: (records: LockedDatasetRecords) => Promise<T>,
+  ): Promise<T> {
+    return this.options.records.withDatasetLock(
+      { datasetId: dataset.id, projectId: dataset.projectId },
+      async (records) => {
+        assertColumnsCurrent({ columns, columnTypes: await records.columnTypes() });
+        return write(records);
+      },
+    );
   }
 
   /** The dataset's image and file columns, read for files a row carries inline. */
@@ -416,14 +437,16 @@ export class DatasetRecordService {
       return content.batchCreateRecords({ dataset, input: parsed });
     }
 
-    return this.options.records.createMany({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      entries: parsed.entries.map((entry) => ({
-        id: entry.id ?? this.deps.generateId(),
-        ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
-      })),
-    });
+    return this.lockedRecords({ dataset, columns }, (records) =>
+      records.createMany({
+        datasetId: dataset.id,
+        projectId: parsed.projectId,
+        entries: parsed.entries.map((entry) => ({
+          id: entry.id ?? this.deps.generateId(),
+          ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
+        })),
+      }),
+    );
   }
 
   async createRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
@@ -459,12 +482,14 @@ export class DatasetRecordService {
     }
 
     try {
-      return await this.options.records.update({
-        id: parsed.recordId,
-        datasetId: dataset.id,
-        projectId: parsed.projectId,
-        entry: sanitizedEntry(parsed.updatedRecord),
-      });
+      return await this.lockedRecords({ dataset, columns: parsed.columns }, (records) =>
+        records.update({
+          id: parsed.recordId,
+          datasetId: dataset.id,
+          projectId: parsed.projectId,
+          entry: sanitizedEntry(parsed.updatedRecord),
+        }),
+      );
     } catch (error) {
       if (isDatasetRecordNotFound(error)) {
         throw new DatasetRecordNotFoundError();
@@ -487,10 +512,9 @@ export class DatasetRecordService {
       return content.deleteRecords({ dataset, input: parsed });
     }
 
-    const count = await this.options.records.deleteMany({
-      ...parsed,
-      datasetId: dataset.id,
-    });
+    const count = await this.lockedRecords({ dataset }, (records) =>
+      records.deleteMany({ ...parsed, datasetId: dataset.id }),
+    );
 
     return { count };
   }

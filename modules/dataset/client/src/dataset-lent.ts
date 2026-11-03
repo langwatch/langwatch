@@ -1,14 +1,12 @@
 /** Dataset UI lent by token to the modules that pick, create, edit and sync datasets (§10.1). */
 
-import type { DatasetColumn, DatasetColumns } from "@langwatch/dataset-contract";
+import type {
+  DatasetColumn,
+  DatasetColumns,
+  DrawerDatasetColumn,
+} from "@langwatch/dataset-contract";
 import { uiTokens } from "@langwatch/module";
 import type { ReactNode } from "react";
-
-/**
- * A drawer column with the caller's own id for it. The drawer hands the id back
- * on the column edited from it (renamed or retyped), and none on a new column.
- */
-export type DrawerDatasetColumn = DatasetColumn & { id?: string };
 
 /** What a screen hands dataset's lent create-or-edit drawer. */
 export type AddOrEditDatasetDrawerProps = {

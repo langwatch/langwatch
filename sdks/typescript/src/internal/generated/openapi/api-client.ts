@@ -622,7 +622,7 @@ export interface paths {
         delete: operations["deleteApiDatasetBySlugOrId"];
         options?: never;
         head?: never;
-        /** @description Update a dataset by its slug or id */
+        /** @description Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to say which existing column each renamed column came from, so a save that deletes one column and renames another moves the right values. */
         patch: operations["patchApiDatasetBySlugOrId"];
         trace?: never;
     };
@@ -9169,6 +9169,11 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
+                    }[];
+                    /** @description Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position. */
+                    columnRenames?: {
+                        from: string;
+                        to: string;
                     }[];
                 };
             };

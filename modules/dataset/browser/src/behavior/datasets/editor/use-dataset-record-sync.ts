@@ -14,6 +14,9 @@ const logger = createLogger("langwatch:dataset:record-sync");
 
 export const DATASET_SYNC_DEBOUNCE_MS = 500;
 
+/** The code a record write is refused with when it names a column a column edit removed. */
+const STALE_COLUMNS = "dataset_stale_columns";
+
 /** pendingChanges shape: dbDatasetId -> recordId -> column changes.
  *  A record with `_delete: true` is a pending deletion. */
 export type DatasetRecordSyncParams = {
@@ -133,6 +136,8 @@ export const useDatasetRecordSync = ({
         deleteMutation: deleteRef.current,
         updateMutation: updateRef.current,
         resolveFullRecord: resolveFullRecordRef.current,
+        currentChange: (dbDatasetId, recordId) =>
+          pendingChangesRef.current[dbDatasetId]?.[recordId],
         clearPendingChange,
         start: handleSyncStart,
         succeed: handleSyncSuccess,
@@ -199,6 +204,7 @@ function syncDatasetChanges({
   deleteMutation,
   updateMutation,
   resolveFullRecord,
+  currentChange,
   clearPendingChange,
   start,
   succeed,
@@ -209,6 +215,8 @@ function syncDatasetChanges({
   dbDatasetId: string;
   recordChanges: PendingSavedChanges[string] | undefined;
   resolveFullRecord: DatasetRecordSyncParams["resolveFullRecord"];
+  /** The record's queued change now; a column edit re-keys it into a new object. */
+  currentChange: (dbDatasetId: string, recordId: string) => unknown;
   clearPendingChange: DatasetRecordSyncParams["clearPendingChange"];
   start: () => void;
   succeed: () => void;
@@ -244,15 +252,31 @@ function syncDatasetChanges({
     if (!fullRecord) continue;
 
     const { id: _id, ...recordData } = fullRecord;
+    const sentChange = recordChanges[recordId];
     start();
     updateMutation.mutate(
-      { projectId, datasetId: dbDatasetId, recordId, updatedRecord: recordData },
+      {
+        projectId,
+        datasetId: dbDatasetId,
+        recordId,
+        updatedRecord: recordData,
+        columns: Object.keys(recordData),
+      },
       {
         onSuccess: () => {
           clearPendingChange(dbDatasetId, recordId);
           succeed();
         },
         onError: (error) => {
+          // Refused for a column a rename removed: the rename re-keyed the queued change,
+          // which syncs again under the new names, so this attempt is superseded.
+          if (
+            error.message === STALE_COLUMNS &&
+            currentChange(dbDatasetId, recordId) !== sentChange
+          ) {
+            succeed();
+            return;
+          }
           logger.error({ error }, "Failed to sync saved record");
           fail(error);
         },

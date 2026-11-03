@@ -1,5 +1,7 @@
 import {
   convertValueToColumnType,
+  datasetColumnsSchema,
+  DatasetStaleColumnsError,
   InvalidColumnError,
   renameReservedColumns,
   type DatasetColumns,
@@ -30,6 +32,24 @@ export function assertKnownColumns({
       throw new InvalidColumnError({ columnName: key, datasetName, validColumns: columns });
     }
   }
+}
+
+/**
+ * A write keyed by a column the dataset no longer has is refused: a column edit landed after
+ * the caller read its columns. Callers that name no columns are not checked.
+ */
+export function assertColumnsCurrent({
+  columns,
+  columnTypes,
+}: {
+  columns: readonly string[] | undefined;
+  columnTypes: unknown;
+}): void {
+  if (!columns) return;
+  const parsed = datasetColumnsSchema.safeParse(columnTypes);
+  if (!parsed.success) return;
+  const current = new Set(parsed.data.map((column) => column.name));
+  if (columns.some((column) => !current.has(column))) throw new DatasetStaleColumnsError();
 }
 
 /**

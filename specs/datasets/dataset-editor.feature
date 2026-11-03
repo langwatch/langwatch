@@ -550,4 +550,14 @@ Feature: Dataset editor
     And every row of "renamed" holds the values "second" held
     And the values of "first" are gone
     And a save that names no renames pairs leftover columns by position, as before
-    And this holds whether the rows are stored in Postgres or in chunked files
+    And this holds whether the rows are stored in Postgres, in chunked files or in a single file from an earlier release
+
+  @integration @unit
+  Scenario: A record write that arrives during a column edit waits for it and is refused when keyed by a removed column
+    Given a saved dataset with columns "input" and "expected_output"
+    And a column edit that deletes "input" and renames "expected_output" to "reference" is running
+    When a record write keyed by "input" and "expected_output", naming those columns, arrives
+    Then the write waits until the column edit has committed
+    And it is refused as "dataset_stale_columns"
+    And every row of "reference" still holds the values "expected_output" held
+    And the same write re-keyed to "reference" and sent again is stored
