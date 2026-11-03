@@ -291,8 +291,9 @@ function syncRecordUpdate({
         // A reorder moved no values: send the same record once more under the new order.
         const reordered = JSON.stringify(resolveColumns(dbDatasetId)) !== JSON.stringify(columns);
         if (stale && attempt === 0 && reordered) {
-          sync.succeed();
+          // Start the retry first, so the pending count never reaches zero in between.
           syncRecordUpdate({ sync, recordId, attempt: attempt + 1 });
+          sync.succeed();
           return;
         }
         logger.error({ error }, "Failed to sync saved record");

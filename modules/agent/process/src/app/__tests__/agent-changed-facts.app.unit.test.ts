@@ -3,7 +3,8 @@
  * Spec: modules/agent/specs/agent-versioning.feature
  */
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   contextOf,
@@ -137,19 +138,26 @@ describe("the agent changed fact", () => {
 });
 
 describe("two writes in the same millisecond", () => {
-  const keyOf = (fact: RecordAgentChangedCommandData, occurredAt: number) => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const keyOf = (fact: RecordAgentChangedCommandData) => {
     const [event] = new RecordAgentChangedCommand().handle({
       tenantId: createTenantId(fact.tenantId),
       aggregateId: fact.agentId,
       type: "record",
-      data: { ...fact, occurredAt },
+      data: fact,
     });
     return event?.idempotencyKey;
   };
+
   /** @scenario "Two writes to an agent in the same millisecond stay two changed facts" */
   it("key two facts apart and a redelivered one alike", async () => {
     const { app, changedFacts } = await httpAgent();
     changedFacts.length = 0;
+    const frozen = Temporal.Instant.fromEpochMilliseconds(1_790_000_000_000);
+    vi.spyOn(Temporal.Now, "instant").mockReturnValue(frozen);
     for (const url of ["https://a.example.test/chat", "https://b.example.test/chat"]) {
       await app.update({
         ...reference,
@@ -159,10 +167,13 @@ describe("two writes in the same millisecond", () => {
     }
     const [first, second] = changedFacts;
     if (!first || !second) throw new Error("two writes recorded fewer than two facts");
-    const sameMillisecond = 1_790_000_000_000;
 
-    expect(keyOf(first, sameMillisecond)).not.toBe(keyOf(second, sameMillisecond));
-    expect(keyOf(first, sameMillisecond)).toBe(keyOf(first, sameMillisecond));
+    expect([first.occurredAt, second.occurredAt]).toEqual([
+      frozen.epochMilliseconds,
+      frozen.epochMilliseconds,
+    ]);
+    expect(keyOf(first)).not.toBe(keyOf(second));
+    expect(keyOf({ ...first })).toBe(keyOf(first));
   });
 });
 

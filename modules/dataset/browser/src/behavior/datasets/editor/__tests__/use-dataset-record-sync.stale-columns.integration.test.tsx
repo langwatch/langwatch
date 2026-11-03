@@ -117,6 +117,7 @@ describe("given a cell edit synced under a column a rename then removed", () => 
         updates[0]?.handlers.onError({ message: "dataset_stale_columns" });
       });
       expect(updates[1]?.input).toMatchObject({ columns: ["test", "input"] });
+      expect(onStatus, "the retry is still saving").not.toHaveBeenCalledWith("saved");
       act(() => {
         updates[1]?.handlers.onSuccess();
       });

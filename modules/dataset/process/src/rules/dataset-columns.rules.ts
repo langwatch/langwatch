@@ -94,7 +94,8 @@ export function columnRenameProblems({
 }
 
 /**
- * Whether a column edit moves record values: a rename, or an old column the new list lacks.
+ * Whether a column edit moves record values: a rename to another name, or an old column the new
+ * list lacks.
  * A type change, a reorder or an added column leaves every stored value where it is.
  */
 export function columnEditMovesValues({
@@ -106,7 +107,7 @@ export function columnEditMovesValues({
   newColumns: DatasetColumns;
   renames: DatasetColumnRenames | undefined;
 }): boolean {
-  if (renames && renames.length > 0) return true;
+  if (renames?.some(({ from, to }) => from !== to)) return true;
   const next = new Set(newColumns.map((column) => column.name));
   return previousColumns.some((column) => !next.has(column.name));
 }

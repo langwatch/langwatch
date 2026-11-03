@@ -140,6 +140,48 @@ describe("given a dataset whose records are stored in Postgres", () => {
     });
   });
 
+  describe("when a save swaps two column names and keeps the column list", () => {
+    /** @scenario "A record write keyed by columns a later edit swapped is refused" */
+    it("swaps the stored values", async () => {
+      const { service, entries } = await seeded();
+
+      await service.upsertDataset({
+        projectId: dataset.projectId,
+        datasetId: dataset.id,
+        name: dataset.name,
+        columnTypes: dataset.columnTypes,
+        columnRenames: [
+          { from: "input", to: "expected_output" },
+          { from: "expected_output", to: "input" },
+        ],
+      });
+
+      expect(await entries()).toEqual([
+        { id: "rec_1", expected_output: "How do I pay?", input: "Open Billing." },
+        { id: "rec_2", expected_output: "Opening hours?", input: "Nine to six." },
+      ]);
+    });
+  });
+
+  describe("when a save names only renames to the same name", () => {
+    /** @scenario "A column edit that moves no values leaves the stored records untouched" */
+    it("rewrites no record", async () => {
+      const { service, records, entries } = await seeded();
+      const replaceAll = vi.spyOn(records, "replaceAll");
+
+      await service.upsertDataset({
+        projectId: dataset.projectId,
+        datasetId: dataset.id,
+        name: dataset.name,
+        columnTypes: [...dataset.columnTypes, { name: "notes", type: "string" }],
+        columnRenames: [{ from: "input", to: "input" }],
+      });
+
+      expect(replaceAll).not.toHaveBeenCalled();
+      expect(await entries()).toEqual(original);
+    });
+  });
+
   describe("when a save names a rename that does not match the dataset", () => {
     const keepsInput = [
       { name: "input", type: "string" },

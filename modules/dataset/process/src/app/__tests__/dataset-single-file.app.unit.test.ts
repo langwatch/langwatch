@@ -51,13 +51,17 @@ const storages: Storage[] = [
   },
 ];
 
-async function setup(storage: Storage, file: unknown[] | "none" = previousReleaseFile) {
+async function setup(
+  storage: Storage,
+  file: unknown[] | "none" = previousReleaseFile,
+  columnTypes: { name: string; type: "string" }[] = [{ name: "question", type: "string" }],
+) {
   const repositories = await storage.repositories();
   const dataset = await repositories.content.create({
     projectId,
     name: "Legacy Questions",
     slug: "legacy-questions",
-    columnTypes: [{ name: "question", type: "string" }],
+    columnTypes,
     useS3: true,
     s3RecordCount: file === "none" ? 0 : file.length,
   });
@@ -374,6 +378,35 @@ describe.each(storages)(
         ]);
         const dataset = await app.getBySlugOrId({ projectId, slugOrId: datasetId });
         expect(dataset.columnTypes).toEqual([{ name: "prompt", type: "string" }]);
+      });
+    });
+
+    describe("when a save swaps two column names and keeps the column list", () => {
+      /** @scenario "A record write keyed by columns a later edit swapped is refused" */
+      it("swaps the values in the file", async () => {
+        const columns = [
+          { name: "first", type: "string" as const },
+          { name: "second", type: "string" as const },
+        ];
+        const { app, datasetId, stored } = await setup(
+          storage,
+          [{ id: "rec_1", entry: { first: "one", second: "two" } }],
+          columns,
+        );
+
+        await app.upsertDataset({
+          projectId,
+          datasetId,
+          name: "Legacy Questions",
+          columnTypes: columns,
+          columnRenames: [
+            { from: "first", to: "second" },
+            { from: "second", to: "first" },
+          ],
+        });
+
+        const file = (await stored()) as { entry: Record<string, unknown> }[];
+        expect(file.map((record) => record.entry)).toEqual([{ second: "one", first: "two" }]);
       });
     });
 

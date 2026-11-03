@@ -80,7 +80,9 @@ export class DatasetUpsertService {
         meta: { fieldErrors: { columnRenames: renameProblems } },
       });
     }
-    if (existing.contentLayout === "s3_jsonl" && options.content && columnsChanged) {
+    const movesValues = columnEditMovesValues(columnEdit);
+    const rewrites = columnsChanged || movesValues;
+    if (existing.contentLayout === "s3_jsonl" && options.content && rewrites) {
       return options.content.updateColumns({
         dataset: existing,
         projectId: parsed.projectId,
@@ -91,13 +93,13 @@ export class DatasetUpsertService {
       });
     }
 
-    if (isSingleFileDataset(existing) && options.singleFile && columnsChanged) {
+    if (isSingleFileDataset(existing) && options.singleFile && rewrites) {
       await options.singleFile.updateColumns({
         dataset: existing,
         columnTypes: parsed.columnTypes,
         columnRenames: parsed.columnRenames,
       });
-    } else if (existing.contentLayout === "postgres" && columnEditMovesValues(columnEdit)) {
+    } else if (existing.contentLayout === "postgres" && movesValues) {
       await this.migrateRecordColumns({ dataset: existing, parsed });
     }
     return options.repository.update(update);
