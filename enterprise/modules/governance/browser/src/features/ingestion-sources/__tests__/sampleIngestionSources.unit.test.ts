@@ -167,6 +167,9 @@ describe("given the Sources tab in sample mode", () => {
         // cadence would be a state no real fleet can produce.
         expect(source.errorCount).toBe(0);
         expect(source.pullSchedule).toBeNull();
+        // Nor can one carry config complaints: those come from a pull adapter
+        // refusing its configuration, and a push source has no such adapter.
+        expect(source.configComplaints).toEqual([]);
       }
     });
   });

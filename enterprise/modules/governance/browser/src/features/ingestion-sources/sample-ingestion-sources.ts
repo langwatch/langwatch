@@ -50,16 +50,19 @@ const HOUR_MS = 60 * MINUTE_MS;
  * still waiting for its first event, one an admin switched off, and one holding a configuration
  * its adapter refuses ("Connection needs fixing").
  *
- * The one exception the cycle cannot state is below: `errorCount` counts
- * consecutive PULL failures and nothing else writes it, so a push source
- * carrying one would be a state the product cannot produce.
+ * Two states the cycle cannot put on a push row, both zeroed below. `errorCount`
+ * counts consecutive PULL failures and nothing else writes it, and
+ * `configComplaints` is what a pull adapter refuses about its configuration, which
+ * a push source has no adapter to do. A push source carrying either would be a
+ * state the product cannot produce.
  *
  * INDEXED BY POSITION, so the cycle is coupled to the sampled list: holding a
  * type back or adding one shifts every state after it, and the shift is
- * silent. The badge it can cost is "Pulls failing", whose state has to land on a
- * PULL source or the exception above zeroes it away. Reorder or hold back
- * freely — a test asserts all four badges still reach the screen, and if one
- * goes missing the fix belongs in this cycle rather than in the catalog order.
+ * silent. The badges it can cost are "Pulls failing" and "Connection needs
+ * fixing", whose states have to land on a PULL source or the exceptions above
+ * zero them away. Reorder or hold back freely: a test asserts all five badges
+ * still reach the screen, and if one goes missing the fix belongs in this cycle
+ * rather than in the catalog order.
  */
 const SAMPLE_INSTANCE_STATES = [
   { status: "active", errorCount: 0, lastEventAgoMs: 3 * MINUTE_MS },
