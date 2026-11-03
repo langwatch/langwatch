@@ -7,6 +7,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { ValidationError } from "@langwatch/handled-error";
 
+import type { LockedDatasetRecords } from "../repositories/dataset-record.repository.ts";
 import type { DatasetUpdateInput } from "../repositories/dataset.repository.ts";
 import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
 import { columnEditMovesValues, columnRenameProblems } from "../rules/dataset-columns.rules.ts";
@@ -99,10 +100,14 @@ export class DatasetUpsertService {
         columnTypes: parsed.columnTypes,
         columnRenames: parsed.columnRenames,
       });
-    } else if (existing.contentLayout === "postgres" && movesValues) {
-      await this.migrateRecordColumns({ dataset: existing, parsed });
+    } else if (existing.contentLayout === "postgres" && rewrites) {
+      await this.migrateRecordColumns({ dataset: existing, parsed, movesValues });
+    } else {
+      return options.repository.update(update);
     }
-    return options.repository.update(update);
+    // The columns were stored under the lock; writing them again here could undo a later edit.
+    const { columnTypes: _stored, ...named } = update;
+    return options.repository.update(named);
   }
 
   /**
@@ -112,9 +117,12 @@ export class DatasetUpsertService {
   private async migrateRecordColumns({
     dataset,
     parsed,
+    movesValues,
   }: {
     dataset: Dataset;
     parsed: ParsedUpsert;
+    /** False for a type change, reorder or addition: the columns change, no record does. */
+    movesValues: boolean;
   }): Promise<void> {
     const key = { datasetId: dataset.id, projectId: dataset.projectId };
     await this.deps.options.records.withDatasetLock(key, async (records) => {
@@ -122,28 +130,41 @@ export class DatasetUpsertService {
       if (JSON.stringify(current) !== JSON.stringify(dataset.columnTypes)) {
         throw new DatasetStaleColumnsError();
       }
-      const stored: Awaited<ReturnType<typeof records.findPage>> = [];
-      let page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE });
-      stored.push(...page);
-      while (page.length === RECORD_PAGE_SIZE) {
-        const cursorId = page.at(-1)!.id;
-        page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE, cursorId });
-        stored.push(...page);
-      }
-      const remapped = mapPreviousColumnsToNewColumns({
-        records: stored.map((record) => record.entry),
-        previousColumns: dataset.columnTypes,
-        newColumns: parsed.columnTypes,
-        renames: parsed.columnRenames,
-      });
-      if (stored.length > 0) {
-        await records.replaceAll({
-          ...key,
-          entries: stored.map((record, index) => ({ ...remapped[index], id: record.id })),
-        });
-      }
+      if (movesValues) await this.rekeyRecords({ records, dataset, parsed });
       await records.setColumnTypes(parsed.columnTypes);
     });
+  }
+
+  private async rekeyRecords({
+    records,
+    dataset,
+    parsed,
+  }: {
+    records: LockedDatasetRecords;
+    dataset: Dataset;
+    parsed: ParsedUpsert;
+  }): Promise<void> {
+    const key = { datasetId: dataset.id, projectId: dataset.projectId };
+    const stored: Awaited<ReturnType<typeof records.findPage>> = [];
+    let page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE });
+    stored.push(...page);
+    while (page.length === RECORD_PAGE_SIZE) {
+      const cursorId = page.at(-1)!.id;
+      page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE, cursorId });
+      stored.push(...page);
+    }
+    const remapped = mapPreviousColumnsToNewColumns({
+      records: stored.map((record) => record.entry),
+      previousColumns: dataset.columnTypes,
+      newColumns: parsed.columnTypes,
+      renames: parsed.columnRenames,
+    });
+    if (stored.length > 0) {
+      await records.replaceAll({
+        ...key,
+        entries: stored.map((record, index) => ({ ...remapped[index], id: record.id })),
+      });
+    }
   }
 
   private async create({ parsed, name }: { parsed: ParsedUpsert; name: string }): Promise<Dataset> {

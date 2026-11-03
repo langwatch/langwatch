@@ -65,7 +65,7 @@ async function seeded() {
       await records.findPage({ datasetId: dataset.id, projectId: dataset.projectId, limit: 10 })
     ).map((record) => ({ id: record.id, ...record.entry }));
   const stored = () => database.getDataset(dataset.projectId, dataset.id).columnTypes;
-  return { service, records, entries, stored };
+  return { service, records, database, entries, stored };
 }
 
 const original = [
@@ -141,7 +141,6 @@ describe("given a dataset whose records are stored in Postgres", () => {
   });
 
   describe("when a save swaps two column names and keeps the column list", () => {
-    /** @scenario "A record write keyed by columns a later edit swapped is refused" */
     it("swaps the stored values", async () => {
       const { service, entries } = await seeded();
 
@@ -160,6 +159,32 @@ describe("given a dataset whose records are stored in Postgres", () => {
         { id: "rec_1", expected_output: "How do I pay?", input: "Open Billing." },
         { id: "rec_2", expected_output: "Opening hours?", input: "Nine to six." },
       ]);
+    });
+  });
+
+  describe("when another column edit commits right after this one releases the lock", () => {
+    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+    it("keeps the later edit's columns: the name update writes no columns", async () => {
+      const { service, records, database, stored } = await seeded();
+      const later = [{ name: "later", type: "string" }] as const;
+      const locked = records.withDatasetLock.bind(records);
+      vi.spyOn(records, "withDatasetLock").mockImplementation(async (key, work) => {
+        const result = await locked(key, work);
+        const row = database.getDataset(dataset.projectId, dataset.id);
+        database.putDataset({ ...row, columnTypes: [...later] });
+        return result;
+      });
+
+      await service.upsertDataset({
+        projectId: dataset.projectId,
+        datasetId: dataset.id,
+        name: "Renamed Set",
+        columnTypes: [{ name: "reference", type: "string" }],
+        columnRenames: [{ from: "expected_output", to: "reference" }],
+      });
+
+      expect(stored()).toEqual(later);
+      expect(database.getDataset(dataset.projectId, dataset.id).name).toBe("Renamed Set");
     });
   });
 

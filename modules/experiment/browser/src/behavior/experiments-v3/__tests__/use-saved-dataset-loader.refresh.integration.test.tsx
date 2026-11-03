@@ -1,0 +1,152 @@
+/**
+ * @vitest-environment jsdom
+ * An open workbench follows its saved dataset's read: when the dataset changes elsewhere and the
+ * read refetches, the tab's rows refresh, and the edits it has not synced yet stay.
+ */
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { createInitialState } from "../../../model/experiments-v3/types.ts";
+import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
+import { useSavedDatasetRecords } from "../use-saved-dataset-loader.ts";
+
+const { server } = vi.hoisted(() => ({
+  server: {
+    columns: ["question"],
+    rows: [] as { id: string; entry: Record<string, string> }[],
+  },
+}));
+
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "project_1" } }),
+}));
+
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    datasetRecord: {
+      getAll: {
+        useQuery: (input: { datasetId: string }, options: { enabled: boolean }) =>
+          useQuery({
+            queryKey: ["datasetRecord.getAll", input.datasetId],
+            enabled: options.enabled,
+            queryFn: async () => ({
+              columnTypes: server.columns.map((name) => ({ name, type: "string" })),
+              datasetRecords: server.rows.map((row) => ({ ...row, entry: { ...row.entry } })),
+              truncated: false,
+              loadedRows: server.rows.length,
+              totalRows: server.rows.length,
+            }),
+          }),
+      },
+    },
+  },
+}));
+
+const TAB = "saved_ds-1";
+
+function openWorkbench() {
+  useEvaluationsV3Store.setState({
+    ...createInitialState(),
+    datasets: [
+      {
+        id: TAB,
+        name: "QA",
+        type: "saved",
+        datasetId: "ds-1",
+        columns: [{ id: "question_0", name: "question", type: "string" }],
+      },
+    ],
+    activeDatasetId: TAB,
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client }, children);
+  renderHook(() => useSavedDatasetRecords(useEvaluationsV3Store((state) => state.datasets[0])), {
+    wrapper,
+  });
+  return {
+    /** What a read hint does in this tab: the dataset's read refetches. */
+    hint: () => act(() => client.invalidateQueries({ queryKey: ["datasetRecord.getAll"] })),
+  };
+}
+
+const shown = () => useEvaluationsV3Store.getState().datasets[0]?.savedRecords;
+
+beforeEach(() => {
+  server.columns = ["question"];
+  server.rows = [
+    { id: "r1", entry: { question: "a" } },
+    { id: "r2", entry: { question: "b4" } },
+  ];
+});
+
+afterEach(() => vi.restoreAllMocks());
+
+describe("given a workbench showing a saved dataset", () => {
+  describe("when the dataset is restored elsewhere and its read refetches", () => {
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("shows the restored rows without a reload", async () => {
+      const { hint } = openWorkbench();
+      await waitFor(() => expect(shown()).toHaveLength(2));
+
+      server.rows = [
+        { id: "r1", entry: { question: "a-EDITED" } },
+        { id: "r2", entry: { question: "b" } },
+        { id: "r3", entry: { question: "c" } },
+      ];
+      await hint();
+
+      await waitFor(() =>
+        expect(shown()).toEqual([
+          { id: "r1", question: "a-EDITED" },
+          { id: "r2", question: "b" },
+          { id: "r3", question: "c" },
+        ]),
+      );
+    });
+  });
+
+  describe("when the tab holds an unsynced cell edit as the read refetches", () => {
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("keeps the edit over the server's value and takes every other row", async () => {
+      const { hint } = openWorkbench();
+      await waitFor(() => expect(shown()).toHaveLength(2));
+      useEvaluationsV3Store.setState({
+        pendingSavedChanges: { "ds-1": { r2: { question: "mine" } } },
+      });
+
+      server.rows = [
+        { id: "r1", entry: { question: "a-EDITED" } },
+        { id: "r2", entry: { question: "b" } },
+      ];
+      await hint();
+
+      await waitFor(() =>
+        expect(shown()).toEqual([
+          { id: "r1", question: "a-EDITED" },
+          { id: "r2", question: "mine" },
+        ]),
+      );
+    });
+  });
+
+  describe("when the refetched read is keyed by other columns than the tab's", () => {
+    /** @scenario "An open workbench shows a saved dataset's new rows after it changes elsewhere" */
+    it("leaves the rows as they are rather than blanking them", async () => {
+      const { hint } = openWorkbench();
+      await waitFor(() => expect(shown()).toHaveLength(2));
+
+      server.columns = ["prompt"];
+      server.rows = [{ id: "r1", entry: { prompt: "renamed" } }];
+      await hint();
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(shown()).toEqual([
+        { id: "r1", question: "a" },
+        { id: "r2", question: "b4" },
+      ]);
+    });
+  });
+});

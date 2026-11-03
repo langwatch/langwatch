@@ -56,7 +56,8 @@ export type DatasetUpdateInput = {
   projectId: string;
   name: string;
   slug: string;
-  columnTypes: DatasetColumns;
+  /** Absent keeps the stored columns: a column edit writes them under the dataset's lock. */
+  columnTypes?: DatasetColumns;
 };
 
 export interface DatasetRepository {

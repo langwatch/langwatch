@@ -174,7 +174,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
       ...row,
       name: input.name,
       slug: input.slug,
-      columnTypes: input.columnTypes,
+      columnTypes: input.columnTypes ?? row.columnTypes,
       updatedAt: toDate(this.#database.now()),
     };
 

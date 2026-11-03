@@ -141,7 +141,7 @@ export class PrismaDatasetRepository
       data: {
         name: input.name,
         slug: input.slug,
-        columnTypes: input.columnTypes as Prisma.InputJsonValue,
+        ...(input.columnTypes ? { columnTypes: input.columnTypes as Prisma.InputJsonValue } : {}),
       },
     });
     return toDataset(row);

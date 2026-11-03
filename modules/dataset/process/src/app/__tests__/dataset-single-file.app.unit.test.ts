@@ -382,7 +382,6 @@ describe.each(storages)(
     });
 
     describe("when a save swaps two column names and keeps the column list", () => {
-      /** @scenario "A record write keyed by columns a later edit swapped is refused" */
       it("swaps the values in the file", async () => {
         const columns = [
           { name: "first", type: "string" as const },

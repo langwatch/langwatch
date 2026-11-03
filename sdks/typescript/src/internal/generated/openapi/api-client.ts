@@ -9845,7 +9845,7 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
-            /** @description The body was not valid JSON, failed input validation, or the experiment has no dataset configured */
+            /** @description The body was not valid JSON, failed input validation, the experiment has no dataset configured, or `dataset_version` was sent while the run reads no saved dataset (no `dataset_id` and an inline active dataset) */
             400: {
                 headers: {
                     [name: string]: unknown;
