@@ -5,7 +5,7 @@
 import { nowInstant } from "@langwatch/time";
 
 import { convertInlineToRowRecords } from "./dataset-conversion.ts";
-import type { DatasetColumn, DatasetReference, EvaluationsV3State } from "./types.ts";
+import type { DatasetColumn, DatasetReference, EvaluationsV3State, SavedRecord } from "./types.ts";
 
 type DatasetsEdit = Pick<EvaluationsV3State, "datasets"> | EvaluationsV3State;
 
@@ -261,7 +261,8 @@ export const withoutSelectedRows = ({
 type DrawerDataset = {
   datasetId: string;
   name: string;
-  columnTypes: { name: string; type: string }[];
+  /** `id` names the workbench column a drawer column was edited from; a new column has none. */
+  columnTypes: { name: string; type: string; id?: string }[];
 };
 
 const columnsFrom = (columnTypes: DrawerDataset["columnTypes"]): DatasetColumn[] =>
@@ -283,10 +284,42 @@ export const savedDatasetUpdate = (saved: DrawerDataset): Partial<DatasetReferen
   columns: columnsFrom(saved.columnTypes),
 });
 
+/** Each edited column paired with the workbench column it came from, if any. */
+const sourceColumnsOf = ({
+  dataset,
+  edited,
+}: {
+  dataset: DatasetReference;
+  edited: DrawerDataset;
+}): (DatasetColumn | undefined)[] =>
+  edited.columnTypes.map((col) =>
+    col.id === undefined ? undefined : dataset.columns.find((c) => c.id === col.id),
+  );
+
+/** Saved records re-keyed from each source column's name to its edited name. */
+const renamedSavedRecords = ({
+  records,
+  columns,
+  sources,
+}: {
+  records: SavedRecord[];
+  columns: DatasetColumn[];
+  sources: (DatasetColumn | undefined)[];
+}): SavedRecord[] =>
+  records.map((record) => ({
+    id: record.id,
+    ...Object.fromEntries(
+      columns.map((column, index) => {
+        const source = sources[index];
+        return [column.name, source ? (record[source.name] ?? "") : ""];
+      }),
+    ),
+  }));
+
 /**
- * A dataset's columns as edited in the drawer. Inline values follow their column
- * by name, and a new column starts empty; a saved dataset was already saved by
- * the drawer, so only the local reference changes.
+ * A dataset's columns as edited in the drawer. Values follow the column they were
+ * edited from, by its id, so a rename keeps them; a new column starts empty. A saved
+ * dataset was saved by the drawer, so only the reference and its cached records change.
  */
 export const editedDatasetUpdate = ({
   dataset,
@@ -298,14 +331,24 @@ export const editedDatasetUpdate = ({
   rowCount: number;
 }): Partial<DatasetReference> => {
   const columns = columnsFrom(edited.columnTypes);
+  const sources = sourceColumnsOf({ dataset, edited });
   if (dataset.type !== "inline") {
-    return { name: edited.name, columns, datasetId: edited.datasetId };
+    return {
+      name: edited.name,
+      columns,
+      datasetId: edited.datasetId,
+      ...(dataset.savedRecords
+        ? {
+            savedRecords: renamedSavedRecords({ records: dataset.savedRecords, columns, sources }),
+          }
+        : {}),
+    };
   }
   const oldRecords = dataset.inline?.records ?? {};
   const records = Object.fromEntries(
-    columns.map((column) => {
-      const oldColumn = dataset.columns.find((c) => c.name === column.name);
-      const oldValues = oldColumn ? oldRecords[oldColumn.id] : undefined;
+    columns.map((column, index) => {
+      const source = sources[index];
+      const oldValues = source ? oldRecords[source.id] : undefined;
       return [column.id, oldValues ?? Array<string>(rowCount).fill("")];
     }),
   );
@@ -316,7 +359,7 @@ export const editedDatasetUpdate = ({
 export const datasetEditDraft = (dataset: DatasetReference) => ({
   datasetId: dataset.type === "saved" ? dataset.datasetId : undefined,
   name: dataset.name,
-  columnTypes: dataset.columns.map((col) => ({ name: col.name, type: col.type })),
+  columnTypes: dataset.columns.map((col) => ({ id: col.id, name: col.name, type: col.type })),
   ...(dataset.type === "inline" && dataset.inline
     ? { datasetRecords: convertInlineToRowRecords(dataset.inline.columns, dataset.inline.records) }
     : {}),

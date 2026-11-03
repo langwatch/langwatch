@@ -4,17 +4,27 @@ import type { DatasetColumn, DatasetColumns } from "@langwatch/dataset-contract"
 import { uiTokens } from "@langwatch/module";
 import type { ReactNode } from "react";
 
+/**
+ * A drawer column with the caller's own id for it. The drawer hands the id back
+ * on the column edited from it (renamed or retyped), and none on a new column.
+ */
+export type DrawerDatasetColumn = DatasetColumn & { id?: string };
+
 /** What a screen hands dataset's lent create-or-edit drawer. */
 export type AddOrEditDatasetDrawerProps = {
   datasetToSave?: {
     datasetId?: string;
     name?: string;
-    columnTypes: DatasetColumn[];
+    columnTypes: DrawerDatasetColumn[];
     datasetRecords?: ({ id?: string } & Record<string, unknown>)[];
   };
   open?: boolean;
   onClose?: () => void;
-  onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumn[] }) => void;
+  onSuccess?: (dataset: {
+    datasetId: string;
+    name: string;
+    columnTypes: DrawerDatasetColumn[];
+  }) => void;
   /** Apply the form without saving it: the caller holds the dataset in memory. */
   localOnly?: boolean;
   columnVisibility?: {

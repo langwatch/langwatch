@@ -1,9 +1,12 @@
 /** Dataset's create-or-edit drawer, lent to other modules (ARCHITECTURE.md §3.4, rule 7). */
 
 import type { AddOrEditDatasetDrawerProps } from "@langwatch/dataset-client";
-import { datasetColumnsSchema } from "@langwatch/dataset-contract";
+import { z } from "zod";
 
-import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
+import {
+  AddOrEditDatasetDrawer,
+  drawerDatasetColumnSchema,
+} from "./add-or-edit-dataset-drawer.tsx";
 
 /** The drawer over a borrower's plain columns, read through the dataset contract. */
 export function LentAddOrEditDatasetDrawer({
@@ -15,7 +18,10 @@ export function LentAddOrEditDatasetDrawer({
       {...props}
       datasetToSave={
         datasetToSave
-          ? { ...datasetToSave, columnTypes: datasetColumnsSchema.parse(datasetToSave.columnTypes) }
+          ? {
+              ...datasetToSave,
+              columnTypes: z.array(drawerDatasetColumnSchema).parse(datasetToSave.columnTypes),
+            }
           : undefined
       }
     />

@@ -152,3 +152,66 @@ describe("given the dataset editor opened on an existing dataset", () => {
     });
   });
 });
+
+describe("given the dataset editor opened on columns that carry the caller's ids", () => {
+  const datasetToSave = {
+    datasetId: "dataset_1",
+    name: "Columns",
+    columnTypes: [
+      { id: "input_0", name: "input", type: "string" as const },
+      { id: "test_1", name: "test", type: "string" as const },
+    ],
+  };
+
+  const renameTestAndAddColumn = async () => {
+    await screen.findByDisplayValue("test");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    fireEvent.change(screen.getByDisplayValue("test"), { target: { value: "test2" } });
+    fireEvent.click(screen.getByTestId("dataset-column-add"));
+    fireEvent.change(screen.getByTestId("dataset-column-name-2"), { target: { value: "extra" } });
+  };
+
+  describe("when the reader renames one column and adds another, applying locally", () => {
+    /** @scenario "The dataset editor hands back each edited column with the caller's id for it" */
+    it("hands back the renamed column with its id and the new one without", async () => {
+      const applied = vi.fn();
+      mount(
+        <AddOrEditDatasetDrawer open localOnly onSuccess={applied} datasetToSave={datasetToSave} />,
+      );
+
+      await renameTestAndAddColumn();
+      fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+      await waitFor(() => expect(applied).toHaveBeenCalled());
+      expect(applied.mock.calls[0]?.[0].columnTypes).toEqual([
+        { id: "input_0", name: "input", type: "string" },
+        { id: "test_1", name: "test2", type: "string" },
+        { name: "extra", type: "string" },
+      ]);
+    });
+  });
+
+  describe("when the reader renames a saved dataset's column and saves", () => {
+    /** @scenario "The dataset editor hands back each edited column with the caller's id for it" */
+    it("saves plain columns and hands back the saved ones with the caller's ids", async () => {
+      const saved = vi.fn();
+      created.mockClear();
+      mount(<AddOrEditDatasetDrawer open onSuccess={saved} datasetToSave={datasetToSave} />);
+
+      await renameTestAndAddColumn();
+      fireEvent.click(screen.getByTestId("dataset-form-submit"));
+
+      await waitFor(() => expect(saved).toHaveBeenCalled());
+      expect(created.mock.calls[0]?.[0].columnTypes).toEqual([
+        { name: "input", type: "string" },
+        { name: "test2", type: "string" },
+        { name: "extra", type: "string" },
+      ]);
+      expect(saved.mock.calls[0]?.[0].columnTypes).toEqual([
+        { id: "input_0", name: "input", type: "string" },
+        { id: "test_1", name: "test2", type: "string" },
+        { name: "extra", type: "string" },
+      ]);
+    });
+  });
+});

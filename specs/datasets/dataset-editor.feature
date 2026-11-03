@@ -533,3 +533,11 @@ Feature: Dataset editor
     Given the dataset editor opened on an existing dataset and its values loaded
     When its name and a column name are edited and applied
     Then the applied dataset carries the typed name and column
+
+  @integration
+  Scenario: The dataset editor hands back each edited column with the caller's id for it
+    Given the dataset editor opened on columns that carry the caller's ids
+    When one column is renamed and another is added, then applied or saved
+    Then the renamed column comes back with its original id
+    And the added column comes back without one
+    And the saved column list carries no ids
