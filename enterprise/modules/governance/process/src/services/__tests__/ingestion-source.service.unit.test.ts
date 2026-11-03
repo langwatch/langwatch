@@ -397,6 +397,7 @@ describe("IngestionSourceService", () => {
     const BILL_B = "bbbbbbbb-0000-4000-8000-000000000002";
     const billing = { billingClientId: "bid", billingClientSecret: "bsecret" };
     const read = JSON.stringify({ costPricedThroughDay: "2026-08-20" });
+    const environmentUrl = "https://org12345.crm.dynamics.com";
 
     function billed({ claim, pollerCursor }: { claim?: string; pollerCursor: string | null }) {
       const { service, repository } = harness();
@@ -404,6 +405,7 @@ describe("IngestionSourceService", () => {
         sourceType: "copilot_studio",
         parserConfig: {
           adapter: "copilot_studio_dataverse",
+          environmentUrl,
           credentials: "enc:v1:aaaa:bbbb:cccc",
           ...(claim ? { azureSubscriptionId: claim } : {}),
           ...(claim ? { _azureBillSubscriptionId: claim } : {}),
@@ -422,6 +424,7 @@ describe("IngestionSourceService", () => {
           id: "source-1",
           organizationId: "org-1",
           parserConfig: {
+            environmentUrl,
             azureSubscriptionId: BILL_B,
             credentials: { clientId: "c", clientSecret: "s", ...billing },
           },
@@ -439,6 +442,7 @@ describe("IngestionSourceService", () => {
           id: "source-1",
           organizationId: "org-1",
           parserConfig: {
+            environmentUrl,
             azureSubscriptionId: BILL_A,
             credentials: { clientId: "c", clientSecret: "s", ...billing },
           },
@@ -454,12 +458,16 @@ describe("IngestionSourceService", () => {
       await service.updateSource({
         id: "source-1",
         organizationId: "org-1",
-        parserConfig: { azureSubscriptionId: BILL_A.toUpperCase() },
+        parserConfig: { environmentUrl, azureSubscriptionId: BILL_A.toUpperCase() },
       });
       expect(repository.updateInput).not.toBeNull();
       repository.updateInput = null;
 
-      await service.updateSource({ id: "source-1", organizationId: "org-1", parserConfig: {} });
+      await service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: { environmentUrl },
+      });
       expect(repository.updateInput).not.toBeNull();
     });
 
@@ -471,6 +479,7 @@ describe("IngestionSourceService", () => {
         id: "source-1",
         organizationId: "org-1",
         parserConfig: {
+          environmentUrl,
           azureSubscriptionId: BILL_B,
           credentials: { clientId: "c", clientSecret: "s", ...billing },
         },
@@ -732,6 +741,147 @@ describe("IngestionSourceService", () => {
           projectIds: ["proj_other_team"],
           limit: 1,
         });
+      });
+    });
+  });
+
+  describe("given a Copilot Studio configuration", () => {
+    const ENVIRONMENT = "https://org12345.crm.dynamics.com";
+    const copilot = (overrides: Record<string, unknown> = {}) => ({
+      adapter: "copilot_studio_dataverse",
+      environmentUrl: ENVIRONMENT,
+      botIds: [],
+      credentials: { tenantId: "t", clientId: "c", clientSecret: "s" },
+      ...overrides,
+    });
+    const create = (service: IngestionSourceService, environmentUrl: string) =>
+      service.createSource({
+        organizationId: "org-1",
+        sourceType: "copilot_studio_dataverse",
+        name: "Copilot",
+        pullConfig: copilot({ environmentUrl }),
+        pullSchedule: "*/15 * * * *",
+        actorUserId: "user-1",
+      });
+
+    describe("when it is created with an address the adapter cannot read", () => {
+      /** @scenario "An environment address the adapter cannot read is refused at save time" */
+      it("refuses an address typed without its scheme, naming the field", async () => {
+        const { service, repository } = harness();
+
+        await expect(create(service, "org12345.crm.dynamics.com")).rejects.toThrow(
+          /Environment URL must be an https Power Platform environment address/,
+        );
+        expect(repository.create).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "An environment address that is not secure is refused at save time" */
+      it("refuses an insecure address", async () => {
+        const { service, repository } = harness();
+
+        await expect(create(service, "http://org12345.crm.dynamics.com")).rejects.toThrow(
+          /Power Platform environment address/,
+        );
+        expect(repository.create).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "An environment address Microsoft does not host is refused at save time" */
+      it("refuses an address Microsoft does not serve", async () => {
+        const { service, repository } = harness();
+
+        await expect(create(service, "https://attacker.example.com")).rejects.toThrow(
+          /Power Platform environment address/,
+        );
+        expect(repository.create).not.toHaveBeenCalled();
+      });
+
+      it("stores a real Power Platform address", async () => {
+        const { service, repository } = harness();
+
+        await create(service, ENVIRONMENT);
+
+        expect(repository.createInput?.parserConfig.environmentUrl).toBe(ENVIRONMENT);
+      });
+    });
+
+    describe("when an update carries a value the adapter's schema refuses", () => {
+      /** @scenario "A pull configuration its adapter would refuse is refused at save time" */
+      it("refuses the save and names the field", async () => {
+        const { service, repository } = harness();
+        repository.row = source({
+          sourceType: "copilot_studio_dataverse",
+          parserConfig: copilot(),
+        });
+
+        await expect(
+          service.updateSource({
+            id: "source-1",
+            organizationId: "org-1",
+            parserConfig: copilot({ botIds: ["not-an-agent-id"] }),
+          }),
+        ).rejects.toThrow(/Agent IDs/);
+        expect(repository.updateInput).toBeNull();
+      });
+    });
+
+    describe("when an update moves the source to another environment", () => {
+      const OTHER = "https://org67890.crm.dynamics.com";
+      const pulled = JSON.stringify({ createdon: "2026-08-20T00:00:00Z" });
+
+      /** @scenario "The environment is fixed once the source has pulled" */
+      it("refuses the move once the source has pulled", async () => {
+        const { service, repository } = harness();
+        repository.row = source({
+          sourceType: "copilot_studio_dataverse",
+          parserConfig: copilot(),
+          pollerCursor: pulled,
+        });
+
+        await expect(
+          service.updateSource({
+            id: "source-1",
+            organizationId: "org-1",
+            parserConfig: copilot({ environmentUrl: OTHER }),
+          }),
+        ).rejects.toThrow(/environment is fixed/);
+        expect(repository.updateInput).toBeNull();
+      });
+
+      /** @scenario "A source that has pulled can still have its address respelled" */
+      it("accepts the same environment spelt with a trailing slash", async () => {
+        const { service, repository } = harness();
+        repository.row = source({
+          sourceType: "copilot_studio_dataverse",
+          parserConfig: copilot(),
+          pollerCursor: pulled,
+        });
+
+        await service.updateSource({
+          id: "source-1",
+          organizationId: "org-1",
+          parserConfig: copilot({ environmentUrl: `${ENVIRONMENT.toUpperCase()}/` }),
+        });
+
+        expect(repository.update).toHaveBeenCalled();
+      });
+
+      it("pins a correction to the cursor it read before the first pull", async () => {
+        const { service, repository } = harness();
+        repository.row = source({
+          sourceType: "copilot_studio_dataverse",
+          parserConfig: copilot({ environmentUrl: "org12345.crm.dynamics.com" }),
+          pollerCursor: null,
+        });
+
+        await service.updateSource({
+          id: "source-1",
+          organizationId: "org-1",
+          parserConfig: copilot(),
+        });
+
+        expect(repository.updateIfCursorUnchanged).toHaveBeenCalledWith(
+          expect.objectContaining({ cursor: null }),
+        );
       });
     });
   });

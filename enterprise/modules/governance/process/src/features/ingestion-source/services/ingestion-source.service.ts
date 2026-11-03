@@ -209,6 +209,7 @@ export class IngestionSourceService {
       ...input.parserConfig,
     };
     this.destinations.assertAllowed(requestedParserConfig);
+    this.validation.assertPullConfig(requestedParserConfig);
     await this.assertOttlParses(requestedParserConfig);
     const { providerAccountId } = await this.parserConfigs.assertClaimsAreFree({
       organizationId: input.organizationId,
@@ -257,8 +258,14 @@ export class IngestionSourceService {
         incoming: input.parserConfig,
       });
       this.validation.assertAdapterUnchanged(existing.parserConfig, incoming);
-      cursorMustNotMove = this.validation.assertReportUnchangedOncePulled(existing, incoming);
+      const reportMoves = this.validation.assertReportUnchangedOncePulled(existing, incoming);
+      const environmentMoves = this.validation.assertEnvironmentUnchangedOncePulled(
+        existing,
+        incoming,
+      );
+      cursorMustNotMove = reportMoves || environmentMoves;
       this.destinations.assertAllowed(incoming);
+      this.validation.assertPullConfig(incoming);
       await this.assertOttlParses(incoming);
       this.parserConfigs.assertRepointAllowed({ existing, incoming });
       const { providerAccountId } = await this.parserConfigs.assertClaimsAreFree({
@@ -350,8 +357,8 @@ export class IngestionSourceService {
     });
     if (pinned.outcome === "cursor_moved") {
       const message =
-        "This source started pulling while the change was being saved, and the report " +
-        "can no longer be changed. Reload the source to see its current configuration.";
+        "This source started pulling while the change was being saved, and its report and " +
+        "environment can no longer be changed. Reload the source to see its current configuration.";
 
       throw new GovernanceValidationError(message, { formErrors: [message] });
     }

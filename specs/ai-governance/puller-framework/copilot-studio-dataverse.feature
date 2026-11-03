@@ -262,6 +262,21 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # whatever address was typed. Customers on their own domain cannot
     # self-serve and need a support ticket; that cost is accepted.
 
+  @unit
+  Scenario: An environment address typed without its scheme is completed by the form
+    Given an admin entering "org12345.crm.dynamics.com" as the environment address
+    When they save the source
+    Then the stored environment address is "https://org12345.crm.dynamics.com"
+    # A pasted host name is the commonest form of the address. Stored bare, it
+    # passed every check the form ran and failed every pull afterwards (#9273).
+
+  @unit
+  Scenario: An environment address the adapter cannot read is refused at save time
+    Given a configuration whose environment address is not a URL
+    When it reaches the server as a create or an update
+    Then the source is refused before it is stored
+    And the refusal names the environment address
+
   @integration
   Scenario: A redirect never carries the credentials onward
     Given the configured address answers by redirecting elsewhere
