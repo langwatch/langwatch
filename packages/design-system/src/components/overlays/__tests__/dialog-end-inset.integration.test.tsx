@@ -18,36 +18,40 @@ function renderOpenDialog() {
   return screen.getByTestId("dialog");
 }
 
-function rulesFor(element: HTMLElement) {
-  const own = Array.from(element.classList).map((name) => `.${name}`);
-  return Array.from(document.querySelectorAll("style"))
-    .map((tag) => tag.textContent ?? "")
-    .filter((css) => own.some((selector) => css.includes(selector)))
-    .join("\n");
+interface MediaRule {
+  rule: CSSStyleRule;
+  mediaText: string;
 }
 
-/** Splits css into the text inside `@media` blocks and everything outside them. */
-function splitMedia(css: string) {
-  let base = "";
-  let media = "";
-  let index = 0;
-  while (index < css.length) {
-    const start = css.indexOf("@media", index);
-    if (start === -1) break;
-    const open = css.indexOf("{", start);
-    let depth = 1;
-    let end = open + 1;
-    while (depth > 0 && end < css.length) {
-      if (css[end] === "{") depth += 1;
-      if (css[end] === "}") depth -= 1;
-      end += 1;
-    }
-    base += css.slice(index, start);
-    media += css.slice(start, end);
-    index = end;
-  }
-  return { base: base + css.slice(index), media };
+interface ElementRules {
+  base: CSSStyleRule[];
+  media: MediaRule[];
 }
+
+/** Style rules naming the element's classes, split by whether an `@media` block holds them. */
+function rulesFor(element: HTMLElement): ElementRules {
+  const own = Array.from(element.classList).map((name) => `.${name}`);
+  const found: ElementRules = { base: [], media: [] };
+  const walk = (rules: CSSRule[], mediaText: string | null) => {
+    for (const rule of rules) {
+      if (rule instanceof CSSStyleRule && own.some((name) => rule.selectorText.includes(name))) {
+        if (mediaText === null) found.base.push(rule);
+        else found.media.push({ rule, mediaText });
+      }
+      if ("cssRules" in rule) {
+        const enclosing = "media" in rule ? (rule as CSSMediaRule).media.mediaText : mediaText;
+        walk([...(rule as CSSGroupingRule).cssRules], enclosing);
+      }
+    }
+  };
+  for (const sheet of document.styleSheets) walk([...sheet.cssRules], null);
+  return found;
+}
+
+const cssTextOf = ({ base, media }: ElementRules) =>
+  [...base, ...media.map((entry) => entry.rule)].map((rule) => rule.cssText).join("\n");
+
+const maxWidths = (rules: CSSStyleRule[]) => rules.map((rule) => rule.style.maxWidth).join("\n");
 
 /**
  * Only drawers yield the docked side panel's room; a dialog stays centred in the whole window.
@@ -61,7 +65,7 @@ describe("given a docked side panel reserves no room from a dialog", () => {
   /** @scenario "A modal dialog ignores a docked panel's room and stays centred" */
   it("adds no end padding to the dialog positioner", () => {
     setDrawerEndInset(412);
-    const css = rulesFor(renderOpenDialog().parentElement as HTMLElement);
+    const css = cssTextOf(rulesFor(renderOpenDialog().parentElement as HTMLElement));
     // Anchor: the positioner's own rule must be found, or the negatives below pass vacuously.
     expect(css).toMatch(/justify-content:\s*center/);
     expect(css).not.toContain("412px");
@@ -71,11 +75,13 @@ describe("given a docked side panel reserves no room from a dialog", () => {
   /** @scenario "A modal dialog ignores a docked panel's room and stays centred" */
   it("reduces the dialog's maximum width by the panel's width from md up", () => {
     setDrawerEndInset(412);
-    const css = rulesFor(renderOpenDialog());
-    const { base, media } = splitMedia(css);
-    expect(media).toMatch(/min-width/);
-    expect(media).toMatch(/max-width:\s*min\([^;]*calc\(100vw - 2rem - 412px\)/);
-    expect(base).toMatch(/max-width:\s*min\([^;]*calc\(100vw - 2rem\)/);
-    expect(base).not.toContain("412px");
+    const { base, media } = rulesFor(renderOpenDialog());
+    const capped = media.find((entry) => entry.rule.style.maxWidth.includes("412px"));
+    expect(capped?.mediaText).toMatch(/min-width/);
+    expect(maxWidths(media.map((entry) => entry.rule))).toMatch(
+      /min\([^;]*calc\(100vw - 2rem - 412px\)/,
+    );
+    expect(maxWidths(base)).toMatch(/min\([^;]*calc\(100vw - 2rem\)/);
+    expect(maxWidths(base)).not.toContain("412px");
   });
 });
