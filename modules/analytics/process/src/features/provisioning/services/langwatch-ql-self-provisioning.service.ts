@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
-import { LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../../../rules/lwql-view-catalog.rules.ts";
+import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
   LangWatchQLAccessModelService,
@@ -27,6 +27,10 @@ import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-te
 import { LWQL_APP_FUNCTION_CATALOG } from "../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { LangWatchQLAppFunctionStatementsService } from "./langwatch-ql-app-function-statements.service.ts";
 import {
+  LangWatchQLClickHouseDriftService,
+  type LwqlRelationsFound,
+} from "./langwatch-ql-clickhouse-drift.service.ts";
+import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
   type PostgresNamedCollection,
@@ -40,6 +44,7 @@ const accessModel = LangWatchQLAccessModelService.create();
 const appFunctionStatements = LangWatchQLAppFunctionStatementsService.create();
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const catalogShapes = LangWatchQLCatalogShapesService.create();
+const clickHouseDrift = LangWatchQLClickHouseDriftService.create();
 const connections = LangWatchQLConnectionService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
@@ -115,10 +120,7 @@ export interface LwqlCollectionProbe {
   /** An approved view the engine tables read; reading its structure authenticates. */
   readonly relation: string;
   readonly connection: Omit<PostgresNamedCollection, "collection">;
-  /**
-   * The PostgreSQL schema holding the approved view. An unqualified name resolves through the
-   * role's search_path, which provisioning never sets, so the default can exclude this schema.
-   */
+  /** The schema holding the approved view; provisioning never sets the role's search_path. */
   readonly schema: string;
 }
 
@@ -442,41 +444,16 @@ export class LangWatchQLSelfProvisioningService {
     relations: readonly string[];
     /** The app functions to expect; empty where a `CREATE FUNCTION` cannot reach every replica. */
     functions: readonly string[];
-    found: {
-      relations: readonly string[];
-      functions: readonly string[];
-      /** Each present relation's `system.tables` comment. */
-      comments: Readonly<Record<string, string>>;
-      /** Each present relation's column names. */
-      columns: Readonly<Record<string, readonly string[]>>;
-    };
+    found: LwqlRelationsFound & { functions: readonly string[] };
     credentialFingerprint: string;
   }): LwqlClickHouseDrift {
-    const engineTables = postgresViews.engineTableNames();
-    const current = postgresMapping.credentialComment({ fingerprint: credentialFingerprint });
-    const isStale = (name: string) =>
-      engineTables.includes(name) && found.comments[name] !== current;
-    // Only a missing column is drift, never an extra one (specs/lwql/api.feature, rolling deploys).
-    const lacksColumns = (name: string) => {
-      const view = pickLwqlViewByName(name);
-      const held = found.columns[name];
-      return !!view && !!held && view.columns.some((column) => !held.includes(column.name));
-    };
-    // A PostgreSQL-backed view reads its engine table's columns, so that table is rebuilt too.
-    const widened = new Set(
-      catalogShapes
-        .postgresViews(LWQL_VIEW_CATALOG)
-        .filter((view) => lacksColumns(view.name))
-        .map((view) => view.sourceTable),
-    );
     const objects = [
-      ...relations.filter(
-        (name) =>
-          !found.relations.includes(name) ||
-          isStale(name) ||
-          lacksColumns(name) ||
-          widened.has(name),
-      ),
+      ...clickHouseDrift.relationsToRebuild({
+        relations,
+        found,
+        engineTables: postgresViews.engineTableNames(),
+        currentComment: postgresMapping.credentialComment({ fingerprint: credentialFingerprint }),
+      }),
       ...functions.filter((name) => !found.functions.includes(name)),
     ];
     return { objects, isKeyMapMissing: objects.includes(names.keyMapTable) };
