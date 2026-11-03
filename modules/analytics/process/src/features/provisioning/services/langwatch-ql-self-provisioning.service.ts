@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
-import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
+import { LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
   LangWatchQLAccessModelService,
@@ -76,7 +76,10 @@ export type LwqlAccessModelMode = "rendered" | "sql";
 
 /** What the app-owned ClickHouse objects lack; names only, never DDL. */
 interface LwqlClickHouseDrift {
-  /** Each object absent, and each engine table not stamped with the current credentials. */
+  /**
+   * Each object absent, each engine table not stamped with the current credentials, and each view
+   * that lacks a column its catalog entry declares.
+   */
   readonly objects: readonly string[];
   /** The key map was among them, so a converge that repairs it is followed by a fill. */
   readonly isKeyMapMissing: boolean;
@@ -89,9 +92,9 @@ export interface LwqlPostgresGap {
 }
 
 /**
- * What the check found absent in each store (or, for an engine table, built on stale credentials);
- * both empty means converged. Columns are the deploy's, so an older worker never rewrites a newer
- * object. `unknown`: PostgreSQL could not be read, so it is neither converged nor cleared.
+ * What the check found absent in each store, or stale (an engine table on old credentials, a view
+ * lacking a catalog column; extra columns are never drift). Both empty means converged.
+ * `unknown`: PostgreSQL could not be read, so it is neither converged nor cleared.
  */
 export interface LwqlAppOwnedDrift {
   readonly clickHouse: readonly string[];
@@ -242,6 +245,14 @@ export class LangWatchQLSelfProvisioningService {
   engineTablesIn({ only }: { only: readonly string[] | undefined }): string[] {
     const engineTables = postgresViews.engineTableNames();
     return only === undefined ? engineTables : engineTables.filter((name) => only.includes(name));
+  }
+
+  /** The PostgreSQL-backed views that read one of `engineTables`. */
+  viewsOverEngineTables({ engineTables }: { engineTables: readonly string[] }): string[] {
+    return catalogShapes
+      .postgresViews(LWQL_VIEW_CATALOG)
+      .filter((view) => engineTables.includes(view.sourceTable))
+      .map((view) => view.name);
   }
 
   /**
@@ -416,8 +427,9 @@ export class LangWatchQLSelfProvisioningService {
   }
 
   /**
-   * Each expected relation absent or, for an engine table, not stamped with the current
-   * credential fingerprint (a table from before #8858 has none); then each app function absent.
+   * Each relation absent; an engine table not on the current credentials (#8858); a view
+   * lacking a catalog column, never one with extra columns (#9245), and the engine table under
+   * such a PostgreSQL-backed one; each app function absent. A view without column data is unknown.
    */
   findDrift({
     names,
@@ -435,6 +447,8 @@ export class LangWatchQLSelfProvisioningService {
       functions: readonly string[];
       /** Each present relation's `system.tables` comment. */
       comments: Readonly<Record<string, string>>;
+      /** Each present relation's column names. */
+      columns: Readonly<Record<string, readonly string[]>>;
     };
     credentialFingerprint: string;
   }): LwqlClickHouseDrift {
@@ -442,8 +456,27 @@ export class LangWatchQLSelfProvisioningService {
     const current = postgresMapping.credentialComment({ fingerprint: credentialFingerprint });
     const isStale = (name: string) =>
       engineTables.includes(name) && found.comments[name] !== current;
+    // Only a missing column is drift, never an extra one (specs/lwql/api.feature, rolling deploys).
+    const lacksColumns = (name: string) => {
+      const view = pickLwqlViewByName(name);
+      const held = found.columns[name];
+      return !!view && !!held && view.columns.some((column) => !held.includes(column.name));
+    };
+    // A PostgreSQL-backed view reads its engine table's columns, so that table is rebuilt too.
+    const widened = new Set(
+      catalogShapes
+        .postgresViews(LWQL_VIEW_CATALOG)
+        .filter((view) => lacksColumns(view.name))
+        .map((view) => view.sourceTable),
+    );
     const objects = [
-      ...relations.filter((name) => !found.relations.includes(name) || isStale(name)),
+      ...relations.filter(
+        (name) =>
+          !found.relations.includes(name) ||
+          isStale(name) ||
+          lacksColumns(name) ||
+          widened.has(name),
+      ),
       ...functions.filter((name) => !found.functions.includes(name)),
     ];
     return { objects, isKeyMapMissing: objects.includes(names.keyMapTable) };

@@ -278,7 +278,7 @@ async function probeCollection({
   return { shown: true };
 }
 
-/** What the gate decided, and the present engine tables it left on their current pool. */
+/** What the gate decided, and the present engine tables it left (with their views) as they are. */
 interface LwqlEngineTableGate {
   readonly collectionLoaded: boolean;
   readonly only: readonly string[] | undefined;
@@ -327,9 +327,14 @@ async function gateEngineTables({
     functions: [],
   });
   const left = only.filter((name) => present.relations.includes(name));
+  // A view replaced over a table left in place could select a column that table lacks.
+  const held = new Set([
+    ...left,
+    ...selfProvisioning.viewsOverEngineTables({ engineTables: left }),
+  ]);
   return {
     collectionLoaded: false,
-    only: only.filter((name) => !left.includes(name)),
+    only: only.filter((name) => !held.has(name)),
     ...(left.length === 0 ? {} : { left: { read, error, tables: left.length } }),
   };
 }
@@ -635,9 +640,9 @@ async function expectedAppFunctions({
 }
 
 /**
- * Which app-owned objects are absent, from catalog reads only (key map, engine tables, views,
- * app functions; approved views and their grant). An engine table not stamped with the current
- * credentials counts as absent; columns are never compared. Throws when ClickHouse is unreadable.
+ * Which app-owned objects are absent, from catalog reads only. An engine table not stamped with the
+ * current credentials counts as absent, and so does a view lacking a catalog column (an extra
+ * column is never drift). Throws when ClickHouse is unreadable.
  */
 export async function findLwqlAppOwnedDrift({
   database,

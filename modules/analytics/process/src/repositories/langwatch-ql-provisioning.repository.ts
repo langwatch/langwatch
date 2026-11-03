@@ -30,6 +30,8 @@ export interface LwqlClickHouseInventory {
   readonly relations: readonly string[];
   /** Each present relation's comment, by name; empty where it has none. */
   readonly comments: Readonly<Record<string, string>>;
+  /** Each present relation's column names, by name. */
+  readonly columns: Readonly<Record<string, readonly string[]>>;
   /** The named SQL user-defined functions present. */
   readonly functions: readonly string[];
 }
@@ -64,7 +66,7 @@ export abstract class LangWatchQLProvisioningRepository {
     configStoreEntities?: readonly ConfigStoreLwqlEntity[];
     failureLevel?: ProvisioningFailureLevel;
   }): Promise<RunClickHouseStatementsResult>;
-  /** Two catalog reads; throws when ClickHouse is unreachable. */
+  /** Catalog reads of the relations, their columns and the functions; throws if unreachable. */
   abstract readInventory(input: {
     database: string;
     relations: readonly string[];

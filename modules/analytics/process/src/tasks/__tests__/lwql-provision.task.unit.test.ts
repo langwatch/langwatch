@@ -90,6 +90,7 @@ function clickHouseThat({
   failing,
   failingProbe,
   present = [],
+  columns,
   cluster,
   mode = "rendered",
   schema = "public",
@@ -97,6 +98,8 @@ function clickHouseThat({
   failing?: RegExp;
   failingProbe?: keyof typeof PROBES;
   present?: readonly string[];
+  /** When given, every present relation holds these columns and every app function exists. */
+  columns?: readonly string[];
   cluster?: string;
   mode?: "rendered" | "sql";
   schema?: string;
@@ -144,8 +147,17 @@ function clickHouseThat({
               }
               return [{ name: "TenantId", type: "String" }];
             }
+            if (columns && sql.includes("system.functions")) {
+              return lwqlAppFunctionNames().map((name) => ({ name }));
+            }
+            // As ClickHouse does: an inventory read returns only the relations it names.
+            const named = params?.relations;
+            const asked = present.filter((name) => !Array.isArray(named) || named.includes(name));
+            if (columns && sql.includes("system.columns")) {
+              return asked.map((table) => ({ table, columns }));
+            }
             if (sql.includes("system.tables")) {
-              return present.map((name) => ({ name, comment: "" }));
+              return asked.map((name) => ({ name, comment: "" }));
             }
             return [];
           },
@@ -347,7 +359,7 @@ describe("convergeLwqlAccessModel", () => {
       expect(clickHouse.ran).toEqual([]);
     });
 
-    /** @scenario "An older worker never rewrites a newer view" */
+    /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
     it("creates only the absent approved view, grants SELECT on each gap and never revokes", async () => {
       const [absent, ungranted, untouched] = approvedViews;
       if (!absent || !ungranted || !untouched) throw new Error("the catalog maps too few datasets");
@@ -376,7 +388,7 @@ describe("convergeLwqlAccessModel", () => {
       expect(grants).not.toMatch(/REVOKE|ALTER ROLE|CREATE ROLE/);
     });
 
-    /** @scenario "An older worker never rewrites a newer view" */
+    /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
     it("keeps the revokes and the full grants on a deploy's converge", async () => {
       const postgres = postgresThat({ refuses: false });
 
@@ -578,7 +590,7 @@ describe("convergeLwqlAccessModel", () => {
         names: NAMES,
         relations: [stale],
         functions: [],
-        found: { relations: [stale], functions: [], comments: clickHouse.comments() },
+        found: { relations: [stale], functions: [], comments: clickHouse.comments(), columns: {} },
         credentialFingerprint: fingerprint,
       });
       expect(next.objects).toEqual([]);
@@ -614,6 +626,102 @@ describe("convergeLwqlAccessModel", () => {
       await expect(check(clickHouse)).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
       expect(rebuilt(clickHouse, stale)).toEqual([]);
     });
+  });
+});
+
+describe("when a PostgreSQL-backed view lacks a column over a current engine table", () => {
+  const view = LWQL_VIEW_CATALOG.find((entry) => entry.postgres !== undefined);
+  if (!view) throw new Error("the catalog maps no PostgreSQL dataset");
+  const present = [view.sourceTable, view.name];
+  const fingerprint = selfProvisioning.credentialFingerprint({
+    names: NAMES,
+    postgres: {
+      endpoint: { host: "postgres", port: 5432, database: "langwatch" },
+      readerPassword: READER_PASSWORD,
+    },
+  });
+  const drift = selfProvisioning.findDrift({
+    names: NAMES,
+    relations: present,
+    functions: [],
+    found: {
+      relations: present,
+      functions: [],
+      comments: {
+        [view.sourceTable]: LangWatchQLPostgresMappingService.create().credentialComment({
+          fingerprint,
+        }),
+      },
+      columns: { [view.name]: view.columns.slice(1).map((column) => column.name) },
+    },
+    credentialFingerprint: fingerprint,
+  });
+  const converge = (clickHouse: ReturnType<typeof clickHouseThat>) =>
+    convergeLwqlAccessModel({
+      database: postgresThat({ refuses: false }).database,
+      plan: clickHouse.plan,
+      failOnError: true,
+      only: { clickHouse: drift.objects, postgres: [], isKeyMapMissing: false },
+    });
+  const rebuilt = (clickHouse: ReturnType<typeof clickHouseThat>) =>
+    clickHouse.ran.findIndex(
+      (s) => s.includes(`.${view.sourceTable} (`) && s.includes("ENGINE = PostgreSQL"),
+    );
+  const replacesView = (statement: string) =>
+    new RegExp(`^CREATE OR REPLACE VIEW [^ .]+\\.${view.name}\\n`).test(statement);
+
+  /** @scenario "The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column" */
+  it("names the engine table, then rebuilds it stamped before replacing the view", async () => {
+    expect(drift.objects).toEqual(present);
+    const clickHouse = clickHouseThat({ present });
+
+    await converge(clickHouse);
+
+    const engineAt = rebuilt(clickHouse);
+    expect(clickHouse.ran[engineAt]).toContain(fingerprint);
+    expect(clickHouse.ran.findIndex(replacesView)).toBeGreaterThan(engineAt);
+  });
+
+  /** @scenario "The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column" */
+  it("leaves the engine table and its view in place while the named collection cannot be confirmed", async () => {
+    const clickHouse = clickHouseThat({ present, failingProbe: "collection" });
+
+    await expect(converge(clickHouse)).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
+    expect(rebuilt(clickHouse)).toBe(-1);
+    expect(clickHouse.ran.some(replacesView)).toBe(false);
+  });
+});
+
+describe("when a view a deploy left stale drifts while the collection cannot be confirmed", () => {
+  const [engineTable] = selfProvisioning.engineTablesIn({ only: undefined });
+  if (!engineTable) throw new Error("the catalog maps no PostgreSQL engine table");
+
+  /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
+  it("replaces the view over a fact table, then raises the unconfirmed collection", async () => {
+    const database = postgresThat({ refuses: false }).database;
+    const clickHouse = clickHouseThat({
+      present: selfProvisioning.appOwnedRelations({ names: NAMES }),
+      columns: LWQL_VIEW_CATALOG.flatMap((view) => view.columns.map((c) => c.name)).filter(
+        (name) => name !== "Source",
+      ),
+      failingProbe: "collection",
+    });
+    const drift = await findLwqlAppOwnedDrift({ database, plan: clickHouse.plan });
+    expect(drift.clickHouse).toContain("trace_metrics");
+
+    await expect(
+      convergeLwqlAccessModel({
+        database,
+        plan: clickHouse.plan,
+        failOnError: true,
+        only: { clickHouse: drift.clickHouse, postgres: [], isKeyMapMissing: false },
+      }),
+    ).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
+
+    expect(clickHouse.ran.some((s) => s.includes(`.${engineTable} (`))).toBe(false);
+    expect(clickHouse.ran).toContainEqual(
+      expect.stringMatching(/^CREATE OR REPLACE VIEW [^ .]+\.trace_metrics\n[\s\S]* AS `Source`/),
+    );
   });
 });
 
@@ -677,19 +785,27 @@ describe("findLwqlAppOwnedDrift", () => {
     return findLwqlAppOwnedDrift({ database, plan });
   }
 
-  /** @scenario "An older worker never rewrites a newer view" */
-  it.each([
-    {
-      shape: "a newer deploy's extra columns",
-      columns: [...catalogColumns, "AddedByANewerDeploy"],
-    },
-    { shape: "fewer columns than this worker's catalog declares", columns: ["TenantId"] },
-  ])("finds no drift in objects holding $shape", async ({ columns }) => {
-    expect(await presentWith({ columns })).toEqual({
+  /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
+  it("finds no drift in objects holding a newer deploy's extra columns", async () => {
+    expect(await presentWith({ columns: [...catalogColumns, "AddedByANewerDeploy"] })).toEqual({
       clickHouse: [],
       postgres: [],
       isKeyMapMissing: false,
     });
+  });
+
+  /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
+  it("names each view that lacks a column this worker's catalog declares, and the engine table under a PostgreSQL one", async () => {
+    const drift = await presentWith({ columns: catalogColumns.filter((c) => c !== "Source") });
+    const lacking = LWQL_VIEW_CATALOG.filter((view) =>
+      view.columns.some((c) => c.name === "Source"),
+    );
+
+    expect(drift.clickHouse).toEqual([
+      ...lacking.flatMap((view) => (view.postgres ? [view.sourceTable] : [])),
+      ...lacking.map((view) => view.name),
+    ]);
+    expect(drift.clickHouse).toContain("trace_metrics");
   });
 
   /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */

@@ -81,7 +81,7 @@ async function runClickHouseStatements({
   return { skipped };
 }
 
-/** The named relations and the named SQL functions present, from two `system` tables. */
+/** The named relations, their columns and the named SQL functions present, from `system` tables. */
 async function readClickHouseInventory({
   client,
   database,
@@ -98,6 +98,15 @@ async function readClickHouseInventory({
       "WHERE database = {database:String} AND has({relations:Array(String)}, name)",
     { database, relations: [...relations] },
   );
+  const columns =
+    present.length === 0
+      ? []
+      : await client.rows(
+          "SELECT table, groupArray(name) AS columns FROM system.columns " +
+            "WHERE database = {database:String} AND has({relations:Array(String)}, table) " +
+            "GROUP BY table",
+          { database, relations: [...relations] },
+        );
   const held =
     functions.length === 0
       ? []
@@ -110,6 +119,12 @@ async function readClickHouseInventory({
     relations: present.map((row) => String(row.name)),
     comments: Object.fromEntries(
       present.map((row) => [String(row.name), typeof row.comment === "string" ? row.comment : ""]),
+    ),
+    columns: Object.fromEntries(
+      columns.map((row) => [
+        String(row.table),
+        Array.isArray(row.columns) ? row.columns.map(String) : [],
+      ]),
     ),
     functions: held.map((row) => String(row.name)),
   };
