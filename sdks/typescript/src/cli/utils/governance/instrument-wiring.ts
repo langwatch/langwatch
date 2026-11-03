@@ -218,6 +218,34 @@ export function installTelemetryWiring({
   } catch (err) {
     warnings.push(`could not write ${tildify(rcPath(shell))}: ${(err as Error).message}`);
   }
+  applyToolExtras({
+    tool,
+    shell,
+    vars,
+    codeWiringChanged,
+    result: { labels, warnings, requiredFailures },
+  });
+  return { labels, warnings, requiredFailures };
+}
+
+/**
+ * The steps a tool needs beside its scoped function: opencode's telemetry
+ * flag, pi's extension, and the VS Code terminal clear plus restart notice.
+ * Writes into `result` in place, as `installTelemetryWiring` reports it.
+ */
+function applyToolExtras({
+  tool,
+  shell,
+  vars,
+  codeWiringChanged,
+  result: { labels, warnings, requiredFailures },
+}: {
+  tool: string;
+  shell: DetectedShell;
+  vars: Record<string, string>;
+  codeWiringChanged: boolean;
+  result: WiringInstallResult;
+}): void {
   if (tool === "opencode") {
     requiredFailures.push(...enableOpencodeTelemetryFlag());
   }
@@ -235,7 +263,6 @@ export function installTelemetryWiring({
     const notice = runningCodeRestartNotice();
     if (notice) warnings.push(notice);
   }
-  return { labels, warnings, requiredFailures };
 }
 
 /**
