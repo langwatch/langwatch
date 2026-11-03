@@ -33,25 +33,17 @@ import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import {
   assertPageWithinLimit,
   assertWholeReadWithinLimits,
-  entryBytesOf,
 } from "../rules/dataset-row-limits.rules.ts";
 import { normalizeDatasetSearch } from "../rules/dataset-search.rules.ts";
-import {
-  isDatasetRecordNotFound,
-  limitDatasetRecordsByBytes,
-  sanitizedEntry,
-  selectDatasetRecords,
-} from "../rules/dataset-selection.rules.ts";
+import { isDatasetRecordNotFound, sanitizedEntry } from "../rules/dataset-selection.rules.ts";
 import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { InlineAttachmentScope } from "./dataset-inline-attachment.service.ts";
 import { DatasetRecordSearchService } from "./dataset-record-search.service.ts";
+import { DatasetRecordWholeReadService } from "./dataset-record-whole-read.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
 const MIB = 1024 * 1024;
-
-/** How many postgres-backed rows a whole read asks for at a time. */
-const WHOLE_READ_PAGE_ROWS = 200;
 
 type DatasetRecordServiceOptions = {
   options: DatasetServiceOptions;
@@ -77,6 +69,7 @@ export class DatasetRecordService {
   }
 
   private readonly search: DatasetRecordSearchService;
+  private readonly wholeRead: DatasetRecordWholeReadService;
 
   private constructor(private readonly deps: DatasetRecordServiceOptions) {
     this.search = DatasetRecordSearchService.create({
@@ -84,6 +77,9 @@ export class DatasetRecordService {
       content: deps.options.content,
       singleFile: deps.options.singleFile,
       requestBounds: deps.requestBounds,
+    });
+    this.wholeRead = DatasetRecordWholeReadService.create({
+      readPage: (input) => this.readRecordsPage(input),
     });
   }
 
@@ -239,49 +235,13 @@ export class DatasetRecordService {
       });
     }
 
-    // Only a read of every row can stop early; picking one row needs them all.
-    const stopAtBytes = parsed.entrySelection === "all" ? limitBytes : null;
-    const records: DatasetRecord[] = [];
-    let bytes = 0;
-    let total = 0;
-    let page = 1;
-    let hasMoreRecords = true;
-    while (hasMoreRecords) {
-      const result = await this.readRecordsPage({
-        slugOrId: parsed.slugOrId,
-        projectId: parsed.projectId,
-        page,
-        limit: WHOLE_READ_PAGE_ROWS,
-      });
-      total = result.pagination.total;
-      for (const record of result.data) {
-        bytes += entryBytesOf(record.entry);
-        if (stopAtBytes !== null && bytes > stopAtBytes) {
-          return {
-            dataset,
-            records,
-            truncated: true,
-            totalRows: Math.max(total, records.length + 1),
-          };
-        }
-        records.push(record);
-      }
-      const lastPage = result.data.length < WHOLE_READ_PAGE_ROWS;
-      const readAllRecords = records.length >= total;
-      hasMoreRecords = !lastPage && !readAllRecords;
-
-      page += 1;
-    }
-
-    const selected = selectDatasetRecords(records, parsed.entrySelection);
-    const limited = limitDatasetRecordsByBytes(selected, limitBytes);
-
-    return {
+    return this.wholeRead.readAll({
+      slugOrId: parsed.slugOrId,
+      projectId: parsed.projectId,
+      entrySelection: parsed.entrySelection,
       dataset,
-      records: limited.records,
-      truncated: limited.truncated,
-      totalRows: selected.length,
-    };
+      limitBytes,
+    });
   }
 
   private async readBudget(projectId: string, limitMb: number | undefined): Promise<number> {
