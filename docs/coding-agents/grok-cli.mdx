@@ -89,7 +89,15 @@ Open your personal page at `/me`, or open the project you pinned Grok to.
 - **Turns**: each prompt, the response, and every tool call with its arguments and its result.
 - **[Cost](/coding-agents/usage-analytics)**: the amount per session, from the cost Grok reports.
 
+<Frame caption="Grok sessions in the sessions list. Each row is named after its first prompt and shows the repository and branch the hook file reported, the context it carried and its cost.">
+  ![Grok sessions list](/images/coding-agents/grok-sessions-list.png)
+</Frame>
+
 Grok exports logs and metrics, not spans, so a session has no per-call model trace, and the session header names Grok and its version but no model.
+
+<Frame caption="Grok turns in the traces list, each with the prompt and the response Grok logged. With no spans to time, the duration reads 0ms.">
+  ![Grok traces list](/images/coding-agents/grok-traces-list.png)
+</Frame>
 
 If the LangWatch Claude Code hooks are installed on the same machine, Grok loads them too. They stay silent inside Grok, so a Grok session never shows up as a Claude Code row as well.
 
