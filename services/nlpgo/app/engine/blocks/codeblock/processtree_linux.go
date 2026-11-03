@@ -45,10 +45,12 @@ const (
 // records whether the subreaper flag took. Without that flag a detached
 // grandchild reparents to PID 1 and leaves the sweep with no way to tell it
 // apart from the rest of the container, so the orphan rule is only applied
-// when this is true.
+// when this is true. hideRefusal is the errno the platform (AWS Lambda's
+// seccomp answers EPERM) gave PR_SET_DUMPABLE, or 0 when it took.
 var (
 	hardeningOnce   sync.Once
 	subreaperActive bool
+	hideRefusal     syscall.Errno
 )
 
 // teardownDeadline bounds the sweep. SIGKILL is not refusable, so a pass that
@@ -64,9 +66,10 @@ const teardownDeadline = 2 * time.Second
 // PR_SET_CHILD_SUBREAPER makes the engine the reaper for orphaned descendants,
 // which is what teardown is built on.
 //
-// PR_SET_DUMPABLE 0 takes the engine's own /proc files away from every other
-// process running as that same user, and a code block is one of those. Without
-// it, the engine's own process environment is readable by any code block that
+// In strict mode, PR_SET_DUMPABLE 0 takes the engine's own /proc files away
+// from every other process running as that same user, and a code block is one
+// of those. In visible-process mode (Lambda refused it) they stay readable:
+// the engine's own process environment is then readable by any code block that
 // looks — the whole pod environment this executor's allowlist exists to
 // withhold, including the database and ClickHouse credentials and the
 // instance's own LangWatch key — and the engine's memory and open descriptors
@@ -81,7 +84,9 @@ func enableProcessHardening() {
 	hardeningOnce.Do(func() {
 		_, _, errno := syscall.Syscall(syscall.SYS_PRCTL, prSetChildSubreaper, 1, 0)
 		subreaperActive = errno == 0
-		_, _, _ = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
+		_, _, errno = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
+		// A refusal is recorded, not fatal; resolveHideMode turns it into a mode.
+		hideRefusal = errno
 	})
 }
 
@@ -374,10 +379,9 @@ func readProcEntry(pid int) (procEntry, bool) {
 // which survives the detach a process group does not — right up to an exec
 // with a scrubbed environment, which is what the orphan rule is for.
 //
-// Never consulted for the interpreter, which makes itself non-dumpable and
-// would refuse this read: it is named by pid and process group instead. The
-// same is true of a descendant that forked without exec and kept that flag,
-// which the process group or the orphan rule catches.
+// In strict mode the interpreter is non-dumpable and refuses this read, so it
+// is named by pid and process group instead; so is a descendant that forked
+// without exec and kept that flag. In visible-process mode the read succeeds.
 func hasRunToken(pid int, token string) bool {
 	raw, err := os.ReadFile(procPath(pid, "environ"))
 	if err != nil {

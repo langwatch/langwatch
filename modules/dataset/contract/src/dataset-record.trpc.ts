@@ -7,6 +7,7 @@
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { DATASET_VERSION_RESTORED_EVENT_TYPE } from "./dataset-version.ts";
 import { datasetRecordEditorReadSchema, datasetRecordHeadReadSchema } from "./dataset.responses.ts";
 import {
   datasetRecordApiCreateInputSchema,
@@ -41,12 +42,12 @@ export const datasetRecordTrpc = defineTrpcContract("datasetRecord")
   .withOutput(datasetRecordMutationResultSchema)
 
   /** The whole dataset for the editor, capped by the editor's byte budget. */
-  .query("getAll")
+  .query("getAll", { invalidatedBy: [DATASET_VERSION_RESTORED_EVENT_TYPE] })
   .withInput(datasetRecordApiLookupInputSchema)
   .withOutput(datasetRecordEditorReadSchema)
 
   /** One page of a dataset for the editor's classic page N of M. */
-  .query("listPaginated")
+  .query("listPaginated", { invalidatedBy: [DATASET_VERSION_RESTORED_EVENT_TYPE] })
   .withInput(datasetRecordApiPageInputSchema)
   .withOutput(datasetPageSchema.nullable())
 
@@ -56,7 +57,7 @@ export const datasetRecordTrpc = defineTrpcContract("datasetRecord")
   .withOutput(datasetRecordEditorReadSchema)
 
   /** The first entries plus the authoritative total, for previews. */
-  .query("getHead")
+  .query("getHead", { invalidatedBy: [DATASET_VERSION_RESTORED_EVENT_TYPE] })
   .withInput(datasetRecordApiLookupInputSchema)
   .withOutput(datasetRecordHeadReadSchema)
 

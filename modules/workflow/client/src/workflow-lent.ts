@@ -20,6 +20,8 @@ export type RunExperimentViaApiDialogProps = {
   datasetColumns: string[];
   datasetName?: string;
   projectSlug?: string;
+  /** The experiment's saved concurrency, the dialog's starting execution choice. */
+  concurrency?: number;
 };
 
 /** What a screen hands workflow's clamped text that expands into a dialog. */

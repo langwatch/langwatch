@@ -150,6 +150,7 @@ By default the run uses the dataset attached to the experiment. You can override
 - `dataset_id`: a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
 - `row_indices`: a subset of dataset row indices to evaluate, instead of the whole dataset
 - `concurrency`: how many cells run at once, from 1 to 24, for this run only. A cell is one row against one target, so an experiment with two targets has two cells per row. Without it, the run uses the server's default. Use `1` to run the cells one at a time, in order, for example so the first row fills a prompt cache before the next rows read it. The experiment's saved run options stay unchanged.
+- `dataset_version`: the version of the saved dataset to run, for example `1`. It overrides the version the experiment pins. Without either, the run saves the dataset's current content as a version and reads that, so every run records the exact rows it used. A version the dataset does not have answers `404` with `dataset_version_not_found`
 
 <Tabs>
   <Tab title="Python">
@@ -164,6 +165,8 @@ langwatch.experiment.run("my-experiment", dataset_id="dataset_xxxxxxxxxxxx")
 langwatch.experiment.run("my-experiment", parameters={"model": "gpt-6-luna"})
 # One row at a time, in order
 langwatch.experiment.run("my-experiment", concurrency=1)
+# Version 1 of the experiment's saved dataset
+langwatch.experiment.run("my-experiment", dataset_version=1)
 ```
   </Tab>
   <Tab title="TypeScript">
@@ -180,6 +183,8 @@ await langwatch.experiments.runWithResults("my-experiment", { datasetId: "datase
 await langwatch.experiments.runWithResults("my-experiment", { parameters: { model: "gpt-6-luna" } });
 // One row at a time, in order
 await langwatch.experiments.runWithResults("my-experiment", { concurrency: 1 });
+// Version 1 of the experiment's saved dataset
+await langwatch.experiments.runWithResults("my-experiment", { datasetVersion: 1 });
 ```
   </Tab>
 </Tabs>

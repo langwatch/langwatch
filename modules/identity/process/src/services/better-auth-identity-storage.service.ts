@@ -83,7 +83,7 @@ const identityAdapterConfig: AdapterFactoryConfig = {
 
 /** Every method wrapped once; a new required adapter method fails to compile here. */
 function surfacingHandledRefusals(adapter: CustomAdapter): CustomAdapter {
-  return {
+  const surfaced: CustomAdapter = {
     create: (input) => surfaceHandledRefusals(() => adapter.create(input)),
     update: (input) => surfaceHandledRefusals(() => adapter.update(input)),
     updateMany: (input) => surfaceHandledRefusals(() => adapter.updateMany(input)),
@@ -91,10 +91,19 @@ function surfacingHandledRefusals(adapter: CustomAdapter): CustomAdapter {
     findMany: (input) => surfaceHandledRefusals(() => adapter.findMany(input)),
     delete: (input) => surfaceHandledRefusals(() => adapter.delete(input)),
     deleteMany: (input) => surfaceHandledRefusals(() => adapter.deleteMany(input)),
-    consumeOne: (input) => surfaceHandledRefusals(() => adapter.consumeOne(input)),
-    incrementOne: (input) => surfaceHandledRefusals(() => adapter.incrementOne(input)),
     count: (input) => surfaceHandledRefusals(() => adapter.count(input)),
   };
+  // Optional: absent, Better Auth falls back to its own find-then-write.
+  const { consumeOne, incrementOne } = adapter;
+  if (consumeOne) {
+    surfaced.consumeOne = <T>(input: Parameters<typeof consumeOne>[0]) =>
+      surfaceHandledRefusals(() => consumeOne<T>(input));
+  }
+  if (incrementOne) {
+    surfaced.incrementOne = <T>(input: Parameters<typeof incrementOne>[0]) =>
+      surfaceHandledRefusals(() => incrementOne<T>(input));
+  }
+  return surfaced;
 }
 
 /**

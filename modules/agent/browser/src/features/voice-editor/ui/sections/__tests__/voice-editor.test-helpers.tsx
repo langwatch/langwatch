@@ -33,6 +33,9 @@ const unusedAgents: AgentClient = {
   pushToCopies: unused("pushToCopies"),
   syncFromSource: unused("syncFromSource"),
   getHistory: unused("getHistory"),
+  listVersions: unused("listVersions"),
+  assignLabel: unused("assignLabel"),
+  removeLabel: unused("removeLabel"),
 };
 
 export class VoiceTestHost implements AgentManagementHost {
