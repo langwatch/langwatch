@@ -39,19 +39,6 @@ type LoadQuerier interface {
 	Query(ctx context.Context, sql string) (string, error)
 }
 
-// LogCapper is implemented by a ClickHouse adapter whose server writes a log
-// nothing else bounds. Optional, like LoadQuerier.
-type LogCapper interface {
-	CapLogs()
-}
-
-// capClickHouseLogs keeps a managed ClickHouse's unrotated log under its cap.
-func (o *Orchestrator) capClickHouseLogs() {
-	if c, ok := o.ch.(LogCapper); ok && o.cfg.ShouldManageClickHouse {
-		c.CapLogs()
-	}
-}
-
 // clickHouseLoad is one probe's reading of the server.
 type clickHouseLoad struct {
 	merges, activeParts, memory, memoryCap int64
