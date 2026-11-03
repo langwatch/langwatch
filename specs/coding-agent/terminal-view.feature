@@ -25,6 +25,12 @@ Feature: Coding agent terminal view
     When the Terminal tab renders the session
     Then the denied call is shown as rejected, not silently missing
 
+  Scenario: A tool call that was aborted reads differently from one the user denied
+    Given a tool call was cancelled or timed out before it ran
+    When the Terminal tab renders the session
+    Then the call is shown as aborted and never ran
+    And it is not said to be denied, nor pinned on the user
+
   Scenario: A tool call shows what actually ran, not just what the model was told
     Given a tool span carries real stdout, a real file's content, or a real structured patch
     When the Terminal tab renders that tool call

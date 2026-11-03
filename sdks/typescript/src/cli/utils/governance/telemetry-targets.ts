@@ -242,6 +242,13 @@ export function scanTelemetryTargets({
     remove: () => removeSessionContextHooks({ tool: "copilot" }),
   });
 
+  // grok, LangWatch's own file in Grok's hook folder, the same shape as Copilot's.
+  targets.push({
+    label: `grok session hooks (${sessionContextHooksTarget("grok").displayPath})`,
+    present: hasSessionContextHooks({ tool: "grok" }),
+    remove: () => removeSessionContextHooks({ tool: "grok" }),
+  });
+
   // shell rc files — the global gateway block + per-tool scoped functions.
   for (const shell of SHELLS) {
     targets.push({

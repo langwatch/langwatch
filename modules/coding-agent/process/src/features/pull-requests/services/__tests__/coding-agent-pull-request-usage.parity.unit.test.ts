@@ -1031,6 +1031,26 @@ describe("PullRequestUsageService", () => {
       expect(usage.totals.costUsd).toBeCloseTo(5);
     });
 
+    /** @scenario "The billable lookup for a Grok session asks with the catalogue slug" */
+    it("asks the billable question of Grok's catalogue slug and applies the answer to its cost", async () => {
+      const askedSources: string[] = [];
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow({ agent: "grok", costUsd: 2 })],
+        isSourceNonBillable: async ({ sourceType }) => {
+          askedSources.push(sourceType);
+          return sourceType === "grok";
+        },
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      // The ingest key's source type is "grok_cli"; the catalogue, and so the lookup, says "grok".
+      expect(askedSources).toEqual(["grok"]);
+      expect(usage.totals.nonBilledCostUsd).toBeCloseTo(2);
+      expect(usage.totals.billedCostUsd).toBe(0);
+    });
+
     /** @scenario "A viewer who may not price a project sees neither half of its cost" */
     it("leaves every half of the cost absent for a project the viewer may not price", async () => {
       const { service } = serviceWith({

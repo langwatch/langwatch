@@ -8405,6 +8405,7 @@ from .read_cli_bootstrap_response_200_tool_policies_codex import ReadCliBootstra
 from .read_cli_bootstrap_response_200_tool_policies_copilot import ReadCliBootstrapResponse200ToolPoliciesCopilot
 from .read_cli_bootstrap_response_200_tool_policies_cursor import ReadCliBootstrapResponse200ToolPoliciesCursor
 from .read_cli_bootstrap_response_200_tool_policies_gemini import ReadCliBootstrapResponse200ToolPoliciesGemini
+from .read_cli_bootstrap_response_200_tool_policies_grok import ReadCliBootstrapResponse200ToolPoliciesGrok
 from .read_cli_bootstrap_response_200_tool_policies_opencode import ReadCliBootstrapResponse200ToolPoliciesOpencode
 from .read_cli_bootstrap_response_200_tools_item import ReadCliBootstrapResponse200ToolsItem
 from .read_cli_bootstrap_response_400 import ReadCliBootstrapResponse400
@@ -13573,6 +13574,7 @@ __all__ = (
     "ReadCliBootstrapResponse200ToolPoliciesCopilot",
     "ReadCliBootstrapResponse200ToolPoliciesCursor",
     "ReadCliBootstrapResponse200ToolPoliciesGemini",
+    "ReadCliBootstrapResponse200ToolPoliciesGrok",
     "ReadCliBootstrapResponse200ToolPoliciesOpencode",
     "ReadCliBootstrapResponse200ToolsItem",
     "ReadCliBootstrapResponse400",
