@@ -85,6 +85,8 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
     A refusal of the caller's own access (every violation names a permission the caller lacks,
     or a view a gate they lack would show) is about the caller, not the statement text: it is decided
     from the parsed statement but writes no built-in line and is not counted, on either path.
+    A refusal cut off at the violation cap is not that: the list may hide other reasons, so it
+    is reported and counted.
     A refusal of the request's own projects, or of a reserved parameter name it supplies, is
     not the statement failing: it is refused before the report, writes no built-in line and is
     not counted. The statement's own failures (parse, policy, execution, busy, timeout) are
@@ -113,7 +115,8 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
 
     @unit
     Scenario: A view no caller could see is reported
-      Given a built-in statement names a view the catalogue has no entry for
+      Given a built-in statement names a view the view list holds but the catalogue has no
+        entry for, so no grant would show it
       When the failure reaches either report path
       Then one built-in failure is reported and counted, because no gate the caller lacks would
         show that view

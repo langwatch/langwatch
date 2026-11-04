@@ -98,9 +98,9 @@ describe("isGatedAccessRefusal at the cap", () => {
 
 describe("hiddenViewTables", () => {
   /** @scenario "A view no caller could see is reported" */
-  it("holds what a full grant shows and the caller does not, never a view nobody sees", () => {
+  it("holds what a full grant shows and the caller does not, never a view outside it", () => {
     const showable = [{ name: "gateway_request_spend" }, { name: "traces" }];
-    const visible = [{ name: "traces" }];
+    const visible = [{ name: "traces" }, { name: "orphan_view" }];
 
     expect(hiddenViewTables({ database: "analytics", showable, visible })).toEqual(
       new Set(["analytics.gateway_request_spend"]),

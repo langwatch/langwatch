@@ -4,7 +4,10 @@
  * @see specs/lwql/query-origin.feature
  * @vitest-environment node
  */
-import { LangWatchQLNotPermittedError } from "@langwatch/analytics-contract";
+import {
+  LangWatchQLNotPermittedError,
+  type LangWatchQLProtections,
+} from "@langwatch/analytics-contract";
 import { counter } from "@langwatch/observability/metrics";
 import {
   createRecordingMeterProvider,
@@ -13,6 +16,7 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { MAX_VIOLATIONS } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { langWatchQLAccessRefusals } from "../langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLFailureReportService } from "../langwatch-ql-failure-report.service.ts";
@@ -31,9 +35,17 @@ beforeEach(() => {
 });
 afterEach(() => meter.uninstall());
 
-function refusalOf(sql: string): LangWatchQLNotPermittedError {
+function refusalOf({
+  sql,
+  via = lwql,
+  protections = withoutGatewayUsage,
+}: {
+  sql: string;
+  via?: LangWatchQLService;
+  protections?: LangWatchQLProtections;
+}): LangWatchQLNotPermittedError {
   try {
-    lwql.validate({ projectId: "project-1", protections: withoutGatewayUsage, sql });
+    via.validate({ projectId: "project-1", protections, sql });
   } catch (error) {
     return error as LangWatchQLNotPermittedError;
   }
@@ -53,7 +65,7 @@ function reporter() {
 describe("given a view the catalogue holds but the caller's protections hide", () => {
   /** @scenario "A caller's own access refusal is neither reported nor counted" */
   it("is the caller's access refused, and neither report path writes a line or a count", () => {
-    const error = refusalOf(GATEWAY_PROBE);
+    const error = refusalOf({ sql: GATEWAY_PROBE });
     const { lines, service } = reporter();
 
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
@@ -66,7 +78,7 @@ describe("given a view the catalogue holds but the caller's protections hide", (
 
   /** @scenario "A caller's own access refusal is neither reported nor counted" */
   it("answers the member exactly what a refusal built from the same violations answers", () => {
-    const error = refusalOf(GATEWAY_PROBE);
+    const error = refusalOf({ sql: GATEWAY_PROBE });
     const unmarked = new LangWatchQLNotPermittedError(error.meta.violations as never);
 
     expect(Object.keys(error).toSorted()).toEqual(Object.keys(unmarked).toSorted());
@@ -85,7 +97,7 @@ describe("given a view the catalogue does not hold", () => {
       "SELECT 1 FROM removed_view LIMIT 1",
       "SELECT 1 FROM gateway_request_spend, removed_view LIMIT 1",
     ]) {
-      const error = refusalOf(sql);
+      const error = refusalOf({ sql });
       expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
       service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
     }
@@ -98,7 +110,7 @@ describe("given a view the catalogue does not hold", () => {
 describe("given a caller's access refusal wrapped as the cause of another error", () => {
   /** @scenario "A wrapped access refusal is reported and counted" */
   it("is not an access refusal, and both report paths write the line and raise the count", () => {
-    const marked = refusalOf(GATEWAY_PROBE);
+    const marked = refusalOf({ sql: GATEWAY_PROBE });
     const wrapped = new Error("wrapped", { cause: marked });
     const { lines, service } = reporter();
 
@@ -127,21 +139,31 @@ describe("given a view no caller could see", () => {
   const everyGrant = { catalogue: EVERY_CATALOGUE_PERMISSION };
 
   /** @scenario "A view no caller could see is reported" */
-  it.each(["orphan_view"])("reports %s on both paths, as no access of the caller's", (view) => {
-    const sql = `SELECT 1 FROM ${view} LIMIT 1`;
-    const error = (() => {
-      try {
-        service.validate({ projectId: "project-1", protections: everyGrant, sql });
-      } catch (caught) {
-        return caught;
-      }
-      throw new Error(`expected "${sql}" to be refused`);
-    })();
+  it("reports orphan_view on both paths, as no access of the caller's", () => {
+    const sql = "SELECT 1 FROM orphan_view LIMIT 1";
+    const error = refusalOf({ sql, via: service, protections: everyGrant });
     const { lines, service: report } = reporter();
 
     report.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
     report.reportFailure({ projectId: "project-1", sql, error });
 
+    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
+  });
+});
+
+describe("given a refusal cut off at the violation cap", () => {
+  /** @scenario "A refusal cut off at the violation cap is reported" */
+  it("is reported on both paths even though every violation is a hidden view", () => {
+    const sql = `${Array.from({ length: 25 }, () => "SELECT 1 FROM gateway_request_spend").join(" UNION ALL ")} LIMIT 1`;
+    const error = refusalOf({ sql });
+    const { lines, service } = reporter();
+
+    service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
+    service.reportFailure({ projectId: "project-1", sql, error });
+
+    expect(error.meta.violations).toHaveLength(MAX_VIOLATIONS);
     expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
