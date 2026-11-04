@@ -333,7 +333,15 @@ describe("AgentManagementPage", () => {
     /** @scenario "A connector agent's card offers no editor until one exists" */
     it("offers no open or edit action on its card, while an HTTP agent keeps both", async () => {
       renderPage(new TestAgentBrowser(), new TestLifecycle(), [
-        { ...wireAgent, id: "agent_connector", type: "connector" },
+        {
+          ...wireAgent,
+          id: "agent_connector",
+          type: "connector",
+          config: {
+            call: { language: "python", code: "def call(message, rows, state):\n    return message" },
+            secretNames: [],
+          },
+        },
         { ...wireAgent, id: "agent_http" },
       ]);
 
