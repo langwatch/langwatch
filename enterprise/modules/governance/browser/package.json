@@ -24,6 +24,7 @@
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/auth-client": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",

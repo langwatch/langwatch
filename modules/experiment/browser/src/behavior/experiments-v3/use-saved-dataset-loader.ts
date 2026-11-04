@@ -1,8 +1,13 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { datasetClient } from "@langwatch/dataset-client";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import isDeepEqual from "fast-deep-equal";
 import { useEffect, useRef, useState } from "react";
 
+import {
+  refreshedSavedRecords,
+  sameColumnNames,
+} from "../../model/experiments-v3/saved-records-refresh.ts";
 import type {
   DatasetColumn,
   DatasetReference,
@@ -50,53 +55,130 @@ const retryUnlessNotReady = (failureCount: number, error: unknown): boolean =>
     : failureCount < 3;
 
 /**
- * Hook to load records for a single saved dataset.
- * Each saved dataset tab should use this hook to declaratively fetch its data.
- * tRPC handles batching multiple queries automatically.
+ * Loads one saved dataset tab's records, then follows the read: when the dataset changes
+ * elsewhere and its read refetches, the rows refresh under this tab's unsynced edits.
+ * Spec: specs/experiments-v3/dataset-version-pin.feature
  */
 export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) => {
   const { project } = useOrganizationTeamProject();
   const setSavedDatasetRecords = useEvaluationsV3Store((state) => state.setSavedDatasetRecords);
-  const hasLoadedRef = useRef(false);
+  const appliedAtRef = useRef<number | undefined>(undefined);
 
   const isSavedDataset = dataset?.type === "saved" && Boolean(dataset.datasetId);
   const needsLoading = isSavedDataset && !dataset.savedRecords;
 
-  // Declarative query - tRPC batches these automatically
   const query = datasetClient.datasetRecord.getAll.useQuery(
     {
       projectId: project?.id ?? "",
       datasetId: dataset?.datasetId ?? "",
     },
     {
-      enabled: Boolean(project?.id) && needsLoading,
+      enabled: Boolean(project?.id) && isSavedDataset,
       retry: retryUnlessNotReady,
     },
   );
 
-  // Sync to store when data arrives
   useEffect(() => {
-    if (!dataset || !needsLoading || !query.data || hasLoadedRef.current) return;
+    if (!dataset || !isSavedDataset || !query.data) return;
+    if (appliedAtRef.current === query.dataUpdatedAt && !needsLoading) return;
+    // A read held for other columns stays unrecorded, so it applies once the tab's columns match.
+    if (applySavedRead({ dataset, read: query.data, setSavedDatasetRecords })) {
+      appliedAtRef.current = query.dataUpdatedAt;
+    }
+  }, [
+    dataset,
+    isSavedDataset,
+    needsLoading,
+    query.data,
+    query.dataUpdatedAt,
+    setSavedDatasetRecords,
+  ]);
 
-    hasLoadedRef.current = true;
-
-    const savedRecords = savedRecordsFrom({
-      records: query.data.datasetRecords ?? [],
-      columnNames: dataset.columns.map((col) => col.name),
-    });
-
-    setSavedDatasetRecords(dataset.id, savedRecords, savedRecordsCutOf(query.data));
-  }, [dataset, needsLoading, query.data, setSavedDatasetRecords]);
-
-  // Reset ref when dataset changes
   useEffect(() => {
-    hasLoadedRef.current = false;
+    appliedAtRef.current = undefined;
   }, [dataset?.id]);
 
   return {
     isLoading: query.isLoading && needsLoading,
   };
 };
+
+type SavedRead = {
+  columnTypes: { name: string }[];
+  datasetRecords?: { id: string; entry: unknown }[];
+  truncated: boolean;
+  loadedRows: number;
+  totalRows: number;
+};
+
+/**
+ * Puts a read into the tab: whole on the first load, under the unsynced edits after that.
+ * False when the read is held because its columns differ from the tab's.
+ */
+function applySavedRead({
+  dataset,
+  read,
+  setSavedDatasetRecords,
+}: {
+  dataset: DatasetReference;
+  read: SavedRead;
+  setSavedDatasetRecords: (id: string, records: SavedRecord[], cut?: SavedRecordsCut) => void;
+}): boolean {
+  const columnNames = dataset.columns.map((col) => col.name);
+  const fresh = savedRecordsFrom({ records: read.datasetRecords ?? [], columnNames });
+  const cut = savedRecordsCutOf(read);
+  if (!dataset.savedRecords) {
+    setSavedDatasetRecords(dataset.id, fresh, cut);
+    return true;
+  }
+  // Columns that differ mean a column edit is in flight or landed elsewhere: keying the read by
+  // this tab's names would blank cells, so the read is held until the tab's columns match.
+  const serverColumns = read.columnTypes.map((column) => column.name);
+  if (!sameColumnNames({ serverColumns, workbenchColumns: columnNames })) return false;
+  const store = useEvaluationsV3Store.getState();
+  const refreshed = refreshedSavedRecords({
+    fresh,
+    current: dataset.savedRecords,
+    pending: dataset.datasetId ? store.pendingSavedChanges[dataset.datasetId] : undefined,
+  });
+  const sameRows = isDeepEqual(refreshed, dataset.savedRecords);
+  if (sameRows && isDeepEqual(cut, dataset.savedRecordsCut)) return true;
+  // A refresh is no edit, so it takes no undo step, nor opens the window that folds the next edit.
+  untracked(() => setSavedDatasetRecords(dataset.id, refreshed, cut));
+  if (sameRows) carryCutThroughHistory({ tabId: dataset.id, cut });
+  // Undo must not step back onto rows the dataset no longer holds.
+  else useEvaluationsV3Store.temporal.getState().clear();
+  return true;
+}
+
+function untracked(write: () => void) {
+  const temporal = useEvaluationsV3Store.temporal.getState();
+  const wasTracking = temporal.isTracking;
+  if (wasTracking) temporal.pause();
+  try {
+    write();
+  } finally {
+    if (wasTracking) temporal.resume();
+  }
+}
+
+/** Undo and Redo restore edits, never a row count the dataset has since moved past. */
+function carryCutThroughHistory({ tabId, cut }: { tabId: string; cut?: SavedRecordsCut }) {
+  const withCut = <T extends { datasets?: DatasetReference[] }>(snapshot: T): T =>
+    snapshot.datasets
+      ? {
+          ...snapshot,
+          datasets: snapshot.datasets.map((d) =>
+            d.id === tabId && d.savedRecords ? { ...d, savedRecordsCut: cut } : d,
+          ),
+        }
+      : snapshot;
+  const { pastStates, futureStates } = useEvaluationsV3Store.temporal.getState();
+  useEvaluationsV3Store.temporal.setState({
+    pastStates: pastStates.map(withCut),
+    futureStates: futureStates.map(withCut),
+  });
+}
 
 /**
  * Hook to track loading state for all saved datasets.
