@@ -38,6 +38,36 @@ export const datasetColumnsSchema: DatasetColumnsSchema = datasetColumnsSchemaDe
 export type DatasetColumn = z.infer<typeof datasetColumnSchema>;
 export type DatasetColumns = z.infer<typeof datasetColumnsSchema>;
 
+/**
+ * A columns-drawer column with the caller's own id for it. The drawer hands the id back on
+ * the column edited from it (renamed or retyped), and none on a new column.
+ */
+const drawerDatasetColumnSchemaDefinition = z.object({
+  ...datasetColumnSchemaDefinition.shape,
+  id: z.string().optional(),
+});
+export interface DrawerDatasetColumnSchema extends Named<
+  typeof drawerDatasetColumnSchemaDefinition
+> {}
+export const drawerDatasetColumnSchema: DrawerDatasetColumnSchema =
+  drawerDatasetColumnSchemaDefinition;
+export type DrawerDatasetColumn = z.infer<typeof drawerDatasetColumnSchema>;
+
+/**
+ * Which old column each renamed column came from. Sent, values move by these
+ * renames and unchanged names only, never by position; omitted, leftover
+ * columns pair by position as before.
+ */
+const datasetColumnRenamesSchemaDefinition = z.array(
+  z.object({ from: z.string().min(1), to: z.string().min(1) }).strict(),
+);
+export interface DatasetColumnRenamesSchema extends Named<
+  typeof datasetColumnRenamesSchemaDefinition
+> {}
+export const datasetColumnRenamesSchema: DatasetColumnRenamesSchema =
+  datasetColumnRenamesSchemaDefinition;
+export type DatasetColumnRenames = z.infer<typeof datasetColumnRenamesSchema>;
+
 export const datasetJsonSchema: z.ZodType<
   string | number | boolean | null | { [key: string]: unknown } | unknown[]
 > = z.lazy(() =>
@@ -363,6 +393,7 @@ const upsertDatasetInputSchemaDefinition = z
     columnTypes: datasetColumnsSchema,
     datasetId: z.string().min(1).optional(),
     datasetRecords: z.array(datasetRecordInputSchema).optional(),
+    columnRenames: datasetColumnRenamesSchema.optional(),
   })
   .strict();
 export interface UpsertDatasetInputSchema extends Named<
@@ -473,6 +504,11 @@ export type CreateDatasetRecordsInput = z.infer<typeof createDatasetRecordsInput
 const updateDatasetRecordInputSchemaDefinition = datasetRecordLookupInputSchema.safeExtend({
   recordId: z.string().min(1),
   updatedRecord: z.record(z.string(), z.unknown()),
+  /**
+   * The dataset's column names in order, as the caller last read them. Sent, a write is refused
+   * with `dataset_stale_columns` when one is gone or they no longer stand in that order.
+   */
+  columns: z.array(z.string()).optional(),
 });
 export interface UpdateDatasetRecordInputSchema extends Named<
   typeof updateDatasetRecordInputSchemaDefinition

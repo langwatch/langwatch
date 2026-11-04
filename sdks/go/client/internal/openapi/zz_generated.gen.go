@@ -46347,6 +46347,11 @@ type GetApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType string
 
 // PatchApiDatasetBySlugOrIdJSONBody defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrIdJSONBody struct {
+	// ColumnRenames Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position.
+	ColumnRenames *[]struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	} `json:"columnRenames,omitempty"`
 	ColumnTypes *[]struct {
 		Name string                                           `json:"name"`
 		Type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType `json:"type"`

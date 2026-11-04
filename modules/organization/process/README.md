@@ -321,7 +321,7 @@ memberOrganizationIds(input: Readonly<{ userId: string; organizationIds: string[
 Every organization this person belongs to. Asked by a peer deciding something about the person rather than about a listed organization.
 
 ```typescript
-organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
+organizationIdsForMember(input: Readonly<{ userId: string; activeOnly?: boolean }>): Promise<string[]>;
 ```
 
 #### `findBySsoDomain`

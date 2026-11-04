@@ -53,6 +53,7 @@ const harness = vi.hoisted(() => ({
   billedLane: undefined as unknown,
 }));
 
+vi.mock("@langwatch/auth-client", () => ({ useRecordPageOpened: () => undefined }));
 vi.mock("../../../../behavior/governance-api.ts", () => ({
   api: {
     governanceCost: {
