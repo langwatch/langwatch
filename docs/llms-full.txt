@@ -1122,12 +1122,14 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | Codex (OpenAI account) | Sign in with your OpenAI account. Used by coding features only |
 | Anthropic | API key, or a base URL |
 | Gemini | API key. Add a project and a location to use Gemini through Vertex AI |
-| Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version |
+| Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version. Optional **Decisions Deployment** and **Microsoft Decision 1 Deployment** name the deployments [Instant Evals can run on](/features/instant-evals/own-model#azure) |
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
 | DeepSeek, Doubleword, xAI, Cerebras, Groq, Voyage AI | API key |
 | ElevenLabs | API key, optional webhook secret. See [Voice Agents](/agent-testing/voice-agents#before-you-start) for the key permissions it needs |
 | Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
+| Inception, Perplexity, TypeSafe, OpenRouter, Fireworks | API key, for the decision models [Instant Evals can run on](/features/instant-evals/own-model) |
+| Cloudflare Workers AI | Account id and API token, for the decision models [Instant Evals can run on](/features/instant-evals/own-model) |
 | Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
 
 You can save several configurations of the same vendor, for example one OpenAI account per region, and tell them apart by **Name**.
@@ -1184,9 +1186,11 @@ The **All you can see** filter above the table narrows the list and the default 
 
 ## Default models
 
-The **Default Models** section on the same page sets the model each feature uses unless the user picks one in the feature itself. A config sets a model per role (**Default**, **Fast**, **Langy**, **Embeddings**) and per feature, for example the model a new prompt or evaluator starts with, the Langy chat model, trace AI search, workflow commit messages, and the topic clustering model and embeddings.
+The **Default Models** section on the same page sets the model each feature uses unless the user picks one in the feature itself. A config sets a model per role (**Default**, **Fast**, **Langy**, **Embeddings**, **Instant Evals**) and per feature, for example the model a new prompt or evaluator starts with, the Langy chat model, trace AI search, workflow commit messages, and the topic clustering model and embeddings.
 
 Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
+
+The **Instant Evals** column takes only decision models: LangWatch Instant Preview, the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
@@ -43734,6 +43738,127 @@ The [Questions](/features/instant-evals/questions) page covers criteria, thresho
 
 ---
 
+# FILE: ./features/instant-evals/own-model.mdx
+
+---
+title: Run Instant Evals on your own decision model
+sidebarTitle: Your own model
+keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, default models
+description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
+---
+
+## LangWatch Instant Preview or your own model
+
+Instant Evals run on **LangWatch Instant Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
+
+<Note>
+  This is off by default. Ask LangWatch to turn it on for your organization. Until then, the **Instant Evals** column offers LangWatch Instant Preview only.
+</Note>
+
+## The models you can pick
+
+| Model in the picker               | Provider to add       | What the provider needs                                                       |
+| --------------------------------- | --------------------- | ----------------------------------------------------------------------------- |
+| OpenAI Decisions API              | OpenAI                | API key. Runs `gpt-6-luna`                                                    |
+| Azure OpenAI Decisions API        | Azure OpenAI          | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure) |
+| Microsoft Decision 1 (Azure)      | Azure OpenAI          | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
+| Inception Mercury Decide          | Inception             | API key                                                                       |
+| Perplexity Decider v1.2           | Perplexity            | API key                                                                       |
+| Perplexity Decider Flash v1.2     | Perplexity            | API key                                                                       |
+| Cloudflare Clef                   | Cloudflare Workers AI | Account id and API token                                                      |
+| Cloudflare Clef Flash             | Cloudflare Workers AI | Account id and API token                                                      |
+| TypeSafe Jev 1.14                 | TypeSafe              | API key                                                                       |
+| Jev 1.14 (OpenRouter)             | OpenRouter            | API key                                                                       |
+| Microsoft Decision 1 (OpenRouter) | OpenRouter            | API key                                                                       |
+| Liquid d1.1 (OpenRouter)          | OpenRouter            | API key                                                                       |
+| Fireworks Rune                    | Fireworks             | API key                                                                       |
+
+OpenAI Decisions API and Azure OpenAI Decisions API need `gpt-6-luna` on that account. The other models need no OpenAI account.
+
+## Set it up
+
+<Steps>
+  <Step title="Add the provider">
+    In **Settings > Model Providers**, click **Add Model Provider**, pick the provider from the table and enter its key. Scope it to each organization, team or project that should use it. See [Model Providers](/platform/model-providers).
+  </Step>
+  <Step title="Pick the model">
+    In **Default Models** on the same page, add or edit a config and pick its scopes. In the **Instant Evals** picker, choose your model and save.
+
+    <Frame>
+      <img
+        src="/images/instant-evals/own-model-picker.png"
+        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open on LangWatch Instant Preview and OpenAI Decisions API"
+      />
+    </Frame>
+  </Step>
+  <Step title="Run">
+    Start a run as usual. The new model judges the next rows within five seconds.
+  </Step>
+</Steps>
+
+The config's **Instant Evals** column then shows your model.
+
+<Frame>
+  <img
+    src="/images/instant-evals/own-model-default-models.png"
+    alt="Default models table with the ACME config, whose Instant Evals column shows OpenAI Decisions API"
+  />
+</Frame>
+
+The picker offers a model only when every scope of the config holds an enabled key for it. An organization config sees only keys saved on the organization, not a key one project holds. A config on two projects sees only what both hold.
+
+As for other [default models](/platform/model-providers#default-models), a project config beats a team config, which beats an organization config. A provider key saved on the project beats one on its team or organization.
+
+## Azure
+
+Both Azure models use the Azure OpenAI provider, with its API key (`AZURE_OPENAI_API_KEY`) and endpoint (`AZURE_OPENAI_ENDPOINT`).
+
+<Frame>
+  <img
+    src="/images/instant-evals/own-model-azure-provider.png"
+    alt="Azure OpenAI provider drawer with Use API Gateway off, the endpoint https://my-resource.openai.azure.com and the decisions deployment gpt-6-luna-eu"
+  />
+</Frame>
+
+- **Endpoint** (`AZURE_OPENAI_ENDPOINT`): your resource URL, such as `https://my-resource.openai.azure.com`. LangWatch takes the resource name from it and calls `https://my-resource.openai.azure.com/openai/v1/decisions` or, for Microsoft Decision 1, `https://my-resource.services.ai.azure.com/providers/microsoft/v1/systemone`. Hosts on `openai.azure.com`, `cognitiveservices.azure.com` and `services.ai.azure.com` work. Other hosts, `http`, custom ports and API Management gateways are refused, so the key stays inside Azure.
+- **Decisions deployment** (`AZURE_OPENAI_DECISIONS_DEPLOYMENT`): your `gpt-6-luna` deployment name. Leave empty if it is `gpt-6-luna`.
+- **Microsoft Decision 1 deployment** (`AZURE_DECISION_1_DEPLOYMENT`): your Microsoft Decision 1 deployment name on Azure AI Foundry. Leave empty if it keeps the model's name.
+
+Keep **Use API Gateway** off. With it on, the endpoint and deployment fields are hidden and every row is skipped as `classifier_key_invalid`.
+
+Deploy the model on your resource before you pick it, in the Azure portal, Azure AI Foundry or the Azure CLI:
+
+```bash
+az cognitiveservices account deployment create \
+  --resource-group my-group --name my-resource \
+  --deployment-name gpt-6-luna --model-name gpt-6-luna --model-format OpenAI --model-version 2026-09-22 \
+  --sku-name GlobalStandard --sku-capacity 50
+```
+
+Without the deployment, every row is skipped as `classifier_not_configured`.
+
+## When your model cannot answer
+
+A run on your own model never falls back to LangWatch Instant Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
+
+| `error`                           | Why                                                                                                         | Fix                                                                         |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `classifier_key_invalid`          | The provider refused the key (401, 402 or 403), or the scope has no enabled provider row, no key, or an endpoint outside Azure | Check the row and its key at **Settings > Model Providers**                 |
+| `classifier_not_configured`       | The provider answered 404: the account does not hold the model, or the Azure deployment does not exist      | Deploy the model, or set the deployment name on the Azure row               |
+| `classifier_rate_limited`         | The provider answered 429 on every retry                                                                    | Raise the rate limit or quota on your provider account                     |
+| `classifier_provider_unavailable` | The provider answered 5xx on every retry                                                                    | Try again later                                                             |
+
+Rate limits and outages are retried before the row is skipped. Refused keys and missing models are not.
+
+## What changes on your own model
+
+- **Cost.** Your provider bills you. LangWatch does not, and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
+- **Limits.** The [row, question and text limits](/features/instant-evals/limits-and-cost#limits) still apply.
+- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Instant Preview never sees them.
+- **Search bar.** Still runs on LangWatch Instant Preview.
+
+---
+
 # FILE: ./features/instant-evals/questions.mdx
 
 ---
@@ -67110,7 +67235,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.22.0 # x-release-please-version
+    targetRevision: 3.23.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -67165,7 +67290,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.22.0 # x-release-please-version
+      targetRevision: 3.23.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -67569,7 +67694,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.22.0 # x-release-please-version
+VERSION=3.23.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -67585,13 +67710,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -72421,7 +72546,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.22.0 \
+  --version 3.23.0 \
   -f values-production.yaml
 # x-release-please-end
 ```

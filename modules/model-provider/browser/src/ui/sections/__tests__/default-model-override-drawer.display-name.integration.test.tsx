@@ -51,7 +51,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
       getInheritedValuesForScopes: {
         useQuery: () => mockGetInheritedValues(),
       },
-      listDecisionModelsForProject: { useQuery: () => ({ data: [], isLoading: false }) },
+      listDecisionModelsForScopes: { useQuery: () => ({ data: [], isLoading: false }) },
       listAllForProjectForFrontend: {
         useQuery: () => mockListAllForProjectForFrontend(),
       },
