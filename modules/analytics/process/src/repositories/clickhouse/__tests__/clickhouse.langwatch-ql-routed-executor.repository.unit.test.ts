@@ -8,6 +8,7 @@ import {
   type TenantRoute,
   TenantScopeError,
 } from "@langwatch/clickhouse-client";
+import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LangWatchQLConnection } from "../../langwatch-ql-executor.repository.ts";
@@ -263,5 +264,46 @@ describe("when the executor closes", () => {
 
     expect(drivers).toHaveLength(3);
     for (const driver of drivers) expect(driver.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Finding 2: a handled private_dataplane_unavailable keeps its own code and message.
+describe("given the router refuses an organization with private_dataplane_unavailable", () => {
+  class RouteMissingError extends HandledError {
+    constructor() {
+      super(
+        "private_dataplane_unavailable",
+        "This organization keeps its data on its own ClickHouse, which this deployment cannot reach",
+        {
+          httpStatus: 503,
+          fault: "platform",
+          retryable: false,
+          meta: {
+            organizationId: "org-labelled",
+            kind: "clickhouse",
+            variable: "CLICKHOUSE_URL__globex__org-labelled",
+            problem: "missing",
+          },
+        },
+      );
+    }
+  }
+
+  it("rethrows that refusal unchanged and runs nothing on the shared ClickHouse", async () => {
+    const refusal = new RouteMissingError();
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      connection: SHARED,
+      route: () => Promise.reject(refusal),
+      createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
+    });
+    const [shared] = drivers;
+
+    const thrown = await executor
+      .execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds: ["project-x"] })
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBe(refusal);
+    expect(thrown).toMatchObject({ code: "private_dataplane_unavailable" });
+    expect(shared?.query).not.toHaveBeenCalled();
   });
 });
