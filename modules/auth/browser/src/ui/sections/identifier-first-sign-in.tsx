@@ -235,7 +235,7 @@ export function IdentifierFirstSignIn() {
       <NoAccountYet
         email={creatingAccountFor}
         reasonCode={decision?.outcome === "route_to_signup" ? decision.reasonCode : null}
-        callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
+        callbackUrl={callbackUrl}
         onAwaitingConfirmation={(email) => {
           setSigningUpEmail(null);
           setSentTo(email);
@@ -395,7 +395,8 @@ function NoAccountYet({
   email: string;
   /** Absent where a refused password found this address, not the router. */
   reasonCode: string | null;
-  callbackUrl: string;
+  /** Where the log-in was going, if anywhere: the sign-up it becomes ends there. */
+  callbackUrl: string | undefined;
   onAwaitingConfirmation: (email: string) => void;
   onAddressAlreadyRegistered: () => void;
   onUseDifferentEmail: () => void;
@@ -425,7 +426,8 @@ function NoAccountYet({
 
   const beginSignUp = async () => {
     try {
-      await requestVerification.mutateAsync({ email });
+      // Rides on the emailed link, so the sign-up it finishes lands where this log-in was going.
+      await requestVerification.mutateAsync({ email, ...(callbackUrl ? { callbackUrl } : {}) });
       onAwaitingConfirmation(email);
     } catch (failure) {
       if (readHandledError(failure)?.code === "email_already_registered") {
@@ -461,7 +463,7 @@ function NoAccountYet({
           Use a different email
         </Button>
         <SignUpLink
-          callbackUrl={callbackUrl}
+          callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
           email={email}
           label="Rather use the sign-up page? Go there instead"
         />

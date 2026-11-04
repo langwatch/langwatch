@@ -47119,6 +47119,7 @@ By default the run uses the dataset attached to the experiment. You can override
 - `dataset_id`: a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
 - `row_indices`: a subset of dataset row indices to evaluate, instead of the whole dataset
 - `concurrency`: how many cells run at once, from 1 to 24, for this run only. A cell is one row against one target, so an experiment with two targets has two cells per row. Without it, the run uses the server's default. Use `1` to run the cells one at a time, in order, for example so the first row fills a prompt cache before the next rows read it. The experiment's saved run options stay unchanged.
+- `dataset_version`: the version of the saved dataset to run, for example `1`. It overrides the version the experiment pins. Without either, the run saves the dataset's current content as a version and reads that, so every run records the exact rows it used. A version the dataset does not have answers `404` with `dataset_version_not_found`
 
 
   ### Python
@@ -47134,6 +47135,8 @@ langwatch.experiment.run("my-experiment", dataset_id="dataset_xxxxxxxxxxxx")
 langwatch.experiment.run("my-experiment", parameters={"model": "gpt-6-luna"})
 # One row at a time, in order
 langwatch.experiment.run("my-experiment", concurrency=1)
+# Version 1 of the experiment's saved dataset
+langwatch.experiment.run("my-experiment", dataset_version=1)
 ```
 
   ### TypeScript
@@ -47151,6 +47154,8 @@ await langwatch.experiments.runWithResults("my-experiment", { datasetId: "datase
 await langwatch.experiments.runWithResults("my-experiment", { parameters: { model: "gpt-6-luna" } });
 // One row at a time, in order
 await langwatch.experiments.runWithResults("my-experiment", { concurrency: 1 });
+// Version 1 of the experiment's saved dataset
+await langwatch.experiments.runWithResults("my-experiment", { datasetVersion: 1 });
 ```
 
 
@@ -67720,7 +67725,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.22.0 # x-release-please-version
+    targetRevision: 3.23.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -67775,7 +67780,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.22.0 # x-release-please-version
+      targetRevision: 3.23.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -68179,7 +68184,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.22.0 # x-release-please-version
+VERSION=3.23.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -68195,13 +68200,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -73031,7 +73036,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.22.0 \
+  --version 3.23.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -73836,6 +73841,15 @@ openapi: "GET /api/v1/agents"
 
 ---
 
+# FILE: ./api-reference/agents/list-an-agent-s-versions.mdx
+
+---
+title: "List an agent's versions"
+openapi: "GET /api/v1/agents/{agentId}/versions"
+---
+
+---
+
 # FILE: ./api-reference/agents/list-poll.mdx
 
 ---
@@ -73858,11 +73872,29 @@ Manage AI agent configurations. Create, update, and organize agents that are tra
 
 ---
 
+# FILE: ./api-reference/agents/point-a-deploy-label-at-an-agent-version.mdx
+
+---
+title: "Point a deploy label at an agent version"
+openapi: "PUT /api/v1/agents/{agentId}/labels/{label}"
+---
+
+---
+
 # FILE: ./api-reference/agents/put-update-agents.mdx
 
 ---
 title: "Update Agents (PUT)"
 openapi: "PUT /api/v1/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/agents/remove-a-deploy-label-from-an-agent.mdx
+
+---
+title: "Remove a deploy label from an agent"
+openapi: "DELETE /api/v1/agents/{agentId}/labels/{label}"
 ---
 
 ---
@@ -74411,6 +74443,15 @@ openapi: "POST /api/v1/dataset/evaluate"
 
 ---
 
+# FILE: ./api-reference/datasets/get-a-dataset-version.mdx
+
+---
+title: "Get a dataset version"
+openapi: "GET /api/v1/dataset/{slugOrId}/versions/{version}"
+---
+
+---
+
 # FILE: ./api-reference/datasets/get-dataset.mdx
 
 ---
@@ -74447,6 +74488,15 @@ openapi: "POST /api/v1/dataset/{slugOrId}/imports"
 
 ---
 
+# FILE: ./api-reference/datasets/list-dataset-versions.mdx
+
+---
+title: "List dataset versions"
+openapi: "GET /api/v1/dataset/{slugOrId}/versions"
+---
+
+---
+
 # FILE: ./api-reference/datasets/list-dataset.mdx
 
 ---
@@ -74478,6 +74528,24 @@ openapi: "POST /api/v1/dataset/{datasetSlug}/entries"
 
 This endpoint only adds entries. To read them back, call
 [`GET /api/dataset/{slugOrId}/records`](/api-reference/datasets/get-records).
+
+---
+
+# FILE: ./api-reference/datasets/restore-a-dataset-version.mdx
+
+---
+title: "Restore a dataset version"
+openapi: "POST /api/v1/dataset/{slugOrId}/versions/{version}/restore"
+---
+
+---
+
+# FILE: ./api-reference/datasets/save-a-dataset-version.mdx
+
+---
+title: "Save a dataset version"
+openapi: "POST /api/v1/dataset/{slugOrId}/versions"
+---
 
 ---
 
@@ -74594,11 +74662,29 @@ openapi: "DELETE /api/v1/evaluators/{id}"
 
 ---
 
+# FILE: ./api-reference/evaluators-config/delete-labels.mdx
+
+---
+title: "Remove a deploy label from an evaluator"
+openapi: "DELETE /api/v1/evaluators/{evaluatorId}/labels/{label}"
+---
+
+---
+
 # FILE: ./api-reference/evaluators-config/get-evaluators.mdx
 
 ---
 title: "Get a specific evaluator by ID or slug"
 openapi: "GET /api/v1/evaluators/{idOrSlug}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/get-versions.mdx
+
+---
+title: "Get Versions"
+openapi: "GET /api/v1/evaluators/{evaluatorId}/versions"
 ---
 
 ---
@@ -74630,6 +74716,15 @@ Manage evaluator configurations for your project. Create, update, and organize e
 ---
 title: "Update an existing evaluator"
 openapi: "PUT /api/v1/evaluators/{id}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/update-labels.mdx
+
+---
+title: "Update Labels"
+openapi: "PUT /api/v1/evaluators/{evaluatorId}/labels/{label}"
 ---
 
 ---

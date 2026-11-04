@@ -259,6 +259,10 @@ function SignInErrorDescription({
           Your organization requires single sign-on. Sign out and sign in again by entering your
           company email address, then choose your organization's login.
         </Text>
+        <Text textStyle="bodySm" color="fg.muted">
+          If your company&apos;s sign-in turns you away, your company may not have given you access
+          to LangWatch yet. Ask your IT administrator to check.
+        </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
           <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>

@@ -385,6 +385,64 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the stored stderr shows the secret value as "[redacted]"
       And the stored stdout still contains "eu-central", because a run parameter is not a credential
 
+  Rule: What the interpreter wrote to stderr explains a runner failure, without leaking a secret
+
+    # Only the last 64 KiB of interpreter stderr is read, and only when no result
+    # exists. The cut falls inside no secret, invalid UTF-8 is replaced before
+    # matching, and a secret cut off at the end is dropped, even an ordinary
+    # tail such as "1000" for a secret "0000", on purpose: a leak is worse than
+    # a lost byte; a partial inside a match stays.
+    @unit
+    Scenario: A runner error carries the end of the interpreter stderr
+      Given a runner that exits without writing a result and wrote to stderr
+      When the runner fails
+      Then the error message is the exit reason followed by the end of that stderr
+      And the stderr part of the message is bounded
+      And a stderr that is one long line keeps the end of that line
+
+    @unit
+    Scenario: The error message carries the end of a stderr longer than the cap
+      Given a runner that exits without writing a result and wrote more stderr than the cap
+      When the runner fails
+      Then the error message carries the final lines of that stderr, not the first
+
+    @unit
+    Scenario: A cut interpreter stderr starts with a truncation marker
+      Given a runner that wrote more stderr than the cap
+      When the interpreter stderr is read back
+      Then the stored stderr starts with "[stderr truncated]" and keeps the end
+      And the kept text is the last 64 KiB even when it has no newline
+
+    @unit
+    Scenario: A secret cut off at the end of the stderr is never partly shown
+      Given the workflow carries a secret
+      And the runner wrote a stderr that ends partway through that secret
+      When the interpreter stderr is read back
+      Then no fragment of that secret is shown
+
+    @unit
+    Scenario: A secret split by an invalid byte is never joined
+      Given the workflow carries a secret
+      And the runner wrote a stderr in which an invalid byte splits that secret
+      When the interpreter stderr is read back
+      Then the stored stderr shows the replacement character where the byte was
+      And the secret is not shown joined
+
+    @unit
+    Scenario: A secret is scrubbed from stderr in its JSON-escaped forms
+      Given the workflow carries a secret with quotes, newlines and non-ASCII characters
+      And the runner wrote that secret to stderr raw, as Go JSON and as Python JSON
+      When the interpreter stderr is redacted
+      Then none of the three forms is shown and each reads "[redacted]"
+
+    @unit
+    Scenario: A secret that crosses the stderr cap is never partly shown
+      Given the workflow carries secrets of different lengths, one of them one character long
+      And the runner wrote a stderr in which a long secret starts before the kept part and ends inside it
+      When the runner fails
+      Then the stored stderr and the error message show no fragment of that secret
+      And the stored stderr starts with "[stderr truncated]"
+
   Rule: A run's own LangWatch credential reaches user code through the environment
 
     # Project secrets never travel in the environment. The one exception is
@@ -475,3 +533,54 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the engine is asked to execute it
       Then the response status field is "error"
       And the error type is "invalid_workflow"
+
+  Rule: The engine hides its process files, or says plainly that it cannot
+
+    # AWS Lambda's seccomp answers EPERM to prctl(PR_SET_DUMPABLE). The mode is
+    # decided once at start-up; see _shared/contract.md §7.
+
+    @integration
+    Scenario: a platform that lets the engine hide its process files runs code blocks in strict mode
+      Given the platform accepts PR_SET_DUMPABLE
+      When a trivial code block runs
+      Then it returns its value
+      And the runner must hide itself or the run fails
+
+    @integration
+    Scenario: a platform that refuses the hide step runs code blocks when visible-process is allowed
+      Given the platform refuses PR_SET_DUMPABLE
+      And visible-process mode is allowed on AWS Lambda
+      When a trivial code block runs
+      Then it returns its value
+      And the runner continues past its refused hide step
+
+    @integration
+    Scenario: a platform that refuses the hide step serves no code blocks unless visible-process is allowed
+      Given the platform refuses PR_SET_DUMPABLE
+      And visible-process mode is not allowed
+      When a code block runs
+      Then the result carries an error that names NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS
+      And the other block types keep working
+
+    @integration
+    Scenario: a platform that refuses the hide step with anything but EPERM serves no code blocks
+      Given the platform refuses PR_SET_DUMPABLE with EACCES
+      And visible-process mode is allowed on AWS Lambda
+      When a code block runs
+      Then the result carries the disabled error and not a raw prctl error
+      And the runner still fails its hide step even in best-effort mode
+
+    @integration
+    Scenario: the engine reports its hide mode once at start-up
+      Given a platform that accepts, refuses with visible-process allowed, or refuses without it
+      When the code block executor is built
+      Then exactly one nlpgo_code_block_hide_mode record carries the mode
+      And the record is at info when the mode is strict and at warn otherwise
+
+    @unit
+    Scenario: the engine warns when the visible-process setting is ignored off Lambda
+      Given visible-process mode is allowed by the setting
+      And the process is not running on AWS Lambda
+      When the code block executor is built
+      Then the setting is ignored and the hide step stays required
+      And one warning names NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS
