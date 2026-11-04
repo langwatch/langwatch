@@ -9,6 +9,13 @@ import { Writable } from "node:stream";
 import { CHILD_PROCESS } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
+// The supervisor imports its timers from node:timers, which fake timers do not
+// patch; delegating to the globals at call time lets the timeout test drive them.
+vi.mock("node:timers", () => ({
+  setTimeout: (handler: () => void, delayMs?: number) => globalThis.setTimeout(handler, delayMs),
+  clearTimeout: (timer?: NodeJS.Timeout) => globalThis.clearTimeout(timer),
+}));
+
 import type { ExecutionJobData } from "../../services/scenario-execution-pool.service.ts";
 import type { ScenarioChildRunPool } from "../scenario-child.channel.ts";
 import { superviseScenarioChild } from "../scenario-child.supervisor.channel.ts";
