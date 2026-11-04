@@ -208,6 +208,8 @@ class TestCard implements AgentManagementCard {
   render(props: AgentCardRenderInput): ReactNode {
     return (
       <div>
+        {props.onClick && <button type="button">Open agent</button>}
+        {props.onEdit && <button type="button">Edit agent</button>}
         <button type="button" onClick={props.onReplicate}>
           Replicate to another project
         </button>
@@ -248,13 +250,17 @@ const wireAgent: WireAgentWithFields = {
   fieldsResolved: true,
 };
 
-function renderPage(browser: TestAgentBrowser, lifecycle = new TestLifecycle()) {
+function renderPage(
+  browser: TestAgentBrowser,
+  lifecycle = new TestLifecycle(),
+  items: WireAgentWithFields[] = [wireAgent],
+) {
   renderWithDesignSystem(
     <AgentManagementPage
       data={{
         projectId: "project_1",
         agents: browser,
-        items: [wireAgent],
+        items,
         isLoading: false,
       }}
       navigation={new TestNavigation()}
@@ -320,6 +326,21 @@ describe("AgentManagementPage", () => {
       fireEvent.click(await screen.findByText("Confirm archive"));
 
       await waitFor(() => expect(lifecycle.agentArchivedCalls).toBe(1));
+    });
+  });
+
+  describe("given the project has a connector agent", () => {
+    /** @scenario "A connector agent's card offers no editor until one exists" */
+    it("offers no open or edit action on its card, while an HTTP agent keeps both", async () => {
+      renderPage(new TestAgentBrowser(), new TestLifecycle(), [
+        { ...wireAgent, id: "agent_connector", type: "connector" },
+        { ...wireAgent, id: "agent_http" },
+      ]);
+
+      await screen.findAllByText("Delete agent");
+
+      expect(screen.getAllByText("Open agent")).toHaveLength(1);
+      expect(screen.getAllByText("Edit agent")).toHaveLength(1);
     });
   });
 

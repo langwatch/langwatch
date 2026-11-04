@@ -53,6 +53,7 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
   private readonly run: ConnectorRun;
   private readonly attemptId: string;
   private state: ConnectorObject | null = null;
+  private turnCount = 0;
   private secrets: Record<string, string> = {};
 
   private constructor(options: ScenarioConnectorOptions) {
@@ -116,6 +117,7 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
         block: this.config.call,
         timeoutMs: this.config.timeoutMs,
         turn,
+        turnIndex: this.turnCount++,
       });
       return this.scrub(connectorCallReply(outputs));
     });
@@ -133,17 +135,24 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
     block,
     timeoutMs,
     turn,
+    turnIndex,
   }: {
     kind: ConnectorBlockKind;
     block: ConnectorAgentData["call"];
     timeoutMs: number;
     turn?: { message: string; history: ConnectorMessage[] };
+    turnIndex?: number;
   }): Promise<ConnectorObject> {
     if (this.config.refusal !== undefined) throw this.refusal();
     const input = connectorBlockInput({
       kind,
       run: this.run,
-      idempotencyKey: connectorIdempotencyKey({ run: this.run, attemptId: this.attemptId, kind }),
+      idempotencyKey: connectorIdempotencyKey({
+        run: this.run,
+        attemptId: this.attemptId,
+        kind,
+        turn: turnIndex,
+      }),
       params: this.parameters,
       rows: this.config.rows,
       state: this.state,

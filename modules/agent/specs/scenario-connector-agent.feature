@@ -33,3 +33,8 @@ Feature: Scenario Connector agent
     Given a connector config with setup, call, teardown, secret names, a fixtures dataset and a timeout
     When it is parsed for the connector agent type
     Then every field is kept
+
+  @integration
+  Scenario: A connector agent's card offers no editor until one exists
+    Given the Agents page lists a connector agent
+    Then its card offers no open or edit action

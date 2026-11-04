@@ -56,19 +56,23 @@ export function connectorTimeoutMessage({
 }
 
 /**
- * `<scenarioRunId>:<attemptId>:<kind>`, or `<attemptId>:<kind>` outside a run. The job queue
- * delivers at least once, so a re-executed run gets a new attempt and a new key.
+ * `<scenarioRunId>:<attemptId>:<kind>`, or `<attemptId>:<kind>` outside a run; a call block adds
+ * `:<turn>` so each turn is its own request. The job queue delivers at least once, so a
+ * re-executed run gets a new attempt and a new key.
  */
 export function connectorIdempotencyKey({
   run,
   attemptId,
   kind,
+  turn,
 }: {
   run: ConnectorRun;
   attemptId: string;
   kind: ConnectorBlockKind;
+  /** Zero-based turn index; set for `call` only. */
+  turn?: number;
 }): string {
-  return [run.scenarioRunId, attemptId, kind].filter(Boolean).join(":");
+  return [run.scenarioRunId, attemptId, kind, turn?.toString()].filter(Boolean).join(":");
 }
 
 /** One message of the conversation as a call block receives it. */

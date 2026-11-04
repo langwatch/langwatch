@@ -95,7 +95,7 @@ describe("ScenarioConnectorService", () => {
         {
           kind: "call",
           run,
-          idempotencyKey: "run_1:att_1:call",
+          idempotencyKey: "run_1:att_1:call:0",
           params: { persona: "gold" },
           rows: config.rows,
           state: { accountId: "acc_1" },
@@ -111,6 +111,17 @@ describe("ScenarioConnectorService", () => {
           state: { accountId: "acc_1" },
         },
       ]);
+    });
+
+    it("gives each turn's call block its own key", async () => {
+      const { connector, posts } = connectorWith();
+
+      await connector.callTurn(turn);
+      await connector.callTurn(turn);
+
+      expect(posts.map(({ input }) => (input as { idempotencyKey: string }).idempotencyKey)).toEqual(
+        ["run_1:att_1:call:0", "run_1:att_1:call:1"],
+      );
     });
 
     it("posts each block as the one code node of its workflow, the code under its budget", async () => {

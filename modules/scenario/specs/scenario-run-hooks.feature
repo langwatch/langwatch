@@ -264,6 +264,11 @@ Feature: Scenario run hooks: setup and teardown
       Then the run does not show "No hooks"
       And the run offers no "Rerun and keep data"
 
+    @integration
+    Scenario: A connector run offers no "Rerun and keep data"
+      Given a finished run on a connector agent whose teardown ran
+      Then the run offers no "Rerun and keep data"
+
     @unit @unimplemented
     Scenario: Keep data is never saved to a plan
       Given a run started with "Rerun and keep data"
@@ -345,7 +350,7 @@ Feature: Scenario run hooks: setup and teardown
     Scenario: Every connector block gets the run, the parameters, the fixture rows and its idempotency key
       Given a run with the parameter persona "gold" and a fixtures dataset of two rows
       When the setup, call and teardown blocks are called
-      Then each receives the run ids, the parameters, both rows and the key "<scenarioRunId>:<attemptId>:<kind>"
+      Then each receives the run ids, the parameters, both rows and the key "<scenarioRunId>:<attemptId>:<kind>", the call block with ":<turn>" added
       And teardown receives the state setup returned
 
     @unit

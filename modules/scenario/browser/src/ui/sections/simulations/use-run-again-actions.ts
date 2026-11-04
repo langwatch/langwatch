@@ -63,12 +63,14 @@ export function useRunAgainActions({
   );
 
   // Keep data rides this one run alone: never remembered with the target, never saved to a plan.
-  const handleRunAgainKeepingData = useCallback(() => {
+  const rerunKeepingData = useCallback(() => {
     if (!scenarioId || !runTarget) return;
     runScenario({ scenarioId, target: runTarget, keepData: true }).catch((error: unknown) => {
       logger.error({ error }, "Failed to rerun scenario keeping its data");
     });
   }, [scenarioId, runTarget, runScenario]);
+  // A run with no pickable target (a connector run) has nothing to rerun, so it offers no action.
+  const handleRunAgainKeepingData = runTarget ? rerunKeepingData : null;
 
   const handleRunAgainClick = useCallback(() => {
     if (hasPersistedTarget && persistedTarget) {
