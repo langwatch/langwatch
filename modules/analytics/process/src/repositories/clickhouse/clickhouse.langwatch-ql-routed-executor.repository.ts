@@ -26,6 +26,8 @@ export type LangWatchQLExecutorFactory = (input: {
   target: LangWatchQLTarget;
 }) => LangWatchQLExecutorRepository;
 
+const PLAIN_DATABASE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 const NOT_AVAILABLE = "LangWatchQL is not available for this organization's ClickHouse.";
 
 /**
@@ -39,8 +41,8 @@ function isRouteRefusal(error: unknown): error is Error {
 
 /**
  * The route's server as the LangWatchQL identity: its origin and database, never the route's
- * own user or password. A URL without an http or https origin is refused without its text,
- * which may carry those credentials.
+ * own user or password. A URL without an http or https origin, or naming a database that is
+ * not a plain identifier, is refused without its text, which may carry those credentials.
  */
 function privateConnectionOf({
   shared,
@@ -57,6 +59,8 @@ function privateConnectionOf({
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("scheme");
     origin = parsed.origin;
     database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+    // The name is written unquoted into generated SQL, so only a plain identifier may pass.
+    if (database !== "" && !PLAIN_DATABASE_NAME.test(database)) throw new Error("database");
   } catch {
     throw new LangWatchQLUnavailableError({ message: NOT_AVAILABLE });
   }
