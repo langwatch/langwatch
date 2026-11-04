@@ -15,31 +15,82 @@ function renderOpenDialog() {
       body
     </Dialog>,
   );
-  return screen.getByTestId("dialog").parentElement as HTMLElement;
+  return screen.getByTestId("dialog");
 }
 
-function rulesFor(element: HTMLElement) {
+interface MediaRule {
+  rule: CSSStyleRule;
+  mediaText: string;
+}
+
+interface ElementRules {
+  base: CSSStyleRule[];
+  media: MediaRule[];
+}
+
+/** Style rules naming the element's classes, split by whether an `@media` block holds them. */
+function rulesFor(element: HTMLElement): ElementRules {
   const own = Array.from(element.classList).map((name) => `.${name}`);
-  return Array.from(document.querySelectorAll("style"))
-    .map((tag) => tag.textContent ?? "")
-    .filter((css) => own.some((selector) => css.includes(selector)))
-    .join("\n");
+  const found: ElementRules = { base: [], media: [] };
+  const walk = (rules: CSSRule[], mediaText: string | null) => {
+    for (const rule of rules) {
+      if (rule instanceof CSSStyleRule && own.some((name) => rule.selectorText.includes(name))) {
+        if (mediaText === null) found.base.push(rule);
+        else found.media.push({ rule, mediaText });
+      }
+      if ("cssRules" in rule) {
+        const enclosing = "media" in rule ? (rule as CSSMediaRule).media.mediaText : mediaText;
+        walk([...(rule as CSSGroupingRule).cssRules], enclosing);
+      }
+    }
+  };
+  for (const sheet of document.styleSheets) walk([...sheet.cssRules], null);
+  return found;
 }
 
-describe("given a docked side panel keeps room on the right edge", () => {
+const cssTextOf = ({ base, media }: ElementRules) =>
+  [...base, ...media.map((entry) => entry.rule)].map((rule) => rule.cssText).join("\n");
+
+const maxWidths = (rules: CSSStyleRule[]) => rules.map((rule) => rule.style.maxWidth).join("\n");
+
+/**
+ * A docked side panel does not offset the dialog's position; from md up it only narrows the
+ * dialog's maximum width.
+ */
+describe("given a docked side panel only narrows a dialog's maximum width", () => {
   afterEach(() => {
     setDrawerEndInset(0);
     cleanup();
   });
 
-  it("centres the dialog in the space left of the panel, from the md breakpoint up", () => {
+  /** @scenario "A modal dialog stays centred while a docked panel only narrows it" */
+  it("adds no end padding to the dialog positioner", () => {
     setDrawerEndInset(412);
-    const css = rulesFor(renderOpenDialog());
-    expect(css).toContain("412px");
-    expect(css).toMatch(/@media[^{]*min-width[^{]*\{[^}]*padding-inline-end:\s*412px/);
+    const css = cssTextOf(rulesFor(renderOpenDialog().parentElement as HTMLElement));
+    // Anchor: the positioner's own rule must be found, or the negatives below pass vacuously.
+    expect(css).toMatch(/justify-content:\s*center/);
+    expect(css).not.toContain("412px");
+    expect(css).not.toContain("padding-inline-end");
   });
 
-  it("keeps the full window when no panel is docked", () => {
-    expect(rulesFor(renderOpenDialog())).not.toContain("padding-inline-end:412px");
+  /** @scenario "A modal dialog stays centred while a docked panel only narrows it" */
+  it("reduces the dialog's maximum width by the panel's width from md up", () => {
+    setDrawerEndInset(412);
+    const { base, media } = rulesFor(renderOpenDialog());
+    const capped = media.find((entry) => entry.rule.style.maxWidth.includes("412px"));
+    expect(capped?.mediaText).toMatch(/min-width/);
+    expect(maxWidths(media.map((entry) => entry.rule))).toMatch(
+      /min\([^;]*calc\(100vw - 2rem - 412px\)/,
+    );
+    expect(maxWidths(base)).toMatch(/min\([^;]*calc\(100vw - 2rem\)/);
+    expect(maxWidths(base)).not.toContain("412px");
+  });
+
+  /** @scenario "A modal dialog stays centred while a docked panel only narrows it" */
+  it("leaves the dialog's maximum width alone when no panel is docked", () => {
+    setDrawerEndInset(0);
+    const { base, media } = rulesFor(renderOpenDialog());
+    expect(media.filter((entry) => entry.rule.style.maxWidth !== "")).toEqual([]);
+    expect(maxWidths(base)).toMatch(/calc\(100vw - 2rem\)/);
   });
 });

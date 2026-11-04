@@ -1,7 +1,7 @@
 /**
  * An own decision model's request and answer (ADR-182 decision 8). The Jev body is shared by
- * Inception, Perplexity and Cloudflare; OpenAI's Decisions API takes a list of named questions,
- * which is turned back into the Jev answer shape so one reader serves every wire.
+ * every System One host; OpenAI's Decisions API (also Azure and Fireworks) takes a list of named
+ * questions, which is turned back into the Jev answer shape so one reader serves every wire.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 
@@ -81,7 +81,9 @@ const openAiDecisionResponseSchema = z.object({
       probabilities: z.array(openAiProbabilitySchema).optional(),
     }),
   ),
-  usage: z.object({ input_tokens: z.number().optional() }).optional(),
+  usage: z
+    .object({ input_tokens: z.number().optional(), output_tokens: z.number().optional() })
+    .optional(),
 });
 
 /** The answer as the Jev reader takes it, or undefined when it is not the provider's shape. */
@@ -104,11 +106,12 @@ function parseOpenAiDecision(body: unknown): ClassifierResponse | undefined {
   if (!parsed.success) return undefined;
 
   const answers = parseOpenAiAnswers(parsed.data.answers);
-  const inputTokens = parsed.data.usage?.input_tokens;
+  const { usage } = parsed.data;
   return {
     ...(parsed.data.model ? { model: parsed.data.model } : {}),
     answers,
-    ...(inputTokens === undefined ? {} : { usage: { input_tokens: inputTokens } }),
+    // Both counts carry through, so a hosted leg is billed for every token OpenAI reports.
+    ...(usage === undefined ? {} : { usage }),
   };
 }
 
@@ -143,15 +146,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * What one failed send means (ADR-182 decision 9): a refused key is never retried, a rate limit
- * or an outage is retried, and anything else is the request's own fault.
+ * or an outage is retried, and anything else is the request's own fault. An own model's 404
+ * (Azure's `DeploymentNotFound`) is the customer's setting to fix, not a failure to retry.
  */
 export type DecisionFailure =
   | Readonly<{ kind: "final"; reason: InstantEvalSkipReason }>
   | Readonly<{ kind: "retry"; reason: InstantEvalSkipReason }>;
 
-export function decisionFailureOf({ status }: { status: number }): DecisionFailure {
+export function decisionFailureOf({
+  status,
+  isOwnModel,
+}: {
+  status: number;
+  isOwnModel: boolean;
+}): DecisionFailure {
   if (status === 401 || status === 403) return { kind: "final", reason: "classifier_key_invalid" };
   if (status === 402) return { kind: "final", reason: "classifier_key_invalid" };
+  if (status === 404 && isOwnModel) return { kind: "final", reason: "classifier_not_configured" };
   if (status === 413) return { kind: "final", reason: "classifier_input_too_large" };
   if (status === 429) return { kind: "retry", reason: "classifier_rate_limited" };
   if (status >= 500) return { kind: "retry", reason: "classifier_provider_unavailable" };

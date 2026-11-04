@@ -219,15 +219,15 @@ function assignParams({ attrs, span }: { attrs: Attributes; span: Span }): void 
     return;
   }
 
-  if (params.temperature != null) {
+  if (typeof params.temperature === "number") {
     attrs["gen_ai.request.temperature"] = params.temperature;
   }
 
-  if (params.max_tokens != null) {
+  if (typeof params.max_tokens === "number") {
     attrs["gen_ai.request.max_tokens"] = params.max_tokens;
   }
 
-  if (params.top_p != null) {
+  if (typeof params.top_p === "number") {
     attrs["gen_ai.request.top_p"] = params.top_p;
   }
 

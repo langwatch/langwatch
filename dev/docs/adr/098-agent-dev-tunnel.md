@@ -36,6 +36,12 @@ What changes is the recommendation. Docs, skills and MCP descriptions offer the 
 
 [ADR-129](129-langy-local-control.md) gives Langy a way to work in the developer's own folder through `langwatch langy --share-control`. The word "dev" in `agent dev` reads as that feature, so the tunnel is documented as `langwatch agent tunnel` from now on. `agent dev` stays as a hidden alias and keeps this ADR's behaviour unchanged.
 
+## Amendment: the CLI downloads and verifies cloudflared itself
+
+The `cloudflared` npm package is gone. The CLI downloads one pinned cloudflared release from GitHub into its cache beside the CLI config, and matches the binary against Cloudflare's published SHA-256 before every run, on every platform. Before, macOS ran unchecked: the wrapper unpacked the release tarball before anything verified it, and its postinstall fetched `latest`. On macOS the archive is now matched against GitHub's asset digest before it is unpacked, and the unpacked binary against the release-notes digest. A cached binary from another release is replaced; a platform with no pin refuses to run.
+
+The CLI also spawns the tunnel itself, with `--no-autoupdate`, so cloudflared cannot replace the verified binary mid-session. `CLOUDFLARED_BIN`, the wrapper's override, goes with it; `--tunnel-url` remains the way to bring your own tunnel. Bumping the release is one edit: the tag and its digest table in `tunnel/cloudflared-binary.ts`.
+
 ## References
 
 - Related ADRs: ADR-097 (scenario remote-trace judging), ADR-128 (connected agents)

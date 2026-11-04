@@ -37,10 +37,14 @@ function commandsFor({
   query,
   reachable,
   codingAgentSessions = false,
+  dashboards = false,
+  projectKind,
 }: {
   query: string;
   reachable: { governance: boolean; gateway: boolean };
   codingAgentSessions?: boolean;
+  dashboards?: boolean;
+  projectKind?: string;
 }): Command[] {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <WithStubNavigationHost
@@ -53,6 +57,7 @@ function commandsFor({
           id: "project_1",
           slug: "demo",
           name: "Demo",
+          ...(projectKind ? { kind: projectKind } : {}),
           lastCodingAgentSessionAt: codingAgentSessions ? new Date().toISOString() : undefined,
         },
         pathname: "/demo",
@@ -60,11 +65,13 @@ function commandsFor({
           "traces:view",
           ...(reachable.gateway ? ["virtualKeys:view"] : []),
           ...(reachable.governance ? ["governance:view"] : []),
+          ...(dashboards ? ["analytics:view"] : []),
         ],
         flags: {
           release_ui_ai_gateway_menu_enabled: reachable.gateway ? ON : OFF,
           release_ui_ai_governance_enabled: ON,
           release_ui_governance_billed_cost_enabled: OFF,
+          release_dashboards: dashboards ? ON : OFF,
         },
       }}
     >
@@ -190,6 +197,30 @@ describe("Quick Search across products", () => {
 
       expect(analytics?.productLabel).toBe("LLM Ops");
       expect(sessions?.path).toBe("/[project]/sessions");
+    });
+  });
+
+  describe("when the Analytics page is listed", () => {
+    const analyticsPath = (options: { dashboards: boolean; projectKind?: string }) =>
+      commandsFor({ query: "analytics", reachable: EVERYTHING, ...options }).find(
+        (command) => command.id === "nav-analytics",
+      )?.path;
+
+    /** @scenario "AC3r Quick Search opens the same Analytics destination as the sidebar" */
+    it("opens Dashboards when the sidebar entry would", () => {
+      expect(analyticsPath({ dashboards: true })).toBe("/[project]/dashboards");
+    });
+
+    /** @scenario "AC3r Quick Search opens the same Analytics destination as the sidebar" */
+    it("opens analytics when Dashboards is out of reach", () => {
+      expect(analyticsPath({ dashboards: false })).toBe("/[project]/analytics");
+    });
+
+    /** @scenario "AC3r Quick Search opens the same Analytics destination as the sidebar" */
+    it("opens analytics for an aggregate project", () => {
+      expect(analyticsPath({ dashboards: true, projectKind: "aggregate" })).toBe(
+        "/[project]/analytics",
+      );
     });
   });
 });
