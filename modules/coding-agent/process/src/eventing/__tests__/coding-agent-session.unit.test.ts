@@ -743,7 +743,8 @@ describe("CodingAgentSessionFoldProjection", () => {
 
     /** @scenario A session context event from Codex folds its git identity */
     /** @scenario A session context event from opencode folds its git identity */
-    it.each(["codex", "opencode"])(
+    /** @scenario A session context event from pi folds its git identity */
+    it.each(["codex", "opencode", "pi"])(
       "folds the same identity for %s, because nothing in the fold is per-agent",
       (agent) => {
         const projection = makeProjection();
@@ -1959,7 +1960,7 @@ describe("coding-agent session fold, codex", () => {
       ]);
     });
 
-    it("reads codex's bare mcp_server spelling into the server set", () => {
+    it("reads codex's bare mcp_server into the server set and its tool_name as the MCP tool", () => {
       const projection = makeProjection();
 
       const state = projection.handleCodingAgentSessionLogFactsContributed(
@@ -1978,6 +1979,29 @@ describe("coding-agent session fold, codex", () => {
       );
 
       expect(state.mcpServers).toEqual(["grafana"]);
+      expect(state.mcpTools).toEqual(["search"]);
+    });
+
+    it("reads a codex builtin, with an empty mcp_server, as no MCP call", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 2_000,
+          facts: {
+            "event.name": "codex.tool_result",
+            tool_name: "shell",
+            success: "true",
+            duration_ms: 50,
+            mcp_server: "",
+          },
+        }),
+        projection.init(),
+      );
+
+      expect(state.mcpServers).toEqual([]);
+      expect(state.mcpTools).toEqual([]);
     });
   });
 

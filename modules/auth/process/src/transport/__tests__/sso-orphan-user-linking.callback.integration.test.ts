@@ -161,7 +161,7 @@ async function completeSignIn({ db, email }: { db: MemoryDb; email: string }) {
       database: hooksRepositoryOver({ db }),
       organizations: {
         findBySsoDomain: async () => ({ id: "org_example", name: "Example", ssoProvider: "okta" }),
-        createSsoDomainMembership: async () => "created",
+        createMembership: async () => ({ outcome: "created", seat: "MEMBER", pending: false }),
         countMembershipsForUser: async () => 1,
       },
       ssoMigration: createApiFixture<SsoMigrationCallbackApi>({

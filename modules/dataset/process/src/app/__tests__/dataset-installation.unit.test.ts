@@ -14,6 +14,7 @@ import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { datasetProcessModule } from "../../dataset.module.ts";
@@ -38,6 +39,7 @@ function process(
       testPeer({ token: ProjectApi, instance: createDatasetTestProjects() }),
       testPeer({ token: EntitlementApi, instance: createDatasetTestEntitlement() }),
       testPeer({ token: StoredObjectApi, instance: createApiFixture<StoredObjectApi>() }),
+      testPeer({ token: UserApi, instance: createApiFixture<UserApi>() }),
     ],
   });
 }

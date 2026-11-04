@@ -1,5 +1,6 @@
 /**
- * Whether everything a workbench state points at still exists.
+ * Whether everything a workbench state points at still exists, and keeping the dataset
+ * versions it pins out of retention.
  */
 
 import type { AgentApi } from "@langwatch/agent-contract";
@@ -53,6 +54,24 @@ export class ExperimentWorkbenchReferencesService {
           throw new WorkbenchMissingReferenceError({ refType: type, refId: id });
         }
       }
+    }
+  }
+
+  /** Marks every dataset version the state pins, so retention never thins one it will run. */
+  async pinDatasetVersions({
+    projectId,
+    state,
+  }: {
+    projectId: string;
+    state: ReturnType<typeof parseWorkbenchState>;
+  }): Promise<void> {
+    for (const dataset of state.datasets) {
+      if (dataset.type !== "saved" || !dataset.datasetId || !dataset.datasetVersion) continue;
+      await this.references.dataset.pinVersion({
+        projectId,
+        datasetId: dataset.datasetId,
+        version: dataset.datasetVersion,
+      });
     }
   }
 
