@@ -427,7 +427,19 @@ function contractCases(backend: Backend): void {
     });
   });
 
-  describe("when a retry verifies existing records", () => {
+  describe.each([
+    { mode: "standalone", locked: false },
+    { mode: "under the dataset lock", locked: true },
+  ])("when a retry verifies existing records $mode", ({ locked }) => {
+    let records: DatasetRecordRepository;
+    beforeEach(() => {
+      records = backend.records();
+    });
+    const write: DatasetRecordRepository["createMany"] = (input) =>
+      locked
+        ? records.withDatasetLock(input, (transaction) => transaction.createMany(input))
+        : records.createMany(input);
+
     /** @scenario "A verified retry is atomic and compares complete normalized entries" */
     it("rolls back every new row when a reused id has different content", async () => {
       const dataset = await create("atomic-retry");
@@ -437,9 +449,9 @@ function contractCases(backend: Backend): void {
         skipDuplicates: true,
         verifyExisting: true,
       };
-      await backend.records().createMany({ ...input, entries: [{ id: "existing", input: "old" }] });
+      await write({ ...input, entries: [{ id: "existing", input: "old" }] });
       await expect(
-        backend.records().createMany({
+        write({
           ...input,
           entries: [
             { id: "new-tail", input: "old" },
@@ -461,11 +473,9 @@ function contractCases(backend: Backend): void {
         skipDuplicates: true,
         verifyExisting: true,
       };
-      await backend
-        .records()
-        .createMany({ ...input, entries: [{ id: "mapped", input: "old", removed: "value" }] });
+      await write({ ...input, entries: [{ id: "mapped", input: "old", removed: "value" }] });
       await expect(
-        backend.records().createMany({ ...input, entries: [{ id: "mapped", input: "old" }] }),
+        write({ ...input, entries: [{ id: "mapped", input: "old" }] }),
       ).rejects.toMatchObject({ code: "dataset_record_conflict" });
       const rows = await backend.records().findByIds({ ...input, ids: ["mapped"] });
       expect(rows[0]?.entry).toEqual({ input: "old", removed: "value" });
@@ -474,7 +484,7 @@ function contractCases(backend: Backend): void {
     it("rejects an id in another dataset without leaving the rest of the batch", async () => {
       const first = await create("first-owner");
       const second = await create("second-owner");
-      await backend.records().createMany({
+      await write({
         datasetId: first.id,
         projectId: backend.mine(),
         entries: [{ id: "owned", input: "old" }],
@@ -486,7 +496,7 @@ function contractCases(backend: Backend): void {
         verifyExisting: true,
       };
       await expect(
-        backend.records().createMany({
+        write({
           ...input,
           entries: [
             { id: "fresh", input: "fresh" },
@@ -509,7 +519,7 @@ function contractCases(backend: Backend): void {
       };
       const results = await Promise.allSettled(
         ["left", "right"].map((value) =>
-          backend.records().createMany({
+          write({
             ...input,
             entries: [
               { id: `tail-${value}`, input: value },
@@ -539,12 +549,8 @@ function contractCases(backend: Backend): void {
         skipDuplicates: true,
         verifyExisting: true,
       };
-      await backend
-        .records()
-        .createMany({ ...input, entries: [{ id: "same", input: { a: 1, b: 2 } }] });
-      const rows = await backend
-        .records()
-        .createMany({ ...input, entries: [{ id: "same", input: { b: 2, a: 1 } }] });
+      await write({ ...input, entries: [{ id: "same", input: { a: 1, b: 2 } }] });
+      const rows = await write({ ...input, entries: [{ id: "same", input: { b: 2, a: 1 } }] });
       expect(rows).toHaveLength(1);
       expect(rows[0]?.entry).toEqual({ input: { a: 1, b: 2 } });
     });

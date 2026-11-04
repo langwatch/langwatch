@@ -30,6 +30,7 @@ export const datasetRecordTrpcTransport: TrpcRouterDeclaration<
     app.upsertRecord({
       recordId: input.recordId,
       updatedRecord: input.updatedRecord,
+      ...(input.columns ? { columns: input.columns } : {}),
       slugOrId: input.datasetId,
       projectId: input.projectId,
       editedBy: datasetAuthorOf({ actor }),

@@ -68,7 +68,27 @@ describe.skipIf(!databaseUrl)("given nurturing's organizations table", () => {
     });
   });
 
+  describe("when traces of an organization are recorded out of order", () => {
+    /** @scenario "A trace the organization's window drops still moves the stored time" */
+    it("keeps the latest time", async () => {
+      await repository.recordOrganization({ organizationId, adminUserId: null, seeded: false });
+
+      await repository.recordLastTrace({ organizationId, occurredAt: 2_000 });
+      await repository.recordLastTrace({ organizationId, occurredAt: 1_000 });
+
+      await expect(repository.findLastTraceAt({ organizationId })).resolves.toBe(2_000);
+    });
+  });
+
   describe("when the organization is one nurturing never learned", () => {
+    it("has no trace time", async () => {
+      const absent = `${organizationId}-absent`;
+
+      await repository.recordLastTrace({ organizationId: absent, occurredAt: 1_000 });
+
+      await expect(repository.findLastTraceAt({ organizationId: absent })).resolves.toBeNull();
+    });
+
     it("counts nothing", async () => {
       await expect(
         repository.countEvaluation({ organizationId: `${organizationId}-absent`, by: 1 }),

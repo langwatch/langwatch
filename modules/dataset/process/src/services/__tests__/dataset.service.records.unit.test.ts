@@ -85,6 +85,7 @@ function service(overrides: { columnTypes?: DatasetColumns; realRecords?: boolea
   );
 
   const database = MemoryDatasetDatabase.create();
+  database.putDataset({ ...row, sourceStoredObjectId: null });
   const repository = Object.assign(MemoryDatasetRepository.create({ database }), {
     findById: async ({ id }: { id: string; projectId: string }) => (id === row.id ? row : null),
     findBySlug: async ({ slug }: { slug: string; projectId: string }) =>
@@ -230,6 +231,25 @@ describe("DatasetService", () => {
           skipDuplicates: true,
           verifyExisting: true,
         };
+
+        /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+        it("rejects a retry whose cached columns were removed under the dataset lock", async () => {
+          const { service: subject, records } = service({ realRecords: true });
+          await records.withDatasetLock(
+            { datasetId: dataset.id, projectId: PROJECT_ID },
+            (locked) => locked.setColumnTypes([{ name: "input", type: "string" }]),
+          );
+
+          await expect(
+            subject.batchCreateRecords({
+              ...retry,
+              readBackExisting: true,
+              entries: [{ id: "row-0", input: "same", output: "stale" }],
+            }),
+          ).rejects.toMatchObject({ code: "dataset_stale_columns" });
+
+          expect(await records.count({ datasetId: dataset.id, projectId: PROJECT_ID })).toBe(0);
+        });
 
         it("does not append shifted expansion rows when an existing row conflicts", async () => {
           const { service: subject, records } = service({ realRecords: true });

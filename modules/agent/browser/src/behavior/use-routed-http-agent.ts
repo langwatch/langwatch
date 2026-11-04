@@ -9,6 +9,7 @@ import { useAgentManagementHost } from "../model/agent-management-host.ts";
 import { explainTestError } from "../model/http-test-error.ts";
 import { agentApi } from "./agent-api.ts";
 import type { HttpAgentEditorOptions } from "./use-http-agent-editor.ts";
+import { useRefreshSavedAgent } from "./use-refresh-saved-agent.ts";
 
 /**
  * What the HTTP agent editor reads and writes when the address opened it (main's editor). A save
@@ -29,7 +30,7 @@ export function useRoutedHttpAgent({
   const saved = useRef(false);
   const host = useAgentManagementHost();
   const projectId = host.project()?.id ?? "";
-  const utils = agentApi.useUtils();
+  const refreshSavedAgent = useRefreshSavedAgent({ projectId });
   const agentQuery = agentApi.agents.getById.useQuery(
     { id: agentId ?? "", projectId },
     { enabled: Boolean(agentId && projectId) },
@@ -52,12 +53,12 @@ export function useRoutedHttpAgent({
     },
     onCreate: async (input) => {
       const agent = await create.mutateAsync({ ...input, type: "http" });
-      await utils.agents.getAll.invalidate({ projectId });
+      await refreshSavedAgent({ agentId: agent.id });
       return agent;
     },
     onUpdate: async (input) => {
       const agent = await update.mutateAsync(input);
-      await utils.agents.getAll.invalidate({ projectId });
+      await refreshSavedAgent({ agentId: agent.id });
       return agent;
     },
     onTest: async ({ templateVariables, ...request }): Promise<HttpTestResult> =>
