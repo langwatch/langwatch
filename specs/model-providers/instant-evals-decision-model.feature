@@ -5,10 +5,17 @@ Feature: Instant Evals decision model column in Default models
 
   # ADR-182. LangWatch Instant Preview is the hosted, metered default. An own decision model
   # runs on the organization's key, unmetered and uncapped, behind the
-  # release_instant_evals_own_decision_model flag. A broken own key never falls back.
+  # release_instant_evals_own_decision_model flag, on by default. A broken own key never falls back.
 
   Background:
     Given an organization with a project
+
+  # --- The flag ---
+
+  @unit
+  Scenario: Own decision models are on by default
+    When the flag registry is read
+    Then the own decision model flag is a product flag, on unless switched off
 
   # --- Resolving the column ---
 
