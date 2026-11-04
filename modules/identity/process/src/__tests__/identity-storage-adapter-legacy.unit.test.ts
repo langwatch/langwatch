@@ -12,6 +12,7 @@ import {
   PASSWORD,
   signUp,
   stockStack,
+  withIssuer,
 } from "./support/storage-adapter-stack.ts";
 
 const EMAIL = "legacy@acme.com";
@@ -69,9 +70,8 @@ async function walk({ auth, db }: Stack): Promise<Transcript> {
   await context.internalAdapter.linkAccount({
     userId,
     providerId: "google",
-    // better-auth 1.7 keys an account by `(issuer, accountId)`, and
-    // synthesises this issuer for a provider that declares none of its own.
-    issuer: "local:oauth:google",
+    // The issuer auth stores for a provider that declares none of its own.
+    ...withIssuer("local:oauth:google"),
     accountId: "sub-google-1",
   });
   const linked = await context.internalAdapter.findAccounts(userId);
@@ -188,13 +188,13 @@ describe("better-auth over the identity storage adapter", () => {
       await context.internalAdapter.linkAccount({
         userId,
         providerId: "github",
-        issuer: "local:oauth:github",
+        ...withIssuer("local:oauth:github"),
         accountId: "sub-github-1",
       });
       await context.internalAdapter.linkAccount({
         userId,
         providerId: "connection-acme",
-        issuer: "https://login.acme.example",
+        ...withIssuer("https://login.acme.example"),
         accountId: "subject-olga",
       });
 
@@ -216,8 +216,8 @@ describe("better-auth over the identity storage adapter", () => {
 
     /** @scenario "A connection is found by its own issuer, not refused for it" */
     it("finds a connection account by the real issuer it was linked under", async () => {
-      // The OAuth callback looks an account up by `(issuer, accountId)`; a
-      // connection's issuer is its own URL, not a synthetic one. Answering
+      // A reader may still look an account up by `(issuer, accountId)`, as
+      // better-auth 1.7.0 did; a connection's issuer is its own URL, not a synthetic one. Answering
       // "no rows" for an issuer it could not decode meant every returning
       // connection sign-in failed to find its row and hit the account
       // uniqueness constraint trying to recreate it.
@@ -228,7 +228,7 @@ describe("better-auth over the identity storage adapter", () => {
       await context.internalAdapter.linkAccount({
         userId,
         providerId: "connection-acme",
-        issuer: "https://login.acme.example",
+        ...withIssuer("https://login.acme.example"),
         accountId: "subject-olga",
       });
 

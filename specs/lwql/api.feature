@@ -1083,17 +1083,57 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a PostgreSQL that cannot be read is unknown: a warning, no converge, and its last alert left as it was
 
   # During a rollout old and new workers run the check side by side. The check
-  # never compares columns, so a newer deploy that added a column or removed one
-  # looks healthy to an older worker, which leaves the newer view alone. Its
-  # grants are additive and never revoke, so a view only the newer catalog has
-  # keeps its SELECT. Column changes converge on a deploy only.
+  # counts a view as drift only when it lacks a column this worker's catalog
+  # declares, never for an extra one, so a newer deploy that added a column looks
+  # healthy to an older worker, which leaves the newer view alone. Its grants are
+  # additive and never revoke, so a view only the newer catalog has keeps its
+  # SELECT. A newer deploy that only removed a column is put back to the older
+  # view by an older worker, and the newer worker accepts the extra column: the
+  # view settles on the union of the columns both catalogs need, so it stops
+  # flapping until the next deploy. The check compares column names
+  # only, and a repair rewrites the whole view from the older worker's catalog,
+  # so it can also revert a newer deploy's type, expression, dedup or filter
+  # change, which the newer worker does not detect. Ship such a change in two
+  # deploys too: the second only once no older worker runs.
+  # A deploy that removes one column and adds another (a rename included) is not
+  # settled by the union: a worker that needs the removed column and one that
+  # needs the added column would each replace the other's view at every check
+  # while both run. So such a deploy ships in two: first add the new column and
+  # keep the old one, then drop the old one once no older worker runs.
   @unit
-  Scenario: An older worker never rewrites a newer view
-    Given a newer deploy has converged views and approved views that added or removed columns this worker's catalog declares
+  Scenario: An older worker never rewrites a newer view for columns it does not declare
+    Given a newer deploy has converged views and approved views that added columns this worker's catalog does not declare
     When this worker's reconvergence check runs
     Then it finds no drift and runs no DDL
     And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes
     And a deploy's converge still revokes and grants the reader role's whole set
+
+  # A deploy converges views after the engine tables and stops at the first
+  # failing statement, so a deploy whose PostgreSQL bridge fails never replaces
+  # the views over fact tables. The check is the backstop (#9245).
+  @unit
+  Scenario: The reconvergence check replaces a view a deploy left on an older definition
+    Given a view is present but lacks a column this worker's catalog declares
+    When the reconvergence check runs
+    Then it names that view as drift, and the converge replaces it with CREATE OR REPLACE VIEW
+    And it does so even when the named collection cannot be confirmed, before raising that
+
+  # A PostgreSQL-backed view reads the columns of its engine table, which a deploy
+  # whose bridge failed left on the older catalog under current credentials.
+  @unit
+  Scenario: The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column
+    Given a PostgreSQL-backed view lacks a column this worker's catalog declares
+    And its engine table is stamped with the current credentials
+    When the reconvergence check runs
+    Then it names that engine table as drift along with the view
+    And the converge rebuilds the engine table before the view, only once the named collection is confirmed
+    And while the collection is unconfirmed it replaces neither, and still raises the unconfirmed collection
+
+  @unit
+  Scenario: The reconvergence check reads a present view with no column data as unknown, not as drift
+    Given a view is present but the column read returns no columns for it
+    When the reconvergence check runs
+    Then it does not name that view as drift
 
   @unit
   Scenario: The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place
@@ -1181,6 +1221,28 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a deploy's converge replaces the engine tables unstamped, so a later check rebuilds them
     And a sql-mode deploy stamps them unprobed only once its own batch rewrote the collection, and reads first where that rewrite was skipped
     And the next check reads again
+
+  # An unqualified relation resolves through the reader role's search_path, which provisioning never
+  # sets, so a probe without a schema can fail UNKNOWN_TABLE where the views live elsewhere.
+  @unit
+  Scenario: The collection probe reads the approved view in the app's PostgreSQL schema
+    Given the approved views live in a PostgreSQL schema other than public
+    When the check reads through the named collection and with the app's own values
+    Then both reads bind that schema as a query parameter, so neither fails for the schema alone
+
+  # The reader role's search_path is never set and its default can exclude the app schema, so an
+  # engine table names it itself.
+  @unit
+  Scenario: Engine tables read the app's PostgreSQL schema
+    Given the app's PostgreSQL schema is langwatch_db
+    When the engine table statements are built
+    Then every engine table names that schema in its ENGINE clause
+
+  @unit
+  Scenario: The reconvergence check rebuilds an engine table built before the schema was pinned
+    Given an engine table stamped by a fingerprint that did not include the schema
+    When the reconvergence check runs
+    Then it names that engine table as drift
 
   # A replica that has not loaded the new collection would build its copy of a replaced table on
   # the old values, so on a cluster (CLICKHOUSE_CLUSTER, set by the chart past one replica) each
