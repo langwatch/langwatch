@@ -45,7 +45,7 @@ describe("given an organization admin approving a CLI login", () => {
 
       /** @scenario "on the approval screen, Organization at Write means managing it, not deleting it" */
       it("keeps every default permission held and adds none left off by default", () => {
-        const defaultPermissionsHeld = adminHeld(management);
+        const defaultPermissionsHeld: string[] = adminHeld(management);
 
         const permissions = cliKeyPermissions({
           isCustomized: true,

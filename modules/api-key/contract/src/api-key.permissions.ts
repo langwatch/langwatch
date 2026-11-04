@@ -336,10 +336,9 @@ export function defaultCliKeyPermissions({
 let cliCategories: readonly PermissionCategory[] | undefined;
 
 /**
- * The categories as the CLI approval screen offers them: each "Write" without what a
- * CLI login key may never carry, so Organization at Write is its management, not its
- * deletion. A caller who manages the organization without being allowed to delete it
- * can still pick it, and a `--management` default still reads back as Write.
+ * The categories as the CLI approval screen offers them: each "Write" without what a CLI
+ * key may never carry, so Organization Write is manage without delete. A manage-only
+ * caller can still pick it, and a `--management` default reads back as Write.
  */
 export function cliPermissionCategories(): readonly PermissionCategory[] {
   cliCategories ??= PERMISSION_CATEGORIES.map((category) => ({

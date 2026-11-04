@@ -7,10 +7,8 @@ import {
 } from "@langwatch/api-key-contract";
 
 /**
- * The CLI login key's permissions: untouched, the defaults held; customised, the
- * selections, read through the CLI's categories, where Organization at Write is its
- * management without its deletion. The final filter backs that up: never a permission
- * a CLI key may not carry.
+ * The CLI login key's permissions: the defaults held, or the selections read through the
+ * CLI categories (Organization Write = manage, not delete). The filter backs that up.
  */
 export function cliKeyPermissions({
   isCustomized,
@@ -28,10 +26,8 @@ export function cliKeyPermissions({
 }
 
 /**
- * Where Customize opens: the levels the default permissions held amount to, so opening
- * it and approving unchanged mints the same key. Read through the regular categories, a
- * `--management` default would show Organization at Read (Write there needs
- * `organization:delete`, which no CLI default holds) and drop `organization:manage`.
+ * Where Customize opens. Through the regular categories a `--management` default reads as
+ * Organization Read (Write there needs `organization:delete`) and drops `organization:manage`.
  */
 export const cliSelectionsFromPermissions = (permissions: string[]): Record<string, AccessLevel> =>
   selectionsFromPermissions(permissions, cliPermissionCategories());
