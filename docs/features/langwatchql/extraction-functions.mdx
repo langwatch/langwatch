@@ -46,7 +46,9 @@ LIMIT 200
 langwatch query --sql-file transcripts.sql --format jsonl --out transcripts.jsonl
 ```
 
-`LIMIT 200` is the conversation cap, so a week with more conversations returns only the first 200 ids. To get the next 200, add `OFFSET 200` after the `LIMIT`, and go on until a page has fewer than 200 rows.
+`LIMIT 200` is the conversation cap, so a week with more conversations returns only the first 200 ids. To get the next 200, add `OFFSET 200` after the `LIMIT`, and write each page to its own file, because `--out` replaces the file. Replace `subtractDays(now(), 7)` with a fixed start time, so that the pages do not shift as time passes.
+
+A page with fewer than 200 rows is the last page, unless it went over the [response size limit](/features/langwatchql/limits-and-cost#limits) and lost its trailing rows. `--format jsonl` holds rows only, so use `--format json` to see the diagnostics when you read large values. If a page has `APP_FUNCTION_RESULT_TRUNCATED`, add the number of rows it returned to the `OFFSET`, and go on.
 
 ## What are eval functions
 
@@ -65,6 +67,8 @@ eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoye
 | `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
 | `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
 
-One query judges at most 1,000 distinct texts. If the text comes from an extraction function, that function's cap also applies, so a query that judges conversations reads at most 200. Eval functions need Instant Evals switched on for the project and a key that reads a single project. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
+One query judges at most 1,000 distinct texts. If the text comes from an extraction function, that function's cap also applies, so a query that judges conversations reads at most 200. Eval functions need Instant Evals switched on for the project and a run that reads one project: use a project key, or name one project.
+
+Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
 
 **Also check:** [Instant Evals](/features/instant-evals/overview) runs the same kind of question from the CLI, and writes every verdict to the `judgments` view.

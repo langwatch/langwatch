@@ -787,7 +787,7 @@ function admitAppFunctionCall({
   if (definition.kind === "eval" && !ctx.policy.isInstantEvalsEnabled) {
     return refuse(
       "APP_FUNCTION_GATED",
-      `The function "${echoIdentifier(definition.name)}" is not available to you. A judgement is charged to one project, so it needs Instant Evals switched on for a key that reads a single project; ask an administrator to enable them, use a project key, or remove the call.`,
+      `The function "${echoIdentifier(definition.name)}" is not available to you. A judgement is charged to one project, so it needs Instant Evals switched on and a run that reads a single project; ask an administrator to enable them, name one project, or remove the call.`,
     );
   }
 

@@ -15,6 +15,7 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { describe, expect, it } from "vitest";
 
 import { LWQL_APP_FUNCTION_KEY_CAPS } from "../../features/app-functions/rules/langwatch-ql-app-function-shapes.rules.ts";
+import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../../features/hydration/rules/langwatch-ql-hydration-assembly.rules.ts";
 
 const GUIDE_DIR = "../../../../../../docs/features/langwatchql/";
 
@@ -50,6 +51,9 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
 
       expect(table).toContain(`| Rows per response | ${format(limits.maxResultRows)}.`);
       expect(table).toContain(`About ${format(limits.maxResultBytes)} bytes`);
+      expect(table).toContain(
+        `About ${format(DEFAULT_LWQL_HYDRATION_LIMITS.maxHydratedBytes)} bytes after the content is read`,
+      );
       expect(table).toContain(`${format(MAX_LWQL_LENGTH)} characters`);
       expect(table).toContain(`| Run time | ${limits.maxExecutionTimeSeconds} seconds`);
       expect(table).toContain(`| Memory | ${limits.maxMemoryUsageBytes / 1_000_000_000} GB`);
