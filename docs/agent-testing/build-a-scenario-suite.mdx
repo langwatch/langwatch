@@ -55,7 +55,7 @@ A run plan is a name and a configuration: the scope (test suites, labels or spec
 
 Give every other test suite your releases rely on its own scheduled plan, such as `Order lookup nightly`, or name several with a repeated `--test-suite`. Leave out a [suite of candidates](#how-do-scenarios-move-from-draft-to-production).
 
-LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so use the exit code as a gate only on a plan whose bar is all pass. For any other bar, such as `Refunds nightly`, replace that command with this form, which fails the job only when the batch has no result:
+LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so use the exit code as a gate only on a plan whose bar is all pass. For any other bar, such as `Refunds nightly`, replace that command with this form, which fails the job only when the batch did not finish:
 
 ```bash
 RESULT=$(langwatch run-plan run --test-suite Refunds --target connected:support-agent@staging \
@@ -63,7 +63,7 @@ RESULT=$(langwatch run-plan run --test-suite Refunds --target connected:support-
 echo "$RESULT" | jq -es '.[0].outcome == "passed" or .[0].outcome == "failed"'
 ```
 
-The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that errored with no verdict.
+The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that ended with no verdict, such as one that errored or was cancelled, so read those there too. This form does not gate a release: for a plan such as `Refunds pre-release`, have the job check `results` in the JSON against your bar.
 
 ```bash
 # Critical: 5 repetitions and a strong judge.

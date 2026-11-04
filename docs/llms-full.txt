@@ -35845,7 +35845,7 @@ A run plan is a name and a configuration: the scope (test suites, labels or spec
 
 Give every other test suite your releases rely on its own scheduled plan, such as `Order lookup nightly`, or name several with a repeated `--test-suite`. Leave out a [suite of candidates](#how-do-scenarios-move-from-draft-to-production).
 
-LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so use the exit code as a gate only on a plan whose bar is all pass. For any other bar, such as `Refunds nightly`, replace that command with this form, which fails the job only when the batch has no result:
+LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so use the exit code as a gate only on a plan whose bar is all pass. For any other bar, such as `Refunds nightly`, replace that command with this form, which fails the job only when the batch did not finish:
 
 ```bash
 RESULT=$(langwatch run-plan run --test-suite Refunds --target connected:support-agent@staging \
@@ -35853,7 +35853,7 @@ RESULT=$(langwatch run-plan run --test-suite Refunds --target connected:support-
 echo "$RESULT" | jq -es '.[0].outcome == "passed" or .[0].outcome == "failed"'
 ```
 
-The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that errored with no verdict.
+The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that ended with no verdict, such as one that errored or was cancelled, so read those there too. This form does not gate a release: for a plan such as `Refunds pre-release`, have the job check `results` in the JSON against your bar.
 
 ```bash
 # Critical: 5 repetitions and a strong judge.
@@ -37332,7 +37332,7 @@ The judge reads the agent's [linked traces](/agent-testing/linking-your-traces),
 
 Put the data a scenario needs in the test environment the target points at. Seed data the agent only reads there before the run. Data the agent changes needs a fresh copy per run, because a refund in the first repetition changes what the second one sees: [seed it per conversation](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
 
-Put the values that stay the same on every run in scenario fields, such as `expected_amount`. A field holds one value per scenario, so an id that differs per run or per environment stays in the session, the state or a [run parameter](/agent-testing/run-parameters). Compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
+Put the values that stay the same on every run in scenario fields, such as `expected_amount`. A field holds one value per scenario, so an id that differs per run stays in the session or the state, and one that differs per environment goes in a [run parameter](/agent-testing/run-parameters). Compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
 
 For how to build the data and report its state, see [Check the World, Not the Words](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
 
@@ -37380,7 +37380,7 @@ This puts the pieces together in one place. The names and counts are an example;
 | **Targets** | `support-agent` in `development`, for a developer debugging. In `staging`, for pre-merge and pre-release runs. In `production`, for a read-only canary after each deploy. |
 | **Test suite `Refunds`** | Field `expected_amount`. Required evaluator "Refund amount", which compares the output of the `refund_total` span with `expected_amount`. |
 | **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
-| **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. `canary`: reads data only, against a production process with seeding turned off. |
+| **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. `canary`: reads data only, against a production process with no setup or teardown hooks and no seeding. |
 
 The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix). Every run plan in [the refund agent table](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule), except the production canary, adds a PII scanner as a plan evaluator.
 
@@ -37575,13 +37575,13 @@ The row stays after the process stops. It keeps the agent identity, the declared
 Two targets in one run is a comparison. The results page shows one column per target, each with its own pass rate, duration and cost.
 
 ```bash
-langwatch run-plan run --test-suite "Checkout" \
+langwatch run-plan run --label canary \
   --target connected:support-agent@production \
   --target connected:support-agent@development \
-  --name "Checkout: production vs local" --wait
+  --name "Canary: production vs local" --wait
 ```
 
-A run against `production` runs on real data, so scope it to scenarios that only read data.
+A run against `production` runs on real data, so scope it to scenarios that only read data, as a `canary` label does here. Setup and teardown hooks run for every scenario, so do not declare them in that process.
 
 The same shape compares two deployed environments, `staging` against `production`, or one environment against another model:
 
