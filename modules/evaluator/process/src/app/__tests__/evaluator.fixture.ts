@@ -75,6 +75,8 @@ export function createEvaluatorTestApp(
     /** The organization's plan; uncapped unless the case says otherwise. */
     plan?: Partial<Plan>;
     workflows?: Partial<WorkflowApi>;
+    users?: UserApi;
+    auditLog?: AuditLogApi;
   }> = {},
 ): Readonly<{
   app: EvaluatorModule;
@@ -103,8 +105,9 @@ export function createEvaluatorTestApp(
       repositories: { evaluators: repository },
       dependencies: {
         permissions,
-        auditLog: createApiFixture<AuditLogApi>({ listEntityHistory: async () => [] }),
-        users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+        auditLog:
+          input.auditLog ?? createApiFixture<AuditLogApi>({ listEntityHistory: async () => [] }),
+        users: input.users ?? createApiFixture<UserApi>({ getProfiles: async () => [] }),
         workflows: createApiFixture<WorkflowApi>({
           assertInProject: async () => void 0,
           ...input.workflows,

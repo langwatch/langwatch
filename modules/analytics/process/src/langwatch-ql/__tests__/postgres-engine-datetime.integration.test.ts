@@ -173,6 +173,7 @@ describe("given every Postgres-backed view mapped into ClickHouse over seeded ro
       const current = postgresViews.engineTableStatements({
         names: harness.names,
         collection,
+        schema: "public",
         views: [projects],
       });
       const engineType = () =>

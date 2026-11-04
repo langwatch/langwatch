@@ -127,6 +127,17 @@ describe("given a response from the classifier", () => {
       expect(verdicts[1]?.score).toBeCloseTo(2.26, 10);
     });
 
+    /** @scenario "A score verdict is the probability-weighted mean of its levels" */
+    it("keeps the levels' weighted standard deviation as the score's spread", () => {
+      const mean = 2.26;
+      const variance =
+        0.06 * (1 - mean) ** 2 +
+        0.63 * (2 - mean) ** 2 +
+        0.3 * (3 - mean) ** 2 +
+        0.01 * (4 - mean) ** 2;
+      expect(verdicts[1]?.spread).toBeCloseTo(Math.sqrt(variance), 10);
+    });
+
     /** @scenario "A category verdict is the most likely option and its probability" */
     it("reads a category as its label, keeping the distribution", () => {
       expect(verdicts[2]?.label).toBe("refund");

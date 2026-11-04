@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.2.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.1.0...typescript-sdk@v2.2.0) (2026-11-03)
+
+
+### Features
+
+* agent and evaluator versioning with deploy labels, plus experiment and dependency fixes ([#9124](https://github.com/langwatch/langwatch/issues/9124)) ([ec774cb](https://github.com/langwatch/langwatch/commit/ec774cb12756a472d7260f6ed5e2292e324906cd))
+* **coding-agent:** capture Grok CLI sessions through its native OpenTelemetry ([#9224](https://github.com/langwatch/langwatch/issues/9224)) ([34c0f70](https://github.com/langwatch/langwatch/commit/34c0f700c4ff679717de20ad9bd15647631b8cec))
+* **coding-agent:** track pi as a natively instrumented coding agent ([#9203](https://github.com/langwatch/langwatch/issues/9203)) ([52eaa9e](https://github.com/langwatch/langwatch/commit/52eaa9e8f38533d84dfdde9896ac0edcd5cffb7a))
+* **dataset:** dataset version history with autosave, compare, restore, retention and run pinning ([#9121](https://github.com/langwatch/langwatch/issues/9121)) ([f50c6f0](https://github.com/langwatch/langwatch/commit/f50c6f0c999e9e1cadf7173db0e87b9d3f1108de))
+
+
+### Bug Fixes
+
+* **model-provider:** drop the Doubleword models shut down on 30 Oct ([#9214](https://github.com/langwatch/langwatch/issues/9214)) ([abfdbbf](https://github.com/langwatch/langwatch/commit/abfdbbfac18f4294d31c06c3460df60741c1c79a))
+
+## [2.1.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.0.0...typescript-sdk@v2.1.0) (2026-10-30)
+
+
+### Features
+
+* **dashboards:** per-widget "Langy traces" setting in the query editor ([#9137](https://github.com/langwatch/langwatch/issues/9137)) ([5e82c1e](https://github.com/langwatch/langwatch/commit/5e82c1ebc1d2dbfda817cf175f3aba62e485a0d8))
+* **dashboards:** widget queries take sources and projects as params ([#9171](https://github.com/langwatch/langwatch/issues/9171)) ([af5a9c3](https://github.com/langwatch/langwatch/commit/af5a9c342951371a1cf547188cff78f9cd50bcc1))
+* **experiment:** accept a per-run concurrency on the experiment run API ([#9023](https://github.com/langwatch/langwatch/issues/9023)) ([640d0f6](https://github.com/langwatch/langwatch/commit/640d0f6e21afd19e46eaed9312d4c04c121b9a4b))
+
+
+### Bug Fixes
+
+* **langy:** pick an existing test suite before creating a scenario ([#9158](https://github.com/langwatch/langwatch/issues/9158)) ([42a13b7](https://github.com/langwatch/langwatch/commit/42a13b7f97128db7cf1570ba86b7f238fdc9d33a))
+
 ## [2.0.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.20.0...typescript-sdk@v2.0.0) (2026-10-28)
 
 

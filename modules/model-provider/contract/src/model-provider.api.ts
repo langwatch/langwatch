@@ -310,6 +310,15 @@ export interface ModelProviderApi {
   }): Promise<DecisionModelResolution>;
   /** The decision models this project may be offered, hosted first; see `resolveDecisionModel`. */
   listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]>;
+  /**
+   * The decision models a Default models config on these scopes may hold, hosted first: an own
+   * one only when it runs from every scope's own chain. Scopes outside the project's
+   * organization are refused.
+   */
+  listDecisionModelsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<readonly BuiltInModel[]>;
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;

@@ -26,10 +26,10 @@ model Account {
   userId            String
   type              String    @default("oauth")
   provider          String
-  /// WHO asserted `providerAccountId` — the other half of better-auth 1.7's
-  /// account key, which it looks up as `(issuer, accountId)`. Nullable only
-  /// so the column could be added to a populated table; every write path
-  /// supplies it and the migration backfilled every existing row.
+  /// WHO asserted `providerAccountId`. Better Auth keys accounts by
+  /// `(provider, providerAccountId)`; auth's account create hook writes this
+  /// (modules/auth/specs/account-issuer.feature). Nullable only so the column
+  /// could be added to a populated table; the migration backfilled every row.
   issuer            String?
   providerAccountId String
   refresh_token     String?   @db.Text
@@ -47,7 +47,7 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
-  // The pair better-auth 1.7 looks a row up by. NOT unique, on purpose: the
+  // The pair identity reads look a row up by. NOT unique, on purpose: the
   // uniqueness that matters is already enforced above, and every issuer here
   // is derived from `provider`, so this pair is unique exactly when that one
   // is. See migration 20260825030000.
@@ -2114,6 +2114,9 @@ model Monitor {
   updatedAt         DateTime                @default(now()) @updatedAt
   autoPausedAt      DateTime? // Set when the monitor paused itself because its evaluations mostly errored
   autoPausedReason  String? // Why it paused itself; cleared with autoPausedAt when enabled again
+  evaluatorLabel    String? // The evaluator's deploy label this monitor runs; null runs the latest
+  createdById       String? // The user who created the monitor; null before creators were recorded
+  updatedById       String? // The user who changed it last
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -2243,6 +2246,48 @@ model DatasetRecord {
   // Without it the planner has to combine the two single-column indexes and
   // falls back to a sequential scan once a project's rows dominate the table.
   @@index([projectId, datasetId])
+}
+
+/// One immutable snapshot of a dataset's columns and rows; the rows are JSONL chunks in object storage.
+model DatasetVersion {
+  id                  String    @id
+  projectId           String
+  datasetId           String
+  version             Int
+  /// A name given by hand; a named version is never thinned by retention.
+  name                String?
+  /// "autosave", "manual", "experiment_run", "restore" or "initial".
+  trigger             String
+  /// SHA-256 over the columns and the rows in order; equal content saves no new version.
+  contentHash         String
+  columnTypes         Json
+  rowCount            Int
+  sizeBytes           BigInt
+  chunkCount          Int
+  restoredFromVersion Int?
+  authorId            String?
+  /// "user", "api_key" or "system": who saved the version when authorId is null.
+  authorKind          String?
+  /// Set when an experiment pins this version; a pinned version is never thinned.
+  pinnedAt            DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@unique([datasetId, version])
+  @@index([projectId, datasetId])
+}
+
+/// An experiment run that read one dataset version; a version a run read is never thinned.
+model DatasetVersionRun {
+  id           String   @id
+  projectId    String
+  datasetId    String
+  versionId    String
+  runId        String
+  experimentId String?
+  createdAt    DateTime @default(now())
+
+  @@unique([projectId, runId, datasetId])
+  @@index([versionId])
 }
 
 /// Who sees a dashboard, named as the prompt scope is, with one more level.
@@ -4223,12 +4268,53 @@ model Agent {
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
+  // The user who created the agent and the one who changed it last; null for
+  // API key callers and for rows written before creators were recorded.
+  createdById       String?
+  updatedById       String?
 
   @@unique([projectId, identityKey])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromAgentId])
   @@index([projectId, lastSeenAt])
+}
+
+/// One immutable snapshot of an agent; the Agent row is always the latest.
+model AgentVersion {
+  id            String   @id
+  projectId     String
+  agentId       String
+  version       Int
+  name          String
+  type          String
+  config        Json
+  workflowId    String?
+  commitMessage String?
+  authorId      String?
+  /// "user", "api_key" or "system": who wrote the version when authorId is null.
+  authorKind    String?
+  createdAt     DateTime @default(now())
+
+  @@unique([agentId, version])
+  @@index([projectId])
+}
+
+/// A deploy label ("production", "staging") pointing at one version of an agent.
+model AgentVersionLabel {
+  id          String   @id
+  projectId   String
+  agentId     String
+  label       String
+  versionId   String
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([agentId, label])
+  @@index([projectId])
+  @@index([versionId])
 }
 
 model Evaluator {
@@ -4249,11 +4335,52 @@ model Evaluator {
   archivedAt            DateTime?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @default(now()) @updatedAt
+  // The user who created the evaluator and the one who changed it last; null
+  // for API key callers and for rows written before creators were recorded.
+  createdById           String?
+  updatedById           String?
 
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromEvaluatorId])
+}
+
+/// One immutable snapshot of an evaluator; the Evaluator row is always the latest.
+model EvaluatorVersion {
+  id            String   @id
+  projectId     String
+  evaluatorId   String
+  version       Int
+  name          String
+  type          String
+  config        Json
+  workflowId    String?
+  commitMessage String?
+  authorId      String?
+  /// "user", "api_key" or "system": who wrote the version when authorId is null.
+  authorKind    String?
+  createdAt     DateTime @default(now())
+
+  @@unique([evaluatorId, version])
+  @@index([projectId])
+}
+
+/// A deploy label ("production", "staging") pointing at one version of an evaluator.
+model EvaluatorVersionLabel {
+  id          String   @id
+  projectId   String
+  evaluatorId String
+  label       String
+  versionId   String
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([evaluatorId, label])
+  @@index([projectId])
+  @@index([versionId])
 }
 
 model Scenario {
@@ -4845,6 +4972,7 @@ model NurturingOrganization {
   codingAgentTypes     String[]  @default([])
   codingActiveDays     Int       @default(0)
   codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  lastTraceAt          DateTime? // moves forward only; told to a person joining later
   updatedAt            DateTime  @updatedAt
 }
 

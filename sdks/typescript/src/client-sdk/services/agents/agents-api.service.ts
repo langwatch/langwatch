@@ -54,7 +54,24 @@ export interface AgentResponse {
   /** Why the agent cannot be run with this key; null when it can. */
   notSelectableReason?: "owned_by_another_person" | null;
   parameters?: AgentParameterSpec[];
+  /** The version this read shows: the latest unless a label or a version was asked for. */
+  version?: number | null;
+  /** The deploy labels and the version each one points at. */
+  labels?: { label: string; version: number }[];
+  createdBy?: { id: string; name: string | null } | null;
+  updatedBy?: { id: string; name: string | null } | null;
 }
+
+/** Which version of an agent to read: a deploy label such as `production`, or a number. */
+export type AgentVersionSelector = { label?: string; version?: number };
+
+/** An agent's versions, newest first, and where each deploy label points. */
+export type AgentVersionsResponse =
+  paths["/api/v1/agents/{agentId}/versions"]["get"]["responses"][200]["content"]["application/json"];
+
+/** A deploy label after it was moved. */
+export type AgentLabelResponse =
+  paths["/api/v1/agents/{agentId}/labels/{label}"]["put"]["responses"][200]["content"]["application/json"];
 
 export interface AgentListResponse {
   data: AgentResponse[];
@@ -125,9 +142,10 @@ export class AgentsApiService {
     }) as unknown as AgentListResponse;
   }
 
-  async get(id: string): Promise<AgentResponse> {
+  /** Reads the latest version unless a `label` or a `version` is asked for. */
+  async get(id: string, selector: AgentVersionSelector = {}): Promise<AgentResponse> {
     const { data, error, response } = await this.apiClient.GET("/api/v1/agents/{id}", {
-      params: { path: { id } },
+      params: { path: { id }, query: selector },
     });
     return unwrapApiResult({
       operation: `get agent "${id}"`,
@@ -143,6 +161,8 @@ export class AgentsApiService {
     type: string;
     config: Record<string, unknown>;
     workflowId?: string;
+    /** Recorded on version 1. */
+    commitMessage?: string;
   }): Promise<AgentResponse> {
     const { data, error, response } = await this.apiClient.POST("/api/v1/agents", {
       body: params as never,
@@ -162,6 +182,8 @@ export class AgentsApiService {
       name?: string;
       type?: string;
       config?: Record<string, unknown>;
+      /** Recorded on the version this update appends. */
+      commitMessage?: string;
     },
   ): Promise<AgentResponse> {
     const { data, error, response } = await this.apiClient.PATCH("/api/v1/agents/{id}", {
@@ -224,5 +246,50 @@ export class AgentsApiService {
       response,
       onError: this.handleApiError.bind(this),
     }) as AgentTestRunResponse;
+  }
+
+  /** Every version of the agent, newest first, with the labels on each. */
+  async listVersions(id: string): Promise<AgentVersionsResponse> {
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/agents/{agentId}/versions",
+      { params: { path: { agentId: id } } },
+    );
+    return unwrapApiResult({
+      operation: `list versions of agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as AgentVersionsResponse;
+  }
+
+  /** Points a deploy label, such as `production`, at one of the agent's versions. */
+  async assignLabel(id: string, label: string, version: number): Promise<AgentLabelResponse> {
+    const { data, error, response } = await this.apiClient.PUT(
+      "/api/v1/agents/{agentId}/labels/{label}",
+      { params: { path: { agentId: id, label } }, body: { version } },
+    );
+    return unwrapApiResult({
+      operation: `deploy label "${label}" of agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as AgentLabelResponse;
+  }
+
+  /** Removes a deploy label from the agent. */
+  async removeLabel(id: string, label: string): Promise<{ label: string; removed: true }> {
+    const { data, error, response } = await this.apiClient.DELETE(
+      "/api/v1/agents/{agentId}/labels/{label}",
+      { params: { path: { agentId: id, label } } },
+    );
+    return unwrapApiResult({
+      operation: `remove label "${label}" of agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as { label: string; removed: true };
   }
 }

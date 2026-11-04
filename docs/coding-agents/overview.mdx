@@ -1,7 +1,7 @@
 ---
 title: Coding Agent Monitoring and Cost Tracking
 sidebarTitle: Overview
-description: Track what Claude Code, Codex, Copilot, Gemini CLI and opencode really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
+description: Track what Claude Code, Codex, Copilot, Gemini CLI, opencode, Grok CLI and pi really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
 keywords:
   - coding agent monitoring
   - claude code usage
@@ -57,6 +57,20 @@ npx langwatch opencode
 ```
 
   </Tab>
+  <Tab title="Grok CLI">
+
+```bash
+npx langwatch grok
+```
+
+  </Tab>
+  <Tab title="pi">
+
+```bash
+npx langwatch pi
+```
+
+  </Tab>
   <Tab title="Cursor">
     Set Cursor's OpenAI base URL to `https://gateway.langwatch.ai/v1` and its OpenAI API key to a
     LangWatch AI Gateway virtual key. See the [gateway quickstart](/ai-gateway/quickstart).
@@ -88,6 +102,12 @@ Check out the [quickstart](/coding-agents/quickstart) for next steps.
   </Card>
   <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode">
     Sessions, cost and traces from opencode.
+  </Card>
+  <Card title="Grok CLI" icon="/images/logos/grok.svg" href="/coding-agents/grok-cli">
+    Sessions, cost and prompts from xAI's Grok CLI.
+  </Card>
+  <Card title="pi" icon="terminal" href="/coding-agents/pi">
+    Sessions, cost and traces from the pi coding agent.
   </Card>
   <Card title="Cursor and Aider" icon="/images/logos/cursor.svg" href="/ai-gateway/quickstart">
     Through the LangWatch AI Gateway: point their OpenAI base URL at

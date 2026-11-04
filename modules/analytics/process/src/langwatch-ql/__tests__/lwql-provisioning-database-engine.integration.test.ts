@@ -84,6 +84,7 @@ describe.runIf(enabled)(
               endpoint: { host: "pg", port: 5432, database: "langwatch" },
               readerPassword: "reader",
             },
+            schema: "public",
           }),
         ).toThrow(/application's own ClickHouse database/);
       });

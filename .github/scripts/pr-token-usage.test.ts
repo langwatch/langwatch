@@ -182,6 +182,10 @@ void describe("given a usage row's agent identifier", () => {
         agentCell("codex"),
         '<img src="https://app.langwatch.ai/images/external-icons/codex.svg" width="14" height="14" /> Codex',
       );
+      assert.equal(
+        agentCell("pi"),
+        '<img src="https://app.langwatch.ai/images/external-icons/pi.svg" width="14" height="14" /> pi',
+      );
       assert.equal(agentCell("mystery_agent"), "Mystery Agent");
     });
   });

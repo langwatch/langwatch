@@ -26,6 +26,7 @@ describe("fireSsoAutoAdded", () => {
             organizationId: "org-1",
             organizationName: "Acme Corp",
           },
+          traces: { hasTraces: false, lastTraceAt: null },
         });
 
         expect(calls[0]).toMatchObject({ traits: { createdAt: 1_792_664_000 } });
