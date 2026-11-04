@@ -12,8 +12,12 @@ import {
   normalizeEventName,
   parseMcpToolName,
   deriveConversationKey,
+  classifyToolCall,
+  unwrapUserQuery,
 } from "./telemetry/coding-agent-normalization.ts";
 import { pickString } from "./telemetry/coding-agent-span.ts";
+import { grokAgent } from "./telemetry/grok.ts";
+import { toolDecisionOutcome } from "./telemetry/tool-decision.ts";
 
 export function collectLogEntries(
   logs: TranscriptLogRecord[],
@@ -66,7 +70,8 @@ function buildLogEntry({
 }
 
 function userPromptEntry(attrs: Record<string, unknown>, atMs: number): TranscriptEntry {
-  const text = pickString(attrs, "prompt");
+  const raw = pickString(attrs, "prompt");
+  const text = raw === null ? null : unwrapUserQuery(raw);
   const chars =
     text !== null && text !== WITHHELD_PROMPT_TEXT
       ? text.length
@@ -114,13 +119,16 @@ function buildToolResultEntry({
   const callId = pickString(attrs, "call_id");
   const isCodex = callId !== null && pickString(attrs, "event.name") === "codex.tool_result";
   if (isCodex) return buildCodexToolResultEntry({ attrs, atMs, callId, claimedToolCalls });
+  if (isGrokEvent(pickString(attrs, "event.name"))) {
+    return buildGrokToolResultEntry(attrs, atMs);
+  }
 
   const name = pickString(attrs, "function_name");
   if (name === null) return null;
 
   const decision = pickString(attrs, "decision");
   if (decision === "reject") {
-    return { kind: "tool_rejected", atMs, name, reason: decision };
+    return { kind: "tool_rejected", atMs, name, reason: decision, outcome: "denied" };
   }
 
   return {
@@ -175,17 +183,46 @@ function buildCodexToolResultEntry({
   };
 }
 
+function isGrokEvent(eventName: string | null): boolean {
+  return eventName !== null && (grokAgent.namePrefixes ?? []).some((p) => eventName.startsWith(p));
+}
+
+/** Grok has no tool spans: its tool_result event is the whole run, content included. */
+function buildGrokToolResultEntry(
+  attrs: Record<string, unknown>,
+  atMs: number,
+): TranscriptEntry | null {
+  const name = pickString(attrs, "tool_name");
+  if (name === null) return null;
+  const origin = classifyToolCall({ toolName: name, server: pickString(attrs, "mcp_server_name") });
+
+  return {
+    kind: "tool",
+    atMs,
+    name,
+    mcpServer: origin.kind === "mcp" ? origin.server : null,
+    input: parseMaybeJson(pickString(attrs, "tool_input") ?? pickString(attrs, "tool_parameters")),
+    output: pickString(attrs, "tool_output"),
+    durationMs: pickNumber(attrs, "duration_ms"),
+    failed: pickString(attrs, "success")?.toLowerCase() === "false",
+    agentId: null,
+    spanId: "",
+  };
+}
+
 function buildToolDecisionEntry(
   attrs: Record<string, unknown>,
   atMs: number,
 ): TranscriptEntry | null {
   const decision = pickString(attrs, "decision");
-  if (decision === null || decision === "accept") return null;
+  const outcome = toolDecisionOutcome({ decision, source: pickString(attrs, "source") });
+  if (decision === null || outcome === "unknown" || outcome === "allowed") return null;
 
   return {
     kind: "tool_rejected",
     atMs,
     name: pickString(attrs, "tool_name"),
     reason: pickString(attrs, "source") ?? decision,
+    outcome,
   };
 }

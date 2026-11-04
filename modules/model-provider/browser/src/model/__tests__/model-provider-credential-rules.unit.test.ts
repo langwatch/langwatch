@@ -8,6 +8,7 @@ import {
   getDisplayKeysForProvider,
   getEmptyRequiredCredentialKeys,
   getRequiredCredentialKeys,
+  isSecretCredentialField,
 } from "../model-provider-helpers.ts";
 
 /** The exact inputs the drawer feeds the rule for a given provider. */
@@ -125,6 +126,31 @@ describe("getRequiredCredentialKeys()", () => {
           AZURE_OPENAI_API_VERSION: "",
         }),
       ).toEqual(["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"]);
+    });
+
+    /** @scenario "An admin can name the Azure deployment of a decision model" */
+    it("shows Azure's decision model deployment names as optional, unmasked fields", () => {
+      const definition = modelProviders.azure;
+      const shown = Object.keys(
+        getDisplayKeysForProvider("azure", false, getSchemaShape(definition.keysSchema)),
+      );
+
+      expect(shown).toEqual(
+        expect.arrayContaining([
+          "AZURE_OPENAI_DECISIONS_DEPLOYMENT",
+          "AZURE_DECISION_1_DEPLOYMENT",
+        ]),
+      );
+      expect(
+        requiredKeysFor("azure", {
+          AZURE_OPENAI_API_KEY: "",
+          AZURE_OPENAI_ENDPOINT: "",
+          AZURE_OPENAI_DECISIONS_DEPLOYMENT: "",
+          AZURE_DECISION_1_DEPLOYMENT: "",
+        }),
+      ).toEqual(["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"]);
+      expect(isSecretCredentialField("AZURE_OPENAI_DECISIONS_DEPLOYMENT")).toBe(false);
+      expect(isSecretCredentialField("AZURE_DECISION_1_DEPLOYMENT")).toBe(false);
     });
 
     it("keeps every AWS credential required for bedrock", () => {

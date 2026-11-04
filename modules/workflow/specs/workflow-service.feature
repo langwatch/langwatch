@@ -291,6 +291,15 @@ Feature: Workflow service boundary
     And the confirmation names the evaluators and monitors from the preview the reader confirmed
 
   @unit
+  Scenario: Archiving a workflow refuses a deployed agent the caller may not undeploy
+    Given a workflow two agents run, one of them with a "production" label
+    And a caller without "agents:deploy"
+    When the caller archives the workflow with its dependants
+    Then the deployed agent's deploy check runs first, naming the caller
+    And it is refused with code "agent_deployed_label_protected"
+    And neither agent nor the workflow is archived
+
+  @unit
   Scenario: The workflows list reads copy lineage on a process that supplies only stores and declared peers
     Given the workflow module is installed on the process's stores and its declared peers alone
     When the project's workflows are listed with their copy lineage

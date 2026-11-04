@@ -29,7 +29,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get an agent in the caller's project */
+        /**
+         * Get an agent in the caller's project
+         * @description Reads the latest version unless `label` or `version` is given. The id also takes a suffix: `agent_1:production`, `agent_1:3` or `agent_1:latest`.
+         */
         get: operations["getAgent"];
         /** Update an authored agent; PUT retains partial update semantics */
         put: operations["replaceAgent"];
@@ -40,6 +43,47 @@ export interface paths {
         head?: never;
         /** Update an authored agent */
         patch: operations["updateAgent"];
+        trace?: never;
+    };
+    "/api/v1/agents/{agentId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an agent's versions
+         * @description Every version of the agent, newest first, with the labels on each.
+         */
+        get: operations["listAgentVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{agentId}/labels/{label}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Point a deploy label at an agent version
+         * @description Points a deploy label, such as production, at one of the agent's versions.
+         */
+        put: operations["assignAgentLabel"];
+        post?: never;
+        /** Remove a deploy label from an agent */
+        delete: operations["removeAgentLabel"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/agents/{id}/call": {
@@ -93,9 +137,9 @@ export interface paths {
          *
          *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.
          *
-         *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+         *     A project API key, or any key that can read exactly one project, reads that project and needs none. A key that reaches several must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). A key that reads no project is refused with `projects_unreadable` (422) when it names no project or sends "all"; a project it names and cannot read is `project_not_found` (404). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
          *
-         *     To run over one project only, send its id as `projectId` in the body: the run then reads that project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same answer as a project that does not exist. Without `projectId` the run spans every project the key can read.
+         *     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of another organization and a project that does not exist are all refused with `project_not_found` (404), with one body that names no id. Send `sources` to bind `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to the projects read. The answer's `params` lists every placeholder the statement declares by its SQL name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
          *
          *     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
          *
@@ -356,7 +400,7 @@ export interface paths {
         head?: never;
         /**
          * Update a dashboard
-         * @description Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).
+         * @description Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.
          */
         patch: operations["patchApiDashboardsByDashboardId"];
         trace?: never;
@@ -376,7 +420,7 @@ export interface paths {
         put?: never;
         /**
          * Create a widget on a dashboard
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a query that names none counts `["application"]`.
          */
         post: operations["postApiDashboardsByDashboardIdWidgets"];
         delete?: never;
@@ -408,7 +452,7 @@ export interface paths {
         head?: never;
         /**
          * Update a widget on a dashboard
-         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.
+         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value; a query sent without `sources` keeps the sources stored under its name, and `sources: null` clears them. A body with none of these fields is refused.
          */
         patch: operations["patchApiDashboardsByDashboardIdWidgetsByWidgetId"];
         trace?: never;
@@ -624,7 +668,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get a specific evaluator by ID or slug */
+        /** @description Get a specific evaluator by ID or slug, at the latest version unless `label` or `version` is given. The address also takes a suffix: `toxicity:production`, `toxicity:2` or `toxicity:latest`. */
         get: operations["getApiEvaluatorsByIdOrSlug"];
         put?: never;
         post?: never;
@@ -652,6 +696,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/evaluators/{evaluatorId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List an evaluator's versions, newest first, with the labels on each */
+        get: operations["getApiEvaluatorsVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/evaluators/{evaluatorId}/labels/{label}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Point a deploy label, such as production, at one of the evaluator's versions */
+        put: operations["putApiEvaluatorsLabel"];
+        post?: never;
+        /** @description Remove a deploy label from an evaluator */
+        delete: operations["deleteApiEvaluatorsLabel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/experiments/{slug}/run": {
         parameters: {
             query?: never;
@@ -663,7 +742,7 @@ export interface paths {
         put?: never;
         /**
          * Run an experiment
-         * @description Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.
+         * @description Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads a version of its saved dataset: `dataset_version` when given, else the version the experiment pins, else the current content saved as a new version.
          */
         post: operations["postApiExperimentsBySlugRun"];
         delete?: never;
@@ -1623,6 +1702,23 @@ export interface operations {
                             selectable: boolean;
                             /** @description Why the agent cannot be run by this credential. Null when it can. */
                             notSelectableReason: "owned_by_another_person" | null;
+                            /** @description The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code. */
+                            version: number | null;
+                            /** @description The deploy labels the agent carries, such as production, and the version each points at. */
+                            labels: {
+                                label: string;
+                                version: number;
+                            }[];
+                            /** @description The user who created the agent. Null when an API key created it, or it predates creators being recorded. */
+                            createdBy: {
+                                id: string;
+                                name: string | null;
+                            } | null;
+                            /** @description The user who changed the agent last. Null when an API key changed it. */
+                            updatedBy: {
+                                id: string;
+                                name: string | null;
+                            } | null;
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
@@ -1652,6 +1748,8 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
                     workflowId?: string;
                     copiedFromAgentId?: string;
                     /** @constant */
@@ -1740,6 +1838,8 @@ export interface operations {
                     };
                 } | {
                     name: string;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
                     workflowId?: string;
                     copiedFromAgentId?: string;
                     /** @constant */
@@ -1818,6 +1918,8 @@ export interface operations {
                     };
                 } | {
                     name: string;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
                     workflowId?: string;
                     copiedFromAgentId?: string;
                     /** @constant */
@@ -1921,6 +2023,8 @@ export interface operations {
                     };
                 } | {
                     name: string;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
                     workflowId?: string;
                     copiedFromAgentId?: string;
                     /** @constant */
@@ -2024,6 +2128,8 @@ export interface operations {
                     };
                 } | {
                     name: string;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
                     workflowId?: string;
                     copiedFromAgentId?: string;
                     /** @constant */
@@ -2033,6 +2139,8 @@ export interface operations {
                     };
                 } | {
                     name: string;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
                     workflowId?: string;
                     copiedFromAgentId?: string;
                     /** @constant */
@@ -2122,6 +2230,23 @@ export interface operations {
                         selectable: boolean;
                         /** @description Why the agent cannot be run by this credential. Null when it can. */
                         notSelectableReason: "owned_by_another_person" | null;
+                        /** @description The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code. */
+                        version: number | null;
+                        /** @description The deploy labels the agent carries, such as production, and the version each points at. */
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                        /** @description The user who created the agent. Null when an API key created it, or it predates creators being recorded. */
+                        createdBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
+                        /** @description The user who changed the agent last. Null when an API key changed it. */
+                        updatedBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
                         /** Format: date-time */
                         createdAt: string;
                         /** Format: date-time */
@@ -2135,7 +2260,12 @@ export interface operations {
     };
     getAgent: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A deploy label, for example production. Omit both to read the latest version. */
+                label?: string;
+                /** @description A version number. */
+                version?: number;
+            };
             header?: never;
             path: {
                 /** @description The agent id. */
@@ -2212,6 +2342,23 @@ export interface operations {
                         selectable: boolean;
                         /** @description Why the agent cannot be run by this credential. Null when it can. */
                         notSelectableReason: "owned_by_another_person" | null;
+                        /** @description The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code. */
+                        version: number | null;
+                        /** @description The deploy labels the agent carries, such as production, and the version each points at. */
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                        /** @description The user who created the agent. Null when an API key created it, or it predates creators being recorded. */
+                        createdBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
+                        /** @description The user who changed the agent last. Null when an API key changed it. */
+                        updatedBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
                         /** Format: date-time */
                         createdAt: string;
                         /** Format: date-time */
@@ -2243,6 +2390,8 @@ export interface operations {
                         [key: string]: unknown;
                     };
                     workflowId?: string | null;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
                 };
             };
         };
@@ -2314,6 +2463,23 @@ export interface operations {
                         selectable: boolean;
                         /** @description Why the agent cannot be run by this credential. Null when it can. */
                         notSelectableReason: "owned_by_another_person" | null;
+                        /** @description The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code. */
+                        version: number | null;
+                        /** @description The deploy labels the agent carries, such as production, and the version each points at. */
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                        /** @description The user who created the agent. Null when an API key created it, or it predates creators being recorded. */
+                        createdBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
+                        /** @description The user who changed the agent last. Null when an API key changed it. */
+                        updatedBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
                         /** Format: date-time */
                         createdAt: string;
                         /** Format: date-time */
@@ -2374,6 +2540,8 @@ export interface operations {
                         [key: string]: unknown;
                     };
                     workflowId?: string | null;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
                 };
             };
         };
@@ -2445,12 +2613,146 @@ export interface operations {
                         selectable: boolean;
                         /** @description Why the agent cannot be run by this credential. Null when it can. */
                         notSelectableReason: "owned_by_another_person" | null;
+                        /** @description The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code. */
+                        version: number | null;
+                        /** @description The deploy labels the agent carries, such as production, and the version each points at. */
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                        /** @description The user who created the agent. Null when an API key created it, or it predates creators being recorded. */
+                        createdBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
+                        /** @description The user who changed the agent last. Null when an API key changed it. */
+                        updatedBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
                         /** Format: date-time */
                         createdAt: string;
                         /** Format: date-time */
                         updatedAt: string;
                         /** Format: uri */
                         platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    listAgentVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                agentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            agentId: string;
+                            projectId: string;
+                            version: number;
+                            name: string;
+                            /** @enum {string} */
+                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                            config: {
+                                [key: string]: unknown;
+                            };
+                            workflowId: string | null;
+                            commitMessage: string | null;
+                            authorId: string | null;
+                            authorKind: ("user" | "api_key" | "system") | null;
+                            author: {
+                                id: string;
+                                name: string | null;
+                                email: string | null;
+                            } | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            labels: string[];
+                        }[];
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    assignAgentLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                agentId: string;
+                /** @description The deploy label, for example production. */
+                label: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The version number the label points at. */
+                    version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        label: string;
+                        version: number;
+                        versionId: string;
+                    };
+                };
+            };
+        };
+    };
+    removeAgentLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                agentId: string;
+                /** @description The deploy label, for example production. */
+                label: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        label: string;
+                        /** @constant */
+                        removed: true;
                     };
                 };
             };
@@ -3082,8 +3384,12 @@ export interface operations {
                         end: string | number;
                     };
                     granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
-                    /** @description Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read. */
+                    /** @description Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both. */
                     projectId?: string;
+                    /** @description The projects to read, each one the key holds analytics:view on, or the string "all" for every project the key can read. A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read. */
+                    projects?: string | string[];
+                    /** @description The trace origins {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter by itself: the statement keeps its rows with a predicate such as WHERE Source IN {dashboard_context_sources:Array(String)}. A statement that never uses the placeholder counts every origin. */
+                    sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[];
                 };
             };
         };
@@ -3110,7 +3416,7 @@ export interface operations {
                         };
                         readonly diagnostics: {
                             /** @enum {string} */
-                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED" | "SHARE_WINDOW_LIMITED" | "SOURCES_IGNORED" | "GRANULARITY_COARSENED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -3138,6 +3444,9 @@ export interface operations {
                                 count: number;
                                 models: string[];
                             };
+                        };
+                        params?: {
+                            [key: string]: unknown;
                         };
                     };
                 };
@@ -3354,7 +3663,7 @@ export interface operations {
                                 type: string;
                                 description: string;
                                 unit: string | null;
-                                readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage"))[];
+                                readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage" | "agents:deploy" | "evaluators:deploy"))[];
                                 available: boolean;
                             }[];
                             exampleSql: string;
@@ -3369,7 +3678,7 @@ export interface operations {
                             /** @enum {string} */
                             kind: "extraction" | "eval";
                             cap: number;
-                            readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage"))[];
+                            readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage" | "agents:deploy" | "evaluators:deploy"))[];
                             available: boolean;
                             exampleSql: string;
                         }[];
@@ -3532,7 +3841,7 @@ export interface operations {
                                         type: string;
                                         description: string;
                                         unit: string | null;
-                                        readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage"))[];
+                                        readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage" | "agents:deploy" | "evaluators:deploy"))[];
                                         available: boolean;
                                     }[];
                                     exampleSql: string;
@@ -3547,7 +3856,7 @@ export interface operations {
                                     /** @enum {string} */
                                     kind: "extraction" | "eval";
                                     cap: number;
-                                    readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage"))[];
+                                    readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage" | "agents:deploy" | "evaluators:deploy"))[];
                                     available: boolean;
                                     exampleSql: string;
                                 }[];
@@ -3605,7 +3914,7 @@ export interface operations {
                                 description: string;
                             }[];
                             requires: {
-                                readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage"))[];
+                                readonly gates: (("input" | "output" | "costs") | ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage" | "agents:deploy" | "evaluators:deploy"))[];
                                 readonly functions: string[];
                             };
                             available: boolean;
@@ -5101,7 +5410,6 @@ export interface operations {
                             description: string | null;
                             /** @enum {string} */
                             scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                            excludedOrigins: string[] | null;
                             createdById: string | null;
                             createdAt: string;
                             updatedAt: string;
@@ -5260,7 +5568,6 @@ export interface operations {
                         description: string | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                        excludedOrigins: string[] | null;
                         createdById: string | null;
                         createdAt: string;
                         updatedAt: string;
@@ -5413,7 +5720,6 @@ export interface operations {
                         description: string | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                        excludedOrigins: string[] | null;
                         createdById: string | null;
                         createdAt: string;
                         updatedAt: string;
@@ -5762,7 +6068,6 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
-                    excludedOrigins?: string[] | null;
                 };
             };
         };
@@ -5779,7 +6084,6 @@ export interface operations {
                         description: string | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                        excludedOrigins: string[] | null;
                         createdById: string | null;
                         createdAt: string;
                         updatedAt: string;
@@ -5972,6 +6276,8 @@ export interface operations {
                                         type: "string" | "number" | "boolean";
                                         default?: string | number | boolean;
                                     }[];
+                                    sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                    projects?: string[] | null;
                                 }[];
                                 description?: string;
                                 prompt?: string;
@@ -6177,6 +6483,8 @@ export interface operations {
                             type: "string" | "number" | "boolean";
                             default?: string | number | boolean;
                         }[];
+                        sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                        projects?: string[] | null;
                     }[];
                     description?: string;
                     prompt?: string;
@@ -6219,6 +6527,8 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                projects?: string[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6433,6 +6743,8 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                projects?: string[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6818,6 +7130,8 @@ export interface operations {
                             type: "string" | "number" | "boolean";
                             default?: string | number | boolean;
                         }[];
+                        sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                        projects?: string[] | null;
                     }[];
                     description?: string;
                     source?: {
@@ -6859,6 +7173,8 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
+                                projects?: string[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -8987,6 +9303,23 @@ export interface operations {
                         }[];
                         workflowName?: string;
                         workflowIcon?: string;
+                        /** @description The version this response shows: the latest, unless a label or a version was asked for. */
+                        version: number | null;
+                        /** @description The deploy labels the evaluator carries, such as production, and the version each points at. */
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                        /** @description The user who created the evaluator. Null when an API key created it, or it predates creators being recorded. */
+                        createdBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
+                        /** @description The user who changed the evaluator last. Null when an API key changed it. */
+                        updatedBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -9045,6 +9378,23 @@ export interface operations {
                         }[];
                         workflowName?: string;
                         workflowIcon?: string;
+                        /** @description The version this response shows: the latest, unless a label or a version was asked for. */
+                        version: number | null;
+                        /** @description The deploy labels the evaluator carries, such as production, and the version each points at. */
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                        /** @description The user who created the evaluator. Null when an API key created it, or it predates creators being recorded. */
+                        createdBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
+                        /** @description The user who changed the evaluator last. Null when an API key changed it. */
+                        updatedBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -9054,7 +9404,12 @@ export interface operations {
     };
     getApiEvaluatorsByIdOrSlug: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A deploy label, for example production. Omit both to read the latest version. */
+                label?: string;
+                /** @description A version number. */
+                version?: number;
+            };
             header?: never;
             path: {
                 /** @description The evaluator id or its project-unique slug. */
@@ -9097,6 +9452,23 @@ export interface operations {
                         }[];
                         workflowName?: string;
                         workflowIcon?: string;
+                        /** @description The version this response shows: the latest, unless a label or a version was asked for. */
+                        version: number | null;
+                        /** @description The deploy labels the evaluator carries, such as production, and the version each points at. */
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                        /** @description The user who created the evaluator. Null when an API key created it, or it predates creators being recorded. */
+                        createdBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
+                        /** @description The user who changed the evaluator last. Null when an API key changed it. */
+                        updatedBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -9133,6 +9505,8 @@ export interface operations {
                     config?: {
                         [key: string]: unknown;
                     };
+                    /** @description A note kept on the version this update appends. */
+                    commitMessage?: string;
                 };
             };
         };
@@ -9170,6 +9544,23 @@ export interface operations {
                         }[];
                         workflowName?: string;
                         workflowIcon?: string;
+                        /** @description The version this response shows: the latest, unless a label or a version was asked for. */
+                        version: number | null;
+                        /** @description The deploy labels the evaluator carries, such as production, and the version each points at. */
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                        /** @description The user who created the evaluator. Null when an API key created it, or it predates creators being recorded. */
+                        createdBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
+                        /** @description The user who changed the evaluator last. Null when an API key changed it. */
+                        updatedBy: {
+                            id: string;
+                            name: string | null;
+                        } | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -9238,6 +9629,171 @@ export interface operations {
             };
         };
     };
+    getApiEvaluatorsVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The evaluator id. */
+                evaluatorId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            evaluatorId: string;
+                            projectId: string;
+                            version: number;
+                            name: string;
+                            /** @enum {string} */
+                            type: "evaluator" | "code" | "workflow";
+                            config: {
+                                [key: string]: unknown;
+                            };
+                            workflowId: string | null;
+                            commitMessage: string | null;
+                            authorId: string | null;
+                            authorKind: ("user" | "api_key" | "system") | null;
+                            author: {
+                                id: string;
+                                name: string | null;
+                                email: string | null;
+                            } | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            labels: string[];
+                        }[];
+                        labels: {
+                            label: string;
+                            version: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    putApiEvaluatorsLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The evaluator id. */
+                evaluatorId: string;
+                /** @description The deploy label, for example production. */
+                label: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The version number the label points at. */
+                    version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        label: string;
+                        version: number;
+                        versionId: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiEvaluatorsLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The evaluator id. */
+                evaluatorId: string;
+                /** @description The deploy label, for example production. */
+                label: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        label: string;
+                        /** @constant */
+                        removed: true;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     postApiExperimentsBySlugRun: {
         parameters: {
             query?: never;
@@ -9255,10 +9811,12 @@ export interface operations {
                         [key: string]: unknown;
                     }[];
                     dataset_id?: string;
+                    dataset_version?: number;
                     parameters?: {
                         [key: string]: string | number | boolean;
                     };
                     row_indices?: number[];
+                    concurrency?: number;
                 };
             };
         };
@@ -9296,7 +9854,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description No such experiment or run in this project */
+            /** @description No such experiment in this project, or its dataset has no version `dataset_version` names (`dataset_version_not_found`) */
             404: {
                 headers: {
                     [name: string]: unknown;

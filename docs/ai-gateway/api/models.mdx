@@ -60,7 +60,7 @@ A model from a provider that has an [instance handle](/ai-gateway/model-naming#i
 
 A provider the key can dispatch to can contribute no models to the catalog. The response then carries `X-Langwatch-Models-Discovery-Incomplete` with one `provider:reason` token per gap, comma separated:
 
-```
+```http
 X-Langwatch-Models-Discovery-Incomplete: bedrock:not-enumerable,openai:probe-failed
 ```
 

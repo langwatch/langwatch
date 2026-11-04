@@ -1,14 +1,13 @@
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import {
-  boardExcludedOriginsSchema,
-  boardSchema,
   DashboardNotFoundError,
+  dashboardSchema,
   type DashboardScope,
   type DashboardStar,
   type StarredDashboard,
 } from "@langwatch/dashboard-contract";
 import { isRecordNotFoundError, PrismaRepository } from "@langwatch/prisma-client";
-import { type DashboardsV2, Prisma } from "@langwatch/prisma-client/generated";
+import type { DashboardsV2, Prisma } from "@langwatch/prisma-client/generated";
 
 import type {
   BoardReach,
@@ -57,7 +56,7 @@ const memberStars = (input: MemberStars): Prisma.DashboardFavouriteWhereInput =>
 });
 
 const boardRow = (row: DashboardsV2): BoardRecord =>
-  boardSchema.parse({
+  dashboardSchema.parse({
     id: row.id,
     projectId: row.projectId,
     name: row.name,
@@ -66,26 +65,9 @@ const boardRow = (row: DashboardsV2): BoardRecord =>
     createdById: row.createdById,
     scope: row.scope,
     organizationId: row.organizationId,
-    excludedOrigins: row.excludedOrigins,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
-
-/**
- * A null list is written as SQL NULL, the board's default, not as a JSON null. A list is checked
- * as the contract bounds it, so no caller stores one a widget's query would refuse.
- */
-const boardData = ({ excludedOrigins, ...data }: BoardUpdate): Prisma.DashboardsV2UpdateInput => ({
-  ...data,
-  ...(excludedOrigins === undefined
-    ? {}
-    : {
-        excludedOrigins:
-          excludedOrigins === null
-            ? Prisma.DbNull
-            : [...boardExcludedOriginsSchema.parse(excludedOrigins)],
-      }),
-});
 
 export class PrismaBoardRepository
   extends PrismaRepository.transactionalFor(
@@ -159,7 +141,7 @@ export class PrismaBoardRepository
     return boardRow(
       await this.prisma.dashboardsV2.update({
         where: { id: input.dashboardId, projectId: input.projectId },
-        data: boardData(input.data),
+        data: input.data,
       }),
     );
   }

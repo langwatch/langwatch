@@ -1,4 +1,8 @@
-import { type DashboardWidget, DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
+import {
+  type DashboardWidget,
+  DashboardWidgetNotFoundError,
+  langWatchQLKeyReachSchema,
+} from "@langwatch/analytics-contract";
 import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 /**
  * Dashboard widgets under `/api/v1/projects/:projectId/analytics/dashboard-widgets`,
@@ -36,10 +40,16 @@ import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts
  */
 export const dashboardWidgetUrl = defineMiddlewareContext("dashboardWidgetUrl", z.string());
 
-/** The source a widget created through this API records when its body names none. */
-export const dashboardWidgetCallerSource = defineMiddlewareContext(
-  "dashboardWidgetCallerSource",
-  dashboardWidgetSourceSchema,
+/**
+ * Who a widget write comes from: the source it records when its body names none, and the API
+ * key it arrives with, so the projects it names are judged as a run of that key would be.
+ */
+export const dashboardWidgetCaller = defineMiddlewareContext(
+  "dashboardWidgetCaller",
+  z.object({
+    source: dashboardWidgetSourceSchema,
+    keyReach: langWatchQLKeyReachSchema.optional(),
+  }),
 );
 
 /** The tags every operation in this file carries in the published document. */
@@ -138,7 +148,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   .withParams(dashboardWidgetProjectParamsSchema)
   .withInput(createDashboardWidgetSchema)
   .withPermission("analytics:create")
-  .withMiddlewareContext(dashboardWidgetUrl, dashboardWidgetCallerSource)
+  .withMiddlewareContext(dashboardWidgetUrl, dashboardWidgetCaller)
   .withOutput(dashboardWidgetResourceSchema)
   .withStatus(201)
   .withDocs({
@@ -151,16 +161,18 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       201: { description: "The widget was saved" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl, callerSource) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl, caller) => {
     const projectId = scope.id;
     const widget = await app.createDashboardWidget({
       projectId,
+      ...viewerOfActor({ actor }),
+      ...(caller.keyReach ? { keyReach: caller.keyReach } : {}),
       name: input.name,
       code: input.code,
       queries: input.queries,
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
-      source: input.source ?? callerSource,
+      source: input.source ?? caller.source,
     });
 
     return widgetResource(widget, platformUrl);
@@ -207,7 +219,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   .withParams(dashboardWidgetParamsSchema)
   .withInput(updateDashboardWidgetSchema)
   .withPermission("analytics:update")
-  .withMiddlewareContext(dashboardWidgetUrl)
+  .withMiddlewareContext(dashboardWidgetUrl, dashboardWidgetCaller)
   .withOutput(dashboardWidgetResourceSchema)
   .withDocs({
     summary: "Update a dashboard widget",
@@ -220,12 +232,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The updated widget" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl, caller) => {
     const projectId = scope.id;
     const { name, code, queries, description, source } = input;
     const widget = await app.updateDashboardWidget({
       id: input.widgetId,
       projectId,
+      ...(caller.keyReach ? { keyReach: caller.keyReach } : {}),
       ...viewerOfActor({ actor }),
       ...(name === undefined ? {} : { name }),
       ...(code === undefined ? {} : { code }),

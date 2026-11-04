@@ -1,6 +1,6 @@
 import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box } from "@langwatch/design-system/primitives";
+import { Badge, Box } from "@langwatch/design-system/primitives";
 import { ResourceTile } from "@langwatch/design-system/resource-tile";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import {
@@ -72,7 +72,21 @@ export function EvaluatorCard({
         </Box>
       }
       title={evaluator.name}
-      meta={`${typeLabel}${evaluatorType ? ` • ${evaluatorType}` : ""} • ${updatedAtLabel}`}
+      badges={
+        evaluator.version ? (
+          <Badge size="xs" variant="subtle" data-testid={`evaluator-version-${evaluator.id}`}>
+            v{evaluator.version}
+          </Badge>
+        ) : undefined
+      }
+      meta={[
+        typeLabel,
+        evaluatorType,
+        evaluator.createdBy?.name ? `Created by ${evaluator.createdBy.name}` : null,
+        updatedAtLabel,
+      ]
+        .filter(Boolean)
+        .join(" • ")}
       menu={
         <Menu.Root>
           <Menu.Trigger

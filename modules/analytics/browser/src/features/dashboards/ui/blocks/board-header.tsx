@@ -1,7 +1,7 @@
 /**
  * A board's header: title (badged on a From LangWatch board, with its scope on a stored one),
  * what peers lend it and one action, then the description, an Organization board's Project
- * chip, a stored board's Langy setting and the period. Star and rename live in the sidebar.
+ * chip and the period. Star and rename live in the sidebar.
  */
 
 import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/analytics-client";
@@ -22,7 +22,6 @@ export function BoardHeader({
   pointer,
   action,
   project,
-  langyControl,
   periodControl,
 }: {
   name: string;
@@ -39,8 +38,6 @@ export function BoardHeader({
   action: ReactNode;
   /** The Project chip of an Organization board: whose data it shows. */
   project?: ReactNode;
-  /** A stored board's "Langy traces" setting (AC200). */
-  langyControl?: ReactNode;
   periodControl: ReactNode;
 }) {
   return (
@@ -62,7 +59,6 @@ export function BoardHeader({
         <BoardDescription description={description} onDescribe={onDescribe} />
         <Spacer />
         {project}
-        {langyControl}
         {periodControl}
       </HStack>
     </VStack>

@@ -8,6 +8,7 @@ import { api } from "../../../behavior/langy-api.ts";
 import { isLangyTranscriptMessage } from "../../transcript/model/langy-transcript.ts";
 import { toEngineMessage } from "../model/langy-engine-parts.ts";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport.ts";
+import { settledWriteOf } from "./logic/langy-write-refresh.ts";
 
 /**
  * At most one transcript re-render per window while a turn streams. Unthrottled, every chunk is a
@@ -67,6 +68,8 @@ export function useLangyChatEngine({
     previousStatusRef.current = status;
   }, [status, utils]);
 
+  const markCallsSeen = useRefreshAppListsOnWrite({ messages, utils });
+
   // useChat's setMessages identity is not guaranteed stable across renders.
   // Capture it in a ref so callers' effects key on real state changes (a
   // conversation-id transition) without re-firing every render — which would
@@ -75,16 +78,17 @@ export function useLangyChatEngine({
   setMessagesRef.current = setMessages;
 
   const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
-    const uiMessages = history
-      .filter(isLangyTranscriptMessage)
-      // `recorded` marks a message off the durable fold: a card fence still in its
-      // TEXT is one the relay decided was not a block (ADR-060 §1). Its `parts`
-      // were stored VERBATIM off the stream and re-enter the engine checked.
-      .map((m) =>
-        toEngineMessage({ id: m.id, role: m.role, parts: m.parts, metadata: { recorded: true } }),
-      );
-    setMessagesRef.current(uiMessages);
+    setMessagesRef.current(toEngineHistory(history));
   }, []);
+
+  const loadStoredHistory = useCallback(
+    (history: LangyMessageDto[]) => {
+      const uiMessages = toEngineHistory(history);
+      markCallsSeen(uiMessages);
+      setMessagesRef.current(uiMessages);
+    },
+    [markCallsSeen],
+  );
 
   const retryTurn = useRetryKeepingFailedReply({ messages, regenerate, setMessagesRef });
 
@@ -115,7 +119,16 @@ export function useLangyChatEngine({
      * The stream writes into a new assistant message, or the last one when it already is one.
      */
     resumeStream,
+    /**
+     * Put a history read from the record into the engine. Writes in it that this tab has not
+     * refreshed yet still refresh: a turn another tab ran, or one a dropped stream never showed.
+     */
     applyHistoryToEngine,
+    /**
+     * Open a stored conversation the user picked. Its writes landed long ago, so they refresh
+     * nothing; only calls that settle from here on do.
+     */
+    loadStoredHistory,
     resetEngine,
     /**
      * Dismiss the engine's error WITHOUT the rest of a reset — the
@@ -124,6 +137,50 @@ export function useLangyChatEngine({
      */
     clearError,
   };
+}
+
+function toEngineHistory(history: LangyMessageDto[]): UIMessage[] {
+  return (
+    history
+      .filter(isLangyTranscriptMessage)
+      // `recorded` marks a message off the durable fold: a card fence still in its
+      // TEXT is one the relay decided was not a block (ADR-060 §1). Its `parts`
+      // were stored VERBATIM off the stream and re-enter the engine checked.
+      .map((m) =>
+        toEngineMessage({ id: m.id, role: m.role, parts: m.parts, metadata: { recorded: true } }),
+      )
+  );
+}
+
+/**
+ * Invalidate the app queries a settled Langy write touched, once per tool call, so an open page
+ * shows what Langy made without a reload. Answers the call that marks the calls of a conversation
+ * the user opens as already refreshed.
+ */
+function useRefreshAppListsOnWrite({
+  messages,
+  utils,
+}: {
+  messages: UIMessage[];
+  utils: ReturnType<typeof api.useUtils>;
+}): (hydrated: UIMessage[]) => void {
+  const refreshedCallsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    for (const part of messages.flatMap((message) => message.parts)) {
+      const write = settledWriteOf(part);
+      if (!write || refreshedCallsRef.current.has(write.callId)) continue;
+      refreshedCallsRef.current.add(write.callId);
+      for (const router of write.routers) void utils[router].invalidate();
+    }
+  }, [messages, utils]);
+
+  return useCallback((hydrated: UIMessage[]) => {
+    for (const part of hydrated.flatMap((message) => message.parts)) {
+      const write = settledWriteOf(part);
+      if (write) refreshedCallsRef.current.add(write.callId);
+    }
+  }, []);
 }
 
 /**

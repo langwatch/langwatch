@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-03
 
-**Status:** Accepted
+**Status:** Accepted. Superseded in part by [ADR-190](./190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md) (decisions 6, 8 and 11 for routed calls; decision 13 amended).
 
 > One line: when an LLM-as-a-judge evaluator names Instant Evals as its model, the **evaluation module** turns its settings into one classifier **question** and maps the verdict back to today's result shape, and a new leaf module, the Instant Evals judge, answers it with a **budget check, a classification and one spend record keyed by the evaluation's own retry key**. The meter, the pricing rule and the $1 budget check already exist in Instant Evals and are reused; wave 1 only connects the judge to them.
 

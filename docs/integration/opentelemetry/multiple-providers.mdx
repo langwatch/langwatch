@@ -15,6 +15,10 @@ does not touch the global one, so each SDK operates independently.
 
 ## Python
 
+```bash
+pip install langwatch opentelemetry-sdk
+```
+
 Pass a dedicated `TracerProvider` to `langwatch.setup()`. LangWatch uses it
 exclusively, leaving the global provider for the other SDK:
 
@@ -57,6 +61,10 @@ def chat(user_message: str):
 ```
 
 ## TypeScript
+
+```bash
+npm install langwatch @opentelemetry/sdk-trace-node
+```
 
 Pass a dedicated `NodeTracerProvider` via the `tracerProvider` option.
 LangWatch attaches its exporter to it and skips global provider detection:
@@ -104,6 +112,8 @@ If you don't need full isolation and just want LangWatch to receive spans from
 an existing provider, use `advanced.attachToExistingProvider`:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 setupObservability({
   langwatch: { apiKey: process.env.LANGWATCH_API_KEY },
   advanced: { attachToExistingProvider: true },
@@ -141,3 +151,9 @@ langwatch.setup(
 ```
 
 This is a name-based blocklist. The dedicated provider approach is more reliable.
+
+## Check it worked
+
+Run a function decorated with `@langwatch.trace()` (Python) or wrapped in a LangWatch tracer span (TypeScript). Then open your project in LangWatch: the trace appears in the traces list within a few seconds, and the other tool does not receive it. Application spans recorded on the global provider stay in the other tool and do not appear in LangWatch.
+
+If no trace appears in LangWatch, check that `LANGWATCH_API_KEY` is set, or that the key passed to the setup call is right.

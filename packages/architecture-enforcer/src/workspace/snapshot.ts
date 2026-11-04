@@ -32,6 +32,7 @@ const APPLICATION_PACKAGES: readonly {
   name: string;
 }[] = [
   { role: "ui", path: "ui", name: "@langwatch/ui" },
+  { role: "ui", path: "docs", name: "@langwatch/docs-site" },
   { role: "api", path: "api", name: "@langwatch/platform-api" },
   { role: "worker", path: "worker", name: "@langwatch/worker" },
   { role: "server", path: "server", name: "@langwatch/server" },
@@ -266,7 +267,7 @@ function discoverApplications(discovery: Discovery): void {
       file: unexpectedManifest,
       message: `Unknown application workspace apps/${directory}.`,
       allowed:
-        "The fixed application roots are ui, api, worker, server, tasks and backend, beside the standalone scenario-child program and the internal consoles haven-web and sims (ADR-160).",
+        "The fixed application roots are ui, docs, api, worker, server, tasks and backend, beside the standalone scenario-child program and the internal consoles haven-web and sims (ADR-160).",
     });
   }
 

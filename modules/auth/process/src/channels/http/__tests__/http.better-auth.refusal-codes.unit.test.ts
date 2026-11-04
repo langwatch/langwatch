@@ -13,6 +13,7 @@ import { findRegisteredRefusals } from "../../../rules/better-auth-error-code.ru
 import { PASSWORD_RESET_REQUIRED_CODE } from "../http.better-auth-hooks.channel.ts";
 import {
   answerAuthRefusalByRegisteredCode,
+  answeringReleasedRefusals,
   releaseHandledRefusal,
 } from "../http.better-auth.channel.ts";
 
@@ -49,7 +50,9 @@ function refusalHarness({ passwordResetRequired = false } = {}) {
 
   const host = new Hono();
   host.onError(createErrorHandler());
-  host.all("/api/auth/*", (context) => auth.handler(context.req.raw));
+  host.all("/api/auth/*", (context) =>
+    answeringReleasedRefusals(() => auth.handler(context.req.raw)),
+  );
 
   return async function post(path: string, body: unknown): Promise<Response> {
     return host.fetch(

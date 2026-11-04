@@ -33,11 +33,11 @@ export type PIICheckOptions = {
 };
 
 /**
- * Maximum attribute value length (in characters) for PII redaction.
- * Matches the Presidio truncation limit in piiCheck.ts — values beyond this
- * are only partially scanned anyway, so skip the expensive call entirely.
+ * Cumulative characters per span sent for PII analysis: the budget the app injects, and the one
+ * used when the injected value is not a finite non-negative number. The ceiling is the gateway
+ * timeout one analysis request must answer inside, not how much of a value gets scanned.
  */
-export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
+export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 400_000;
 
 /** One text to analyse, and whether its name/place findings are dropped. */
 export type PiiAnalysisItem = { text: string; isNameExempt: boolean };

@@ -43,3 +43,45 @@ Feature: Run via API snippet generator
     Then the Python snippet reads per-row results and the run url
     And the TypeScript snippet reads the rows and the run url
     And the Shell snippet starts the run, polls it, then fetches the results
+
+  # ==========================================================================
+  # Per-run execution for experiments (CI)
+  # ==========================================================================
+
+  @unit
+  Scenario: An experiment snippet carries the run's concurrency in every language
+    Given an experiment snippet with a concurrency of 4
+    When I generate the Python, TypeScript, Go, Shell, CLI and GitHub Actions snippets
+    Then each one starts the run with a concurrency of 4
+
+  @unit
+  Scenario: A sequential experiment snippet starts the run with a concurrency of one
+    Given an experiment snippet that runs sequentially
+    When I generate the CLI snippet
+    Then it passes a concurrency of 1
+
+  @unit
+  Scenario: A workflow snippet carries no concurrency
+    Given a workflow snippet with a concurrency of 4
+    When I generate the Python and Shell snippets
+    Then neither names a concurrency
+
+  @unit
+  Scenario: The CLI snippet runs the experiment and waits for it to finish
+    Given an experiment with an entry field the dataset does not provide
+    When I generate the CLI snippet for the attached dataset
+    Then it runs "langwatch experiment run" for the experiment with --wait
+    And passes the missing field as a --param flag
+
+  @unit
+  Scenario: The GitHub Actions snippet runs the CLI with the API key from a repository secret
+    When I generate the GitHub Actions snippet for an experiment on a self-hosted origin
+    Then it is a workflow step that runs the CLI through npx
+    And it reads LANGWATCH_API_KEY from the repository's secrets
+    And it points LANGWATCH_ENDPOINT at that origin
+
+  @unit
+  Scenario: The CLI snippets say they run the attached dataset when another data source is chosen
+    When I generate the CLI snippet for the inline-data source
+    Then it says the CLI runs the experiment's attached dataset
+    And it passes no inline rows

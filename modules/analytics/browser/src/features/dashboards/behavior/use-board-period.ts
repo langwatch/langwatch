@@ -1,7 +1,7 @@
 /**
  * What every widget on a board is run with: the period from the address's `range` and `grain`,
- * the origins it leaves out, and the writes the header control makes. One reading per
- * board, so every widget updates together (AC13). Live rolls; a fixed range re-ends on refresh.
+ * and the header control's writes. One reading per board, so every widget updates together
+ * (AC13). Live rolls; a fixed range re-ends on refresh.
  */
 
 import { nowInstant } from "@langwatch/time";
@@ -9,13 +9,12 @@ import { useMemo, useState } from "react";
 
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import {
-  type BoardQueryContext,
+  type BoardPeriod,
   boardGrainFits,
   boardPeriodBounds,
   boardPeriodGranularity,
   type BoardPeriodGrain,
   type BoardPeriodRange,
-  boardExcludedOrigins,
   boardWindowEnd,
   parseBoardPeriodGrain,
   parseBoardPeriodRange,
@@ -41,21 +40,10 @@ export function useBoardRange() {
   };
 }
 
-/**
- * `refreshedAt` is the board's auto-refresh clock; each move re-ends a fixed range at now.
- * `excludedOrigins` is what a stored board keeps; absent or null, the board's default (AC200).
- */
-export function useBoardPeriod({
-  refreshedAt,
-  excludedOrigins = null,
-}: {
-  refreshedAt?: number;
-  excludedOrigins?: readonly string[] | null;
-} = {}) {
-  const host = useAnalyticsHost();
+/** `refreshedAt` is the board's auto-refresh clock; each move re-ends a fixed range at now. */
+export function useBoardPeriod({ refreshedAt }: { refreshedAt?: number } = {}) {
   const board = useBoardRange();
   const { range, grain } = board;
-  const isPersonalProject = host.project()?.isPersonal === true;
 
   // When the range was picked, so a range change ends at now and a render does not.
   const [picked, setPicked] = useState(() => ({ range, at: nowInstant().epochMilliseconds }));
@@ -70,14 +58,13 @@ export function useBoardPeriod({
     () => boardPeriodBounds({ range, now: windowEnd }),
     [range, windowEnd],
   );
-  const period: BoardQueryContext = useMemo(
+  const period: BoardPeriod = useMemo(
     () => ({
       periodStart,
       periodEnd,
       granularitySeconds: boardPeriodGranularity({ grain, periodStart, periodEnd }),
-      excludeOrigins: boardExcludedOrigins({ stored: excludedOrigins, isPersonalProject }),
     }),
-    [grain, periodStart, periodEnd, isPersonalProject, excludedOrigins],
+    [grain, periodStart, periodEnd],
   );
 
   return { ...board, period };
