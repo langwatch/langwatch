@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { isSameOrigin, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
+import { UI_SIGN_OUT_PATH } from "../../behavior/ui-session-client.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import {
@@ -17,13 +18,6 @@ import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
 import { FRONT_DOOR_PRIMARY_STYLE } from "../elements/front-door-primary-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
-
-/**
- * Server route that clears the app session and, on Auth0 deployments, federates to Auth0
- * `/v2/logout` to clear the identity-provider session too (see logoutHandler in
- * server/routes/auth.ts). Other providers just clear the app session and return to sign-in.
- */
-export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
 
 /**
  * The registry's words for a code the boundary admits, when it holds any. Gated on the admitted
@@ -218,7 +212,7 @@ function SignInErrorDescription({
           Continue with your organization&apos;s sign-in
         </Button>
         <FrontDoorLinkButton
-          href={FEDERATED_LOGOUT_PATH}
+          href={UI_SIGN_OUT_PATH}
           label="Sign out and try again"
           tone="secondary"
         />
@@ -238,7 +232,7 @@ function SignInErrorDescription({
           login.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>
       </VStack>
     );
@@ -265,8 +259,12 @@ function SignInErrorDescription({
           Your organization requires single sign-on. Sign out and sign in again by entering your
           company email address, then choose your organization's login.
         </Text>
+        <Text textStyle="bodySm" color="fg.muted">
+          If your company&apos;s sign-in turns you away, your company may not have given you access
+          to LangWatch yet. Ask your IT administrator to check.
+        </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>
       </VStack>
     );
@@ -280,7 +278,7 @@ function SignInErrorDescription({
           provider.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out</a>
         </Button>
       </VStack>
     );
@@ -298,7 +296,7 @@ function SignInErrorDescription({
           meantime, sign in with a method you have used before.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>
       </VStack>
     );
@@ -352,7 +350,7 @@ function SignInErrorDescription({
       <VStack gap={4} align="stretch">
         <Text>{admitted.description}</Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>
       </VStack>
     );

@@ -2,6 +2,8 @@ package nlpgo
 
 import (
 	"testing"
+
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 )
 
 // TestEngineDefaults pins the engine-level SSE timeouts at the
@@ -122,5 +124,22 @@ func TestBlockTimeoutDefaultsMatchTodaysHardcodedValues(t *testing.T) {
 			t.Errorf("Engine.%s = %d; want %d (12min — the value the executor hardcoded before the knob existed)",
 				tc.name, tc.got, twelveMinutes)
 		}
+	}
+}
+
+// Setting the operator variable by the name the executor quotes in its error
+// must reach the config, so renaming the tag or the prefix turns this red.
+func TestCodeBlockAllowVisibleProcessHydrates(t *testing.T) {
+	for value, want := range map[string]bool{"true": true, "1": true, "false": false} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv(codeblock.AllowVisibleProcessSetting, value)
+			cfg, err := LoadConfig(t.Context())
+			if err != nil {
+				t.Fatalf("LoadConfig: %v", err)
+			}
+			if cfg.Engine.CodeBlockAllowVisibleProcess != want {
+				t.Errorf("hydrated %q to %v; want %v", value, cfg.Engine.CodeBlockAllowVisibleProcess, want)
+			}
+		})
 	}
 }

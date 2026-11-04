@@ -16,6 +16,11 @@ import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
  */
 type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord" | "$queryRaw" | "$transaction">;
 
+/** Entries written per statement while a dataset's entries are replaced. */
+const REPLACE_BATCH_SIZE = 500;
+/** A replace writes up to one whole read of entries, so it gets the dataset mutation's time. */
+const REPLACE_TXN_TIMEOUT_MS = 120_000;
+
 /**
  * Declared rather than inherited from `PrismaRepository.for`: the ordered reads
  * are SQL, and the model-scoped client that base class hands over has no
@@ -198,6 +203,58 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
     });
     return result.count;
   }
+
+  async replaceAll(input: {
+    datasetId: string;
+    projectId: string;
+    entries: (DatasetRecordInput & { id: string })[];
+  }): Promise<void> {
+    const { datasetId, projectId } = input;
+    const writtenAt = Date.now();
+    await this.database.$transaction(
+      async (tx) => {
+        await tx.datasetRecord.deleteMany({ where: { datasetId, projectId } });
+        for (let start = 0; start < input.entries.length; start += REPLACE_BATCH_SIZE) {
+          await tx.datasetRecord.createMany({
+            data: input.entries
+              .slice(start, start + REPLACE_BATCH_SIZE)
+              .map(({ id, ...entry }, offset) => {
+                const createdAt = replacedAt({
+                  writtenAt,
+                  position: start + offset,
+                  count: input.entries.length,
+                });
+                return {
+                  id,
+                  datasetId,
+                  projectId,
+                  entry: entry as Prisma.InputJsonValue,
+                  createdAt,
+                  updatedAt: createdAt,
+                };
+              }),
+          });
+        }
+      },
+      { timeout: REPLACE_TXN_TIMEOUT_MS },
+    );
+  }
+}
+
+/**
+ * Reads order entries by `createdAt`: a replacement stamps its entries one millisecond apart in
+ * the order given, ending before the write time, so an entry added after it still reads last.
+ */
+function replacedAt({
+  writtenAt,
+  position,
+  count,
+}: {
+  writtenAt: number;
+  position: number;
+  count: number;
+}): Date {
+  return new Date(writtenAt - (count - position));
 }
 
 function toDatasetRecord(row: unknown): DatasetRecord {

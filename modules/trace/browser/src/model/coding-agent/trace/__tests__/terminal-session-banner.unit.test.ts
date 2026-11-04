@@ -148,4 +148,24 @@ describe("deriveSessionBanner", () => {
       expect(copilot.model).toBe("gpt-5-mini");
     });
   });
+
+  describe("given a Grok session, which sends logs and no spans", () => {
+    /** @scenario The terminal banner names Grok and its version */
+    it("names Grok from its service and reads its version, with no model to show", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: {
+          "service.name": "grok-cli",
+          "service.version": "1.0.70 (f50904eaee6c)",
+        },
+        spans: [],
+      });
+
+      expect(banner).toEqual({
+        agent: "grok",
+        version: "1.0.70 (f50904eaee6c)",
+        model: null,
+        repo: null,
+      });
+    });
+  });
 });

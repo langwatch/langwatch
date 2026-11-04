@@ -286,6 +286,28 @@ describe("the personal Sessions table", () => {
     });
   });
 
+  describe("given a pi session, whose spans carry no prompt and no title", () => {
+    /** @scenario "A pi session falls back to untitled rather than to a span name" */
+    it("names it as an untitled session, never after a span name or pi's session id", () => {
+      const sessionId = "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+      pinSessions([
+        sessionRow({
+          sessionId,
+          title: null,
+          agent: "pi",
+          agentVersion: "",
+          models: ["claude-opus-4-7"],
+        }),
+      ]);
+
+      renderTable();
+
+      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.queryByText(/pi\.harness|pi\.ai\.request/)).not.toBeInTheDocument();
+      expect(screen.queryByText(sessionId)).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a session whose branch has no pull request", () => {
     /** @scenario "A session with no pull request reads as none" */
     it("reads the pull request cell as absent", () => {

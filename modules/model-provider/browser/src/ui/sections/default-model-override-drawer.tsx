@@ -13,8 +13,6 @@ import {
 } from "@langwatch/design-system/provider-model-selector";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useFeatureFlag } from "@langwatch/feature-flag-client";
-import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
@@ -350,13 +348,8 @@ interface Props {
 export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const host = useModelProviderHost();
   const { closeDrawer } = useDrawer();
-  const { projectId, organizationId } = host.scope();
+  const { projectId } = host.scope();
   const utils = modelProviderApi.useUtils();
-  // Asked of the organization only, so the picker agrees with the server's write check.
-  const { enabled: ownDecisionModelsEnabled } = useFeatureFlag(
-    FrontendFlags.release_instant_evals_own_decision_model,
-    { projectId: NOT_TARGETED, organizationId, enabled: !!organizationId },
-  );
   const saveMutation = modelProviderApi.modelProvider.saveDefaultModelsConfig.useMutation();
 
   // Pulls the same Payload DefaultModelsSection consumes - tRPC
@@ -439,12 +432,17 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     { enabled: !!projectId && open, refetchOnMount: false },
   );
 
-  const decisionOptions = decisionModelPickerOptions({
-    ownModelsEnabled: ownDecisionModelsEnabled,
-    enabledProviderKeys: projectProviders.data
-      ? new Set(projectProviders.data.filter((p) => p.enabled === true).map((p) => p.provider))
-      : null,
-  });
+  // The server weighs the flag and the keys of the picked scopes, not the page's project, so
+  // the column offers only models every picked scope would run. No scope picked: LangWatch only.
+  const pickableDecisionModels =
+    modelProviderApi.modelProvider.listDecisionModelsForScopes.useQuery(
+      {
+        projectId: projectId ?? "",
+        scopes: scopes.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId })),
+      },
+      { enabled: !!projectId && scopes.length > 0 && open },
+    );
+  const decisionOptions = decisionModelPickerOptions({ pickable: pickableDecisionModels.data });
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,
     hasProviderLoadError: projectProviders.isError,

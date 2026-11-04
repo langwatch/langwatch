@@ -61,6 +61,9 @@ export const INSTANT_EVAL_DECISION_WIRES = ["openai_decisions", "jev", "cloudfla
 
 export type InstantEvalDecisionWire = (typeof INSTANT_EVAL_DECISION_WIRES)[number];
 
+/** How the key travels: `Authorization: Bearer`, or Azure's `api-key` header. */
+export type InstantEvalDecisionAuthHeader = "bearer" | "api_key";
+
 /**
  * An organization's own decision model, resolved by the caller from Default models. The judge
  * calls it with the organization's key, unmetered and uncapped (ADR-182 decisions 6 and 7).
@@ -70,6 +73,8 @@ export interface InstantEvalOwnDecisionModel {
   readonly wire: InstantEvalDecisionWire;
   readonly providerModel: string;
   readonly endpoint: string;
+  /** Bearer when absent. */
+  readonly authHeader?: InstantEvalDecisionAuthHeader;
   /** Never logged, stored or returned. */
   readonly apiKey: string;
 }
@@ -78,8 +83,8 @@ export interface InstantEvalOwnDecisionModel {
 export function instantEvalOwnDecisionModelOf(
   resolved: InstantEvalOwnDecisionModel,
 ): InstantEvalOwnDecisionModel {
-  const { model, wire, providerModel, endpoint, apiKey } = resolved;
-  return { model, wire, providerModel, endpoint, apiKey };
+  const { model, wire, providerModel, endpoint, authHeader, apiKey } = resolved;
+  return { model, wire, providerModel, endpoint, ...(authHeader ? { authHeader } : {}), apiKey };
 }
 
 /** Why an own decision model cannot run; model-provider's list, as no contract imports another. */
@@ -87,7 +92,8 @@ export type InstantEvalUnavailableDecisionModelReason =
   | "not_enabled"
   | "provider_missing"
   | "provider_disabled"
-  | "key_missing";
+  | "key_missing"
+  | "endpoint_invalid";
 
 /** The skip an own model that cannot run answers with; never LangWatch's classifier (ADR-182). */
 export function instantEvalUnavailableDecisionModelSkipOf({

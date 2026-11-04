@@ -137,7 +137,8 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     label: "Evaluations",
     accessLevels: ["read", "write"],
     readPermissions: viewsOf("evaluations"),
-    writePermissions: allActionsOf("evaluations"),
+    // Agents and evaluators are edited under evaluations, so their deploy labels move with it.
+    writePermissions: allActionsOf("evaluations", "agents", "evaluators"),
   },
   {
     key: "langy",
