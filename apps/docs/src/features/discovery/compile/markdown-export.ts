@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { approximateTokens } from "../../../lib/page-tokens.ts";
+import { REPOSITORY_URL } from "../../../lib/repository.ts";
 import { canonicalUrl, docsUrl } from "../../../lib/site-path.ts";
 import { resolveOperation } from "../../api-reference/compile.ts";
 import {
@@ -11,7 +13,7 @@ import {
 } from "../../api-reference/model.ts";
 import { readFrontmatter, withoutFrontmatter } from "../../content/compile.ts";
 import { readDocsConfig } from "../../navigation/compile.ts";
-import { withReleaseNotes } from "../../releases/compile.ts";
+import { RELEASES_SLUG, readReleases, withReleaseNotes } from "../../releases/compile.ts";
 import { mdxToMarkdown } from "./mdx-markdown.ts";
 import { FENCE, mapProse, markedLines } from "./mdx-text.ts";
 import { pageDescription } from "./page-head.ts";
@@ -147,7 +149,7 @@ function operationMarkdown({ operation }: { operation: Operation }) {
   return sections.filter(Boolean).join("\n\n");
 }
 
-const SOURCE_REPOSITORY = "https://github.com/langwatch/langwatch/blob/main/docs";
+const SOURCE_REPOSITORY = `${REPOSITORY_URL}/blob/main/docs`;
 const SNIPPET_IMPORT = /^import\s+([A-Z]\w*)\s+from\s+["'](\/snippets\/[^"']+\.mdx)["'];?\s*$/;
 /** A snippet compiles on its own, so a fence it leaves open ends with it; an empty one goes. */
 function closeFence({ source }: { source: string }) {
@@ -258,13 +260,41 @@ export function pageMarkdown({
   docsRoot,
   slug,
   instructions = agentInstructions({ docsRoot }),
+  pageTokens,
 }: {
   docsRoot: string;
   slug: string;
   /** Pass "" where pages are concatenated, so the block appears once rather than per page. */
   instructions?: string;
+  /** The changelog export keeps the newest releases that fit this many tokens, maybe none. */
+  pageTokens?: number;
 }) {
   const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
+  const exportOf = ({ releaseCount }: { releaseCount?: number } = {}) =>
+    exportMarkdown({ docsRoot, slug, instructions, source, releaseCount });
+  if (slug !== RELEASES_SLUG || pageTokens === undefined) return exportOf();
+  for (let count = readReleases({ docsRoot }).length; count > 0; count--) {
+    const markdown = exportOf({ releaseCount: count });
+    if (approximateTokens({ text: markdown }) <= pageTokens) return markdown;
+  }
+  // Even the newest release can exceed the budget. Fall back to the note alone,
+  // and leave any remaining overage to the agent-readiness audit.
+  return exportOf({ releaseCount: 0 });
+}
+
+function exportMarkdown({
+  docsRoot,
+  slug,
+  instructions,
+  source,
+  releaseCount,
+}: {
+  docsRoot: string;
+  slug: string;
+  instructions: string;
+  source: string;
+  releaseCount?: number;
+}) {
   const metadata = readFrontmatter({ source });
   const operation = metadata.openapi
     ? resolveOperation({ docsRoot, openapi: metadata.openapi })
@@ -274,7 +304,9 @@ export function pageMarkdown({
   const fallbackTitle = (slug.split("/").pop() ?? slug).replaceAll("-", " ");
   const title = (metadata.title ?? operation?.summary ?? fallbackTitle) || fallbackTitle;
   const description = pageDescription({ title, description: metadata.description, operation });
-  const authored = withoutFrontmatter({ source: withReleaseNotes({ source, slug, docsRoot }) });
+  const authored = withoutFrontmatter({
+    source: withReleaseNotes({ source, slug, docsRoot, releaseCount }),
+  });
   const markdown = mdxToMarkdown({ source: inlineSnippets({ docsRoot, source: authored }) });
   const body = absoluteLinks({ source: markdown }).trim();
   return (

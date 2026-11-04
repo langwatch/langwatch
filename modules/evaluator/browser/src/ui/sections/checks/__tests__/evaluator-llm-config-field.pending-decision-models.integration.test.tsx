@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const OWN_DECISION_MODEL = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions (gpt-6-luna)",
+  label: "OpenAI Decisions API",
 };
 
 const state = vi.hoisted(() => ({

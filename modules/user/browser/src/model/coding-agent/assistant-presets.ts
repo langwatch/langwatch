@@ -8,6 +8,8 @@ export const ASSISTANT_KINDS = [
   "opencode",
   "cursor",
   "github_copilot",
+  "grok",
+  "pi",
   "custom",
 ] as const;
 
@@ -61,6 +63,17 @@ export const ASSISTANT_PRESETS: Record<Exclude<AssistantKind, "custom">, Assista
     label: "GitHub Copilot",
     iconUrl: "/images/external-icons/github-copilot.svg",
     darkModeInvert: true,
+  },
+  grok: {
+    label: "Grok",
+    iconUrl: "/images/external-icons/grok-lighttheme.svg",
+    darkModeInvert: true,
+  },
+  // pi spells its own name in lower case, and no mark of pi's ships in this build or its package.
+  pi: {
+    label: "pi",
+    iconUrl: null,
+    darkModeInvert: false,
   },
 };
 
