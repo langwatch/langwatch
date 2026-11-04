@@ -68,8 +68,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     Question String CODEC(ZSTD(3)),
     Kind LowCardinality(String) CODEC(ZSTD(1)),
     JudgeModel LowCardinality(String) CODEC(ZSTD(1)),
-    InputHash String CODEC(ZSTD(1)),
-    JudgedColumn LowCardinality(String) CODEC(ZSTD(1)),  -- the judged column (input, output, ...); 'monitor' for a monitor
+    InputHash String DEFAULT '' CODEC(ZSTD(1)),
+    JudgedColumn LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),  -- the judged column (input, output, ...); 'monitor' for a monitor; every writer sets it
     KeyVersion UInt16 CODEC(ZSTD(1)),  -- recall reads only the current version
 
     -- Who asked: ask, run, dashboard or monitor, and the id of that query, run, widget or monitor.
@@ -105,7 +105,7 @@ Why this shape:
 - **The sort key leads with the trace.** `(TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash)` is the recall key, and its first three columns are the trace page's read. Both are prefix reads.
 - **`InputHash` is in the key.** `eval(input, 'q')` and `eval(output, 'q')` on one trace are two rows, and recall serves each its own verdict. `JudgedColumn` names the column, so a reader can tell the two apart after the text changes.
 - **`SourceId, JudgedAt` end the key.** Every judgment is kept: a rerun, a "judge again" or a monitor re-evaluating the same trace adds a row. An exact retry of one insert has the same `JudgedAt`, so the replacing merge collapses it. `Source` and `SourceId` are provenance only, and recall never reads them. A row is shared by every source that judges the same text with the same question and judge. A wrong or forged `SourceId` cannot change which verdict recall returns.
-- **`KeyVersion`** is the recall epoch. Recall reads only rows with the current version. Rows written before recall is on, or under a key bug, are never served; a version bump retires them.
+- **`KeyVersion`** is the recall epoch. Recall reads only rows with the current version. Rows written before recall is on, or under a key bug, are never recalled; a version bump retires them.
 - **The partition and TTL anchor on `OccurredAt`**, the trace's time. `trace_summaries` uses the same anchor (`ttl.reconciler.ts:139-145`) and the same `toYearWeek` partition (00002 line 179). So a result expires with its trace.
 - **The TTL clause** is what `buildRetentionTTLExpression` emits for a `TABLE_TTL_CONFIG` entry with `retentionTTLColumn: "OccurredAt"` (`ttl.reconciler.ts:327-331`). With cold storage off, the reconciler finds it correct and issues no ALTER. With `CLICKHOUSE_COLD_STORAGE_ENABLED` on, `planTieredTTL` (`ttl.reconciler.ts:438-475`) adds `TO VOLUME 'cold'`, as for every tiered table.
 - **The bloom filter on `SourceId`** serves provenance reads, such as "what did this monitor or widget write". It does not serve the run results page: a recall adds no row, so a rerun's recalled traces have no row with its id. The run page keeps reading `instant_eval_judgments` (section 3). The pattern is the `idx_trace_id` bloom filter on `evaluation_runs` (00002).
@@ -127,7 +127,7 @@ Before judging, the service looks up the rows that match tenant, trace, span, qu
 - **A recall makes no judge call**, so it is free, and every viewer sees the same number.
 - **The table is the cache.** There is no separate cache with its own expiry.
 - **A new row is added only when something changed:** a new judge model, an explicit "judge again", or changed judged text (`InputHash`). Both rows are kept with their times, because a judge is not deterministic.
-- **Readers show what recall would serve.** They take the latest judged row at the current `KeyVersion` and the project's current judge model, per trace, span, question and `JudgedColumn`, by `JudgedAt` (`argMax`), as `clickhouse.instant-eval-judgments.repository.ts:28-45` does today with `UpdatedAt`. So `eval(input, 'q')` and `eval(output, 'q')` stay two results; after the text changes, the newer row replaces the old; a retired row or another judge's row is never shown; and the drawer and an ask show the same number. A failed or skipped row shows only where no judged row exists. A reader that wants history reads every row.
+- **Readers show the latest verdict, labelled.** They take the latest judged row per trace, span, question and `JudgedColumn`, by `JudgedAt` (`argMax`), as `clickhouse.instant-eval-judgments.repository.ts:28-45` does today with `UpdatedAt`, and show its `JudgeModel` and `JudgedAt` with it. So `eval(input, 'q')` and `eval(output, 'q')` stay two results, a newer verdict replaces an older one, and a judge change hides no past result. `KeyVersion` and `JudgeModel` bind recall, not reads. A failed or skipped row shows only where no judged row exists. A reader that wants history reads every row.
 - **The threshold is not in the hash.** A pass is `Probability >= threshold`, applied on read (`instant-eval-verdicts.rules.ts:49-54`). Two viewers with different thresholds share the same judge call.
 
 Each trigger uses the same path:
@@ -143,7 +143,7 @@ Each trigger uses the same path:
 
 The trace drawer shows every result on its trace, labelled by source. `eval_results` is owned by the instant-eval module. A plain read of another module's table is a query on its owner's `*Api` (`dev/docs/ARCHITECTURE.md` section 7, "A ClickHouse table has one owner"). So instant-eval adds a results-by-trace query to `InstantEvalApi`. Trace calls it through a channel bound to that token (section 5, "A channel may be bound to another module's `*Api` token"). A binding makes no peer edge, so it is allowed although instant-eval already depends on `TraceApi` (`instant-eval.app.ts:152-157`, `static dependencies`).
 
-The run page keeps reading `instant_eval_judgments`, which runs keep writing. The Explorer `eval:"q"` chip and the `analytics.judgments` LWQL view read `eval_results`, so they find results from every source, and also `instant_eval_judgments` for run results written before `eval_results` existed, which are not copied (Risks, "Old judgments"). The second read goes when the copy plan lands. The ownership exception in `clickhouse-table-ownership.ts` covers both tables until then.
+The run page, the Explorer `eval:"q"` chip and the `analytics.judgments` LWQL view stay on `instant_eval_judgments`, which runs keep writing. The chip filters one run and reads the `Passed` stored at write, and the view's public columns are run-shaped (`RunId`, `QuestionId`, `Passed`); neither fits `eval_results`. Whether they move is the open question on run storage.
 
 ### 4. Retention follows the trace
 
@@ -213,6 +213,8 @@ Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
 - **The hosted judge changes under one id.** Recall keys on `JudgeModel`. If `langwatch/instant-evals` (`instant-eval-judge.api.ts:103`) changes its weights without a new id, recall serves old verdicts. A new judge version must change the id the row records.
 - **Dashboard reads are not prefix reads.** A widget reads by question over a time window, and the key leads with the trace. Partitions prune by `OccurredAt` and the `QuestionHash` bloom filter skips granules. This is unmeasured. If it is slow, add a time-leading rollup as ADR-034 did for evaluations.
 - **The key cap.** A quick `eval()` refuses above 1,000 trace keys (`langwatch-ql-app-function-shapes.rules.ts:96-103`). Whether a recalled key counts toward the cap goes to the build PLAN.
+- **The chip and the view see runs only.** Results from asks, dashboards and monitors show in the trace drawer, not in the `eval:"q"` chip or `analytics.judgments`, until those move (section 3).
+- **The drawer can lag the text.** After a trace's text changes, the drawer shows the last verdict with its time until something judges the new text; an ask on the new text misses, judges, and the drawer then shows that.
 - **Old judgments.** `instant_eval_judgments` keeps its rows with no expiry, and runs keep writing it. A copy into `eval_results` is its own plan: an old row has no question text, `QuestionHash`, `JudgeModel` or `InputHash`, so the copy must rebuild them losslessly from `instant_eval_runs.Questions` and the run's judge before it may run. Rows it cannot rebuild are not copied and recall does not serve them. The old table is not dropped while the run page, the Explorer chip or the LWQL view read it; any drop is an operator step, never a goose file.
 
 ## Consequences
@@ -223,6 +225,8 @@ Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
 - A quick `eval()` now writes rows. It costs one recall read and one bulk insert per query.
 - Instant eval results follow the trace's retention, not "never expire".
 - Monitors keep writing `evaluation_runs`. A monitor on the Instant Evals judge also writes `eval_results` and gets recall.
+- A run writes two tables: `instant_eval_judgments` for its run page, chip and view, and `eval_results` for recall.
+- The usage report (`usage-report.ts:394-396`) counts `instant_eval_judgments`; it must add `eval_results` rows whose `Source` is not `run`, so a run is not counted twice.
 
 ## References
 
