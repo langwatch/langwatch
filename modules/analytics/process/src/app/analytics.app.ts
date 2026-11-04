@@ -28,6 +28,8 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   LangWatchQLProjectNotFoundError,
+  LangWatchQLReservedParameterSuppliedError,
+  isLangWatchQLSurfaceParameter,
   type LangWatchQLRunCaller,
   type LangWatchQLAcceptedStatement,
   type LangWatchQLAppFunctionCall,
@@ -925,13 +927,22 @@ export class AnalyticsModule
   async executeWorkbenchQuery(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
-    // The scope is the request's own input: a refusal there is not the statement failing.
+    // The scope and the reserved names are the request's own input: refusing them is not the
+    // statement failing.
+    this.#assertNoReservedNameSupplied(input.parameters);
     const scope = await this.#resolveRunScope(input);
     return this.#failureReport.reportingFailures({
       projectId: input.project.id,
       sql: input.sql,
       run: () => this.#runInScope({ input, scope }),
     });
+  }
+
+  #assertNoReservedNameSupplied(parameters: Readonly<Record<string, unknown>> | undefined): void {
+    const supplied = Object.keys(parameters ?? {})
+      .filter(isLangWatchQLSurfaceParameter)
+      .toSorted();
+    if (supplied.length > 0) throw new LangWatchQLReservedParameterSuppliedError(supplied);
   }
 
   reportBuiltInQueryFailure(input: { projectId: string; error: unknown }): void {

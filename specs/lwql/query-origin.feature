@@ -64,11 +64,11 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
 
   Rule: Only the statement failing is reported; a refused request input is not
 
-    A refusal of the request's own projects is not the statement failing, so it writes no
-    built-in line and is not counted. The statement's own failures (parse, policy, parameters
-    it declares, execution, busy, timeout) are reported. Parameter and time-window checks run
-    inside statement validation, after the statement is parsed, so they cannot be split off by
-    stage and count with the statement.
+    A refusal of the request's own projects, or of a reserved parameter name it supplies, is
+    not the statement failing: it is refused before the report, writes no built-in line and is
+    not counted. The statement's own failures (parse, policy, execution, busy, timeout) are
+    reported, and so are the time window and missing-parameter refusals, which are decided
+    from the parsed statement and stay inside.
 
     @unit
     Scenario: A refused project scope writes no built-in failure
@@ -82,6 +82,21 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       Given a stock statement is sent with an accepted project scope
       When the statement fails
       Then one built-in failure is reported
+
+  Rule: A reserved parameter name is refused before the report
+
+    @unit
+    Scenario: A reserved parameter name supplied writes no built-in failure
+      Given a stock statement is sent with a value for a reserved surface parameter name
+      When the workbench door refuses it
+      Then no error-level record is written
+      And the failure count does not rise
+
+    @unit
+    Scenario: A reserved name is refused before the statement text is read
+      Given a request that supplies a reserved name and whose statement text is also broken
+      When the workbench door answers
+      Then it answers the reserved-name refusal and reports nothing
 
   Rule: A user-written failure is counted and writes no error line
 

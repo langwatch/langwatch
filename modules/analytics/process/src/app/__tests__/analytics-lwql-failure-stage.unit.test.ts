@@ -98,12 +98,16 @@ async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
       (error: unknown) =>
         error instanceof Error && "code" in error ? String(error.code) : "unknown",
     );
-  const runStock = () =>
+  const runStock = ({
+    sql = STOCK_SQL,
+    parameters,
+  }: { sql?: string; parameters?: Record<string, unknown> } = {}) =>
     outcome(
       app.executeWorkbenchQuery({
+        ...(parameters ? { parameters } : {}),
         project: { id: AGGREGATE, lwqlKey: "lwql-aggregate" },
         protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
-        sql: STOCK_SQL,
+        sql,
         authorization: analyticsProof({
           projectId: AGGREGATE,
           shared: MEMBERS.map((projectId) => ({ projectId, from: 0 })),
@@ -115,7 +119,7 @@ async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
 }
 
 describe("given a stock statement on the workbench door", () => {
-  /** @scenario "A refused scope writes no built-in failure" */
+  /** @scenario "A refused project scope writes no built-in failure" */
   it("reports nothing when the request's own projects are refused", async () => {
     const { runStock } = await harness({ keyless: ["project_b"] });
 
@@ -129,5 +133,28 @@ describe("given a stock statement on the workbench door", () => {
 
     expect(await runStock()).not.toBe("executed");
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
+  });
+
+  /** @scenario "A reserved parameter name supplied writes no built-in failure" */
+  it("reports nothing when a reserved parameter name is supplied", async () => {
+    const { runStock } = await harness();
+
+    const code = await runStock({ parameters: { dashboard_context_granularity_seconds: 60 } });
+
+    expect(code).toBe("lwql_reserved_parameter_supplied");
+    expect(meter.valueOf(FAILURE_METRIC)).toBe(0);
+  });
+
+  /** @scenario "A reserved name is refused before the statement text is read" */
+  it("answers the reserved-name refusal for a request whose text is also broken", async () => {
+    const { runStock } = await harness();
+
+    const code = await runStock({
+      sql: "SELEC broken (",
+      parameters: { dashboard_context_granularity_seconds: 60 },
+    });
+
+    expect(code).toBe("lwql_reserved_parameter_supplied");
+    expect(meter.valueOf(FAILURE_METRIC)).toBe(0);
   });
 });
