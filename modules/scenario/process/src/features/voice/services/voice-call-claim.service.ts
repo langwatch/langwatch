@@ -66,7 +66,7 @@ export class VoiceCallClaimService {
     // Node detaches the http server's socket error handler before emitting "upgrade".
     // Without this, a client reset during take/spawn is an uncaught exception.
     socket.on("error", (error: Error) => {
-      logger.warn({ error, nonce: upgrade.nonce }, "voice media socket errored before handoff");
+      logger.warn({ error, nonce: upgrade.nonce }, "voice media socket errored");
     });
     this.claim({ upgrade, socket }).catch((error: unknown) => {
       logger.error({ error, nonce: upgrade.nonce }, "voice media upgrade could not be claimed");
