@@ -122,6 +122,18 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
         show that view
 
     @unit
+    Scenario: A full grant shows every real view
+      Given a caller holds every permission and content gate the catalogue names
+      When the views they can reach are listed
+      Then every view of the real view catalogue is in the list
+
+    @unit
+    Scenario: A view behind a permission the caller lacks reads as hidden
+      Given a caller holds every grant but the permission a real view's table needs
+      When the views a full grant shows are compared with the views this caller can reach
+      Then that view is among the hidden ones
+
+    @unit
     Scenario: A refusal cut off at the violation cap is reported
       Given a refusal holds as many access violations as the cap
       When the failure reaches either report path

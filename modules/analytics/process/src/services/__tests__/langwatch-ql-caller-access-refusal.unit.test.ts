@@ -47,7 +47,10 @@ function refusalOf({
   try {
     via.validate({ projectId: "project-1", protections, sql });
   } catch (error) {
-    return error as LangWatchQLNotPermittedError;
+    if (error instanceof LangWatchQLNotPermittedError && error.code === "lwql_not_permitted") {
+      return error;
+    }
+    throw error;
   }
   throw new Error(`expected "${sql}" to be refused`);
 }
@@ -164,6 +167,11 @@ describe("given a refusal cut off at the violation cap", () => {
     service.reportFailure({ projectId: "project-1", sql, error });
 
     expect(error.meta.violations).toHaveLength(MAX_VIOLATIONS);
+    expect(
+      (error.meta.violations as readonly { code: string }[]).every(
+        ({ code }) => code === "TABLE_NOT_ALLOWED",
+      ),
+    ).toBe(true);
     expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);

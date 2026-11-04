@@ -20,7 +20,7 @@ const visibleTo = (protections: typeof fullGrant) =>
   shapes.visibleViews({ protections, views: LWQL_VIEW_CATALOG, catalog: LWQL_CATALOG });
 
 describe("given the real view catalogue", () => {
-  /** @scenario "A view no caller could see is reported" */
+  /** @scenario "A full grant shows every real view" */
   it("shows every view to a caller holding a full grant", () => {
     const shown = new Set(visibleTo(fullGrant).map((view) => view.name));
 
@@ -29,11 +29,10 @@ describe("given the real view catalogue", () => {
     ).toEqual([]);
   });
 
-  /** @scenario "A caller's own access refusal is neither reported nor counted" */
+  /** @scenario "A view behind a permission the caller lacks reads as hidden" */
   it("marks a view behind the cost permission hidden for a caller who lacks it", () => {
     const withoutCost = {
       ...fullGrant,
-      canSeeCosts: false,
       catalogue: catalogueWithout("cost:view"),
     };
 
