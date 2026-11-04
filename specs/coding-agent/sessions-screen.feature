@@ -3,8 +3,9 @@
 # Implementation:
 #   modules/coding-agent/process/src/services/coding-agent.service.ts (the canonical read service)
 #   modules/coding-agent/contract/src/coding-agent.ts                        (codingAgents.sessionsList)
-#   modules/coding-agent/process/src/transport/api-trpc/coding-agent.gates.ts                  (the title and cost gates)
-#   modules/trace/process/src/services/trace-viewer-protections.rules.ts (the shared content-visibility rule)
+#   modules/coding-agent/process/src/rules/coding-agent-gates.rules.ts (the title and cost gates)
+#   modules/coding-agent/process/src/services/coding-agent-viewer-visibility.service.ts (what resolves the viewer's gates)
+#   modules/trace/contract/src/trace-viewer-protections.contract.ts (the shared content-visibility rule)
 #   The page and its table live under [gone] src/pages/me/ and
 #   [gone] src/components/me/.
 #
@@ -72,6 +73,19 @@ Rule: The page lists my sessions with their context economics
     Given a personal workspace with no coding-agent sessions
     When the user opens their Sessions page
     Then the page says no sessions have been recorded yet
+
+  # Parked: the sessions-screen row schema carries no reported-cost field, and an
+  # unpriced call's cost reaches it as 0, not blank. The stored session row keeps
+  # both figures (pi-model-calls.feature); this screen does not show them yet.
+  # becomes @unit
+  @unimplemented
+  Scenario: A pi session row keeps pi's reported cost apart from the catalogue's
+    Given a pi session whose model calls reported their own usage and cost
+    When the sessions list is read
+    Then it is one row carrying its input, output and cache token totals
+    And the row's cost is the catalogue's price for those tokens
+    And pi's own reported cost is carried separately, never summed into it
+    And a cost the catalogue could not price reads blank rather than zero
 
 Rule: A session row exists once the session says something
 
@@ -148,6 +162,18 @@ Rule: A session is named by its generated title, else by its first prompt
     Given a session whose agent never generated a title or received a prompt
     When the user reads its row
     Then the row names it as an untitled session
+
+  # pi declares no prompt and no title attribute anywhere in its schema, so
+  # every pi session reaches this fallback, not just the ones that went
+  # unnamed. The risk is a fallback that reaches for the nearest string it can
+  # find and prints a span name or a session id at a human.
+
+  @integration
+  Scenario: A pi session falls back to untitled rather than to a span name
+    Given a pi session folded from pi's own spans
+    When the user reads its row
+    Then the row names it as an untitled session
+    And it is not named after a span name or pi's session id
 
 Rule: The session's own name outranks every derived title
 

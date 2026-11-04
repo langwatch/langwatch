@@ -90,6 +90,9 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   // Grok runner: execs grok with ingestion telemetry env, no gateway path and
   // no LangWatch result of its own. ADR-192.
   "grok",
+  // pi runner: execs pi with ingestion telemetry env, no gateway path and no
+  // LangWatch result of its own. ADR-188 Decision 1.
+  "pi",
   // Local capture setup for the standalone GitHub Copilot app: installs an
   // OS login agent on this machine, no platform resource to card.
   "copilot-app",

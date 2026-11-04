@@ -79,12 +79,18 @@ export abstract class LangWatchQLProvisioningRepository {
   abstract probePostgresCollection(input: {
     collection: string;
     relation: string;
+    /**
+     * The PostgreSQL schema holding the approved view. An unqualified name resolves through the
+     * role's search_path, which provisioning never sets, so the default can exclude this schema.
+     */
+    schema: string;
     cluster: string | undefined;
   }): Promise<void>;
   /** The same read with explicit values; throws when they do not authenticate. */
   abstract probePostgresCredentials(input: {
     credentials: LwqlPostgresCredentials;
     relation: string;
+    schema: string;
     cluster: string | undefined;
   }): Promise<void>;
   abstract inventoryConfigStore(input: {

@@ -176,6 +176,7 @@ export class ModelProviderService {
       resolution: this.resolution,
       scopes,
       findProviderForProject: (input) => this.query.findProviderForProject(input),
+      findProviderForScope: (input) => this.query.findProviderForScope(input),
       isOwnModelAllowed: options.isOwnDecisionModelAllowed,
     });
     this.defaultWrites = ModelProviderDefaultsWriteService.create({
@@ -353,6 +354,13 @@ export class ModelProviderService {
 
   listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]> {
     return this.decisionModels.listPickable(input);
+  }
+
+  listDecisionModelsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<readonly BuiltInModel[]> {
+    return this.decisionModels.listPickableForScopes(input);
   }
 
   findAlternateModel(input: {

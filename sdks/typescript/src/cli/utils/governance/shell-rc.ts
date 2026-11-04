@@ -51,6 +51,10 @@ export const SHELL_FUNCTION_TOOLS: readonly string[] = [
   // grok reads its exporter only from the environment, so a bare `grok` run
   // reports only while the scoped function re-injects it. ADR-192.
   "grok",
+  // pi's extension reads the endpoint and key from the environment alone,
+  // there being no pi config file carrying either, so a bare `pi` run reports
+  // only while the scoped function re-injects them. ADR-188 Constants.
+  "pi",
 ] as const;
 
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";

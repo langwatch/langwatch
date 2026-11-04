@@ -30,6 +30,40 @@ function connected(id: string, projectId = "project-a"): RegisterPersistedAgentI
 }
 
 describe("MemoryAgentRepository", () => {
+  /** @scenario "A write that changes nothing appends no version" */
+  it("appends no version when a save or a workflow sync writes the same content", async () => {
+    const repository = MemoryAgentRepository.create();
+    await repository.create({ ...agent("steady"), workflowId: "workflow-steady" });
+    await repository.update({
+      id: "steady",
+      projectId: "project-a",
+      name: "steady",
+      type: "workflow",
+      config: {},
+      workflowId: "workflow-steady",
+    });
+    await repository.updateWorkflowConfig({
+      id: "steady",
+      projectId: "project-a",
+      workflowId: "workflow-steady",
+      config: {},
+    });
+    await repository.update({
+      id: "steady",
+      projectId: "project-a",
+      name: "renamed",
+      type: "workflow",
+      config: {},
+      workflowId: "workflow-steady",
+    });
+
+    const versions = await repository.findVersions({ projectId: "project-a", agentId: "steady" });
+    expect(versions.map((row) => [row.version, row.name])).toEqual([
+      [2, "renamed"],
+      [1, "steady"],
+    ]);
+  });
+
   /** @scenario "Workflow mapping updates cannot bypass Agent ownership" */
   it("scopes workflow configs and keeps detached metadata when mappings change", async () => {
     const repository = MemoryAgentRepository.create();
