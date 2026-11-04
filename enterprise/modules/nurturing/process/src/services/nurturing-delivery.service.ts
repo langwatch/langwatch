@@ -24,10 +24,8 @@ import {
 } from "../rules/nurturing-feature-adoption-service.rules.ts";
 import {
   fireGuidedOnboardingPaths,
-  fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
   fireGuidedTurnFailedPostHog,
-  fireOnboardingVariantAssignedPostHog,
   postHogUuidFor,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
@@ -41,25 +39,15 @@ import {
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
 import {
-  activationTrackInput,
-  evaluationsCompletedEvent,
-} from "../rules/nurturing-posthog-activation.rules.ts";
-import {
   fireIntegrationMethod,
   fireUsesCodingAgent,
   integrationMethodFor,
 } from "../rules/nurturing-product-interest-service.rules.ts";
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
-import {
-  fireOrganizationCreated,
-  fireSignup,
-} from "../rules/nurturing-signup-identification-service.rules.ts";
-import {
-  fireSubscriptionStarted,
-  fireSubscriptionSync,
-} from "../rules/nurturing-subscription-sync-service.rules.ts";
-import { isoOf } from "../rules/nurturing-time.rules.ts";
+import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
+import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
+import { NurturingPostHogDeliveryService } from "./nurturing-posthog-delivery.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
@@ -97,10 +85,14 @@ export class NurturingDeliveryService {
       /** Who hears an organization's fact, and what a joining person is told of traces. */
       memberFacts: NurturingMemberFactsService;
     }>,
+    private readonly postHogDelivery: NurturingPostHogDeliveryService | undefined,
   ) {}
 
   static create(deps: NurturingDeliveryService["deps"]): NurturingDeliveryService {
-    return new NurturingDeliveryService(deps);
+    return new NurturingDeliveryService(
+      deps,
+      deps.posthog && NurturingPostHogDeliveryService.create(deps.posthog),
+    );
   }
 
   /** `key` names the signal: its kind and source event. A first session also tells its members. */
@@ -200,7 +192,7 @@ export class NurturingDeliveryService {
   /** A PostHog channel that throws only logs: analytics never fails the delivery. */
   private toPostHogSafely(signal: NurturingSignal): void {
     try {
-      this.toPostHog(signal);
+      this.postHogDelivery?.send(signal);
     } catch (error) {
       reportFailure(error);
     }
@@ -289,86 +281,6 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireSubscriptionSync(signal));
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
-      default:
-        return;
-    }
-  }
-
-  private toPostHog(signal: NurturingSignal): void {
-    const posthog = this.deps.posthog;
-    // The coding-agent and app-open signals go to Customer.io only.
-    if (!posthog || isCodingOrAppSignal(signal)) return;
-    const track = ({
-      userId,
-      event,
-      properties,
-    }: {
-      userId: string;
-      event: string;
-      properties?: Record<string, unknown>;
-    }) =>
-      posthog.track({
-        userId,
-        event,
-        properties: {
-          ...properties,
-          ...("projectId" in signal ? { projectId: signal.projectId } : {}),
-        },
-      });
-    switch (signal.kind) {
-      case "guided_onboarding_paths":
-        return posthog.track(
-          fireGuidedOnboardingPostHog({
-            userId: signal.userId,
-            organizationId: signal.organizationId,
-            event: signal.event,
-            payload: signal.payload ?? {},
-            paths: signal.paths,
-            currentPath: undefined,
-          }),
-        );
-      case "guided_onboarding_progress":
-        return posthog.track(
-          fireGuidedOnboardingPostHog({
-            userId: signal.userId,
-            organizationId: signal.organizationId,
-            event: signal.event,
-            payload: signal.payload,
-            paths: signal.state.paths,
-            currentPath: signal.state.currentPath,
-          }),
-        );
-      case "onboarding_variant_assigned":
-        return posthog.track(fireOnboardingVariantAssignedPostHog(signal));
-      case "scenario_created":
-      case "scenario_run_succeeded":
-      case "first_trace_integrated":
-      case "project_active_day":
-        return track(activationTrackInput(signal));
-      case "experiment_ran":
-      case "evaluation_ran":
-        return track({ userId: signal.userId, event: "evaluation_ran" });
-      case "evaluation_completed":
-        return track(evaluationsCompletedEvent(signal));
-      case "user_registered":
-        return track({ userId: signal.userId, event: "signed_up" });
-      case "user_created":
-        return posthog.identify({
-          userId: signal.userId,
-          properties: { created_at: isoOf(signal.occurredAt) },
-        });
-      case "signed_up":
-        return posthog.track(fireOrganizationCreated(signal));
-      case "team_member_invited":
-        return track({
-          userId: signal.userId,
-          event: "team_member_invited",
-          properties: { inviteCount: signal.roles.length },
-        });
-      case "subscription_started":
-        return fireSubscriptionStarted(signal).forEach((event) => posthog.track(event));
-      case "checkout_completed":
-        return this.checkoutCompleted({ posthog, signal });
       default:
         return;
     }
@@ -540,26 +452,5 @@ export class NurturingDeliveryService {
         await nurturing.trackEvent({ userId, event, properties: { instance_id: instanceId } });
       }
     })().catch(reportFailure);
-  }
-
-  /** Main's checkout webhook: the organization's event, then its group properties. */
-  private checkoutCompleted({
-    posthog,
-    signal,
-  }: {
-    posthog: PostHogChannel;
-    signal: NurturingSignalOf<"checkout_completed">;
-  }): void {
-    const { organizationId, subscriptionId } = signal;
-    posthog.track({
-      userId: organizationId,
-      event: "subscription_created",
-      properties: { subscriptionId, $groups: { organization: organizationId } },
-    });
-    posthog.groupIdentify({
-      groupType: "organization",
-      groupKey: organizationId,
-      properties: { subscriptionCreatedAt: signal.checkoutCreatedAt, hasActiveSubscription: true },
-    });
   }
 }
