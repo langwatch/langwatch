@@ -1,6 +1,6 @@
 /**
- * An own decision model over HTTP: one POST per text with the organization's key, to the fixed
- * endpoint the catalogue names (ADR-182 decisions 8 and 9). The provider's own error text is
+ * An own decision model over HTTP: one POST per text with the organization's key, to the
+ * endpoint the catalogue builds (ADR-182 decisions 5, 8 and 9). The provider's own error text is
  * never read into a result or a log; only the status is.
  */
 
@@ -78,8 +78,9 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       const sent = await this.send({
         endpoint: decisionModel.endpoint,
-        apiKey: decisionModel.apiKey,
+        authorization: authorizationHeaderOf(decisionModel),
         body,
+        isOwnModel: !isBilledToLangWatch,
         signal,
       });
       if (sent.kind === "answered") {
@@ -111,13 +112,15 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
 
   private async send({
     endpoint,
-    apiKey,
+    authorization,
     body,
+    isOwnModel,
     signal,
   }: {
     endpoint: string;
-    apiKey: string;
+    authorization: Readonly<Record<string, string>>;
     body: string;
+    isOwnModel: boolean;
     signal: AbortSignal | undefined;
   }): Promise<
     | Readonly<{ kind: "answered"; body: unknown }>
@@ -132,7 +135,9 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     try {
       const response = await undiciFetch(endpoint, {
         method: "POST",
-        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        // A redirect would carry the key to another host; undici keeps `api-key` cross-origin.
+        redirect: "error",
+        headers: { ...authorization, "content-type": "application/json" },
         body,
         signal: requestSignal(signal),
         ...(this.dispatcher ? { dispatcher: this.dispatcher } : {}),
@@ -145,7 +150,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
       return {
         kind: "failed",
         status: response.status,
-        failure: decisionFailureOf({ status: response.status }),
+        failure: decisionFailureOf({ status: response.status, isOwnModel }),
         retryAfter: response.headers.get("retry-after"),
       };
     } catch (error) {
@@ -166,6 +171,14 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     logger.warn({ model, reason, status }, "Own decision model call did not answer");
     return instantEvalSkipped(reason);
   }
+}
+
+/** Azure takes its key in `api-key`; every other provider takes a bearer token. */
+function authorizationHeaderOf({
+  authHeader,
+  apiKey,
+}: InstantEvalDecisionModelRequest["decisionModel"]): Readonly<Record<string, string>> {
+  return authHeader === "api_key" ? { "api-key": apiKey } : { authorization: `Bearer ${apiKey}` };
 }
 
 /**

@@ -14,7 +14,7 @@ import { evaluatorTrpcTransport, type EvaluatorBrowserApi } from "../evaluator.t
 type Invoke = (args: {
   app: EvaluatorBrowserApi;
   input: unknown;
-  actor: { id: string };
+  actor: { type: "user"; id: string };
   scope: { tier: "project"; id: string };
   signal: undefined;
 }) => unknown;
@@ -32,7 +32,7 @@ function callersFor(app: EvaluatorBrowserApi): ReadonlyMap<string, (input: unkno
         invoke({
           app,
           input,
-          actor: { id: "user_1" },
+          actor: { type: "user", id: "user_1" },
           scope: { tier: "project", id: "project_1" },
           signal: undefined,
         }),
@@ -73,6 +73,7 @@ describe("evaluators.disableAsEvaluator", () => {
     expect(disableAsEvaluator).toHaveBeenCalledWith({
       projectId: "project_1",
       workflowId: "workflow_1",
+      caller: { type: "user", id: "user_1" },
     });
     expect(answered).toEqual({ success: true });
   });

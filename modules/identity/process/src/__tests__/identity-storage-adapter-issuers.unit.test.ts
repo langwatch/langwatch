@@ -4,7 +4,12 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { type IdentityStack, identityStack, signUp } from "./support/storage-adapter-stack.ts";
+import {
+  type IdentityStack,
+  identityStack,
+  signUp,
+  withIssuer,
+} from "./support/storage-adapter-stack.ts";
 
 const EMAIL = "olga@acme.com";
 const CONNECTION = "ssoc_acme";
@@ -26,7 +31,7 @@ describe("given the identity storage adapter over the legacy engine", () => {
     await context.internalAdapter.linkAccount({
       userId,
       providerId: CONNECTION,
-      issuer,
+      ...withIssuer(issuer),
       accountId: SUBJECT,
     });
     return context;
@@ -72,7 +77,7 @@ describe("given the identity storage adapter over the legacy engine", () => {
       await context.internalAdapter.linkAccount({
         userId,
         providerId: "github",
-        issuer: "local:oauth:github",
+        ...withIssuer("local:oauth:github"),
         accountId: "sub-github-1",
       });
 

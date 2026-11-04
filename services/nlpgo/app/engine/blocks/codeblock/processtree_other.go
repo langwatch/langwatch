@@ -18,6 +18,9 @@ import (
 
 func enableProcessHardening() {}
 
+// hideRefusal is always 0 off Linux: nothing is hidden there to refuse.
+const hideRefusal syscall.Errno = 0
+
 func runStartMarker(int) uint64 { return 0 }
 
 func terminateRunTree(scope runScope, _ *zap.Logger) {

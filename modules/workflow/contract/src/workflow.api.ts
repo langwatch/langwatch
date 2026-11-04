@@ -153,6 +153,8 @@ export type WorkflowEvaluationRequest = Readonly<{
   versionId?: string | undefined;
   data?: Record<string, unknown>[] | undefined;
   datasetId?: string | undefined;
+  /** The saved dataset's version to evaluate; its current content when absent. */
+  datasetVersion?: number | undefined;
   parameters?: Record<string, string | number | boolean> | undefined;
   rowIndices?: number[] | undefined;
 }>;
@@ -359,11 +361,11 @@ export interface WorkflowApi {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowRelatedEntities>;
-  cascadeArchive(input: {
-    projectId: string;
-    workflowId: string;
-    unarchive?: boolean;
-  }): Promise<WorkflowCascadeArchive>;
+  /** A deployed agent among those it archives needs `agents:deploy` of `by`. */
+  cascadeArchive(
+    input: { projectId: string; workflowId: string; unarchive?: boolean },
+    by: WorkflowCaller,
+  ): Promise<WorkflowCascadeArchive>;
 
   // -- the Optimization Studio's publication flags --------------------------
 

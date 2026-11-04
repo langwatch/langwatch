@@ -923,6 +923,33 @@ const presentations = {
       return `No process running ${name} is connected.${where} Start the process, or name the environment as connected:${name}@<environment>.`;
     },
   },
+  agent_deployed_label_protected: {
+    title: "This agent is deployed",
+    describe: (error) => {
+      const labels = strList(error, "labels").join(", ") || "a label";
+      return `A deploy label (${labels}) points at this agent, so archiving it needs the deploy permission. Remove the labels first, or ask someone who can deploy agents.`;
+    },
+  },
+  agent_label_invalid: {
+    title: "That label name can't be used",
+    describe: () =>
+      'A label starts with a lowercase letter, holds only lowercase letters, digits, hyphens or underscores, is not a number and is not "latest".',
+  },
+  agent_version_not_found: {
+    title: "That agent version doesn't exist",
+    describe: () =>
+      "No version of this agent matches that label or number. The label may have been removed, or the version belongs to another agent.",
+  },
+  agent_version_selector_conflict: {
+    title: "Pick a label or a version, not both",
+    describe: () =>
+      "Ask for the agent by one label, one version number, or neither for the latest.",
+  },
+  agent_version_unsupported: {
+    title: "Connected agents have no versions here",
+    describe: () =>
+      "A connected agent is versioned by the code that registers it, so it carries no versions or deploy labels in LangWatch.",
+  },
   agent_not_found: {
     title: "Agent not found",
     describe: () =>
@@ -1053,6 +1080,28 @@ const presentations = {
       "Copying an online evaluation needs permission to manage evaluations in the project it comes from. Ask an administrator there for access.",
   },
   evaluator_not_found: { title: "Evaluator not found" },
+  evaluator_deployed_label_protected: {
+    title: "This evaluator is deployed",
+    describe: (error) => {
+      const labels = strList(error, "labels").join(", ") || "a label";
+      return `A deploy label (${labels}) points at this evaluator, so deleting it needs the deploy permission. Remove the labels first, or ask someone who can deploy evaluators.`;
+    },
+  },
+  evaluator_label_invalid: {
+    title: "That label name can't be used",
+    describe: () =>
+      'A label starts with a lowercase letter, holds only lowercase letters, digits, hyphens or underscores, is not a number and is not "latest".',
+  },
+  evaluator_version_not_found: {
+    title: "That evaluator version doesn't exist",
+    describe: () =>
+      "No version of this evaluator matches that label or number. The label may have been removed, or the version belongs to another evaluator.",
+  },
+  evaluator_version_selector_conflict: {
+    title: "Pick a label or a version, not both",
+    describe: () =>
+      "Ask for the evaluator by one label, one version number, or neither for the latest.",
+  },
   evaluator_source_permission_denied: {
     title: "You can't copy from that project",
     describe: () =>
@@ -4077,6 +4126,20 @@ const presentations = {
     title: "That dataset is gone",
     describe: () =>
       "It was archived, or it belongs to another project. Reload the list and pick one that is still there.",
+  },
+  dataset_version_not_found: {
+    title: "That dataset version is gone",
+    describe: () =>
+      "The dataset has no version with that number, or retention removed it. Open the history and pick one that is listed.",
+  },
+  dataset_version_restore_unsupported: {
+    title: "This dataset can't be restored here",
+    describe: () =>
+      "It is kept in the older single-file layout. Copy the dataset to a new one first, then restore there.",
+  },
+  dataset_version_too_large: {
+    title: "That version is too large to read at once",
+    describe: () => "Page through the version's rows instead, or ask for a larger dataset limit.",
   },
   dataset_chunk_too_large: {
     title: "That value is too large to save",

@@ -23,7 +23,7 @@ type ModelProviderDefaultsWriteOptions = {
   writeAuthorization: ModelProviderWriteAuthorizationService;
   ids: ModelProviderIdService;
   scopes: ModelProviderScopeService;
-  /** Refuses an own decision model for an organization without the flag (ADR-182 decision 4). */
+  /** Refuses an own decision model without the flag, or on a scope with no key for it (ADR-182). */
   decisionModels: Pick<ModelProviderDecisionModelService, "assertMayStore">;
 };
 
@@ -49,7 +49,11 @@ export class ModelProviderDefaultsWriteService {
     }
 
     const organizationId = await this.options.scopes.getOrganizationIdForScope(parsed.scope);
-    await this.options.decisionModels.assertMayStore({ organizationId, config });
+    await this.options.decisionModels.assertMayStore({
+      organizationId,
+      config,
+      scopes: [parsed.scope],
+    });
     await this.options.defaults.set({
       id: this.options.ids.generate({ type: "default" }),
       organizationId,
@@ -104,7 +108,8 @@ export class ModelProviderDefaultsWriteService {
     await this.options.decisionModels.assertMayStore({
       organizationId,
       config,
-      ...(existing ? { stored: existing.config } : {}),
+      scopes,
+      ...(existing ? { stored: existing.config, storedScopes: existing.scopes } : {}),
     });
 
     return this.options.defaults.save({

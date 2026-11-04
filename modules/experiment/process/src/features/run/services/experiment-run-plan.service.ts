@@ -62,6 +62,7 @@ export class ExperimentRunPlanService {
     actor,
     experimentSlug,
     runUrl,
+    boardRowIndices,
   }: {
     request: ExperimentRunPlanRequest;
     data: ExperimentRunPlanData;
@@ -72,6 +73,8 @@ export class ExperimentRunPlanService {
     /** What a poll of the run answers with; a browser's run names no project slug, so no link. */
     experimentSlug?: string;
     runUrl?: string;
+    /** The board row each run row is written back to, when the run read another version. */
+    boardRowIndices?: (number | null)[];
   }): ExperimentRunPlan {
     const { state, scope, seedTargetOutputs } = request;
     const targetCells = this.cellPlan
@@ -102,6 +105,7 @@ export class ExperimentRunPlanService {
           const entry = data.datasetRows[rowIndex];
           return entry ? [{ rowIndex, entry }] : [];
         }),
+      ...(boardRowIndices ? { boardRowIndices } : {}),
       cells,
       pinned: pinnedVersionsOf({ state, data }),
       ...(seedTargetOutputs ? { seedTargetOutputs } : {}),

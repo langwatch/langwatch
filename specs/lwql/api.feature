@@ -1222,6 +1222,28 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a sql-mode deploy stamps them unprobed only once its own batch rewrote the collection, and reads first where that rewrite was skipped
     And the next check reads again
 
+  # An unqualified relation resolves through the reader role's search_path, which provisioning never
+  # sets, so a probe without a schema can fail UNKNOWN_TABLE where the views live elsewhere.
+  @unit
+  Scenario: The collection probe reads the approved view in the app's PostgreSQL schema
+    Given the approved views live in a PostgreSQL schema other than public
+    When the check reads through the named collection and with the app's own values
+    Then both reads bind that schema as a query parameter, so neither fails for the schema alone
+
+  # The reader role's search_path is never set and its default can exclude the app schema, so an
+  # engine table names it itself.
+  @unit
+  Scenario: Engine tables read the app's PostgreSQL schema
+    Given the app's PostgreSQL schema is langwatch_db
+    When the engine table statements are built
+    Then every engine table names that schema in its ENGINE clause
+
+  @unit
+  Scenario: The reconvergence check rebuilds an engine table built before the schema was pinned
+    Given an engine table stamped by a fingerprint that did not include the schema
+    When the reconvergence check runs
+    Then it names that engine table as drift
+
   # A replica that has not loaded the new collection would build its copy of a replaced table on
   # the old values, so on a cluster (CLICKHOUSE_CLUSTER, set by the chart past one replica) each
   # read runs on every replica.
