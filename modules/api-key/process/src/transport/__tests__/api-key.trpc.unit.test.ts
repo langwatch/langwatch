@@ -65,6 +65,7 @@ describe("the apiKey tRPC transport", () => {
       // part of every procedure's name, and of its React Query cache key.
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "apiKey.create",
+        "apiKey.grantablePermissions",
         "apiKey.list",
         "apiKey.mintDocsSessionKey",
         "apiKey.myBindings",
