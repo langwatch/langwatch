@@ -63,7 +63,7 @@ The command takes one tool name: `claude`, `codex`, `gemini`, `opencode`, `copil
 | Tool       | What the command writes                                                                                                                                                                                                         |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `claude`   | The OpenTelemetry variables into the `env` block of `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`), plus a `SessionStart` and a `Stop` hook in the same file. With the LangWatch Claude Code plugin installed, the plugin runs the hooks instead. |
-| `codex`    | An `[otel]` block and a `notify` program in `$CODEX_HOME/config.toml`, plus an instruction block in `$CODEX_HOME/AGENTS.md` (`~/.codex` by default). Your own `notify` program keeps running after the LangWatch one. If your `notify` cannot be moved safely, the command prints a warning that the conversation will not be recorded and installs no `notify` program, so a plain `codex` session reports tokens but no conversation, and no repository unless `langwatch ingest context` reaches LangWatch directly. To fix it, remove your `notify` setting and run the command again. |
+| `codex`    | An `[otel]` block and a `notify` program in `$CODEX_HOME/config.toml`, plus an instruction block in `$CODEX_HOME/AGENTS.md` (`~/.codex` by default). Your own `notify` program keeps running after the LangWatch one. If your `notify` cannot be moved safely, the command prints a warning that the conversation will not be recorded and installs no `notify` program, so a plain `codex` session reports tokens but no conversation, and no repository unless the agent runs `langwatch ingest context` and the declaration reaches LangWatch. To fix it, remove your `notify` setting and run the command again. |
 | `gemini`   | A `gemini` shell function in `~/.zshrc`, `~/.bashrc` or `~/.config/fish/config.fish`.                                                                                                                                           |
 | `opencode` | An `opencode` shell function in the same file, plus `experimental.openTelemetry: true` in `~/.config/opencode/opencode.jsonc`.                                                                                                 |
 | `copilot`  | A `copilot` shell function in the same file, plus a `sessionStart` and an `agentStop` hook in `~/.copilot/hooks/langwatch.json` (or `$COPILOT_HOME/hooks/langwatch.json`). |
@@ -77,7 +77,7 @@ Claude Code, Codex, GitHub Copilot and GitHub Copilot in VS Code (`code`) report
 
 A `langwatch <tool>` wrapper run can also set this up. For Codex, a run that sends telemetry directly installs the `notify` program. For Claude Code and both Copilot tools, a direct run writes the reporting hooks only when you accept its prompt to keep the plain command reporting, or when that wiring is already there. A gateway-route run writes none.
 
-For Claude Code and both Copilot tools, if a direct run leaves no hooks in the file [the table above](#what-langwatch-instrument-does) names, and no LangWatch plugin runs them, run `langwatch instrument <tool>`: a session with no hooks joins no pull request. For Codex, check for the `notify` program.
+For Claude Code and both Copilot tools, if a direct run leaves no hooks in the file [the table above](#what-langwatch-instrument-does) names, and no LangWatch plugin runs them, run `langwatch instrument <tool>`: with no hooks, a session does not report its repository by itself. For Codex, check `$CODEX_HOME/config.toml` for the `notify` program. If it is missing, run `langwatch instrument codex`. If that command warns about your own `notify`, use the fix in the same table.
 
 For Gemini CLI and opencode, these commands wire the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
 
@@ -121,7 +121,7 @@ By default the wiring captures the conversation as well as the token counts. To 
 
 For Claude Code, also remove them from `.claude/settings.local.json` in any folder where you ran `langwatch claude`, because that file overrides your user settings.
 
-For Codex, the conversation is read from the transcript by the `notify` program. The same program reports the repository and branch, so removing it also stops the pull request join.
+For Codex, the conversation is read from the transcript by the `notify` program. The same program reports the repository and branch, so removing it also stops the automatic pull request join: see [the Codex page](/coding-agents/openai-codex).
 
 A removal on your machine may not last: `langwatch instrument`, a `langwatch <tool>` wrapper run that sends telemetry directly and `langwatch login` can write the variables back, and for Codex the `notify` program too. For content to stay off, drop it for the whole organization at ingestion: see [Privacy](/coding-agents/privacy).
 
