@@ -1,6 +1,6 @@
 /**
  * A private route's statement names that route's database, not the shared one: the service
- * qualifies SQL with the shared database, but the routed executor dials the route's own.
+ * validates against the route's database, and the routed executor dials the route's own.
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
@@ -76,7 +76,11 @@ function privateRun(input: {
     ...input,
   });
 
-  return { done, privateExecutor: () => executors.find((e) => e.connection.url !== SHARED.url) };
+  return {
+    done,
+    privateExecutor: () => executors.find((e) => e.connection.url !== SHARED.url),
+    sharedExecutor: () => executors.find((e) => e.connection.url === SHARED.url),
+  };
 }
 
 /** Every `database.` that precedes a table name in the SQL the server was handed. */
@@ -88,15 +92,16 @@ function qualifiersOf(requests: readonly LangWatchQLExecutionRequest[]): string[
 
 describe("given a statement for an organization whose route names its own database", () => {
   /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity" */
-  it("qualifies the statement with the database the private executor dials", async () => {
-    const { done, privateExecutor } = privateRun({
+  it("leaves an unqualified statement unqualified and dials the route database", async () => {
+    const { done, privateExecutor, sharedExecutor } = privateRun({
       sql: "SELECT count() AS n FROM trace_metrics LIMIT 1",
     });
     await done;
 
-    const dialled = privateExecutor()?.connection.database;
-    expect(dialled).toBe("acme_db");
-    expect(qualifiersOf(privateExecutor()?.requests ?? [])).toEqual([dialled]);
+    expect(qualifiersOf(privateExecutor()?.requests ?? [])).toEqual([]);
+    expect(privateExecutor()?.connection.database).toBe("acme_db");
+    expect(privateExecutor()?.requests.length).toBeGreaterThan(0);
+    expect(sharedExecutor()?.requests ?? []).toEqual([]);
   });
 
   /** @scenario "A statement on a private route names the route's database, never the shared one" */

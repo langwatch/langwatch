@@ -811,6 +811,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And no statement runs
 
   @unit
+  Scenario: A deployment with no LangWatchQL identity judges the statement first
+    Given this deployment has no LangWatchQL restricted identity
+    When a LangWatchQL query is run with a statement the caller may not read
+    Then the query layer refuses it with the policy's refusal, lwql_not_permitted
+    And a statement the caller may read is refused with error code lwql_unavailable
+
+  @unit
   Scenario: A save needs no route
     Given a statement is saved without being run
     When it is validated

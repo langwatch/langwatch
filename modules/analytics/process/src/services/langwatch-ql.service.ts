@@ -270,29 +270,43 @@ export class LangWatchQLService {
   }
 
   /**
-   * Where this run goes, asked once and before anything is judged: every later step of the run
-   * uses the executor and database returned here. Fails closed. Checked here, not in the
-   * constructor, so a deployment with no LangWatchQL identity still serves the schema endpoint.
+   * Where this run goes, asked once and before anything is judged. With no executor there is
+   * no route to ask: the run is judged against the shared database and then refused by
+   * `requireExecutor`, so a caller without permission still hears that first.
    */
   private async resolveRoute({
     tenantIds,
-    kind,
   }: {
     readonly tenantIds: readonly string[];
-    readonly kind: "query" | "pass";
-  }): Promise<{ readonly executor: LangWatchQLExecutorRepository; readonly database: string }> {
+  }): Promise<{ readonly executor?: LangWatchQLExecutorRepository; readonly database: string }> {
     const { executor } = this.deps;
-    if (!executor) {
-      logger.error(
-        { projectIds: tenantIds },
-        `LangWatchQL ${kind} refused: no restricted identity is provisioned`,
-      );
-
-      throw new LangWatchQLUnavailableError();
-    }
+    if (!executor) return { database: this.deps.database };
 
     const route: LangWatchQLRoute = await executor.resolveRoute({ tenantIds });
     return { executor: route.executor, database: route.database ?? this.deps.database };
+  }
+
+  /**
+   * Fails closed. Checked at run time rather than in the constructor, so a deployment with no
+   * LangWatchQL identity still serves the schema endpoint and refuses per request.
+   */
+  private requireExecutor({
+    executor,
+    tenantIds,
+    kind,
+  }: {
+    readonly executor: LangWatchQLExecutorRepository | undefined;
+    readonly tenantIds: readonly string[];
+    readonly kind: "query" | "pass";
+  }): LangWatchQLExecutorRepository {
+    if (executor) return executor;
+
+    logger.error(
+      { projectIds: tenantIds },
+      `LangWatchQL ${kind} refused: no restricted identity is provisioned`,
+    );
+
+    throw new LangWatchQLUnavailableError();
   }
 
   /**
@@ -309,10 +323,7 @@ export class LangWatchQLService {
     isInstantEvalsEnabled,
   }: LangWatchQLPassInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
     const wrapper = langWatchQLPassSchema.parse(pass);
-    const { executor, database } = await this.resolveRoute({
-      tenantIds: [project.id],
-      kind: "pass",
-    });
+    const { executor: routed, database } = await this.resolveRoute({ tenantIds: [project.id] });
     const validation = this.validate({
       projectId: project.id,
       database,
@@ -329,6 +340,11 @@ export class LangWatchQLService {
     });
     // A pass is not scoped, so the FINAL/SAMPLE refusal runs here too.
     assertNoUnsupportedTableModifiers({ sql, views: this.views, database });
+    const executor = this.requireExecutor({
+      executor: routed,
+      tenantIds: [project.id],
+      kind: "pass",
+    });
 
     const composed = langWatchQLPassSql({ sql, pass: wrapper });
     const executionParameters = { ...validation.boundParameters, ...composed.parameters };
@@ -367,10 +383,7 @@ export class LangWatchQLService {
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
     const boundSources = resolveRunSources(sources);
-    const { executor, database } = await this.resolveRoute({
-      tenantIds: projectIds,
-      kind: "query",
-    });
+    const { executor: routed, database } = await this.resolveRoute({ tenantIds: projectIds });
     const validation = this.validate({
       projectId: projectIds.join(",") || "(none)",
       database,
@@ -388,6 +401,11 @@ export class LangWatchQLService {
       ...(timeWindow ? { timeWindow } : {}),
       ...(onBudgetOverflow ? { onBudgetOverflow } : {}),
       awaitingTimeWindow: validation.awaitingTimeWindow,
+    });
+    const executor = this.requireExecutor({
+      executor: routed,
+      tenantIds: projectIds,
+      kind: "query",
     });
 
     const tenantCapability = lwqlCapability.tenantCapabilitySet({

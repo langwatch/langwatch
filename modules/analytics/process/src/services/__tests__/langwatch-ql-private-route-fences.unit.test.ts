@@ -21,7 +21,7 @@ import {
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
-import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
+import { catalogueWithout, EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 const SHARED: LangWatchQLConnection = {
   url: "http://shared.invalid:8123",
@@ -180,11 +180,14 @@ describe("given a private organization whose route database is acme_db and a sha
     expect(attempt.onTarget("shared")).toEqual([]);
   });
 
-  it("resolves an unqualified name to the route database", async () => {
+  it("leaves an unqualified name unqualified and runs it on the route database", async () => {
     const attempt = run({ answers: [PRIVATE], sql: countFrom("trace_metrics") });
 
     expect((await outcomeOf(attempt.done)).code).toBe("ok");
-    expect(new Set(qualifiersOf(attempt.requests()))).toEqual(new Set(["acme_db"]));
+    expect(qualifiersOf(attempt.requests())).toEqual([]);
+    expect(attempt.onTarget("private").length).toBeGreaterThan(0);
+    expect(attempt.onTarget("shared")).toEqual([]);
+    expect(attempt.databasesDialled()).toEqual(new Set(["acme_db"]));
   });
 });
 
@@ -219,7 +222,10 @@ describe("given a shared organization", () => {
 });
 
 describe("given a route that cannot be resolved", () => {
-  const failures: readonly [string, Error][] = [
+  // A route refusal is wrapped by the routed executor into the one unavailable refusal; any
+  // other failure passes through untouched.
+  const NOT_AVAILABLE = "LangWatchQL is not available for this organization's ClickHouse.";
+  const failures: readonly [string, Error, string][] = [
     [
       "a private organization whose route is missing",
       new PrivateRouteUnavailableError({
@@ -227,17 +233,22 @@ describe("given a route that cannot be resolved", () => {
         variable: "CLICKHOUSE_URL__acme__org-private",
         problem: "missing",
       }),
+      NOT_AVAILABLE,
     ],
-    ["a project with no known organization", new UnknownTenantError("project-1")],
+    [
+      "a project with no known organization",
+      new UnknownTenantError("project-1"),
+      new UnknownTenantError("project-1").message,
+    ],
   ];
 
   // Pinned: today the main query fails first, so the completeness read is never reached.
   it.each(failures)(
     "runs no statement at all for %s, completeness included",
-    async (_, failure) => {
+    async (_, failure, expectedMessage) => {
       const attempt = run({ answers: [failure], sql: PERIOD_SQL, timeWindow: WINDOW });
 
-      await expect(attempt.done).rejects.toThrow(failure.message);
+      await expect(attempt.done).rejects.toThrow(expectedMessage);
       expect(attempt.requests()).toEqual([]);
     },
   );
@@ -375,5 +386,47 @@ describe("given a statement saved without a run", () => {
     await attempt.done;
 
     expect(validate).toThrow(expect.objectContaining({ code: "lwql_not_permitted" }));
+  });
+});
+
+describe("given a deployment with no LangWatchQL identity", () => {
+  const bare = LangWatchQLService.create({ executor: null, database: SHARED.database });
+  // A viewer: everything but cost, so a cost statement is a refusal the policy owns.
+  const viewer = { ...PROTECTIONS, canSeeCosts: false, catalogue: catalogueWithout("cost:view") };
+  const unreadable = "SELECT sum(TotalCost) AS cost FROM analytics.traces";
+  const readable = countFrom("analytics.trace_metrics");
+  const attempt = ({ sql, pass }: { sql: string; pass?: LangWatchQLPass }) =>
+    pass
+      ? bare.executePass({
+          project: PROJECT,
+          protections: viewer,
+          sql,
+          pass,
+          isInstantEvalsEnabled: true,
+        })
+      : bare.executeForProjects({ projects: [PROJECT], protections: viewer, sql });
+
+  /** @scenario "A deployment with no LangWatchQL identity judges the statement first" */
+  it("refuses a statement the caller may not read with the policy's refusal, in a query", async () => {
+    expect((await outcomeOf(attempt({ sql: unreadable }))).code).toBe("lwql_not_permitted");
+  });
+
+  /** @scenario "A deployment with no LangWatchQL identity judges the statement first" */
+  it("refuses a statement the caller may not read with the policy's refusal, in a pass", async () => {
+    const done = attempt({ sql: unreadable, pass: { kind: "probe" } });
+
+    expect((await outcomeOf(done)).code).toBe("lwql_not_permitted");
+  });
+
+  /** @scenario "A deployment with no LangWatchQL identity judges the statement first" */
+  it("refuses a statement the caller may read as unavailable, in a query", async () => {
+    expect((await outcomeOf(attempt({ sql: readable }))).code).toBe("lwql_unavailable");
+  });
+
+  /** @scenario "A deployment with no LangWatchQL identity judges the statement first" */
+  it("refuses a statement the caller may read as unavailable, in a pass", async () => {
+    const done = attempt({ sql: readable, pass: { kind: "probe" } });
+
+    expect((await outcomeOf(done)).code).toBe("lwql_unavailable");
   });
 });
