@@ -59,7 +59,7 @@ describe("VoiceCallClaimService", () => {
     it("throws from emit when nothing listens for the socket's error, as a control for the above", () => {
       const socket = new Socket();
 
-      expect(() => socket.emit("error", new Error("unlistened"))).toThrow();
+      expect(() => socket.emit("error", new Error("unlistened"))).toThrow("unlistened");
     });
   });
 });
