@@ -12,10 +12,11 @@
 -- InstantEvalApi.
 --
 -- The sort key leads with the trace, so the recall lookup and the trace page's
--- read are both prefix reads. InputHash is in the key so a question asked of a
--- trace's input and of its output are two rows, never one. JudgedAt ends the key
--- so every judgment is kept: a judge is not deterministic, and a re-judgment of
--- the same trace by the same source adds a row rather than replacing one. A
+-- read are both prefix reads. InputHash and JudgedColumn are in the key so a
+-- question asked of a trace's input and of its output are two rows, never one.
+-- JudgedAt ends the key so every judgment is kept: a judge is not
+-- deterministic, and a re-judgment of the same trace by the same source adds a
+-- row rather than replacing one. A
 -- redelivered insert carries the same JudgedAt, so the replacing merge collapses
 -- it. SourceId sits before JudgedAt, so the same verdict written by two sources
 -- is two rows. Recall never keys on SourceId: it takes the latest row by
