@@ -94,7 +94,7 @@ The general model, both reporting channels and their limits, is covered on [Repo
 
 `langwatch instrument codex` installs a `notify` program, and Codex runs it at the end of every turn, and the program reads the working directory from the session start record. That directory does not change during the session, so after a `cd` the agent must run `langwatch ingest context` to move attribution.
 
-`langwatch ingest context` still matters: it updates attribution as soon as the agent runs it, mid-turn. If `notify` does not run, it reaches LangWatch only when the shell has network access: under Codex's default sandbox it is queued for the `notify` report.
+`langwatch ingest context` still matters. When the shell has network access, it updates attribution at once, mid-turn. Under Codex's default sandbox it is queued, and the `notify` report delivers it after the turn. If `notify` does not run and no Codex session hook is installed, a queued declaration is not delivered.
 
 The agent moves the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares.
 

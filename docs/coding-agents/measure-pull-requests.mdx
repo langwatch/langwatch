@@ -10,7 +10,7 @@ keywords:
   - coding agent pr tracking
 ---
 
-Three things have to be in place for a pull request to show its cost: the agent is wired with `langwatch instrument` or with a `langwatch <tool>` wrapper run that keeps the plain command reporting, you start the agent inside the repository's folder, and your organization has GitHub connected. This page covers each one, what the command writes on your machine, and how to remove it again.
+Three things have to be in place for a pull request to show its cost: the agent is wired with `langwatch instrument` ([a wrapper run](#which-agents-report-their-pull-requests) can also do it), you start the agent inside the repository's folder, and your organization has GitHub connected. This page covers each one, what the command writes on your machine, and how to remove it again.
 
 ## Set it up
 
@@ -32,7 +32,7 @@ Three things have to be in place for a pull request to show its cost: the agent 
     Run the line for each agent you use. The command prints where the telemetry goes, then exits. [The table below](#what-langwatch-instrument-does) lists every file it writes.
   </Step>
   <Step title="Connect GitHub">
-    An organization admin connects GitHub once, under **Settings → Integrations**. LangWatch needs it to turn a branch into its pull requests. The GitHub App must have access to the repository: if it has access to selected repositories only and this one is not selected, the pull request shows no cost and no error.
+    An organization admin connects GitHub once, under **Settings → Integrations**. LangWatch needs it to turn a branch into its pull requests. The GitHub App must have access to the repository: if it has access to selected repositories only and this one is not selected, the branch's row on **Pull requests** shows **Link this repo** in place of a pull request. An organization admin can use that button to grant access.
   </Step>
   <Step title="Start the agent inside the repository">
     ```bash
@@ -63,7 +63,7 @@ The command takes one tool name: `claude`, `codex`, `gemini`, `opencode`, `copil
 | Tool       | What the command writes                                                                                                                                                                                                         |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `claude`   | The OpenTelemetry variables into the `env` block of `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`), plus a `SessionStart` and a `Stop` hook in the same file. With the LangWatch Claude Code plugin installed, the plugin runs the hooks instead. |
-| `codex`    | An `[otel]` block and a `notify` program in `$CODEX_HOME/config.toml`, plus an instruction block in `$CODEX_HOME/AGENTS.md` (`~/.codex` by default). Your own `notify` program keeps running after the LangWatch one. If your `notify` cannot be moved safely, the command prints a warning and installs no `notify` program, so sessions report tokens but no repository.  |
+| `codex`    | An `[otel]` block and a `notify` program in `$CODEX_HOME/config.toml`, plus an instruction block in `$CODEX_HOME/AGENTS.md` (`~/.codex` by default). Your own `notify` program keeps running after the LangWatch one. If your `notify` cannot be moved safely, the command prints a warning that the conversation will not be recorded and installs no `notify` program, so sessions report tokens but no conversation or repository. To fix it, remove your `notify` setting and run the command again. |
 | `gemini`   | A `gemini` shell function in `~/.zshrc`, `~/.bashrc` or `~/.config/fish/config.fish`.                                                                                                                                           |
 | `opencode` | An `opencode` shell function in the same file, plus `experimental.openTelemetry: true` in `~/.config/opencode/opencode.jsonc`.                                                                                                 |
 | `copilot`  | A `copilot` shell function in the same file, plus a `sessionStart` and an `agentStop` hook in `~/.copilot/hooks/langwatch.json` (or `$COPILOT_HOME/hooks/langwatch.json`). |
@@ -75,7 +75,7 @@ The shell function sets the variables only for that one tool run, so other comma
 
 Claude Code, Codex, GitHub Copilot and GitHub Copilot in VS Code (`code`) report the repository and branch after `langwatch instrument`, which is what joins a session to a pull request. Both Copilot tools read the same hook file.
 
-A `langwatch <tool>` wrapper run does the same only when you keep the plain command reporting. If you decline that prompt, if the run has no terminal, or if it takes the gateway route, it writes no reporting hook, so the session joins no pull request.
+A `langwatch <tool>` wrapper run can also set this up. For Codex, a run that sends telemetry directly installs the `notify` program. For Claude Code and Copilot, a run writes the reporting hooks only when you accept its prompt to keep the plain command reporting, or when that wiring is already there. A gateway-route run writes none. If you see no prompt, or you decline it, run `langwatch instrument <tool>`: a session with no hooks joins no pull request.
 
 For Gemini CLI and opencode, these commands wire the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
 
@@ -117,9 +117,11 @@ For each branch a session reported, LangWatch asks GitHub for every pull request
 
 By default the wiring captures the conversation as well as the token counts. To turn content off at the source, remove the content variables for your tool, then restart the agent. Cost and token counts keep flowing. The variable names are on each tool page, for example [Claude Code](/coding-agents/claude-code#content-and-privacy), and [Privacy](/coding-agents/privacy) explains the controls.
 
+For Claude Code, also remove them from `.claude/settings.local.json` in any folder where you ran `langwatch claude`, because that file overrides your user settings.
+
 For Codex, the conversation is read from the transcript by the `notify` program. The same program reports the repository and branch, so removing it also stops the pull request join.
 
-`langwatch instrument`, any `langwatch <tool>` wrapper run and `langwatch login` write the removed variables back. For content to stay off, drop it for the whole organization at ingestion: see [Privacy](/coding-agents/privacy).
+`langwatch instrument` and any `langwatch <tool>` wrapper run write the removed variables back, and `langwatch login` does so when you sign in to a different LangWatch address. For Codex, all three reinstall the `notify` program. For content to stay off, drop it for the whole organization at ingestion: see [Privacy](/coding-agents/privacy).
 
 ## Undo it
 
@@ -129,7 +131,7 @@ langwatch logout
 
 `langwatch logout` signs this machine out and removes what LangWatch wrote: the Claude Code variables and hooks, the LangWatch Claude Code plugin, the Codex `[otel]` and `notify` blocks, its profile file and the `AGENTS.md` instruction, the shell functions, the Copilot hook file, and the VS Code setting that clears the telemetry variables. In a file you also edit, it leaves the rest as it was.
 
-It reads a Claude Code project pin (`.claude/settings.local.json`) only in the current folder, so run it from each repository where you ran `langwatch claude`.
+It reads a Claude Code project pin (`.claude/settings.local.json`) only in the current folder, so run it from each folder where you ran `langwatch claude`, linked worktrees included.
 
 - `--keep-credentials` removes the wiring and keeps you signed in.
 - `-y` skips the confirmation prompt.
