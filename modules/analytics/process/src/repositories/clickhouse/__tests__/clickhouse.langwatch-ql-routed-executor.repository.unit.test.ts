@@ -340,3 +340,61 @@ describe("given a private route whose URL has no usable origin", () => {
     expect(drivers).toHaveLength(1);
   });
 });
+
+describe("given a private route whose path is not a plain ClickHouse database name", () => {
+  const withPath = (path: string): TenantRoute => ({
+    kind: "private",
+    organizationId: "org-shape",
+    url: `https://route-user:route-password@private.invalid:8443${path}`,
+  });
+  const attempt = (route: TenantRoute) => {
+    const createExecutor = vi.fn(
+      (input: Parameters<typeof ClickHouseLangWatchQLExecutorRepository.create>[0]) =>
+        ClickHouseLangWatchQLExecutorRepository.create(input),
+    );
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      connection: SHARED,
+      route: () => Promise.resolve(route),
+      createExecutor,
+    });
+    const run = () =>
+      executor
+        .execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds: ["project-x"] })
+        .catch((error: unknown) => error);
+
+    return { createExecutor, run };
+  };
+
+  /** @scenario "A private route whose database is not a plain ClickHouse name is refused" */
+  it.each([
+    ["a hyphenated name", "/acme-db", /acme-db/],
+    ["a path carrying SQL once decoded", "/x%3B%20DROP%20TABLE%20t", /DROP|x;|%3B/],
+    ["a path with a second segment", "/acme_db/extra", /extra/],
+    ["a name starting with a digit", "/1acme", /1acme/],
+  ])(
+    "refuses %s, naming no part of the URL, and builds no private executor",
+    async (_, path, leak) => {
+      const { createExecutor, run } = attempt(withPath(path));
+
+      const refusal = await run();
+
+      expect(refusal).toMatchObject({
+        code: "lwql_unavailable",
+        message: "LangWatchQL is not available for this organization's ClickHouse.",
+      });
+      expect((refusal as Error).message).not.toMatch(leak);
+      expect((refusal as Error).message).not.toMatch(/route-user|route-password|private\.invalid/);
+      expect(createExecutor.mock.calls.map(([input]) => input.target)).toEqual(["shared"]);
+      expect(privateDrivers()).toEqual([]);
+    },
+  );
+
+  /** @scenario "A private route whose database is not a plain ClickHouse name is refused" */
+  it("accepts a plain name and dials it", async () => {
+    const { run } = attempt(withPath("/acme_db"));
+
+    await run();
+
+    expect(privateDrivers()[0]?.config).toMatchObject({ database: "acme_db" });
+  });
+});

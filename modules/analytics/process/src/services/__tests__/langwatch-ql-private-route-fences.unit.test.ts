@@ -430,3 +430,77 @@ describe("given a deployment with no LangWatchQL identity", () => {
     expect((await outcomeOf(done)).code).toBe("lwql_unavailable");
   });
 });
+
+describe("given a run validated at its start", () => {
+  const MISSING = new PrivateRouteUnavailableError({
+    organizationId: "org-private",
+    variable: "CLICKHOUSE_URL__acme__org-private",
+    problem: "missing",
+  });
+
+  /** The service over a recording route, and the number of times the route was asked. */
+  function validating(answer: TenantRoute | Error) {
+    let routeCalls = 0;
+    const executors: RecordingExecutor[] = [];
+    const routed = RoutedLangWatchQLExecutorRepository.create({
+      connection: SHARED,
+      route: () => {
+        routeCalls += 1;
+        return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+      },
+      createExecutor: ({ connection, target }) => {
+        const executor = new RecordingExecutor(connection, target);
+        executors.push(executor);
+        return executor;
+      },
+    });
+    const service = LangWatchQLService.create({ executor: routed, database: SHARED.database });
+
+    return {
+      routeCalls: () => routeCalls,
+      ranAnything: () => executors.some((executor) => executor.requests.length > 0),
+      validateRun: (sql: string) =>
+        service.validateForRun({ projectId: PROJECT.id, protections: PROTECTIONS, sql }),
+    };
+  }
+
+  /** @scenario "A run validates against its route's database before anything is judged" */
+  it("refuses a statement naming the shared database on a private organization", async () => {
+    const attempt = validating(PRIVATE);
+
+    const refusal = await outcomeOf(attempt.validateRun(countFrom("analytics.traces")));
+
+    expect(refusal.code).toBe("lwql_not_permitted");
+    expect(refusal.violations).toContain("TABLE_NOT_ALLOWED");
+    expect(attempt.ranAnything()).toBe(false);
+  });
+
+  /** @scenario "A run validates against its route's database before anything is judged" */
+  it("accepts a statement naming the route database and asks the route once", async () => {
+    const attempt = validating(PRIVATE);
+
+    expect((await outcomeOf(attempt.validateRun(countFrom("acme_db.traces")))).code).toBe("ok");
+    expect(attempt.routeCalls()).toBe(1);
+    expect(attempt.ranAnything()).toBe(false);
+  });
+
+  /** @scenario "A run validates against its route's database before anything is judged" */
+  it("gives a missing route its refusal, even for a statement the policy would refuse", async () => {
+    const attempt = validating(MISSING);
+
+    const refusal = await outcomeOf(attempt.validateRun("SELECT * FROM analytics.no_such_view"));
+
+    expect(refusal.code).toBe("lwql_unavailable");
+    expect(attempt.ranAnything()).toBe(false);
+  });
+
+  /** @scenario "A run validates against its route's database before anything is judged" */
+  it("judges a shared organization against the shared database, as before", async () => {
+    const attempt = validating(SHARED_ROUTE);
+
+    expect((await outcomeOf(attempt.validateRun(countFrom("analytics.traces")))).code).toBe("ok");
+    expect((await outcomeOf(attempt.validateRun(countFrom("acme_db.traces")))).code).toBe(
+      "lwql_not_permitted",
+    );
+  });
+});

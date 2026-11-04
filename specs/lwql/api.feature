@@ -825,6 +825,23 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a statement naming the shared database saves, and is refused at run on a private organization
     And a statement naming a private route's database is refused at save
 
+  @unit
+  Scenario: A run validates against its route's database before anything is judged
+    Given an organization routed to its own ClickHouse, whose route names the database acme_db
+    When a run is validated at its start
+    Then the route is asked once, and the statement is judged against acme_db
+    And a statement naming the shared database is refused with error code lwql_not_permitted
+    And a statement naming acme_db is accepted
+    And an organization whose route is missing gets the route's refusal, not a statement refusal
+    And an organization without a private ClickHouse is judged against the shared database as before
+
+  @unit
+  Scenario: A private route whose database is not a plain ClickHouse name is refused
+    Given an organization routed to a URL whose path is not a plain identifier, or carries SQL once decoded
+    When a LangWatchQL query reads that organization's projects
+    Then the query layer refuses it with error code lwql_unavailable before any statement runs
+    And the refusal names no part of the route URL
+
   # ---------------------------------------------------------------------------
   # Resource safety (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
