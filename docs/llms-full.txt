@@ -44401,7 +44401,11 @@ keywords: langwatch, langwatchql, lwql, sql examples, traces, spans, evaluations
 description: Worked LangWatchQL statements for traces, spans, evaluations, simulations, per-minute rollups, conversations, coding-agent sessions and Instant Eval judgments.
 ---
 
-Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. The one exception is the judgments statement, which has a `{run:String}` parameter that needs a value. If your key reaches several projects, also name them: add `--projects <id,id>` or `--projects all` to the command, or send `projects` in the body. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
+Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. The one exception is the judgments statement, which has a `{run:String}` parameter that needs a value.
+
+If your key reaches several projects, also name them: add `--projects <id,id>` or `--projects all` to the command, or send `projects` in the body.
+
+Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
 
 ## Traces: the most recent failures
 
