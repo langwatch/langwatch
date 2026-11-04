@@ -18,5 +18,10 @@ export abstract class StorageFootprintRepository {
   /** The active parts of each named table, summed; a table with no parts is absent. */
   abstract findTables(input: { tables: readonly string[] }): Promise<StorageStatsReading["tables"]>;
   abstract findDisks(): Promise<StorageStatsReading["disks"]>;
-  abstract findBackupStatuses(): Promise<BackupStatusRow[]>;
+  /**
+   * Backup history. `cluster` names the replicas to read together: `system.backup_log` is
+   * per-replica and backups run on one of them, so a single replica's answer can be weeks stale.
+   * Absent reads the endpoint's own log (single node, self-hosted).
+   */
+  abstract findBackupStatuses(input?: { cluster?: string | undefined }): Promise<BackupStatusRow[]>;
 }

@@ -1,6 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { getRequestListener } from "@hono/node-server";
+import {
+  UNMATCHED_ROUTE,
+  recordHttpServerRequest,
+  routeTemplateOf,
+} from "@langwatch/observability/metrics";
 import { Hono } from "hono";
 
 import { canonicalOtlpRequest } from "../rest/otlp-path-alias.ts";
@@ -78,6 +83,23 @@ export class HttpMux {
   }
 
   fetch = async (received: Request, socketAddress?: string): Promise<Response> => {
+    const startedAt = performance.now();
+    const { request, response } = await this.#answer(received, socketAddress);
+    // Labelled by the template an inner router matched, else the mount prefix:
+    // both are bounded by the code, unlike the path the caller chose.
+    recordHttpServerRequest({
+      method: request.method,
+      route: routeTemplateOf(request) ?? this.#routeFor(request)?.prefix ?? UNMATCHED_ROUTE,
+      status: response.status,
+      durationSeconds: (performance.now() - startedAt) / 1000,
+    });
+    return response;
+  };
+
+  #answer = async (
+    received: Request,
+    socketAddress?: string,
+  ): Promise<{ request: Request; response: Response }> => {
     // Root-level exporter paths (`/v1/traces`) reach the API only once rewritten, as on main.
     const request = canonicalOtlpRequest(received);
     const router = this.#compile();
@@ -118,11 +140,14 @@ export class HttpMux {
       body = null;
     }
 
-    return new Response(body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
+    return {
+      request,
+      response: new Response(body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      }),
+    };
   };
 
   get handler(): NodeHandler {
@@ -153,12 +178,7 @@ export class HttpMux {
 
   #answerFailure(failure: unknown, request: Request): Response {
     const pathname = new URL(request.url).pathname;
-
-    const route = this.#routes.find(({ prefix, exact }) =>
-      exact
-        ? pathname === prefix || pathname === `${prefix}/`
-        : prefix === "/" || pathname === prefix || pathname.startsWith(`${prefix}/`),
-    );
+    const route = this.#routeFor(request);
 
     try {
       this.#reporter?.error({ error: failure, path: pathname }, "a request was not answered");
@@ -167,6 +187,17 @@ export class HttpMux {
     } catch {
       return new Response(null, { status: 500 });
     }
+  }
+
+  /** The mount a request's path falls under; routes are sorted most specific first. */
+  #routeFor(request: Request): Route | undefined {
+    const pathname = new URL(request.url).pathname;
+
+    return this.#routes.find(({ prefix, exact }) =>
+      exact
+        ? pathname === prefix || pathname === `${prefix}/`
+        : prefix === "/" || pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
   }
 
   #assertMutable(): void {
