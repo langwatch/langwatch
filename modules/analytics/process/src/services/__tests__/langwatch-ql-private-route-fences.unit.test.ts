@@ -283,6 +283,23 @@ describe("given FINAL on a table qualified with the route's database", () => {
   });
 });
 
+describe("given FINAL on a route-qualified table of a windowed aggregate", () => {
+  const dated = [{ projectId: PROJECT.id, from: 1_000 }];
+
+  // The windowed scope rewrites the table into a subquery, where FINAL means nothing.
+  it("refuses it in a query on the route database, and runs nothing", async () => {
+    const attempt = run({
+      answers: [PRIVATE],
+      sql: "SELECT count() AS n FROM acme_db.trace_metrics FINAL",
+      timeWindow: WINDOW,
+      memberWindows: dated,
+    });
+
+    expect((await outcomeOf(attempt.done)).code).toBe("lwql_table_modifier_unsupported");
+    expect(attempt.requests()).toEqual([]);
+  });
+});
+
 describe("given a pass for a private organization", () => {
   /** @scenario "A pass on a private route validates against the route's database" */
   it("admits an unqualified statement, as a shorthand writes it, and runs it on the route", async () => {
