@@ -875,7 +875,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.membership.countMembershipsForUser(input);
   }
 
-  organizationIdsForMember(input: { userId: string }): Promise<string[]> {
+  organizationIdsForMember(input: { userId: string; activeOnly?: boolean }): Promise<string[]> {
     return this.#dependencies.organizations.organizationIdsForMember(input);
   }
 

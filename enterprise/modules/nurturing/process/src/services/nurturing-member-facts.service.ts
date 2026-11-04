@@ -68,7 +68,11 @@ export class NurturingMemberFactsService {
     userId,
     organizationId,
   }: Readonly<{ userId: string; organizationId: string }>): Promise<KnownTraces> {
-    const memberOf = await this.dependencies.organizations.organizationIdsForMember({ userId });
+    // Disabled memberships count: their traces already reached the profile, which must not regress.
+    const memberOf = await this.dependencies.organizations.organizationIdsForMember({
+      userId,
+      activeOnly: false,
+    });
     const known = await Promise.all(
       [...new Set([organizationId, ...memberOf])].map((id) => this.tracesOfOrganization(id)),
     );

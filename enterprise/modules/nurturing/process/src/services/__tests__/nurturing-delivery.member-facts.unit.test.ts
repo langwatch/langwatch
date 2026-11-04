@@ -90,7 +90,9 @@ async function organizationWithMembers({
   const milestones = MemoryNurturingMilestonesRepository.create();
   const projects = MemoryNurturingProjectDirectoryRepository.create({ placed, traced });
   const getAllMembers = vi.fn(async () => members.map((id) => ({ id })) as never);
-  const organizationIdsForMember = vi.fn(async () => [...organizationsOfPerson]);
+  const organizationIdsForMember = vi.fn(async (input: { userId: string; activeOnly?: boolean }) =>
+    input.activeOnly === false ? [...organizationsOfPerson] : [],
+  );
   for (const organizationId of new Set(placed.values())) {
     await milestones.recordOrganization({ organizationId, adminUserId: "admin-1", seeded: false });
   }
@@ -423,6 +425,21 @@ describe("NurturingDeliveryService organization facts", () => {
 
       expect(traitsOf(cio.identifies(), "joiner-1")).toEqual([
         expect.objectContaining({ has_traces: true, last_trace_at: seconds(T0) }),
+      ]);
+    });
+  });
+
+  describe("when the only organization with traces was disabled for a person the SSO adds elsewhere", () => {
+    /** @scenario "A disabled membership still counts toward has_traces" */
+    it("identifies them with has_traces true", async () => {
+      const { cio, deliver } = await organizationWithMembers({ organizationsOfPerson: ["org-1"] });
+      await deliver(trace(T0));
+
+      await deliver({ ...ssoAutoAdded, organizationId: "org-new" });
+      await settle();
+
+      expect(traitsOf(cio.identifies(), "joiner-1")).toEqual([
+        expect.objectContaining({ has_traces: true }),
       ]);
     });
   });
