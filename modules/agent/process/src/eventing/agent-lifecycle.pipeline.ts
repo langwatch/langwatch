@@ -13,15 +13,19 @@ import {
   AGENT_AGGREGATE_TYPE,
   AGENT_LIFECYCLE_PIPELINE_NAME,
   agentArchivedEventSchema,
+  agentChangedEventSchema,
   type AgentLifecycleEvent,
   RecordAgentArchivedCommand,
   type RecordAgentArchivedCommandData,
+  RecordAgentChangedCommand,
+  type RecordAgentChangedCommandData,
 } from "./agent-lifecycle.commands.ts";
 
 export type AgentLifecyclePipeline = StaticPipelineDefinition<
   AgentLifecycleEvent,
   Record<string, Projection>,
-  { name: "recordAgentArchived"; payload: RecordAgentArchivedCommandData }
+  | { name: "recordAgentArchived"; payload: RecordAgentArchivedCommandData }
+  | { name: "recordAgentChanged"; payload: RecordAgentChangedCommandData }
 >;
 
 /** The api sends the command; peers (workflow) react to its event from their own side (§9). */
@@ -30,8 +34,9 @@ export function buildAgentLifecyclePipeline(): AgentLifecyclePipeline {
     name: AGENT_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: AGENT_AGGREGATE_TYPE }),
   })
-    .withEvents([agentArchivedEventSchema])
+    .withEvents([agentArchivedEventSchema, agentChangedEventSchema])
     .withCommand("recordAgentArchived", RecordAgentArchivedCommand)
+    .withCommand("recordAgentChanged", RecordAgentChangedCommand)
     .build();
 }
 

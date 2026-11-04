@@ -75,23 +75,23 @@ export const withoutMappingsToMissingColumns = ({
       mapping.type === "source" && !columnNames.has(mapping.sourceField) ? "remove" : mapping,
   });
 
-/** The wiring with dataset mappings that read `from` reading `to` instead. */
-export const withRenamedColumnMappings = ({
+/** The wiring with each dataset mapping reading a renamed column reading its new name. */
+export const withRenamedColumnsMappings = ({
   wiring,
   datasetId,
-  from,
-  to,
+  renames,
 }: {
   wiring: Wiring;
   datasetId: string;
-  from: string;
-  to: string;
+  /** Old column name to new, all applied at once so a swap swaps. */
+  renames: ReadonlyMap<string, string>;
 }): Wiring =>
   editWiring({
     wiring,
     datasetId,
-    edit: (mapping) =>
-      mapping.type === "source" && mapping.sourceField === from
-        ? { ...mapping, sourceField: to }
-        : mapping,
+    edit: (mapping) => {
+      if (mapping.type !== "source") return mapping;
+      const renamed = renames.get(mapping.sourceField);
+      return renamed === undefined ? mapping : { ...mapping, sourceField: renamed };
+    },
   });

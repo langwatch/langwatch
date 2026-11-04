@@ -10,13 +10,21 @@ import { Skeleton, SkeletonText, Text, VStack } from "@langwatch/design-system/p
 import { Server } from "lucide-react";
 
 import { useBillingHost } from "../../model/billing-host.ts";
+import { SaasPageOpened } from "./saas-page-opened.tsx";
 import { SubscriptionPage } from "./subscription-page.tsx";
 
 export default function SubscriptionScreen() {
   const host = useBillingHost();
 
   const isSettled = host.isDeploymentSettled();
-  if (isSettled && host.isSaaS()) return <SubscriptionPage />;
+  if (isSettled && host.isSaaS()) {
+    return (
+      <>
+        <SaasPageOpened page="settings_subscription" />
+        <SubscriptionPage />
+      </>
+    );
+  }
 
   return (
     <>
