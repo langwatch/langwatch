@@ -198,6 +198,8 @@ schedule that is on and no other; a run on a template keeps ending `skipped` wit
 
 **Run now asks for the same run.** The board's dropdown offers Run now to a person who
 holds `analytics:view` and `langy:create`, on a board that is on with no run in flight.
+A From LangWatch board and a board with no widgets offer none, since the gate would
+always skip the run.
 `runBoardDailyRunNow` sends the request an operator's task sends, for the caller alone,
 so the run files into the same inbox. The server refuses it with `validation_error`
 unless the caller's run on the board is on, its sentence in `meta.formErrors` for the
@@ -208,10 +210,13 @@ with that id to show, with no standing poll: `run_started` and `run_settled` hin
 board's read, which is read again. A hint is published off the committed event, not after
 the schedule row is folded, so it can outrun the row: a read a hint brought back without
 the run is read again after each of `REQUESTED_RUN_REREAD_DELAYS_MS` in turn (2, 4, 8 and
-16 seconds, about 30 in all), and stops once the run shows or the request ends. The read
-Run now asks once the request is in starts the same re-reads, since a hint that lands
-while it is unanswered merges into it and could not start them itself. In flight, it
-opens Langy on the run's conversation; settled first, it ends the wait.
+16 seconds, about 30 in all), and stops once the run shows, the delays run out or the
+request ends. A read that fails counts as answered, so it takes the next delay and does
+not end the re-reads early. The read Run now asks once the request is in starts the same
+re-reads, since a hint that lands while it is unanswered merges into it and could not
+start them itself. In flight, it opens Langy on the run's conversation; settled first, it
+ends the wait, opening Langy if the run has a conversation and otherwise telling the
+person how it ended or why it did not start, from `lastRun`.
 
 While a run is in flight, `runNow` requests nothing and answers that run's id, so the
 browser follows it. The read cannot see a run the process holds before `run_started`
@@ -227,9 +232,12 @@ run that never reached Langy leaves the wait to its deadline. Run now answers
 `requestedAt`, the time the server recorded the request on the clock that stamps a
 run's start, so the browser's clock never enters the comparison. A scheduled run that
 settled before the request is shown as the last run, and the wait goes on. A run that
-shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser says the
-run could not be started. While a run is in flight the dropdown offers to open it
-instead.
+shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser reads the
+board once more, as its cached read can be behind. If that read shows the run, the wait
+ends as for any other read. If it shows none, fails, or has not answered within
+`REQUESTED_RUN_LAST_READ_MS`, the browser says the run could not be started and the
+request ends, so an answer after that changes nothing. While a run is in flight the
+dropdown offers to open it instead.
 
 **The row names the run in flight.** `run_started` writes `runInFlightId`,
 `runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run

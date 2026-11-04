@@ -1,7 +1,7 @@
 /**
  * "Daily insights" in a board's header, lent through analytics' board-header extension point
- * (§10.1). A personal setting: none yet or off (a quiet switch), or on (one dropdown, with Run
- * now). The board never asks by itself; a run the system turned off keeps the dropdown.
+ * (§10.1). A personal setting: none yet or off (a quiet switch), or on (one dropdown). The board
+ * never asks by itself; a run the system turned off keeps the dropdown.
  */
 
 import type { BoardHeaderActionProps } from "@langwatch/analytics-client";
@@ -46,6 +46,8 @@ function DailyInsightsControl({
   if (!isOn && (widgetCount ?? 0) === 0) return null;
   // Set only while the system turned it off: the person is owed the reason.
   const turnedOff = setting.offReason === null ? undefined : OFF_REASON_WORDS[setting.offReason];
+  // A run on either always ends skipped (template_board, board_empty): nothing to offer.
+  const canRunRead = boardKind !== "template" && (widgetCount ?? 0) > 0;
 
   return (
     <>
@@ -59,7 +61,7 @@ function DailyInsightsControl({
           turnedOff={isOn ? undefined : turnedOff}
           insightsHref={daily.insightsHref}
           runNow={
-            isOn && daily.mayRunNow
+            isOn && daily.mayRunNow && canRunRead
               ? { isStarting: daily.isStartingRun, onRun: daily.runNow }
               : undefined
           }
@@ -122,7 +124,7 @@ function DailyInsightsDropdown({
   /** Why the system turned the run off; undefined while it is on. */
   turnedOff: string | undefined;
   insightsHref: string | undefined;
-  /** Undefined where the person may not run the board now. */
+  /** Undefined where the person may not run the board now, or a run could not read it. */
   runNow: { isStarting: boolean; onRun: () => void } | undefined;
   /** Turns the run off while it is on, and on again with what was last chosen while it is off. */
   onToggle: () => void;

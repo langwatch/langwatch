@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import {
   defaultRunSettings,
+  requestedRunEndWords,
   requestedRunOf,
   runTimeWords,
   TEMPLATE_BOARD_NOTE,
@@ -37,6 +38,9 @@ const RUN_NOT_STARTED = "Couldn't start the run";
 
 /** A hint can reach the tab before the worker stored the row it names; these outlast that gap. */
 export const REQUESTED_RUN_REREAD_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
+
+/** How long the deadline's own read may take; a read can retry for as long as an upgrade lasts. */
+export const REQUESTED_RUN_LAST_READ_MS = 30_000;
 
 /** No run reads a From LangWatch board yet, so its toast says so instead of a promise. */
 function turnedOnWords({
@@ -59,7 +63,7 @@ function openInLangy({ host, conversationId }: { host: InsightHostApi; conversat
 /**
  * A hint races the row it names (ADR-004): a read it brought back without the awaited run is
  * asked again after each delay in turn, until the run shows. Answers the read Run now asks, which
- * starts the same re-reads, so a hint merged into it loses none.
+ * starts the same re-reads, so a hint merged into it loses none. A failed read answers too.
  */
 function useRereadWhileAwaiting({
   scope: {
@@ -98,6 +102,47 @@ function useRereadWhileAwaiting({
   return () => readAgain(0);
 }
 
+/**
+ * One deadline, not a poll: past a run's expiry the server holds the run as lost. The cached read
+ * may be behind, so the deadline reads once and gives up only if that shows no run. A run it shows
+ * ends the wait the usual way, and an answer after giving up finds no request to follow (ADR-004).
+ */
+function useRequestedRunDeadline({
+  request,
+  isAwaitingRun,
+  readOnce,
+  onLost,
+}: {
+  /** What the server answered Run now with. */
+  request: { requestId: string; requestedAt: number } | undefined;
+  isAwaitingRun: boolean;
+  readOnce: () => Promise<{ data?: InsightDailyRunSetting | undefined }>;
+  onLost: () => void;
+}) {
+  useEffect(() => {
+    if (!isAwaitingRun || !request) return;
+    let isOver = false;
+    const giveUp = () => {
+      if (isOver) return;
+      isOver = true;
+      onLost();
+    };
+    let lastRead: ReturnType<typeof setTimeout> | undefined;
+    const deadline = setTimeout(() => {
+      lastRead = setTimeout(giveUp, REQUESTED_RUN_LAST_READ_MS);
+      void readOnce().then(({ data }) => {
+        // A failed read hands back what the board last read, which shows no run either.
+        if (!data || !requestedRunOf({ setting: data, ...request })) giveUp();
+      });
+    }, INSIGHT_DAILY_RUN_EXPIRY_MS);
+    return () => {
+      isOver = true;
+      clearTimeout(deadline);
+      clearTimeout(lastRead);
+    };
+  }, [isAwaitingRun, request, readOnce, onLost]);
+}
+
 type Write = {
   next: (current: InsightDailyRunSetting) => InsightDailyRunSetting;
   send: (handlers: { onSuccess: () => void; onError: (error: unknown) => void }) => void;
@@ -131,10 +176,12 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       : undefined;
   const hasRequestedRunShown = requested !== undefined;
   const requestedConversationId = requested?.conversationId ?? null;
+  // Only a settled run shows with no conversation, so the last run is the one to speak of.
+  const requestedRunEnd = query.data?.lastRun ? requestedRunEndWords(query.data.lastRun) : null;
   const isAwaitingRun = runNowRequest.isSuccess && !hasRequestedRunShown;
   const readAgain = useRereadWhileAwaiting({
     scope,
-    answeredAt: query.dataUpdatedAt,
+    answeredAt: Math.max(query.dataUpdatedAt, query.errorUpdatedAt),
     isAwaitingRun,
   });
   useEffect(() => {
@@ -142,20 +189,23 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     endRunNow();
     if (requestedConversationId !== null) {
       openInLangy({ host, conversationId: requestedConversationId });
+    } else if (requestedRunEnd !== null) {
+      host.informed({ title: requestedRunEnd });
     }
-  }, [hasRequestedRunShown, requestedConversationId, endRunNow, host]);
-  // One deadline, not a poll: past a run's expiry the server holds the run as lost, so say so.
-  useEffect(() => {
-    if (!isAwaitingRun) return;
-    const lost = setTimeout(() => {
-      endRunNow();
-      host.failed({
-        error: new Error("The requested run never showed"),
-        fallbackTitle: RUN_NOT_STARTED,
-      });
-    }, INSIGHT_DAILY_RUN_EXPIRY_MS);
-    return () => clearTimeout(lost);
-  }, [isAwaitingRun, endRunNow, host]);
+  }, [hasRequestedRunShown, requestedConversationId, requestedRunEnd, endRunNow, host]);
+  const sayRunNotStarted = useCallback(() => {
+    endRunNow();
+    host.failed({
+      error: new Error("The requested run never showed"),
+      fallbackTitle: RUN_NOT_STARTED,
+    });
+  }, [endRunNow, host]);
+  useRequestedRunDeadline({
+    request: runNowRequest.data,
+    isAwaitingRun,
+    readOnce: query.refetch,
+    onLost: sayRunNotStarted,
+  });
 
   const write = ({ next, send, done, fallbackTitle }: Write) => {
     const before = utils.insights.getBoardDailyRun.getData(scope);

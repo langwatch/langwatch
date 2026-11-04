@@ -39,6 +39,8 @@ export type StubInsightHostOptions = {
 /** A host that answers from fixtures and records everything it is told. */
 export class StubInsightHost extends InsightHostApi {
   readonly successes: InsightSuccessNotice[] = [];
+  /** Notices that are neither a success nor a failure, oldest first. */
+  readonly notices: InsightSuccessNotice[] = [];
   readonly failures: InsightFailureNotice[] = [];
   readonly navigations: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
@@ -76,6 +78,10 @@ export class StubInsightHost extends InsightHostApi {
 
   succeeded(notice: InsightSuccessNotice): void {
     this.successes.push(notice);
+  }
+
+  informed(notice: InsightSuccessNotice): void {
+    this.notices.push(notice);
   }
 
   failed(failure: InsightFailureNotice): void {

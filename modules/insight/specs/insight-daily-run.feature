@@ -1152,9 +1152,18 @@ Feature: The daily insights run
 
     @integration
     Scenario: Run now is in the dropdown of a board that is on
-      Given a member turned a board's daily run on
+      Given a member turned the daily run on for a stored board with widgets
       When they open the dropdown in the board's header
       Then it offers Run now
+
+    @integration
+    Scenario: Run now is offered only on a board a run can read
+      Given a board that is on, and a member who may ask Langy
+      When they open the dropdown in the board's header
+      Then a stored board with widgets offers Run now
+      And a From LangWatch board does not, since a run on it always ends skipped with template_board
+      And a board with no widgets does not, since a run on it always ends skipped with board_empty
+      And a board whose widgets have not loaded does not, until they have
 
     @integration
     Scenario: Run now asks for a run and opens Langy on it
@@ -1218,6 +1227,67 @@ Feature: The daily insights run
       When the member chooses Run now
       Then the member is told the run could not be started
       And the dropdown offers Run now again
+
+    @integration
+    Scenario: A requested run that ends with no conversation says how it ended
+      Given a board that is on, and the member chose Run now
+      When the run they asked for settles with no conversation
+      Then the member is told how it ended, or why it did not start, in plain words
+      And no Langy panel opens and no failure is shown
+      And the dropdown offers Run now again
+
+    @integration
+    Scenario: A failed re-read leaves the next re-read its delay
+      Given a board that is on, and the member chose Run now
+      When a re-read of the board fails
+      Then the board reads again only after the next delay
+      And the Langy panel opens on the run's conversation once a later read shows it
+
+    @integration
+    Scenario: Repeated failed re-reads stop when the delays end
+      Given a board that is on, and the member chose Run now
+      When every re-read of the board fails
+      Then the board reads no more once the 2, 4, 8 and 16 second delays have passed
+      And the member is told nothing until the deadline says the run could not be started
+
+    @integration
+    Scenario: The deadline follows a run its last read finds
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read shows the run
+      Then the wait ends as it does for any read that shows the run
+      And the member is not told the run could not be started
+
+    @integration
+    Scenario: The deadline says the run could not be started when its last read finds none
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read shows no run
+      Then the member is told once that the run could not be started
+      And the dropdown offers Run now again
+
+    @integration
+    Scenario: The deadline says so once when its last read fails
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read fails
+      Then the member is told once that the run could not be started
+      And the board reads no more
+
+    @integration
+    Scenario: The deadline gives up on a last read that never answers
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline's read has not answered within 30 seconds
+      Then the member is told once that the run could not be started
+      And if that read then answers with the run, no Langy panel opens and nothing more is said
+
+    @integration
+    Scenario: A run that shows after the deadline gave up opens nothing and says nothing
+      Given the member was told a run they asked for could not be started
+      When a later read shows that run in flight, or settled with no conversation
+      Then no Langy panel opens and the member is told nothing more
+      And the dropdown shows the run as any run on the board
 
     @unit
     Scenario: A started run names its conversation on the board's row

@@ -36,6 +36,9 @@ export abstract class InsightHostApi {
 
   abstract succeeded(notice: InsightSuccessNotice): void;
 
+  /** A plain fact about what happened, neither a success nor a failure. */
+  abstract informed(notice: InsightSuccessNotice): void;
+
   abstract failed(failure: InsightFailureNotice): void;
 
   /** Writes plain text to the clipboard; false where the browser refuses or has none. */

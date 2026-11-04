@@ -16,9 +16,12 @@ import { currentTimeZone, format, nowInstant } from "@langwatch/time";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { REQUESTED_RUN_REREAD_DELAYS_MS } from "../../../behavior/use-board-daily-insights.ts";
+import {
+  REQUESTED_RUN_LAST_READ_MS,
+  REQUESTED_RUN_REREAD_DELAYS_MS,
+} from "../../../behavior/use-board-daily-insights.ts";
 import { OFF_REASON_WORDS, SKIP_REASON_WORDS } from "../../../model/daily-run.ts";
 import {
   insightEntry,
@@ -53,6 +56,19 @@ const RUNNING: InsightDailyRunSetting = {
 function runNowAnswer({ requestedAt = nowInstant().epochMilliseconds } = {}) {
   return Promise.resolve({ requestId: "request-1", requestedAt });
 }
+
+/** A read that fails for good: this status is not retried, so the answer lands at once. */
+const READ_REFUSED = () =>
+  Promise.reject<InsightDailyRunSetting>(new UiProcedureRefusal("forbidden", 403));
+
+/** What a read the test changes as it goes can answer. */
+type ReadAnswer = () => InsightDailyRunSetting | Promise<InsightDailyRunSetting>;
+
+/** The shape of a board, as `openBoard` takes it. */
+type BoardShape = Parameters<typeof openBoard>[0];
+type RanOverrides = Partial<LastRun>;
+type LangyQuery = Record<string, string>;
+type Notice = { title: string };
 
 /** A member who may also ask Langy, which a run is. */
 const ASKER: StubInsightHostOptions = { permissions: ["analytics:view", "langy:create"] };
@@ -171,6 +187,13 @@ const dropdownButton = () => screen.findByRole("button", { name: /^Daily insight
 async function openDropdown(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await dropdownButton());
   return within(await screen.findByRole("dialog"));
+}
+
+/** Chooses Run now and waits for the read it asks: the board's second. */
+async function chooseRunNow(board: ReturnType<typeof openBoard>) {
+  const dropdown = await openDropdown(board.user);
+  await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+  await waitFor(() => expect(board.reads()).toHaveLength(2));
 }
 
 describe("given a board with widgets and a member who never answered for it", () => {
@@ -499,6 +522,22 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
 
       expect(dropdown.queryByRole("button", { name: "Run now" })).toBeNull();
     });
+
+    /** @scenario "Run now is offered only on a board a run can read" */
+    it.each<[string, BoardShape, boolean]>([
+      ["a stored board with widgets", {}, true],
+      ["a From LangWatch board", { kind: "template", id: "release" }, false],
+      ["a board with no widgets", { widgets: 0 }, false],
+      ["a board whose widgets have not loaded", { widgets: "loading" }, false],
+    ])("on %s, offers Run now only where a run can read it", async (_name, shape, isOffered) => {
+      const board = openBoard({ setting: ON, host: ASKER, ...shape });
+
+      const dropdown = await openDropdown(board.user);
+
+      expect(dropdown.queryAllByRole("button", { name: "Run now" })).toHaveLength(
+        isOffered ? 1 : 0,
+      );
+    });
   });
 
   describe("when they choose Run now, with no run in flight", () => {
@@ -813,6 +852,247 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       const again = await openDropdown(board.user);
       expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
       expect(board.host.queries).toEqual([]);
+    });
+  });
+
+  describe("when the run they asked for settles with no conversation", () => {
+    /** @scenario "A requested run that ends with no conversation says how it ended" */
+    it.each<[string, RanOverrides, string]>([
+      [
+        "on a quiet project",
+        { outcome: "nothing", reason: "no_new_traces" },
+        "The run ended: no new traces, so Langy was not asked.",
+      ],
+      ["with nothing new", { outcome: "nothing" }, "The run ended: nothing new."],
+      [
+        "skipped as no_access",
+        { outcome: "skipped", reason: "no_access" },
+        `The run did not start: ${SKIP_REASON_WORDS.no_access}.`,
+      ],
+      [
+        "skipped as langy_off",
+        { outcome: "skipped", reason: "langy_off" },
+        `The run did not start: ${SKIP_REASON_WORDS.langy_off}.`,
+      ],
+      [
+        "failed before reaching Langy",
+        { outcome: "failed", reason: "brief_changed" },
+        "The run failed: nothing was filed, and the next run tries again.",
+      ],
+    ])("says how it ended %s, and opens nothing", async (_name, lastRun, words) => {
+      let read = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await chooseRunNow(board);
+
+      read = ranToday({ ...lastRun, runId: "request-1" });
+      await board.readHint();
+
+      await waitFor(() => expect(board.host.notices).toEqual([{ title: words }]));
+      expect(board.host.queries).toEqual([]);
+      expect(board.host.failures).toEqual([]);
+      expect(board.host.successes).toEqual([]);
+      const again = await openDropdown(board.user);
+      expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+      expect(board.host.notices).toHaveLength(1);
+    });
+  });
+
+  describe("when a re-read of the board fails", () => {
+    let answerRead: ReadAnswer;
+    let board: ReturnType<typeof openBoard>;
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      answerRead = () => ON;
+      board = openBoard({
+        setting: () => answerRead(),
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await chooseRunNow(board);
+      answerRead = READ_REFUSED;
+      await board.readHint();
+    });
+    afterEach(() => void vi.useRealTimers());
+
+    /** @scenario "A failed re-read leaves the next re-read its delay" */
+    it("reads again only after the next delay, and opens Langy once a read shows the run", async () => {
+      const [first, second] = REQUESTED_RUN_REREAD_DELAYS_MS;
+
+      await vi.advanceTimersByTimeAsync(first - 500);
+      expect(board.reads()).toHaveLength(3);
+      await vi.advanceTimersByTimeAsync(500);
+      await waitFor(() => expect(board.reads()).toHaveLength(4));
+      answerRead = () => RUNNING;
+      await vi.advanceTimersByTimeAsync(second);
+
+      await waitFor(() =>
+        expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+      );
+      expect(board.reads()).toHaveLength(5);
+      expect(board.host.failures).toEqual([]);
+    });
+
+    /** @scenario "Repeated failed re-reads stop when the delays end" */
+    it("stops after 4 re-reads, and leaves the rest to the deadline", async () => {
+      for (const [step, delay] of REQUESTED_RUN_REREAD_DELAYS_MS.entries()) {
+        await vi.advanceTimersByTimeAsync(delay);
+        await waitFor(() => expect(board.reads()).toHaveLength(4 + step));
+      }
+      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
+
+      expect(board.reads()).toHaveLength(7);
+      expect(board.host.failures).toEqual([]);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await waitFor(() => expect(board.host.failures).toHaveLength(1));
+      expect(board.reads()).toHaveLength(8);
+    });
+  });
+
+  describe("when the board has read no run for as long as a run can last", () => {
+    /** The read the board opened with, Run now's read and its 4 re-reads. */
+    const READS_BEFORE_DEADLINE = 2 + REQUESTED_RUN_REREAD_DELAYS_MS.length;
+
+    beforeEach(() => void vi.useFakeTimers({ shouldAdvanceTime: true }));
+    afterEach(() => void vi.useRealTimers());
+
+    async function aMinuteBeforeTheDeadline(board: ReturnType<typeof openBoard>) {
+      await chooseRunNow(board);
+      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
+      expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE);
+      expect(board.host.failures).toEqual([]);
+    }
+
+    /** @scenario "The deadline follows a run its last read finds" */
+    it.each<[string, InsightDailyRunSetting, LangyQuery[], Notice[]]>([
+      ["opens Langy on a run in flight", RUNNING, [{ langyConversation: "conversation-7" }], []],
+      [
+        "says how a run with no conversation ended",
+        ranToday({ outcome: "skipped", reason: "langy_off", runId: "request-1" }),
+        [],
+        [{ title: `The run did not start: ${SKIP_REASON_WORDS.langy_off}.` }],
+      ],
+    ])("%s, and reports no failure", async (_name, shown, queries, notices) => {
+      let read = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await aMinuteBeforeTheDeadline(board);
+
+      read = shown;
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await waitFor(() => {
+        expect(board.host.queries).toEqual(queries);
+        expect(board.host.notices).toEqual(notices);
+      });
+      expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
+      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS);
+      expect(board.host.failures).toEqual([]);
+      expect(board.host.notices).toEqual(notices);
+    });
+
+    /** @scenario "The deadline says the run could not be started when its last read finds none" */
+    it("says so once, after one more read, and offers Run now again", async () => {
+      const board = openBoard({ setting: ON, host: ASKER, write: () => runNowAnswer() });
+      await aMinuteBeforeTheDeadline(board);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await waitFor(() => expect(board.host.failures).toHaveLength(1));
+      expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
+      expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
+      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS);
+      expect(board.host.failures).toHaveLength(1);
+      const again = await openDropdown(board.user);
+      expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+      expect(board.host.queries).toEqual([]);
+    });
+
+    /** @scenario "The deadline says so once when its last read fails" */
+    it("says so once, and reads no more", async () => {
+      let answerRead: ReadAnswer = () => ON;
+      const board = openBoard({
+        setting: () => answerRead(),
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await aMinuteBeforeTheDeadline(board);
+
+      answerRead = READ_REFUSED;
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await waitFor(() => expect(board.host.failures).toHaveLength(1));
+      expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
+      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS);
+      expect(board.host.failures).toHaveLength(1);
+      expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
+      expect(board.host.queries).toEqual([]);
+    });
+
+    /** @scenario "The deadline gives up on a last read that never answers" */
+    it("says so once when its read has not answered, and an answer after that opens nothing", async () => {
+      let answerRead: ReadAnswer = () => ON;
+      let answerLate: (() => void) | undefined;
+      const board = openBoard({
+        setting: () => answerRead(),
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await aMinuteBeforeTheDeadline(board);
+
+      answerRead = () =>
+        new Promise<InsightDailyRunSetting>((resolve) => (answerLate = () => resolve(RUNNING)));
+      await vi.advanceTimersByTimeAsync(60_000);
+      await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
+      expect(board.host.failures).toEqual([]);
+      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS);
+      await waitFor(() => expect(board.host.failures).toHaveLength(1));
+
+      answerLate?.();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      const after = await openDropdown(board.user);
+      expect(await after.findByText("A run is going.")).toBeInTheDocument();
+      expect(board.host.queries).toEqual([]);
+      expect(board.host.notices).toEqual([]);
+      expect(board.host.failures).toHaveLength(1);
+    });
+
+    /** @scenario "A run that shows after the deadline gave up opens nothing and says nothing" */
+    it.each<[string, InsightDailyRunSetting, RegExp]>([
+      ["in flight", RUNNING, /^A run is going\.$/],
+      [
+        "settled with no conversation",
+        ranToday({ outcome: "nothing", reason: "no_new_traces", runId: "request-1" }),
+        /no new traces, so Langy was not asked$/,
+      ],
+    ])("opens nothing and says nothing for a run shown %s", async (_name, late, line) => {
+      let read = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await aMinuteBeforeTheDeadline(board);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await waitFor(() => expect(board.host.failures).toHaveLength(1));
+
+      read = late;
+      await board.readHint();
+
+      const after = await openDropdown(board.user);
+      expect(await after.findByText(line)).toBeInTheDocument();
+      expect(board.host.queries).toEqual([]);
+      expect(board.host.notices).toEqual([]);
+      expect(board.host.successes).toEqual([]);
+      expect(board.host.failures).toHaveLength(1);
     });
   });
 });

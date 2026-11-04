@@ -82,6 +82,10 @@ class CapabilityInsightHost extends InsightHostApi {
     this.deps.feedback.succeeded(notice);
   }
 
+  informed(notice: InsightSuccessNotice): void {
+    this.deps.feedback.informed(notice);
+  }
+
   failed(failure: InsightFailureNotice): void {
     this.deps.feedback.failed(failure);
   }

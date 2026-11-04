@@ -152,6 +152,14 @@ function ranWords({ filedCount, renewedCount, reason }: InsightLastRun): string 
   return parts.join(", ") || "nothing new";
 }
 
+/** Why a run was skipped; a reason the contract does not list says what is sure. */
+function skipWords({ reason }: InsightLastRun): string {
+  const known = INSIGHT_RUN_SKIP_REASONS.find((skipReason) => skipReason === reason);
+  return known ? SKIP_REASON_WORDS[known] : "nothing was filed";
+}
+
+const FAILED_WORDS = "nothing was filed, and the next run tries again";
+
 /**
  * The line under the schedule: what the last run did. A run that never reached Langy says
  * "Did not run" and why, so an empty inbox is an answer and not a question.
@@ -172,10 +180,18 @@ export function lastRunWords({
     return `Ran ${when} · ${ranWords(lastRun)}`;
   }
   if (lastRun.outcome === "failed") {
-    return `Failed ${when} · nothing was filed, and the next run tries again`;
+    return `Failed ${when} · ${FAILED_WORDS}`;
   }
-  const reason = INSIGHT_RUN_SKIP_REASONS.find((known) => known === lastRun.reason);
-  return `Did not run ${when} · ${reason ? SKIP_REASON_WORDS[reason] : "nothing was filed"}`;
+  return `Did not run ${when} · ${skipWords(lastRun)}`;
+}
+
+/** What a person is told when the run they asked for ended with no conversation to open. */
+export function requestedRunEndWords(lastRun: InsightLastRun): string {
+  if (lastRun.outcome === "filed" || lastRun.outcome === "nothing") {
+    return `The run ended: ${ranWords(lastRun)}.`;
+  }
+  if (lastRun.outcome === "failed") return `The run failed: ${FAILED_WORDS}.`;
+  return `The run did not start: ${skipWords(lastRun)}.`;
 }
 
 /**
