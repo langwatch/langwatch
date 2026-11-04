@@ -20186,6 +20186,15 @@
           "documentation": ""
         },
         {
+          "name": "codingFirstDays",
+          "columnName": "codingFirstDays",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",

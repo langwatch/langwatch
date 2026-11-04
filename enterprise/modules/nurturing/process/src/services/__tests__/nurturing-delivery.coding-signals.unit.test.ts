@@ -107,6 +107,13 @@ const repoCount = (codingRepoCount: number): NurturingSignal => ({
   ...codingSource,
   codingRepoCount,
 });
+const firstDays: NurturingSignal = {
+  kind: "coding_session_days_first_3",
+  sourceEventId: "org-1:2",
+  occurredAt: T0,
+  ...codingSource,
+  codingSessionDaysFirst3: 2,
+};
 const firstSession: NurturingSignal = {
   kind: "coding_agent_first_session",
   sourceEventId: "org-1",
@@ -298,6 +305,21 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       await settle();
 
       expect(cio.identifies()).toHaveLength(1);
+    });
+  });
+
+  describe("when the first-three-days count is delivered", () => {
+    /** @scenario "A first-three-days signal identifies the count without an event" */
+    it("identifies the count and tracks nothing", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, firstDays);
+      await settle();
+
+      expect(cio.identifies()).toEqual([
+        expect.objectContaining({ userId: "admin-1", traits: { coding_session_days_first_3: 2 } }),
+      ]);
+      expect(cio.tracks()).toEqual([]);
     });
   });
 
@@ -520,6 +542,7 @@ describe("NurturingDeliveryService PostHog for the new kinds", () => {
     ["coding_agent_first_session", firstSession],
     ["coding_terminal_types", terminalTypes(["vscode"])],
     ["coding_repo_count", repoCount(1)],
+    ["coding_session_days_first_3", firstDays],
     ["app_opened", appOpened(T0)],
     ["sessions_page_viewed", pageViewed(T0)],
   ];

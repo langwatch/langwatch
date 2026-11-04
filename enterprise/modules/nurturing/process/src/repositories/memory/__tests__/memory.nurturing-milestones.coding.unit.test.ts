@@ -53,6 +53,27 @@ describe("MemoryNurturingMilestonesRepository coding signals", () => {
     });
   });
 
+  describe("when a day offset is added twice", () => {
+    it("counts it once", async () => {
+      const repository = await learned();
+      const input = { organizationId: "org-1", dayOffset: 1 };
+
+      await repository.addCodingSessionDayOffset(input);
+
+      await expect(repository.addCodingSessionDayOffset(input)).resolves.toBe(1);
+    });
+
+    it("counts two offsets as two", async () => {
+      const repository = await learned();
+
+      await repository.addCodingSessionDayOffset({ organizationId: "org-1", dayOffset: 0 });
+
+      await expect(
+        repository.addCodingSessionDayOffset({ organizationId: "org-1", dayOffset: 2 }),
+      ).resolves.toBe(2);
+    });
+  });
+
   describe("when the organization is not learned", () => {
     it("reports no first session", async () => {
       const repository = MemoryNurturingMilestonesRepository.create();

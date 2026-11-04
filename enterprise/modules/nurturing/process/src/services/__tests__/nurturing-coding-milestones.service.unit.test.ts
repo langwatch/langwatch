@@ -16,6 +16,7 @@ import { NurturingCodingMilestonesService } from "../nurturing-coding-milestones
 
 type Terminals = NurturingSignalOf<"coding_terminal_types">;
 type RepoCount = NurturingSignalOf<"coding_repo_count">;
+type FirstDays = NurturingSignalOf<"coding_session_days_first_3">;
 
 const DAY = Date.UTC(2026, 9, 20, 12);
 const HOUR = 60 * 60 * 1000;
@@ -36,10 +37,14 @@ async function serviceOver({
   adminUserId = "admin-1",
   seeded = false,
   failFirstDeliveryOf,
+  organizationCreatedAt,
+  now = DAY,
 }: {
   adminUserId?: string | null;
   seeded?: boolean;
   failFirstDeliveryOf?: NurturingSignal["kind"];
+  organizationCreatedAt?: number;
+  now?: number;
 } = {}) {
   const milestones = MemoryNurturingMilestonesRepository.create();
   await milestones.recordOrganization({ organizationId: "org-1", adminUserId, seeded });
@@ -48,6 +53,9 @@ async function serviceOver({
       ["project-1", "org-1"],
       ["project-2", "org-1"],
     ]),
+    organizationsCreated: new Map(
+      organizationCreatedAt === undefined ? [] : [["org-1", organizationCreatedAt]],
+    ),
   });
   const firstProjectRead = vi.spyOn(projects, "getFirstProjectCreatedAt");
   const service = NurturingCodingMilestonesService.create({
@@ -56,6 +64,7 @@ async function serviceOver({
     organizations: createApiFixture<OrganizationApi>({
       getAllMembers: async () => [{ id: "admin-1" }, { id: "member-2" }] as never,
     }),
+    clock: { nowMs: () => now },
   });
   const delivered: NurturingSignal[] = [];
   const claimed = new Set<string>();
@@ -505,6 +514,147 @@ describe("NurturingCodingMilestonesService", () => {
           (signal) => (signal as Terminals).userId,
         ),
       ).toEqual([person, person]);
+    });
+  });
+
+  describe("given an organization created 23:00 UTC on day 0", () => {
+    const CREATED = Date.UTC(2026, 9, 20, 23);
+    /** Noon UTC on the day offset from the organization's creation. */
+    const onDay = (offset: number) => Date.UTC(2026, 9, 20 + offset, 12);
+    const session = (sessionId: string, occurredAt: number) =>
+      fact({ sessionId, firstForProject: false, occurredAt });
+    const countsOf = (ofKind: Awaited<ReturnType<typeof serviceOver>>["ofKind"]) =>
+      ofKind("coding_session_days_first_3").map(
+        (signal) => (signal as FirstDays).codingSessionDaysFirst3,
+      );
+    const onDay2 = { organizationCreatedAt: CREATED, now: onDay(2) };
+
+    /** @scenario "Sessions on days 0, 1 and 2 count as one, two and three" */
+    it("counts sessions on days 0, 1 and 2 as one, two and three", async () => {
+      const { send, ofKind } = await serviceOver(onDay2);
+
+      await send([session("s-0", CREATED + 1_000)]);
+      await send([session("s-1", onDay(1))]);
+      await send([session("s-2", onDay(2))]);
+
+      expect(countsOf(ofKind)).toEqual([1, 2, 3]);
+    });
+
+    it("raises one signal with the count for a batch over two days", async () => {
+      const { send, ofKind } = await serviceOver(onDay2);
+
+      await send([session("s-1", onDay(1)), session("s-2", onDay(2))]);
+
+      expect(countsOf(ofKind)).toEqual([2]);
+    });
+
+    /** @scenario "Two sessions on one day count once" */
+    it("counts two sessions on one day once", async () => {
+      const { send, ofKind } = await serviceOver(onDay2);
+
+      await send([session("s-1", onDay(1))]);
+      await send([session("s-2", onDay(1) + 1_000)]);
+
+      expect(countsOf(ofKind)).toEqual([1]);
+    });
+
+    /** @scenario "Days are UTC calendar days from the organization's creation" */
+    it("counts 23:30 on day 0 and 00:30 on day 1 as two days", async () => {
+      const { send, ofKind } = await serviceOver(onDay2);
+
+      await send([session("s-0", CREATED + 30 * 60 * 1000)]);
+      await send([session("s-1", CREATED + 90 * 60 * 1000)]);
+
+      expect(countsOf(ofKind)).toEqual([1, 2]);
+    });
+
+    /** @scenario "A session of an earlier day arriving after a later day still counts" */
+    it("counts an earlier day arriving after a later one", async () => {
+      const { send, ofKind } = await serviceOver(onDay2);
+
+      await send([session("s-2", onDay(2))]);
+      await send([session("s-0", CREATED + 1_000)]);
+
+      expect(countsOf(ofKind)).toEqual([1, 2]);
+    });
+
+    /** @scenario "A session after day 2 does not grow the first-three-days count" */
+    it("does not count a session on day 3", async () => {
+      const { send, ofKind } = await serviceOver(onDay2);
+
+      await send([session("s-0", CREATED + 1_000)]);
+      await send([session("s-3", onDay(3))]);
+
+      expect(countsOf(ofKind)).toEqual([1]);
+    });
+
+    /** @scenario "A session of day 2 handled after day 2 raises nothing" */
+    it("raises nothing for a session of day 2 handled on day 3", async () => {
+      const { send, ofKind } = await serviceOver({
+        organizationCreatedAt: CREATED,
+        now: onDay(3),
+      });
+
+      await send([session("s-2", onDay(2))]);
+
+      expect(countsOf(ofKind)).toEqual([]);
+    });
+
+    /** @scenario "An organization whose first session comes after day 2 never gets the first-three-days count" */
+    it("raises nothing for a first session on day 5, and still counts the active day", async () => {
+      const { send, ofKind } = await serviceOver({
+        organizationCreatedAt: CREATED,
+        now: onDay(5),
+      });
+
+      await send([session("s-5", onDay(5))]);
+
+      expect(countsOf(ofKind)).toEqual([]);
+      expect(ofKind("coding_active_days")).toMatchObject([{ codingActiveDays: 1 }]);
+    });
+
+    /** @scenario "A session dated before the organization's creation does not count" */
+    it("does not count a session dated the day before", async () => {
+      const { send, ofKind } = await serviceOver(onDay2);
+
+      await send([session("s-early", onDay(-1))]);
+
+      expect(countsOf(ofKind)).toEqual([]);
+    });
+
+    /** @scenario "A first-three-days delivery that fails is not lost when the fact is redelivered" */
+    it("sends the count once when its delivery fails and the fact is redelivered", async () => {
+      const { send, ofKind } = await serviceOver({
+        ...onDay2,
+        failFirstDeliveryOf: "coding_session_days_first_3",
+      });
+
+      await expect(send([session("s-1", onDay(1))])).rejects.toThrow("delivery failed");
+      await send([session("s-1", onDay(1))]);
+
+      expect(countsOf(ofKind)).toEqual([1]);
+    });
+
+    /** @scenario "The first-three-days count goes to whoever gets the agent types" */
+    it("names the person the agent-types signal names", async () => {
+      const { send, ofKind } = await serviceOver(onDay2);
+
+      await send([session("s-1", onDay(1))]);
+
+      const [person] = ofKind("coding_agent_types").map((signal) => (signal as FirstDays).userId);
+      expect(person).toBeDefined();
+      expect(ofKind("coding_session_days_first_3")).toMatchObject([{ userId: person }]);
+    });
+  });
+
+  describe("when the owners hold no creation time for the organization", () => {
+    /** @scenario "An organization whose creation is unknown gets no first-three-days count" */
+    it("raises no first-three-days signal", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact()]);
+
+      expect(ofKind("coding_session_days_first_3")).toEqual([]);
     });
   });
 

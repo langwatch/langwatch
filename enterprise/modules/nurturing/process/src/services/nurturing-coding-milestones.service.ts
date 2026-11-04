@@ -13,6 +13,8 @@ import {
   codingAgentFirstSessionSignal,
   codingAgentTypesSignal,
   codingRepoCountSignal,
+  codingSessionDayOffsets,
+  codingSessionDaysFirst3Signal,
   codingSessionStoredSignal,
   codingTerminalTypesSignal,
 } from "../rules/nurturing-coding-signals.rules.ts";
@@ -27,6 +29,7 @@ type CodingDependencies = Readonly<{
   projects: NurturingProjectDirectoryRepository;
   /** The one nurturing -> organization edge: who to tell uses_coding_agent on a first session. */
   organizations: Pick<OrganizationApi, "getAllMembers">;
+  clock: Readonly<{ nowMs(): number }>;
 }>;
 
 /** The fact that happened last; the earliest in order wins a tie. */
@@ -36,7 +39,8 @@ function latestOf(facts: readonly Fact[]): Fact {
 
 /**
  * What nurturing decides from coding-agent's session-stored fact (§9), per project: the last
- * session, first session, agent types, terminal types, repo count and UTC active days. Each step is a guarded write that
+ * session, first session, agent types, terminal types, repo count, first-three-days count and UTC
+ * active days. Each step is a guarded write that
  * answers a retry of the same fact again, and delivery's claims send each signal once.
  */
 export class NurturingCodingMilestonesService {
@@ -87,6 +91,13 @@ export class NurturingCodingMilestonesService {
     const codingRepoCount = await this.addRepositories({ organizationId, facts });
     if (codingRepoCount > 0) {
       await deliver(codingRepoCountSignal({ data: latest, codingRepoCount, ...common }));
+    }
+
+    const codingSessionDaysFirst3 = await this.addFirstDays({ organizationId, facts });
+    if (codingSessionDaysFirst3 > 0) {
+      await deliver(
+        codingSessionDaysFirst3Signal({ data: latest, codingSessionDaysFirst3, ...common }),
+      );
     }
 
     // Each UTC day of the batch counts, oldest first: a batch over midnight loses none.
@@ -175,6 +186,30 @@ export class NurturingCodingMilestonesService {
       count = await this.dependencies.milestones.addCodingRepository({
         organizationId,
         repositoryKey,
+      });
+    }
+    return count;
+  }
+
+  /** Adds each of the batch's first-three-days offsets once; zero when it has none. */
+  private async addFirstDays({
+    organizationId,
+    facts,
+  }: Readonly<{ organizationId: string; facts: readonly Fact[] }>): Promise<number> {
+    const { organizationCreatedAt } = await this.dependencies.projects.getOrganizationCreatedAt({
+      organizationId,
+    });
+    if (organizationCreatedAt === null) return 0;
+    let count = 0;
+    const offsets = codingSessionDayOffsets({
+      organizationCreatedAt,
+      occurredAts: facts.map((fact) => fact.occurredAt),
+      now: this.dependencies.clock.nowMs(),
+    });
+    for (const dayOffset of offsets) {
+      count = await this.dependencies.milestones.addCodingSessionDayOffset({
+        organizationId,
+        dayOffset,
       });
     }
     return count;

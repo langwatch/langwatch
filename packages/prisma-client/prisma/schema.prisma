@@ -4975,6 +4975,8 @@ model NurturingOrganization {
   codingTerminalTypes  String[]  @default([])
   // Hashes standing for repos, only ever counted; no repo name is held here.
   codingRepositoryKeys String[]  @default([])
+  // UTC day offsets 0 to 2 from the organization's creation that held a coding session.
+  codingFirstDays      Int[]     @default([])
   updatedAt            DateTime  @updatedAt
 }
 

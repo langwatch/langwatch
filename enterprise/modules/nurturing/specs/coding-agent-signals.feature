@@ -216,3 +216,86 @@ Feature: Coding-agent session signals reach Customer.io
   Scenario: Concurrent writes hold one terminal type and one repo key once
     Given five writes of one terminal type and five of one repo key at once
     Then the organization holds each once
+
+  @unit
+  Scenario: Sessions on days 0, 1 and 2 count as one, two and three
+    Given the organization was created on day 0
+    When sessions occur on days 0, 1 and 2
+    Then the first-three-days counts raised are one, two and three
+
+  @unit
+  Scenario: Two sessions on one day count once
+    Given the organization was created on day 0
+    When two sessions occur on day 1
+    Then one first-three-days signal with the count one is raised
+
+  @unit
+  Scenario: Days are UTC calendar days from the organization's creation
+    Given the organization was created at 23:00 UTC on day 0
+    When a session occurs at 23:30 on day 0 and another at 00:30 UTC on day 1
+    Then the first-three-days count is two
+
+  @unit
+  Scenario: A session of an earlier day arriving after a later day still counts
+    Given a session of day 2 was counted
+    When a session of day 0 arrives, still on day 2
+    Then the first-three-days counts raised are one and two
+
+  @unit
+  Scenario: A session after day 2 does not grow the first-three-days count
+    Given a session of day 0 was counted
+    When a session occurs on day 3
+    Then one first-three-days signal has been raised
+
+  @unit
+  Scenario: A session of day 2 handled after day 2 raises nothing
+    Given it is day 3
+    When a late session dated day 2 arrives
+    Then no first-three-days signal is raised
+
+  @unit
+  Scenario: An organization whose first session comes after day 2 never gets the first-three-days count
+    Given the organization was created on day 0
+    When its first session occurs on day 5
+    Then no first-three-days signal is raised
+    But the active-day count is one
+
+  @unit
+  Scenario: A session dated before the organization's creation does not count
+    Given the organization was created on day 0
+    When a session is dated the day before
+    Then no first-three-days signal is raised
+
+  @unit
+  Scenario: An organization whose creation is unknown gets no first-three-days count
+    Given the owners hold no creation time for the organization
+    When a session-stored fact arrives
+    Then no first-three-days signal is raised
+
+  @unit
+  Scenario: A first-three-days delivery that fails is not lost when the fact is redelivered
+    Given delivering the first-three-days signal fails once
+    When the same session-stored fact is delivered again
+    Then the first-three-days signal is sent exactly once
+
+  @unit
+  Scenario: The first-three-days count goes to whoever gets the agent types
+    When a session-stored fact arrives on day 0
+    Then the first-three-days signal names the person the agent-types signal names
+
+  @unit
+  Scenario: A first-three-days signal identifies the count without an event
+    When a coding_session_days_first_3 signal is delivered
+    Then Customer.io identifies coding_session_days_first_3 with the count
+    And no event is tracked
+
+  @integration
+  Scenario: Concurrent writes of one day count it once
+    Given five writes of one day offset at once
+    Then the first-three-days count is one
+
+  @integration
+  Scenario: Nurturing reads an organization's creation through its share
+    Given an organization its owners hold
+    Then nurturing reads when it was created
+    And it reads null for an organization they do not hold

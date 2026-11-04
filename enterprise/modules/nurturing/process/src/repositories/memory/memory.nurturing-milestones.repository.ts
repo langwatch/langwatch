@@ -8,7 +8,11 @@ import type {
 
 /** A row plus the columns only their own writes read, as the Postgres table holds them. */
 type MemoryOrganization = NurturingOrganizationRow &
-  Readonly<{ codingTerminalTypes: string[]; codingRepositoryKeys: string[] }>;
+  Readonly<{
+    codingTerminalTypes: string[];
+    codingRepositoryKeys: string[];
+    codingFirstDays: number[];
+  }>;
 
 /** The Postgres twin's semantics over nurturing's own organizations. */
 export class MemoryNurturingMilestonesRepository
@@ -42,6 +46,7 @@ export class MemoryNurturingMilestonesRepository
             codingLastActiveDay: null,
             codingTerminalTypes: [],
             codingRepositoryKeys: [],
+            codingFirstDays: [],
           },
     );
   }
@@ -133,6 +138,22 @@ export class MemoryNurturingMilestonesRepository
     const codingRepositoryKeys = [...organization.codingRepositoryKeys, repositoryKey];
     this.#organizations.set(organizationId, { ...organization, codingRepositoryKeys });
     return codingRepositoryKeys.length;
+  }
+
+  async addCodingSessionDayOffset({
+    organizationId,
+    dayOffset,
+  }: Parameters<
+    NurturingCodingMilestonesRepository["addCodingSessionDayOffset"]
+  >[0]): Promise<number> {
+    const organization = this.#organizations.get(organizationId);
+    if (!organization) return 0;
+    if (organization.codingFirstDays.includes(dayOffset)) {
+      return organization.codingFirstDays.length;
+    }
+    const codingFirstDays = [...organization.codingFirstDays, dayOffset];
+    this.#organizations.set(organizationId, { ...organization, codingFirstDays });
+    return codingFirstDays.length;
   }
 
   async recordCodingActiveDay({

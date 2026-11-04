@@ -333,6 +333,15 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     codingRepoCount: countIncludingThis,
   }),
   z.object({
+    kind: z.literal("coding_session_days_first_3"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    projectId: id,
+    /** Distinct UTC days among days 0, 1 and 2 from the organization's creation with a session. */
+    codingSessionDaysFirst3: z.number().int().min(1).max(3),
+  }),
+  z.object({
     kind: z.literal("coding_agent_first_session"),
     ...signalSource,
     /** The organization's admin. `occurredAt` is the first session's. */

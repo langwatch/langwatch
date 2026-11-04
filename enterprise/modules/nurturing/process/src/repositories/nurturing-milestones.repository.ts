@@ -73,6 +73,10 @@ export interface NurturingCodingMilestonesRepository {
   addCodingRepository(
     input: Readonly<{ organizationId: string; repositoryKey: string }>,
   ): Promise<number>;
+  /** Adds a first-three-days offset once; answers how many distinct offsets it holds. */
+  addCodingSessionDayOffset(
+    input: Readonly<{ organizationId: string; dayOffset: number }>,
+  ): Promise<number>;
   /** Counts the UTC `day` when later than the last one; `changed` stays true for that same day. */
   recordCodingActiveDay(
     input: Readonly<{ organizationId: string; day: string }>,

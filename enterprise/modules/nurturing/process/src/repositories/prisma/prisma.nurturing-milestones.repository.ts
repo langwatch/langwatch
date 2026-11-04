@@ -148,6 +148,23 @@ export class PrismaNurturingMilestonesRepository
     return organization?.codingRepositoryKeys.length ?? 0;
   }
 
+  async addCodingSessionDayOffset({
+    organizationId,
+    dayOffset,
+  }: Parameters<
+    NurturingCodingMilestonesRepository["addCodingSessionDayOffset"]
+  >[0]): Promise<number> {
+    await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId, NOT: { codingFirstDays: { has: dayOffset } } },
+      data: { codingFirstDays: { push: dayOffset } },
+    });
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { codingFirstDays: true },
+    });
+    return organization?.codingFirstDays.length ?? 0;
+  }
+
   async recordCodingActiveDay({
     organizationId,
     day,

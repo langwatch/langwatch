@@ -13,6 +13,7 @@ const CODING_AND_APP_KINDS = [
   "coding_agent_types",
   "coding_terminal_types",
   "coding_repo_count",
+  "coding_session_days_first_3",
   "coding_agent_first_session",
   "app_opened",
   "sessions_page_viewed",
@@ -52,6 +53,14 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
       ];
     case "coding_repo_count":
       return [{ type: "identify", userId, traits: { coding_repo_count: signal.codingRepoCount } }];
+    case "coding_session_days_first_3":
+      return [
+        {
+          type: "identify",
+          userId,
+          traits: { coding_session_days_first_3: signal.codingSessionDaysFirst3 },
+        },
+      ];
     case "coding_agent_first_session":
       return [
         {
