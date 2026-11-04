@@ -34,3 +34,9 @@ Feature: The app's and the worker's JavaScript heap follows its container memory
       Given the operator sets NODE_OPTIONS in the app's or the workers' extra environment
       When the chart renders
       Then each process that gets that environment starts with the operator's NODE_OPTIONS as its only one
+
+    @e2e
+    Scenario: The operator can turn the ceiling off
+      Given the operator turns the chart's heap ceiling off, as when NODE_OPTIONS comes from extraEnvFrom
+      When the chart renders
+      Then neither the app nor the worker is started with a heap ceiling of the chart's

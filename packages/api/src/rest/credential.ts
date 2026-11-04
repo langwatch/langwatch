@@ -86,6 +86,25 @@ export function credentialPrincipalOfToken(
 }
 
 /**
+ * The key-door principal of an API key a project door resolved: the one mapping, so a run at the
+ * key door and a write at a project door judge the same key the same way. None for other kinds.
+ */
+export function keyPrincipalOfApiKey(
+  resolved: RestResolvedProjectCredential,
+): Extract<RestKeyCredentialPrincipal, { kind: "apiKey" }> | undefined {
+  if (resolved.type !== "apiKey") return undefined;
+
+  return {
+    kind: "apiKey",
+    apiKeyId: resolved.apiKeyId,
+    userId: resolved.userId,
+    organizationId: resolved.organizationId,
+    resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
+    ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
+  };
+}
+
+/**
  * Who authz checks a project credential as: a project-bound access token is its user, a project
  * key or legacy access token its own key row. None for a legacy API key, which predates RBAC
  * and carries full project access by its class alone.

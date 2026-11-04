@@ -510,6 +510,45 @@ describe.skipIf(!connection)("given a run of six cells started with a concurrenc
   });
 });
 
+describe.skipIf(!connection)("given a run of six cells started with a concurrency of one", () => {
+  /** @scenario "A sequential run executes one cell at a time in row order" */
+  it("starts each cell only after the one before it ended, row by row", async () => {
+    const log: string[] = [];
+    await withPair(
+      {
+        answer: async (dispatch) => {
+          const row = ["one", "two", "three"].find((question) => asks(dispatch, question));
+          log.push(`start ${row} ${dispatch.nodeId}`);
+          await pause(20);
+          log.push(`end ${row} ${dispatch.nodeId}`);
+          return answersEveryNode(dispatch);
+        },
+      },
+      async ({ api, engine }) => {
+        const answer = await api.executeWorkbenchRun(
+          execution({
+            questions: ["one", "two", "three"],
+            targets: [promptTarget("target_a"), promptTarget("target_b")],
+            concurrency: 1,
+          }),
+          person,
+        );
+        await collect(answer.events).ended;
+
+        expect(engine.maxInFlight).toBe(1);
+        expect(log).toEqual(
+          ["one", "two", "three"].flatMap((row) =>
+            ["target_a", "target_b"].flatMap((target) => [
+              `start ${row} ${target}`,
+              `end ${row} ${target}`,
+            ]),
+          ),
+        );
+      },
+    );
+  });
+});
+
 describe.skipIf(!connection)("given a run with two targets and a pairwise comparison", () => {
   const comparedRun = (questions: string[]) =>
     execution({

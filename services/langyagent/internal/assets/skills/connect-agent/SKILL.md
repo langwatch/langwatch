@@ -99,6 +99,8 @@ A Python parameter that is not a turn field is a run parameter. The platform off
 ```python
 from typing import Literal
 
+import langwatch
+
 @langwatch.connect_agent(name="support-agent")
 async def support_agent(
     messages: list[dict],
@@ -128,6 +130,8 @@ Declare a parameter for a value the tests must vary: a model, a plan, a tenant, 
 `thread_id` is the platform's conversation id. `session` is the agent's own memory of the conversation: any JSON value, `None` on the first turn, and whatever the function returns comes back on the next turn of the same conversation.
 
 ```python
+import langwatch
+
 @langwatch.connect_agent(name="support-agent")
 async def support_agent(messages: list[dict], session: str | None = None):
     conversation_id = session or await my_agent.create_conversation()
@@ -182,23 +186,25 @@ The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and 
 
 ## Step 5: Run the first test suite
 
-Create a test suite, create one scenario about behavior this agent really has, file it into the test suite, and run it:
+Pick the test suite first, the same way the `scenarios` skill does. Run `langwatch test-suite list --format json` and file the scenario in the test suite whose name and scenarios fit it. When none clearly fits, ask the user which test suite to use, or whether to create a new one with `langwatch test-suite create "<name>"`, and wait for the answer. Never invent a test suite name the user did not agree to.
+
+Then create one scenario about behavior this agent really has, file it into that test suite, and run it:
 
 ```bash
-langwatch test-suite create 'Smoke'
+langwatch test-suite list --format json
 
 langwatch scenario create 'Order status question' \
   --situation "A customer asks about the status of a recent order" \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
-  --test-suite 'Smoke'
+  --test-suite '<test-suite>'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent --wait
+langwatch test-suite run '<test-suite>' --target connected:support-agent --wait
 ```
 
 - `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id. A name with a space goes in double quotes, `--target "connected:ACME checkout"`, and so does `--wait-online "ACME checkout"`: passed bare, the shell splits it and the command refuses the stray word.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
-- `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
+- `--test-suite` files the scenario into a test suite that exists: one from the list, or one the user agreed to create first.
 - Repeat `--target` to compare two environments, or the same agent with two parameter values: `--target 'connected:support-agent@production?model=gpt-6-sol'`.
 - `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 6 needs the result.
 - Keep the agent process running for the whole run. A run against an agent with no connected instance is refused with `agent_offline`.
@@ -206,10 +212,10 @@ langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 When the first run is green and the agent declares a parameter with an option list, offer one comparison run across the options. It reuses the same test suite, and the results page shows one column per value:
 
 ```bash
-langwatch run-plan run --test-suite 'Smoke' \
+langwatch run-plan run --test-suite '<test-suite>' \
   --target 'connected:support-agent?model=gpt-6-sol' \
   --target 'connected:support-agent?model=gpt-6-luna' \
-  --name 'Smoke: model comparison' --format json
+  --name '<test-suite>: model comparison' --format json
 ```
 
 `--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name that neither the scenario nor the target agent declares is refused the same way, so read the names from `langwatch scenario get` and `langwatch agent get` rather than from memory.

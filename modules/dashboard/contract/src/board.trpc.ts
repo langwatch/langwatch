@@ -7,12 +7,11 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
-  boardTrpcRowSchema,
-  boardTrpcSummarySchema,
   dashboardReorderResponseSchema,
+  dashboardTrpcRowSchema,
+  boardTrpcSummarySchema,
 } from "./dashboard.responses.ts";
 import {
-  boardExcludedOriginsSchema,
   dashboardDescriptionSchema,
   dashboardNameSchema,
   dashboardScopeImpactSchema,
@@ -39,36 +38,32 @@ export const boardTrpc = defineTrpcContract("boards")
 
   .query("getById")
   .withInput(boardRefSchema)
-  .withOutput(boardTrpcRowSchema)
+  .withOutput(dashboardTrpcRowSchema)
 
   .mutation("create")
   .withInput(z.object({ ...projectScopeSchema.shape, name: z.string() }))
-  .withOutput(boardTrpcRowSchema)
+  .withOutput(dashboardTrpcRowSchema)
 
-  /**
-   * The board's inline name, description and left-out origins (`null` restores the default,
-   * AC200); refused while `release_dashboards` is off.
-   */
+  /** The board's inline name and description; refused while `release_dashboards` is off. */
   .mutation("update")
   .withInput(
     z.object({
       ...boardRefSchema.shape,
       name: dashboardNameSchema.optional(),
       description: dashboardDescriptionSchema.nullable().optional(),
-      excludedOrigins: boardExcludedOriginsSchema.nullable().optional(),
     }),
   )
-  .withOutput(boardTrpcRowSchema)
+  .withOutput(dashboardTrpcRowSchema)
 
   /** The board, its widgets and every star on it; a Reports board under the same id stays. */
   .mutation("delete")
   .withInput(boardRefSchema)
-  .withOutput(boardTrpcRowSchema)
+  .withOutput(dashboardTrpcRowSchema)
 
   /** Only the board's author changes its scope, in the project that owns it. */
   .mutation("setScope")
   .withInput(z.object({ ...boardRefSchema.shape, scope: dashboardScopeSchema }))
-  .withOutput(boardTrpcRowSchema)
+  .withOutput(dashboardTrpcRowSchema)
 
   /** What a narrower scope takes from other members; the author's to read. */
   .query("scopeImpact")

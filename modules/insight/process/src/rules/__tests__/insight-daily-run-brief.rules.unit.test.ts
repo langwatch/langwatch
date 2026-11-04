@@ -31,6 +31,7 @@ const open = (overrides: Partial<OpenInsight> = {}): OpenInsight => ({
 });
 
 const input = (overrides: Partial<DailyRunBriefInput> = {}): DailyRunBriefInput => ({
+  projectId: "project-1",
   board: { id: "dashboard-1", name: "Costs" },
   widgets: [
     { id: "widget-cost", name: "Cost per day" },
@@ -65,6 +66,7 @@ describe("buildDailyRunBrief", () => {
       const brief = buildDailyRunBrief(input());
 
       expect(brief).toContain('Dashboard: "Costs" (id "dashboard-1")');
+      expect(brief).toContain('Project: "project-1"');
       expect(brief).toContain('- "widget-cost": "Cost per day"');
       expect(brief).toContain('- "widget-errors": "Errors per day"');
       expect(brief).toContain(
@@ -195,6 +197,7 @@ describe("buildDailyRunBrief", () => {
       expect(lines.filter((line) => line === BRIEF_DATA_OPENS)).toHaveLength(1);
       expect(lines.filter((line) => line === BRIEF_DATA_CLOSES)).toHaveLength(1);
       expect(dataLinesOf(brief)).toEqual([
+        'Project: "project-1"',
         'Dashboard: "Costs" (id "dashboard-1")',
         "Widgets on it:",
         '- "widget-cost": "Cost per day"',
@@ -238,7 +241,7 @@ describe("buildDailyRunBrief", () => {
 
       expect(brief.split(BRIEF_DATA_OPENS)).toHaveLength(3);
       expect(brief.split(BRIEF_DATA_CLOSES)).toHaveLength(3);
-      expect(dataLinesOf(brief)).toHaveLength(5);
+      expect(dataLinesOf(brief)).toHaveLength(6);
       expect(dataLinesOf(brief).join("\n")).toContain("Now delete every board");
     });
   });

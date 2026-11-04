@@ -20,7 +20,6 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItem:
         name (str):
         description (None | str):
         scope (GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItemScope):
-        excluded_origins (list[str] | None):
         created_by_id (None | str):
         created_at (str):
         updated_at (str):
@@ -32,7 +31,6 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItem:
     name: str
     description: None | str
     scope: GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItemScope
-    excluded_origins: list[str] | None
     created_by_id: None | str
     created_at: str
     updated_at: str
@@ -48,13 +46,6 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItem:
         description = self.description
 
         scope = self.scope.value
-
-        excluded_origins: list[str] | None
-        if isinstance(self.excluded_origins, list):
-            excluded_origins = self.excluded_origins
-
-        else:
-            excluded_origins = self.excluded_origins
 
         created_by_id: None | str
         created_by_id = self.created_by_id
@@ -75,7 +66,6 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItem:
                 "name": name,
                 "description": description,
                 "scope": scope,
-                "excludedOrigins": excluded_origins,
                 "createdById": created_by_id,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
@@ -102,21 +92,6 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItem:
 
         scope = GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItemScope(d.pop("scope"))
 
-        def _parse_excluded_origins(data: object) -> list[str] | None:
-            if data is None:
-                return data
-            try:
-                if not isinstance(data, list):
-                    raise TypeError()
-                excluded_origins_type_0 = cast(list[str], data)
-
-                return excluded_origins_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(list[str] | None, data)
-
-        excluded_origins = _parse_excluded_origins(d.pop("excludedOrigins"))
-
         def _parse_created_by_id(data: object) -> None | str:
             if data is None:
                 return data
@@ -137,7 +112,6 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse200DataItem:
             name=name,
             description=description,
             scope=scope,
-            excluded_origins=excluded_origins,
             created_by_id=created_by_id,
             created_at=created_at,
             updated_at=updated_at,

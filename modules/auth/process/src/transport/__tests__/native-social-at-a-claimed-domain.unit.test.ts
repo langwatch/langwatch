@@ -96,7 +96,6 @@ function collaborators({
     federation: licensed,
     invites: createApiFixture<BetterAuthHookCollaborators["invites"]>(),
     announcements: createApiFixture<BetterAuthHookCollaborators["announcements"]>(),
-    authzGrants: createApiFixture<BetterAuthHookCollaborators["authzGrants"]>(),
     arrivals: createApiFixture<SsoArrivalApi>({ admit }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
     linkProposals: createApiFixture<LinkProposals>(),

@@ -13,6 +13,11 @@ import {
   type IdIndexLookup,
   SHARED_CLICKHOUSE_TARGET,
 } from "./idIndexFlags.ts";
+import {
+  coalesceKeyOf,
+  DEFAULT_INSERT_COALESCE_MAX_ROWS,
+  InsertCoalescer,
+} from "./insert-coalescing.ts";
 import type {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
@@ -51,6 +56,11 @@ export interface ClickHouseQueryClientOptions {
   unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
   /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
   overloadErrorFactory?: ClickHouseOverloadErrorFactory | undefined;
+  /**
+   * Rows one coalesced async insert carries at most (ADR-187); 0 sends every insert alone.
+   * Coalescing needs a limiter: with none, nothing ever waits for a slot.
+   */
+  insertCoalesceMaxRows?: number | undefined;
 }
 
 /** The handled refusal for a read whose server did not answer once retries ran out. */
@@ -104,6 +114,7 @@ export class ClickHouseQueryClient {
   private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
   private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
   private readonly idIndexRegistry: IdIndexRegistry;
+  private readonly coalescer: InsertCoalescer<InsertRequest> | undefined;
 
   constructor({
     driver,
@@ -117,6 +128,7 @@ export class ClickHouseQueryClient {
     unavailableErrorFactory,
     overloadErrorFactory,
     organizationOf,
+    insertCoalesceMaxRows,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
@@ -130,6 +142,17 @@ export class ClickHouseQueryClient {
     this.overloaded = overloadErrorFactory;
     this.organizationOf = organizationOf;
     this.idIndexRegistry = new IdIndexRegistry(this);
+    this.coalescer =
+      limiter === undefined
+        ? undefined
+        : new InsertCoalescer<InsertRequest>(
+            {
+              admitsNow: () => limiter.admitsNow("insert"),
+              admit: (task, callers) => limiter.run({ operation: "insert", task, callers }),
+              send: (requests) => this.sendInsert(coalescedRequest(requests)),
+            },
+            insertCoalesceMaxRows ?? DEFAULT_INSERT_COALESCE_MAX_ROWS,
+          );
   }
 
   /**
@@ -180,7 +203,10 @@ export class ClickHouseQueryClient {
     const tenants =
       tenantIds === undefined
         ? { params: { tenantId } }
-        : { params: { [`${ID_BOUND_PARAM_PREFIX}_tenants`]: [...tenantIds] }, tenantIds };
+        : {
+            params: { [`${ID_BOUND_PARAM_PREFIX}_tenants`]: [...tenantIds] },
+            tenantIds,
+          };
     const result = await this.statement<unknown>({
       tenantId,
       ...(tenants.tenantIds === undefined ? {} : { tenantIds: tenants.tenantIds }),
@@ -298,7 +324,11 @@ export class ClickHouseQueryClient {
     const withSlot = () =>
       this.limiter === undefined
         ? withReport()
-        : this.limiter.run({ operation: "query", task: withReport, signal: request.signal });
+        : this.limiter.run({
+            operation: "query",
+            task: withReport,
+            signal: request.signal,
+          });
 
     try {
       return await (this.tracer === undefined
@@ -343,7 +373,11 @@ export class ClickHouseQueryClient {
         : this.retries.run(runOnce, { signal: request.signal, request });
 
     if (this.limiter === undefined) return withRetries();
-    await this.limiter.run({ operation: "command", task: withRetries, signal: request.signal });
+    await this.limiter.run({
+      operation: "command",
+      task: withRetries,
+      signal: request.signal,
+    });
   }
 
   /**
@@ -355,6 +389,24 @@ export class ClickHouseQueryClient {
     this.tenantGuard.assertInsert(request);
     if (request.rows.length === 0) return;
 
+    // An async insert that would wait for a slot joins others of its route and table (ADR-187).
+    const coalesced = this.coalescer?.submit(request, coalesceKeyOf(request));
+    if (coalesced !== undefined && coalesced !== null) return coalesced;
+    return this.insertAlone(request);
+  }
+
+  /** One insert in a statement of its own, under its own slot. */
+  private async insertAlone(request: InsertRequest): Promise<void> {
+    if (this.limiter === undefined) return this.sendInsert(request);
+    await this.limiter.run({
+      operation: "insert",
+      task: () => this.sendInsert(request),
+      signal: request.signal,
+    });
+  }
+
+  /** One insert statement under the slot already held: retried only when refused, and reported. */
+  private sendInsert(request: InsertRequest): Promise<void> {
     const runOnce = () => this.driver.insert(request);
     const refusedOnly = async (): Promise<void> => {
       try {
@@ -380,11 +432,11 @@ export class ClickHouseQueryClient {
         throw error instanceof InsertNotRetriedInPlace ? error.failure : error;
       }
     };
-    const withReport = () =>
-      this.reported({ operation: "insert", params: { table: request.table }, task: withRetries });
-
-    if (this.limiter === undefined) return withReport();
-    await this.limiter.run({ operation: "insert", task: withReport, signal: request.signal });
+    return this.reported({
+      operation: "insert",
+      params: { table: request.table },
+      task: withRetries,
+    });
   }
 
   /** One statement's outcome, reported the way the vendor client policy reports it. */
@@ -416,6 +468,17 @@ export class ClickHouseQueryClient {
       throw error;
     }
   }
+}
+
+/**
+ * One statement carrying every request's rows. They share a coalescing key, so the route, the
+ * tenant set and the settings are the first's; each request passed the tenant guard on its own.
+ */
+function coalescedRequest(requests: readonly InsertRequest[]): InsertRequest {
+  const [first, ...rest] = requests;
+  if (first === undefined) throw new Error("A coalesced insert carries at least one request.");
+  if (rest.length === 0) return first;
+  return { ...first, rows: requests.flatMap((request) => request.rows) };
 }
 
 /** The last check before a statement leaves: an unexpanded marker never reaches the server. */

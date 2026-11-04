@@ -843,6 +843,8 @@ span.end();
 <CodeGroup>
 
 ```python Python Best Practices
+import langwatch
+
 # Use context managers for automatic span management
 with langwatch.span(name="operation") as span:
     # Your code here
@@ -946,6 +948,8 @@ provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
 ```
 
 ```typescript TypeScript Debugging Migration
+import { setupObservability } from "langwatch/observability/node";
+
 // Enable detailed logging during migration
 const handle = setupObservability({
   langwatch: {

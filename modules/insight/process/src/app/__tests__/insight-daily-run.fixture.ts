@@ -395,7 +395,7 @@ function scriptedDashboard(world: RunWorld) {
       boardReads.push({ read: "board", viewer });
       if (world.boardReadError) throw world.boardReadError;
       const { board: _board, ...found } = boards.open({ projectId, dashboardId, viewer });
-      return { ...found, excludedOrigins: null };
+      return found;
     },
     listDashboardWidgets: async ({ projectId, dashboardId, viewer }) => {
       boardReads.push({ read: "widgets", viewer, ...(dashboardId ? { dashboardId } : {}) });

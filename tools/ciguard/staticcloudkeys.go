@@ -12,41 +12,52 @@ import (
 	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
-// storedAWSKey matches a long-lived AWS key read from secrets, env or vars, by
-// property (`secrets.X`) or index (`secrets['X']`), or passed as
-// configure-aws-credentials' aws-access-key-id or aws-secret-access-key input,
-// in block or flow (`with: { aws-access-key-id: ... }`) style. A shell
-// `$AWS_ACCESS_KEY_ID` is a session the job already holds, so it is ignored.
-// Case-insensitive, because GitHub resolves context names case-insensitively.
-var storedAWSKey = regexp.MustCompile(
-	`(?i)\b(?:secrets|env|vars)\s*(?:\.\s*|\[\s*['"])[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)\b` +
-		`|(?:^|[\s{,])['"]?aws-(?:access-key-id|secret-access-key)['"]?\s*:`,
-)
+// awsKeyName is an AWS key variable, setting or input in any spelling:
+// AWS_ACCESS_KEY_ID, aws_secret_access_key, aws-session-token.
+const awsKeyName = `aws[_-](?:access[_-]key[_-]id|secret[_-]access[_-]key|session[_-]token)`
 
-// gateTerm matches one `&&` term of a fallback step's `if:` that holds only
-// while the OIDC role variable is unset (`vars.<NAME> == ”`), and oidcTerm
-// the complementary term on its OIDC twin (`vars.<NAME> != ”`).
-var (
-	gateTerm = regexp.MustCompile(`^vars\.([A-Z0-9_]+)\s*==\s*''$`)
-	oidcTerm = regexp.MustCompile(`^vars\.([A-Z0-9_]+)\s*!=\s*''$`)
-)
+// awsKeyAssignment finds where a line sets an AWS key: a YAML key, `X=`,
+// `export X=`, `-e X=`, or `aws configure set [profile.]x`. A read
+// (`env.X`, `outputs.x`, `$X`, `${X}`) is not an assignment.
+var awsKeyAssignment = regexp.MustCompile(`(?i)(?:(?:^|[^\w.${-]|[^$]\{|\\(?:n|x0a|012)|-e|--|process\.env\.)['"]?` + awsKeyName + `['"]?\s*(?:[:=]|<<|\+=)` +
+	`|\$\{` + awsKeyName + `:=` +
+	`|\bset\s+['"]?(?:[\w.-]+\.)?` + awsKeyName + `['"]?\s)\s*`)
 
-// credentialsAction is the action both the OIDC step and its stored-key
-// fallback use.
-const credentialsAction = "aws-actions/configure-aws-credentials@"
+// awsKeyFromSession is the only value an AWS key may take: an OIDC step's
+// output or a shell variable, whole. Anything else (secrets, vars, inputs,
+// format(), a prefix, an empty or block value) is refused.
+var awsKeyFromSession = regexp.MustCompile(`(?i)^['"]?(?:\$\{\{\s*steps\.[\w-]+\.outputs\.[\w-]+\s*\}\}|\$[a-z_]\w*|\$\{[a-z_]\w*\})['"]?(?:$|[\s;,})&|])`)
 
-// StaticKeyFallbackVars are the role variables whose absence may still select
-// a stored-key step during the move to OIDC, keyed to the one workflow each
-// serves. Delete an entry once its fallback step is gone; a gate on any other
-// variable is rejected, so a new stored key cannot hide behind a new variable.
-var StaticKeyFallbackVars = map[string]string{
-	"EMBEDS_AWS_ROLE_ARN": ".github/workflows/embedded-binaries-publish.yml",
-	"MATRIX_AWS_ROLE_ARN": ".github/workflows/gateway-matrix.yaml",
+// storedAWSKey is refused anywhere: a secret or var named for a key, the
+// whole secrets context as JSON, or the shared credentials file.
+var storedAWSKey = regexp.MustCompile(`(?i)\b(?:secrets|vars)\s*(?:\.\s*|\[\s*['"])[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)\w*` +
+	`|\b(?:fromJSON|toJSON)\(.*\bsecrets\b|\.aws/credentials` +
+	`|\bos\.environ\[\s*['"]` + awsKeyName + `['"]\s*\]\s*=(?:[^=]|$)` +
+	`|\bSetEnvironmentVariable\(\s*['"]` + awsKeyName + `|\bSet-Item\b.*\bEnv:` + awsKeyName)
+
+// isStoredAWSKeyLine reports whether a non-comment line sets an AWS key from
+// anything but an OIDC session, or names a stored key outright. A tripwire for
+// copied snippets, not a boundary: a key relayed under a neutral name passes.
+func isStoredAWSKeyLine(line string) bool {
+	if strings.HasPrefix(strings.TrimSpace(line), "#") {
+		return false
+	}
+	if storedAWSKey.MatchString(line) {
+		return true
+	}
+	for _, at := range awsKeyAssignment.FindAllStringIndex(line, -1) {
+		if !awsKeyFromSession.MatchString(line[at[1]:]) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // StaticCloudKeys reports every stored AWS key in a workflow or composite
-// action that is not a sanctioned, gated fallback with an OIDC twin in the
-// same job. See specs/ci/no-static-cloud-keys.feature.
+// action. No condition or variable makes one acceptable: the OIDC cutover is
+// done and break-glass is the AWS root account, not a key in GitHub. See
+// specs/ci/no-static-cloud-keys.feature.
 func StaticCloudKeys(repoRoot string) ([]string, error) {
 	files, err := workflowAndActionFiles(repoRoot)
 	if err != nil {
@@ -55,298 +66,29 @@ func StaticCloudKeys(repoRoot string) ([]string, error) {
 
 	var problems []string
 	for _, rel := range files {
-		fileProblems, err := staticKeysIn(repoRoot, rel)
+		raw, err := os.ReadFile(filepath.Join(repoRoot, rel))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("read %s: %w", rel, err)
 		}
-		problems = append(problems, fileProblems...)
-	}
-	stale, err := staleFallbackVars(repoRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(problems, stale...), nil
-}
-
-// staleFallbackVars refuses a StaticKeyFallbackVars entry whose workflow is
-// gone or no longer gates any stored-key step on it, so the list can only
-// shrink: once a fallback step is deleted, its entry has to go in the same change.
-func staleFallbackVars(repoRoot string) ([]string, error) {
-	var problems []string
-	for _, gateVar := range sortedKeys(StaticKeyFallbackVars) {
-		rel := StaticKeyFallbackVars[gateVar]
-		if _, err := os.Stat(filepath.Join(repoRoot, rel)); os.IsNotExist(err) {
+		for _, line := range storedKeyLines(string(raw)) {
 			problems = append(problems, fmt.Sprintf(
-				"tools/ciguard/staticcloudkeys.go: StaticKeyFallbackVars lists %s for %s, which no longer exists; "+
-					"delete the entry so the fallback stays banned", gateVar, rel))
-
-			continue
-		}
-		workflow, err := ciscan.Load(repoRoot, rel)
-		if err != nil {
-			return nil, err
-		}
-		if !gatesAStoredKeyOn(workflow, gateVar) {
-			problems = append(problems, fmt.Sprintf(
-				"tools/ciguard/staticcloudkeys.go: StaticKeyFallbackVars lists %s for %s, which no longer gates a stored-key step on it; "+
-					"delete the entry so the fallback stays banned", gateVar, rel))
+				"%s:%d: stored AWS key: a long-lived key in GitHub can be read by any workflow edit; assume a role with GitHub OIDC (role-to-assume) instead", rel, line))
 		}
 	}
 
 	return problems, nil
 }
 
-func gatesAStoredKeyOn(workflow *ciscan.Workflow, gateVar string) bool {
-	for _, jobName := range workflow.JobNames() {
-		steps := workflow.Jobs[jobName].Steps
-		for i := range steps {
-			if found, ok := conditionTerm(steps[i].If, gateTerm); ok && found == gateVar && hasStoredKey(&steps[i]) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func sortedKeys(entries map[string]string) []string {
-	keys := make([]string, 0, len(entries))
-	for key := range entries {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	return keys
-}
-
-// staticKeysIn checks one file: every stored-key line must sit inside a
-// sanctioned fallback step, or it is reported.
-func staticKeysIn(repoRoot, rel string) ([]string, error) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot, rel))
-	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", rel, err)
-	}
-	found := storedKeyLines(string(raw))
-	if len(found) == 0 {
-		return nil, nil
-	}
-
-	var problems []string
-	var permitted []lineSpan
-	if strings.HasPrefix(rel, ciscan.WorkflowDir+"/") {
-		workflow, err := ciscan.Load(repoRoot, rel)
-		if err != nil {
-			return nil, err
-		}
-		permitted, problems = sanctionedFallbacks(workflow)
-	}
-	for _, line := range found {
-		if within(permitted, line) {
-			continue
-		}
-		problems = append(problems, fmt.Sprintf(
-			"%s:%d: stored AWS key: a long-lived key in GitHub can be read by any workflow edit; assume a role with GitHub OIDC (role-to-assume) instead", rel, line))
-	}
-
-	return problems, nil
-}
-
-// lineSpan is the inclusive source range of one sanctioned fallback step.
-type lineSpan struct{ first, last int }
-
-func within(spans []lineSpan, line int) bool {
-	for _, span := range spans {
-		if line >= span.first && line <= span.last {
-			return true
-		}
-	}
-
-	return false
-}
-
-// storedKeyLines returns the 1-based numbers of non-comment lines naming a
-// stored AWS key.
+// storedKeyLines returns the 1-based numbers of lines naming a stored AWS key.
 func storedKeyLines(text string) []int {
 	var lines []int
 	for i, line := range strings.Split(text, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "#") {
-			continue
-		}
-		if storedAWSKey.MatchString(line) {
+		if isStoredAWSKeyLine(line) {
 			lines = append(lines, i+1)
 		}
 	}
 
 	return lines
-}
-
-// sanctionedFallbacks returns the source spans of the sanctioned fallback
-// steps, whose stored-key lines are permitted, and reports gated stored-key
-// steps that are not sanctioned.
-func sanctionedFallbacks(workflow *ciscan.Workflow) ([]lineSpan, []string) {
-	var spans []lineSpan
-	var problems []string
-	for _, jobName := range workflow.JobNames() {
-		jobSpans, jobProblems := sanctionedFallbacksIn(workflow, jobName)
-		spans = append(spans, jobSpans...)
-		problems = append(problems, jobProblems...)
-	}
-
-	return spans, problems
-}
-
-// sanctionedFallbacksIn does the same for one job.
-func sanctionedFallbacksIn(workflow *ciscan.Workflow, jobName string) ([]lineSpan, []string) {
-	var spans []lineSpan
-	var problems []string
-	steps := workflow.Jobs[jobName].Steps
-	for i := range steps {
-		step := &steps[i]
-		gateVar, gated := conditionTerm(step.If, gateTerm)
-		if !gated || !hasStoredKey(step) {
-			continue
-		}
-		if reason := fallbackProblem(workflow, jobName, gateVar); reason != "" {
-			problems = append(problems, fmt.Sprintf("%s: job %s, step %q: %s", workflow.Path, jobName, step.Name, reason))
-
-			continue
-		}
-		spans = append(spans, lineSpan{first: step.Line, last: step.EndLine})
-	}
-
-	return spans, problems
-}
-
-// conditionTerm reports whether the whole `if:` condition is a conjunction
-// with a term matching term, returning that term's variable. Any `||`, or a
-// term inside parentheses, disqualifies the condition: either can make the
-// step run while the role variable is set, so only a plain `&&` chain counts.
-func conditionTerm(condition string, term *regexp.Regexp) (string, bool) {
-	expression := strings.TrimSpace(condition)
-	if inner, ok := strings.CutPrefix(expression, "${{"); ok {
-		inner, ok = strings.CutSuffix(inner, "}}")
-		if !ok {
-			return "", false
-		}
-		expression = inner
-	}
-	parts, ok := conjunctionTerms(expression)
-	if !ok {
-		return "", false
-	}
-	for _, part := range parts {
-		if match := term.FindStringSubmatch(strings.TrimSpace(part)); match != nil {
-			return match[1], true
-		}
-	}
-
-	return "", false
-}
-
-// conjunctionTerms splits an expression on the `&&` operators outside its
-// string literals, so a quoted `&&` cannot forge a term. It refuses an `||`, a
-// parenthesis or a `${{` outside a literal, and a literal left open: a group
-// such as `!(… && …)` can negate a term it holds. Literals are
-// single-quoted, with `”` as an escaped quote.
-func conjunctionTerms(expression string) ([]string, bool) {
-	var parts []string
-	start := 0
-	for i := 0; i < len(expression); i++ {
-		switch {
-		case expression[i] == '\'':
-			end, closed := literalEnd(expression, i)
-			if !closed {
-				return nil, false
-			}
-			i = end
-		case strings.HasPrefix(expression[i:], "||"), strings.HasPrefix(expression[i:], "${{"),
-			expression[i] == '(', expression[i] == ')':
-			return nil, false
-		case strings.HasPrefix(expression[i:], "&&"):
-			parts = append(parts, expression[start:i])
-			start = i + 2
-			i++
-		}
-	}
-
-	return append(parts, expression[start:]), true
-}
-
-// literalEnd returns the index of the quote closing the literal opened at
-// open, and false when the literal is never closed.
-func literalEnd(expression string, open int) (int, bool) {
-	for i := open + 1; i < len(expression); i++ {
-		if expression[i] != '\'' {
-			continue
-		}
-		if i+1 < len(expression) && expression[i+1] == '\'' {
-			i++
-
-			continue
-		}
-
-		return i, true
-	}
-
-	return 0, false
-}
-
-// fallbackProblem explains why a gated stored-key step is not a sanctioned
-// fallback, or returns "" when it is.
-func fallbackProblem(workflow *ciscan.Workflow, jobName, gateVar string) string {
-	if owner, listed := StaticKeyFallbackVars[gateVar]; !listed || owner != workflow.Path {
-		return fmt.Sprintf("gated on vars.%s, which is not a sanctioned OIDC fallback for this workflow", gateVar)
-	}
-	if !hasOIDCTwin(workflow.Jobs[jobName], gateVar) {
-		return fmt.Sprintf("stored-key fallback has no separate step in the same job assuming vars.%s by OIDC "+
-			"(configure-aws-credentials with role-to-assume, `if: vars.%s != ''`, and no stored key)", gateVar, gateVar)
-	}
-	if !workflow.EffectivePermissions(jobName).GrantsWrite("id-token") {
-		return "the OIDC twin needs `id-token: write` in the job's effective permissions " +
-			"(a job-level permissions block replaces the workflow-level one)"
-	}
-
-	return ""
-}
-
-// hasOIDCTwin reports whether the job has a separate credentials step that
-// assumes the role named by roleVar, runs only while that variable is set,
-// and carries no stored key of its own.
-func hasOIDCTwin(job ciscan.Job, roleVar string) bool {
-	for i := range job.Steps {
-		step := &job.Steps[i]
-		if !strings.HasPrefix(step.Uses, credentialsAction) || hasStoredKey(step) {
-			continue
-		}
-		role, _ := step.StringWith("role-to-assume")
-		if strings.Join(strings.Fields(role), "") != "${{vars."+roleVar+"}}" {
-			continue
-		}
-		if twinVar, ok := conditionTerm(step.If, oidcTerm); ok && twinVar == roleVar {
-			return true
-		}
-	}
-
-	return false
-}
-
-// hasStoredKey reports whether the step's with or env entries carry a stored
-// key.
-func hasStoredKey(step *ciscan.Step) bool {
-	for key, value := range step.With {
-		text, _ := value.(string)
-		if key == "aws-access-key-id" || key == "aws-secret-access-key" || storedAWSKey.MatchString(text) {
-			return true
-		}
-	}
-	for _, value := range step.Env {
-		if storedAWSKey.MatchString(value) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // workflowAndActionFiles lists the workflows and every composite action,

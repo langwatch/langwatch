@@ -7,6 +7,7 @@ import { defineBrowserModule } from "@langwatch/browser";
 import {
   AddOrEditDatasetDrawerToken,
   AddOrEditDatasetRoutedDrawerToken,
+  DatasetHistoryDrawerToken,
   DatasetEditorTableToken,
   DatasetPickerListToken,
   DatasetRecordSyncToken,
@@ -48,6 +49,11 @@ export const datasetWeb = defineBrowserModule("dataset")
     load: async () => ({
       default: (await import("./ui/sections/datasets/routed-upload-csv-drawer.tsx"))
         .RoutedUploadCsvDrawer,
+    }),
+  })
+  .drawer(DatasetHistoryDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/dataset-history-drawer.tsx")).DatasetHistoryDrawer,
     }),
   })
   /** The create-or-edit drawer, editor table, picker list and record sync, lent (§3.4 rule 7). */
