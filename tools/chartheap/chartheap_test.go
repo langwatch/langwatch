@@ -44,6 +44,9 @@ func TestOperatorNodeOptionsWin(t *testing.T) {
 	runScenario(t, 3)
 }
 
+// @scenario "The operator can turn the ceiling off"
+func TestOperatorCanTurnTheCeilingOff(t *testing.T) { runScenario(t, 4) }
+
 func TestNodeOptionsReadsTheDeploymentInOrder(t *testing.T) {
 	manifest := `---
 kind: ConfigMap
@@ -78,6 +81,9 @@ func TestNodeOptionsRefusesAManifestWithoutADeployment(t *testing.T) {
 }
 
 func TestAssertionsRejectTheWrongValue(t *testing.T) {
+	if Checks[0].Expect[Workers]([]string{Ceiling, Ceiling}) == nil {
+		t.Fatal("a duplicate ceiling passed where the chart's must be the only one")
+	}
 	if Checks[0].Expect[Workers]([]string{"--max-old-space-size-percentage=50"}) == nil {
 		t.Fatal("a 50 percent ceiling passed")
 	}

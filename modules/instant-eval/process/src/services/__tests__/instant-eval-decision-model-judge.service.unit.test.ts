@@ -22,6 +22,7 @@ const OWN: DecisionModelResolution = {
   wire: "jev",
   providerModel: "mercury-decide",
   endpoint: "https://api.inceptionlabs.ai/v1/decisions",
+  authHeader: "bearer",
   apiKey: "customer-key",
 };
 

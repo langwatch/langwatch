@@ -48,15 +48,21 @@ export const experimentWorkflowEvaluationRest = defineRestRouter(ExperimentApi)
       "Trigger an evaluation run of a workflow's committed version through " +
       "the evaluations pipeline. Evaluate the workflow's attached dataset, " +
       "inline data, or a platform dataset id; parameters bind as constant " +
-      "entry inputs on every row. Returns a run id and a results URL to poll " +
-      "or open in the browser.",
+      "entry inputs on every row. A saved dataset is read at `dataset_version` " +
+      "when given, else its current content is saved as a new version. Returns " +
+      "a run id and a results URL to poll or open in the browser.",
     errors: [
       {
         status: 400,
-        description: "The workflow has no committed version, or the run could not start",
+        description:
+          "The workflow has no committed version, the run could not start, or `dataset_version` was sent with no saved dataset to read it from",
       },
       { status: 403, description: "The API key cannot read the evaluation run it would start" },
-      { status: 404, description: "The project holds no such workflow or dataset" },
+      {
+        status: 404,
+        description:
+          "The project holds no such workflow or dataset, or the dataset has no version `dataset_version` names (`dataset_version_not_found`)",
+      },
       { status: 422, description: "The body failed validation" },
     ],
   })
@@ -74,6 +80,7 @@ export const experimentWorkflowEvaluationRest = defineRestRouter(ExperimentApi)
       versionId: input.version_id,
       data: input.data,
       datasetId: input.dataset_id,
+      ...(input.dataset_version !== undefined ? { datasetVersion: input.dataset_version } : {}),
       parameters: input.parameters,
       rowIndices: input.row_indices,
     });

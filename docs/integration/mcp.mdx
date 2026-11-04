@@ -232,7 +232,8 @@ The AI assistant will:
 **Example transformation:**
 
 Before:
-```python
+<CodeGroup>
+```python title="chat.py"
 from openai import OpenAI
 
 client = OpenAI()
@@ -245,8 +246,24 @@ def chat(message: str):
     return response.choices[0].message.content
 ```
 
+```typescript title="chat.ts"
+import { OpenAI } from "openai";
+
+const client = new OpenAI();
+
+async function chat(message: string) {
+  const response = await client.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "user", content: message }],
+  });
+  return response.choices[0].message.content;
+}
+```
+</CodeGroup>
+
 After (automatically added by AI assistant):
-```python
+<CodeGroup>
+```python title="chat.py" {2,5,7-12}
 from openai import OpenAI
 import langwatch
 
@@ -266,6 +283,31 @@ def chat(message: str):
     )
     return response.choices[0].message.content
 ```
+
+```typescript title="chat.ts" {2-3,5-6,10-12}
+import { OpenAI } from "openai";
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch/observability";
+
+setupObservability({ serviceName: "chatbot" });
+const tracer = getLangWatchTracer("chatbot");
+const client = new OpenAI();
+
+async function chat(message: string) {
+  return tracer.withActiveSpan("chat", async (span) => {
+    span.setInput(message);
+    span.setAttribute("langwatch.labels", ["document_parsing"]);
+    const response = await client.chat.completions.create({
+      model: "gpt-5-mini",
+      messages: [{ role: "user", content: message }],
+    });
+    const text = response.choices[0].message.content;
+    span.setOutput(text);
+    return text;
+  });
+}
+```
+</CodeGroup>
 
 ### Set Up Evaluations
 
@@ -402,7 +444,7 @@ The MCP server provides tools organized into categories. Your AI assistant autom
 | `platform_update_monitor` | Update, enable or disable an online evaluation |
 | `platform_delete_monitor` | Delete an online evaluation |
 | `platform_experiment_list` | List the experiments in the project |
-| `platform_run_experiment` | Start an experiment run |
+| `platform_run_experiment` | Start an experiment run, optionally with a `concurrency` from 1 to 24: the cells that run at once, for that run only |
 | `platform_experiment_status` | Get the progress of a run |
 | `platform_experiment_list_runs` | List the runs of an experiment |
 | `platform_experiment_results` | Get the per-row results of a run |

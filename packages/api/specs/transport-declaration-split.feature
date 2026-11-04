@@ -81,12 +81,38 @@ Feature: Transport declaration split
     And the feature's server and contract value-import no runtime
 
   @unit
-  Scenario: A procedure whose answer breaks its output schema refuses rather than answering
+  Scenario: A procedure whose answer breaks its output schema is logged and still answered
     Given a procedure or a REST route whose handler answers a shape its output schema refuses
     When the caller asks for it
-    Then the failure is logged with the procedure name, the issue path and request metadata
+    Then the failure is logged as an error with the procedure name, the issue path and request metadata
     And the log carries no response contents
-    And the caller receives an internal error and never the handler's answer
+    And the caller receives the handler's answer rather than an internal error
+    And the answer carries no key the output schema does not name
+    And no value of a type the output schema does not allow for its field
+
+  @unit
+  Scenario: A refused answer's log names the failing field without the caller's keys
+    Given a procedure whose output schema is a union of objects with an open record inside
+    When its answer is refused at a field inside one union arm
+    Then the logged issue path is read from the root of the answer, through the union arm
+    And it keeps array and tuple indices and the keys the schema declares
+    And every other key or number on the path, and anything below an open value, is logged as a placeholder
+
+  @unit
+  Scenario: A procedure that declares no output and answers a value is logged and answers nothing
+    Given a procedure that declares no output
+    When its handler answers a value
+    Then the value is logged as an error with the procedure name and the value's kind
+    And the log carries no response contents
+    And the caller receives nothing
+
+  @unit
+  Scenario: A subscription that declares no output is refused
+    Given a subscription that declares no output
+    When its handler streams values
+    Then the stream is logged as an error with the procedure name
+    And the log carries no response contents
+    And the caller receives an internal error and never a streamed value
 
   @unit @typecheck
   Scenario: The browser derives its client from the contract

@@ -188,6 +188,9 @@ func runStatus(_ context.Context, d deps, inv invocation) error {
 		if err := d.orch.Status(false, d.worktree, inv.has("--reveal")); err != nil {
 			return err
 		}
+		if run, ok := d.orch.DocsOnly(d.params); ok {
+			fmt.Printf("\ndocs only (haven up --only docs)  %s  pid %d  ·  logs: haven logs docs  ·  stop: haven down\n", run.URL, run.PID)
+		}
 		for _, name := range []string{"jobs", "stores"} {
 			if body, ok := statusTabBody(d, slug, name); ok {
 				fmt.Printf("\n%s\n%s", name, body)
@@ -209,6 +212,9 @@ func runStatus(_ context.Context, d deps, inv invocation) error {
 		report["jobs"] = agentJobRows(d, slug)
 	} else {
 		report["jobs"] = statusTabRows(d, slug, "jobs")
+	}
+	if run, ok := d.orch.DocsOnly(d.params); ok {
+		report["docsOnly"] = run
 	}
 	return json.NewEncoder(os.Stdout).Encode(report)
 }

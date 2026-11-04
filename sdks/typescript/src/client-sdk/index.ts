@@ -31,6 +31,7 @@ export {
   DatasetPlanLimitError,
 } from "./services/datasets";
 export type {
+  ExperimentConcurrencyOptions,
   ExperimentRunResult,
   RunExperimentOptions,
   RunWithResultsOptions,

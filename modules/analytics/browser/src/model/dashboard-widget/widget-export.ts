@@ -80,6 +80,17 @@ export function widgetExportStatus({
   return answered.some((result) => result.rows.length > 0) ? "ready" : "empty";
 }
 
+/** Whether the card shows none of the widget's data: no traffic, the setup view or no rows. */
+export function widgetShowsNoData({
+  face,
+  status,
+}: {
+  face: WidgetFace["kind"];
+  status: WidgetExportStatus;
+}): boolean {
+  return face === "missing" || status === "empty";
+}
+
 /** Why "Export CSV" cannot be picked yet, in the menu's words. */
 export const EXPORT_UNAVAILABLE_REASON: Readonly<
   Record<Exclude<WidgetExportStatus, "hidden" | "ready">, string>

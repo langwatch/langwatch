@@ -431,7 +431,10 @@ describe("given the named collection's values an engine table is built on", () =
     password: "reader-password-DO-NOT-LOG",
   };
   const fingerprintOf = (overrides: Partial<typeof CONNECTION> = {}) =>
-    postgresMapping.credentialFingerprint({ connection: { ...CONNECTION, ...overrides } });
+    postgresMapping.credentialFingerprint({
+      connection: { ...CONNECTION, ...overrides },
+      schema: "langwatch_db",
+    });
   const engineTable = (credentialFingerprint?: string) =>
     postgresMapping.engineTableStatement({
       names: {
@@ -445,6 +448,7 @@ describe("given the named collection's values an engine table is built on", () =
       columns: [{ name: "TenantId", type: "String" }],
       collection: "lwql_postgres_langwatch",
       postgresRelation: "lwql_annotations",
+      schema: "langwatch_db",
       ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
     });
 
@@ -467,6 +471,13 @@ describe("given the named collection's values an engine table is built on", () =
     ])("gives a different fingerprint for %o", (change) => {
       expect(fingerprintOf(change)).not.toBe(fingerprintOf());
     });
+
+    /** @scenario "The reconvergence check rebuilds an engine table built before the schema was pinned" */
+    it("gives a different fingerprint for another schema", () => {
+      const other = postgresMapping.credentialFingerprint({ connection: CONNECTION, schema: "x" });
+
+      expect(other).not.toBe(fingerprintOf());
+    });
   });
 
   describe("when an engine table is stamped with it", () => {
@@ -482,6 +493,11 @@ describe("given the named collection's values an engine table is built on", () =
       );
       expect(statement).toContain(postgresMapping.credentialComment({ fingerprint }));
       expect(statement).not.toContain(CONNECTION.password);
+    });
+
+    /** @scenario "Engine tables read the app's PostgreSQL schema" */
+    it("names the app schema in its ENGINE clause", () => {
+      expect(engineTable()).toContain("table='lwql_annotations', schema='langwatch_db')");
     });
 
     /** @scenario "No engine table is rebuilt until ClickHouse holds the app's collection values" */

@@ -104,6 +104,8 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
+  "/api/docs-session":
+    "Live surface, intentionally undocumented: the docs playground's own revoke call for its session key (ADR-185), not an API for integrations.",
   "/api/checkup": UNDOCUMENTED_CHECKUP,
   "/api/checkup/run": UNDOCUMENTED_CHECKUP,
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
@@ -591,6 +593,9 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   },
 ];
 
+/** Longer summary slugs are cut at a whole word: a cut mid-word published `...-fields-ho`. */
+const SLUG_MAX = 48;
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -633,7 +638,7 @@ function getResourceName(apiPath: string): string {
 function generateFileName(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) {
     const s = slugify(op.summary);
-    return s.length > 40 ? s.substring(0, 40).replace(/-$/, "") : s;
+    return s.length > SLUG_MAX ? s.slice(0, SLUG_MAX + 1).replace(/-[^-]*$/, "") : s;
   }
 
   const resource = getResourceName(apiPath);
