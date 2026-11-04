@@ -314,6 +314,7 @@ describe("NurturingMilestonesService", () => {
           if (failuresLeft-- > 0) throw new Error("database unavailable");
           return directory.getFirstProjectCreatedAt(input);
         },
+        hasTracedProject: (input) => directory.hasTracedProject(input),
       };
       const service = serviceOver({ milestones, projects });
       await service.projectCreated(projectCreatedFact());

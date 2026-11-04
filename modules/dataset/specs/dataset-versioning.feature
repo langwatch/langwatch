@@ -279,6 +279,30 @@ Feature: Dataset version history
   # --- Existing datasets ---
 
   @unit
+  Scenario: A dataset stored with an empty slug gets a slug from its name
+    Given datasets stored before slugs were required, with an empty slug
+    When the background step "dataset:fill-empty-slugs" runs
+    Then each one has the slug its name gives, as creating a dataset would
+    And a name another dataset in the project already holds gets the next numbered slug
+    And a name with no letters or digits gets the slug "dataset"
+    And a dataset that has a slug keeps it
+    And running the step again changes nothing
+    And a dry run changes nothing and saves no checkpoint
+
+  @unit
+  Scenario: The first-version step runs after empty slugs are filled
+    Given the background steps the dataset module declares
+    Then "dataset:create-first-versions" runs after "dataset:fill-empty-slugs"
+
+  @integration
+  Scenario: Postgres gives a dataset with an empty slug a free slug once
+    Given a Postgres project holding a dataset with an empty slug and one whose slug its name gives
+    When the empty slug is filled
+    Then the dataset gets the next numbered slug, the unique slug index refusing the taken one
+    And the dataset opens by id and by its new slug
+    And filling it again finds nothing to fill
+
+  @unit
   Scenario: Existing datasets get version 1 in the background
     Given datasets created before versioning, with no versions
     When the background step "dataset:create-first-versions" runs

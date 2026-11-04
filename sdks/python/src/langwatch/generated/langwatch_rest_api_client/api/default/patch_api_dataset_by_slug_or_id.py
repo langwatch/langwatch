@@ -67,7 +67,9 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdBody | Unset = UNSET,
 ) -> Response[PatchApiDatasetBySlugOrIdResponse200]:
-    """Update a dataset by its slug or id
+    """Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to
+    say which existing column each renamed column came from, so a save that deletes one column and
+    renames another moves the right values.
 
     Args:
         slug_or_id (str):
@@ -99,7 +101,9 @@ def sync(
     client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdBody | Unset = UNSET,
 ) -> PatchApiDatasetBySlugOrIdResponse200 | None:
-    """Update a dataset by its slug or id
+    """Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to
+    say which existing column each renamed column came from, so a save that deletes one column and
+    renames another moves the right values.
 
     Args:
         slug_or_id (str):
@@ -126,7 +130,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdBody | Unset = UNSET,
 ) -> Response[PatchApiDatasetBySlugOrIdResponse200]:
-    """Update a dataset by its slug or id
+    """Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to
+    say which existing column each renamed column came from, so a save that deletes one column and
+    renames another moves the right values.
 
     Args:
         slug_or_id (str):
@@ -156,7 +162,9 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdBody | Unset = UNSET,
 ) -> PatchApiDatasetBySlugOrIdResponse200 | None:
-    """Update a dataset by its slug or id
+    """Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to
+    say which existing column each renamed column came from, so a save that deletes one column and
+    renames another moves the right values.
 
     Args:
         slug_or_id (str):

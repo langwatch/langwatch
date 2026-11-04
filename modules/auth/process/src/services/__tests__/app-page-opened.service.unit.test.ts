@@ -2,6 +2,7 @@
  * @vitest-environment node
  * @see modules/auth/specs/app-page-opened.feature
  */
+import type { AppPage } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
 import { AppPageOpenedService } from "../app-page-opened.service.ts";
@@ -11,9 +12,9 @@ function serviceOver({
   appPageOpened = () => undefined,
 }: {
   memberships?: () => Promise<number>;
-  appPageOpened?: (input: { userId: string; page: "me_sessions" }) => void;
+  appPageOpened?: (input: { userId: string; page: AppPage }) => void;
 } = {}) {
-  const opened: { userId: string; page: "me_sessions" }[] = [];
+  const opened: { userId: string; page: AppPage }[] = [];
   const reported: unknown[] = [];
   const service = AppPageOpenedService.create({
     organizations: { countMembershipsForUser: memberships },

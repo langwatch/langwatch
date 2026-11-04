@@ -6,6 +6,7 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
 import {
+  datasetColumnRenamesSchema,
   datasetRecordFormSchema,
   datasetRecordInputSchema,
   newDatasetEntriesSchema,
@@ -26,6 +27,7 @@ const DATASET_RECORD_IDS_MAX = resolveRequestBound("datasetBatchMax", "ENTERPRIS
 const datasetApiUpsertBaseInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetRecords: z.array(datasetRecordInputSchema).optional(),
+  columnRenames: datasetColumnRenamesSchema.optional(),
 });
 export interface DatasetApiUpsertBaseInputSchema extends Named<
   typeof datasetApiUpsertBaseInputSchemaDefinition
@@ -148,6 +150,8 @@ const datasetRecordApiUpdateInputSchemaDefinition = z.object({
   datasetId: z.string(),
   recordId: z.string(),
   updatedRecord: z.record(z.string(), z.any()),
+  /** The column names in order as last read; one gone or out of order refuses the write. */
+  columns: z.array(z.string()).optional(),
 });
 export interface DatasetRecordApiUpdateInputSchema extends Named<
   typeof datasetRecordApiUpdateInputSchemaDefinition

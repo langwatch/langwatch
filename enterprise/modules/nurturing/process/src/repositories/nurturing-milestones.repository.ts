@@ -48,6 +48,14 @@ export interface NurturingMilestonesRepository {
   ): Promise<NurturingOrganizationCounts[]>;
 }
 
+/** The organization's latest trace, the one fact of it a person joining later must be told. */
+export interface NurturingTraceMilestonesRepository {
+  /** Moves the time forward only; a late trace or an organization never learned changes nothing. */
+  recordLastTrace(input: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void>;
+  /** Epoch ms of the latest recorded trace; null when none was recorded. */
+  findLastTraceAt(input: Readonly<{ organizationId: string }>): Promise<number | null>;
+}
+
 /** The coding-agent signals of the same organizations table, written one conditional update each. */
 export interface NurturingCodingMilestonesRepository {
   /** The organization's row; empty when nurturing never learned it. */
