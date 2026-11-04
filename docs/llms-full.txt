@@ -18995,7 +18995,7 @@ keywords:
   - coding agent pr tracking
 ---
 
-Three things have to be in place for a pull request to show its cost: the agent is wired with `langwatch instrument` or started through a `langwatch <tool>` wrapper, you start the agent inside the repository's folder, and your organization has GitHub connected. This page covers each one, what the command writes on your machine, and how to remove it again.
+Three things have to be in place for a pull request to show its cost: the agent is wired with `langwatch instrument` or with a `langwatch <tool>` wrapper run that keeps the plain command reporting, you start the agent inside the repository's folder, and your organization has GitHub connected. This page covers each one, what the command writes on your machine, and how to remove it again.
 
 ## Set it up
 
@@ -19006,7 +19006,7 @@ Three things have to be in place for a pull request to show its cost: the agent 
     langwatch login --device
     ```
 
-    Install it globally, not through `npx`. The Claude Code hooks that `langwatch instrument` writes call the `langwatch` command, and the Codex `notify` entry points at the copy that ran the setup, so a copy that npm deletes from its `npx` cache stops the reporting.
+    Install it globally, not through `npx`. The Claude Code hooks that `langwatch instrument` writes call the `langwatch` command, and the Codex `notify` entry points at the copy that ran the setup, so a copy that npm deletes from its `npx` cache stops the reporting. The same applies to a wrapper started with `npx langwatch <tool>`.
   </Step>
   <Step title="Wire the agent">
     ```bash
@@ -19014,10 +19014,10 @@ Three things have to be in place for a pull request to show its cost: the agent 
     langwatch instrument codex
     ```
 
-    Run the line for each agent you use. The command prints every file it wrote and where the telemetry goes, then exits.
+    Run the line for each agent you use. The command prints where the telemetry goes, then exits. [The table below](#what-langwatch-instrument-does) lists every file it writes.
   </Step>
   <Step title="Connect GitHub">
-    An organization admin connects GitHub once, under **Settings → Integrations**. LangWatch needs it to turn a branch into its pull requests.
+    An organization admin connects GitHub once, under **Settings → Integrations**. LangWatch needs it to turn a branch into its pull requests. The GitHub App must have access to the repository: if it has access to selected repositories only and this one is not selected, the pull request shows no cost and no error.
   </Step>
   <Step title="Start the agent inside the repository">
     ```bash
@@ -19048,7 +19048,7 @@ The command takes one tool name: `claude`, `codex`, `gemini`, `opencode`, `copil
 | Tool       | What the command writes                                                                                                                                                                                                         |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `claude`   | The OpenTelemetry variables into the `env` block of `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`), plus a `SessionStart` and a `Stop` hook in the same file. With the LangWatch Claude Code plugin installed, the plugin runs the hooks instead. |
-| `codex`    | An `[otel]` block and a `notify` program in `~/.codex/config.toml`, plus an instruction block in `$CODEX_HOME/AGENTS.md` (`~/.codex/AGENTS.md` by default). Your own `notify` program keeps running after the LangWatch one.  |
+| `codex`    | An `[otel]` block and a `notify` program in `$CODEX_HOME/config.toml`, plus an instruction block in `$CODEX_HOME/AGENTS.md` (`~/.codex` by default). Your own `notify` program keeps running after the LangWatch one. If your `notify` cannot be moved safely, the command prints a warning and installs no `notify` program, so sessions report tokens but no repository.  |
 | `gemini`   | A `gemini` shell function in `~/.zshrc`, `~/.bashrc` or `~/.config/fish/config.fish`.                                                                                                                                           |
 | `opencode` | An `opencode` shell function in the same file, plus `experimental.openTelemetry: true` in `~/.config/opencode/opencode.jsonc`.                                                                                                 |
 | `copilot`  | A `copilot` shell function in the same file, plus a `sessionStart` and an `agentStop` hook in `~/.copilot/hooks/langwatch.json` (or `$COPILOT_HOME/hooks/langwatch.json`). |
@@ -19058,7 +19058,11 @@ The shell function sets the variables only for that one tool run, so other comma
 
 ## Which agents report their pull requests
 
-Claude Code, Codex, GitHub Copilot and GitHub Copilot in VS Code (`code`) report the repository and branch after `langwatch instrument` or a `langwatch <tool>` wrapper run, which is what joins a session to a pull request. Both Copilot tools read the same hook file. For Gemini CLI and opencode, these commands wire the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
+Claude Code, Codex, GitHub Copilot and GitHub Copilot in VS Code (`code`) report the repository and branch after `langwatch instrument`, which is what joins a session to a pull request. Both Copilot tools read the same hook file.
+
+A `langwatch <tool>` wrapper run does the same only when you keep the plain command reporting. If you decline that prompt, if the run has no terminal, or if it takes the gateway route, it writes no reporting hook, so the session joins no pull request.
+
+For Gemini CLI and opencode, these commands wire the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
 
 ## Why the agent must start inside the repository
 
@@ -19100,7 +19104,7 @@ By default the wiring captures the conversation as well as the token counts. To 
 
 For Codex, the conversation is read from the transcript by the `notify` program. The same program reports the repository and branch, so removing it also stops the pull request join.
 
-Both `langwatch instrument` and any `langwatch <tool>` wrapper run write the removed variables back. For content to stay off, drop it for the whole organization at ingestion: see [Privacy](/coding-agents/privacy).
+`langwatch instrument`, any `langwatch <tool>` wrapper run and `langwatch login` write the removed variables back. For content to stay off, drop it for the whole organization at ingestion: see [Privacy](/coding-agents/privacy).
 
 ## Undo it
 
@@ -19108,7 +19112,9 @@ Both `langwatch instrument` and any `langwatch <tool>` wrapper run write the rem
 langwatch logout
 ```
 
-`langwatch logout` signs this machine out and removes every block LangWatch wrote: the Claude Code variables and hooks, the Codex `[otel]` and `notify` blocks and the `AGENTS.md` instruction, the shell functions, the Copilot hook file, and the VS Code setting that clears the telemetry variables. It removes only blocks LangWatch wrote, and leaves the rest of each file as it was.
+`langwatch logout` signs this machine out and removes what LangWatch wrote: the Claude Code variables and hooks, the LangWatch Claude Code plugin, the Codex `[otel]` and `notify` blocks, its profile file and the `AGENTS.md` instruction, the shell functions, the Copilot hook file, and the VS Code setting that clears the telemetry variables. In a file you also edit, it leaves the rest as it was.
+
+It reads a Claude Code project pin (`.claude/settings.local.json`) only in the current folder, so run it from each repository where you ran `langwatch claude`.
 
 - `--keep-credentials` removes the wiring and keeps you signed in.
 - `-y` skips the confirmation prompt.
@@ -19217,7 +19223,7 @@ The general model, both reporting channels and their limits, is covered on [Repo
 
 `langwatch instrument codex` installs a `notify` program, and Codex runs it at the end of every turn, and the program reads the working directory from the session start record. That directory does not change during the session, so after a `cd` the agent must run `langwatch ingest context` to move attribution.
 
-`langwatch ingest context` still matters: it updates attribution as soon as the agent runs it, mid-turn, and it works when the `notify` program does not run.
+`langwatch ingest context` still matters: it updates attribution as soon as the agent runs it, mid-turn. If `notify` does not run, it reaches LangWatch only when the shell has network access: under Codex's default sandbox it is queued for the `notify` report.
 
 The agent moves the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares.
 
