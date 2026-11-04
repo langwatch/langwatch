@@ -102,7 +102,8 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
 
   Rule: ALLOWED_PROXY_HOSTS is a literal hostname allowlist evaluated regardless of NODE_ENV
     Match is case-insensitive on hostname only (port is ignored). Matches bypass
-    private-IP/localhost checks. Cloud metadata is NEVER bypassed.
+    private-IP/localhost checks, and the .local/.localhost block for on-premise
+    hosts. Cloud metadata and cloud internal domains are NEVER bypassed.
 
     @unit
     Scenario Outline: <impl> allows allowlisted host even when BLOCK_LOCAL_HTTP_CALLS is "true"
@@ -140,6 +141,47 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
         | impl   |
         | TS     |
         | Go     |
+
+  # ============================================================================
+  # On-premise hosts — blocked by default, allowlistable per host
+  # ============================================================================
+
+  Rule: An operator can reach a specific on-premise .local host through ALLOWED_PROXY_HOSTS
+    LangWatch running inside a customer datacentre has to call services named
+    under .local or .localhost. Those suffixes are refused whatever
+    BLOCK_LOCAL_HTTP_CALLS says, but unlike cloud internal domains they name
+    private infrastructure that hands out no ambient credentials, so an
+    operator may name one exact host in the allowlist. Naming a cloud internal
+    domain still fails. packages/egress and the Go scenario runner behave the
+    same.
+
+    @unit
+    Scenario: An allowlisted on-premise .local host is reachable
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS is "llm.corp.local"
+      When the validator checks "http://llm.corp.local/v1/chat"
+      Then the validation passes
+
+    @unit
+    Scenario: A .local host the allowlist does not name stays refused
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS is "llm.corp.local"
+      When the validator checks "http://other.corp.local/api"
+      Then the validation fails with an SSRF block error
+
+    @unit
+    Scenario: A cloud internal domain cannot be allowlisted
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS is "s3.amazonaws.com"
+      When the validator checks "http://s3.amazonaws.com/bucket"
+      Then the validation fails with an SSRF block error
+
+    @unit
+    Scenario: A cloud internal domain with an on-premise suffix added cannot be allowlisted
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS is "metadata.google.internal.local"
+      When the validator checks "http://metadata.google.internal.local/computeMetadata/v1/"
+      Then the validation fails with an SSRF block error
 
   # ============================================================================
   # Cloud metadata — ALWAYS blocked, no escape
@@ -189,6 +231,13 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       Then the validation fails with a metadata security error
 
     @unit
+    Scenario: An allowlisted hostname that resolves to the metadata address is refused
+      Given ALLOWED_PROXY_HOSTS is "imds-bait.example"
+      And the hostname "imds-bait.example" resolves to the cloud metadata address
+      When the NLP service's HTTP block connects to "http://imds-bait.example/latest/meta-data/"
+      Then the connection is refused with an SSRF block error
+
+    @unit
     Scenario: A bracketed IPv6 metadata literal is refused with local calls allowed
       Given BLOCK_LOCAL_HTTP_CALLS is "false"
       When the TS validator processes a URL whose host is a bracketed IPv6 spelling
@@ -211,6 +260,23 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       Then the validation passes
       And the destination is pinned to that address with the brackets kept for the
         request line and Host header
+
+  # ============================================================================
+  # Connecting — only to checked addresses
+  # ============================================================================
+
+  Rule: The HTTP block connects only to addresses it checked, falling back across them
+    A name can resolve to several addresses. Every one is checked before any
+    connection, and the connection goes to a checked address, never to one a
+    second lookup returns. Allowlisted or not, the same fallback applies.
+
+    @unit
+    Scenario: The HTTP block falls back across the addresses it checked
+      Given a hostname that resolves to several addresses, all of which pass the policy
+      And the first address does not answer
+      When the NLP service's HTTP block connects to that hostname
+      Then it connects to the next checked address, never to one it did not check
+      And each address gets an equal share of the time left, so one silent address cannot spend it all
 
   # ============================================================================
   # Migration — IS_SAAS no longer drives SSRF blocking

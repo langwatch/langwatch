@@ -658,6 +658,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "my-dataset",
         projectId: "project-1",
         entries: [{ input: "hello" }],
+        editedBy: { kind: "user", id: "user-1" },
       });
       await expect(response.json()).resolves.toMatchObject({
         data: [{ id: "rec-1", entry: { input: "hello" } }],
@@ -672,6 +673,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "dataset_xyz",
         projectId: "project-1",
         entries: [{ input: "x" }],
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 
@@ -770,6 +772,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "my-dataset",
         projectId: "project-1",
         recordIds: ["rec-1", "rec-2"],
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 
@@ -888,6 +891,7 @@ describe("the mounted dataset REST family", () => {
         projectId: "project-1",
         recordId: "rec-1",
         updatedRecord: { input: "updated" },
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 

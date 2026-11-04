@@ -1,5 +1,5 @@
 # redis-valkey.yaml — Run the chart-managed Redis as Valkey 9.1; Redis stays the default.
-# For fresh installs. Valkey 9.1 cannot load a Redis 8.0 dump (RDB format 12), so on an
+# For fresh installs. Valkey 9.1 cannot load a dump from the chart's Redis 8 image (newer RDB format), so on an
 # existing release drain the workers and start with an empty redis-data volume: Redis
 # holds queues, cache and sessions, so queued jobs are lost, users and MCP clients sign in again.
 #

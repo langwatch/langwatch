@@ -69,7 +69,8 @@ class UserList(BaseModel):
 # Use the client as usual. Traces are sent to LangWatch automatically
 def extract_user_info(text: str) -> User:
     return client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-6-luna",
+        reasoning_effort="none",  # Instructor sends function tools, which gpt-6 accepts on Chat Completions only with reasoning off
         response_model=User,
         messages=[
             {"role": "user", "content": f"Extract user information from: {text}"}
@@ -78,7 +79,8 @@ def extract_user_info(text: str) -> User:
 
 def extract_multiple_users(text: str) -> UserList:
     return client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-6-luna",
+        reasoning_effort="none",  # Instructor sends function tools, which gpt-6 accepts on Chat Completions only with reasoning off
         response_model=UserList,
         messages=[
             {"role": "user", "content": f"Extract all users from: {text}"}
@@ -130,13 +132,14 @@ def extract_product_info(text: str) -> Product:
         current_trace.update(
             metadata={
                 "extraction_type": "product_info",
-                "model": "gpt-5",
+                "model": "gpt-6-luna",
                 "source_text_length": len(text)
             }
         )
 
     return client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-6-luna",
+        reasoning_effort="none",  # Instructor sends function tools, which gpt-6 accepts on Chat Completions only with reasoning off
         response_model=Product,
         messages=[
             {"role": "user", "content": f"Extract product information from: {text}"}
@@ -206,14 +209,15 @@ def extract_tasks_from_text(text: str) -> List[Task]:
         current_trace.update(
             metadata={
                 "pipeline_type": "task_extraction",
-                "model": "gpt-5",
+                "model": "gpt-6-luna",
                 "input_length": len(text)
             }
         )
 
     # Your Instructor AI code here
     return client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-6-luna",
+        reasoning_effort="none",  # Instructor sends function tools, which gpt-6 accepts on Chat Completions only with reasoning off
         response_model=List[Task],
         messages=[
             {"role": "user", "content": f"Extract tasks from: {text}"}

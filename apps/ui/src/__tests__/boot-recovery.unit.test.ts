@@ -135,13 +135,15 @@ describe("given the page has not shown yet", () => {
     /** @scenario "A dropped entry file reloads the page" */
     it("reloads and says it is retrying", () => {
       const page = bootPage();
-      const entry = addTag('<script type="module" src="/assets/core-x.js"></script>');
+      const entry = addTag(
+        '<script type="module" data-lw-boot src="https://cdn.example/assets/core-x.js"></script>',
+      );
       finishParsing();
 
       page.fail(entry);
 
       expect(page.location.reload).toHaveBeenCalledTimes(1);
-      expect(statusText()).toBe("Slow connection, retrying (1 of 6)...");
+      expect(statusText()).toBe("Still loading, retrying (1 of 6)...");
     });
   });
 
@@ -149,7 +151,7 @@ describe("given the page has not shown yet", () => {
     it("reloads", () => {
       const page = bootPage();
 
-      page.fail(addTag('<link rel="stylesheet" href="/assets/core-x.css">'));
+      page.fail(addTag('<link rel="stylesheet" data-lw-boot href="/assets/core-x.css">'));
 
       expect(page.location.reload).toHaveBeenCalledTimes(1);
     });
@@ -162,6 +164,36 @@ describe("given the page has not shown yet", () => {
       finishParsing();
 
       page.fail(addTag('<link rel="stylesheet" href="/assets/screen-x.css">'));
+
+      expect(page.location.reload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a script outside the application's asset files fails", () => {
+    /** @scenario "A script the server's page names that is not the application's code does not reload the page" */
+    it("leaves the page alone", () => {
+      const page = bootPage();
+      const injected = addTag(
+        '<script type="module" async src="https://app.example/.webmcp/bridge.js"></script>',
+      );
+
+      page.fail(injected);
+      finishParsing();
+      page.fail(injected);
+
+      expect(page.location.reload).not.toHaveBeenCalled();
+      expect(statusText()).toBe("");
+    });
+
+    /** @scenario "A script the server's page names that is not the application's code does not reload the page" */
+    it("leaves the page alone when that script's address looks like an asset file", () => {
+      const page = bootPage();
+      const injected = addTag(
+        '<script async src="https://edge.example/assets/bridge.js"></script>',
+      );
+      finishParsing();
+
+      page.fail(injected);
 
       expect(page.location.reload).not.toHaveBeenCalled();
     });
@@ -224,7 +256,7 @@ describe("given earlier reloads", () => {
       page.chunkFailed();
 
       expect(page.saved()).toBe("3,3");
-      expect(statusText()).toBe("Slow connection, retrying (3 of 6)...");
+      expect(statusText()).toBe("Still loading, retrying (3 of 6)...");
     });
   });
 
@@ -236,7 +268,9 @@ describe("given earlier reloads", () => {
       page.chunkFailed();
 
       expect(page.location.reload).not.toHaveBeenCalled();
-      expect(statusText()).toContain("Could not load. Check your connection.");
+      expect(statusText()).toContain(
+        "LangWatch could not load. Reload the page, or try another browser if it keeps happening.",
+      );
       expect(status()?.querySelector("button")?.textContent).toBe("Try again");
       expect(page.saved()).toBeNull();
     });
@@ -256,7 +290,9 @@ describe("given earlier reloads", () => {
 
       expect(document.getElementById("lw-boot-note")).toBeNull();
       expect(document.body.textContent).not.toContain("Connected");
-      expect(statusText()).toContain("Could not load. Check your connection.");
+      expect(statusText()).toContain(
+        "LangWatch could not load. Reload the page, or try another browser if it keeps happening.",
+      );
     });
   });
 
@@ -264,7 +300,7 @@ describe("given earlier reloads", () => {
     it("says which retry it is on", () => {
       bootPage({ saved: "2,3" });
 
-      expect(statusText()).toBe("Slow connection, retrying (2 of 6)...");
+      expect(statusText()).toBe("Still loading, retrying (2 of 6)...");
     });
   });
 });

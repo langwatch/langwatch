@@ -80,6 +80,9 @@ async function listApiKeyBindings({
 
 class MemoryApiKeys extends ApiKeyRepository {
   private rows: ApiKeyRow[] = [];
+  findLiveBySessions(): Promise<{ id: string; organizationId: string }[]> {
+    return Promise.resolve([]);
+  }
   create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
     const now = toDate(nowInstant());
     const { grants, startsDisabled, ...record } = input;

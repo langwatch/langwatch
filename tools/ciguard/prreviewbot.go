@@ -213,8 +213,8 @@ func prReviewBotPinning(workflow *ciscan.Workflow) []string {
 	}
 
 	var problems []string
-	for _, step := range steps {
-		if problem, bad := pinProblem(step); bad {
+	for i := range steps {
+		if problem, bad := pinProblem(steps[i]); bad {
 			problems = append(problems, problem)
 		}
 	}
@@ -227,9 +227,10 @@ func prReviewBotPinning(workflow *ciscan.Workflow) []string {
 func usesSteps(workflow *ciscan.Workflow) []ciscan.Step {
 	var steps []ciscan.Step
 	for _, job := range workflow.JobNames() {
-		for _, step := range workflow.Jobs[job].Steps {
-			if step.Uses != "" {
-				steps = append(steps, step)
+		jobSteps := workflow.Jobs[job].Steps
+		for i := range jobSteps {
+			if jobSteps[i].Uses != "" {
+				steps = append(steps, jobSteps[i])
 			}
 		}
 	}

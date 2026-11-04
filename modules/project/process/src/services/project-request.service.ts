@@ -1,10 +1,24 @@
 import { ProjectPermissionDeniedError } from "@langwatch/authorization";
-import { CannotArchiveCurrentProjectError, type ProjectApi } from "@langwatch/project-contract";
+import {
+  CannotArchiveCurrentProjectError,
+  type ProjectApi,
+  type ProjectLegacyKey,
+} from "@langwatch/project-contract";
+
+import type { LegacyKeyCandidate } from "./project-operations.service.ts";
 
 type Actor = Readonly<{ id: string }>;
 
 type ProjectRequestOptions = Readonly<{
   projects: ProjectApi;
+  /** Every live legacy key in the organisation, before anyone's standing is asked about. */
+  findLegacyKeys: (input: { organizationId: string }) => Promise<LegacyKeyCandidate[]>;
+  /** One decision covering every project read: the manage standing of each, by project id. */
+  decideManageable: (input: {
+    organizationId: string;
+    projects: readonly Readonly<{ projectId: string; teamId: string }>[];
+    by: Actor;
+  }) => Promise<ReadonlyMap<string, boolean>>;
   probePermission: (input: {
     permission: "project:delete";
     scope: { tier: "project"; id: string };
@@ -43,5 +57,36 @@ export class ProjectRequestService {
     if (!canDeleteTarget) throw new ProjectPermissionDeniedError("project:delete");
 
     return this.options.projects.archive({ projectId: projectToArchiveId });
+  }
+
+  /**
+   * The screen is organisation-wide, so its answer is too: a row only for a
+   * project the caller may manage. Which those are is known only once read,
+   * which is why the standing is asked here and not on the route.
+   */
+  async findLegacyKeys({
+    organizationId,
+    by,
+  }: {
+    organizationId: string;
+    by: Actor;
+  }): Promise<ProjectLegacyKey[]> {
+    const candidates = await this.options.findLegacyKeys({ organizationId });
+    if (candidates.length === 0) return [];
+
+    const manageable = await this.options.decideManageable({
+      organizationId,
+      projects: candidates.map(({ projectId, teamId }) => ({ projectId, teamId })),
+      by,
+    });
+
+    return candidates
+      .filter((candidate) => manageable.get(candidate.projectId) === true)
+      .map(({ projectId, projectName, projectSlug, lastUsedAt }) => ({
+        projectId,
+        projectName,
+        projectSlug,
+        lastUsedAt,
+      }));
   }
 }

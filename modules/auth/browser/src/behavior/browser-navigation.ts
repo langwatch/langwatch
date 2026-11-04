@@ -28,6 +28,18 @@ export function replaceLocation(url: string): void {
 }
 
 /**
+ * Take one query parameter off the address bar without navigating, for a single-use value such
+ * as a spent link token: a reload or a copied address must not carry it again.
+ */
+export function dropQueryParameter(name: string): void {
+  if (!hasWindow()) return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(name)) return;
+  url.searchParams.delete(name);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+/**
  * Rebuild the current page from the server — a blunt instrument: it discards
  * every in-memory cache and unmounts the app, taking any toast or in-flight
  * interaction with it. Prefer invalidating the queries that actually moved.

@@ -112,6 +112,8 @@ export function instantEvalSkipResultOf(
 const NEXT_STEPS: Partial<Record<InstantEvalJudgeSkipReason, string>> = {
   classifier_key_invalid:
     "The decision model's key is missing, switched off or refused. Check it in Settings > Model Providers.",
+  classifier_not_configured:
+    "No decision model is set up to judge this, or its model or Azure deployment name was not found. Check it in Settings > Model Providers.",
   classifier_rate_limited: "The decision model is rate limited. Wait a moment and retry.",
   classifier_provider_unavailable: "The decision model's provider is unavailable. Retry later.",
   classifier_failed:

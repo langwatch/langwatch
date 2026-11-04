@@ -57,7 +57,7 @@ kernel = sk.Kernel()
 kernel.add_service(
     OpenAIChatCompletion(
         service_id="chat-gpt",
-        ai_model_id="gpt-5",
+        ai_model_id="gpt-6-luna",
         api_key=os.environ["OPENAI_API_KEY"]
     )
 )
@@ -117,7 +117,7 @@ kernel = sk.Kernel()
 kernel.add_service(
     OpenAIChatCompletion(
         service_id="chat-gpt",
-        ai_model_id="gpt-5",
+        ai_model_id="gpt-6-luna",
         api_key=os.environ["OPENAI_API_KEY"]
     )
 )
@@ -130,7 +130,7 @@ async def chat_with_context(user_input: str):
         current_trace.update(
             metadata={
                 "kernel_function": "chat",
-                "model": "gpt-5",
+                "model": "gpt-6-luna",
                 "input_length": len(user_input)
             }
         )
@@ -204,7 +204,7 @@ kernel = sk.Kernel()
 kernel.add_service(
     OpenAIChatCompletion(
         service_id="chat-gpt",
-        ai_model_id="gpt-5",
+        ai_model_id="gpt-6-luna",
         api_key=os.environ["OPENAI_API_KEY"]
     )
 )
@@ -217,7 +217,7 @@ async def run_kernel_pipeline(user_input: str):
         current_trace.update(
             metadata={
                 "pipeline_type": "semantic_kernel",
-                "model": "gpt-5",
+                "model": "gpt-6-luna",
                 "input_length": len(user_input)
             }
         )

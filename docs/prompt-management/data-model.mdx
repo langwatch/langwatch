@@ -30,7 +30,7 @@ When you retrieve a prompt, you get all the configuration in a single response:
   "deletedAt": null,
 
   "prompt": "You are a helpful customer support agent...",
-  "model": "openai/gpt-5-mini",
+  "model": "openai/gpt-6-luna",
   "maxTokens": 1000,
   "messages": [
     { "role": "system", "content": "You are a helpful customer support agent..." },
@@ -120,13 +120,13 @@ When you retrieve a prompt, you get all the configuration in a single response:
 ### Model Configuration
 
 <ResponseField name="model" type="string">
-  The LLM model to use (e.g., "openai/gpt-5-mini"). Model names follow the litellm structure
+  The LLM model to use (e.g., "openai/gpt-6-luna"). Model names follow the litellm structure
   ("provider/model")
 </ResponseField>
 
 <ResponseField name="temperature" type="float">
   Fine-tune creativity vs. consistency (0.0 = deterministic, 2.0 = very creative). Not every model
-  accepts it: the GPT-5 family rejects a custom temperature, so leave it unset for those.
+  accepts it: reasoning models such as the GPT-5 and GPT-6 families reject a custom temperature, so leave it unset for those.
 </ResponseField>
 
 <ResponseField name="maxTokens" type="integer">

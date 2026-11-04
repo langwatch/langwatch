@@ -28,6 +28,8 @@ const DENIED_COMMANDS = new Set([
   // (stdio /dev/null, no DISPLAY) breaks them silently.
   "copilot",
   "code",
+  "grok",
+  "pi",
   "instrument",
   "report",
   "push",
