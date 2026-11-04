@@ -181,6 +181,7 @@ function SourceTableRow({
     // A run stopped by a page limit reports no error, so without this the
     // badge reads Active on a source collecting a fraction of its data.
     completeness: runCompleteness(source.lastRunCompleteness),
+    configComplaints: source.configComplaints,
   });
   const StatusIcon = status.icon;
   // Own-property test: see sourceHealthDisplay. `sourceType` is cast from a
