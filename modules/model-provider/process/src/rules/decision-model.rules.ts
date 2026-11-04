@@ -79,18 +79,23 @@ type EndpointFill =
   | Readonly<{ kind: "missing" }>
   | Readonly<{ kind: "invalid" }>;
 
-/** One param's text, or undefined when the row's value cannot be part of the host. */
+type EndpointValue = Readonly<{ kind: "value"; value: string }> | Readonly<{ kind: "invalid" }>;
+
+/** One param's text, or `invalid` when the row's value cannot be part of the host. */
 function endpointValueOf({
   param,
   raw,
 }: {
   param: DecisionEndpointParam;
   raw: string;
-}): string | undefined {
-  if (param.read === "value") return encodeURIComponent(raw);
-  if (param.read === "aws_region") return awsRegionOf(raw);
+}): EndpointValue {
+  if (param.read === "value") return { kind: "value", value: encodeURIComponent(raw) };
+  if (param.read === "aws_region") {
+    const aws = awsRegionOf(raw);
+    return aws.kind === "aws" ? { kind: "value", value: aws.region } : { kind: "invalid" };
+  }
   const azure = azureResourceOf(raw);
-  return azure.kind === "azure" ? azure.resource : undefined;
+  return azure.kind === "azure" ? { kind: "value", value: azure.resource } : { kind: "invalid" };
 }
 
 /** Fills each `{name}` from the row; Azure and AWS fields name only their vendor's host. */
@@ -105,9 +110,9 @@ function fillEndpoint({
   for (const [name, param] of Object.entries(entry.endpointParams ?? {})) {
     const raw = normalizeText(customKeys?.[param.field]);
     if (!raw) return { kind: "missing" };
-    const value = endpointValueOf({ param, raw });
-    if (value === undefined) return { kind: "invalid" };
-    endpoint = endpoint.replace(`{${name}}`, value);
+    const filled = endpointValueOf({ param, raw });
+    if (filled.kind === "invalid") return { kind: "invalid" };
+    endpoint = endpoint.replace(`{${name}}`, filled.value);
   }
   return { kind: "filled", endpoint };
 }

@@ -23,9 +23,9 @@ export const DECISION_MODEL_AUTH_HEADERS = ["bearer", "api_key"] as const;
 export type DecisionModelAuthHeader = (typeof DECISION_MODEL_AUTH_HEADERS)[number];
 
 /**
- * One `{name}` in an endpoint, filled from a provider row field. `value` sends the field URL-encoded;
- * `azure_resource` reads the resource name from an Azure endpoint URL and `aws_region` takes only an
- * AWS region name, so neither can point a key at another host (ADR-182 decision 5).
+ * One `{name}` in an endpoint, filled from a provider row field. `value` sends the field
+ * URL-encoded; `azure_resource` reads the resource name from an Azure endpoint URL and `aws_region`
+ * takes only an AWS region name, so neither can point a key at another host (ADR-182 decision 5).
  */
 export type DecisionEndpointParam = Readonly<{
   field: string;
@@ -230,10 +230,14 @@ export function azureResourceOf(endpoint: string): AzureEndpointRead {
 /** An AWS region name such as `us-east-1` or `us-gov-west-1`; nothing else becomes a host label. */
 const AWS_REGION = /^[a-z]{2}(?:-gov)?-[a-z]+-\d{1,2}$/;
 
-/** The region as a lowercase name, or undefined for anything that is not one. */
-export function awsRegionOf(region: string): string | undefined {
+export type AwsRegionRead =
+  | Readonly<{ kind: "aws"; region: string }>
+  | Readonly<{ kind: "not_aws" }>;
+
+/** The region as a lowercase name, or `not_aws` for anything that is not one. */
+export function awsRegionOf(region: string): AwsRegionRead {
   const name = region.trim().toLowerCase();
-  return AWS_REGION.test(name) ? name : undefined;
+  return AWS_REGION.test(name) ? { kind: "aws", region: name } : { kind: "not_aws" };
 }
 
 export function findDecisionModel(id: string): DecisionModelEntry | undefined {

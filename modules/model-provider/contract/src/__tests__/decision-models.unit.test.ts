@@ -53,7 +53,7 @@ describe("awsRegionOf", () => {
     ["us-gov-west-1", "us-gov-west-1"],
     ["ap-southeast-11", "ap-southeast-11"],
   ])("reads %s as a region", (raw, region) => {
-    expect(awsRegionOf(raw)).toBe(region);
+    expect(awsRegionOf(raw)).toEqual({ kind: "aws", region });
   });
 
   it.each([
@@ -64,7 +64,7 @@ describe("awsRegionOf", () => {
     "useast1",
     "",
   ])("refuses %s", (raw) => {
-    expect(awsRegionOf(raw)).toBeUndefined();
+    expect(awsRegionOf(raw)).toEqual({ kind: "not_aws" });
   });
 });
 
