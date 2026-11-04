@@ -13,7 +13,7 @@ For example, this policy sends `gpt-4o` to Azure and gives the Anthropic model a
   "modelAliases": {
     "gpt-4o": "azure/my-eastus-deployment",
     "claude": "anthropic/claude-haiku-4-5-20251001",
-    "coding-small": "openai/gpt-5-mini"
+    "coding-small": "openai/gpt-6-luna"
   }
 }
 ```
@@ -36,7 +36,7 @@ A project with one provider and one model does not need an alias. Send the provi
 
 Open **AI Gateway → Routing Policies**, select a policy and edit **Model name mapping**. The left field is the name the client sends, the right field is the model the gateway serves instead.
 
-Write the target as a full model id, for example `openai/gpt-5-mini`. The target can use any form from [Model Naming](/ai-gateway/model-naming): a provider family, an instance handle, or a bare model id.
+Write the target as a full model id, for example `openai/gpt-6-luna`. The target can use any form from [Model Naming](/ai-gateway/model-naming): a provider family, an instance handle, or a bare model id.
 
 The same fields are `modelAliases` on `trpc.routingPolicy.create` and `trpc.routingPolicy.update`. See [Model name mapping](/ai-gateway/governance/routing-policies#model-name-mapping).
 
@@ -52,7 +52,7 @@ An explicit `provider/model` string that is not an alias name goes to that provi
 
 An alias cannot reach a model the key may not use. `models_allowed` and the model rules in [Policy Rules](/ai-gateway/policy-rules) judge the model the alias resolves to, never the name the client sent.
 
-The allowlist accepts both spellings of the resolved model. `gpt-5-mini` and `openai/gpt-5-mini` allow the same model, so write the form your team reads.
+The allowlist accepts both spellings of the resolved model. `gpt-6-luna` and `openai/gpt-6-luna` allow the same model, so write the form your team reads.
 
 A request through an alias whose target is outside `models_allowed` is refused with `400 model_not_allowed`. The message names the resolved model and the alias, so you can see which side to correct:
 

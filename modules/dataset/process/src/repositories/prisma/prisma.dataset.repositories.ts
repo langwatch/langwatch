@@ -7,12 +7,14 @@ import type { DatasetRepositories } from "../dataset.repositories.ts";
 import { FilesystemDatasetSingleFileRepository } from "../filesystem/filesystem.dataset-single-file.repository.ts";
 import { ObjectStorageDatasetChunkRepository } from "../object-storage/object-storage.dataset-chunk.repository.ts";
 import { ObjectStorageDatasetSingleFileRepository } from "../object-storage/object-storage.dataset-single-file.repository.ts";
+import { ObjectStorageDatasetVersionContentRepository } from "../object-storage/object-storage.dataset-version-content.repository.ts";
 import { PrismaBatchEvaluationRepository } from "./prisma.batch-evaluation.repository.ts";
 import { PrismaDatasetContentRepository } from "./prisma.dataset-content.repository.ts";
 import { PrismaDatasetCountRepository } from "./prisma.dataset-count.repository.ts";
 import { PrismaDatasetMigrationRepository } from "./prisma.dataset-migration.repository.ts";
 import { PrismaDatasetRecordContentRepository } from "./prisma.dataset-record-content.repository.ts";
 import { PrismaDatasetRecordRepository } from "./prisma.dataset-record.repository.ts";
+import { PrismaDatasetVersionRepository } from "./prisma.dataset-version.repository.ts";
 import { PrismaDatasetRepository } from "./prisma.dataset.repository.ts";
 
 const PostgresDatasetTableRepositories = prismaRepositories({
@@ -22,6 +24,7 @@ const PostgresDatasetTableRepositories = prismaRepositories({
   recordContent: PrismaDatasetRecordContentRepository,
   batchEvaluations: PrismaBatchEvaluationRepository,
   count: PrismaDatasetCountRepository,
+  versions: PrismaDatasetVersionRepository,
 });
 
 /** Dataset's live stores: its Postgres tables, plus the content move into object storage. */
@@ -44,6 +47,7 @@ export class PostgresDatasetRepositories {
       migration: PrismaDatasetMigrationRepository.create({ database: prisma }),
       migrationChunks: chunks,
       singleFiles: singleFilesOf({ objectStorage, storage: config.singleFileStorage }),
+      versionContent: ObjectStorageDatasetVersionContentRepository.create({ objectStorage }),
     };
   }
 }
