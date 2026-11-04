@@ -105,7 +105,6 @@ describe("PrismaLangyTurnAdmissionRepository.claim", () => {
     });
 
     describe("when the racing send is still preparing", () => {
-      /** @scenario A send that clashes with a copy still being prepared is refused as being prepared */
       it("retries and answers pending", async () => {
         const { database, calls } = fakeDatabase(
           [uniqueKeyClash()],
@@ -120,12 +119,15 @@ describe("PrismaLangyTurnAdmissionRepository.claim", () => {
   });
 
   describe("given the first serializable attempt loses a driver-adapter write conflict", () => {
-    /** @scenario A send that races another send is still admitted */
+    /** @scenario A send that loses a write conflict is admitted on its next attempt */
     it("retries and returns the claim from the second attempt", async () => {
       const { database, calls } = fakeDatabase([driverAdapterWriteConflict()]);
       const repository = PrismaLangyTurnAdmissionRepository.create(database);
 
-      await expect(repository.claim(CLAIM_INPUT)).resolves.toMatchObject(CLAIMED);
+      await expect(repository.claim(CLAIM_INPUT)).resolves.toMatchObject({
+        ...CLAIMED,
+        claimToken: expect.any(String),
+      });
       expect(calls()).toBe(2);
     });
   });
