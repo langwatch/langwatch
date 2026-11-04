@@ -3,6 +3,7 @@ import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurt
 import { nowInstant } from "@langwatch/time";
 
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
+import { type KnownTraces, knownTraceTraits } from "./nurturing-member-facts.rules.ts";
 
 type Joined = Pick<
   NurturingSignalOf<"invite_accepted">,
@@ -30,25 +31,36 @@ function joinedCalls({
 }
 
 /**
- * Decides the calls for a person who accepted an invite into an existing organization. The
- * email has one home: signed_up's send, never here (Alex, "ids only").
+ * Decides the calls for a person who accepted an invite into an existing organization: known
+ * traces reach them, and no traces says nothing. The email has one home: signed_up's send,
+ * never here (Alex, "ids only").
  */
 export function fireInviteAccepted({
   signal,
+  traces,
 }: {
   signal: NurturingSignalOf<"invite_accepted">;
+  traces: KnownTraces;
 }): CioBatchCall[] {
-  return joinedCalls({ joined: signal, event: "joined_via_invite" });
+  const { userId } = signal;
+  return [
+    ...(traces.hasTraces
+      ? [{ type: "identify" as const, userId, traits: knownTraceTraits(traces) }]
+      : []),
+    ...joinedCalls({ joined: signal, event: "joined_via_invite" }),
+  ];
 }
 
 /**
- * Decides the calls for a person the SSO domain match added: a new person, so every
- * milestone starts false. No email here: it has one home, signed_up's send.
+ * Decides the calls for a person the SSO domain match added: a new person, so every milestone
+ * starts false but the traces nurturing knows of. No email here: it has one home, signed_up's send.
  */
 export function fireSsoAutoAdded({
   signal,
+  traces,
 }: {
   signal: NurturingSignalOf<"sso_auto_added">;
+  traces: KnownTraces;
 }): CioBatchCall[] {
   const { userId } = signal;
   return [
@@ -56,7 +68,7 @@ export function fireSsoAutoAdded({
       type: "identify",
       userId,
       traits: {
-        has_traces: false,
+        ...knownTraceTraits(traces),
         has_evaluations: false,
         has_prompts: false,
         has_simulations: false,

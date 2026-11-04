@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
   CioBatchCall,
+  CioPersonTraits,
   NurturingSignal,
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
@@ -30,6 +31,12 @@ import {
   postHogUuidFor,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
+  firstSessionMemberTraits,
+  isMemberFact,
+  type KnownTraces,
+  memberFactTraits,
+} from "../rules/nurturing-member-facts.rules.ts";
+import {
   fireInviteAccepted,
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
@@ -52,9 +59,13 @@ import {
   fireSubscriptionSync,
 } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { isoOf } from "../rules/nurturing-time.rules.ts";
+import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
+
+/** Well under Customer.io's 500KB per batch: one member's identify is a few hundred bytes. */
+const MEMBER_BATCH_SIZE = 100;
 
 /**
  * Where a fire-and-forget lifecycle signal's failure goes. Warn rather than error, and
@@ -83,6 +94,8 @@ export class NurturingDeliveryService {
       posthog: PostHogChannel | undefined;
       /** The one nurturing -> user edge: signed_up reads the email fresh, never stores it. */
       users: UserApi;
+      /** Who hears an organization's fact, and what a joining person is told of traces. */
+      memberFacts: NurturingMemberFactsService;
     }>,
   ) {}
 
@@ -98,15 +111,48 @@ export class NurturingDeliveryService {
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
+    await this.tellMembers(signal);
+  }
+
+  /** An organization's fact reaches every active member's own profile, in bounded batches. */
+  private async tellMembers(signal: NurturingSignal): Promise<void> {
+    if (!isMemberFact(signal) || !this.deps.customerIo) return;
+    const recipients = await this.deps.memberFacts.recipientsOf(signal);
+    this.identifyInBatches({ userIds: recipients, traits: memberFactTraits(signal) });
+  }
+
+  /** One request per batch, one after the other, so a large organization never opens a burst. */
+  private identifyInBatches({
+    userIds,
+    traits,
+  }: {
+    userIds: readonly string[];
+    traits: Partial<CioPersonTraits>;
+  }): void {
+    const nurturing = this.deps.customerIo;
+    if (!nurturing) return;
+    void (async () => {
+      for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
+        const batch = userIds.slice(start, start + MEMBER_BATCH_SIZE);
+        await nurturing.batch(batch.map((userId) => ({ type: "identify", userId, traits })));
+      }
+    })().catch(reportFailure);
   }
 
   /**
    * A coding-agent organization's members each get uses_coding_agent once, claimed per person
    * so a redelivery or a second organization of theirs does not send it again in the window.
+   * The first session's own traits go first: a member's claim that throws must not strand them.
    */
   private async identifyCodingAgentMembers(signal: NurturingSignal): Promise<void> {
     if (signal.kind !== "coding_agent_first_session" || !this.deps.customerIo) return;
-    for (const userId of new Set(signal.memberUserIds)) {
+    const members = new Set(signal.memberUserIds);
+    this.identifyInBatches({
+      // The admin's first session is already in fireCodingOrApp.
+      userIds: [...members].filter((userId) => userId !== signal.userId),
+      traits: firstSessionMemberTraits(signal),
+    });
+    for (const userId of members) {
       const claimKey = `nurturing:uses_coding_agent:${userId}`;
       if (!(await this.deps.claims.claim(claimKey, DELIVERED_WINDOW_SECONDS))) continue;
       // Sent at once, so a later member's claim failing never strands one already claimed.
@@ -202,11 +248,6 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireWorkflowCreated(signal));
       case "first_trace_integrated":
         return this.firstTraceToCustomerIo(signal);
-      case "trace_received":
-        return this.identify({
-          userId: signal.userId,
-          traits: { last_trace_at: unixSecondsOf(signal.occurredAt) },
-        });
       case "simulation_run_finished":
         return this.simulationRunFinished(signal);
       case "evaluation_completed":
@@ -222,9 +263,15 @@ export class NurturingDeliveryService {
       case "team_member_invited":
         return this.teamMemberInvited(signal);
       case "invite_accepted":
-        return this.sendCustomerIoCalls(fireInviteAccepted({ signal }));
+        return this.sendWithTraces({
+          ...signal,
+          callsFor: (traces) => fireInviteAccepted({ signal, traces }),
+        });
       case "sso_auto_added":
-        return this.sendCustomerIoCalls(fireSsoAutoAdded({ signal }));
+        return this.sendWithTraces({
+          ...signal,
+          callsFor: (traces) => fireSsoAutoAdded({ signal, traces }),
+        });
       case "session_started":
         return this.sendCustomerIoCalls(fireActivity(signal));
       case "integration_method_chosen":
@@ -342,12 +389,32 @@ export class NurturingDeliveryService {
     this.sendCustomerIoCalls([{ type: "identify", ...input }]);
   }
 
+  /** A join's calls, with what the person's organizations already know of traces. */
+  private sendWithTraces({
+    userId,
+    organizationId,
+    callsFor,
+  }: {
+    userId: string;
+    organizationId: string;
+    callsFor: (traces: KnownTraces) => CioBatchCall[];
+  }): void {
+    void this.deps.memberFacts
+      .tracesOfPerson({ userId, organizationId })
+      .then((traces) => this.sendCustomerIoCalls(callsFor(traces)))
+      .catch(reportFailure);
+  }
+
   /** The email has one home: read fresh from the user module at send time, never stored. */
   private sendSignup(signal: NurturingSignalOf<"signed_up">): void {
-    void this.deps.users
-      .findById({ id: signal.userId })
-      .then((user) =>
-        this.sendCustomerIoCalls(fireSignup({ ...signal, email: user?.email, name: user?.name })),
+    void Promise.all([
+      this.deps.users.findById({ id: signal.userId }),
+      this.deps.memberFacts.tracesOfPerson(signal),
+    ])
+      .then(([user, traces]) =>
+        this.sendCustomerIoCalls(
+          fireSignup({ ...signal, email: user?.email, name: user?.name, traces }),
+        ),
       )
       .catch(reportFailure);
   }
