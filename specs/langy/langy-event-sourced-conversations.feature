@@ -235,8 +235,8 @@ Feature: Langy conversations are an event-sourced projection
 
   # ============================================================================
   # Turn admission under concurrent sends
-  # These scenarios state the server error. The REST body still masks that code:
-  # https://github.com/langwatch/tasks/issues/1008
+  # The two refusals state the server error. The REST body still masks that code:
+  # https://github.com/langwatch/langwatch/issues/8860
   # ============================================================================
 
   @regression @unit
@@ -247,19 +247,26 @@ Feature: Langy conversations are an event-sourced projection
     Then my turn is admitted on the next attempt
 
   @unit
+  Scenario: A send that loses a write conflict to another turn on my conversation is answered busy
+    Given another turn's write conflicts with mine
+    And that turn holds my conversation when my send tries again
+    When my send loses the write conflict
+    Then the turn start is answered busy
+
+  @unit
   Scenario: A send that clashes with an already committed copy replays it
     Given a copy of my send raced mine and has already been committed
     When my send is submitted
     Then I get that committed turn back instead of an error
 
   @unit
-  Scenario: A send that clashes with a copy still being prepared is refused as being prepared
+  Scenario: A send that clashes with a copy still being prepared is refused as Langy unavailable
     Given a copy of my send raced mine and is still being prepared
     When my send is submitted
-    Then the turn start fails with "langy_agent_unavailable" saying it is already being prepared
+    Then the turn start fails with the "langy_agent_unavailable" error
 
   @unit
-  Scenario: A send that cannot get through a burst of sends is told Langy is unavailable
+  Scenario: A send that cannot get through a burst of sends fails as Langy unavailable
     Given many sends race mine and none lets it through
     When my send keeps losing
     Then the turn start fails with the "langy_agent_unavailable" error
