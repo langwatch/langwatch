@@ -432,11 +432,15 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     { enabled: !!projectId && open, refetchOnMount: false },
   );
 
-  // The server weighs the flag and the keys, so the column offers only models that would run.
+  // The server weighs the flag and the keys of the picked scopes, not the page's project, so
+  // the column offers only models every picked scope would run. No scope picked: LangWatch only.
   const pickableDecisionModels =
-    modelProviderApi.modelProvider.listDecisionModelsForProject.useQuery(
-      { projectId: projectId ?? "" },
-      { enabled: !!projectId && open },
+    modelProviderApi.modelProvider.listDecisionModelsForScopes.useQuery(
+      {
+        projectId: projectId ?? "",
+        scopes: scopes.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId })),
+      },
+      { enabled: !!projectId && scopes.length > 0 && open },
     );
   const decisionOptions = decisionModelPickerOptions({ pickable: pickableDecisionModels.data });
   const modelOptionsByRole = modelOptionsByRoleFor({
