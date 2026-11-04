@@ -332,9 +332,8 @@ export class LangWatchQLService {
 
   /**
    * Where this run goes, asked once and before anything is judged: every later step of the run
-   * uses the executor and database returned here, so no second ask exists to differ. Fails
-   * closed. The check is here rather than in the constructor so that a deployment with no
-   * LangWatchQL identity still answers the schema endpoint, with a per-request handled error.
+   * uses the executor and database returned here. Fails closed. Checked here, not in the
+   * constructor, so a deployment with no LangWatchQL identity still serves the schema endpoint.
    */
   private async resolveRoute({
     tenantIds,

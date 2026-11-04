@@ -51,7 +51,7 @@ export type LangWatchQLTenantRouting = (input: {
   tenantIds: readonly string[];
 }) => Promise<TenantRoute>;
 
-/** The server a run goes to, and the database its tables live in where that is not the shared one. */
+/** The server a run goes to, and its database where that is not the shared one. */
 export interface LangWatchQLRoute {
   readonly executor: LangWatchQLExecutorRepository;
   readonly database?: string;

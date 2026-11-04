@@ -466,7 +466,7 @@ function renderStatement({
     ...template.projection,
     ...columns.map((column) => `${column.expression} AS ${column.id}`),
   ];
-  // Unqualified on purpose: the run's route resolves it, so a private database of another name works.
+  // Unqualified on purpose: the run's route resolves it, so a private database name works.
   const from = template.alias ? `${template.view} AS ${template.alias}` : template.view;
   return [
     `SELECT\n  ${projection.join(",\n  ")}`,

@@ -1,8 +1,6 @@
 /**
- * A statement run for a private route names the database that route's executor dials. The
- * service qualifies SQL once, with the shared connection's database; the routed executor then
- * dials the route's own, so a qualifier left at the shared name points at a database the
- * private server need not have.
+ * A private route's statement names that route's database, not the shared one: the service
+ * qualifies SQL with the shared database, but the routed executor dials the route's own.
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
@@ -108,7 +106,9 @@ describe("given a statement for an organization whose route names its own databa
 
     const requests = privateExecutor()?.requests ?? [];
     expect(requests.length).toBeGreaterThan(1);
-    expect(new Set(qualifiersOf(requests))).toEqual(new Set([privateExecutor()?.connection.database]));
+    expect(new Set(qualifiersOf(requests))).toEqual(
+      new Set([privateExecutor()?.connection.database]),
+    );
   });
 
   /** @scenario "A statement on a private route names the route's database, never the shared one" */
@@ -121,6 +121,8 @@ describe("given a statement for an organization whose route names its own databa
 
     const requests = privateExecutor()?.requests ?? [];
     expect(requests[0]?.sql).toContain("traces");
-    expect(new Set(qualifiersOf(requests))).toEqual(new Set([privateExecutor()?.connection.database]));
+    expect(new Set(qualifiersOf(requests))).toEqual(
+      new Set([privateExecutor()?.connection.database]),
+    );
   });
 });

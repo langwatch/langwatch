@@ -1,3 +1,4 @@
+import type { LangWatchQLPass } from "@langwatch/analytics-contract";
 /**
  * The route of a query decides which database its statement may name, and nothing runs before
  * that route is known: a private organization names its route's database, never the shared one;
@@ -7,7 +8,6 @@
  */
 import { PrivateRouteUnavailableError, UnknownTenantError } from "@langwatch/clickhouse-client";
 import type { TenantRoute } from "@langwatch/clickhouse-client";
-import type { LangWatchQLPass } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
@@ -226,12 +226,15 @@ describe("given a route that cannot be resolved", () => {
   ];
 
   // Pinned: today the main query fails first, so the completeness read is never reached.
-  it.each(failures)("runs no statement at all for %s, completeness included", async (_, failure) => {
-    const attempt = run({ answers: [failure], sql: PERIOD_SQL, timeWindow: WINDOW });
+  it.each(failures)(
+    "runs no statement at all for %s, completeness included",
+    async (_, failure) => {
+      const attempt = run({ answers: [failure], sql: PERIOD_SQL, timeWindow: WINDOW });
 
-    await expect(attempt.done).rejects.toThrow();
-    expect(attempt.requests()).toEqual([]);
-  });
+      await expect(attempt.done).rejects.toThrow(failure.message);
+      expect(attempt.requests()).toEqual([]);
+    },
+  );
 
   /** @scenario "A bad statement for an organization with no usable route gets the route refusal first" */
   it("refuses a bad statement as unavailable, not as a bad statement", async () => {

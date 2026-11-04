@@ -39,8 +39,8 @@ function isRouteRefusal(error: unknown): error is Error {
 
 /**
  * The route's server as the LangWatchQL identity: its origin and database, never the route's
- * own user or password. A URL without an http or https origin is refused without its text, which may
- * carry those credentials.
+ * own user or password. A URL without an http or https origin is refused without its text,
+ * which may carry those credentials.
  */
 function privateConnectionOf({
   shared,

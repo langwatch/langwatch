@@ -19,8 +19,7 @@ const SHORTHAND = {
   questions: [{ kind: "boolean" as const, instructions: "The customer sounds annoyed" }],
 };
 
-const statementFor = (input: InstantEvalRunInput) =>
-  instantEvalStatementFor({ input, now: NOW });
+const statementFor = (input: InstantEvalRunInput) => instantEvalStatementFor({ input, now: NOW });
 
 const refusalOf = (input: InstantEvalRunInput): InstantEvalQueryInvalidError => {
   try {
@@ -56,9 +55,7 @@ describe("instantEvalStatementFor, given what a caller sent", () => {
     });
 
     it("keeps an empty parameters object, which binds nothing", () => {
-      expect(statementFor({ shorthand: SHORTHAND, parameters: {} }).sql).toContain(
-        "FROM traces",
-      );
+      expect(statementFor({ shorthand: SHORTHAND, parameters: {} }).sql).toContain("FROM traces");
     });
   });
 
