@@ -199,3 +199,10 @@ Feature: Coding-agent session signals reach Customer.io
     When an own-session signal is delivered
     Then PostHog receives nothing
     And Customer.io tracks no event
+
+  @unit
+  Scenario: A failed first-session send gives its claim back
+    Given Customer.io rejects the owner's own_coding_first_session_at
+    When an own-session signal is delivered
+    Then the owner's first-session claim is given back
+    And the owner's next session sets own_coding_first_session_at

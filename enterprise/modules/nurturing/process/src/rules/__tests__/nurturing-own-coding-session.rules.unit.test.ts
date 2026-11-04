@@ -7,7 +7,10 @@ import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-
 import type { NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { describe, expect, it } from "vitest";
 
-import { fireCodingOrApp, fireOwnCodingFirstSession } from "../nurturing-coding-delivery.rules.ts";
+import {
+  fireOwnCodingFirstSession,
+  fireOwnCodingLastSession,
+} from "../nurturing-coding-delivery.rules.ts";
 import {
   ownCodingSessionRecipients,
   ownCodingSessionStoredSignal,
@@ -114,7 +117,7 @@ describe("own coding session delivery rules", () => {
 
   it("identifies the owner with their own times in Unix seconds", () => {
     const signal = own("owner-1");
-    expect(fireCodingOrApp(signal)).toEqual([
+    expect(fireOwnCodingLastSession(signal)).toEqual([
       {
         type: "identify",
         userId: "owner-1",

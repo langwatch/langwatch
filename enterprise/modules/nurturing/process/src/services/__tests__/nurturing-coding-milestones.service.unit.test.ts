@@ -4,7 +4,7 @@
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  */
 import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
-import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -73,8 +73,8 @@ async function serviceOver({
   };
   const send = (sessions: CodingAgentSessionStoredEventData[]) =>
     service.sessionsStored({ sessions, deliver });
-  const ofKind = (kind: NurturingSignal["kind"]) =>
-    delivered.filter((signal) => signal.kind === kind);
+  const ofKind = <Kind extends NurturingSignal["kind"]>(kind: Kind) =>
+    delivered.filter((signal): signal is NurturingSignalOf<Kind> => signal.kind === kind);
   return { send, delivered, ofKind, firstProjectRead };
 }
 
