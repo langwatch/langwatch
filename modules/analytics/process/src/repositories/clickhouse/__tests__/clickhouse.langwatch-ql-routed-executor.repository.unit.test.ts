@@ -124,6 +124,24 @@ describe("given a statement over projects on the shared ClickHouse", () => {
   });
 });
 
+describe("given a statement over no projects", () => {
+  it("runs on the shared executor and never asks for a route", async () => {
+    const route = vi.fn(routeOf);
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      connection: SHARED,
+      route,
+      createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
+    });
+    const [shared] = drivers;
+
+    await executor.execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds: [] });
+
+    expect(shared?.query).toHaveBeenCalledTimes(1);
+    expect(route).not.toHaveBeenCalled();
+    expect(privateDrivers()).toEqual([]);
+  });
+});
+
 describe("given a statement over an organization with a private ClickHouse", () => {
   /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity" */
   it("runs on the route's origin and database as the LangWatchQL identity, with no route credentials anywhere", async () => {

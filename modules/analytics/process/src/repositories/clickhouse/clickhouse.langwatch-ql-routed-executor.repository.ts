@@ -121,6 +121,8 @@ export class RoutedLangWatchQLExecutorRepository extends LangWatchQLExecutorRepo
   }
 
   private async executorFor(tenantIds: readonly string[]): Promise<LangWatchQLExecutorRepository> {
+    // An empty set carries the empty capability, which reads zero rows on any server.
+    if (tenantIds.length === 0) return this.sharedExecutor;
     const route = await this.routeOrRefuse(tenantIds);
     if (route.kind === "shared") return this.sharedExecutor;
 
