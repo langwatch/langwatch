@@ -4,8 +4,8 @@
 -- ============================================================================
 -- eval_results, every Instant Evals judgment, recalled before judging (ADR-189).
 --
--- One row per judge call on one trace (or span), one question and one judge
--- model. Any source may write: a quick eval() ask, a run, a dashboard widget or
+-- One row per judge call on one trace (or span), one judged column, one
+-- question and one judge model. Any source may write: a quick eval() ask, a run, a dashboard widget or
 -- a monitor on the Instant Evals judge. Before judging, the instant-eval module
 -- looks up a matching row and reuses it; it judges only the misses and writes
 -- them in one bulk insert. Owned by instant-eval; other modules read it through
@@ -21,12 +21,14 @@
 -- is two rows. Recall never keys on SourceId: it takes the latest row by
 -- JudgedAt across every source. Reads MUST be replacement-aware (argMax or FINAL).
 -- A reader that shows a verdict groups by (TraceId, SpanId, QuestionHash,
--- JudgedColumn) and takes the latest judged row by JudgedAt, so input and
--- output stay two results and a newer verdict replaces an older one.
+-- JudgedColumn) at the current KeyVersion and takes the latest judged row by
+-- (JudgedAt, UpdatedAt, SourceId), as recall does, so input and output stay
+-- two results and a newer verdict replaces an older one.
 --
 -- KeyVersion is the version of the recall key's hashing. Recall reads only rows
 -- of the current version, so rows written before recall is switched on, or
--- under a key bug, are never recalled; bumping the version retires them.
+-- under a key bug, are never recalled or shown; bumping the version retires
+-- them.
 --
 -- NO JUDGED TEXT IS STORED, as in 00097. InputHash is a hash of the text, not
 -- the text. A judgment of free text with no trace is not stored.
@@ -105,7 +107,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(OccurredAt)
-ORDER BY (TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash, SourceId, JudgedAt)
+ORDER BY (TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash, JudgedColumn, SourceId, JudgedAt)
 TTL IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
