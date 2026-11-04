@@ -79,8 +79,9 @@ export class RedisPendingVoiceCallRepository implements PendingVoiceCallReposito
       ttlSeconds,
     );
     if (stored === 1) return { stored: true } as const;
-    const reason = stored === 2 ? "claimed" : stored === 3 ? "pending" : "cancelled";
-    return { stored: false, reason } as const;
+    if (stored === 2) return { stored: false, reason: "claimed" } as const;
+    if (stored === 3) return { stored: false, reason: "pending" } as const;
+    return { stored: false, reason: "cancelled" } as const;
   }
 
   async peek({ scenarioRunId, nonce }: PendingVoiceCallKey): Promise<PendingVoiceCallPeekResult> {
