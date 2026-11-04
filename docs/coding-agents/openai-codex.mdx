@@ -176,7 +176,7 @@ Codex does write the whole conversation to a transcript on your machine, and eac
 
 It also reports the repository and branch the session worked in, read from the same transcript, which is what connects the session to its pull request. This is the path that carries content, and LangWatch installs it unless you say otherwise. A `notify` program of your own keeps running: LangWatch calls it after its own.
 
-To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue. This also stops the pull request join, and later LangWatch commands can put `notify` back: see [how to turn content off](/coding-agents/measure-pull-requests#what-content-is-captured-and-how-to-turn-it-off).
+To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue. The session then joins a pull request only if `langwatch ingest context` reaches LangWatch directly, which the default sandbox blocks. Later LangWatch commands can put `notify` back: see [how to turn content off](/coding-agents/measure-pull-requests#what-content-is-captured-and-how-to-turn-it-off).
 
 <Warning>
   The `[otel]` block holds an ingest key on the `Authorization` header, because Codex reads that
