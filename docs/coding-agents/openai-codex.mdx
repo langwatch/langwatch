@@ -178,7 +178,7 @@ It also reports the repository and branch the session worked in, read from the s
 
 To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue.
 
-The session then joins a pull request only if the agent runs `langwatch ingest context` and the declaration reaches LangWatch. The default sandbox queues it, and with no `notify` program it can go undelivered. Agents are told to run that command only when they change checkout, so ask for it if the session stays in one place. Later LangWatch commands can put `notify` back: see [how to turn content off](/coding-agents/measure-pull-requests#what-content-is-captured-and-how-to-turn-it-off).
+With this wiring, the session then joins a pull request only if `langwatch ingest context` runs and the declaration reaches LangWatch. The default sandbox queues it, and with no `notify` program it can go undelivered. So give the sandbox network access, or run the command from your own terminal in the checkout with `--agent codex --session-id <id>`. Agents are told to run it only when they change checkout, so ask for it if the session stays in one place. Later LangWatch commands can put `notify` back: see [how to turn content off](/coding-agents/measure-pull-requests#what-content-is-captured-and-how-to-turn-it-off).
 
 <Warning>
   The `[otel]` block holds an ingest key on the `Authorization` header, because Codex reads that
