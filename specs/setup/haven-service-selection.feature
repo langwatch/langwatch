@@ -187,6 +187,46 @@ Feature: haven service selection
       And the Storybook's output appears in "haven logs design-system"
       And the mail studio's output appears in "haven logs mail-room"
 
+    # Like the design system, the docs are built to static files and served by
+    # haven itself, at a real address under the app: no frame, no dev server.
+    # Hot reload while writing stays "pnpm --filter @langwatch/docs-site dev".
+    Scenario: The docs site is built and mounted at /docs on the app
+      When the developer runs "haven up +docs"
+      Then the docs lane builds the site with "--base-path /docs" unless its content check finds the last build current
+      And haven serves that build natively at "app.<slug>.langwatch.localhost/docs/"
+      And every other path on the app hostname, websockets and streams included, reaches the app unchanged
+      And "docs.<slug>.langwatch.localhost" serves the same build and sends its root to "/docs/"
+      And its output appears in "haven logs docs"
+      And a later "haven up -docs" stops it and the app hostname routes straight to the app again
+
+    # Writing docs needs none of the product: no app, api, worker, databases,
+    # migrations or simulators. The docs run alone, the way "haven sim idp" does.
+    Scenario: The docs site runs alone without the stack
+      When the developer runs "haven up --only docs -d"
+      Then only the docs lane runs, in the background, building and serving the docs natively
+      And it is served at "app.<slug>.langwatch.localhost/docs/" and "docs.<slug>.langwatch.localhost", whose roots go to "/docs/"
+      And its output appears in "haven logs docs" and "haven status" reports it
+      And "haven browser open" reaches it with no app to wait on
+      And "haven down" stops it and removes the route
+      And a running stack refuses it, naming "haven up +docs"
+
+    Scenario: A stack refuses to start beside docs running alone
+      Given the docs run alone in this worktree and no stack is running
+      When the developer runs "haven up" or "haven up +docs"
+      Then startup refuses before registering any stack route or starting a service
+      And the message names "haven down" to stop the docs first
+
+    Scenario: Cancelling docs startup during stack registration starts nothing
+      Given this worktree's stack registration holds its startup lock
+      When "haven up --only docs" is cancelled while waiting for that lock
+      Then no docs service starts and no docs route is registered
+
+    Scenario: Solo docs keep their startup claim until their route is removed
+      Given the docs run alone in this worktree
+      When the docs stop
+      Then their route is removed before their live startup record
+      And a later stack startup cannot have its route removed by the solo runner
+
     # Haven hands the ui lane the routed URL of the built Storybook, so the
     # hostname and the application's /design-system reach the same Storybook.
     Scenario: The application frames the Storybook the stack routes to

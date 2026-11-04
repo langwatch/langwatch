@@ -33,7 +33,7 @@ class GetBioInfoList(BaseModel):
 
 async def extract_structured_user_bios(user_bios: list[str]) -> GetBioInfoList:
     completion = client.beta.chat.completions.parse(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",
@@ -43,6 +43,7 @@ async def extract_structured_user_bios(user_bios: list[str]) -> GetBioInfoList:
         ],
         tools=[openai.pydantic_function_tool(GetBioInfoList)],
         tool_choice="required",
+        reasoning_effort="none",
     )
 
     get_bio_info_list: GetBioInfoList = completion.choices[0].message.tool_calls[0].function.parsed_arguments  # type: ignore
@@ -53,7 +54,7 @@ async def extract_structured_user_bios(user_bios: list[str]) -> GetBioInfoList:
         output=str(get_bio_info_list),
         contexts=user_bios,
         settings={
-            "model": "openai/gpt-5-mini",
+            "model": "openai/gpt-6-luna",
             "embeddings_model": "openai/text-embedding-ada-002",
             "max_tokens": 2048,
         },
@@ -71,7 +72,7 @@ async def generate_and_execute_code(
     msg: cl.Message, question: str, bio_info_list: GetBioInfoList
 ) -> tuple[str, str]:
     completion = client.beta.chat.completions.parse(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",
@@ -92,6 +93,7 @@ async def generate_and_execute_code(
         ],
         tools=[openai.pydantic_function_tool(GeneratePythonCode)],
         tool_choice="required",
+        reasoning_effort="none",
     )
 
     code = completion.choices[0].message.tool_calls[0].function.parsed_arguments.code  # type: ignore
@@ -156,7 +158,7 @@ async def answer_user(
     result: str,
 ):
     completion = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "user",
@@ -211,7 +213,7 @@ async def main(message: cl.Message):
         output=answer,
         expected_output="Rogerio",
         settings={
-            "model": "openai/gpt-5-mini",
+            "model": "openai/gpt-6-luna",
             "embeddings_model": "openai/text-embedding-ada-002",
             "max_tokens": 2048,
         },

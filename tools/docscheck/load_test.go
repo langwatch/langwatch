@@ -94,18 +94,22 @@ func TestLoadRefusesADocsJsonWithNoNavigation(t *testing.T) {
 	}
 }
 
+// @scenario "Site implementation files are excluded from content scanning"
 func TestLoadReadsPagesRedirectsAndChartVersion(t *testing.T) {
 	root := t.TempDir()
 	writeFixture(t, root, map[string]string{
 		"charts/langwatch/Chart.yaml": "name: langwatch\nversion: 1.0.0\nappVersion: 3.12.0\n",
 		"docs/a.mdx":                  "---\ntitle: t\n---\nlangwatch/langwatch:3.0.0\n",
 		"docs/sub/b.md":               "---\ntitle: t\n---\nbody\n",
+		"docs/sub/site/page.mdx":      "---\ntitle: public page\n---\nbody\n",
+		"apps/docs/DESIGN.md":         "# compiler notes\nlangwatch/langwatch:0.0.1\n",
+		"apps/docs/src/example.mdx":   "# compiler fixture\n",
 		// Not servable: a snippet is included by other pages, and a README is
 		// repository documentation.
 		"docs/snippets/s.mdx": "shared\n",
 		"docs/README.md":      "# readme\n",
 		"docs/docs.json": `{"navigation":{"anchors":[{"anchor":"A","groups":[
-			{"group":"G","pages":["a","sub/b"]}]}]},
+			{"group":"G","pages":["a","sub/b","sub/site/page"]}]}]},
 			"redirects":[{"source":"/old","destination":"/a"}]}`,
 	})
 
@@ -119,8 +123,8 @@ func TestLoadReadsPagesRedirectsAndChartVersion(t *testing.T) {
 	}
 	pages := slices.Clone(in.ContentPages)
 	sort.Strings(pages)
-	if !slices.Equal(pages, []string{"a", "sub/b"}) {
-		t.Errorf("ContentPages = %v, want [a sub/b] — snippets and README are not pages", pages)
+	if !slices.Equal(pages, []string{"a", "sub/b", "sub/site/page"}) {
+		t.Errorf("ContentPages = %v, want public pages only — snippets, README and the site implementation are not pages", pages)
 	}
 	if len(in.Redirects) != 1 || in.Redirects[0].Destination != "/a" {
 		t.Errorf("Redirects = %v, want one entry pointing at /a", in.Redirects)

@@ -1,26 +1,36 @@
 /**
  * Which evaluations Instant Evals answers, and what their mapped data reads as (ADR-174
- * decisions 1 and 11): an LLM judge whose model is Instant Evals, never any other evaluator.
+ * decisions 1 and 11): an LLM judge whose model is a decision model, never any other evaluator.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
+import { isDecisionModelId, isOwnDecisionModelId } from "@langwatch/model-provider-contract";
 
 import type {
   InstantEvalJudge,
   InstantEvalJudgeInputs,
 } from "./instant-eval-judge-question.rules.ts";
 
-/** The judge Instant Evals answers for these settings, or `runs_as_today` for any other. */
+/**
+ * The judge Instant Evals answers for these settings, or `runs_as_today` for any other. Any
+ * decision model id means Instant Evals. Only an own pick is carried, as an override the
+ * resolver weighs; the hosted id is no preference, so the project's column still decides.
+ * @see dev/docs/adr/182-instant-evals-decision-model-is-a-default-model-column.md
+ */
 export function instantEvalJudgeOf({
   evaluatorType,
   settings,
 }: {
   evaluatorType: string;
   settings: Record<string, unknown> | undefined;
-}): { kind: "instant_eval"; judge: InstantEvalJudge } | { kind: "runs_as_today" } {
-  if (settings?.model !== INSTANT_EVAL_JUDGE_MODEL_ID) return { kind: "runs_as_today" };
+}):
+  | { kind: "instant_eval"; judge: InstantEvalJudge; decisionModel?: string | undefined }
+  | { kind: "runs_as_today" } {
+  if (!settings) return { kind: "runs_as_today" };
+  const { model } = settings;
+  if (typeof model !== "string" || !isDecisionModelId(model)) return { kind: "runs_as_today" };
+  const picked = isOwnDecisionModelId(model) ? { decisionModel: model } : {};
 
   const prompt = textOr({
     value: settings.prompt,
@@ -28,10 +38,15 @@ export function instantEvalJudgeOf({
   });
   switch (evaluatorType) {
     case "langevals/llm_boolean":
-      return { kind: "instant_eval", judge: { evaluatorType, settings: { prompt } } };
+      return {
+        kind: "instant_eval",
+        ...picked,
+        judge: { evaluatorType, settings: { prompt } },
+      };
     case "langevals/llm_score":
       return {
         kind: "instant_eval",
+        ...picked,
         judge: {
           evaluatorType,
           settings: {
@@ -45,7 +60,11 @@ export function instantEvalJudgeOf({
       const saved = findCategories(settings.categories);
       const categories =
         saved.length > 0 ? saved : findCategories(defaultOf({ evaluatorType, key: "categories" }));
-      return { kind: "instant_eval", judge: { evaluatorType, settings: { prompt, categories } } };
+      return {
+        kind: "instant_eval",
+        ...picked,
+        judge: { evaluatorType, settings: { prompt, categories } },
+      };
     }
     default:
       return { kind: "runs_as_today" };

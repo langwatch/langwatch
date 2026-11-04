@@ -12,11 +12,15 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./docs-session-frame": {
+      "types": "./dist/api-key.docs-session-frame.d.ts",
+      "default": "./src/api-key.docs-session-frame.ts"
     }
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run"
+    "test": "vitest run --fsModuleCache"
   },
   "dependencies": {
     "@langwatch/authorization": "workspace:*",

@@ -94,7 +94,7 @@ export interface SpendSummaryRow {
    * two dimensions, two rows can share a key: read `group` to tell them apart.
    */
   key: string;
-  /** Every grouping dimension by name, e.g. `{ model: "gpt-5-mini" }`. */
+  /** Every grouping dimension by name, e.g. `{ model: "gpt-6-luna" }`. */
   group: Record<string, string>;
   /** Start of the time bucket in the requested zone, null when unbucketed. */
   bucket_start: string | null;

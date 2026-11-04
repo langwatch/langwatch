@@ -123,3 +123,21 @@ export function searchMatchesNobody(
   if (!members || !search.trim()) return false;
   return matchMemberId(members, search) === undefined;
 }
+
+/** The project filter, remembered together with the organization it was picked in. */
+export type AuditProjectFilter = { organizationId: string; projectId: string | null };
+
+/**
+ * The filter rebased onto the organization in scope. One picked in an
+ * organization the reader has left is gone for good: it names a project the
+ * new one never heard of, and returning must not revive a forgotten choice.
+ */
+export function auditProjectFilterIn({
+  filter,
+  organizationId,
+}: {
+  filter: AuditProjectFilter;
+  organizationId: string;
+}): AuditProjectFilter {
+  return filter.organizationId === organizationId ? filter : { organizationId, projectId: null };
+}

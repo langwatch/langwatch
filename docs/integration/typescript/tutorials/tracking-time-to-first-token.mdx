@@ -49,7 +49,7 @@ const client = new OpenAI();
 async function streamCompletion(prompt: string): Promise<string> {
   return await tracer.withActiveSpan("LLM call", async (span) => {
     span.setType("llm");
-    span.setRequestModel("gpt-5-mini");
+    span.setRequestModel("gpt-6-luna");
     span.setInput(prompt);
 
     const startedAt = Date.now();
@@ -57,7 +57,7 @@ async function streamCompletion(prompt: string): Promise<string> {
     const chunks: string[] = [];
 
     const stream = await client.chat.completions.create({
-      model: "gpt-5-mini",
+      model: "gpt-6-luna",
       messages: [{ role: "user", content: prompt }],
       stream: true,
     });

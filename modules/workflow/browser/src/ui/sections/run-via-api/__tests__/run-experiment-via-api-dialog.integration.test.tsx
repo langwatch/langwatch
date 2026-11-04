@@ -9,9 +9,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { RunExperimentViaApiDialog } from "../run-experiment-via-api-dialog.tsx";
 
-const renderDialog = () =>
+const renderDialog = ({ concurrency }: { concurrency?: number } = {}) =>
   renderWithDesignSystem(
     <RunExperimentViaApiDialog
+      concurrency={concurrency}
       open={true}
       onOpenChange={() => {}}
       experimentSlug="my-experiment"
@@ -104,6 +105,42 @@ describe("RunExperimentViaApiDialog (evaluations-v3)", () => {
 
       await click("Attached dataset");
       expect(dialogText()).toContain("parameters=");
+    });
+  });
+
+  describe("when choosing a CI snippet", () => {
+    /** @scenario The evaluations-v3 dialog offers CLI and GitHub Actions snippets */
+    it("offers CLI and GitHub Actions, the latter a step running the CLI", async () => {
+      renderDialog();
+
+      await screen.findByRole("dialog");
+      expect(screen.getByText("CLI")).toBeTruthy();
+      await click("GitHub Actions");
+      const snippet = dialogText();
+      expect(snippet).toContain("secrets.LANGWATCH_API_KEY");
+      expect(snippet).toContain("langwatch@latest experiment run my-experiment");
+    });
+  });
+
+  describe("given an experiment saved with a concurrency of 6", () => {
+    /** @scenario The execution choice sets the concurrency the snippets start the run with */
+    it("starts parallel at 6, then follows the sequential and parallel choices", async () => {
+      const user = userEvent.setup();
+      renderDialog({ concurrency: 6 });
+
+      await screen.findByRole("dialog");
+      await click("CLI");
+      expect(dialogText()).toContain("--concurrency 6");
+
+      await click("Sequential");
+      expect(dialogText()).toContain("--concurrency 1");
+      expect(screen.queryByLabelText("Concurrency")).toBeNull();
+
+      await click("Parallel");
+      const input = screen.getByLabelText("Concurrency");
+      await user.clear(input);
+      await user.type(input, "3{Enter}");
+      expect(dialogText()).toContain("--concurrency 3");
     });
   });
 });
