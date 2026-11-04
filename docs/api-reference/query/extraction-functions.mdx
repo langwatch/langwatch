@@ -70,7 +70,7 @@ A query that would go past a cap answers `422` with the code `lwql_app_function_
 
 Three things can shorten a result, and each one leaves a diagnostic behind:
 
-- `RESULT_TRUNCATED` with `meta.ceiling` set to `hydratedBytes` means trailing rows were dropped at the 32 MB response budget.
+- `APP_FUNCTION_RESULT_TRUNCATED` means trailing rows were dropped at the 32 MB response budget.
 - `APP_FUNCTION_VALUE_TRUNCATED` means one conversation or trace was larger than a single value may be, so that value was cut. Ask for a smaller token budget to choose what is kept.
 - `APP_FUNCTION_UNRESOLVED_KEYS` means some rows are null because their conversation or trace identifier matched no record. Check the identifiers, and that the rows fall inside your retention window.
 
