@@ -28,7 +28,7 @@ const SHARED: LangWatchQLConnection = {
 const PRIVATE_URL = "https://route-user:route-password@private.invalid:8443/acme_db";
 const WINDOW = { start: "2026-02-01T00:00:00.000Z", end: "2026-02-04T00:00:00.000Z" };
 const PERIOD_SQL =
-  "SELECT count() AS n FROM analytics.trace_metrics " +
+  "SELECT count() AS n FROM trace_metrics " +
   "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} " +
   "AND OccurredAt < {dashboard_context_period_end:DateTime} LIMIT 1";
 
@@ -92,7 +92,7 @@ describe("given a statement for an organization whose route names its own databa
   /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity" */
   it("qualifies the statement with the database the private executor dials", async () => {
     const { done, privateExecutor } = privateRun({
-      sql: "SELECT count() AS n FROM analytics.trace_metrics LIMIT 1",
+      sql: "SELECT count() AS n FROM trace_metrics LIMIT 1",
     });
     await done;
 
@@ -112,7 +112,7 @@ describe("given a statement for an organization whose route names its own databa
 
   it("qualifies a dated member's window and its trace lookup with that database", async () => {
     const { done, privateExecutor } = privateRun({
-      sql: "SELECT count() AS n FROM analytics.evaluations LIMIT 1",
+      sql: "SELECT count() AS n FROM evaluations LIMIT 1",
       memberWindows: [{ projectId: "project-1", from: 1_760_000_000_000 }],
     });
     await done;
