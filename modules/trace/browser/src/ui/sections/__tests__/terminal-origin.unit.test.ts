@@ -13,6 +13,12 @@ describe("isTerminalOrigin", () => {
     });
   });
 
+  describe("given Grok's fixed service name", () => {
+    it("is true", () => {
+      expect(isTerminalOrigin({ serviceName: "grok-cli" })).toBe(true);
+    });
+  });
+
   describe("given a coding-agent origin", () => {
     it("is true", () => {
       expect(isTerminalOrigin({ origin: "coding_agent" })).toBe(true);

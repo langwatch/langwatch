@@ -14,6 +14,9 @@ export interface WithheldWords {
   readonly ask: string;
 }
 
+/** The pseudo-gate a refused project stands for in `missingGates`. */
+export const PROJECT_GATE = "project";
+
 /** The state's two lines for the gates a reader lacks, in the project they are reading. */
 export function withheldWords({
   missingGates,
@@ -23,6 +26,13 @@ export function withheldWords({
   /** Absent before the project has resolved; the line then says "the project". */
   projectName: string | undefined;
 }): WithheldWords {
+  // A project the widget names and the reader cannot read: never named, never counted (AC208).
+  if (missingGates.includes(PROJECT_GATE)) {
+    return {
+      what: "You can't read a project this widget uses",
+      ask: "Ask whoever owns the board to change the widget's projects.",
+    };
+  }
   const isCostOnly = missingGates.length > 0 && missingGates.every((gate) => gate === COST_GATE);
   const admin = `an admin of ${projectName ?? "the project"}`;
   return isCostOnly

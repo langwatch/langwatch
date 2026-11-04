@@ -4,6 +4,8 @@
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
+import { isLangWatchQLListParameter } from "./analytics.lwql-time-window.ts";
+
 /**
  * Feature flag disabled for this project; distinct from unavailable (no
  * identity)—administrator can enable.
@@ -172,6 +174,53 @@ export class LangWatchQLParameterMissingError extends HandledError {
 }
 
 /**
+ * An organization, team or personal key ran a statement without naming a project. The message
+ * names the field and never a project id (owner, 2026-10-29).
+ */
+export class LangWatchQLProjectsRequiredError extends HandledError {
+  declare readonly code: "projects_required";
+
+  constructor() {
+    super(
+      "projects_required",
+      'Name the projects to query: send `projects`, a list of project ids, or "all"',
+      { httpStatus: 422, fault: "customer", ...remediation("projects_required") },
+    );
+    this.name = "LangWatchQLProjectsRequiredError";
+  }
+}
+
+/**
+ * A key ran a statement, or sent "all", and holds `analytics:view` on no project. Naming projects
+ * would not help it, so this is a code of its own: the CLI and the MCP tool show its message.
+ */
+export class LangWatchQLProjectsUnreadableError extends HandledError {
+  declare readonly code: "projects_unreadable";
+
+  constructor() {
+    super(
+      "projects_unreadable",
+      "This key reads no project. Ask an admin to grant it `analytics:view` on a project.",
+      { httpStatus: 422, fault: "customer", ...remediation("projects_unreadable") },
+    );
+    this.name = "LangWatchQLProjectsUnreadableError";
+  }
+}
+
+/**
+ * A named project the caller cannot read, one that does not exist, or one of another
+ * organization. One body for all three and no id in it, so a refusal never says which.
+ */
+export class LangWatchQLProjectNotFoundError extends HandledError {
+  declare readonly code: "project_not_found";
+
+  constructor() {
+    super("project_not_found", "Project not found", { httpStatus: 404, fault: "customer" });
+    this.name = "LangWatchQLProjectNotFoundError";
+  }
+}
+
+/**
  * A bound parameter's value the server could not read as the type its placeholder
  * declares, such as an ISO `…Z` string on `{start:DateTime64(3)}`. Without this it
  * reached the caller as an unknown 500 for a one-edit fix (WEB-18301).
@@ -221,6 +270,20 @@ function suppliedParameterSentence(supplied: readonly string[]): string {
   return `The request supplied values for ${names}, which the surface sets itself.`;
 }
 
+/** The request field that sets a list name, so the message can point at it. */
+const LIST_FIELD: Readonly<Record<string, string>> = {
+  dashboard_context_sources: "sources",
+  dashboard_context_projects: "projects",
+};
+
+/** Adds, for each list name supplied, the request field to send in its place. */
+function withListFields(sentence: string, supplied: readonly string[]): string {
+  const fields = supplied.flatMap((name) => LIST_FIELD[name] ?? []);
+  if (fields.length === 0) return sentence;
+
+  return `${sentence} Send ${fields.map((field) => `the \`${field}\` field`).join(" and ")} of the request instead.`;
+}
+
 /**
  * Request supplies a value for surface-owned parameter (period bounds or
  * granularity); refused to prevent silent discard.
@@ -232,21 +295,38 @@ export class LangWatchQLReservedParameterSuppliedError extends HandledError {
     /** The reserved names the request carried. Sorted. */
     supplied: readonly string[],
   ) {
-    super("lwql_reserved_parameter_supplied", suppliedParameterSentence(supplied), {
-      httpStatus: 400,
-      fault: "customer",
-      // Named consumer: the parameter editor, which lists the rows to remove,
-      // and an agent repairing a request it composed.
-      meta: { parameters: supplied },
-      ...remediation("lwql_reserved_parameter_supplied"),
-    });
+    super(
+      "lwql_reserved_parameter_supplied",
+      withListFields(suppliedParameterSentence(supplied), supplied),
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumer: the parameter editor, which lists the rows to remove,
+        // and an agent repairing a request it composed.
+        meta: { parameters: supplied },
+        ...remediation("lwql_reserved_parameter_supplied"),
+      },
+    );
     this.name = "LangWatchQLReservedParameterSuppliedError";
   }
 }
 
+/** What a reserved name declared with the wrong type should have been, for each kind named. */
+function reservedTypeMessage(mistyped: readonly string[]): string {
+  const lists = mistyped.filter(isLangWatchQLListParameter);
+  if (lists.length === 0) {
+    return "The query declares a time-window parameter with a type that is not a date-time.";
+  }
+  const listFault = `The query declares ${lists.join(", ")} with a type other than Array(String).`;
+
+  return lists.length === mistyped.length
+    ? listFault
+    : `${listFault} It also declares a time-window parameter with a type that is not a date-time.`;
+}
+
 /**
- * Time-window parameter declared as non-DateTime; caught at save via the
- * shared validator.
+ * A reserved parameter declared with the wrong type (a time-window name that is not a DateTime,
+ * a list name that is not Array(String)); caught at save via the shared validator.
  */
 export class LangWatchQLReservedParameterTypeError extends HandledError {
   declare readonly code: "lwql_reserved_parameter_type";
@@ -255,17 +335,13 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
     /** The reserved names declared with the wrong type. Sorted. */
     mistyped: readonly string[],
   ) {
-    super(
-      "lwql_reserved_parameter_type",
-      "The query declares a time-window parameter with a type that is not a date-time.",
-      {
-        httpStatus: 400,
-        fault: "customer",
-        // Named consumer: the editor, which says which declaration to rewrite.
-        meta: { parameters: mistyped },
-        ...remediation("lwql_reserved_parameter_type"),
-      },
-    );
+    super("lwql_reserved_parameter_type", reservedTypeMessage(mistyped), {
+      httpStatus: 400,
+      fault: "customer",
+      // Named consumer: the editor, which says which declaration to rewrite.
+      meta: { parameters: mistyped },
+      ...remediation("lwql_reserved_parameter_type"),
+    });
     this.name = "LangWatchQLReservedParameterTypeError";
   }
 }

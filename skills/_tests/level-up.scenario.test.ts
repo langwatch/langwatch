@@ -22,7 +22,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 
-const judgeModel = openai("gpt-5-mini");
+const judgeModel = openai("gpt-6-luna");
 
 function copySkillToWorkDir(tempFolder: string) {
   installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "level-up" });

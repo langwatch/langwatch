@@ -3,6 +3,40 @@ title: Releases and support
 description: "How LangWatch is versioned, which releases get fixes, and why you can upgrade to the latest release from any version."
 ---
 
+What changed in each release is in the [changelog](/changelog). This page covers how releases are versioned and supported, and what to prepare before an upgrade.
+
+## Preparing for 3.21
+
+<Info>
+**Upcoming minor release.** 3.21 is planned as a backward-compatible release with substantial internal changes and data migrations. Existing API and SDK integrations are intended to keep working. This is preparation guidance; review the final release notes before deploying the 3.21 image.
+</Info>
+
+### What changes for self-hosted operators
+
+Migration work runs through the existing upgrade system on deployment. The runner records completed work and checkpoints so a retry can resume rather than repeat the entire upgrade. Most installations should not need a manual migration pass.
+
+An automatic migration can still need operator assistance when historical data is inconsistent, required database privileges are missing, a dependency is unavailable, or another upgrade holds the lease. Treat an incomplete migration as something to investigate; a successful container start alone does not establish that every tenant migration finished.
+
+### Prepare before rollout
+
+1. Take fresh PostgreSQL and ClickHouse backups and verify your restore procedure. See [Backups](/self-hosting/configuration/backups).
+2. Test the target image and your current Helm values in staging. Keep `CREDENTIALS_SECRET`, provider credentials, existing SSO configuration and callback URLs unchanged during the upgrade.
+3. Read [Before you upgrade](/self-hosting/upgrade#before-you-upgrade), including the queue-format preparation and database privileges that apply to your starting release.
+4. Check the planned work with `pnpm task upgrade plan` from the target app image. Schedule time for the blocking steps and background migrations; larger installations may take longer.
+5. Make sure an operator listed in `ADMIN_EMAILS` can reach **Ops → Upgrades** and inspect tenant migrations after deployment.
+
+### Confirm the upgrade completed
+
+Use **Ops → Upgrades** (`/ops/upgrades`) or `pnpm task upgrade status` to inspect the installation ledger and the recorded steps. Check **Tenant migrations** separately for Finalized, Held and Parked counts. Smoke-test sign-in, trace ingestion and the integrations your team uses before declaring the rollout complete.
+
+Held or parked tenant migrations are retried automatically and can be targeted from the operator view. Review the reason before retrying; preserve existing sign-in connections and domain ownership while resolving conflicts. See [Check the migration results](/self-hosting/upgrade#check-the-migration-results).
+
+### If an automatic step needs help
+
+Read the error and its next action in `pnpm task upgrade status`. Resolve the named dependency, privilege or data conflict, then use the documented retry flow. Completed steps and checkpoints are retained. Do not delete the upgrade ledger or force a migration complete to bypass an error.
+
+If the cause is unclear, include the starting and target versions, failed step name, deployment method and redacted error when [contacting support](/support). Never include API keys, provider credentials, database passwords or `CREDENTIALS_SECRET`. The [upgrade guide](/self-hosting/upgrade) covers failure reasons, retries and recovery in detail.
+
 ## Versioning
 
 LangWatch is released from one line. Every release has a version number such as `3.20.1`, and the images and the Helm chart carry the same number. A higher number is always a newer release on that line. A patch number (the last digit) is a smaller release on the same line, not a fix to an older one.

@@ -28,6 +28,7 @@ import type { InstantEvalJudgeUsageBillingFact } from "../../rules/instant-eval-
 import { InstantEvalJudgeFactsService } from "../../services/instant-eval-judge-facts.service.ts";
 import { InstantEvalJudgeService } from "../../services/instant-eval-judge.service.ts";
 import { MemoryInstantEvalClassifierChannel } from "./instant-eval-classifier.test-fakes.ts";
+import { publicInstantEvalJudgeRouter } from "./instant-eval-judge-router.test-fakes.ts";
 import { MemoryInstantEvalRateLimiter } from "./instant-eval-rate-limiter.test-fakes.ts";
 
 export type InstantEvalJudgeOverMemory = Readonly<{
@@ -67,17 +68,20 @@ export function instantEvalJudgeOverMemory({
   };
   const facts = InstantEvalJudgeFactsService.create({ repositories });
   let sendPriced: ((fact: InstantEvalJudgeSpendPricedEventData) => Promise<void>) | undefined;
+  const classifier = MemoryInstantEvalClassifierChannel.create({
+    answer: async ({ questions }) => ({
+      verdicts: questions.map((question) => ({ questionId: question.id, probability: 1 })),
+      inputTokens: 1_000,
+      isTextTruncated: false,
+    }),
+  });
+  const limiter = MemoryInstantEvalRateLimiter.create();
   const judge = InstantEvalJudgeService.create({
     decisionModels: MemoryInstantEvalDecisionModelChannel.create(),
     repositories,
-    limiter: MemoryInstantEvalRateLimiter.create(),
-    classifier: MemoryInstantEvalClassifierChannel.create({
-      answer: async ({ questions }) => ({
-        verdicts: questions.map((question) => ({ questionId: question.id, probability: 1 })),
-        inputTokens: 1_000,
-        isTextTruncated: false,
-      }),
-    }),
+    limiter,
+    classifier,
+    ...publicInstantEvalJudgeRouter({ classifier, limiter }),
     isCloud: true,
     recordSpendPriced: async (fact) => {
       if (!sendPriced) throw new Error("connectSpend was not called");

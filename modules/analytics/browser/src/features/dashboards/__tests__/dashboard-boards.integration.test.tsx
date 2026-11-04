@@ -822,6 +822,43 @@ describe("a member's board", () => {
       });
     });
 
+    describe("when a fixed range is refreshed", () => {
+      afterEach(() => vi.useRealTimers());
+
+      /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+      it("moves every widget's window end to the refresh, keeping its length", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(Date.UTC(2026, 8, 28, 12, 0, 30));
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const frames = recordWidgetFrames();
+        try {
+          openBoard({ server: boardWithTwoWidgets(), query: { range: "24h" } });
+          frames.loadAll(await screen.findAllByTitle("Custom chart"));
+          const before = frames.latestContexts().map(({ timeWindow }) => timeWindow);
+          expect(before.map(({ end }) => end)).toEqual([
+            Date.UTC(2026, 8, 28, 12, 1),
+            Date.UTC(2026, 8, 28, 12, 1),
+          ]);
+
+          vi.setSystemTime(Date.UTC(2026, 8, 28, 12, 10, 5));
+          await user.click(screen.getByRole("button", { name: "Period" }));
+          await user.click(await screen.findByRole("menuitem", { name: "Refresh now" }));
+
+          await waitFor(() => {
+            frames.loadAll(screen.getAllByTitle("Custom chart"));
+            expect(frames.latestContexts().map(({ timeWindow }) => timeWindow.end)).toEqual([
+              Date.UTC(2026, 8, 28, 12, 11),
+              Date.UTC(2026, 8, 28, 12, 11),
+            ]);
+          });
+          const after = frames.latestContexts().map(({ timeWindow }) => timeWindow);
+          expect(after.map(({ start, end }) => end - start)).toEqual([86_400_000, 86_400_000]);
+        } finally {
+          frames.restore();
+        }
+      });
+    });
+
     describe("when the member changes the grain", () => {
       /** @scenario "AC13 Grain choices update every block" */
       it.each([
@@ -915,12 +952,12 @@ describe("a member's board", () => {
   });
 
   describe("given a member's board", () => {
-    /** @scenario "Boards: no star or pencil by the board title" */
-    it("has no star and no rename pencil by its title", async () => {
+    /** @scenario "Boards: no pin or pencil by the board title" */
+    it("has no pin and no rename pencil by its title", async () => {
       openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
       expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Star dashboard|Unstar dashboard/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Pin dashboard|Unpin dashboard/ })).toBeNull();
       expect(screen.queryByRole("button", { name: "Rename dashboard" })).toBeNull();
     });
   });
