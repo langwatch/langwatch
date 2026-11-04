@@ -4,7 +4,7 @@
 
 **Status:** Accepted (Drew, 2026-10-29)
 
-> One line: every trace-linked Instant Evals result is a row in one ClickHouse table, `eval_results`, linked to its trace and tagged with its source (ask, run, dashboard, monitor). Before judging, we look up the same trace, question and judge model, and reuse the row if it exists. The table is append-only and follows the trace's retention. Every trace-linked Instant Evals judgment lands here, whoever asked; a monitor still keeps its own `evaluation_runs`.
+> One line: every trace-linked Instant Evals result is a row in one ClickHouse table, `eval_results`, linked to its trace and tagged with its source (ask, run, dashboard, monitor). Before judging, we look up the same trace, question, judge model and judged text (its hash), and reuse the row if it exists. The table is append-only and follows the trace's retention. Every trace-linked Instant Evals judgment lands here, whoever asked; a monitor still keeps its own `evaluation_runs`.
 
 ## Context
 
@@ -103,10 +103,10 @@ Why this shape:
 
 - **The sort key leads with the trace.** `(TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash)` is the recall key, and its first three columns are the trace page's read. Both are prefix reads.
 - **`InputHash` is in the key.** `eval(input, 'q')` and `eval(output, 'q')` on one trace are two rows, and recall serves each its own verdict.
-- **`SourceId, JudgedAt` end the key.** Every judgment is kept: a rerun, a "judge again" or a monitor re-evaluating the same trace adds a row. An exact retry of one insert has the same `JudgedAt`, so the replacing merge collapses it. `Source` and `SourceId` are provenance only: results are shared across sources on purpose, and recall never reads them, so a wrong or forged `SourceId` cannot change which verdict recall returns.
+- **`SourceId, JudgedAt` end the key.** Every judgment is kept: a rerun, a "judge again" or a monitor re-evaluating the same trace adds a row. An exact retry of one insert has the same `JudgedAt`, so the replacing merge collapses it. `Source` and `SourceId` are provenance only: recall never reads them, so a row is shared by every source that judges the same text with the same question and judge, so a wrong or forged `SourceId` cannot change which verdict recall returns.
 - **`KeyVersion`** is the recall epoch. Recall reads only rows with the current version. Rows written before recall is on, or under a key bug, are never served; a version bump retires them.
 - **The partition and TTL anchor on `OccurredAt`**, the trace's time. `trace_summaries` uses the same anchor (`ttl.reconciler.ts:139-145`) and the same `toYearWeek` partition (00002 line 179). So a result expires with its trace.
-- **The TTL clause** is what `buildRetentionTTLExpression` emits for a `TABLE_TTL_CONFIG` entry with `retentionTTLColumn: "OccurredAt"` (`ttl.reconciler.ts:327-331`). The reconciler then finds it correct and issues no ALTER.
+- **The TTL clause** is what `buildRetentionTTLExpression` emits for a `TABLE_TTL_CONFIG` entry with `retentionTTLColumn: "OccurredAt"` (`ttl.reconciler.ts:327-331`). With cold storage off, the reconciler finds it correct and issues no ALTER. With `CLICKHOUSE_COLD_STORAGE_ENABLED` on, `planTieredTTL` (`ttl.reconciler.ts:438-475`) adds `TO VOLUME 'cold'`, as for every tiered table.
 - **The bloom filter on `SourceId`** serves a run's results page, which reads by run, not by trace. The pattern is the `idx_trace_id` bloom filter on `evaluation_runs` (00002).
 - **No judged text is stored**, as in 00097. `InputHash` is a hash of the judged text, not the text.
 - **A judgment of free text with no trace is not stored.** It has no trace to link to.
@@ -116,18 +116,17 @@ The migration is one new goose file with the next free number, created with `IF 
 
 ### 2. Append-only, recall first
 
-Before judging, the service looks up the rows that match tenant, trace, span, question hash, judge model, input hash and the current `KeyVersion`, with `Status = judged`. It reuses a match: when several rows match, the one with the latest `JudgedAt`; on equal `JudgedAt`, the latest `UpdatedAt`, then the greatest `SourceId` (the last sort-key column), so the pick is deterministic. It judges only the misses, then writes them in one bulk insert. A recall adds no row.
+Before judging, the service looks up the rows that match tenant, trace, span, question hash, judge model, input hash and the current `KeyVersion`, with `Status = judged`. It reuses a match: when several rows match, the one with the latest `JudgedAt`; on equal `JudgedAt`, the latest `UpdatedAt`, then the greatest `SourceId`, so the pick is deterministic. It judges only the misses, then writes them in one bulk insert. A recall adds no row.
 
 - **Only judged rows are reused.** A failed or skipped row never blocks a retry.
 - **Recall splits a unit.** A text is judged only for its missed questions; a unit with no misses is dropped. The budget check runs on what is left.
 - **Trace and span keys only.** A thread-keyed or text-keyed `eval()` has no single trace, so it is judged as today and not stored.
 - **Every read filters `TenantId` first** and carries an `OccurredAt` window, so the cold-scan detector stays quiet.
 - **Flags.** Writes sit behind `release_instant_evals`. Recall and the drawer section, on every path including monitors, sit behind a new flag, `release_instant_eval_results`.
-
 - **A recall makes no judge call**, so it is free, and every viewer sees the same number.
 - **The table is the cache.** There is no separate cache with its own expiry.
 - **A new row is added only when something changed:** a new judge model, an explicit "judge again", or changed judged text (`InputHash`). Both rows are kept with their times, because a judge is not deterministic.
-- **Readers take the latest row** per trace, span and question by `JudgedAt` (`argMax`), as `clickhouse.instant-eval-judgments.repository.ts:28-45` does today with `UpdatedAt`. A reader that wants history reads every row.
+- **Readers take the latest judged row** per trace, span, question and `InputHash` by `JudgedAt` (`argMax`), as `clickhouse.instant-eval-judgments.repository.ts:28-45` does today with `UpdatedAt`. So `eval(input, 'q')` and `eval(output, 'q')` stay two results, and a later failed or skipped row never hides a good verdict; such a row shows only where no judged row exists. The judge model is not a group key: a newer judge's verdict replaces the older one on read. A reader that wants history reads every row.
 - **The threshold is not in the hash.** A pass is `Probability >= threshold`, applied on read (`instant-eval-verdicts.rules.ts:49-54`). Two viewers with different thresholds share the same judge call.
 
 Each trigger uses the same path:
@@ -137,23 +136,23 @@ Each trigger uses the same path:
 | Quick `eval()` ask | `ask`       | the query id    | A repeat question is free and stays the same answer.      |
 | Run                | `run`       | the run id      | A rerun pays only for traces it has not judged.           |
 | Dashboard widget   | `dashboard` | the widget id   | A refresh pays only for new traces. All viewers agree.    |
-| Monitor, Instant Evals judge | `monitor` | the monitor id | A trace already judged by the same question is not judged again. |
+| Monitor, Instant Evals judge | `monitor` | the monitor id | A trace a monitor already judged with the same question is not judged again. A monitor hashes `{input, output, contexts}`, an ask hashes one column, so monitor rows and ask rows do not recall each other. |
 
 ### 3. The trace page reads this table
 
 The trace drawer shows every result on its trace, labelled by source. `eval_results` is owned by the instant-eval module. A plain read of another module's table is a query on its owner's `*Api` (`dev/docs/ARCHITECTURE.md` section 7, "A ClickHouse table has one owner"). So instant-eval adds a results-by-trace query to `InstantEvalApi`. Trace calls it through a channel bound to that token (section 5, "A channel may be bound to another module's `*Api` token"). A binding makes no peer edge, so it is allowed although instant-eval already depends on `TraceApi` (`instant-eval.app.ts:152-157`, `static dependencies`).
 
-The Explorer chip subquery and the `analytics.judgments` LWQL view move to `eval_results`. The ownership exception in `clickhouse-table-ownership.ts` moves with them.
+The Explorer chip subquery and the `analytics.judgments` LWQL view stay on `instant_eval_judgments`, because runs keep writing it and its old rows are not copied (Risks, "Old judgments"). They move only if runs move, with the copy plan.
 
 ### 4. Retention follows the trace
 
 Three changes make a result expire with its trace. Each follows a pattern already in the repo.
 
 1. **Stamp at write.** Each row gets the project's trace retention in `_retention_days`, from `DataRetentionApi.getRetentionDays({ projectId, category: "traces" })` (`data-retention.api.ts:36`). `evaluation_runs` does the same with `context.retentionPolicy?.traces` (`evaluation-run.store.ts:36`).
-2. **Enrol the table in the cascade.** Add `eval_results: "traces"` to `RETENTION_TABLE_CATEGORY_MAP` (`retention-tables.ts:8-28`). When a project's retention changes, the retroactive repository rewrites `_retention_days` for every table in that map (`clickhouse.retroactive-retention.repository.ts:113-160`).
-3. **Add a `TABLE_TTL_CONFIG` entry** with `ttlColumn` and `retentionTTLColumn` set to `OccurredAt` (`ttl.reconciler.ts:28`), for cold storage and the TTL check.
+2. **Enrol the table in the cascade.** Add `eval_results: "traces"` to `RETENTION_TABLE_CATEGORY_MAP` (`retention-tables.ts:8-28`). When a project's retention changes, the retroactive repository rewrites `_retention_days` for every table in that map (`clickhouse.retroactive-retention.repository.ts:113-160`). That rewrite is one of the cross-module ALTERs `dev/docs/ARCHITECTURE.md` section 9.1 names as a break; `eval_results` joins it as every trace-retained table does today, and moves with them when instant-eval reacts to the retention fact on its own side.
+3. **Add a `TABLE_TTL_CONFIG` entry** with `ttlColumn` and `retentionTTLColumn` set to `OccurredAt`, `envVar: CLICKHOUSE_COLD_STORAGE_EVAL_RESULTS_TTL_DAYS` and `hardcodedDefault: 49` like its neighbours (`ttl.reconciler.ts:28`), for cold storage and the TTL check.
 
-Enrolment also adds the table to the storage meter (`PRODUCTION_STORAGE_METER_TABLES`, `retention-tables.ts:114-116`), which sums `_size_bytes`. We list `eval_results` in `TABLES_WITHOUT_SIZE_COLUMN` (`retention-tables.ts:107-112`), as the analytics tables are. So `eval_results` is not counted by the storage meter. That is accepted: a row holds a verdict and the question text, not the judged trace text, so it is small next to the trace it belongs to.
+Enrolment also adds the table to the storage meter (`PRODUCTION_STORAGE_METER_TABLES`, `retention-tables.ts:114-116`), which sums `_size_bytes`. We list `eval_results` in `TABLES_WITHOUT_SIZE_COLUMN` (`retention-tables.ts:107-112`), as the analytics tables are. So `eval_results` is not counted by the storage meter. Purge and erase: no ClickHouse table, `instant_eval_judgments` included, is reached by user erase today (`prisma.user-data-erase.repository.ts` touches Postgres only), so `Question` text expires by retention like the trace it belongs to; when the section 9.1 owner shape lands, instant-eval removes its own rows. That is accepted: a row holds a verdict and the question text, not the judged trace text, so it is small next to the trace it belongs to.
 
 ### 5. Monitors stay separate; their Instant Evals judgments land here too
 
@@ -185,7 +184,7 @@ Rejected. The trace page and dashboards get no lasting result. When the cache ex
 
 Reuse the collector write-back path (`trace-collector-dispatch.service.ts:219`, `reportOneEvaluation`).
 
-Rejected for instant evals. A run of 100,000 rows and 10 questions is 1,000,000 events, each with fold and analytics rows, written one by one. The same run in `eval_results` is 2,000 bulk inserts of 500 rows (one per page, `INSTANT_EVAL_PAGE_SIZE`). `evaluation_runs` is keyed by `EvaluationId`, so a recall by trace and question is not a prefix read. Its lifecycle columns (scheduled, started, attempts) do not apply to an instant verdict.
+Rejected for instant evals. A run of 100,000 rows and 10 questions is 1,000,000 events, each with fold and analytics rows, written one by one. The same run in `eval_results` is 200 bulk inserts of up to 5,000 rows: one insert per page of 500 source rows times 10 questions (`instant-eval-judge-page.service.ts:452`). `evaluation_runs` is keyed by `EvaluationId`, so a recall by trace and question is not a prefix read. Its lifecycle columns (scheduled, started, attempts) do not apply to an instant verdict.
 
 ## How others do it
 
