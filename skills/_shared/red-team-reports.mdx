@@ -1,0 +1,3 @@
+Scenario writes one JSON report per red-team run to `./redteam-reports/<batch>/`. Add that folder to `.gitignore`. Python reports carry a severity and suggested fixes; open a dashboard over the batch with `pip install 'langwatch-scenario[report]'` and `scenario redteam-report`.
+
+With `LANGWATCH_API_KEY` set, every run also shows up in LangWatch under Simulations with the full attack transcript.

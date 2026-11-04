@@ -11,6 +11,9 @@ metadata:
 import CliInstall from "../../_shared/cli-install.mdx";
 import ImprovingTheAgent from "../../_shared/improving-the-agent.mdx";
 import RedTeamSetup from "../../_shared/red-team-setup.mdx";
+import RedTeamStatefulAgents from "../../_shared/red-team-stateful-agents.mdx";
+import RedTeamReports from "../../_shared/red-team-reports.mdx";
+import RedTeamScorerFailed from "../../_shared/red-team-scorer-failed.mdx";
 
 # Red Team Your Agent
 
@@ -162,7 +165,7 @@ describe("red team", () => {
 });
 ```
 
-**Stateful agents.** When the attacker gets a hard refusal it backtracks: it removes that exchange from the conversation so the agent "forgets" it. An agent that keeps its own server-side session (a chat product, a framework with memory) still remembers. Either make the adapter start a fresh session on every call and send it the full `input.messages`, or switch backtracking off with `fast_refusal_detection=False` (`detectRefusals: false`). Backtracked exchanges are also missing from the final transcript, so a run that held may show fewer refusals than the agent gave.
+<RedTeamStatefulAgents />
 
 Adapt the check to the attack the user picked. A deterministic check fits only what can never appear in a correct reply: a secret value, a tool call, an argument over a limit. Everything else goes to the judge.
 
@@ -184,9 +187,7 @@ npx vitest run tests/redteam-system-prompt.test.ts # TypeScript
 
 `total_turns` is the only control of run length and is a hard cap. To check the wiring first, run once with `total_turns=5`, then put it back to 50: an agent that holds for 5 turns often breaks by turn 20. 50 turns take several minutes and spend tokens on the attacker, the judge and the agent. For faster runs keep the turns and set `score_responses=False` (`scoreResponses: false`).
 
-When the run includes a `RedTeamAgent`, Scenario writes a JSON report to `./redteam-reports/<batch>/`. Add that folder to `.gitignore`. Python reports carry a severity and suggested fixes; open the dashboard with `pip install 'langwatch-scenario[report]'` and `scenario redteam-report`.
-
-With `LANGWATCH_API_KEY` set, the run also shows up in LangWatch under Simulations with the full attack transcript.
+<RedTeamReports />
 
 ## Step 6: Report and Fix
 
@@ -194,8 +195,9 @@ Tell the user, in a few lines:
 
 1. **Held or broke.** On a break: the turn, the technique the attacker used, and the exact text that leaked.
 2. **The fix at the right layer.** A secret in the prompt is the bug, not the leak: move it to configuration or a tool the model cannot echo. A tool the agent was talked into calling needs an authorization check in the tool. A prompt rule is the last resort.
-3. **Scores that never move.** A `Scorer failed` warning always means the planner model call failed (wrong model name, missing key, refused parameter) and the attack ran blind. With per-turn scoring on, every turn scoring 0 means the same. With `score_responses=False` every turn scores 0 by design, so ignore the scores then. Fix that and run again before reporting a pass.
-4. **One pass is one sample.** The attacker improvises, so a green run lowers the risk; it does not prove the agent safe. Run it again after each fix and in CI.
+3. **One pass is one sample.** The attacker improvises, so a green run lowers the risk; it does not prove the agent safe. Run it again after each fix and in CI.
+
+<RedTeamScorerFailed />
 
 <ImprovingTheAgent />
 

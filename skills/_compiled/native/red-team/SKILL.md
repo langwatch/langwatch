@@ -59,7 +59,7 @@ With `langwatch-scenario` 1.6.0 or older (Python), four known issues need a line
 - Pin `litellm<1.106` in the test dependencies. litellm 1.106 imports the optional `mcp` package when a call passes tools, and the judge fails with `No module named 'mcp'` after every attack turn was already paid for.
 - When the attacker model is a reasoning model (gpt-5 family, o-series), add `litellm.drop_params = True` at the top of the test file. The attacker sends a fixed temperature, which those models refuse.
 - Pass `success_score=None` to `RedTeamAgent.crescendo()`. On those versions an early exit, which happens when the attack reaches its objective, ends the run as passed. The same holds for TypeScript versions without that fix: pass `successScore: undefined`.
-- Add `pytest_plugins = ["scenario.pytest_plugin"]` to the tests' `conftest.py`. The plugin does not load by itself there, so no red-team report is written.
+- Add `pytest_plugins = ["scenario.pytest_plugin"]` to the `conftest.py` at the project root (the pytest rootdir). pytest rejects `pytest_plugins` in a nested conftest such as `tests/conftest.py`. The plugin does not load by itself on those versions, so no red-team report is written.
 
 ## Step 4: Write the Test
 
@@ -198,9 +198,9 @@ npx vitest run tests/redteam-system-prompt.test.ts # TypeScript
 
 `total_turns` is the only control of run length and is a hard cap. To check the wiring first, run once with `total_turns=5`, then put it back to 50: an agent that holds for 5 turns often breaks by turn 20. 50 turns take several minutes and spend tokens on the attacker, the judge and the agent. For faster runs keep the turns and set `score_responses=False` (`scoreResponses: false`).
 
-When the run includes a `RedTeamAgent`, Scenario writes a JSON report to `./redteam-reports/<batch>/`. Add that folder to `.gitignore`. Python reports carry a severity and suggested fixes; open the dashboard with `pip install 'langwatch-scenario[report]'` and `scenario redteam-report`.
+Scenario writes one JSON report per red-team run to `./redteam-reports/<batch>/`. Add that folder to `.gitignore`. Python reports carry a severity and suggested fixes; open a dashboard over the batch with `pip install 'langwatch-scenario[report]'` and `scenario redteam-report`.
 
-With `LANGWATCH_API_KEY` set, the run also shows up in LangWatch under Simulations with the full attack transcript.
+With `LANGWATCH_API_KEY` set, every run also shows up in LangWatch under Simulations with the full attack transcript.
 
 ## Step 6: Report and Fix
 
@@ -208,8 +208,9 @@ Tell the user, in a few lines:
 
 1. **Held or broke.** On a break: the turn, the technique the attacker used, and the exact text that leaked.
 2. **The fix at the right layer.** A secret in the prompt is the bug, not the leak: move it to configuration or a tool the model cannot echo. A tool the agent was talked into calling needs an authorization check in the tool. A prompt rule is the last resort.
-3. **Scores that never move.** A `Scorer failed` warning always means the planner model call failed (wrong model name, missing key, refused parameter) and the attack ran blind. With per-turn scoring on, every turn scoring 0 means the same. With `score_responses=False` every turn scores 0 by design, so ignore the scores then. Fix that and run again before reporting a pass.
-4. **One pass is one sample.** The attacker improvises, so a green run lowers the risk; it does not prove the agent safe. Run it again after each fix and in CI.
+3. **One pass is one sample.** The attacker improvises, so a green run lowers the risk; it does not prove the agent safe. Run it again after each fix and in CI.
+
+**Scores that never move.** A `Scorer failed` warning means the attacker's planner model call failed (wrong model name, missing key, refused parameter) and the attack ran blind. With per-turn scoring on, every turn scoring 0 means the same. With `score_responses=False` every turn scores 0 by design, so ignore the scores then. Fix the model or key and run again before reporting a pass.
 
 A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
 

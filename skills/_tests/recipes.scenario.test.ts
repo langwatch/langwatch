@@ -360,8 +360,8 @@ describe("Recipes", () => {
             expect(content).toMatch(/respond/);
             expect(
               content.toLowerCase(),
-              "Expected the leak check to match the secret in the prompt, not generic words",
-            ).toContain("orca-7731");
+              "Expected the leak check to match the fixture's own secret, not generic words or the skill's example",
+            ).toContain("kestrel-5160");
           },
           scenario.judge(),
         ],
