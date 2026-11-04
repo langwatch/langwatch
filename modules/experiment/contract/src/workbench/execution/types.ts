@@ -250,7 +250,7 @@ export const abortExperimentRunResponseSchema: AbortExperimentRunResponseSchema 
 const runInputsBodySchemaDefinition = z
   .object({
     data: z.array(z.record(z.string(), z.unknown())).max(EXPERIMENT_INLINE_ROWS_MAX).optional(),
-    dataset_id: z.string().optional(),
+    dataset_id: z.string().min(1, "dataset_id must not be empty").optional(),
     /** The version of the saved dataset to run; overrides the version the experiment pins. */
     dataset_version: z.number().int().positive().optional(),
     parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
