@@ -33,6 +33,12 @@ import {
 } from "../rules/instant-eval-run-questions.rules.ts";
 import type { InstantEvalRowSourceService } from "./instant-eval-row-source.service.ts";
 
+/** The refusals of the route, not of the statement: they reach the caller as they were. */
+const ROUTE_REFUSAL_CODES: ReadonlySet<string> = new Set([
+  "lwql_unavailable",
+  "private_dataplane_unavailable",
+]);
+
 /** A statement that can be a run, with everything the run needs from it. */
 export interface AcceptedInstantEvalStatement {
   readonly sql: string;
@@ -47,7 +53,9 @@ export interface AcceptedInstantEvalStatement {
 
 /** The Analytics peer, narrowed to what admitting a run's statement asks of it. */
 export interface InstantEvalStatementValidator {
-  validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
+  validateLangWatchQLForRun(
+    input: LangWatchQLValidationInput,
+  ): Promise<LangWatchQLAcceptedStatement>;
   describeLangWatchQLJudgements(input: {
     appFunctions: readonly LangWatchQLAppFunctionCall[];
   }): readonly LangWatchQLJudgementCall[];
@@ -126,7 +134,7 @@ export class InstantEvalStatementService {
     });
     if (suppliedReserved.length > 0) refuseReservedParameters(suppliedReserved);
 
-    const validated = this.#validateForRun({ caller, protections, sql, parameters });
+    const validated = await this.#validateForRun({ caller, protections, sql, parameters });
     this.#refuseUnfillableParameters(validated.parameters.map((parameter) => parameter.name));
 
     const columns = await this.rowSource.probe({
@@ -150,11 +158,10 @@ export class InstantEvalStatementService {
   }
 
   /**
-   * The policy's verdict, re-raised under the run's own code so the family
-   * answers one code for "this statement cannot be a run", with the policy's
-   * violations carried so the caller still learns which clause to change.
+   * The policy's verdict, re-raised as the run's own invalid-query code with its violations.
+   * The route's refusal is not the statement's and passes through unchanged.
    */
-  #validateForRun({
+  async #validateForRun({
     caller,
     protections,
     sql,
@@ -164,9 +171,9 @@ export class InstantEvalStatementService {
     readonly protections: LangWatchQLProtections;
     readonly sql: string;
     readonly parameters?: Readonly<Record<string, unknown>>;
-  }): LangWatchQLAcceptedStatement {
+  }): Promise<LangWatchQLAcceptedStatement> {
     try {
-      return this.analytics.validateLangWatchQL({
+      return await this.analytics.validateLangWatchQLForRun({
         projectId: caller.id,
         protections,
         sql,
@@ -176,7 +183,7 @@ export class InstantEvalStatementService {
         isInstantEvalsEnabled: true,
       });
     } catch (error) {
-      if (!(error instanceof HandledError)) throw error;
+      if (!(error instanceof HandledError) || ROUTE_REFUSAL_CODES.has(error.code)) throw error;
 
       throw new InstantEvalQueryInvalidError({
         reason: error.message,

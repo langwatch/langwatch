@@ -65,7 +65,9 @@ class ScriptedAnalytics implements InstantEvalStatementValidator {
     } = {},
   ) {}
 
-  validateLangWatchQL(_input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
+  async validateLangWatchQLForRun(
+    _input: LangWatchQLValidationInput,
+  ): Promise<LangWatchQLAcceptedStatement> {
     this.askedToValidate += 1;
     if (this.options.validateThrows) throw this.options.validateThrows;
 

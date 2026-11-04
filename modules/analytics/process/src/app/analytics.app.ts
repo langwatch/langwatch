@@ -962,6 +962,12 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.validate(input);
   }
 
+  validateLangWatchQLForRun(
+    input: LangWatchQLValidationInput,
+  ): Promise<LangWatchQLAcceptedStatement> {
+    return this.#dependencies.langWatchQL.validateForRun(input);
+  }
+
   /** The projects a card's editor may offer this member. */
   listReadableProjects(input: {
     projectId: string;

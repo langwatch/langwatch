@@ -224,6 +224,17 @@ export class LangWatchQLService {
     };
   }
 
+  /**
+   * Decides whether a run may start: asks the route first, then judges the statement against
+   * the route's database. The route's refusal comes before any statement refusal.
+   */
+  async validateForRun(
+    input: Omit<Parameters<LangWatchQLService["validate"]>[0], "database">,
+  ): Promise<ValidatedLangWatchQL> {
+    const { database } = await this.resolveRoute({ tenantIds: [input.projectId] });
+    return this.validate({ ...input, database });
+  }
+
   /** The result with what the run was bound to, and the notes on what limited or ignored it. */
   private withRunNotes({
     result,

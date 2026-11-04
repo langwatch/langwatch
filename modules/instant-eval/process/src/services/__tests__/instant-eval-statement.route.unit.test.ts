@@ -48,13 +48,9 @@ class Refusal extends HandledError {
   }
 }
 
-/** Accepts a save-time validation always; a run-time one answers what the suite states. */
+/** Answers the run-time validation as the suite states. */
 class RouteAwareAnalytics {
   constructor(private readonly runVerdict: Error | undefined) {}
-
-  validateLangWatchQL(_input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
-    return { parameters: [], appFunctions: [judged] };
-  }
 
   validateLangWatchQLForRun(
     _input: LangWatchQLValidationInput,
