@@ -368,8 +368,10 @@ export const modelProviders = {
       AWS_ACCESS_KEY_ID: z.string().nullable().optional(),
       AWS_SECRET_ACCESS_KEY: z.string().nullable().optional(),
       AWS_REGION_NAME: z.string().nullable().optional(),
+      // A Bedrock API key, sent as a bearer token; only decision models read it (ADR-182).
+      AWS_BEARER_TOKEN_BEDROCK: z.string().nullable().optional(),
     }),
-    optionalKeys: [],
+    optionalKeys: ["AWS_BEARER_TOKEN_BEDROCK"],
     enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   vertex_ai: {

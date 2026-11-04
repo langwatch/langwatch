@@ -159,8 +159,23 @@ describe("getRequiredCredentialKeys()", () => {
           AWS_ACCESS_KEY_ID: "",
           AWS_SECRET_ACCESS_KEY: "",
           AWS_REGION_NAME: "",
+          AWS_BEARER_TOKEN_BEDROCK: "",
         }),
       ).toEqual(["AWS_ACCESS_KEY_ID", "AWS_REGION_NAME", "AWS_SECRET_ACCESS_KEY"]);
+    });
+
+    /** @scenario "An admin can add a Bedrock API key without changing how chat models run" */
+    it("shows the Bedrock API key as an optional, masked field", () => {
+      const shown = Object.keys(
+        getDisplayKeysForProvider(
+          "bedrock",
+          false,
+          getSchemaShape(modelProviders.bedrock.keysSchema),
+        ),
+      );
+
+      expect(shown).toContain("AWS_BEARER_TOKEN_BEDROCK");
+      expect(isSecretCredentialField("AWS_BEARER_TOKEN_BEDROCK")).toBe(true);
     });
   });
 

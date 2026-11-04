@@ -97,11 +97,45 @@ Feature: Instant Evals decision model column in Default models
     Then it resolves as unavailable because the endpoint is not allowed
     And the call is skipped as a key problem, never sent
 
+  # Bedrock serves OpenAI's Decisions route on its Mantle host, one per region. The row's access key
+  # pair signs requests and cannot be a bearer token, so this entry reads its own Bedrock API key.
+
+  @unit
+  Scenario: A Bedrock decision model is sent to Mantle in the row's region with the Bedrock API key
+    Given the Instant Evals column is "OpenAI Decisions API (Bedrock)"
+    And the project's Bedrock row has a Bedrock API key and the region "us-east-1"
+    When the project's decision model is resolved
+    Then it resolves to "https://bedrock-mantle.us-east-1.api.aws/openai/v1/decisions"
+    And the Bedrock API key is sent as a bearer token, never the access key pair
+    And the model is sent as "openai.gpt-6-luna"
+
+  @unit
+  Scenario: A Bedrock row without a Bedrock API key cannot run a decision model
+    Given the Instant Evals column is "OpenAI Decisions API (Bedrock)"
+    And the project's Bedrock row has only an access key pair and a region
+    When the project's decision model is resolved
+    Then it resolves as unavailable because the key is missing
+    And the picker does not offer it
+
+  @unit
+  Scenario: A Bedrock key is never sent to a host outside AWS
+    Given the Instant Evals column is "OpenAI Decisions API (Bedrock)"
+    And the project's Bedrock row has a region that is not an AWS region name
+    When the project's decision model is resolved
+    Then it resolves as unavailable because the endpoint is not allowed
+    And the call is skipped as a key problem, never sent
+
+  @unit
+  Scenario: An admin can add a Bedrock API key without changing how chat models run
+    When an admin edits the project's Bedrock provider
+    Then the form shows an optional, masked Bedrock API key
+    And chat models on Bedrock still run on the access key pair
+
   @unit
   Scenario: Every catalogue entry can be reached with the key it names
     When the decision model catalogue is read
     Then every own entry names a registry provider, an https endpoint and a wire format
-    And every placeholder in an endpoint is filled from a field of that provider's row
+    And every placeholder in an endpoint and every key field is a field of that provider's row
     And no two entries share an id
 
   @unit

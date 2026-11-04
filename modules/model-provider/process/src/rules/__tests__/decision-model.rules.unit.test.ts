@@ -147,6 +147,69 @@ describe("decisionModelResolutionOf", () => {
       ).toEqual({ kind: "own_unavailable", model: AZURE_DECISIONS, reason: "key_missing" });
     });
   });
+
+  describe("given the Bedrock decision model", () => {
+    const BEDROCK_DECISIONS = "bedrock/decisions:gpt-6-luna";
+    const ACCESS_PAIR = { AWS_ACCESS_KEY_ID: "AKIAEXAMPLE", AWS_SECRET_ACCESS_KEY: "secret" };
+    const bedrockRow = (customKeys: Record<string, string>) => ({ enabled: true, customKeys });
+
+    /** @scenario "A Bedrock decision model is sent to Mantle in the row's region with the Bedrock API key" */
+    it("sends the Bedrock API key as a bearer to Mantle in the row's region", () => {
+      const resolved = decisionModelResolutionOf({
+        model: BEDROCK_DECISIONS,
+        row: bedrockRow({
+          ...ACCESS_PAIR,
+          AWS_REGION_NAME: " US-East-1 ",
+          AWS_BEARER_TOKEN_BEDROCK: "bedrock-api-key",
+        }),
+      });
+
+      expect(resolved).toEqual({
+        kind: "own",
+        model: BEDROCK_DECISIONS,
+        wire: "openai_decisions",
+        providerModel: "openai.gpt-6-luna",
+        endpoint: "https://bedrock-mantle.us-east-1.api.aws/openai/v1/decisions",
+        authHeader: "bearer",
+        apiKey: "bedrock-api-key",
+      });
+    });
+
+    /** @scenario "A Bedrock row without a Bedrock API key cannot run a decision model" */
+    it("answers key_missing for a row with only the access key pair", () => {
+      expect(
+        decisionModelResolutionOf({
+          model: BEDROCK_DECISIONS,
+          row: bedrockRow({ ...ACCESS_PAIR, AWS_REGION_NAME: "us-east-1" }),
+        }),
+      ).toEqual({ kind: "own_unavailable", model: BEDROCK_DECISIONS, reason: "key_missing" });
+    });
+
+    /** @scenario "A Bedrock key is never sent to a host outside AWS" */
+    it.each([
+      ["a host", "evil.example"],
+      ["a path", "us-east-1/../x"],
+      ["a host with a region in it", "us-east-1.evil.example"],
+      ["a URL", "https://us-east-1.example"],
+      ["a made-up shape", "useast1"],
+    ])("answers endpoint_invalid for %s", (_, region) => {
+      expect(
+        decisionModelResolutionOf({
+          model: BEDROCK_DECISIONS,
+          row: bedrockRow({ AWS_REGION_NAME: region, AWS_BEARER_TOKEN_BEDROCK: "bedrock-api-key" }),
+        }),
+      ).toEqual({ kind: "own_unavailable", model: BEDROCK_DECISIONS, reason: "endpoint_invalid" });
+    });
+
+    it("answers key_missing when the row has no region", () => {
+      expect(
+        decisionModelResolutionOf({
+          model: BEDROCK_DECISIONS,
+          row: bedrockRow({ AWS_BEARER_TOKEN_BEDROCK: "bedrock-api-key" }),
+        }),
+      ).toEqual({ kind: "own_unavailable", model: BEDROCK_DECISIONS, reason: "key_missing" });
+    });
+  });
 });
 
 describe("picksOwnDecisionModel", () => {

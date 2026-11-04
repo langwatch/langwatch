@@ -361,6 +361,28 @@ describe("ModelProviderDecisionModelService.listPickable", () => {
     ]);
     expect(providerLookups.filter((provider) => provider === "perplexity")).toEqual(["perplexity"]);
   });
+
+  /** @scenario "A Bedrock row without a Bedrock API key cannot run a decision model" */
+  it("offers the Bedrock model only once its row holds a Bedrock API key", async () => {
+    const BEDROCK_DECISIONS = "bedrock/decisions:gpt-6-luna";
+    const accessPair = {
+      AWS_ACCESS_KEY_ID: "AKIA",
+      AWS_SECRET_ACCESS_KEY: "s",
+      AWS_REGION_NAME: "us-east-1",
+    };
+    const offeredWith = async (customKeys: Readonly<Record<string, unknown>>) => {
+      const { service } = harness({
+        stored: OPENAI_DECISIONS,
+        rowsByProvider: { bedrock: rowOf({ provider: "bedrock", customKeys }) },
+      });
+      return (await service.listPickable({ projectId: "proj_1" })).map((model) => model.value);
+    };
+
+    expect(await offeredWith(accessPair)).not.toContain(BEDROCK_DECISIONS);
+    expect(await offeredWith({ ...accessPair, AWS_BEARER_TOKEN_BEDROCK: "k" })).toContain(
+      BEDROCK_DECISIONS,
+    );
+  });
 });
 
 describe("ModelProviderDecisionModelService.listPickableForScopes", () => {

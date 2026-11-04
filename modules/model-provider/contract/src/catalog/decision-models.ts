@@ -23,11 +23,14 @@ export const DECISION_MODEL_AUTH_HEADERS = ["bearer", "api_key"] as const;
 export type DecisionModelAuthHeader = (typeof DECISION_MODEL_AUTH_HEADERS)[number];
 
 /**
- * One `{name}` in an endpoint, filled from a provider row field. `value` sends the field as it
- * is, URL-encoded; `azure_resource` reads the resource name from an Azure endpoint URL and
- * refuses any host that is not Azure's (ADR-182 decision 5, revised 2026-11-02).
+ * One `{name}` in an endpoint, filled from a provider row field. `value` sends the field URL-encoded;
+ * `azure_resource` reads the resource name from an Azure endpoint URL and `aws_region` takes only an
+ * AWS region name, so neither can point a key at another host (ADR-182 decision 5).
  */
-export type DecisionEndpointParam = Readonly<{ field: string; read: "value" | "azure_resource" }>;
+export type DecisionEndpointParam = Readonly<{
+  field: string;
+  read: "value" | "azure_resource" | "aws_region";
+}>;
 
 export type DecisionModelEntry = Readonly<{
   id: string;
@@ -46,6 +49,8 @@ export type DecisionModelEntry = Readonly<{
   endpointParams?: Readonly<Record<string, DecisionEndpointParam>>;
   /** Bearer when absent. */
   authHeader?: DecisionModelAuthHeader;
+  /** The row field holding this entry's key, when it is not the provider's `apiKey`. */
+  keyField?: string;
 }>;
 
 const CLOUDFLARE_ACCOUNT = {
@@ -156,6 +161,18 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
     authHeader: "api_key",
   },
   {
+    id: "bedrock/decisions:gpt-6-luna",
+    provider: "bedrock",
+    label: "OpenAI Decisions API (Bedrock)",
+    description: "gpt-6-luna on Amazon Bedrock, on your Bedrock API key.",
+    wire: "openai_decisions",
+    providerModel: "openai.gpt-6-luna",
+    endpoint: "https://bedrock-mantle.{region}.api.aws/openai/v1/decisions",
+    endpointParams: { region: { field: "AWS_REGION_NAME", read: "aws_region" } },
+    // The access key pair signs requests and is never a bearer token.
+    keyField: "AWS_BEARER_TOKEN_BEDROCK",
+  },
+  {
     id: "openrouter/decisions:typesafe/jev-1.14",
     provider: "openrouter",
     label: "Jev 1.14 (OpenRouter)",
@@ -208,6 +225,15 @@ export type AzureEndpointRead =
 export function azureResourceOf(endpoint: string): AzureEndpointRead {
   const resource = AZURE_AI_ENDPOINT.exec(endpoint.trim())?.[1];
   return resource ? { kind: "azure", resource: resource.toLowerCase() } : { kind: "not_azure" };
+}
+
+/** An AWS region name such as `us-east-1` or `us-gov-west-1`; nothing else becomes a host label. */
+const AWS_REGION = /^[a-z]{2}(?:-gov)?-[a-z]+-\d{1,2}$/;
+
+/** The region as a lowercase name, or undefined for anything that is not one. */
+export function awsRegionOf(region: string): string | undefined {
+  const name = region.trim().toLowerCase();
+  return AWS_REGION.test(name) ? name : undefined;
 }
 
 export function findDecisionModel(id: string): DecisionModelEntry | undefined {

@@ -227,6 +227,33 @@ describe("ModelProviderModule.create", () => {
         aws_region_name: "eu-west-1",
       });
     });
+
+    /** @scenario "An admin can add a Bedrock API key without changing how chat models run" */
+    it("runs Bedrock chat on the access key pair when the row also holds a Bedrock API key", async () => {
+      const app = await createRealModelProviderApp();
+      await app.upsertUnattributed({
+        projectId: "project-1",
+        provider: "bedrock",
+        enabled: true,
+        customKeys: {
+          AWS_ACCESS_KEY_ID: "AKIATEST",
+          AWS_SECRET_ACCESS_KEY: "secret",
+          AWS_REGION_NAME: "us-east-1",
+          AWS_BEARER_TOKEN_BEDROCK: "bedrock-api-key",
+        },
+      });
+
+      const parameters = await app.prepareExecution({
+        model: "bedrock/anthropic.claude-v2",
+        projectId: "project-1",
+      });
+
+      expect(parameters).toMatchObject({
+        aws_access_key_id: "AKIATEST",
+        aws_region_name: "us-east-1",
+      });
+      expect(JSON.stringify(parameters)).not.toContain("bedrock-api-key");
+    });
   });
 
   describe("given the trace module bound to the channel tier", () => {

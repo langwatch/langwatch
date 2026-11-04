@@ -104,6 +104,11 @@ export const MODEL_PROVIDER_FIELD_METADATA: Record<
       label: "Region",
       description: "The AWS region where Bedrock is available (e.g., us-east-1, us-west-2)",
     },
+    AWS_BEARER_TOKEN_BEDROCK: {
+      label: "Bedrock API Key",
+      description:
+        "Optional: a Bedrock API key, for Instant Evals on gpt-6-luna. Chat models keep using the access key pair.",
+    },
   },
   deepseek: {
     DEEPSEEK_API_KEY: {

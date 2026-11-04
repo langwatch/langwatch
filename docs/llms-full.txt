@@ -43743,8 +43743,8 @@ The [Questions](/features/instant-evals/questions) page covers criteria, thresho
 ---
 title: Run Instant Evals on your own decision model
 sidebarTitle: Your own model
-keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, default models
-description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
+keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, amazon bedrock, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, default models
+description: Run Instant Evals on a decision model in your own provider account, set up Azure or Amazon Bedrock, and read the rows your model cannot judge.
 ---
 
 ## LangWatch Instant Preview or your own model
@@ -43758,6 +43758,7 @@ Instant Evals run on **LangWatch Instant Preview** by default, billed as in [Lim
 | OpenAI Decisions API              | OpenAI                | API key. Runs `gpt-6-luna`                                                    |
 | Azure OpenAI Decisions API        | Azure OpenAI          | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure) |
 | Microsoft Decision 1 (Azure)      | Azure OpenAI          | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
+| OpenAI Decisions API (Bedrock)    | Bedrock               | Bedrock API key and region. Runs `gpt-6-luna`. See [Amazon Bedrock](#amazon-bedrock) |
 | Inception Mercury Decide          | Inception             | API key                                                                       |
 | Perplexity Decider v1.2           | Perplexity            | API key                                                                       |
 | Perplexity Decider Flash v1.2     | Perplexity            | API key                                                                       |
@@ -43769,7 +43770,7 @@ Instant Evals run on **LangWatch Instant Preview** by default, billed as in [Lim
 | Liquid d1.1 (OpenRouter)          | OpenRouter            | API key                                                                       |
 | Fireworks Rune                    | Fireworks             | API key                                                                       |
 
-OpenAI Decisions API and Azure OpenAI Decisions API need `gpt-6-luna` on that account. The other models need no OpenAI account.
+OpenAI Decisions API, Azure OpenAI Decisions API and OpenAI Decisions API (Bedrock) need `gpt-6-luna` on that account. The other models need no OpenAI account.
 
 ## Set it up
 
@@ -43833,13 +43834,22 @@ az cognitiveservices account deployment create \
 
 Without the deployment, every row is skipped as `classifier_not_configured`.
 
+## Amazon Bedrock
+
+OpenAI Decisions API (Bedrock) uses the Bedrock provider and calls `https://bedrock-mantle.<region>.api.aws/openai/v1/decisions`.
+
+- **Bedrock API Key** (`AWS_BEARER_TOKEN_BEDROCK`): a [Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html). The access key pair cannot call this route, and chat models on Bedrock keep using it.
+- **Region** (`AWS_REGION_NAME`): an AWS region name such as `us-east-1`. Anything else is refused, so the key stays on AWS.
+
+Without the Bedrock API key, the model is not offered in the picker.
+
 ## When your model cannot answer
 
 A run on your own model never falls back to LangWatch Instant Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `classifier_key_invalid`          | The provider refused the key (401, 402 or 403), or the scope has no enabled provider row, no key, or an endpoint outside Azure | Check the row and its key at **Settings > Model Providers**                 |
+| `classifier_key_invalid`          | The provider refused the key (401, 402 or 403), or the scope has no enabled provider row, no key, or an endpoint outside Azure or AWS | Check the row and its key at **Settings > Model Providers**                 |
 | `classifier_not_configured`       | The provider answered 404: the account does not hold the model, or the Azure deployment does not exist      | Deploy the model, or set the deployment name on the Azure row               |
 | `classifier_rate_limited`         | The provider answered 429 on every retry                                                                    | Raise the rate limit or quota on your provider account                     |
 | `classifier_provider_unavailable` | The provider answered 5xx on every retry                                                                    | Try again later                                                             |

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  awsRegionOf,
   azureResourceOf,
   DECISION_MODELS,
   isOwnDecisionModelId,
@@ -33,6 +34,7 @@ describe("DECISION_MODELS", () => {
       const rowFields = [
         ...Object.values(entry.endpointParams ?? {}).map((param) => param.field),
         ...(entry.providerModelField ? [entry.providerModelField] : []),
+        ...(entry.keyField ? [entry.keyField] : []),
       ];
       for (const field of rowFields) expect(shape?.shape?.[field]).toBeDefined();
     },
@@ -41,6 +43,28 @@ describe("DECISION_MODELS", () => {
   it("never repeats an id", () => {
     const ids = DECISION_MODELS.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("awsRegionOf", () => {
+  it.each([
+    ["us-east-1", "us-east-1"],
+    [" EU-Central-1 ", "eu-central-1"],
+    ["us-gov-west-1", "us-gov-west-1"],
+    ["ap-southeast-11", "ap-southeast-11"],
+  ])("reads %s as a region", (raw, region) => {
+    expect(awsRegionOf(raw)).toBe(region);
+  });
+
+  it.each([
+    "evil.example",
+    "us-east-1.evil.example",
+    "us-east-1/x",
+    "us-east-1:443",
+    "useast1",
+    "",
+  ])("refuses %s", (raw) => {
+    expect(awsRegionOf(raw)).toBeUndefined();
   });
 });
 

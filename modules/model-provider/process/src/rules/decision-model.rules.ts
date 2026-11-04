@@ -5,7 +5,9 @@
  */
 
 import {
+  awsRegionOf,
   azureResourceOf,
+  type DecisionEndpointParam,
   findDecisionModel,
   findModelProviderDefinition,
   INSTANT_EVAL_DECISION_FEATURE_KEY,
@@ -77,7 +79,21 @@ type EndpointFill =
   | Readonly<{ kind: "missing" }>
   | Readonly<{ kind: "invalid" }>;
 
-/** Fills each `{name}` from the row; an Azure resource must sit on Azure's own hosts. */
+/** One param's text, or undefined when the row's value cannot be part of the host. */
+function endpointValueOf({
+  param,
+  raw,
+}: {
+  param: DecisionEndpointParam;
+  raw: string;
+}): string | undefined {
+  if (param.read === "value") return encodeURIComponent(raw);
+  if (param.read === "aws_region") return awsRegionOf(raw);
+  const azure = azureResourceOf(raw);
+  return azure.kind === "azure" ? azure.resource : undefined;
+}
+
+/** Fills each `{name}` from the row; Azure and AWS fields name only their vendor's host. */
 function fillEndpoint({
   entry,
   customKeys,
@@ -89,13 +105,9 @@ function fillEndpoint({
   for (const [name, param] of Object.entries(entry.endpointParams ?? {})) {
     const raw = normalizeText(customKeys?.[param.field]);
     if (!raw) return { kind: "missing" };
-    if (param.read === "value") {
-      endpoint = endpoint.replace(`{${name}}`, encodeURIComponent(raw));
-      continue;
-    }
-    const azure = azureResourceOf(raw);
-    if (azure.kind === "not_azure") return { kind: "invalid" };
-    endpoint = endpoint.replace(`{${name}}`, azure.resource);
+    const value = endpointValueOf({ param, raw });
+    if (value === undefined) return { kind: "invalid" };
+    endpoint = endpoint.replace(`{${name}}`, value);
   }
   return { kind: "filled", endpoint };
 }
@@ -116,7 +128,7 @@ export function decisionModelResolutionOf({
   if (!row.enabled)
     return { kind: "own_unavailable", model: entry.id, reason: "provider_disabled" };
 
-  const keyField = findModelProviderDefinition(entry.provider)?.apiKey;
+  const keyField = entry.keyField ?? findModelProviderDefinition(entry.provider)?.apiKey;
   const apiKey = keyField ? normalizeText(row.customKeys?.[keyField]) : undefined;
   const filled = fillEndpoint({
     entry: { ...entry, endpoint: entry.endpoint },
