@@ -47,6 +47,8 @@ const hookInputSchema = z
     // one is set (`--name` at launch, `/rename` before a resume). Absent on
     // the other events, where the live registry answers instead.
     session_title: reportedText,
+    // Grok's SubagentStart, which fires in the parent: the child's own session id.
+    subagentId: reportedText,
   })
   .transform(
     (
@@ -56,11 +58,13 @@ const hookInputSchema = z
       cwd?: string;
       hookEventName?: string;
       sessionTitle?: string;
+      subagentId?: string;
     } => ({
       sessionId: payload.session_id ?? payload.sessionId,
       cwd: payload.cwd,
       hookEventName: payload.hook_event_name,
       sessionTitle: payload.session_title,
+      subagentId: payload.subagentId,
     }),
   );
 

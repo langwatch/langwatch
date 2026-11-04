@@ -67,6 +67,8 @@ const transcriptEntrySchemaDefinition = z.discriminatedUnion("kind", [
     atMs: z.number(),
     name: z.string().nullable(),
     reason: z.string().nullable(),
+    // A user who cancels a call did not refuse it; the line says which.
+    outcome: z.enum(["denied", "aborted"]),
   }),
   z.object({
     kind: z.literal("note"),

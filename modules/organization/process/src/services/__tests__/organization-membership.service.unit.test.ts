@@ -69,7 +69,6 @@ describe("OrganizationMembershipService", () => {
     getMembership: vi.fn(),
     listAllMembers: vi.fn(),
     findMemberTeamBindings: vi.fn(),
-    createSsoDomainMembership: vi.fn(),
     countMembershipsForUser: vi.fn(),
     deleteMember: vi.fn(),
     setMemberDisabled: vi.fn(),
@@ -272,6 +271,7 @@ describe("OrganizationMembershipService", () => {
     });
 
     /** @scenario "An approved join request given a Lite Member seat holds the organization-wide Viewer grant" */
+    /** @scenario "A new account joined by its email domain past the seats is admitted as a Lite Member" */
     it("writes a Lite Member row and lands the organization-wide Viewer grant", async () => {
       mockCheckLimit.mockImplementation(async ({ resource }: { resource: string }) => ({
         allowed: resource === "membersLite",
@@ -313,6 +313,7 @@ describe("OrganizationMembershipService", () => {
     });
 
     /** @scenario "An arrival held pending for want of any seat is given no grant" */
+    /** @scenario "A new account joined by its email domain with no seat left is held with no grant" */
     it("holds the person pending when the Lite Member seats are used up too", async () => {
       mockCheckLimit.mockResolvedValue({
         allowed: false,

@@ -100,6 +100,7 @@ describe("the modelProvider tRPC namespace", () => {
         "listAllForOrganizationForFrontend",
         "listAllForProjectForFrontend",
         "listDecisionModelsForProject",
+        "listDecisionModelsForScopes",
         "saveDefaultModelsConfig",
         "setFeatureOverrideForScope",
         "setRoleAssignmentForScope",

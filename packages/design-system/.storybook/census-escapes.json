@@ -2172,14 +2172,6 @@
     "disposition": "reviewed"
   },
   {
-    "path": "modules/prompt/browser/src/ui/sections/variables/variable-mapping-input.tsx",
-    "rule": "card-box",
-    "line": 872,
-    "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
-    "owner": "prompt",
-    "disposition": "reviewed"
-  },
-  {
     "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-name-field.tsx",
     "rule": "card-box",
     "line": 134,
