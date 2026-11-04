@@ -9,6 +9,7 @@ import {
 import { toDate } from "@langwatch/time";
 
 import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
+import { verifyDatasetRecords } from "../../rules/dataset-record-retry.rules.ts";
 import type {
   DatasetRecordRepository,
   LockedDatasetRecords,
@@ -138,17 +139,16 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
     skipDuplicates?: boolean;
+    verifyExisting?: boolean;
   }): Promise<DatasetRecord[]> {
     const now = toDate(this.#database.now());
+    // Stage the complete batch; a conflict must not leave even a prefix behind.
+    const pending: DatasetRecord[] = [];
+
     // `DatasetRecord.id` is globally unique (Prisma's `@id`), and putRecord replaces by
-    // projectId+id, so the ids are tracked project-wide: an id stored in another dataset
+    // projectId+id, so the ids are tracked globally: an id stored in another dataset
     // must be skipped or refused here exactly as Postgres would.
-    const storedIds = new Set(
-      this.#database
-        .records()
-        .filter((record) => record.projectId === input.projectId)
-        .map((record) => record.id),
-    );
+    const storedIds = new Set(this.#database.records().map((record) => record.id));
 
     for (const { id, ...entry } of input.entries) {
       if (storedIds.has(id)) {
@@ -158,7 +158,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
         throw new Error(`Unique constraint failed on the fields: (id) ${id}`);
       }
 
-      this.#database.putRecord(
+      pending.push(
         datasetRecordSchema.parse({
           id,
           datasetId: input.datasetId,
@@ -171,6 +171,11 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
       // Same batch, later entry with this id: Prisma keeps the first row and skips the rest.
       storedIds.add(id);
     }
+
+    if (input.verifyExisting) {
+      verifyDatasetRecords(input.entries, [...this.#of(input), ...pending]);
+    }
+    for (const record of pending) this.#database.putRecord(record);
 
     const created = new Set(input.entries.map((entry) => entry.id));
 

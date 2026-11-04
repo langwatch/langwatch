@@ -4,6 +4,7 @@ import {
   type DatasetApi,
   type DatasetRecord,
   DatasetNotFoundError,
+  DatasetRecordConflictError,
   InvalidColumnError,
 } from "@langwatch/dataset-contract";
 import { refusesRetry } from "@langwatch/group-queue";
@@ -116,7 +117,11 @@ describe("PersistActionWriterService.addToDataset", () => {
       await writer.addToDataset(write);
 
       expect(appended).toEqual([
-        expect.objectContaining({ skipDuplicates: true, readBackExisting: true }),
+        expect.objectContaining({
+          skipDuplicates: true,
+          readBackExisting: true,
+          verifyExisting: true,
+        }),
       ]);
     });
 
@@ -132,20 +137,9 @@ describe("PersistActionWriterService.addToDataset", () => {
     it("fails terminally when a stored row no longer matches what the retry would write", async () => {
       const { writer } = writerOver({
         findBySlugOrId: async () => datasetWith(["question", "input"]),
-        // The first attempt stored this id against an older mapping; skipDuplicates
-        // keeps it, so the id check alone would report the new row as written.
-        batchCreateRecords: async (input) =>
-          input.entries.map(
-            ({ id }) =>
-              ({
-                id: id ?? "generated-id",
-                datasetId: input.slugOrId,
-                projectId: input.projectId,
-                entry: { question: "an earlier mapping", input: "secret value" },
-                createdAt: new Date(0),
-                updatedAt: new Date(0),
-              }) as DatasetRecord,
-          ),
+        batchCreateRecords: async () => {
+          throw new DatasetRecordConflictError("row-0");
+        },
       });
 
       const refusal = await refusalOf(writer.addToDataset(write));

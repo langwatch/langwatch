@@ -263,3 +263,12 @@ Feature: Shared Dataset service
     When records are added without ids
     Then each record returned carries the id it was stored under
     And those ids update and delete the stored records
+
+  @unit @integration
+  Scenario: A verified retry is atomic and compares complete normalized entries
+    Given an inline dataset with rows from an earlier attempt
+    When a retry reuses an id with changed content or a different dataset
+    Then the entire batch is refused as dataset_record_conflict
+    And no new rows from that batch remain
+    And columns removed from the mapping are included in the comparison
+    And identical normalized entries remain safe to retry

@@ -103,9 +103,10 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         // Record ids are deterministic per trigger, trace and row, so a page retry that
         // re-runs a trace whose rows already landed is already done, not a failure.
         skipDuplicates: true,
-        // Also return rows an earlier attempt stored, so the retry can compare their
-        // content with the row this mapping produces now instead of trusting the id.
+        // The dataset owner compares normalized content inside the write transaction;
+        // a conflict must not leave new expansion rows behind.
         readBackExisting: true,
+        verifyExisting: true,
       });
       // DatasetRecord.id is globally unique, but the readback is scoped to this dataset:
       // an id that already belongs to a different dataset is skipped by skipDuplicates and
@@ -121,35 +122,15 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
           retryable: false,
         });
       }
-
-      // A deterministic id only identifies a row while the mapping and expansions that
-      // produced it stay the same. If the trigger was edited between the first write and
-      // this retry, skipDuplicates would keep the old row and silently drop the new
-      // content, so compare the stored row with what this attempt would write and fail
-      // terminally instead of claiming a row that does not hold the new mapping.
-      const mappedColumns = [
-        ...new Set(input.datasetRecords.flatMap((record) => Object.keys(record))),
-      ].filter((column) => column !== "id");
-      const changed = entries.find((entry) => {
-        const storedRecord = storedById.get(entry.id as string);
-        if (storedRecord === undefined) {
-          return false;
-        }
-
-        return (
-          canonicalEntry(entry, mappedColumns) !== canonicalEntry(storedRecord.entry, mappedColumns)
-        );
-      });
-      if (changed !== undefined) {
+    } catch (error) {
+      if (readCode(error) === "dataset_record_conflict") {
         throw new DispatchError({
           message:
-            `The mapping for trigger ${input.triggerId} changed after trace ${input.traceId}'s rows ` +
-            `were first written; row ${String(changed.id)} now maps to different content. Restore the ` +
-            "mapping that wrote it, or clear those rows, before retrying.",
+            "The dataset or mapping changed; restore it or clear conflicting rows before retrying.",
           retryable: false,
+          cause: error,
         });
       }
-    } catch (error) {
       // A column refusal here means one was removed since the trim: a redelivery re-reads them.
       // It is a customer-fault handled error, which the outbox would retire as dead, so it is
       // rethrown as a retryable dispatch failure.
@@ -196,14 +177,4 @@ function readCode(error: unknown): unknown {
 
 function holdsOnlyId(entry: Record<string, unknown>): boolean {
   return Object.keys(entry).every((key) => key === "id");
-}
-
-/** One comparable form of a mapped row: every dataset column, null when absent. */
-function canonicalEntry(entry: Record<string, unknown>, columns: readonly string[]): string {
-  const normalized: Record<string, unknown> = {};
-  for (const column of [...columns].toSorted()) {
-    normalized[column] = entry[column] ?? null;
-  }
-
-  return JSON.stringify(normalized);
 }
