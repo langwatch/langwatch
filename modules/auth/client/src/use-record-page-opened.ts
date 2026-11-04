@@ -1,7 +1,10 @@
-import type { AppPage } from "@langwatch/auth-contract";
+import { type ContractApiMap, createModuleApi, type ModuleApi } from "@langwatch/api/web";
+import type { AppPage, authTrpc } from "@langwatch/auth-contract";
 import { useEffect } from "react";
 
-import { api } from "./personal-workspace-api.ts";
+type AuthApiMap = ContractApiMap<typeof authTrpc>;
+
+const authClient: ModuleApi<AuthApiMap> = createModuleApi<AuthApiMap>();
 
 type KeyValueStorage = Pick<Storage, "getItem" | "setItem">;
 
@@ -40,7 +43,7 @@ export async function recordPageOpenedOncePerHour({
 
 /** Announces once per mount that the person opened this page. */
 export function useRecordPageOpened({ page }: { page: AppPage }): void {
-  const { mutateAsync } = api.auth.recordPageOpened.useMutation();
+  const { mutateAsync } = authClient.auth.recordPageOpened.useMutation();
 
   useEffect(() => {
     void recordPageOpenedOncePerHour({

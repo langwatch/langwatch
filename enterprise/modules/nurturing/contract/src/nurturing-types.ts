@@ -60,6 +60,8 @@ export interface CioPersonTraits {
 
   // The person's own last page open
   app_last_opened_at?: number;
+  // The person's own last open of a usage, cost or plan page
+  usage_page_viewed_at?: number;
 
   // Evaluation milestones
   has_evaluations: boolean;
@@ -149,6 +151,7 @@ export type CioEventName =
   | "first_simulation_ran"
   | "coding_agent_first_session"
   | "sessions_page_viewed"
+  | "usage_page_viewed"
   | "joined_via_invite"
   | "joined_via_sso"
   | "onboarding_paths_selected"

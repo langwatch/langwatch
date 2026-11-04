@@ -365,6 +365,20 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     page: id,
   }),
+  z.object({
+    /** A usage, cost or plan page open: moves the person's usage_page_viewed_at. */
+    kind: z.literal("usage_page_opened"),
+    ...signalSource,
+    userId: id,
+    page: id,
+  }),
+  z.object({
+    /** The same open as the event Customer.io receives only for the person's first. */
+    kind: z.literal("usage_page_viewed"),
+    ...signalSource,
+    userId: id,
+    page: id,
+  }),
 ]);
 export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}
 export const nurturingSignalSchema: NurturingSignalSchema = nurturingSignalSchemaDefinition;
