@@ -209,7 +209,7 @@ func needsTarget(name string) bool {
 		return false
 	}
 	switch name {
-	case "pr", "switch", "simulator", "static", "go-watch", "ui-watch", "keep", "daemon", "gate":
+	case "pr", "switch", "simulator", "static", "docs-mount", "go-watch", "ui-watch", "keep", "daemon", "gate":
 		return false
 	}
 	return true

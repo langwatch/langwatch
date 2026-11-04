@@ -9,7 +9,7 @@ import {
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { evaluatorClient } from "@langwatch/evaluator-client";
-import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
+import { evaluatorMappingGaps } from "@langwatch/experiment-contract/mapping-validation";
 import { PromptEditorDrawerToken, PromptListDrawerToken } from "@langwatch/prompt-client";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef } from "react";
@@ -256,7 +256,12 @@ export const useWorkbenchEvaluatorAdd = () => {
 
       if (
         firstTarget &&
-        evaluatorHasMissingMappings(added, state.activeDatasetId, firstTarget.id)
+        !evaluatorMappingGaps({
+          evaluator: added,
+          datasetId: state.activeDatasetId,
+          targetId: firstTarget.id,
+          datasets: state.datasets,
+        }).isValid
       ) {
         openEvaluatorEditor({
           evaluator: added,

@@ -62,6 +62,8 @@ const apiKeySchemaDefinition = z
     ingestionTemplateId: z.string().nullable(),
     /** Minted by LangWatch for itself (a run, the gateway, Langy), never by a customer. */
     isSystemManaged: z.boolean().optional(),
+    /** The browser session that minted a docs session key, so its sign-out revokes it. */
+    createdByBrowserSessionId: z.string().nullable().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
     grants: z.array(apiKeyBindingSchema),
@@ -93,6 +95,8 @@ const apiKeyMutationShape = {
    */
   parentApiKeyId: z.string().min(1).nullable().optional(),
   isSystemManaged: z.boolean().optional(),
+  /** The browser session minting a docs session key (ADR-185); null for every other key. */
+  createdByBrowserSessionId: z.string().min(1).nullable().optional(),
 };
 const createApiKeyInputSchemaDefinition = z.object(apiKeyMutationShape).strict();
 export interface CreateApiKeyInputSchema extends Named<typeof createApiKeyInputSchemaDefinition> {}

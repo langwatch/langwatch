@@ -247,6 +247,7 @@ export function EvaluationsV3Table({
     addDataset,
     setActiveDataset,
     updateDataset,
+    removeMappingsToMissingColumns,
     setColumnWidths,
     toggleColumnVisibility,
     duplicateTarget,
@@ -281,6 +282,7 @@ export function EvaluationsV3Table({
       addDataset: state.addDataset,
       setActiveDataset: state.setActiveDataset,
       updateDataset: state.updateDataset,
+      removeMappingsToMissingColumns: state.removeMappingsToMissingColumns,
       setColumnWidths: state.setColumnWidths,
       toggleColumnVisibility: state.toggleColumnVisibility,
       duplicateTarget: state.duplicateTarget,
@@ -876,6 +878,8 @@ export function EvaluationsV3Table({
               rowCount: getRowCount(activeDataset.id),
             }),
           );
+          // An explicit columns edit, unlike a dataset load, drops mappings to removed columns.
+          removeMappingsToMissingColumns({ datasetId: activeDataset.id });
           setEditDatasetDrawerOpen(false);
         }}
       />
