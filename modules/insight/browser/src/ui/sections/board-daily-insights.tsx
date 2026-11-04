@@ -60,11 +60,8 @@ function DailyInsightsControl({
           runInFlight={setting.runInFlight}
           turnedOff={isOn ? undefined : turnedOff}
           insightsHref={daily.insightsHref}
-          runNow={
-            isOn && daily.mayRunNow && canRunRead
-              ? { isStarting: daily.isStartingRun, onRun: daily.runNow }
-              : undefined
-          }
+          isStarting={isOn && daily.isStartingRun}
+          onRunNow={isOn && daily.mayRunNow && canRunRead ? daily.runNow : undefined}
           onToggle={isOn ? daily.turnOff : () => daily.turnOn(settings)}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenInLangy={daily.openInLangy}
@@ -110,7 +107,8 @@ function DailyInsightsDropdown({
   runInFlight,
   turnedOff,
   insightsHref,
-  runNow,
+  isStarting,
+  onRunNow,
   onToggle,
   onOpenSettings,
   onOpenInLangy,
@@ -124,8 +122,10 @@ function DailyInsightsDropdown({
   /** Why the system turned the run off; undefined while it is on. */
   turnedOff: string | undefined;
   insightsHref: string | undefined;
+  /** A wait already going, whether or not the board could be run again now. */
+  isStarting: boolean;
   /** Undefined where the person may not run the board now, or a run could not read it. */
-  runNow: { isStarting: boolean; onRun: () => void } | undefined;
+  onRunNow: (() => void) | undefined;
   /** Turns the run off while it is on, and on again with what was last chosen while it is off. */
   onToggle: () => void;
   onOpenSettings: () => void;
@@ -206,7 +206,7 @@ function DailyInsightsDropdown({
               A run is going.
             </Text>
           )}
-          {runInFlight === null && runNow?.isStarting === true && (
+          {runInFlight === null && isStarting && (
             <Text textStyle="caption" color="fg.muted">
               Starting a run.
             </Text>
@@ -229,8 +229,8 @@ function DailyInsightsDropdown({
               Open in Langy
             </MenuRow>
           )}
-          {runInFlight === null && runNow !== undefined && !runNow.isStarting && (
-            <MenuRow icon={<Play size={13} aria-hidden />} onClick={() => leave(runNow.onRun)}>
+          {runInFlight === null && onRunNow !== undefined && !isStarting && (
+            <MenuRow icon={<Play size={13} aria-hidden />} onClick={() => leave(onRunNow)}>
               Run now
             </MenuRow>
           )}

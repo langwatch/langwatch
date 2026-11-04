@@ -100,9 +100,9 @@ export class StubInsightHost extends InsightHostApi {
 }
 
 /**
- * Renders one element inside the harness and hands back the host it recorded on. `lends` is
- * what a peer lends by token (§10.1), as an installed analytics would; none unless given.
- * `readHint` stands in for the server's read hints: every read is asked again.
+ * Renders one element inside the harness and hands back the host it recorded on. `lends` is what a
+ * peer lends by token (§10.1); none unless given. `readHint` stands in for the server's read hints:
+ * every read is asked again. `swapHost` puts another host over the same tree, as a URL query does.
  */
 export function renderWithInsightHost({
   element,
@@ -114,7 +114,11 @@ export function renderWithInsightHost({
   answer: UiProcedureAnswer;
   host?: StubInsightHost;
   lends?: readonly UiLend[];
-}): RenderResult & { host: StubInsightHost; readHint: () => Promise<void> } {
+}): RenderResult & {
+  host: StubInsightHost;
+  readHint: () => Promise<void>;
+  swapHost: (next: StubInsightHost) => void;
+} {
   const queryClient = createUiQueryClient({ onMutationError: () => void 0 });
   const capabilities = {
     ...createUiHostServicesFromHost({
@@ -125,18 +129,22 @@ export function renderWithInsightHost({
       { name: "analytics", installation: { capabilities: {}, lends } },
     ]),
   };
+  const transport = answeringUiTransport(answer);
+  const tree = (mounted: StubInsightHost) => (
+    <DesignSystemProvider forcedTheme="light">
+      <UiHostServicesContextProvider value={capabilities}>
+        <insightApi.Provider client={transport} queryClient={queryClient}>
+          <InsightHostProvider value={mounted}>{element}</InsightHostProvider>
+        </insightApi.Provider>
+      </UiHostServicesContextProvider>
+    </DesignSystemProvider>
+  );
+  const rendered = render(tree(host));
   return {
-    ...render(
-      <DesignSystemProvider forcedTheme="light">
-        <UiHostServicesContextProvider value={capabilities}>
-          <insightApi.Provider client={answeringUiTransport(answer)} queryClient={queryClient}>
-            <InsightHostProvider value={host}>{element}</InsightHostProvider>
-          </insightApi.Provider>
-        </UiHostServicesContextProvider>
-      </DesignSystemProvider>,
-    ),
+    ...rendered,
     host,
     readHint: () => queryClient.invalidateQueries(),
+    swapHost: (next) => rendered.rerender(tree(next)),
   };
 }
 

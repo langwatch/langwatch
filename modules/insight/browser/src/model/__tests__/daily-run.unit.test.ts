@@ -256,19 +256,18 @@ describe("given a member chose Run now, and the server answered request-1", () =
 
   describe("when its run settled before a read saw it start", () => {
     it("follows the settled run to its conversation", () => {
-      const settled = setting({
-        lastRun: lastRun({ at: NOW, runId: REQUEST, conversationId: "conversation-8" }),
-      });
+      const run = lastRun({ at: NOW, runId: REQUEST, conversationId: "conversation-8" });
 
-      expect(awaited(settled)).toEqual({ conversationId: "conversation-8" });
+      expect(awaited(setting({ lastRun: run }))).toEqual({
+        conversationId: "conversation-8",
+        settled: run,
+      });
     });
 
     it("ends the wait with no conversation for a run that never reached Langy", () => {
-      const skipped = setting({
-        lastRun: lastRun({ at: NOW, runId: REQUEST, outcome: "skipped", reason: "board_empty" }),
-      });
+      const run = lastRun({ at: NOW, runId: REQUEST, outcome: "skipped", reason: "board_empty" });
 
-      expect(awaited(skipped)).toEqual({ conversationId: null });
+      expect(awaited(setting({ lastRun: run }))).toEqual({ conversationId: null, settled: run });
     });
   });
 
@@ -277,12 +276,13 @@ describe("given a member chose Run now, and the server answered request-1", () =
       const started = setting({
         runInFlight: { runId: "run-scheduled", conversationId: "conversation-6", startedAt: NOW },
       });
-      const settled = setting({
-        lastRun: lastRun({ at: NOW, runId: "run-scheduled", conversationId: "conversation-6" }),
-      });
+      const run = lastRun({ at: NOW, runId: "run-scheduled", conversationId: "conversation-6" });
 
       expect(awaited(started)).toEqual({ conversationId: "conversation-6" });
-      expect(awaited(settled)).toEqual({ conversationId: "conversation-6" });
+      expect(awaited(setting({ lastRun: run }))).toEqual({
+        conversationId: "conversation-6",
+        settled: run,
+      });
     });
   });
 

@@ -1177,7 +1177,7 @@ Feature: The daily insights run
       Given a board that is on, with no run in flight
       And the member chose Run now
       When the hint that the run started reaches the board before the run is stored
-      Then the board reads its run again after 2, 4, 8 and 16 seconds, 4 times at most
+      Then the board reads its run again after 2, 4, 8 and 16 seconds, 4 times at most per chain
       And it does so also when the hint lands while the read Run now asked is unanswered
       And it stops reading as soon as the run shows
       And the Langy panel opens on the run's conversation without waiting for the run to end
@@ -1246,9 +1246,25 @@ Feature: The daily insights run
     @integration
     Scenario: Repeated failed re-reads stop when the delays end
       Given a board that is on, and the member chose Run now
-      When every re-read of the board fails
+      When every re-read of the board fails, and no other hint reaches it
       Then the board reads no more once the 2, 4, 8 and 16 second delays have passed
       And the member is told nothing until the deadline says the run could not be started
+
+    # A chain is the read Run now asks, or a hint's read, and the re-reads that follow it.
+    @integration
+    Scenario: The limit on re-reads holds per chain, and a hint starts a new chain
+      Given a board that is on, the member chose Run now, and the re-reads have stopped
+      When a hint reaches the board with no re-read in flight
+      Then the board reads its run, and again after 2, 4, 8 and 16 seconds
+      And no limit holds how many chains one wait starts
+
+    # A hint and a re-read are one refetch of one read, so the browser cannot tell them apart.
+    @integration
+    Scenario: A hint that lands on a re-read in flight counts as that re-read
+      Given a board that is on, the member chose Run now, and the last re-read of a chain is in flight
+      When a hint reaches the board and its read shows no run
+      Then the chain ends with that read
+      And the Langy panel opens once a later hint's read, or the deadline's, shows the run
 
     @integration
     Scenario: The deadline follows a run its last read finds
@@ -1265,6 +1281,13 @@ Feature: The daily insights run
       When the deadline reads the board once more and that read shows no run
       Then the member is told once that the run could not be started
       And the dropdown offers Run now again
+
+    @integration
+    Scenario: The deadline does not move when the page's host is rebuilt
+      Given a board that is on, and the member chose Run now
+      When the page's address changes before the deadline, or while its last read is unanswered
+      Then the member is told once, at the same time as if it had not changed
+      And the message goes through the page as it is by then
 
     @integration
     Scenario: The deadline says so once when its last read fails
@@ -1288,6 +1311,20 @@ Feature: The daily insights run
       When a later read shows that run in flight, or settled with no conversation
       Then no Langy panel opens and the member is told nothing more
       And the dropdown shows the run as any run on the board
+
+    @integration
+    Scenario: Turning the run off ends the wait for a requested run
+      Given a board that is on, and the member chose Run now
+      When they turn the run off before the run shows
+      Then no Langy panel opens and nothing is said when the run shows, or at the deadline
+      And turning it on again shows no run starting, and offers Run now
+
+    @integration
+    Scenario: Starting a run still shows after the last widget is deleted
+      Given a board that is on, and the member chose Run now
+      When the board loses its last widget before the run shows
+      Then the dropdown still says a run is starting
+      And it offers no Run now
 
     @unit
     Scenario: A started run names its conversation on the board's row

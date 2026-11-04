@@ -214,7 +214,12 @@ the run is read again after each of `REQUESTED_RUN_REREAD_DELAYS_MS` in turn (2,
 request ends. A read that fails counts as answered, so it takes the next delay and does
 not end the re-reads early. The read Run now asks once the request is in starts the same
 re-reads, since a hint that lands while it is unanswered merges into it and could not
-start them itself. In flight, it opens Langy on the run's conversation; settled first, it
+start them itself. The limit is 4 re-reads per chain, not per wait: a hint that lands with
+no re-read in flight starts the delays over, so the reads of one wait grow with the hints
+that reach the tab. A hint that lands on a re-read in flight merges with it into one refetch
+of one read, so the browser cannot tell them apart and counts the answer as that re-read. On
+a chain's last re-read that ends the chain, and the run is then found by a later hint's read
+or the deadline's. In flight, it opens Langy on the run's conversation; settled first, it
 ends the wait, opening Langy if the run has a conversation and otherwise telling the
 person how it ended or why it did not start, from `lastRun`.
 
@@ -238,6 +243,12 @@ ends as for any other read. If it shows none, fails, or has not answered within
 `REQUESTED_RUN_LAST_READ_MS`, the browser says the run could not be started and the
 request ends, so an answer after that changes nothing. While a run is in flight the
 dropdown offers to open it instead.
+
+The deadline counts from the answer to the request, and nothing but the end of the wait
+moves it: the page's host is rebuilt on each change of the URL's query, and the notice goes
+through the host of that moment. Turning the run off ends the wait at once, also when the
+write is then refused, so a board switched off opens no panel and says nothing more. Losing
+the last widget does not end the wait: the offer of Run now goes, "Starting a run." stays.
 
 **The row names the run in flight.** `run_started` writes `runInFlightId`,
 `runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run

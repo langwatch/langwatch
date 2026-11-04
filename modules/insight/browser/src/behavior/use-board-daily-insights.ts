@@ -14,7 +14,7 @@ import {
 import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { currentTimeZone } from "@langwatch/time";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 
 import {
   defaultRunSettings,
@@ -80,7 +80,8 @@ function useRereadWhileAwaiting({
 }): () => void {
   const utils = insightApi.useUtils();
   const seenAnswer = useRef(answeredAt);
-  /** How many re-reads came before the read in flight; 0 when a hint or Run now asked it. */
+  /** Re-reads before the read in flight; 0 when a hint or Run now asked it. A hint that lands on a
+   * re-read merges into it and looks the same here, so it counts as that re-read (ADR-004). */
   const rereadsBefore = useRef(0);
   const readAgain = useCallback(
     (rereads: number) => {
@@ -119,18 +120,21 @@ function useRequestedRunDeadline({
   readOnce: () => Promise<{ data?: InsightDailyRunSetting | undefined }>;
   onLost: () => void;
 }) {
+  // The host is rebuilt on each change of the URL's query: it reaches the deadline, never moves it.
+  const readLastTime = useEffectEvent(readOnce);
+  const sayLost = useEffectEvent(onLost);
   useEffect(() => {
     if (!isAwaitingRun || !request) return;
     let isOver = false;
     const giveUp = () => {
       if (isOver) return;
       isOver = true;
-      onLost();
+      sayLost();
     };
     let lastRead: ReturnType<typeof setTimeout> | undefined;
     const deadline = setTimeout(() => {
       lastRead = setTimeout(giveUp, REQUESTED_RUN_LAST_READ_MS);
-      void readOnce().then(({ data }) => {
+      void readLastTime().then(({ data }) => {
         // A failed read hands back what the board last read, which shows no run either.
         if (!data || !requestedRunOf({ setting: data, ...request })) giveUp();
       });
@@ -140,7 +144,7 @@ function useRequestedRunDeadline({
       clearTimeout(deadline);
       clearTimeout(lastRead);
     };
-  }, [isAwaitingRun, request, readOnce, onLost]);
+  }, [isAwaitingRun, request]);
 }
 
 type Write = {
@@ -176,8 +180,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       : undefined;
   const hasRequestedRunShown = requested !== undefined;
   const requestedConversationId = requested?.conversationId ?? null;
-  // Only a settled run shows with no conversation, so the last run is the one to speak of.
-  const requestedRunEnd = query.data?.lastRun ? requestedRunEndWords(query.data.lastRun) : null;
+  const requestedSettledRun = requested?.settled ?? null;
   const isAwaitingRun = runNowRequest.isSuccess && !hasRequestedRunShown;
   const readAgain = useRereadWhileAwaiting({
     scope,
@@ -189,17 +192,17 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     endRunNow();
     if (requestedConversationId !== null) {
       openInLangy({ host, conversationId: requestedConversationId });
-    } else if (requestedRunEnd !== null) {
-      host.informed({ title: requestedRunEnd });
+    } else if (requestedSettledRun !== null) {
+      host.informed({ title: requestedRunEndWords(requestedSettledRun) });
     }
-  }, [hasRequestedRunShown, requestedConversationId, requestedRunEnd, endRunNow, host]);
-  const sayRunNotStarted = useCallback(() => {
+  }, [hasRequestedRunShown, requestedConversationId, requestedSettledRun, endRunNow, host]);
+  const sayRunNotStarted = () => {
     endRunNow();
     host.failed({
       error: new Error("The requested run never showed"),
       fallbackTitle: RUN_NOT_STARTED,
     });
-  }, [endRunNow, host]);
+  };
   useRequestedRunDeadline({
     request: runNowRequest.data,
     isAwaitingRun,
@@ -237,13 +240,16 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       done: `${done} ${turnedOnWords({ kind: board.kind, settings })}`,
       fallbackTitle,
     });
-  const turnOffWith = ({ done, fallbackTitle }: { done: string; fallbackTitle: string }) =>
+  const turnOffWith = ({ done, fallbackTitle }: { done: string; fallbackTitle: string }) => {
+    // A board switched off owes no panel and no toast, and turning it on again starts no wait.
+    endRunNow();
     write({
       next: (current) => ({ ...current, state: "off", offReason: null }),
       send: (handlers) => turnOffRun.mutate({ projectId, board }, handlers),
       done,
       fallbackTitle,
     });
+  };
 
   const ownTimezone = currentTimeZone() || "UTC";
   const settings = query.data?.settings ?? defaultRunSettings({ timezone: ownTimezone });
@@ -275,7 +281,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       }),
     /** A run is a Langy turn, so Run now asks what turning the run on asks. */
     mayRunNow: host.hasPermission("langy:create"),
-    /** True from Run now until its run shows, or a run's expiry passes without it. */
+    /** True from Run now until its run shows, it is turned off, or a run's expiry passes. */
     isStartingRun: runNowRequest.isPending || isAwaitingRun,
     runNow: () =>
       runNowRequest.mutate(

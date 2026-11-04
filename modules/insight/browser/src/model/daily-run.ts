@@ -202,9 +202,9 @@ export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";
 
 /**
- * What a Run now waits for: the run its request named, or another run that started after the
- * request, or settled after it in Langy. The process drops a request while it holds a run, so that
- * run is the one to follow; a lost run settles with no conversation, and is not it (ADR-004).
+ * What a Run now waits for: the run its request named, or another that started after the request,
+ * or settled after it in Langy (the process drops a request while it holds a run), and never a lost
+ * run, settled with no conversation (ADR-004). A settled run comes with itself, for its own words.
  */
 export function requestedRunOf({
   setting,
@@ -216,14 +216,14 @@ export function requestedRunOf({
   requestId: string;
   /** When the server recorded the request, on the clock that stamps a run's start. */
   requestedAt: number;
-}): { conversationId: string | null } | undefined {
+}): { conversationId: string | null; settled?: InsightLastRun } | undefined {
   const { runInFlight, lastRun } = setting;
   if (runInFlight && (runInFlight.runId === requestId || runInFlight.startedAt >= requestedAt)) {
     return { conversationId: runInFlight.conversationId };
   }
   const settledInLangy = lastRun?.conversationId != null && lastRun.at >= requestedAt;
   if (lastRun && (lastRun.runId === requestId || settledInLangy)) {
-    return { conversationId: lastRun.conversationId };
+    return { conversationId: lastRun.conversationId, settled: lastRun };
   }
   return undefined;
 }
