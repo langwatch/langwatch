@@ -770,14 +770,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given projects that belong to two organizations
     When one LangWatchQL query reads them together
     Then the query layer refuses it with error code lwql_unavailable before any statement runs
-    And the REST API answers 503 internal_error with "An unknown error occurred", so that code does not reach a REST caller (ruling 2026-10-05)
+    And from REST with a project key the request gets 404 project_not_found earlier, so this refusal is not reached there
 
   @unit
   Scenario: A LangWatchQL query on a private ClickHouse without LangWatchQL set up is refused
     Given an organization whose private ClickHouse does not know the LangWatchQL identity or has no LangWatchQL views
     When a LangWatchQL query reads that organization's projects
     Then the query layer refuses it with error code lwql_unavailable, saying LangWatchQL is not set up on this organization's ClickHouse yet
-    And the REST API answers 503 internal_error with "An unknown error occurred", so that code and sentence do not reach a REST caller (ruling 2026-10-05)
     And the refusal names no URL, user or password
 
   # ---------------------------------------------------------------------------
