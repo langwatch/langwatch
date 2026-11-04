@@ -15,7 +15,7 @@ The Grok CLI is xAI's terminal coding agent. It reports every session over OpenT
 There are two ways to set it up:
 
 - `langwatch grok` starts Grok and sets up the connection on the first run. Use it on a machine you work on.
-- `langwatch instrument grok` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+- `langwatch instrument grok` writes the same setup and exits. Use it on a machine where people start Grok from a terminal, or when the telemetry must go to a team project.
 
 ## Before you start
 
@@ -42,7 +42,7 @@ Everything else is unchanged: `langwatch grok` accepts the same flags as `grok` 
 
 ## Set up a machine without starting Grok
 
-`langwatch instrument grok` writes the connection and exits. A plain `grok` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
+`langwatch instrument grok` writes the connection and exits. A plain `grok` run on that machine then sends its telemetry to LangWatch. This is the setup for a shared machine where people start Grok from a terminal, for a machine image, or for a configuration management run.
 
 ```bash
 langwatch instrument grok
@@ -54,6 +54,8 @@ The command writes two things:
 - The hook file in `~/.grok/hooks/`.
 
 Open a new terminal after the command, or read the start file again, so the function is in place.
+
+Only a shell that reads the start file has the function. A service, a scheduled job or a script that starts `grok` without it gets no LangWatch settings and sends no telemetry. For those, set the variables from [Manual OpenTelemetry setup](#manual-opentelemetry-setup) in that process's environment.
 
 <Note>
   The shell function needs zsh, bash or fish. On Windows, start Grok with `langwatch grok` each
@@ -118,7 +120,7 @@ The setup switches on Grok's four content settings: prompts, responses, tool det
   </Accordion>
 
   <Accordion title="The wrapper reports that the hook file is not a LangWatch file">
-    A file of your own already sits at `~/.grok/hooks/langwatch.json`. LangWatch never overwrites it, and sessions report no repository while it is there. Rename your file, then run `langwatch grok` again.
+    A file of your own named `langwatch.json` already sits in Grok's hook folder: `~/.grok/hooks/`, or `hooks` inside `GROK_HOME` when that is set. LangWatch never overwrites it, and sessions report no repository while it is there. Rename your file, then run `langwatch grok` again.
   </Accordion>
 
 <Accordion title="The command reports that it could not write the shell start file">

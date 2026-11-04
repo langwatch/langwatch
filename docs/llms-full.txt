@@ -18908,7 +18908,7 @@ The Grok CLI is xAI's terminal coding agent. It reports every session over OpenT
 There are two ways to set it up:
 
 - `langwatch grok` starts Grok and sets up the connection on the first run. Use it on a machine you work on.
-- `langwatch instrument grok` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+- `langwatch instrument grok` writes the same setup and exits. Use it on a machine where people start Grok from a terminal, or when the telemetry must go to a team project.
 
 ## Before you start
 
@@ -18935,7 +18935,7 @@ Everything else is unchanged: `langwatch grok` accepts the same flags as `grok` 
 
 ## Set up a machine without starting Grok
 
-`langwatch instrument grok` writes the connection and exits. A plain `grok` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
+`langwatch instrument grok` writes the connection and exits. A plain `grok` run on that machine then sends its telemetry to LangWatch. This is the setup for a shared machine where people start Grok from a terminal, for a machine image, or for a configuration management run.
 
 ```bash
 langwatch instrument grok
@@ -18947,6 +18947,8 @@ The command writes two things:
 - The hook file in `~/.grok/hooks/`.
 
 Open a new terminal after the command, or read the start file again, so the function is in place.
+
+Only a shell that reads the start file has the function. A service, a scheduled job or a script that starts `grok` without it gets no LangWatch settings and sends no telemetry. For those, set the variables from [Manual OpenTelemetry setup](#manual-opentelemetry-setup) in that process's environment.
 
 <Note>
   The shell function needs zsh, bash or fish. On Windows, start Grok with `langwatch grok` each
@@ -19011,7 +19013,7 @@ The setup switches on Grok's four content settings: prompts, responses, tool det
   </Accordion>
 
   <Accordion title="The wrapper reports that the hook file is not a LangWatch file">
-    A file of your own already sits at `~/.grok/hooks/langwatch.json`. LangWatch never overwrites it, and sessions report no repository while it is there. Rename your file, then run `langwatch grok` again.
+    A file of your own named `langwatch.json` already sits in Grok's hook folder: `~/.grok/hooks/`, or `hooks` inside `GROK_HOME` when that is set. LangWatch never overwrites it, and sessions report no repository while it is there. Rename your file, then run `langwatch grok` again.
   </Accordion>
 
 <Accordion title="The command reports that it could not write the shell start file">
@@ -19858,7 +19860,7 @@ keywords:
 There are two ways to set it up:
 
 - `langwatch pi` starts pi and sets up the connection on the first run. Use it on a machine you work on.
-- `langwatch instrument pi` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+- `langwatch instrument pi` writes the same setup and exits. Use it on a machine where people start pi from a terminal, or when the telemetry must go to a team project.
 
 ## Before you start
 
@@ -19884,7 +19886,7 @@ On that run the wrapper writes the telemetry extension to `~/.pi/agent/extension
 
 ## Set up a machine without starting pi
 
-`langwatch instrument pi` writes the connection and exits. A plain `pi` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
+`langwatch instrument pi` writes the connection and exits. A plain `pi` run on that machine then sends its telemetry to LangWatch. This is the setup for a shared machine where people start pi from a terminal, for a machine image, or for a configuration management run.
 
 ```bash
 langwatch instrument pi
@@ -19896,6 +19898,8 @@ The command writes two files:
 - The telemetry extension in pi's extension folder, `~/.pi/agent/extensions/`. It reads the endpoint and the key from the function's environment, since pi has no configuration file that holds either.
 
 Open a new terminal after the command, or read the start file again, so the function is in place.
+
+Only a shell that reads the start file has the function. A service, a scheduled job or a script that starts `pi` without it gets no LangWatch settings and sends no telemetry. For those, set the variables from [Manual setup](#manual-setup) in that process's environment.
 
 <Note>
   The shell function needs zsh, bash or fish. On Windows, start pi with `langwatch pi` each time
@@ -19951,12 +19955,12 @@ The extension exports what pi's own span tree describes: model, provider, token 
   <Accordion title="No telemetry arrives in LangWatch">
     Open a new terminal. The `pi` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
-    Then check that `~/.pi/agent/extensions/langwatch-pi-telemetry.ts` exists. Run `langwatch pi` or `langwatch ingest install pi_cli` once to write it again.
+    Then check that the extension exists at `~/.pi/agent/extensions/langwatch-pi-telemetry.ts`, or in the `extensions` folder inside `PI_CODING_AGENT_DIR` when that is set. Run `langwatch pi` or `langwatch instrument pi` once to write it again.
 
   </Accordion>
 
   <Accordion title="The wrapper reports that the extension file is not a LangWatch file">
-    A file of your own already sits at `~/.pi/agent/extensions/langwatch-pi-telemetry.ts`. LangWatch never overwrites it, and pi sessions send no telemetry while it is there. Rename or remove your file, then run `langwatch pi` again.
+    A file of your own named `langwatch-pi-telemetry.ts` already sits in pi's extension folder: `~/.pi/agent/extensions/`, or `extensions` inside `PI_CODING_AGENT_DIR` when that is set. LangWatch never overwrites it, and pi sessions send no telemetry while it is there. Rename or remove your file, then run `langwatch pi` again.
   </Accordion>
 
 <Accordion title="The command reports that it could not write the shell start file">
@@ -19980,7 +19984,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual setup
 
-The extension is required: pi exports no telemetry without it. Run `langwatch ingest install pi_cli` once to write it, then set the variables below before you start pi. They are the ones the shell function sets.
+The extension is required: pi exports no telemetry without it. Run `langwatch instrument pi --key <ingest-key>` once to write it with no login (it writes the shell function too), or `langwatch ingest install pi_cli` on a machine where you are signed in. Then set the variables below before you start pi. They are the ones the shell function sets.
 
 ```bash
 export OTEL_TRACES_EXPORTER=otlp
