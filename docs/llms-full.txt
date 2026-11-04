@@ -18995,7 +18995,7 @@ keywords:
   - coding agent pr tracking
 ---
 
-Three things have to be in place for a pull request to show its cost: the agent is wired with `langwatch instrument`, you start the agent inside the repository's folder, and your organization has GitHub connected. This page covers each one, what the command writes on your machine, and how to remove it again.
+Three things have to be in place for a pull request to show its cost: the agent is wired with `langwatch instrument` or started through a `langwatch <tool>` wrapper, you start the agent inside the repository's folder, and your organization has GitHub connected. This page covers each one, what the command writes on your machine, and how to remove it again.
 
 ## Set it up
 
@@ -19058,7 +19058,7 @@ The shell function sets the variables only for that one tool run, so other comma
 
 ## Which agents report their pull requests
 
-Claude Code, Codex, GitHub Copilot and GitHub Copilot in VS Code (`code`) report the repository and branch after `langwatch instrument`, which is what joins a session to a pull request. Both Copilot tools read the same hook file. For Gemini CLI and opencode, the command wires the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
+Claude Code, Codex, GitHub Copilot and GitHub Copilot in VS Code (`code`) report the repository and branch after `langwatch instrument` or a `langwatch <tool>` wrapper run, which is what joins a session to a pull request. Both Copilot tools read the same hook file. For Gemini CLI and opencode, these commands wire the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
 
 ## Why the agent must start inside the repository
 
@@ -19108,7 +19108,7 @@ Both `langwatch instrument` and any `langwatch <tool>` wrapper run write the rem
 langwatch logout
 ```
 
-`langwatch logout` signs this machine out and removes every block LangWatch wrote: the Claude Code variables and hooks, the Codex `[otel]` and `notify` blocks and the `AGENTS.md` instruction, and the shell functions. It removes only blocks LangWatch wrote, and leaves the rest of each file as it was.
+`langwatch logout` signs this machine out and removes every block LangWatch wrote: the Claude Code variables and hooks, the Codex `[otel]` and `notify` blocks and the `AGENTS.md` instruction, the shell functions, the Copilot hook file, and the VS Code setting that clears the telemetry variables. It removes only blocks LangWatch wrote, and leaves the rest of each file as it was.
 
 - `--keep-credentials` removes the wiring and keeps you signed in.
 - `-y` skips the confirmation prompt.
