@@ -1001,12 +1001,12 @@ readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClust
 readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
 ```
 
-#### `countTracesInLastDay`
+#### `countTracesOnUtcDay`
 
-The project's distinct traces over the last 24 hours.
+The project's distinct traces that occurred on one UTC day, `day` counted in whole days since the epoch (the automation ceiling's day).
 
 ```typescript
-countTracesInLastDay(input: { projectId: string }): Promise<number>;
+countTracesOnUtcDay(input: { projectId: string; day: number }): Promise<number>;
 ```
 
 #### `hasTraceWithAttribute`

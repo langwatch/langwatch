@@ -13,7 +13,8 @@ export abstract class TraceUsageCountRepository {
     afterTraceId: string;
     limit: number;
   }): Promise<string[]>;
-  abstract countTracesInLastDay(input: { tenantId: string }): Promise<number>;
+  /** Distinct traces whose OccurredAt falls on UTC day `day` (whole days since the epoch). */
+  abstract countTracesOnUtcDay(input: { tenantId: string; day: number }): Promise<number>;
   abstract hasTraceWithAttribute(input: {
     tenantId: string;
     sinceMs: number;

@@ -86,7 +86,7 @@ class TestRunaway
   extends AutomationRunawayRepository
   implements AutomationRunawayNotice, AutomationRunawaySignals
 {
-  async countProjectTraces24h() {
+  async countProjectTracesOnDay() {
     return 0;
   }
   async notificationRecipients() {

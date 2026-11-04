@@ -37,7 +37,7 @@ function adapter(
     },
     suppression: { filterSuppressed },
     mailer: new NoopMailer(),
-    traces: createApiFixture<TraceApi>({ countTracesInLastDay: async () => 0 }),
+    traces: createApiFixture<TraceApi>({ countTracesOnUtcDay: async () => 0 }),
     metrics: AutomationRunawayMetricsNullService.create(),
     baseHost: "https://app.langwatch.test",
   });
@@ -127,9 +127,9 @@ describe("given a worker holding an automation containment claim", () => {
 });
 
 describe("given a project whose traces the runaway check counts", () => {
-  describe("when the last day's traces are counted", () => {
+  describe("when one UTC day's traces are counted", () => {
     it("asks the trace owner for the project's count", async () => {
-      const countTracesInLastDay = vi.fn(async () => 42);
+      const countTracesOnUtcDay = vi.fn(async () => 42);
       const service = AutomationRunawayService.create({
         claims: MemoryAutomationContainmentClaimRepository.create(),
         directories: {
@@ -138,13 +138,13 @@ describe("given a project whose traces the runaway check counts", () => {
         },
         suppression: { filterSuppressed: vi.fn() },
         mailer: new NoopMailer(),
-        traces: createApiFixture<TraceApi>({ countTracesInLastDay }),
+        traces: createApiFixture<TraceApi>({ countTracesOnUtcDay }),
         metrics: AutomationRunawayMetricsNullService.create(),
         baseHost: "https://app.langwatch.test",
       });
 
-      await expect(service.countProjectTraces24h("project-1")).resolves.toBe(42);
-      expect(countTracesInLastDay).toHaveBeenCalledWith({ projectId: "project-1" });
+      await expect(service.countProjectTracesOnDay("project-1", 20_000)).resolves.toBe(42);
+      expect(countTracesOnUtcDay).toHaveBeenCalledWith({ projectId: "project-1", day: 20_000 });
     });
   });
 });

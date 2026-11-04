@@ -949,8 +949,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): boolean;
   readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
-  /** The project's distinct traces over the last 24 hours. */
-  countTracesInLastDay(input: { projectId: string }): Promise<number>;
+  /**
+   * The project's distinct traces that occurred on one UTC day, `day` counted
+   * in whole days since the epoch (the automation ceiling's day).
+   */
+  countTracesOnUtcDay(input: { projectId: string; day: number }): Promise<number>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
   hasTraceWithAttribute(input: {
     projectId: string;

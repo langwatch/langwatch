@@ -518,7 +518,7 @@ function organizationOf(members: { email: string; role: "ADMIN" | "MEMBER" }[]):
 async function breachedWorker(input: {
   filters: CreateTriggerCommand["filters"];
   nextStep?: EntitlementApi["resolvePlanNextStep"];
-  countTracesInLastDay: TraceApi["countTracesInLastDay"];
+  countTracesOnUtcDay: TraceApi["countTracesOnUtcDay"];
 }) {
   const { notification, sent } = capturingMail();
   const appended: string[] = [];
@@ -534,7 +534,7 @@ async function breachedWorker(input: {
       getById: async ({ traceId }) => settlementTrace(traceId),
       deriveEvents: async () => [],
       matchesTraceFilters: () => true,
-      countTracesInLastDay: input.countTracesInLastDay,
+      countTracesOnUtcDay: input.countTracesOnUtcDay,
     }),
     dataset: createApiFixture<DatasetApi>({
       findBySlugOrId: qaDataset,
@@ -562,7 +562,7 @@ describe("given a memory-tier worker whose automation passes its plan's ceiling"
   it("pauses a condition-less automation for runaway volume and mails only the administrators", async () => {
     const { sent, appended, trigger } = await breachedWorker({
       filters: {},
-      countTracesInLastDay: async () => 1_000_000,
+      countTracesOnUtcDay: async () => 1_000_000,
     });
 
     expect(trigger.active).toBe(false);
@@ -576,7 +576,7 @@ describe("given a memory-tier worker whose automation passes its plan's ceiling"
     const counted: string[] = [];
     const { sent, trigger } = await breachedWorker({
       filters: { "metadata.labels": ["checkout"] },
-      countTracesInLastDay: async ({ projectId }) => {
+      countTracesOnUtcDay: async ({ projectId }) => {
         counted.push(projectId);
         return 1_000_000;
       },
@@ -594,7 +594,7 @@ describe("given a memory-tier worker pricing its plans", () => {
     const asked: Parameters<EntitlementApi["resolvePlanNextStep"]>[0][] = [];
     const { sent } = await breachedWorker({
       filters: { "metadata.labels": ["checkout"] },
-      countTracesInLastDay: async () => 1_000_000,
+      countTracesOnUtcDay: async () => 1_000_000,
       nextStep: async (input) => {
         asked.push(input);
         return {

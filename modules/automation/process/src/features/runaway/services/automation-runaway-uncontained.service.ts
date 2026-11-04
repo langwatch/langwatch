@@ -19,7 +19,7 @@ export class AutomationRunawayUncontainedService
 
   private constructor(private readonly logger: AutomationLogger) {}
 
-  countProjectTraces24h(): Promise<number> {
+  countProjectTracesOnDay(): Promise<number> {
     return Promise.resolve(0);
   }
 

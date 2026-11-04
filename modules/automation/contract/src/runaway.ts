@@ -14,6 +14,12 @@ export type AutomationPersistCapBreach = {
   count: number;
   cap: number;
   skipped: number;
+  /**
+   * The UTC day the breached counter belongs to (whole days since the epoch):
+   * the day the matched traces occurred, so a replayed backlog breaches the
+   * day it came from rather than the day it was processed.
+   */
+  day: number;
 };
 
 /**

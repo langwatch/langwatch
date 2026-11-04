@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryTraceUsageCountRepository } from "../../memory/memory.trace-usage-count.repository.ts";
 import { TraceUsageCountClickHouseRepository } from "../trace-usage-count.repository.ts";
 
+const DAY_MS = 24 * 60 * 60 * 1_000;
 const ORIGIN = { key: "langwatch.origin.kind", value: "ingestion_source" };
 
 function createRepository(rows: unknown[]) {
@@ -20,14 +21,36 @@ function createRepository(rows: unknown[]) {
 }
 
 describe("TraceUsageCountClickHouseRepository", () => {
-  describe("when the last day's traces are counted", () => {
-    it("counts distinct traces on the tenant over the trailing 24 hours", async () => {
+  describe("when one UTC day's traces are counted", () => {
+    it("counts distinct traces on the tenant that occurred within that day", async () => {
       const { queries, repository } = createRepository([{ total: "12" }]);
 
-      await expect(repository.countTracesInLastDay({ tenantId: "project-1" })).resolves.toBe(12);
+      await expect(
+        repository.countTracesOnUtcDay({ tenantId: "project-1", day: 20_000 }),
+      ).resolves.toBe(12);
       expect(queries[0]?.tenantId).toBe("project-1");
       expect(queries[0]?.sql).toMatch(/WHERE TenantId = \{tenantId:String\}\s+AND OccurredAt >=/);
+      expect(queries[0]?.sql).toContain("OccurredAt < fromUnixTimestamp64Milli({to:UInt64})");
       expect(queries[0]?.sql).toContain("count(DISTINCT TraceId)");
+      expect(queries[0]?.params).toMatchObject({ from: 20_000 * DAY_MS, to: 20_001 * DAY_MS });
+    });
+
+    it("counts in memory only the distinct traces that occurred on that day", async () => {
+      const memory = MemoryTraceUsageCountRepository.create();
+      const day = 20_000;
+      const at = (traceId: string, occurredAtMs: number) => ({
+        tenantId: "project-1",
+        traceId,
+        createdAt: "2024-10-04 00:00:00.000",
+        occurredAtMs,
+      });
+      memory.record(at("before", day * DAY_MS - 1));
+      memory.record(at("first", day * DAY_MS));
+      memory.record(at("first", day * DAY_MS + 5));
+      memory.record(at("last", (day + 1) * DAY_MS - 1));
+      memory.record(at("after", (day + 1) * DAY_MS));
+
+      await expect(memory.countTracesOnUtcDay({ tenantId: "project-1", day })).resolves.toBe(2);
     });
   });
 

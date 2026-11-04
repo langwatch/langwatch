@@ -3150,8 +3150,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
   }
 
-  countTracesInLastDay(input: { projectId: string }): Promise<number> {
-    return this.#usageCountRead().countTracesInLastDay({ tenantId: input.projectId });
+  countTracesOnUtcDay(input: { projectId: string; day: number }): Promise<number> {
+    return this.#usageCountRead().countTracesOnUtcDay({
+      tenantId: input.projectId,
+      day: input.day,
+    });
   }
 
   hasTraceWithAttribute(input: {

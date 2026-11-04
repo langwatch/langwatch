@@ -36,10 +36,14 @@ class TestRunawaySignals
   /** Every signals call in the order the policy made it. */
   readonly calls: string[] = [];
   count = 1_000;
+  /** Per-day traffic, read before `count`; the days the policy asked about. */
+  readonly countByDay = new Map<number, number>();
+  readonly countedDays: number[] = [];
   failEmail = false;
-  async countProjectTraces24h(): Promise<number> {
+  async countProjectTracesOnDay(_projectId: string, day: number): Promise<number> {
     this.calls.push("count-project-traces");
-    return this.count;
+    this.countedDays.push(day);
+    return this.countByDay.get(day) ?? this.count;
   }
   async notificationRecipients(): Promise<string[]> {
     return ["admin@example.com"];
@@ -90,6 +94,9 @@ class TestRunawaySignals
   }
 }
 
+/** 2026-01-01, the day of the clock every runtime below reads. */
+const TODAY = 20_454;
+
 const trigger = (overrides: Partial<AutomationRunawayTrigger> = {}): AutomationRunawayTrigger => ({
   id: "trigger-1",
   name: "Every trace",
@@ -107,6 +114,7 @@ function breach(overrides: Partial<AutomationPersistCapBreach> = {}): Automation
     count: 1_000,
     cap: 100,
     skipped: 900,
+    day: TODAY,
     ...overrides,
   };
 }
@@ -417,5 +425,39 @@ describe("runaway containment policy", () => {
     expect(active).toContain("trigger-1");
     await service.handle(breach());
     expect(active).not.toContain("trigger-1");
+  });
+
+  describe("given a breach on a replayed day", () => {
+    const REPLAYED_DAY = TODAY - 3;
+    const selective = () => trigger({ filters: { status: ["error"] } });
+
+    /** @scenario "Replaying older days does not pause an automation whose share of each day is below the threshold" */
+    it("compares the breach with that day's traffic and leaves the automation active", async () => {
+      const signals = new TestRunawaySignals();
+      // Today is quiet; the replayed day had plenty of traffic the matches are a small share of.
+      signals.countByDay.set(TODAY, 120);
+      signals.countByDay.set(REPLAYED_DAY, 5_000);
+      const { service } = runtime(signals);
+
+      await service.handle(breach({ trigger: selective(), count: 200, skipped: 100, day: REPLAYED_DAY }));
+
+      expect(signals.countedDays).toEqual([REPLAYED_DAY]);
+      expect(signals.paused).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A replayed day that matches almost every trace of that day still pauses" */
+    it("pauses when the matches cover almost all of that day's traffic", async () => {
+      const signals = new TestRunawaySignals();
+      signals.countByDay.set(TODAY, 100_000);
+      signals.countByDay.set(REPLAYED_DAY, 1_000);
+      const { service } = runtime(signals);
+
+      await service.handle(breach({ trigger: selective(), count: 950, skipped: 850, day: REPLAYED_DAY }));
+
+      expect(signals.countedDays).toEqual([REPLAYED_DAY]);
+      expect(signals.paused).toHaveBeenCalledWith(
+        expect.objectContaining({ active: false, pausedReason: RUNAWAY_PAUSE_REASON }),
+      );
+    });
   });
 });

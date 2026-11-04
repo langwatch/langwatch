@@ -84,7 +84,7 @@ export function createCanonicalAutomationApp(): {
   };
   const runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals =
     {
-      countProjectTraces24h: vi.fn(async () => 0),
+      countProjectTracesOnDay: vi.fn(async () => 0),
       notificationRecipients: vi.fn(async () => []),
       sendLimitEmail: vi.fn(async () => undefined),
       findNextStep: vi.fn(async () => undefined),

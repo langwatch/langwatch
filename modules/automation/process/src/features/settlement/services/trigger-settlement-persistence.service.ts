@@ -8,6 +8,7 @@ import { createLogger, createWarnThrottle } from "@langwatch/observability";
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../../../repositories/automation-settlement-read.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
+import { derivePersistCapDay, persistCapBucketInstant } from "../../../rules/persist-cap.rules.ts";
 import { isCustomerConfigurationRefusal } from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationPersistActionService } from "../../runaway/services/persist-action.service.ts";
@@ -151,7 +152,7 @@ export class TriggerSettlementPersistenceService {
       return;
     }
 
-    const allowed = await this.allowedByDailyCeiling(page, traceId);
+    const allowed = await this.allowedByDailyCeiling(page, traceId, foldState.occurredAt);
     if (!allowed) {
       return;
     }
@@ -165,12 +166,21 @@ export class TriggerSettlementPersistenceService {
     await this.claimDispatch(page, traceId);
   }
 
-  private async allowedByDailyCeiling(page: PersistPage, traceId: string): Promise<boolean> {
+  /**
+   * Counts the match against the UTC day its trace occurred (#8893), so a
+   * replayed backlog fills each past day's ceiling instead of today's.
+   */
+  private async allowedByDailyCeiling(
+    page: PersistPage,
+    traceId: string,
+    occurredAtMs: number,
+  ): Promise<boolean> {
+    const bucketAt = persistCapBucketInstant({ occurredAtMs, now: this.composition.clock.now() });
     const slot = await this.composition.automation.consumePersistCapSlot({
       projectId: page.projectId,
       triggerId: page.triggerId,
       dedupKey: `${page.projectId}/${page.triggerId}:persist:${traceId}`,
-      now: this.composition.clock.now(),
+      now: bucketAt,
       cap: page.cap,
     });
     if (slot.allowed) {
@@ -185,7 +195,7 @@ export class TriggerSettlementPersistenceService {
         count: slot.count,
         cap: slot.cap,
       },
-      "Automation passed its daily match ceiling — skipping this match for the UTC day",
+      "Automation passed its daily match ceiling — skipping this match for its trace's UTC day",
     );
     if (page.breachReported) {
       return false;
@@ -200,6 +210,7 @@ export class TriggerSettlementPersistenceService {
         count: slot.count,
         cap: slot.cap,
         skipped: slot.skipped,
+        day: derivePersistCapDay(bucketAt),
       });
     } catch (error) {
       this.capture(error, {

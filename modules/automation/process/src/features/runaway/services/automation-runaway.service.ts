@@ -54,7 +54,7 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
     directories: AutomationRunawayDirectories;
     suppression: AutomationRunawaySuppression;
     mailer: MailSender;
-    traces: Pick<TraceApi, "countTracesInLastDay">;
+    traces: Pick<TraceApi, "countTracesOnUtcDay">;
     metrics: AutomationRunawayMetricsSink;
     baseHost: string;
     /** Absent on a deployment that composed no self-serve plan catalogue. */
@@ -73,7 +73,7 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
       directories: AutomationRunawayDirectories;
       suppression: AutomationRunawaySuppression;
       mailer: MailSender;
-      traces: Pick<TraceApi, "countTracesInLastDay">;
+      traces: Pick<TraceApi, "countTracesOnUtcDay">;
       metrics: AutomationRunawayMetricsSink;
       baseHost: string;
       nextStep?: AutomationNextStepResolver | null;
@@ -83,8 +83,8 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
     super();
   }
 
-  countProjectTraces24h(projectId: string): Promise<number> {
-    return this.input.traces.countTracesInLastDay({ projectId });
+  countProjectTracesOnDay(projectId: string, day: number): Promise<number> {
+    return this.input.traces.countTracesOnUtcDay({ projectId, day });
   }
 
   async notificationRecipients(input: { projectId: string; triggerId: string }): Promise<string[]> {
