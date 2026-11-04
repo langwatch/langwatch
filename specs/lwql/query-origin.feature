@@ -117,6 +117,13 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       Then one built-in failure is reported and counted
 
     @unit
+    Scenario: A wrapped access refusal is reported and counted
+      Given a caller's own access refusal is wrapped in another error as its cause
+      When the wrapper reaches either report path
+      Then the wrapper is not an access refusal, so one built-in failure is reported and counted per path
+      And the unwrapped refusal is still skipped
+
+    @unit
     Scenario: A statement failure still writes the built-in failure
       Given a stock statement is sent with an accepted project scope
       When the statement fails

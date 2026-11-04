@@ -93,3 +93,24 @@ describe("given a view the catalogue does not hold", () => {
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
   });
 });
+
+describe("given a caller's access refusal wrapped as the cause of another error", () => {
+  /** @scenario "A wrapped access refusal is reported and counted" */
+  it("is not an access refusal, and both report paths write the line and raise the count", () => {
+    const marked = refusalOf(GATEWAY_PROBE);
+    const wrapped = new Error("wrapped", { cause: marked });
+    const { lines, service } = reporter();
+
+    service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error: marked });
+    service.reportFailure({ projectId: "project-1", sql: GATEWAY_PROBE, error: marked });
+    expect(isCallerAccessRefusal({ error: marked })).toBe(true);
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(0);
+
+    service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error: wrapped });
+    service.reportFailure({ projectId: "project-1", sql: GATEWAY_PROBE, error: wrapped });
+    expect(isCallerAccessRefusal({ error: wrapped })).toBe(false);
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
+  });
+});
