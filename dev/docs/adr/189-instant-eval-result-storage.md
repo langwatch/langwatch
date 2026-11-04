@@ -227,7 +227,7 @@ Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
 - Instant eval results follow the trace's retention, not "never expire".
 - Monitors keep writing `evaluation_runs`. A monitor on the Instant Evals judge also writes `eval_results` and gets recall.
 - A trace or span run writes two tables: `instant_eval_judgments` for its run page, chip and view, and `eval_results` for recall.
-- The usage report (`usage-report.ts:394-396`) counts `instant_eval_judgments`, so it counts runs only, as today; asks, dashboards and monitors are not counted today either. Counting `eval_results` is its own change, planned with the first writer (build step 2).
+- A run writes every verdict it delivers to `instant_eval_judgments`, recalled or judged, so its run page stays complete. The usage report (`usage-report.ts:394-396`) counts those rows, so once recall is on it counts delivered run verdicts, recalled ones included, not judge calls. Asks, dashboards and monitors are not counted, as today. Counting judge calls from `eval_results` is its own change, planned with the first writer (build step 2 on https://github.com/langwatch/tasks/issues/986).
 
 ## References
 
