@@ -71,9 +71,8 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 | 400 | `lwql_parameter_missing` | The statement declares a parameter the request has no value for. `meta.parameters` lists them: send each under `parameters` |
 | 400 | `lwql_parameter_invalid` | A parameter value does not match its declared type. `meta.parameter` names it: send a `DateTime` as `YYYY-MM-DD HH:MM:SS` in UTC |
 | 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
-| 403 | `api_key_permission_denied` | The key does not have `analytics:view` |
 | 403 | `lwql_not_enabled` | LangWatchQL is not enabled for this project. Ask an administrator to enable it |
-| 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
+| 404 | `project_not_found` | A project named in `projectId` or `projects` does not exist, or the key cannot read it with `analytics:view` |
 | 413 | `lwql_result_too_large` | The result is over the result size limit in [Limits](#limits) |
 | 422 | `validation_error` | The request body does not match the expected shape, for example it sends both `projectId` and `projects` |
 | 422 | `projects_required` | The key reaches several projects. Send `projects`, a list of project ids, or `"all"` |
