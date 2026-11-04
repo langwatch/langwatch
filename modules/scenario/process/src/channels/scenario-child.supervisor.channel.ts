@@ -86,6 +86,7 @@ function observeChild(input: {
       settled = true;
       log("error", "Child process timed out", { timeoutMs: CHILD_PROCESS.TIMEOUT_MS });
       child.kill();
+      endStdin({ child, log });
       resolve({ success: false, error: "Scenario execution timed out" });
     }, CHILD_PROCESS.TIMEOUT_MS);
 
@@ -179,7 +180,20 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
 
   async abort(): Promise<void> {
     this.options.release.released = this.options.child.kill("SIGTERM");
+    endStdin({ child: this.options.child, log: this.options.log });
     await this.options.completion;
+  }
+}
+
+// A child still reading its job blocks on stdin and ignores SIGTERM, so a
+// stop closes it too. Ending an already-ended stream must not throw.
+function endStdin({ child, log }: { child: ChildProcess; log: ChildLog }): void {
+  try {
+    child.stdin?.end();
+  } catch (error) {
+    log("warn", "Child stdin end failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

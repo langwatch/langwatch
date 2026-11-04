@@ -57,6 +57,8 @@ Feature: A simulation blocked by the project's own configuration says so
     Then the close is logged at info level and not at error level
     But a released child that any other signal killed is logged at error level
     And a child that exited before the release could signal it is logged at error level
+    And the release closes the child's stdin so a child still reading its job can stop
+    And a child stopped by the timeout has its stdin closed too
     And a child that closes without an exit code and was not released is logged at error level
 
   @unit @scenario-prefetch

@@ -4,7 +4,9 @@
  * @see specs/scenarios/execution-blocked-by-configuration.feature
  */
 import { ChildProcess } from "node:child_process";
+import { Writable } from "node:stream";
 
+import { CHILD_PROCESS } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExecutionJobData } from "../../services/scenario-execution-pool.service.ts";
@@ -28,10 +30,19 @@ const pool: ScenarioChildRunPool = {
 
 function supervised({ killed }: { killed: boolean }) {
   const child = new ChildProcess();
-  vi.spyOn(child, "kill").mockReturnValue(killed);
+  const calls: string[] = [];
+  child.stdin = new Writable({ write: (_chunk, _encoding, done) => done() });
+  const end = vi.spyOn(child.stdin, "end").mockImplementation(() => {
+    calls.push("end");
+    return child.stdin as Writable;
+  });
+  vi.spyOn(child, "kill").mockImplementation(() => {
+    calls.push("kill");
+    return killed;
+  });
   const log = vi.fn();
   const session = superviseScenarioChild({ child, jobData, pool, log });
-  return { child, log, session };
+  return { child, log, session, calls, end };
 }
 
 const levelsLogged = (log: ReturnType<typeof vi.fn>) => log.mock.calls.map(([level]) => level);
@@ -113,6 +124,64 @@ describe("given a scenario child process", () => {
         "Child process exited with code null",
         expect.anything(),
       );
+    });
+  });
+
+  describe("when the processor releases it", () => {
+    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    it("ends its stdin after the kill, so a child blocked reading its job can stop", async () => {
+      const { child, session, calls } = supervised({ killed: true });
+      const aborted = session.abort();
+      child.emit("close", null, "SIGTERM");
+      await aborted;
+
+      expect(calls).toEqual(["kill", "end"]);
+    });
+
+    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    it("does not throw when a stdin end throws, and still counts as released", async () => {
+      const { child, end, log, session } = supervised({ killed: true });
+      end.mockImplementation(() => {
+        throw new Error("write after end");
+      });
+      const aborted = session.abort();
+      child.emit("close", null, "SIGTERM");
+
+      await expect(aborted).resolves.toBeUndefined();
+      expect(levelsLogged(log)).toContain("warn");
+      expect(log).toHaveBeenCalledWith(
+        "info",
+        "Child process stopped after its run was released",
+        expect.anything(),
+      );
+    });
+
+    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    it("does not throw after the job was already sent and stdin ended", async () => {
+      const { child, session } = supervised({ killed: true });
+      const completion = session.execute({} as never);
+      const aborted = session.abort();
+      child.emit("close", null, "SIGTERM");
+
+      await expect(aborted).resolves.toBeUndefined();
+      await completion;
+    });
+  });
+
+  describe("when it runs past the timeout", () => {
+    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    it("kills it, then ends its stdin, and logs the timeout at error", () => {
+      vi.useFakeTimers();
+      try {
+        const { calls, log } = supervised({ killed: true });
+
+        vi.advanceTimersByTime(CHILD_PROCESS.TIMEOUT_MS);
+
+        expect(calls).toEqual(["kill", "end"]);
+        expect(log).toHaveBeenCalledWith("error", "Child process timed out", expect.anything());
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });
