@@ -20,10 +20,13 @@
 -- it. SourceId sits before JudgedAt, so the same verdict written by two sources
 -- is two rows. Recall never keys on SourceId: it takes the latest row by
 -- JudgedAt across every source. Reads MUST be replacement-aware (argMax or FINAL).
+-- A reader that shows a verdict groups by (TraceId, SpanId, QuestionHash,
+-- JudgedColumn) and takes the latest judged row by JudgedAt, so input and
+-- output stay two results and a newer verdict replaces an older one.
 --
 -- KeyVersion is the version of the recall key's hashing. Recall reads only rows
 -- of the current version, so rows written before recall is switched on, or
--- under a key bug, are never served; bumping the version retires them.
+-- under a key bug, are never recalled; bumping the version retires them.
 --
 -- NO JUDGED TEXT IS STORED, as in 00097. InputHash is a hash of the text, not
 -- the text. A judgment of free text with no trace is not stored.
@@ -66,8 +69,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     -- sha256 of the judged column name and the judged text.
     InputHash String DEFAULT '' CODEC(ZSTD(1)),
 
-    -- The judged column (input, output, ...); 'monitor' for a monitor. Readers
-    -- group by it, so a changed text replaces its old verdict on read.
+    -- The judged column (input, output, ...); 'monitor' for a monitor. Every
+    -- writer sets it; an empty value is a writer bug. Readers group by it.
     JudgedColumn LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
 
     -- The version of the recall key's hashing.
