@@ -333,32 +333,54 @@ export function defaultCliKeyPermissions({
   );
 }
 
+let cliCategories: readonly PermissionCategory[] | undefined;
+
+/**
+ * The categories as the CLI approval screen offers them: each "Write" without what a
+ * CLI login key may never carry, so Organization at Write is its management, not its
+ * deletion. A caller who manages the organization without being allowed to delete it
+ * can still pick it, and a `--management` default still reads back as Write.
+ */
+export function cliPermissionCategories(): readonly PermissionCategory[] {
+  cliCategories ??= PERMISSION_CATEGORIES.map((category) => ({
+    ...category,
+    writePermissions: category.writePermissions.filter((p) => !isNeverOnCliKey(p)),
+  }));
+  return cliCategories;
+}
+
 export function categoryPermissions({
   key,
   level,
+  categories = PERMISSION_CATEGORIES,
 }: {
   key: string;
   level: AccessLevel;
+  categories?: readonly PermissionCategory[];
 }): AuthzPermission[] {
-  const category = PERMISSION_CATEGORIES.find((c) => c.key === key);
+  const category = categories.find((c) => c.key === key);
   if (!category) return [];
   return level === "write" ? category.writePermissions : category.readPermissions;
 }
 
 export function computePermissionsFromSelections(
   selections: Record<string, AccessLevel | "none">,
+  categories: readonly PermissionCategory[] = PERMISSION_CATEGORIES,
 ): AuthzPermission[] {
   const permSet = new Set<AuthzPermission>();
   for (const [key, level] of Object.entries(selections)) {
     if (level === "none") continue;
-    for (const perm of categoryPermissions({ key, level })) {
+    for (const perm of categoryPermissions({ key, level, categories })) {
       permSet.add(perm);
     }
   }
   return [...permSet].toSorted();
 }
 
-export function selectionsFromPermissions(permissions: string[]): Record<string, AccessLevel> {
+export function selectionsFromPermissions(
+  permissions: string[],
+  categories: readonly PermissionCategory[] = PERMISSION_CATEGORIES,
+): Record<string, AccessLevel> {
   const granted = new Set(permissions);
 
   // Hierarchy-aware so a stored list carrying `datasets:manage` still
@@ -379,7 +401,7 @@ export function selectionsFromPermissions(permissions: string[]): Record<string,
     );
 
   const selections: Record<string, AccessLevel> = {};
-  for (const category of PERMISSION_CATEGORIES) {
+  for (const category of categories) {
     const hasWrite =
       category.writePermissions.length > 0 &&
       category.writePermissions.every((p) => heldWithinCategory(category, p));
