@@ -8,7 +8,7 @@
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import type { InsightActionRun } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -26,6 +26,11 @@ const DRAFT_EVALUATOR = {
   id: "a1",
   label: "Draft an evaluator",
   prompt: "Draft an evaluator that flags a failed checkout.",
+};
+const CHECK_LATENCY = {
+  id: "a0",
+  label: "Check the latency",
+  prompt: "Find the slowest traces from the last day.",
 };
 const WITH_ACTIONS = insightEntry({ seenAt: NOW, actions: [FIND_TRACES, DRAFT_EVALUATOR] });
 const MAY_USE_LANGY = ["analytics:view", "langy:create"];
@@ -111,21 +116,20 @@ describe("given an insight with actions in the inbox", () => {
         id: "insight-2",
         title: "Latency rose",
         seenAt: NOW,
-        actions: [DRAFT_EVALUATOR],
+        actions: [CHECK_LATENCY],
       });
       const { answerRun, runs } = renderInbox({ entries: [WITH_ACTIONS, second] });
 
       await userEvent.click(await screen.findByRole("button", { name: FIND_TRACES.label }));
       await waitFor(() => expect(runs()).toHaveLength(1));
-      const [, secondCard] = screen.getAllByTestId("insight-actions");
-      const waiting = within(secondCard!).getByRole("button", { name: DRAFT_EVALUATOR.label });
+      const waiting = screen.getByRole("button", { name: CHECK_LATENCY.label });
 
       expect(waiting).toBeDisabled();
-      expect(within(secondCard!).getByText(ANOTHER_ACTION_SENDING)).toBeInTheDocument();
+      expect(screen.getAllByText(ANOTHER_ACTION_SENDING)).toHaveLength(1);
 
       answerRun({ conversationId: "conversation-1", turnId: "turn-1", sourceGone: false });
       await waitFor(() => expect(waiting).toBeEnabled());
-      expect(within(secondCard!).queryByText(ANOTHER_ACTION_SENDING)).not.toBeInTheDocument();
+      expect(screen.queryByText(ANOTHER_ACTION_SENDING)).not.toBeInTheDocument();
     });
   });
 
