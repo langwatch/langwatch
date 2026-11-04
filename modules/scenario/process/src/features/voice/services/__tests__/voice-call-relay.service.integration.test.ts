@@ -80,7 +80,8 @@ async function placeCallThroughRelay(): Promise<string> {
   return callControl.placedCalls[0]!.streamUrl!;
 }
 
-/** Twilio dials the stream URL it was given, signing the upgrade (if given one), and sends `start`. */
+/** Twilio dials the stream URL it was given, signing the upgrade (if given one), and sends
+ * `start`. */
 function twilioJoins({ streamUrl, signature }: { streamUrl: string; signature?: string }) {
   const headers = signature === undefined ? {} : { "x-twilio-signature": signature };
   const twilio = new WebSocket(streamUrl, { headers });
