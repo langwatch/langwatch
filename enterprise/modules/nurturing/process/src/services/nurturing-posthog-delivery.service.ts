@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type {
-  NurturingSignal,
-  NurturingSignalOf,
-} from "@langwatch/enterprise-nurturing-contract";
+import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import { isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
