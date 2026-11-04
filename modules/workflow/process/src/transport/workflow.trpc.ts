@@ -174,12 +174,15 @@ export const workflowTrpcTransport: TrpcRouterDeclaration<WorkflowBrowserApi, ty
 
     .procedure("cascadeArchive")
     .withPermission("workflows:delete")
-    .handle(({ app, input }) =>
-      app.workflows().cascadeArchive({
-        projectId: input.projectId,
-        workflowId: input.workflowId,
-        unarchive: input.unarchive,
-      }),
+    .handle(({ app, input, actor }) =>
+      app.workflows().cascadeArchive(
+        {
+          projectId: input.projectId,
+          workflowId: input.workflowId,
+          unarchive: input.unarchive,
+        },
+        actor,
+      ),
     )
 
     .procedure("archive")

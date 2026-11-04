@@ -8,12 +8,16 @@ import type {
   AgentCopy,
   AgentCopyCreated,
   AgentHistoryEntry,
+  AgentLabel,
   AgentPushToCopies,
+  AgentVersions,
+  AssignAgentLabelInput,
   AgentSyncFromSource,
   AgentWithFields,
   CreateAgentCommand,
   ConnectedAgentView,
   RelatedAgentEntities,
+  RemoveAgentLabelInput,
   UpdateAgentCommand,
 } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
@@ -51,4 +55,10 @@ export interface AgentClient {
   syncFromSource(input: AgentSyncFromSourceInput): Promise<AgentSyncFromSource>;
 
   getHistory(input: AgentHistoryInput): Promise<AgentHistoryEntry[]>;
+
+  listVersions(input: AgentHistoryInput): Promise<AgentVersions>;
+
+  assignLabel(input: AssignAgentLabelInput): Promise<AgentLabel>;
+
+  removeLabel(input: RemoveAgentLabelInput): Promise<void>;
 }

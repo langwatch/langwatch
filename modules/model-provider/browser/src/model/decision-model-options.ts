@@ -6,8 +6,8 @@
 import {
   DECISION_MODELS,
   findDecisionModel,
-  findModelProviderDefinition,
   LANGWATCH_DECISION_MODEL_ID,
+  type BuiltInModel,
   type ModelPickerOption,
 } from "@langwatch/model-provider-contract";
 
@@ -21,35 +21,18 @@ export function isShownDecisionModel(id: string | null | undefined): id is strin
   return !!id && !!findDecisionModel(id);
 }
 
-function missingKeyHint(provider: string): string {
-  const name = findModelProviderDefinition(provider)?.name ?? provider;
-  const article = /^[aeiou]/i.test(name) ? "an" : "a";
-  return `Add ${article} ${name} key in Model Providers first`;
-}
-
 /**
- * The column's picker entries, LangWatch Instant Preview first. Own entries need the
- * own-decision-model flag; one whose provider has no enabled row says how to add it.
- * `enabledProviderKeys` null means the rows have not loaded, so no hint is shown yet.
+ * The column's picker entries: exactly the decision models the server says would run for the
+ * project, in catalogue order, LangWatch Instant Preview first. The server weighs the flag and
+ * the keys, so a pick here always runs. `pickable` undefined means not loaded yet.
  */
 export function decisionModelPickerOptions({
-  ownModelsEnabled,
-  enabledProviderKeys,
+  pickable,
 }: {
-  ownModelsEnabled: boolean;
-  enabledProviderKeys: ReadonlySet<string> | null;
+  pickable: readonly BuiltInModel[] | undefined;
 }): ModelPickerOption[] {
+  const offered = new Set((pickable ?? []).map((model) => model.value));
   return DECISION_MODELS.filter(
-    (entry) => entry.id === LANGWATCH_DECISION_MODEL_ID || ownModelsEnabled,
-  ).map((entry) => {
-    const needsKey =
-      entry.id !== LANGWATCH_DECISION_MODEL_ID &&
-      !!enabledProviderKeys &&
-      !enabledProviderKeys.has(entry.provider);
-    return {
-      label: entry.label,
-      value: entry.id,
-      subtitle: needsKey ? missingKeyHint(entry.provider) : entry.description,
-    };
-  });
+    (entry) => entry.id === LANGWATCH_DECISION_MODEL_ID || offered.has(entry.id),
+  ).map((entry) => ({ label: entry.label, value: entry.id, subtitle: entry.description }));
 }
