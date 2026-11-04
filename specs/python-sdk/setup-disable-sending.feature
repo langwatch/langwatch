@@ -14,3 +14,24 @@ Feature: langwatch.setup() can disable sending traces
     Given no LangWatch client has been set up
     When I call langwatch.setup with only an API key
     Then the resulting client has sending enabled
+
+  @unit
+  Scenario: Re-enabling sending through setup() resumes the provider it created
+    Given langwatch.setup created its tracer provider with disable_sending=True
+    When I call langwatch.setup again with disable_sending=False
+    Then the provider samples spans again, including from tracers handed out before
+    And the LangWatch exporter is attached to it
+
+  @unit
+  Scenario: setup() inside a disable_sending trace keeps sending disabled after the trace
+    Given a trace with disable_sending=True is active
+    When I call langwatch.setup with disable_sending=True inside it
+    Then sending stays disabled after the trace exits
+
+  @unit
+  Scenario: setup() inside a disable_sending trace can re-enable sending after the trace
+    Given sending was disabled through langwatch.setup
+    And a trace with disable_sending=True is active
+    When I call langwatch.setup with disable_sending=False inside it
+    Then sending stays disabled until the trace exits
+    And sending is enabled after the trace exits

@@ -15,7 +15,12 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
+from opentelemetry.sdk.trace.sampling import (
+    ALWAYS_OFF,
+    Sampler,
+    SamplingResult,
+    TraceIdRatioBased,
+)
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace import ReadableSpan
 
@@ -56,6 +61,42 @@ def _skip_open_telemetry_setup_from_env() -> bool:
     spend the runner's time budget.
     """
     return os.getenv("LANGWATCH_SKIP_OTEL_SETUP", "").strip().lower() == "true"
+
+
+class _ResumableSampler(Sampler):
+    """The sampler of a provider the SDK creates itself.
+
+    A provider created while sending is disabled samples nothing, as before.
+    Tracers keep a reference to their provider's sampler, so resuming this
+    one is seen by every tracer already handed out. Without it, a later
+    `setup(disable_sending=False)` could flip the flag but not the provider,
+    and every trace after it would still be dropped.
+    """
+
+    def __init__(self, sending: bool) -> None:
+        self._sending = sending
+        self._on = TraceIdRatioBased(1.0)
+
+    @property
+    def sending(self) -> bool:
+        return self._sending
+
+    @property
+    def rate(self) -> float:
+        # What `langwatch.sampling_rate` reported for both samplers this
+        # replaces: the 1.0 ratio, and the 1.0 fallback for ALWAYS_OFF.
+        return self._on.rate
+
+    def resume(self) -> None:
+        self._sending = True
+
+    def should_sample(self, *args, **kwargs) -> SamplingResult:  # type: ignore[override]
+        sampler = self._on if self._sending else ALWAYS_OFF
+        return sampler.should_sample(*args, **kwargs)
+
+    def get_description(self) -> str:
+        sampler = self._on if self._sending else ALWAYS_OFF
+        return sampler.get_description()
 
 
 class Client(LangWatchClientProtocol):
@@ -195,10 +236,11 @@ class Client(LangWatchClientProtocol):
                     self.__setup_tracer_provider()
             if debug is not None:
                 Client._debug = debug
-            if (
-                disable_sending is not None
-                and disable_sending != Client._disable_sending
-            ):
+            # Always through the setter, even when the flag already matches:
+            # inside a `trace(disable_sending=True)` the flag reads True for
+            # the trace, and the setter records the configured value as the
+            # baseline that trace restores on exit.
+            if disable_sending is not None:
                 self.disable_sending = disable_sending
             if flush_on_exit is not None:
                 Client._flush_on_exit = flush_on_exit
@@ -538,15 +580,42 @@ class Client(LangWatchClientProtocol):
 
     @disable_sending.setter
     def disable_sending(self, value: bool) -> None:
-        """Set whether sending is disabled. Spans are still created; the exporter conditionally drops them."""
-        if Client._disable_sending == value:
+        """Set whether sending is disabled. Spans are still created; the exporter conditionally drops them.
+
+        While a `trace(disable_sending=True)` is active, sending stays off for
+        that trace and the value is recorded as the baseline the trace
+        restores when it exits.
+        """
+        with Client._disable_sending_lock:
+            if Client._disable_sending_refcount > 0:
+                Client._disable_sending_user_baseline = value
+            elif Client._disable_sending != value:
+                # force flush the tracer provider before changing the disable_sending flag
+                if Client._tracer_provider and not Client._skip_open_telemetry_setup:
+                    Client._tracer_provider.force_flush()
+                Client._disable_sending = value
+
+        if not value:
+            self.__resume_own_provider()
+
+    def __resume_own_provider(self) -> None:
+        """Start sampling and exporting on a provider the SDK created while
+        sending was disabled. Providers the SDK did not create are left alone:
+        their sampler is the caller's, and the exporter was attached to them
+        when the client was set up."""
+        provider = Client._tracer_provider
+        if provider is None or Client._skip_open_telemetry_setup:
             return
-
-        # force flush the tracer provider before changing the disable_sending flag
-        if Client._tracer_provider and not Client._skip_open_telemetry_setup:
-            Client._tracer_provider.force_flush()
-
-        Client._disable_sending = value
+        sampler = getattr(provider, "sampler", None)
+        if not isinstance(sampler, _ResumableSampler) or sampler.sending:
+            return
+        if not Client._api_key:
+            logger.warning(
+                "Sending was re-enabled, but no LangWatch API key is set, so traces will not be exported."
+            )
+            return
+        self.__set_langwatch_exporter(provider)
+        sampler.resume()
 
     def acquire_disable_sending(self) -> None:
         """Refcount-based gate used by `langwatch.trace(disable_sending=True)`.
@@ -711,7 +780,7 @@ class Client(LangWatchClientProtocol):
     def __create_new_tracer_provider(self) -> TracerProvider:
         try:
             resource = Resource.create(Client._base_attributes)
-            sampler = ALWAYS_OFF if Client._disable_sending else TraceIdRatioBased(1.0)
+            sampler = _ResumableSampler(sending=not Client._disable_sending)
             provider = TracerProvider(resource=resource, sampler=sampler)
 
             # Only set up LangWatch exporter if sending is not disabled
