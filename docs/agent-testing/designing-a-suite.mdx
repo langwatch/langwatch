@@ -97,7 +97,9 @@ The judge reads the agent's [linked traces](/agent-testing/linking-your-traces),
 
 ## How to seed test data for a scenario
 
-Put the data a scenario needs in the test environment the target points at. Seed it there before the run, put the exact values in scenario fields such as `order_id` and `expected_amount`, and compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
+Put the data a scenario needs in the test environment the target points at. Seed data the agent only reads there before the run. Data the agent changes needs a fresh copy per run, because a refund in the first repetition changes what the second one sees: [seed it per conversation](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
+
+Put the exact values in scenario fields such as `order_id` and `expected_amount`, and compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
 
 For how to build the data and report its state, see [Check the World, Not the Words](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
 
@@ -132,7 +134,7 @@ Open the trace of a failing run before you change anything, then match what you 
 | The agent really fails some of the time | Keep the scenario, because you found an intermittent fault. |
 | A criterion can be read two ways | Rewrite the criterion, or move the check into a required suite evaluator. |
 | The judge gets a clear case wrong | Give that scenario a stronger judge model. |
-| The seed data changed between runs | Keep every seeded value except the dates the same on every run, and compute the dates from the current time. |
+| The seed data changed between runs | Keep every seeded value except the dates and per-run ids the same on every run, and compute the dates from the current time. |
 
 Do not lower the number of repetitions that must pass until the scenario passes, because that hides the fault. Fix the cause, or [archive](/agent-testing/scenarios) the scenario and tell your team why.
 
@@ -142,10 +144,10 @@ This puts the pieces together in one place. The names and counts are an example;
 
 | Part | Setup |
 |---|---|
-| **Targets** | `support-agent` in `development`, for a developer debugging. In `staging`, for pre-merge and pre-release runs. In `production`, for a smoke check after each deploy. |
+| **Targets** | `support-agent` in `development`, for a developer debugging. In `staging`, for pre-merge and pre-release runs. In `production`, for a read-only canary after each deploy. |
 | **Test suite `Refunds`** | Fields `expected_amount` and `order_id`. Required evaluator "Refund amount", which compares the output of the `refund_total` span with `expected_amount`. |
 | **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
-| **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
+| **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. `canary`: reads data only, so it is safe in production. |
 
 The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix). Every run plan in [the refund agent table](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule), except the production canary, adds a PII scanner as a plan evaluator.
 
@@ -196,7 +198,8 @@ async def test_double_charge_refunded_once():
         script=[
             scenario.user(),
             scenario.agent(),
-            scenario.proceed(turns=2),
+            scenario.user(),
+            scenario.agent(),
             one_refund_for_the_double_charge,
             scenario.judge(criteria=[
                 "Says that one of the two charges is refunded",

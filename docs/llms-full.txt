@@ -35803,19 +35803,19 @@ This page covers how to organise, run and maintain that set. For which cases to 
 
 ## How to organise scenarios
 
-Use test suites for the groups that ship together and labels for the cuts that cross them. A scenario belongs to exactly one test suite, and it can have any number of labels, so a test suite works as the folder and a label as the tag.
+Use test suites for one area of the agent and labels for the cuts that cross them. A scenario belongs to exactly one test suite, and it can have any number of labels, so a test suite works as the folder and a label as the tag.
 
 Start with one suite per agent, and split by area only when the fields or the owners differ. Never copy a suite per environment or per cadence, because copies drift: point a run plan at another target, or scope it by label, instead.
 
 | Use               | For                                                            | Example                                   |
 | ----------------- | -------------------------------------------------------------- | ----------------------------------------- |
-| **Test suite**    | One area of the agent, owned by one team                       | `Dashboards`, `Refunds`                   |
+| **Test suite**    | One area of the agent, owned by one team                       | `Refunds`, `Billing`                      |
 | **Label**         | A cut across suites: speed, risk, or the kind of failure       | `smoke`, `safety`, `regression`           |
 | **Target**        | Which environment: `support-agent` in `production` and in `development` are separate targets | `connected:support-agent@staging`         |
-| **Run parameter** | One scenario under several setups, instead of copies of it     | `world=A1`, `plan=pro`                    |
-| **Run plan name** | One history on the Results tab for one way you run the suite   | `Dashboards smoke`, `Dashboards nightly`  |
+| **Run parameter** | One scenario under several setups, instead of copies of it     | `amount=49.95`, `plan=pro`                |
+| **Run plan name** | One history on the Results tab for one way you run the suite   | `PR smoke`, `Refunds nightly`             |
 
-Name a scenario after the behaviour it checks, with a short id in front if you track the rows elsewhere: `A1: no board in context, asks which board`. The name shows on every result row, so a failing name should already tell you what broke.
+Name a scenario after the behaviour it checks, with a short id in front if you track the rows elsewhere: `A1: double charge, refunds one charge`. The name shows on every result row, so a failing name should already tell you what broke.
 
 A run plan scoped by labels is dynamic: a scenario that gets the `smoke` label is in the next run of every plan scoped to `smoke`. See [Run plans](/agent-testing/run-plans#where-a-run-starts) for the scopes.
 
@@ -35826,11 +35826,11 @@ Split the suite into two run plans. The smoke plan runs a handful of fast, high-
 ```bash
 # On every pull request: the scenarios labelled smoke
 langwatch run-plan run --label smoke --target connected:support-agent@staging \
-  --name "Support smoke" --wait
+  --name "PR smoke" --wait
 
-# On a schedule: every scenario of the project, three times each
-langwatch run-plan run --all --target connected:support-agent@staging \
-  --name "Support nightly" --repeat 3 --wait
+# On a schedule: every scenario of the suite, three times each
+langwatch run-plan run --test-suite Refunds --target connected:support-agent@staging \
+  --name "Refunds nightly" --repeat 3 --wait
 ```
 
 A run plan is a name and a configuration: the scope (test suites, labels or specific scenarios), the targets, the repeat count from 1 to 5 (for how many to use, see [How many times to repeat a scenario](/agent-testing/designing-a-suite#how-many-times-to-repeat-a-scenario)), and the simulator and judge models. Every run under the same name joins one pass rate history on [Results](/agent-testing/results). For the refund agent:
@@ -35841,19 +35841,23 @@ A run plan is a name and a configuration: the scope (test suites, labels or spec
 | **Refunds nightly** | Suite `Refunds` | Staging | 3 | On a cron schedule. | All pass, or a failure you can explain. |
 | **Critical** | Label `critical` | Staging | 5 | Before a release. | Every repetition passes, strong judge. |
 | **Refunds pre-release** | Suite `Refunds` | Staging | 3 | Before a release. | Happy paths and critical scenarios pass every repetition, the rest a majority. |
-| **Production canary** | Label `smoke` | Production | 1 | After each deploy. | All pass. |
+| **Production canary** | Label `canary` | Production | 1 | After each deploy. | All pass. |
 
-LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so your team reads the pass bar on Results.
+LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so use the exit code as a gate only on a plan whose bar is all pass. For any other bar, have the job report the run, and your team reads the pass bar on Results.
 
 ```bash
 # Critical: 5 repetitions and a strong judge.
 langwatch run-plan run --label critical --target connected:support-agent@staging \
   --name "Critical" --repeat 5 --judge-model openai/gpt-5 --wait
 
-# Production canary: the same smoke label against production.
-langwatch run-plan run --label smoke --target connected:support-agent@production \
+# Production canary: only the read-only scenarios, against production.
+langwatch run-plan run --label canary --target connected:support-agent@production \
   --name "Production canary" --wait
 ```
+
+Give the `canary` label only to scenarios that read data and change nothing, because a canary runs on real data. A refund scenario must never run in production. The production process must also be connected for the canary to reach it.
+
+Add a plan evaluator with `--evaluator <id-or-slug>`, repeated for each one. The commands above leave it out to stay short.
 
 LangWatch does not schedule runs itself: a run plan has no schedule or cron setting, and the API refuses one. Start the scheduled run from your CI's own scheduler, for example a GitHub Actions `schedule` trigger. See [Run from CI](/agent-testing/run-from-ci) for the batch id, the poll and the exit code.
 
@@ -35892,6 +35896,8 @@ A scenario goes through three stages: a candidate someone proposed, a scenario t
 
 Keep the stages apart by where you store the scenario file. If your scenarios are files in your repository that a script syncs to LangWatch, keep proposals outside the synced directory until a person reviews them, and promote a scenario by moving its file in, in a reviewed pull request. A label such as `candidate` does not stop a sync: any scope that includes the scenario runs it.
 
+If you write scenarios on the platform, keep proposals in a test suite of their own, such as `Candidates`, that no run plan scopes, and promote one with **Move to suite**.
+
 Promote a scenario when all of these hold:
 
 - It failed against the agent before the fix, so you know it can catch the failure.
@@ -35918,11 +35924,11 @@ A connected agent can be online in several environments at once, so one plan can
 Every failure you find in production can become a scenario that keeps it fixed. LangWatch does not do this for you: there is no automatic step that turns a trace into a scenario.
 
 1. **Trace.** Find the conversation that went wrong in your traces, from a user report, a low score or a review of recent traffic.
-2. **Finding.** Write down what the agent did wrong, in one sentence that a judge could check: "asked which board only after it had already written a chart".
+2. **Finding.** Write down what the agent did wrong, in one sentence that a judge could check: "issued the refund before it checked that the second charge existed".
 3. **Validate.** Confirm the failure happens again with the same input, so you are fixing a behaviour and not a one-off.
-4. **Failing scenario.** Write a scenario that acts out the conversation and has the finding as a criterion. Run it against the current agent and keep it out of the promoted suite while it fails.
+4. **Failing scenario.** Write a scenario that acts out the conversation and has the finding as a criterion. Run it against the current agent and keep it out of the promoted suite while it fails, in the proposals directory or the `Candidates` suite.
 5. **Review.** A person reads the scenario and its failing run and agrees that the criterion is the right one.
-6. **Fix.** Open the pull request that fixes the agent, with the scenario moved into the suite in the same pull request. The run that passes against the fix is the proof, and the scenario stays in the suite as the regression test.
+6. **Fix.** Open the pull request that fixes the agent, with the scenario moved into the suite in the same pull request, or moved with **Move to suite** when the fix ships. The run that passes against the fix is the proof, and the scenario stays in the suite as the regression test.
 
 Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Connect your agent](/agent-testing/connect-your-agent), [Scenario Suite Design](/agent-testing/designing-a-suite), [Check the World, Not the Words](/agent-testing/check-the-world), [Results](/agent-testing/results), [Compare agents](/agent-testing/compare-agents).
 
@@ -35984,7 +35990,7 @@ async def support_agent(
     ...
 ```
 
-Write parameters as readable facts about the case: a tier, a count, an amount. Do not use a fixture id or a database dump. The person who reads the run should understand the case from the parameter values alone.
+Write parameters as readable facts about the case: a tier, a count, an amount. Prefer these to an opaque fixture id or a database dump. The person who reads the run should understand the case from the parameter values alone.
 
 ## Level 2: seed the world, report its state
 
@@ -36039,7 +36045,7 @@ async def support_agent(
     return langwatch.AgentReply(
         reply,
         session=session,
-        state={"customer_id": session["customer_id"], "charge_id": session["charge_id"]},
+        state={"namespace": thread_id, "customer_id": session["customer_id"], "charge_id": session["charge_id"]},
     )
 ```
 
@@ -36083,6 +36089,8 @@ Call it after the turn, next to `state_of_world`. Then attach an Exact Match eva
 1. Run the scenario once first. The tool calls picker lists the span names the project recorded over the last 30 days, not only tool spans. Only a span reported with `type="tool"` answers a tool call mapping, so a name from any other span never resolves. A span name shows only after a run has produced it, so `refund_total` is not there before that.
 2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
 3. Set `expected_output` to the literal `49.95`. Type `49.95`, then click **Use "49.95" as value**.
+
+A suite evaluator runs on every scenario in the suite, so this literal fits only a suite where every case refunds 49.95. For a suite with other amounts, or a scenario that must not refund, declare a suite field such as `expected_amount`, map `expected_output` to it, and leave it blank where the check does not apply: see [Scenario Suite Design](/agent-testing/designing-a-suite#how-to-check-numbers-and-actions-exactly).
 
 The run plan editor lists no tool names. On a run plan, set this mapping through the [run plans API](/api-reference/run-plans/create-run).
 
@@ -37310,7 +37318,9 @@ The judge reads the agent's [linked traces](/agent-testing/linking-your-traces),
 
 ## How to seed test data for a scenario
 
-Put the data a scenario needs in the test environment the target points at. Seed it there before the run, put the exact values in scenario fields such as `order_id` and `expected_amount`, and compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
+Put the data a scenario needs in the test environment the target points at. Seed data the agent only reads there before the run. Data the agent changes needs a fresh copy per run, because a refund in the first repetition changes what the second one sees: [seed it per conversation](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
+
+Put the exact values in scenario fields such as `order_id` and `expected_amount`, and compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
 
 For how to build the data and report its state, see [Check the World, Not the Words](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
 
@@ -37345,7 +37355,7 @@ Open the trace of a failing run before you change anything, then match what you 
 | The agent really fails some of the time | Keep the scenario, because you found an intermittent fault. |
 | A criterion can be read two ways | Rewrite the criterion, or move the check into a required suite evaluator. |
 | The judge gets a clear case wrong | Give that scenario a stronger judge model. |
-| The seed data changed between runs | Keep every seeded value except the dates the same on every run, and compute the dates from the current time. |
+| The seed data changed between runs | Keep every seeded value except the dates and per-run ids the same on every run, and compute the dates from the current time. |
 
 Do not lower the number of repetitions that must pass until the scenario passes, because that hides the fault. Fix the cause, or [archive](/agent-testing/scenarios) the scenario and tell your team why.
 
@@ -37355,10 +37365,10 @@ This puts the pieces together in one place. The names and counts are an example;
 
 | Part | Setup |
 |---|---|
-| **Targets** | `support-agent` in `development`, for a developer debugging. In `staging`, for pre-merge and pre-release runs. In `production`, for a smoke check after each deploy. |
+| **Targets** | `support-agent` in `development`, for a developer debugging. In `staging`, for pre-merge and pre-release runs. In `production`, for a read-only canary after each deploy. |
 | **Test suite `Refunds`** | Fields `expected_amount` and `order_id`. Required evaluator "Refund amount", which compares the output of the `refund_total` span with `expected_amount`. |
 | **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
-| **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
+| **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. `canary`: reads data only, so it is safe in production. |
 
 The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix). Every run plan in [the refund agent table](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule), except the production canary, adds a PII scanner as a plan evaluator.
 
@@ -37409,7 +37419,8 @@ async def test_double_charge_refunded_once():
         script=[
             scenario.user(),
             scenario.agent(),
-            scenario.proceed(turns=2),
+            scenario.user(),
+            scenario.agent(),
             one_refund_for_the_double_charge,
             scenario.judge(criteria=[
                 "Says that one of the two charges is refunded",
@@ -40320,7 +40331,7 @@ Also check: [Evaluators](/agent-testing/evaluators) to grade every run with a fa
 title: Test Suites
 sidebarTitle: Test suites
 keywords: langwatch, agent testing, test suite, scenarios, default test suite, from code, labels, archive
-description: A test suite is a named group of scenarios you run together. It defines the fields a scenario may carry a value for and the evaluators that run after each scenario. The targets, the models and the repeat count are set on the run plan.
+description: A test suite is a named group of scenarios for one area of an agent. It defines the fields a scenario may carry a value for and the evaluators that run after each scenario. The targets, the models and the repeat count are set on the run plan.
 ---
 
 ## The rail

@@ -52,7 +52,7 @@ async def support_agent(
     ...
 ```
 
-Write parameters as readable facts about the case: a tier, a count, an amount. Do not use a fixture id or a database dump. The person who reads the run should understand the case from the parameter values alone.
+Write parameters as readable facts about the case: a tier, a count, an amount. Prefer these to an opaque fixture id or a database dump. The person who reads the run should understand the case from the parameter values alone.
 
 ## Level 2: seed the world, report its state
 
@@ -107,7 +107,7 @@ async def support_agent(
     return langwatch.AgentReply(
         reply,
         session=session,
-        state={"customer_id": session["customer_id"], "charge_id": session["charge_id"]},
+        state={"namespace": thread_id, "customer_id": session["customer_id"], "charge_id": session["charge_id"]},
     )
 ```
 
@@ -151,6 +151,8 @@ Call it after the turn, next to `state_of_world`. Then attach an Exact Match eva
 1. Run the scenario once first. The tool calls picker lists the span names the project recorded over the last 30 days, not only tool spans. Only a span reported with `type="tool"` answers a tool call mapping, so a name from any other span never resolves. A span name shows only after a run has produced it, so `refund_total` is not there before that.
 2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
 3. Set `expected_output` to the literal `49.95`. Type `49.95`, then click **Use "49.95" as value**.
+
+A suite evaluator runs on every scenario in the suite, so this literal fits only a suite where every case refunds 49.95. For a suite with other amounts, or a scenario that must not refund, declare a suite field such as `expected_amount`, map `expected_output` to it, and leave it blank where the check does not apply: see [Scenario Suite Design](/agent-testing/designing-a-suite#how-to-check-numbers-and-actions-exactly).
 
 The run plan editor lists no tool names. On a run plan, set this mapping through the [run plans API](/api-reference/run-plans/create-run).
 
