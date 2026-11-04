@@ -4,7 +4,10 @@ import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluatio
 import type { ProjectCreatedEventData } from "@langwatch/project-contract";
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
 
-import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
+import {
+  type NurturingClaimRepository,
+  releasedAll,
+} from "../repositories/nurturing-claim.repository.ts";
 import type {
   NurturingMilestonesRepository,
   NurturingOrganizationCounts,
@@ -65,15 +68,6 @@ async function claimedOnly<Item>({
     [...rejected.map((result) => result.reason), ...released],
     "nurturing could not claim every item in the batch",
   );
-}
-
-/** Gives every claim back; the reasons a release failed, so the batch error carries them. */
-async function releasedAll({
-  keys,
-  claims,
-}: Readonly<{ keys: readonly string[]; claims: NurturingClaimRepository }>): Promise<unknown[]> {
-  const results = await Promise.allSettled(keys.map((key) => claims.release(key)));
-  return results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
 }
 
 /** Items grouped by a key, the groups in order of their first item. */
