@@ -33,11 +33,13 @@ const TERMINAL_BY_REPORTED: ReadonlyMap<string, CodingTerminal> = new Map<string
 
 /**
  * The closed name a client's `terminal.type` goes to peers under: the raw string flows to Postgres,
- * a Redis key and Customer.io otherwise. Null when the session reported none.
+ * a Redis key and Customer.io otherwise. Undefined when the session reported none.
  */
-export function findCodingTerminal(reported: string | null): CodingTerminal | null {
+export function classifyCodingTerminal(
+  reported: string | undefined | null,
+): CodingTerminal | undefined {
   const name = reported?.trim().toLowerCase();
-  if (!name) return null;
+  if (!name) return undefined;
   // `TERM` values such as `xterm-256color`, after the terminals that report through one.
   if (!TERMINAL_BY_REPORTED.has(name) && name.startsWith("xterm")) return "xterm";
   return TERMINAL_BY_REPORTED.get(name) ?? "other";

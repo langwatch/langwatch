@@ -17,7 +17,7 @@ import {
 import type { RepositoryKeyOf } from "../rules/coding-agent-repository-key.rules.ts";
 import { toCodingAgentSessionRow } from "../rules/coding-agent-session-row-mapper.rules.ts";
 import { codingAgentSessionStateFromRow } from "../rules/coding-agent-session-state-mapper.rules.ts";
-import { findCodingTerminal } from "../rules/coding-agent-terminal-type.rules.ts";
+import { classifyCodingTerminal } from "../rules/coding-agent-terminal-type.rules.ts";
 
 /**
  * Whether a committed row's read-back columns can be trusted. Projection
@@ -188,7 +188,7 @@ function toStoredSession(
     occurredAt: state.LastEventOccurredAt,
     firstStoredAt: state.createdAt,
     auxiliary: state.auxiliary,
-    terminalType: findCodingTerminal(state.terminalType),
+    terminalType: classifyCodingTerminal(state.terminalType) ?? null,
     // The same bar extractWorkingContext sets for naming a repo: owner and name.
     repositoryKey:
       state.repositoryOwner && state.repositoryName
