@@ -14,6 +14,8 @@ const CODING_AND_APP_KINDS = [
   "coding_agent_first_session",
   "app_opened",
   "sessions_page_viewed",
+  "usage_page_opened",
+  "usage_page_viewed",
 ] as const;
 
 /** The signals of the coding-agent and app-open facts: Customer.io only, never PostHog. */
@@ -30,20 +32,14 @@ export function isCodingOrAppSignal(signal: NurturingSignal): signal is CodingOr
 export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
   const { userId } = signal;
   switch (signal.kind) {
+    // Every active member hears these, the admin among them: memberFactTraits.
     case "coding_session_stored":
-      return [
-        {
-          type: "identify",
-          userId,
-          traits: { coding_last_session_at: unixSecondsOf(signal.occurredAt) },
-        },
-      ];
+    case "coding_agent_types":
+      return [];
     case "coding_active_days":
       return [
         { type: "identify", userId, traits: { coding_active_days: signal.codingActiveDays } },
       ];
-    case "coding_agent_types":
-      return [{ type: "identify", userId, traits: { coding_agent_types: signal.agentTypes } }];
     case "coding_agent_first_session":
       return [
         {
@@ -72,6 +68,18 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
     case "sessions_page_viewed":
       return [
         { type: "track", userId, event: "sessions_page_viewed", properties: { page: signal.page } },
+      ];
+    case "usage_page_opened":
+      return [
+        {
+          type: "identify",
+          userId,
+          traits: { usage_page_viewed_at: unixSecondsOf(signal.occurredAt) },
+        },
+      ];
+    case "usage_page_viewed":
+      return [
+        { type: "track", userId, event: "usage_page_viewed", properties: { page: signal.page } },
       ];
     default: {
       signal satisfies never;

@@ -123,3 +123,36 @@ func TestRunHTTP_KeepsTheUpstreamBodyOfANon2xx(t *testing.T) {
 	require.NotNil(t, ns.HTTP)
 	assert.JSONEq(t, `{"detail":"quota exceeded for [redacted]"}`, ns.HTTP.ResponseBody)
 }
+
+// An endpoint that answered 200 was reached. When its reply has nothing at the
+// output path, the code must say so; reported as http_error it read "couldn't
+// reach the agent, check the URL", which sends the author to the wrong field.
+// @scenario "An HTTP agent reply with nothing at the output path names the output path"
+func TestRunHTTP_OutputPathMatchingNothingReportsItsOwnCode(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"present":"value"}`))
+	}))
+	defer srv.Close()
+
+	eng := New(Options{
+		HTTP: httpblock.New(httpblock.Options{
+			SSRF: httpblock.SSRFOptions{AllowLocal: true},
+		}),
+	})
+
+	node := httpNode(srv.URL)
+	node.Data.Parameters = append(node.Data.Parameters, stringField("output_path", "$.missing"))
+
+	ns := &NodeState{ID: "http"}
+	_, nodeErr := eng.runHTTP(context.Background(), node, map[string]any{}, ns, nil)
+
+	require.NotNil(t, nodeErr)
+	assert.Equal(t, "jsonpath_no_match", nodeErr.Type)
+	assert.Equal(t, faultCustomer, classifyNodeFault(nodeErr),
+		"an output path the author set is theirs to fix, not a platform fault")
+	require.NotNil(t, ns.HTTP, "the reply the path was read against still reaches the author")
+	assert.Equal(t, 200, ns.HTTP.StatusCode)
+	assert.JSONEq(t, `{"present":"value"}`, ns.HTTP.ResponseBody,
+		"the body the path missed is what the author reads to correct it")
+}

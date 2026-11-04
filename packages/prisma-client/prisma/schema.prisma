@@ -4972,6 +4972,7 @@ model NurturingOrganization {
   codingAgentTypes     String[]  @default([])
   codingActiveDays     Int       @default(0)
   codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  lastTraceAt          DateTime? // moves forward only; told to a person joining later
   updatedAt            DateTime  @updatedAt
 }
 
