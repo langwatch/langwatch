@@ -368,6 +368,12 @@ export class HttpCopilotStudioDataverseChannel
       directory: directoryRead.directory,
     };
 
+    // A transcript read that never produced a row could not read the page it
+    // set out to read. The cost/seats/directory side reads may still have
+    // advanced their own cursor parts, so errorCount alone would let the worker
+    // treat the run as a successful advance and reset the failure streak.
+    const transcriptReadFailed = walk.errorCount > 0 && walk.last === null;
+
     return {
       events: walk.events,
       // An unmoved position hands back the incoming string verbatim, which the
@@ -376,6 +382,7 @@ export class HttpCopilotStudioDataverseChannel
         ? HttpCopilotStudioDataverseChannel.encodeCursor(next)
         : options.cursor,
       errorCount: walk.errorCount,
+      ...(transcriptReadFailed ? { unreadPage: true as const } : {}),
       ...(walk.isTruncated ? { completeness: "truncated" as const } : {}),
     };
   }

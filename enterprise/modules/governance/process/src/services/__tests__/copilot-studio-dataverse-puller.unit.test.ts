@@ -1530,3 +1530,41 @@ describe("given a subscription billing both AI services and unrelated infrastruc
     });
   });
 });
+
+describe("when the transcript sign-in is refused after a side read advanced", () => {
+  function subscribedSkusReply() {
+    return {
+      value: [
+        {
+          skuId: "aaaaaaaa-0000-4000-8000-000000000010",
+          skuPartNumber: "POWER_VIRTUAL_AGENTS_VIRAL",
+          appliesTo: "User",
+          capabilityStatus: "Enabled",
+          consumedUnits: 8,
+          prepaidUnits: { enabled: 10, suspended: 0, warning: 0 },
+        },
+      ],
+    };
+  }
+
+  it("marks the run as having an unread page", async () => {
+    const adapter = await newAdapter();
+    // The seat read uses the Graph audience and succeeds, advancing the seat
+    // half of the cursor. The transcript sign-in for the Dataverse audience is
+    // then refused, so no transcript row was read at all.
+    responseQueue.push({ status: 200, body: { access_token: "graph-token" } });
+    responseQueue.push({ status: 200, body: subscribedSkusReply() });
+    responseQueue.push({ status: 400, body: { error: "invalid_client" } });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig({ ...CONFIG, readSeats: true }),
+    );
+
+    expect(result.errorCount).toBe(1);
+    // The seat read advanced the cursor, but the transcript read produced no
+    // row at all. unreadPage makes the run status count the failure instead of
+    // treating the side-read advance as a clean completion.
+    expect(result.unreadPage).toBe(true);
+  });
+});
