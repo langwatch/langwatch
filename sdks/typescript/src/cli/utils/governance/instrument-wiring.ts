@@ -170,7 +170,7 @@ export function installTelemetryWiring({
     return { labels, warnings, requiredFailures };
   }
 
-  warnings.push(...assertCopilotHookFile(tool));
+  warnings.push(...assertOwnedHookFile(tool));
 
   // Every remaining tool persists as a scoped shell function so the OTel
   // env applies to `<tool>` runs only, never to other shell children.
@@ -212,12 +212,18 @@ export function installTelemetryWiring({
 }
 
 /**
- * Both Copilot surfaces load the one hook file LangWatch owns (ADR-039 S4), so
- * wiring either writes it, quietly and best-effort as claude's is. The warning
- * it returns is for a file of the user's at its path: then linking is off.
+ * Both Copilot surfaces and Grok load a hook file LangWatch owns (ADR-039 S4,
+ * ADR-192), so wiring writes it, quietly and best-effort as claude's is. The
+ * warning is for a file of the user's at its path: then linking is off.
  */
-function assertCopilotHookFile(tool: string): string[] {
+function assertOwnedHookFile(tool: string): string[] {
   const hookFile = assertOwnedHookFileFor({ command: tool });
   if (hookFile?.action !== "not_ours") return [];
-  return [hookFileNotOursNotice({ displayPath: hookFile.displayPath, command: tool })];
+  return [
+    hookFileNotOursNotice({
+      displayPath: hookFile.displayPath,
+      agentId: hookFile.tool,
+      command: tool,
+    }),
+  ];
 }

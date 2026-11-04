@@ -179,9 +179,9 @@ const testSuiteIdDescription =
   "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.";
 
 const simulatorModelDescription =
-  "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.";
+  "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.";
 const judgeModelDescription =
-  "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.";
+  "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.";
 const maxTurnsDescription =
   "Maximum conversation turns for a run of this scenario. Null uses the default.";
 const minTurnsDescription =

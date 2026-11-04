@@ -34,6 +34,8 @@ interface WorkflowEvaluateRequest {
   version_id?: string;
   data?: Record<string, unknown>[];
   dataset_id?: string;
+  /** Version of the saved dataset to evaluate; its current content when absent. */
+  dataset_version?: number;
   parameters?: Record<string, string | number | boolean>;
   row_indices?: number[];
 }
@@ -173,6 +175,7 @@ export class WorkflowsApiService {
     if (options.versionId !== undefined) body.version_id = options.versionId;
     if (options.data !== undefined) body.data = options.data;
     if (options.datasetId !== undefined) body.dataset_id = options.datasetId;
+    if (options.datasetVersion !== undefined) body.dataset_version = options.datasetVersion;
     if (options.parameters !== undefined) body.parameters = options.parameters;
     if (options.rowIndices !== undefined) body.row_indices = options.rowIndices;
 

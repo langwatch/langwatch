@@ -8,6 +8,7 @@ import type { BoardTemplateWidget } from "../../templates/model/board-template.t
 import { definition, full, half } from "../../templates/model/template-widget.ts";
 import { CATALOGUE_WIDGET_BUILDS } from "../widgets/index.ts";
 import { CATALOGUE_WIDGETS, type CatalogueWidget } from "./catalogue-widgets.ts";
+import { stockWidgetSources } from "./stock-widget-sources.ts";
 
 const widgetById = new Map(CATALOGUE_WIDGETS.map((widget) => [widget.id, widget] as const));
 
@@ -43,12 +44,13 @@ export function implementedWidget(id: string): BoardTemplateWidget | undefined {
   const build = CATALOGUE_WIDGET_BUILDS[id];
   const widget = widgetById.get(id);
   if (!build || widget === void 0) return void 0;
+  const sources = stockWidgetSources(id);
   const place = { gridRow: 0, rowSpan: build.rows };
   return {
     key: id,
     name: widget.question,
     definition: {
-      ...definition({ code: build.code, queries: build.queries }),
+      ...definition({ code: build.code, queries: build.queries, sources }),
       description: descriptionOf({ subtitle: build.code.description, why: widget.why }),
       prompt: promptFor(widget),
     },

@@ -42,6 +42,9 @@ class CharacterizationProjectDirectory implements ProjectOperationsDirectory {
     this.overrides.findLegacyApiKeyLastUsedAt?.(input) ??
     this.unimplemented("findLegacyApiKeyLastUsedAt");
 
+  findLiveLegacyKeys: ProjectOperationsDirectory["findLiveLegacyKeys"] = (input) =>
+    this.overrides.findLiveLegacyKeys?.(input) ?? this.unimplemented("findLiveLegacyKeys");
+
   private unimplemented(operation: string): Promise<never> {
     return Promise.reject(
       new Error(`CharacterizationProjectDirectory does not implement ${operation}`),

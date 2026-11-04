@@ -99,6 +99,13 @@ Feature: Trace span-tree read service
     Then its input is read as json rather than an invalid chat_messages value
 
   @unit
+  Scenario: A span whose own attributes share a name with a request param still reads
+    Given a span whose own attributes include "user.*" and "stop.*" keys
+    When the trace is read with its spans
+    Then the span's params carry those attributes as objects
+    And the spans match the declared output
+
+  @unit
   Scenario: AI SDK tool parts in a stored message satisfy the trace schema
     Given a stored assistant message holding a "tool-call" part and a tool message holding a "tool-result" part
     When the trace is read with its spans

@@ -29,6 +29,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "route /cli/auth -> pages/cli/auth",
   "route /authorize -> pages/authorize",
   "route /mcp/authorize -> pages/mcp/authorize",
+  "route /connect/docs -> pages/connect/docs",
   "route /:project/chat/:workflow -> pages/[project]/chat/[workflow]",
   "layout -> full-screen",
   "  layout -> layouts/project-langy",

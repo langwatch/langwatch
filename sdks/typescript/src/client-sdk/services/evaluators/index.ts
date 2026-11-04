@@ -5,5 +5,8 @@ export type {
   CreateEvaluatorBody,
   UpdateEvaluatorBody,
   DeleteEvaluatorResponse,
+  EvaluatorVersionSelector,
+  EvaluatorVersionsResponse,
+  EvaluatorLabelResponse,
 } from "./types";
 export { EvaluatorsApiError } from "./errors";

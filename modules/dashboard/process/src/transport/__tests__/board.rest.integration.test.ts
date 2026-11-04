@@ -18,11 +18,14 @@ import { MY_DASHBOARD_NAME, type DashboardApi } from "@langwatch/dashboard-contr
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
-import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
+import {
+  createDashboardTestAnalytics,
+  createDashboardTestApp,
+} from "../../app/__tests__/dashboard.fixture.ts";
 import { boardProjectRest } from "../board-project.rest.ts";
 import { boardRest, boardsReleased, releasedOrRefused } from "../board.rest.ts";
 import {
-  dashboardWidgetCallerSource,
+  dashboardWidgetCaller,
   dashboardWidgetRest,
   dashboardWidgetUrl,
 } from "../dashboard-widget.rest.ts";
@@ -59,7 +62,13 @@ async function projectWithBothBoards({
   actor = API_KEY,
   released = true,
   langy = false,
-}: { actor?: Actor; released?: boolean | "unreadable"; langy?: boolean } = {}) {
+  analytics,
+}: {
+  actor?: Actor;
+  released?: boolean | "unreadable";
+  langy?: boolean;
+  analytics?: ReturnType<typeof createDashboardTestAnalytics>;
+} = {}) {
   const caller = { actor, scope: { tier: "project" as const, id: PROJECT } };
   // Each card the gate was asked for, with the names it read; it holds a click for every one.
   const cards: { resource: string; names: (string | null | undefined)[] }[] = [];
@@ -67,7 +76,10 @@ async function projectWithBothBoards({
     if (langy) recordProjectCredential(request, LANGY_KEY);
     return caller;
   };
-  const app = createDashboardTestApp({ publicBaseUrl: BASE });
+  const app = createDashboardTestApp({
+    publicBaseUrl: BASE,
+    ...(analytics ? { dependencies: { analytics } } : {}),
+  });
   const reports = await app.create({ projectId: PROJECT, name: "Reports" });
   const board = await app.createBoard({ projectId: PROJECT, name: "Usage" });
   const widget = await app.createDashboardWidget({
@@ -99,7 +111,7 @@ async function projectWithBothBoards({
         bindMiddlewareContext(dashboardWidgetUrl, () =>
           app.dashboardWidgetPlatformUrl({ projectSlug: "project-one" }),
         ),
-        bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+        bindMiddlewareContext(dashboardWidgetCaller, () => ({ source: { kind: "api" as const } })),
         bindMiddlewareContext(boardsReleased, () =>
           released === "unreadable"
             ? Promise.reject(new Error("flag service down"))
@@ -140,6 +152,7 @@ async function projectWithBothBoards({
 
 const BOARDS = "/api/v1/dashboards";
 const REPORTS = "/api/v1/analytics/reports";
+const PROJECT_DASHBOARDS = `/api/v1/projects/${PROJECT}/analytics/dashboards`;
 const PROJECT_BOARDS = `/api/v1/projects/${PROJECT}/analytics/boards`;
 const ids = (json: { data?: { id: string }[] } | undefined) => json?.data?.map(({ id }) => id);
 const refusal = (answer: { status: number; json?: { code?: string } }) => ({
@@ -420,6 +433,32 @@ describe("given two Dashboards boards, one holding a widget", () => {
     });
   });
 
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("stores application on a new query, a picked set as sent, and keeps it through a rename", async () => {
+    const { other, send } = await twoBoards();
+    const widgets = `${BOARDS}/${other.id}/widgets`;
+    const query = { name: "turns", sql: "SELECT count() FROM traces" };
+
+    const created = await send("dashboards", widgets, {
+      method: "POST",
+      body: { name: "Langy refusals", code: CODE, queries: [query] },
+    });
+    const path = `${widgets}/${created.json?.id}`;
+    const picked = await send("dashboards", path, {
+      method: "PATCH",
+      body: { queries: [{ ...query, sources: ["langy"] }] },
+    });
+    const renamed = await send("dashboards", path, { method: "PATCH", body: { name: "Refused" } });
+    const sources = (response: typeof created) =>
+      response.json?.definition?.queries?.map((q: { sources?: unknown }) => q.sources);
+
+    expect({
+      created: sources(created),
+      picked: sources(picked),
+      renamed: sources(renamed),
+    }).toEqual({ created: [["application"]], picked: [["langy"]], renamed: [["langy"]] });
+  });
+
   /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */
   it("answers a widget reached through another board's path as not found, and leaves it", async () => {
     const { board, other, widget, send } = await twoBoards();
@@ -580,7 +619,7 @@ describe("given the Reports boards at /api/v1/analytics/reports", () => {
         renamed: "Spend",
         deleted: { id, name: "Spend" },
         dashboardsBoard: { status: 404, code: "dashboard_not_found" },
-        headers: answers.map(() => [null, null, null]),
+        headers: answers.map(() => ["true", '</api/v1/dashboards>; rel="successor-version"', null]),
       });
     }
   });
@@ -589,11 +628,80 @@ describe("given the Reports boards at /api/v1/analytics/reports", () => {
   it("leaves the project-path boards read without deprecation headers", async () => {
     const { board, send } = await projectWithBothBoards();
 
-    const listed = await send("projectBoards", PROJECT_BOARDS);
+    const listed = await send("projectBoards", PROJECT_DASHBOARDS);
 
     expect({ ids: ids(listed.json), headers: deprecationHeaders(listed) }).toEqual({
       ids: [board.id],
       headers: [null, null, null],
     });
+  });
+});
+
+describe("given a Dashboards board read on the project path", () => {
+  const deprecationHeaders = (answer: { headers: Headers }) =>
+    ["Deprecation", "Link"].map((name) => answer.headers.get(name));
+
+  /** @scenario "AC199y Names: the project-path dashboards read answers at /analytics/dashboards" */
+  it("answers at /analytics/dashboards, and the same at /analytics/boards, deprecated", async () => {
+    const { board, send } = await projectWithBothBoards();
+
+    const answers = await Promise.all(
+      [
+        PROJECT_DASHBOARDS,
+        `${PROJECT_DASHBOARDS}/${board.id}`,
+        PROJECT_BOARDS,
+        `${PROJECT_BOARDS}/${board.id}`,
+      ].map((path) => send("projectBoards", path)),
+    );
+
+    expect(
+      answers.map((answer) => ({
+        status: answer.status,
+        id: answer.json?.id ?? ids(answer.json)?.[0],
+        headers: deprecationHeaders(answer),
+      })),
+    ).toEqual([
+      { status: 200, id: board.id, headers: [null, null] },
+      { status: 200, id: board.id, headers: [null, null] },
+      {
+        status: 200,
+        id: board.id,
+        headers: ["true", `<${PROJECT_DASHBOARDS}>; rel="successor-version"`],
+      },
+      {
+        status: 200,
+        id: board.id,
+        headers: ["true", `<${PROJECT_DASHBOARDS}/${board.id}>; rel="successor-version"`],
+      },
+    ]);
+  });
+});
+
+describe("given a person's CLI access token naming a project in a board widget", () => {
+  /** @scenario "AC210c Compatibility: a write naming a project that does not exist, lies in another organization or cannot be read is refused alike" */
+  it("is judged as that person on create, as on update", async () => {
+    const asked: unknown[] = [];
+    const analytics = createDashboardTestAnalytics({
+      assertProjectsReadable: async (input) => void asked.push(input),
+    });
+    const { board, widget, send } = await projectWithBothBoards({
+      actor: { type: "user", id: "user-1" },
+      analytics,
+    });
+    const queries = [{ name: "traces", sql: "SELECT 1", projects: ["project-2"] }];
+
+    await send("dashboards", `${BOARDS}/${board.id}/widgets`, {
+      method: "POST",
+      body: { name: "New", code: CODE, queries },
+    });
+    await send("dashboards", `${BOARDS}/${board.id}/widgets/${widget.id}`, {
+      method: "PATCH",
+      body: { queries },
+    });
+
+    expect(asked).toEqual([
+      { userId: "user-1", projectIds: ["project-2"], anchorProjectId: "project-1" },
+      { userId: "user-1", projectIds: ["project-2"], anchorProjectId: "project-1" },
+    ]);
   });
 });

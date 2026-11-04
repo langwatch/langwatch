@@ -49,6 +49,16 @@ export const SOURCE_UNHEALTHY_META: SourceBadge = {
 };
 
 /**
+ * A source holding a configuration its adapter refuses. Every pull fails the same way until an
+ * admin edits it, so this outranks "Pulls failing", which reads as something that may pass.
+ */
+export const SOURCE_MISCONFIGURED_META: SourceBadge = {
+  icon: CircleAlert,
+  label: "Connection needs fixing",
+  color: "red.fg",
+};
+
+/**
  * A source whose last run stopped before it had read everything.
  *
  * A third answer, because the other two are both wrong about it. It is not
@@ -78,15 +88,19 @@ export function sourceBadge({
   status,
   errorCount,
   completeness,
+  configComplaints = [],
 }: {
   status: string;
   errorCount: number;
   /** Whether the last run drained the period it was asked for, when known. */
   completeness?: RunCompleteness | null;
+  /** What the adapter refuses about the stored configuration. */
+  configComplaints?: readonly string[];
 }): SourceBadge {
   // Checked before health: a source nobody asked to run cannot be failing to
   // run, so its configured state is the honest badge.
   if (status === "disabled") return SOURCE_STATUS_META.disabled!;
+  if (configComplaints.length > 0) return SOURCE_MISCONFIGURED_META;
   // Failing outranks partly collected. A source doing both is one an admin
   // has to go and fix, and a run that stopped early is the milder half of
   // that news -- shown on its own it reads as a source that is working.

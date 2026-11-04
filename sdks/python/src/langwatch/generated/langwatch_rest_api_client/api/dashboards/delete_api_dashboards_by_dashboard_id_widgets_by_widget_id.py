@@ -123,9 +123,9 @@ def sync_detailed(
     | DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse404
     | DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500
 ]:
-    """Delete a widget on a board
+    """Delete a widget on a dashboard
 
-     Deletes one widget on this board. Answers 204 with no body.
+     Deletes one widget on this dashboard. Answers 204 with no body.
 
     Args:
         dashboard_id (str):
@@ -165,9 +165,9 @@ def sync(
     | DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500
     | None
 ):
-    """Delete a widget on a board
+    """Delete a widget on a dashboard
 
-     Deletes one widget on this board. Answers 204 with no body.
+     Deletes one widget on this dashboard. Answers 204 with no body.
 
     Args:
         dashboard_id (str):
@@ -201,9 +201,9 @@ async def asyncio_detailed(
     | DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse404
     | DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500
 ]:
-    """Delete a widget on a board
+    """Delete a widget on a dashboard
 
-     Deletes one widget on this board. Answers 204 with no body.
+     Deletes one widget on this dashboard. Answers 204 with no body.
 
     Args:
         dashboard_id (str):
@@ -241,9 +241,9 @@ async def asyncio(
     | DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500
     | None
 ):
-    """Delete a widget on a board
+    """Delete a widget on a dashboard
 
-     Deletes one widget on this board. Answers 204 with no body.
+     Deletes one widget on this dashboard. Answers 204 with no body.
 
     Args:
         dashboard_id (str):
