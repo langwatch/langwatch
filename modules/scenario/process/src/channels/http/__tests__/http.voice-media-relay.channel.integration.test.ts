@@ -138,6 +138,21 @@ describe("HttpVoiceMediaRelayChannel", () => {
 
         expect(await ended).toMatchObject({ code: 4502 });
       });
+
+      /** @scenario "A transient socket error after open does not terminate an active relay" */
+      it("keeps relaying frames after a socket error fires once the relay is open", async () => {
+        // The opening handshake listens for "error" on the socket to refuse an unopened relay.
+        // That listener must not outlive the handshake, or a later, unrelated error on the same
+        // socket would terminate an already-paired call.
+        (relay as unknown as { socket: WebSocket }).socket.emit("error", new Error("transient"));
+
+        const heard = new Promise<string>((resolve) =>
+          twilio.once("message", (data) => resolve(frameBytes(data).toString("utf8"))),
+        );
+        relay.send({ data: Buffer.from('{"event":"media"}'), isBinary: false });
+
+        expect(await heard).toBe('{"event":"media"}');
+      });
     });
   });
 
