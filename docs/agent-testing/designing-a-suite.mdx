@@ -99,7 +99,9 @@ The judge reads the agent's [linked traces](/agent-testing/linking-your-traces),
 
 Put the data a scenario needs in the test environment the target points at. Seed data the agent only reads there before the run. Data the agent changes needs a fresh copy per run, because a refund in the first repetition changes what the second one sees: [seed it per conversation](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
 
-Put the values that stay the same on every run in scenario fields, such as `expected_amount`. A field holds one value per scenario, so an id that differs per run stays in the session or the state, and one that differs per environment goes in a [run parameter](/agent-testing/run-parameters). Compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
+Put the values that stay the same on every run in scenario fields, such as `expected_amount`. A field holds one value per scenario, so an id that differs per run stays in the session or the state, and one that differs per environment goes in a [run parameter](/agent-testing/run-parameters).
+
+Compute every date from the current time, because a fixed date falls outside a "last 24 hours" window the next day and the scenario then fails because of the date, not the agent.
 
 For how to build the data and report its state, see [Check the World, Not the Words](/agent-testing/check-the-world#level-2-seed-the-world-report-its-state).
 
