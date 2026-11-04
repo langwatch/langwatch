@@ -23,6 +23,9 @@ export type SessionCaller = Readonly<{
   sessionId?: string | undefined;
   /** The RAW verified auth-session id, before any live-session lookup. */
   authSessionId?: string | undefined;
+  /** When the live session began and when it ends, as ISO instants, where auth reports them. */
+  sessionStartedAt?: string | undefined;
+  sessionExpiresAt?: string | undefined;
 }>;
 
 /**

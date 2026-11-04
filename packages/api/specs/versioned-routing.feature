@@ -122,6 +122,15 @@ Feature: Explicit compatibility version namespaces
     And no /api/v1 address is registered for it, nor a version guard under one
 
   @integration
+  Scenario: A family can deprecate its bare path in favour of its /api/v1 twin
+    Given a dated family that declares its bare /api path deprecated
+    When a caller reaches it at its bare path, its dated or latest path, or a version it never named
+    Then it answers as the same /api/v1 address does
+    And the answer carries Deprecation true and a successor-version Link to the family's /api/v1 path
+    And no /api/v1 answer carries a Deprecation header
+    And a family with no /api/v1 twin cannot declare it
+
+  @integration
   Scenario: A path the family serves with another method answers 405, not 404
     Given a family serving one path with one method
     When a caller sends a method the family does not serve there

@@ -36,6 +36,14 @@ describe("logContentKeys", () => {
     });
   });
 
+  describe("given grok's tool_result", () => {
+    /** @scenario A Grok tool run's output is withheld behind the output gate */
+    it("withholds tool_output on output and tool_input on input", () => {
+      expect(categoryOf("grok_code.tool_result", "tool_output")).toBe("output");
+      expect(categoryOf("grok_code.tool_result", "tool_input")).toBe("input");
+    });
+  });
+
   describe("given a namespaced wire spelling", () => {
     it("resolves codex events through the canonical vocabulary", () => {
       expect(categoryOf("codex.user_prompt", "prompt")).toBe("input");
@@ -121,6 +129,7 @@ const KNOWN_METADATA_ATTRS: ReadonlySet<string> = new Set([
   "call_id",
   "tool_name",
   "mcp_server",
+  "mcp_server_name",
   "function_name",
   "decision",
   "source",

@@ -19,15 +19,17 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type BuiltInModel,
   type GroupedModelOptions,
+  isServedOnlyAsBuiltIn,
   modelSelectionFrom,
   type ModelOption,
+  unavailableModelReason,
 } from "@langwatch/model-provider-contract";
 import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "@langwatch/prompt-contract/llm-config-constants";
 import { AlertTriangle, Search } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 
 import { api } from "../../behavior/model-provider-api.ts";
@@ -55,23 +57,13 @@ export const useModelSelectionOptions = ({
     { enabled: !!project?.id },
   );
 
-  // Memoized as one block: the derivation runs on data changes, not on every
-  // render of the caller. Without this, each render handed back fresh
-  // `selectOptions` / `groupedByProvider` arrays, so every downstream
-  // `useMemo` keyed on them recomputed too — the langy composer's model pill
-  // rebuilt its whole combobox collection per parent render because of it.
-  const providers = modelProviders.data;
-  const { selectOptions, groupedByProvider } = useMemo(
-    () =>
-      modelSelectionFrom({
-        providers: providers ?? [],
-        options,
-        mode,
-        featureKey,
-        ...(builtInModels ? { builtInModels } : {}),
-      }),
-    [providers, options, mode, featureKey, builtInModels],
-  );
+  const { selectOptions, groupedByProvider } = modelSelectionFrom({
+    providers: modelProviders.data ?? [],
+    options,
+    mode,
+    featureKey,
+    ...(builtInModels ? { builtInModels } : {}),
+  });
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
@@ -198,12 +190,14 @@ function SelectedModelValue({
   isProviderMissing,
   isUnknown,
   label,
+  model,
   providerKey,
   size,
 }: {
   isProviderMissing: boolean;
   isUnknown: boolean;
   label: string;
+  model: string;
   providerKey: string;
   size: SelectorSize;
 }) {
@@ -228,7 +222,7 @@ function SelectedModelValue({
       </Box>
       {isProviderMissing && (
         <Tooltip
-          content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+          content={unavailableModelReason({ model })}
           positioning={{ placement: "top" }}
           showArrow
         >
@@ -336,7 +330,7 @@ function ConfigureModelsAction({ size }: { size: SelectorSize }) {
   );
 }
 
-export const ModelSelector = React.memo(function ModelSelector({
+export function ModelSelector({
   model,
   options,
   onChange,
@@ -392,19 +386,24 @@ export const ModelSelector = React.memo(function ModelSelector({
   // Model might not be in the list if it's a custom model or unknown
   const isUnknown = !selectedItem;
 
-  // Provider gone (deleted or never configured at any reachable
-  // scope) — the value is still persisted on the form but the user
-  // needs to update it before the evaluation can run. Same chip
-  // treatment ModelChip renders in the Default Models table.
+  // Provider gone (deleted, or never configured at any reachable scope): the value is still
+  // persisted on the form but has to change before the evaluation can run. A built-in model is
+  // LangWatch's own offer, so no provider row has to carry it; a decision model the picker no
+  // longer offers asks for an update even though its provider's group is there.
   const providerKey = model.split("/")[0] ?? "";
   const isProviderMissing =
-    !!model && !!providerKey && !groupedByProvider.some((group) => group.provider === providerKey);
+    !!model &&
+    !!providerKey &&
+    !selectedItem?.isBuiltIn &&
+    (isServedOnlyAsBuiltIn(model) ||
+      !groupedByProvider.some((group) => group.provider === providerKey));
 
   const selectValueText = (
     <SelectedModelValue
       isProviderMissing={isProviderMissing}
       isUnknown={isUnknown}
       label={selectedItem?.label ?? model}
+      model={model}
       providerKey={providerKey}
       size={size}
     />
@@ -415,8 +414,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   useEffect(() => {
     const next = highlightAfterSearch({ current: highlightedValue, items: allFilteredModels });
     if (next.changed) setHighlightedValue(next.value);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelSearch]);
+  }, [modelSearch, highlightedValue, allFilteredModels]);
 
   // Skeleton while the providers query is in flight so the empty
   // state doesn't flash before the data resolves.
@@ -503,4 +501,4 @@ export const ModelSelector = React.memo(function ModelSelector({
       </Select.Content>
     </Select.Root>
   );
-});
+}

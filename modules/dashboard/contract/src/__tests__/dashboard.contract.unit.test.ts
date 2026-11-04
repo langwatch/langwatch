@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  createDashboardWidgetSchema,
   createSavedWorkbenchChartSchema,
   customGraphInputSchema,
   dashboardCreateInputSchema,
@@ -230,5 +231,26 @@ describe("dashboard contract", () => {
     });
 
     expect(parsed.success && parsed.data.graphId).toBe("custom");
+  });
+
+  /** @scenario "AC207c Project: a query stores at most as many projects as a member's list may hold" */
+  it("refuses a widget query naming more than 100 projects, at that field", () => {
+    const body = (count: number) => ({
+      name: "w",
+      code: "export default () => null",
+      queries: [
+        {
+          name: "main",
+          sql: "SELECT 1",
+          projects: Array.from({ length: count }, (_, index) => `p${index}`),
+        },
+      ],
+    });
+
+    expect(createDashboardWidgetSchema.validate(body(100))).toBe(true);
+    expect(createDashboardWidgetSchema.validate(body(101))).toBe(false);
+    expect(createDashboardWidgetSchema.safeParse(body(101)).error?.issues[0]?.path.join(".")).toBe(
+      "queries.0.projects",
+    );
   });
 });

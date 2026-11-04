@@ -1,0 +1,43 @@
+name: operator-action-notes
+
+# Adds an "Operator action required" section to a published release's notes,
+# listing the pull requests it ships that carry the operator-action label: the
+# label is how a maintainer clears a deployment-impact block, so the release
+# must tell operators about it. Spec: specs/ci/deployment-impact-report.feature
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: operator-action-notes-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      - name: List the pull requests that need operator action
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: go run ./cmd/operatornotes -repo "$REPO" -tag "$TAG"

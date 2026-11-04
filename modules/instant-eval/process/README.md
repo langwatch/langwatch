@@ -389,17 +389,18 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `instant_eval_processing` (aggregate `instant_eval_run`)
 
-Declared at `src/eventing/instant-eval-processing.pipeline.ts:60`. Events: `instantEvalRequestedEventSchema`, `instantEvalPlannedEventSchema`, `instantEvalPageJudgedEventSchema`, `instantEvalCancelRequestedEventSchema`, `instantEvalFinishedEventSchema`.
+Declared at `src/eventing/instant-eval-processing.pipeline.ts:61`. Events: `instantEvalRequestedEventSchema`, `instantEvalPlannedEventSchema`, `instantEvalPageJudgedEventSchema`, `instantEvalCancelRequestedEventSchema`, `instantEvalFinishedEventSchema`, `instantEvalLatePageBilledEventSchema`.
 
-| Kind                | Name                                                                    | Handles                                        | Declared at                                           |
-| ------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
-| command             | `requestRun`                                                            | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:74` |
-| command             | `recordPlanned`                                                         | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:75` |
-| command             | `recordPageJudged`                                                      | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:76` |
-| command             | `requestCancel`                                                         | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:82` |
-| command             | `recordFinished`                                                        | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:83` |
-| process manager     | `instantEval`                                                           | intents `finish`, `judgePage`, `plan` (outbox) | `src/eventing/instant-eval-processing.pipeline.ts:84` |
-| Postgres projection | `≈ createInstantEvalRunProjection({ store: deps.instantEvalRunStore })` | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:73` |
+| Kind                | Name                                                                    | Handles                                                        | Declared at                                           |
+| ------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------- |
+| command             | `requestRun`                                                            | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:76` |
+| command             | `recordPlanned`                                                         | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:77` |
+| command             | `recordPageJudged`                                                      | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:78` |
+| command             | `requestCancel`                                                         | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:84` |
+| command             | `recordFinished`                                                        | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:85` |
+| command             | `recordLatePageBilled`                                                  | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:86` |
+| process manager     | `instantEval`                                                           | intents `billLatePage`, `finish`, `judgePage`, `plan` (outbox) | `src/eventing/instant-eval-processing.pipeline.ts:87` |
+| Postgres projection | `≈ createInstantEvalRunProjection({ store: deps.instantEvalRunStore })` | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:75` |
 
 ## Configuration
 

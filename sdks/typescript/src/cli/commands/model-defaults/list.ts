@@ -47,7 +47,7 @@ export const listModelDefaultsCommand = async (): Promise<CommandResult | void> 
         console.log(chalk.bold(`Configs (${snapshot.configs.length})`));
         if (snapshot.configs.length === 0) {
           console.log(chalk.gray("  No configs at any readable scope. Set one with:"));
-          console.log(chalk.cyan("    langwatch model-default set DEFAULT openai/gpt-5"));
+          console.log(chalk.cyan("    langwatch model-default set DEFAULT openai/gpt-6-luna"));
           console.log();
           return;
         }

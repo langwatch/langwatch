@@ -98,6 +98,8 @@ jobs:
               - 'pkg/ciscan/**'
               # The static-cloud-keys guard walks composite actions too.
               - '.github/actions/**'
+              # The publish-shape guard checks ECR_CHARTS against every chart.
+              - 'charts/*/Chart.yaml'
               # The lambda-workdir guard reads the Lambda images' Dockerfiles.
               - 'infra/docker/Dockerfile.*.lambda'
       - name: Force the filter true on non-PR events
