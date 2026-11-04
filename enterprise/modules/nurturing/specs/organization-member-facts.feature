@@ -77,6 +77,12 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then Customer.io identifies the person with has_traces true and that organization's last_trace_at
 
   @unit
+  Scenario: A disabled membership still counts toward has_traces
+    Given the person's only membership with traces was disabled
+    When an sso_auto_added signal for a trace-free organization is delivered
+    Then Customer.io identifies the person with has_traces true
+
+  @unit
   Scenario: A busy organization sends one batch per debounce window
     When traces of project-1 and project-2 are delivered inside 300 seconds
     Then each member is identified once
