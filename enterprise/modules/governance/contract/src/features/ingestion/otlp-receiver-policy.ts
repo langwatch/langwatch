@@ -21,6 +21,8 @@ const CODING_AGENT_SOURCES = new Set([
   "copilot_cli",
   "copilot_app",
   "copilot_vscode",
+  "grok_cli",
+  "pi_cli",
 ]);
 // The CLI and SDK report as `github.copilot`/`@github/copilot`; VS Code Chat as `copilot-chat`.
 const COPILOT_SCOPES = ["github.copilot", "@github/copilot", "copilot-chat"];

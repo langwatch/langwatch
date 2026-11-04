@@ -8,6 +8,7 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { DeployLabelSelect } from "@langwatch/design-system/deploy-label-select";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Alert,
@@ -64,6 +65,7 @@ import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
+import { useEvaluatorLabelOptions } from "../../../behavior/use-evaluator-label-options.ts";
 import { EvaluatorSelectionBox } from "../../elements/evaluations/evaluator-selection-box.tsx";
 import { StepRadio } from "../../elements/evaluations/step-button.tsx";
 import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
@@ -92,6 +94,7 @@ let onlineEvaluationDrawerState: {
   mappings: Record<string, UIFieldMapping>;
   preconditions: CheckPrecondition[];
   threadIdleTimeout: number | null; // Seconds to wait after last message (thread level only)
+  evaluatorLabel?: string; // The evaluator deploy label the monitor runs; absent runs latest
   pendingEvaluatorId?: string; // ID of newly created evaluator to load
 } | null = null;
 
@@ -162,6 +165,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     sample: number;
     preconditions: CheckPrecondition[];
     threadIdleTimeout: number | null;
+    evaluatorLabel: string | undefined;
     // Note: selectedEvaluator and mappings are managed separately because they're complex objects
     // that need special handling (module-level persistence, callbacks, etc.)
   };
@@ -174,6 +178,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       sample: onlineEvaluationDrawerState?.sample ?? 1.0,
       preconditions: onlineEvaluationDrawerState?.preconditions ?? [DEFAULT_PRECONDITION],
       threadIdleTimeout: onlineEvaluationDrawerState?.threadIdleTimeout ?? 300,
+      evaluatorLabel: onlineEvaluationDrawerState?.evaluatorLabel,
     },
   });
 
@@ -183,6 +188,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const sample = form.watch("sample");
   const preconditions = form.watch("preconditions");
   const threadIdleTimeout = form.watch("threadIdleTimeout");
+  const evaluatorLabel = form.watch("evaluatorLabel");
 
   // These are managed separately due to complex interactions with drawer system
   const [selectedEvaluator, setSelectedEvaluator] = useState<WireEvaluatorWithFields | null>(
@@ -271,6 +277,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         sample: 1.0,
         preconditions: [DEFAULT_PRECONDITION],
         threadIdleTimeout: 300,
+        evaluatorLabel: undefined,
       });
       setSelectedEvaluator(null);
       setMappings({});
@@ -293,9 +300,24 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       mappings,
       preconditions,
       threadIdleTimeout,
+      evaluatorLabel,
       pendingEvaluatorId: onlineEvaluationDrawerState?.pendingEvaluatorId,
     };
-  }, [isOpen, level, name, selectedEvaluator, sample, mappings, preconditions, threadIdleTimeout]);
+  }, [
+    isOpen,
+    level,
+    name,
+    selectedEvaluator,
+    sample,
+    mappings,
+    preconditions,
+    threadIdleTimeout,
+    evaluatorLabel,
+  ]);
+  const labelOptions = useEvaluatorLabelOptions({
+    projectId: project?.id,
+    evaluatorId: selectedEvaluator?.id,
+  });
 
   // Mark form as dirty when user makes changes to non-form-managed state
   const markDirty = useCallback(() => setHasUnsavedChanges(true), []);
@@ -378,7 +400,16 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       monitorId,
       projectId: project?.id,
       blocked: hasPendingMappings,
-      draft: { selectedEvaluator, name, preconditions, mappings, sample, level, threadIdleTimeout },
+      draft: {
+        selectedEvaluator,
+        name,
+        preconditions,
+        mappings,
+        sample,
+        level,
+        threadIdleTimeout,
+        evaluatorLabel,
+      },
       create: createMutation.mutate,
       update: updateMutation.mutate,
     });
@@ -398,6 +429,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     createMutation,
     level,
     threadIdleTimeout,
+    evaluatorLabel,
   ]);
 
   // Run on text
@@ -467,6 +499,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 onRemoveSelection={() => {
                   setSelectedEvaluator(null);
                   form.setValue("name", "");
+                  form.setValue("evaluatorLabel", undefined);
                   setMappings({});
                   setHasUnsavedChanges(true);
                 }}
@@ -507,6 +540,19 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 {...form.register("name")}
                 data-testid="online-evaluation-name-input"
                 placeholder="Enter evaluation name"
+              />
+            </HorizontalFormControl>
+            <HorizontalFormControl
+              label="Deploy label"
+              helper="Which version of the evaluator this online evaluation runs"
+            >
+              <DeployLabelSelect
+                value={evaluatorLabel}
+                onChange={(label) => form.setValue("evaluatorLabel", label)}
+                labels={labelOptions.labels}
+                latestVersion={labelOptions.latestVersion}
+                aria-label="Deploy label"
+                data-testid="online-evaluation-label-select"
               />
             </HorizontalFormControl>
             <HorizontalFormControl
@@ -644,6 +690,7 @@ function monitorFormValues(monitor: {
   threadIdleTimeout?: number | null;
   level?: unknown;
   mappings?: unknown;
+  evaluatorLabel?: string | null;
 }) {
   const level = (monitor.level as EvaluationLevel) ?? "trace";
   const existingMappings = monitor.mappings as MappingState | null;
@@ -654,6 +701,7 @@ function monitorFormValues(monitor: {
       preconditions: (monitor.preconditions as CheckPrecondition[]) ?? [],
       threadIdleTimeout: monitor.threadIdleTimeout ?? null,
       level,
+      evaluatorLabel: monitor.evaluatorLabel ?? undefined,
     },
     mappings: existingMappings?.mapping
       ? deserializeMappingStateToUI(existingMappings, level as "trace" | "thread")
@@ -765,6 +813,7 @@ function monitorPayload({
   sample,
   level,
   threadIdleTimeout,
+  evaluatorLabel,
 }: {
   selectedEvaluator: WireEvaluatorWithFields;
   projectId: string;
@@ -774,6 +823,7 @@ function monitorPayload({
   sample: number;
   level: EvaluationLevel;
   threadIdleTimeout: number | null;
+  evaluatorLabel: string | undefined;
 }) {
   const evaluatorConfig = selectedEvaluator.config as {
     evaluatorType?: string;
@@ -796,6 +846,7 @@ function monitorPayload({
     evaluatorId: selectedEvaluator.id,
     level: level ?? "trace",
     threadIdleTimeout: level === "thread" ? threadIdleTimeout : null,
+    evaluatorLabel: evaluatorLabel ?? null,
   };
 }
 
@@ -1058,6 +1109,7 @@ type DrawerFormValues = {
   sample: number;
   preconditions: CheckPrecondition[];
   threadIdleTimeout: number | null;
+  evaluatorLabel: string | undefined;
 };
 
 /**
@@ -1333,6 +1385,10 @@ function useEvaluatorFlow({
       setSelectedEvaluator(evaluator);
       setHasUnsavedChanges(true);
       if (!name) form.setValue("name", newName);
+      // Labels belong to one evaluator, so another evaluator starts on latest.
+      const evaluatorLabel =
+        evaluator.id === selectedEvaluator?.id ? form.getValues("evaluatorLabel") : undefined;
+      form.setValue("evaluatorLabel", evaluatorLabel);
       const autoMappings = autoInferMappings({ evaluator, level });
       setMappings(autoMappings);
       onlineEvaluationDrawerState = {
@@ -1343,6 +1399,7 @@ function useEvaluatorFlow({
         mappings: autoMappings,
         preconditions,
         threadIdleTimeout,
+        evaluatorLabel,
       };
       openEvaluatorEditor({
         openDrawer,
@@ -1362,6 +1419,7 @@ function useEvaluatorFlow({
       form,
       openDrawer,
       handleMappingChange,
+      selectedEvaluator,
       setSelectedEvaluator,
       setMappings,
       setHasUnsavedChanges,

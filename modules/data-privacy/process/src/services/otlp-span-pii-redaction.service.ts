@@ -22,6 +22,7 @@ import {
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
+import { PII_ANALYSIS_TEXT_BUDGET } from "../rules/pii-analysis.rules.ts";
 import { OtlpRecordPiiRedactionService } from "./otlp-record-pii-redaction.service.ts";
 import {
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
@@ -247,9 +248,14 @@ export class OtlpSpanPiiRedactionService {
     }
     const { options } = redaction;
 
-    const { entries, anySkipped, anyRedacted } = this.collectSpanEntries(span, resource);
+    const { entries, anySkipped, anyRedacted, anyTruncated } = this.collectSpanEntries(
+      span,
+      resource,
+    );
 
-    if (anySkipped) {
+    // A truncated value entered the batch, so it counts as collected and the status reads
+    // "partial": one analysis pass reads its head and the tail comes back unscanned.
+    if (anySkipped || anyTruncated) {
       this.markRedactionStatus(span, anyRedacted ? "partial" : "none");
     }
 
@@ -277,16 +283,23 @@ export class OtlpSpanPiiRedactionService {
   private collectSpanEntries(
     span: OtlpSpan,
     resource: OtlpResource | null,
-  ): { entries: StringEntry[]; anySkipped: boolean; anyRedacted: boolean } {
+  ): {
+    entries: StringEntry[];
+    anySkipped: boolean;
+    anyRedacted: boolean;
+    anyTruncated: boolean;
+  } {
     const entries: StringEntry[] = [];
     let anySkipped = false;
     let anyRedacted = false;
+    let anyTruncated = false;
     let totalLength = 0;
 
     for (const attrs of this.collectAllAttributeSets(span)) {
       const result = this.collectStringEntries(attrs, entries, totalLength);
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
+      anyTruncated ||= result.truncated;
       totalLength = result.totalLength;
     }
 
@@ -306,6 +319,7 @@ export class OtlpSpanPiiRedactionService {
         });
         totalLength += span.status.message.length;
         anyRedacted = true;
+        anyTruncated ||= span.status.message.length > PII_ANALYSIS_TEXT_BUDGET;
       }
     }
 
@@ -313,9 +327,10 @@ export class OtlpSpanPiiRedactionService {
       const result = this.collectStringEntries(resource.attributes, entries, totalLength);
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
+      anyTruncated ||= result.truncated;
     }
 
-    return { entries, anySkipped, anyRedacted };
+    return { entries, anySkipped, anyRedacted, anyTruncated };
   }
 
   /**
@@ -346,17 +361,18 @@ export class OtlpSpanPiiRedactionService {
   }
 
   /**
-   * Collects string attribute values into the entries array.
-   * Enforces a cumulative character budget — once adding a value would
-   * exceed piiRedactionMaxAttributeLength the value is skipped.
+   * Collects string attribute values into the entries array. Enforces a cumulative character
+   * budget — once adding a value would exceed piiRedactionMaxAttributeLength the value is
+   * skipped — and reports a collected value longer than one analysis pass may read.
    */
   private collectStringEntries(
     attributes: OtlpKeyValue[],
     entries: StringEntry[],
     currentTotalLength: number,
-  ): { skipped: boolean; collected: boolean; totalLength: number } {
+  ): { skipped: boolean; collected: boolean; truncated: boolean; totalLength: number } {
     let skipped = false;
     let collected = false;
+    let truncated = false;
     let totalLength = currentTotalLength;
 
     for (const attr of attributes) {
@@ -397,10 +413,11 @@ export class OtlpSpanPiiRedactionService {
         });
         totalLength += attr.value.stringValue.length;
         collected = true;
+        truncated ||= attr.value.stringValue.length > PII_ANALYSIS_TEXT_BUDGET;
       }
     }
 
-    return { skipped, collected, totalLength };
+    return { skipped, collected, truncated, totalLength };
   }
 
   /**

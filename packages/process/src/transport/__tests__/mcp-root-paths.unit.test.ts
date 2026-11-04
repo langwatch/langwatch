@@ -85,6 +85,7 @@ function servedSurface({ doors }: { doors: RawHttpHost }): NodeHandler {
     trustCloudflare: false,
     executionProxyBaseUrl: void 0,
     publicBaseUrl: void 0,
+    docsOrigins: [],
     production: false,
     selection: TransportSelection.create().rest().browserBundle(false),
     sockets: WebSocketHost.create(),

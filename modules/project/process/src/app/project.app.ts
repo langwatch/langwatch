@@ -24,6 +24,7 @@ import {
   type ArchivedProject,
   type Project,
   type ProjectIdentity,
+  type ProjectLegacyKey,
   type ProjectLegacyKeyStatus,
   type ProjectWithTeam,
   type PaginatedProjects,
@@ -131,6 +132,8 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #aggregateReads: ProjectRepository;
   readonly #requests = ProjectRequestService.create({
     projects: this,
+    findLegacyKeys: (input) => this.#operations.findLegacyKeys(input),
+    decideManageable: (input) => this.#decideManageable(input),
     probePermission: (input) => this.probePermission(input),
   });
   private constructor({
@@ -285,6 +288,34 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     by: Readonly<{ id: string }>;
   }): Promise<{ alreadyArchived: boolean }> {
     return this.#requests.archiveOtherProject(input);
+  }
+
+  legacyKeys(input: {
+    organizationId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<ProjectLegacyKey[]> {
+    return this.#requests.findLegacyKeys(input);
+  }
+
+  /** `project:manage` for every project read, in one decision off one grant snapshot. */
+  async #decideManageable({
+    organizationId,
+    projects,
+    by,
+  }: {
+    organizationId: string;
+    projects: readonly Readonly<{ projectId: string; teamId: string }>[];
+    by: Readonly<{ id: string }>;
+  }): Promise<ReadonlyMap<string, boolean>> {
+    const decision = await this.#authorization.canBatchByIds({
+      principal: { type: "user", id: by.id },
+      permission: "project:manage",
+      organizationId,
+      teams: [],
+      projects,
+    });
+
+    return decision.projects;
   }
 
   getLegacyKeyStatus(input: { projectId: string }): Promise<ProjectLegacyKeyStatus> {

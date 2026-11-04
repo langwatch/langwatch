@@ -927,6 +927,27 @@ describe("given the identifier-first sign-in screen", () => {
       );
     });
 
+    /** @scenario "The log-in door's confirmation link carries the invitation" */
+    it("sends the invitation the log-in was going to along with the link", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "callbackUrl=%2Finvite%2Faccept%3FinviteCode%3Dabc",
+      );
+      routeMock.mockResolvedValue(unknownIdentifier);
+      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
+
+      renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("unknown-identifier");
+      await userEvent.click(screen.getByRole("button", { name: /send confirmation link/i }));
+
+      await waitFor(() =>
+        expect(requestSignUpVerificationMock).toHaveBeenCalledWith({
+          email: "nobody@example.com",
+          callbackUrl: "/invite/accept?inviteCode=abc",
+        }),
+      );
+    });
+
     /** @scenario An address with no account on an installation that cannot send email is told what is missing */
     it("says what is missing and offers no confirmation link", async () => {
       publicEnvRef.current = { IS_SAAS: false, HAS_EMAIL_PROVIDER_KEY: false };

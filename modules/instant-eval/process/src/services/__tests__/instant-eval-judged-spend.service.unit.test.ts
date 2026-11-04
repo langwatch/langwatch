@@ -81,7 +81,7 @@ async function judgeQuery(spend: InstantEvalJudgedSpendService): Promise<void> {
     }),
     budget: { reserve: async () => undefined, release: async () => undefined },
     spend,
-    pricing: INSTANT_EVAL_PRICING,
+    holdPricing: async () => INSTANT_EVAL_PRICING,
     queryTokenBudget: 4_000_000,
     now: () => AT,
   });
@@ -180,5 +180,29 @@ describe("given a project with no organization", () => {
     await finishRun(spend, "finished");
 
     expect(recorded).toEqual([]);
+  });
+});
+
+describe("given a routed page billed after its run finished", () => {
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("records it beside the run's record, under the run and an id of its own", async () => {
+    const { spend, recorded } = judging();
+
+    await finishRun(spend, "cancelled");
+    await finishOver(spend).billLatePage({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      page: 3,
+      inputTokens: 0,
+      requests: 4,
+      costNanoUsd: 5000,
+      routedInputTokens: 0,
+    });
+
+    expect(recorded.map((record) => record.requestId)).toEqual([
+      `instanteval_${RUN_ID}`,
+      `instanteval_${RUN_ID}_late_page_3`,
+    ]);
+    expect(recorded[1]).toMatchObject({ runId: RUN_ID, inputTokens: 0, costNanoUsd: 5000 });
   });
 });

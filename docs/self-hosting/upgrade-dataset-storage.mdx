@@ -92,7 +92,7 @@ On EKS with IRSA, put the role on the ServiceAccount the app and workers use (`g
 
 With local storage active, the chart now refuses to install or upgrade when `workers.replicaCount` is greater than 1:
 
-```
+```text
 app.storedObjects.localFilesystem.enabled requires workers.replicaCount=1
 ... Enable app.dataplane for multi-replica deployments.
 ```
