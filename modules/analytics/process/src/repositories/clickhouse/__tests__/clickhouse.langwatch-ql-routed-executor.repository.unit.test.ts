@@ -371,6 +371,7 @@ describe("given a private route whose path is not a plain ClickHouse database na
     ["a path carrying SQL once decoded", "/x%3B%20DROP%20TABLE%20t", /DROP|x;|%3B/],
     ["a path with a second segment", "/acme_db/extra", /extra/],
     ["a name starting with a digit", "/1acme", /1acme/],
+    ["a trailing slash", "/acme_db/", /acme_db/],
   ])(
     "refuses %s, naming no part of the URL, and builds no private executor",
     async (_, path, leak) => {

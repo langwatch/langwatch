@@ -100,7 +100,7 @@ const accept = (runVerdict?: Error) => {
 
 describe("given a run validated at its start", () => {
   /** @scenario "A run is judged against the organization's route, and a route refusal is not rewritten" */
-  it("passes the route's own refusal through, not as an invalid query", async () => {
+  it("passes a route refusal through by its error code, not its class, because the two refusal codes belong to classes of different packages", async () => {
     const routeRefusal = new Refusal("private_dataplane_unavailable");
 
     await expect(accept(routeRefusal)).rejects.toBe(routeRefusal);
