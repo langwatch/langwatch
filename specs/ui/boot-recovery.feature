@@ -17,7 +17,7 @@ Feature: The application recovers from files a lossy link dropped while it boots
       Given the page has not shown yet
       When a script or stylesheet the server's page names fails to load
       Then the page reloads
-      And it says "Slow connection, retrying (1 of 6)..." while it waits
+      And it says "Still loading, retrying (1 of 6)..." while it waits
 
     @unit
     Scenario: A chunk that outlived its retries before the first page reloads the page
@@ -47,13 +47,13 @@ Feature: The application recovers from files a lossy link dropped while it boots
     Scenario: Six reloads in a row that fetch nothing new give up
       Given six reloads in a row fetched no new code
       When the next load fails
-      Then the page says "Could not load. Check your connection." with a "Try again" button
+      Then the page says "LangWatch could not load. Reload the page, or try another browser if it keeps happening." with a "Try again" button
       And it does not reload by itself
 
     @unit
     Scenario: Giving up clears the loading screen's progress note
       Given the loading screen says "Connected. Opening LangWatch…"
-      When the page gives up and says "Could not load. Check your connection."
+      When the page gives up and says "LangWatch could not load. Reload the page, or try another browser if it keeps happening."
       Then the loading screen no longer says it is connected
 
     @unit
@@ -67,6 +67,23 @@ Feature: The application recovers from files a lossy link dropped while it boots
       Given the page has not shown yet
       When a stylesheet the application added itself fails to load
       Then the page does not reload
+
+    # Customer report: an edge-injected helper script that a browser blocked reloaded every
+    # page seven times, which also re-ran one-shot steps such as spending a sign-up link.
+    @unit
+    Scenario: A script the server's page names that is not the application's code does not reload the page
+      Given the page has not shown yet
+      When a script outside the application's asset files fails to load
+      Then the page does not reload
+      And it says nothing about retrying
+
+    @unit
+    Scenario: The build marks the application's own files for the boot recovery
+      Given the page the build writes, with a script the edge added before the application's own
+      When the build marks the page's tags
+      Then every tag that loads one of the application's built files is marked
+      And no other tag is
+      And a marked tag is marked once, however often the page passes through
 
   Rule: Once the first page shows, the recovery stands down
 

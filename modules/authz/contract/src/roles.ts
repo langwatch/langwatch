@@ -78,6 +78,9 @@ const MEMBER_ADDITIONS: readonly AuthzPermission[] = [
   "triggers:view",
   "triggers:manage",
   "prompts:manage",
+  // A member deploys agents and evaluators as they tag prompts; a custom role can withhold it.
+  "agents:deploy",
+  "evaluators:deploy",
   "scenarios:manage",
   "secrets:manage",
   // Agent cache — a member runs agents, and an agent writes its own run state.

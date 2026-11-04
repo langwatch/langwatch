@@ -1,7 +1,7 @@
 /**
- * Re-reading who is signed in, on demand — the session query is held
- * forever (`staleTime: Infinity`) since sign-in/out both reload the page.
- * The one exception: the avatar control's new photo needs a re-fetch.
+ * Re-reading who is signed in, on demand — the session query is held forever
+ * (`staleTime: Infinity`) since signing in and signing out both leave the page
+ * for a new document. The one exception: a new avatar photo needs a re-fetch.
  */
 
 import { useQueryClient } from "@tanstack/react-query";

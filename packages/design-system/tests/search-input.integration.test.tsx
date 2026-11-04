@@ -28,6 +28,7 @@ describe("<SearchInput/>", () => {
     /** @scenario SearchInput renders with a search icon and placeholder */
     /** @scenario Scenario picker search field displays a search icon */
     /** @scenario Target picker search field displays a search icon */
+    /** @scenario Scope filter project search field displays a search icon */
     it("renders a search icon inside the input", () => {
       // The icon is DECORATIVE and carries `aria-hidden`, which is why it is
       // found in the DOM rather than by role: the accessible name lives on the

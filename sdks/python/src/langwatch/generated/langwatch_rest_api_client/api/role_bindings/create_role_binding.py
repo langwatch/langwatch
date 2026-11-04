@@ -67,7 +67,7 @@ def sync_detailed(
     own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The
     response always carries the new binding's id; the names of its principal, role and scope may be
     absent on this response alone, and a follow-up read carries them. superseded by /api/grants, which
-    answers the same rows as grants
+    answers the same rows as grants.
 
     Args:
         body (CreateRoleBindingBody):
@@ -102,7 +102,7 @@ def sync(
     own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The
     response always carries the new binding's id; the names of its principal, role and scope may be
     absent on this response alone, and a follow-up read carries them. superseded by /api/grants, which
-    answers the same rows as grants
+    answers the same rows as grants.
 
     Args:
         body (CreateRoleBindingBody):
@@ -132,7 +132,7 @@ async def asyncio_detailed(
     own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The
     response always carries the new binding's id; the names of its principal, role and scope may be
     absent on this response alone, and a follow-up read carries them. superseded by /api/grants, which
-    answers the same rows as grants
+    answers the same rows as grants.
 
     Args:
         body (CreateRoleBindingBody):
@@ -165,7 +165,7 @@ async def asyncio(
     own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The
     response always carries the new binding's id; the names of its principal, role and scope may be
     absent on this response alone, and a follow-up read carries them. superseded by /api/grants, which
-    answers the same rows as grants
+    answers the same rows as grants.
 
     Args:
         body (CreateRoleBindingBody):

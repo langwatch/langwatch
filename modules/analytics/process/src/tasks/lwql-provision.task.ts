@@ -257,12 +257,14 @@ async function probeCollection({
       repository.probePostgresCollection({
         collection: probe.collection,
         relation: probe.relation,
+        schema: probe.schema,
         cluster,
       }),
     appCredentials: () =>
       repository.probePostgresCredentials({
         credentials: probe.connection,
         relation: probe.relation,
+        schema: probe.schema,
         cluster,
       }),
   };
@@ -276,7 +278,7 @@ async function probeCollection({
   return { shown: true };
 }
 
-/** What the gate decided, and the present engine tables it left on their current pool. */
+/** What the gate decided, and the present engine tables it left (with their views) as they are. */
 interface LwqlEngineTableGate {
   readonly collectionLoaded: boolean;
   readonly only: readonly string[] | undefined;
@@ -292,12 +294,14 @@ async function gateEngineTables({
   repository,
   request,
   names,
+  schema,
   only,
   cluster,
 }: {
   repository: LangWatchQLProvisioningRepository;
   request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
   names: LangWatchQLNames;
+  schema: string;
   only: readonly string[] | undefined;
   /** `CLICKHOUSE_CLUSTER`: set, both reads must pass on every replica. */
   cluster: string | undefined;
@@ -307,6 +311,7 @@ async function gateEngineTables({
   const probe = selfProvisioning.collectionProbe({
     names,
     postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+    schema,
   });
   const result = await probeCollection({ repository, probe, cluster });
   if (result.shown) return { collectionLoaded: true, only };
@@ -322,9 +327,14 @@ async function gateEngineTables({
     functions: [],
   });
   const left = only.filter((name) => present.relations.includes(name));
+  // A view replaced over a table left in place could select a column that table lacks.
+  const held = new Set([
+    ...left,
+    ...selfProvisioning.viewsOverEngineTables({ engineTables: left }),
+  ]);
   return {
     collectionLoaded: false,
-    only: only.filter((name) => !left.includes(name)),
+    only: only.filter((name) => !held.has(name)),
     ...(left.length === 0 ? {} : { left: { read, error, tables: left.length } }),
   };
 }
@@ -348,6 +358,7 @@ async function convergeClickHouse({
   source,
   request,
   names,
+  schema,
   sourceDatabase,
   failureLevel,
   only,
@@ -356,6 +367,7 @@ async function convergeClickHouse({
   source: Readonly<Record<string, string | undefined>>;
   request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
   names: LangWatchQLNames;
+  schema: string;
   sourceDatabase: string;
   failureLevel: ProvisioningFailureLevel;
   /** The drifted objects alone; absent, the whole ClickHouse half. */
@@ -373,6 +385,7 @@ async function convergeClickHouse({
       restrictedPassword: request.connection.password,
       sourceDatabase,
       postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+      schema,
       includeAppFunctions,
       mode,
       collectionLoaded,
@@ -385,6 +398,7 @@ async function convergeClickHouse({
       repository,
       request,
       names,
+      schema,
       only,
       cluster: source.CLICKHOUSE_CLUSTER || undefined,
     });
@@ -533,6 +547,7 @@ async function convergeLocked({
           source: plan.settings,
           request: plan.request,
           names: plan.names,
+          schema: plan.schema,
           sourceDatabase,
           failureLevel,
           only: only?.clickHouse,
@@ -625,9 +640,9 @@ async function expectedAppFunctions({
 }
 
 /**
- * Which app-owned objects are absent, from catalog reads only (key map, engine tables, views,
- * app functions; approved views and their grant). An engine table not stamped with the current
- * credentials counts as absent; columns are never compared. Throws when ClickHouse is unreadable.
+ * Which app-owned objects are absent, from catalog reads only. An engine table not stamped with the
+ * current credentials counts as absent, and so does a view lacking a catalog column (an extra
+ * column is never drift). Throws when ClickHouse is unreadable.
  */
 export async function findLwqlAppOwnedDrift({
   database,
@@ -641,6 +656,7 @@ export async function findLwqlAppOwnedDrift({
   const credentialFingerprint = selfProvisioning.credentialFingerprint({
     names,
     postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+    schema: plan.schema,
   });
   const clickHouse = await withProvisioningRepository({
     open: plan.openRepository,

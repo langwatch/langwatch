@@ -55,6 +55,8 @@ export interface AgentCodeEditorDrawerProps extends AgentCodeEditorOptions {
     onOutputFieldChange(field: string | undefined): void;
   }): ReactNode;
   renderTestPanel(input: { agentId: string; projectId: string }): ReactNode;
+  /** The experiment target's deploy label picker, shown above the name in the workbench. */
+  deployLabel?: ReactNode;
 }
 
 export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
@@ -109,6 +111,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         }}
       >
         <VStack gap={4} align="stretch">
+          {props.deployLabel}
           <Field.Root required invalid={attempted && nameMissing}>
             <Field.Label>Agent Name</Field.Label>
             <Input

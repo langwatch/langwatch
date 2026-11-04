@@ -221,6 +221,11 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 			return ""
 		}
 		return customertracebridge.EndUserIDFromBody(call.Request.Body)
+	case domain.RequestTypeDecisions:
+		if err := call.MaterializeBody(); err != nil {
+			return ""
+		}
+		return customertracebridge.DecisionsEndUserIDFromBody(call.Request.Body)
 	case domain.RequestTypePassthrough, domain.RequestTypeTranscription,
 		domain.RequestTypeRealtimeSession:
 		// Passthrough carries a provider-native body shape, transcription is

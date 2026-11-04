@@ -323,6 +323,26 @@ describe("liftLogContribution", () => {
     });
   });
 
+  describe("when a hook's start and completion arrive", () => {
+    const hookEvent = (eventName: string, recordId: string) =>
+      canonicalLogRecord({
+        attributes: { "event.name": eventName, "session.id": "sess-hooks", num_blocking: 1 },
+        recordId,
+      });
+
+    /** @scenario a hook's start is not contributed, its completion is */
+    it("contributes the completion and not the start, in either spelling", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(hookEvent("claude_code.hook_execution_start", "rec-start-namespaced"));
+      lift(hookEvent("hook_execution_start", "rec-start-bare"));
+      lift(hookEvent("claude_code.hook_execution_complete", "rec-complete"));
+
+      expect(dispatched.map((contribution) => contribution.recordId)).toEqual(["rec-complete"]);
+      expect(dispatched[0]!.facts.num_blocking).toBe(1);
+    });
+  });
+
   describe("when a LangWatch session context event arrives", () => {
     const HOOK_SCOPE = "langwatch.coding_agent.hook";
     const contextAttributes = (

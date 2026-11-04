@@ -12,14 +12,51 @@ keywords:
   - opentelemetry coding agents
 ---
 
+<AgentActions />
+
+<figure>
+  <img className="docs-product-shot" src="/images/coding-agents/optimized/session-detail-1024.webp" srcSet="/images/coding-agents/optimized/session-detail-640.webp 640w, /images/coding-agents/optimized/session-detail-1024.webp 1024w, /images/coding-agents/optimized/session-detail-1560.webp 1560w" sizes="(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)" width="1560" height="900" loading="eager" fetchPriority="high" alt="Claude Code session in LangWatch: model calls, tools, cost, compactions and cache health." />
+  <figcaption>Inspect a session, replay its terminal and see where tokens and time went. <a href="/coding-agents/sessions">Explore sessions →</a></figcaption>
+</figure>
+
 ## Getting started
 
 <Tabs>
-  <Tab title="Claude Code">```bash npx langwatch claude ```</Tab>
-  <Tab title="Codex">```bash npx langwatch codex ```</Tab>
-  <Tab title="GitHub Copilot">```bash npx langwatch copilot ```</Tab>
-  <Tab title="Gemini CLI">```bash npx langwatch gemini ```</Tab>
-  <Tab title="OpenCode">```bash npx langwatch opencode ```</Tab>
+  <Tab title="Claude Code">
+
+```bash
+npx langwatch claude
+```
+
+  </Tab>
+  <Tab title="Codex">
+
+```bash
+npx langwatch codex
+```
+
+  </Tab>
+  <Tab title="GitHub Copilot">
+
+```bash
+npx langwatch copilot
+```
+
+  </Tab>
+  <Tab title="Gemini CLI">
+
+```bash
+npx langwatch gemini
+```
+
+  </Tab>
+  <Tab title="OpenCode">
+
+```bash
+npx langwatch opencode
+```
+
+  </Tab>
   <Tab title="Cursor">
     Set Cursor's OpenAI base URL to `https://gateway.langwatch.ai/v1` and its OpenAI API key to a
     LangWatch AI Gateway virtual key. See the [gateway quickstart](/ai-gateway/quickstart).
@@ -33,19 +70,25 @@ Check out the [quickstart](/coding-agents/quickstart) for next steps.
 ## Set up your agent
 
 <CardGroup cols={3}>
-  <Card
-    title="Claude Code"
-    icon="/images/logos/claude-code.svg"
-    href="/coding-agents/claude-code"
-  />
-  <Card title="Codex" icon="/images/logos/codex.svg" href="/coding-agents/openai-codex" />
+  <Card title="Claude Code" icon="/images/logos/claude-code.svg" href="/coding-agents/claude-code">
+    One command, or `CLAUDE_CODE_ENABLE_TELEMETRY` and the OpenTelemetry variables by hand.
+  </Card>
+  <Card title="Codex" icon="/images/logos/codex.svg" href="/coding-agents/openai-codex">
+    Sessions, cost and traces from the OpenAI Codex CLI.
+  </Card>
   <Card
     title="GitHub Copilot"
     icon="/images/logos/github-copilot.svg"
     href="/coding-agents/github-copilot-cli"
-  />
-  <Card title="Gemini CLI" icon="/images/logos/gemini.svg" href="/coding-agents/gemini-cli" />
-  <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode" />
+  >
+    Usage and cost from the Copilot CLI and Copilot Chat.
+  </Card>
+  <Card title="Gemini CLI" icon="/images/logos/gemini.svg" href="/coding-agents/gemini-cli">
+    Sessions, cost and traces from the Gemini CLI.
+  </Card>
+  <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode">
+    Sessions, cost and traces from opencode.
+  </Card>
   <Card title="Cursor and Aider" icon="/images/logos/cursor.svg" href="/ai-gateway/quickstart">
     Through the LangWatch AI Gateway: point their OpenAI base URL at
     `https://gateway.langwatch.ai/v1` with a virtual key.

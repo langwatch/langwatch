@@ -282,6 +282,7 @@ describe("the before-session-create hook", () => {
           evidence.recordAuthenticatedSsoAccount({
             providerId: "acme-saml",
             providerAccountId: "ada-subject",
+            issuer: "https://idp.acme.test",
           });
           return createBeforeSessionCreateHook({
             sessionClaims: { identity, evidence },

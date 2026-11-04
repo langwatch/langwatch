@@ -220,6 +220,15 @@ export abstract class UiSession {
   refresh(): Promise<void> {
     return Promise.reject(new UiHostServiceUnavailableError("session refresh"));
   }
+
+  /**
+   * Ends the session and leaves this page, as whoever owns sign-out decides.
+   * A port that does not publish it fails by name rather than letting a screen
+   * believe the reader left. Spec: specs/auth/sign-out-leaves-the-page.feature
+   */
+  signOut(): Promise<void> {
+    return Promise.reject(new UiHostServiceUnavailableError("session sign-out"));
+  }
 }
 
 class UnavailableUiFeedback extends UiFeedback {

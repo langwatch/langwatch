@@ -8,6 +8,7 @@ import { createTenantId } from "@langwatch/eventing";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
 import type { IngestionPullRunRepository } from "../../../repositories/ingestion-pull-run.repository.ts";
+import { findPullConfigComplaints } from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
 import {
   type PullRunSummary,
   sourcePullStatus,
@@ -108,6 +109,7 @@ export class IngestionSourceReadService {
         cursor: row.pollerCursor,
         pullRun,
       }),
+      configComplaints: findPullConfigComplaints(row.parserConfig),
       traceProjectId,
       traceProjectArchived: traceProjectId ? !live.has(traceProjectId) : false,
       lastEventAt: row.lastEventAt,

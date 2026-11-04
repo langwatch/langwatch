@@ -2,15 +2,14 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
 import {
   type AvailableSource,
   type FieldMapping,
   VariableMappingInput,
-} from "../variable-mapping-input.tsx";
+} from "@langwatch/design-system/variable-mapping";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Debounce delay used in VariableMappingInput
 const _DEBOUNCE_DELAY = 300;
@@ -71,6 +70,19 @@ describe("VariableMappingInput", () => {
       expect(screen.getByText("Test Data.input")).toBeInTheDocument();
       // Should have a close button
       expect(screen.getByTestId("clear-mapping-button")).toBeInTheDocument();
+    });
+
+    /** @scenario "The prompt editor's mapping names a column the dataset does not have" */
+    it("says a mapped column is not in the dataset, and clears it in one click", () => {
+      const onMappingChange = vi.fn();
+      renderComponent({
+        mapping: { type: "source", sourceId: "dataset-1", path: ["question"] },
+        onMappingChange,
+      });
+
+      expect(screen.getByText('"question" is not in the dataset')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("clear-mapping-button"));
+      expect(onMappingChange).toHaveBeenCalledWith(undefined);
     });
 
     /** @scenario Mapping a value from another target shows the target name not its ID */

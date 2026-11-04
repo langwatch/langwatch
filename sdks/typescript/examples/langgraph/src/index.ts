@@ -77,7 +77,7 @@ function router(state: GraphStateType): string {
 function buildApp(langWatchCallback: LangWatchCallbackHandler) {
   // Initialize LangChain components
   const chatModel = new ChatOpenAI({
-    modelName: "gpt-5",
+    modelName: "gpt-6-luna",
   });
 
   // Mock search tool for demo purposes

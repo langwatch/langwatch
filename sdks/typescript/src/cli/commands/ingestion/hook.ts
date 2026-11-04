@@ -195,6 +195,12 @@ async function runHook({
     return;
   }
   const agent = spec.agent;
+  // Grok also runs the Claude Code hooks it finds, for its own session: the
+  // record would make a phantom Claude row, so Grok's own hook reports instead.
+  if (agent === "claude_code" && env.GROK_HOOK_EVENT?.trim()) {
+    debug({ message: "the Claude Code hook was run by Grok; Grok's own hook reports", env });
+    return;
+  }
   // Which personal key this run posts with: the agent's own, or for an agent
   // with more than one surface, the one of the surface that ran the hook.
   const sourceType = spec.keySourceType(env);
@@ -213,10 +219,15 @@ async function runHook({
   }
 
   const input = parseHookInput(await readInput());
-  const sessionId = firstNonEmpty(
+  const ownSessionId = firstNonEmpty(
     input.sessionId,
     spec.sessionIdVar ? env[spec.sessionIdVar] : undefined,
   );
+  // Grok gives a subagent a session of its own whose telemetry names no parent.
+  // Its SubagentStart fires in the parent, so the record is the child's, linked.
+  const isSubagentStart = input.hookEventName === "SubagentStart" && !!input.subagentId;
+  const sessionId = isSubagentStart ? input.subagentId : ownSessionId;
+  const parentSessionId = isSubagentStart ? ownSessionId : undefined;
   if (!sessionId) {
     debug({ message: "no session id in the hook input or the environment", env });
     return;
@@ -230,6 +241,7 @@ async function runHook({
     spec,
     agent,
     sessionId,
+    parentSessionId,
     input,
     env,
     runGit,
@@ -240,38 +252,16 @@ async function runHook({
     target,
   });
 
-  // A 401 means the key is dead (revoked, or retired with its session); the
-  // agent's exporter fails silently, so this is the one place it's caught. A
-  // personal key is re-minted, rewired and retried, with the user told to
-  // restart the agent (which still holds the old key); a pinned key just reports.
-  let liveTarget = target;
-  if (own.httpStatus === 401 && claimHealWindow({ stateDir, sourceType, now })) {
-    // A pinned key is not this device's to replace: minting a personal one in
-    // its place would move the session's telemetry into another project
-    // without saying so. The healer declines a pinned tool for that same
-    // reason, so the report is the whole repair, and the only person who can
-    // make it is the one who pinned the key.
-    if (target.source === "pin") {
-      debug({
-        message: "the pinned ingest key was rejected; not re-minted",
-        env,
-      });
-      if (agent === "claude_code") notifyClaude(PINNED_REJECTED_NOTICE);
-    } else {
-      await healOrReport({
-        agent,
-        sourceType,
-        env,
-        target,
-        own,
-        stateDir,
-        healRevokedKey,
-        adoptHealed: (healed) => {
-          liveTarget = healed;
-        },
-      });
-    }
-  }
+  const liveTarget = await repairRejectedKey({
+    agent,
+    sourceType,
+    env,
+    target,
+    own,
+    now,
+    stateDir,
+    healRevokedKey,
+  });
 
   // The record above posted with THIS CLI's key. The agent's own exporter
   // posts with whatever its settings file holds, and the two can drift — a
@@ -304,6 +294,62 @@ async function runHook({
       return sent.ok;
     },
   });
+}
+
+/**
+ * A 401 means the key is dead; the agent's exporter fails silently, so this is
+ * where it's caught. A personal key is re-minted, rewired and retried; a pinned
+ * key just reports. Returns the target to post anything further with.
+ */
+async function repairRejectedKey({
+  agent,
+  sourceType,
+  env,
+  target,
+  own,
+  now,
+  stateDir,
+  healRevokedKey,
+}: {
+  agent: string;
+  sourceType: string;
+  env: NodeJS.ProcessEnv;
+  target: TelemetryTarget;
+  own: OwnContextOutcome;
+  now: () => number;
+  stateDir: string;
+  healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
+}): Promise<TelemetryTarget> {
+  let liveTarget = target;
+  if (own.httpStatus !== 401 || !claimHealWindow({ stateDir, sourceType, now })) {
+    return target;
+  }
+  // A pinned key is not this device's to replace: minting a personal one in
+  // its place would move the session's telemetry into another project
+  // without saying so. The healer declines a pinned tool for that same
+  // reason, so the report is the whole repair, and the only person who can
+  // make it is the one who pinned the key.
+  if (target.source === "pin") {
+    debug({
+      message: "the pinned ingest key was rejected; not re-minted",
+      env,
+    });
+    if (agent === "claude_code") notifyClaude(PINNED_REJECTED_NOTICE);
+  } else {
+    await healOrReport({
+      agent,
+      sourceType,
+      env,
+      target,
+      own,
+      stateDir,
+      healRevokedKey,
+      adoptHealed: (healed) => {
+        liveTarget = healed;
+      },
+    });
+  }
+  return liveTarget;
 }
 
 /**
@@ -660,6 +706,7 @@ async function postOwnSessionContext({
   spec,
   agent,
   sessionId,
+  parentSessionId,
   input,
   env,
   runGit,
@@ -672,6 +719,7 @@ async function postOwnSessionContext({
   spec: SessionContextAgent;
   agent: string;
   sessionId: string;
+  parentSessionId?: string;
   input: ReturnType<typeof parseHookInput>;
   env: NodeJS.ProcessEnv;
   runGit: GitRunner;
@@ -728,6 +776,7 @@ async function postOwnSessionContext({
     scopeVersion: LANGWATCH_SDK_VERSION,
     trace: parseTraceparent(env.TRACEPARENT),
     name,
+    parentSessionId,
   });
 
   const recordFingerprint = (): void => {

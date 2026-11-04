@@ -19,6 +19,11 @@ export const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
   // editor surface is separable from the CLI (`copilot_cli`) and app
   // (`copilot_app`) in the API-keys page and analytics. ADR-039 §Extension #2.
   code: "copilot_vscode",
+  // `grok_cli`, as the receiver stamps it, so no other xAI surface reads as this CLI.
+  grok: "grok_cli",
+  // `pi_cli`, not `pi`: the slug is a provenance label, and pi's harness also
+  // runs outside a CLI. ADR-188 Constants.
+  pi: "pi_cli",
 };
 
 /**
@@ -132,6 +137,34 @@ export function buildOtelEnvBlock(
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-chat",
+      };
+    case "grok":
+      // grok exports nothing without GROK_EXTERNAL_OTEL; logs and metrics only,
+      // so no traces exporter, and it reads no OTEL_RESOURCE_ATTRIBUTES. The four
+      // content gates are each one kind of content, all on (ADR-192).
+      return {
+        GROK_EXTERNAL_OTEL: "1",
+        OTEL_LOGS_EXPORTER: "otlp",
+        OTEL_METRICS_EXPORTER: "otlp",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+        OTEL_LOG_USER_PROMPTS: "1",
+        OTEL_LOG_ASSISTANT_RESPONSES: "1",
+        OTEL_LOG_TOOL_DETAILS: "1",
+        OTEL_LOG_TOOL_CONTENT: "1",
+        ...base,
+      };
+    case "pi":
+      // The backend reading this block is our own extension (ADR-188), which
+      // autoconfigures from these names, so logs and metrics are switched off
+      // rather than left unset: unset would start an exporter with nothing to
+      // send. codex omits both names because it ships its own exporter.
+      return {
+        OTEL_TRACES_EXPORTER: "otlp",
+        OTEL_LOGS_EXPORTER: "none",
+        OTEL_METRICS_EXPORTER: "none",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+        ...base,
+        OTEL_RESOURCE_ATTRIBUTES: "service.name=pi",
       };
     default:
       return base;

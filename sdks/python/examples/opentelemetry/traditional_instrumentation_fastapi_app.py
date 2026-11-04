@@ -51,7 +51,7 @@ def fastapi_sample_endpoint(params: EndpointParams):
     langwatch.get_current_trace().autotrack_openai_calls(client)
 
     completion = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",
