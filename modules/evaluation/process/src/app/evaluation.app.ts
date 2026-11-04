@@ -44,6 +44,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -76,6 +77,7 @@ import { EvaluationExecutionReceiptService } from "../features/execution/service
 import { EvaluationExecutionService } from "../features/execution/services/evaluation-execution.service.ts";
 import { EvaluationFilterMatchingService } from "../features/execution/services/evaluation-filter-matching.service.ts";
 import { EvaluationGuardrailCheckService } from "../features/execution/services/evaluation-guardrail-check.service.ts";
+import { EvaluationJudgeRoutingService } from "../features/execution/services/evaluation-judge-routing.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../features/execution/services/evaluation-inputs-offload-switch.service.ts";
 import {
   EVAL_INPUTS_PREVIEW_BYTES,
@@ -271,6 +273,8 @@ export class EvaluationModule implements EvaluationApiContract {
     judges: InstantEvalJudgeApi,
     /** Mints the own-only proof each evaluation_runs read is fenced by; a leaf (AGG-EVAL-PROOF). */
     authz: AuthzApi,
+    /** A project's organization, so the judge router flag is read with its organization rule. */
+    projects: ProjectApi,
   };
   static readonly secrets = {
     openAi: openAiApiKey,
@@ -436,6 +440,10 @@ export class EvaluationModule implements EvaluationApiContract {
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
       judges: dependencies.judges,
       decisionModels: dependencies.modelProviders,
+      judgeRouting: EvaluationJudgeRoutingService.create({
+        flags: dependencies.featureFlags,
+        projects: dependencies.projects,
+      }),
       installEnvironment: environment.read(),
       telemetry,
     });
