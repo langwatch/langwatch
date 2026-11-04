@@ -8,6 +8,7 @@ Feature: Coding-agent session signals reach Customer.io
   own organization row.
 
   Background:
+    # Days are UTC calendar days counted from the organization's creation.
     Given nurturing knows organization org-1 with admin admin-1 and project project-1
 
   @unit

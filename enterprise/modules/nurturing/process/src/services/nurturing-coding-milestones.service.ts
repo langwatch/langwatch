@@ -43,8 +43,7 @@ function latestOf(facts: readonly Fact[]): Fact {
 /**
  * What nurturing decides from coding-agent's session-stored fact (§9), per project: the last
  * session, first session, agent types, terminal types, repo count, first-three-days count and UTC
- * active days. Each step is a guarded write that
- * answers a retry of the same fact again, and delivery's claims send each signal once.
+ * active days. Each step is a guarded write that answers a retry again; claims send each once.
  */
 export class NurturingCodingMilestonesService {
   static create(dependencies: CodingDependencies): NurturingCodingMilestonesService {
