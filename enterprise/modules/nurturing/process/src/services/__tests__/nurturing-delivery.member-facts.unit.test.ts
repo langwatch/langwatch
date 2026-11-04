@@ -7,7 +7,7 @@ import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-n
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
@@ -88,17 +88,17 @@ async function organizationWithMembers({
   const claims = new ClockedClaims();
   const cio = customerIo();
   const milestones = MemoryNurturingMilestonesRepository.create();
+  const projects = MemoryNurturingProjectDirectoryRepository.create({ placed, traced });
+  const getAllMembers = vi.fn(async () => members.map((id) => ({ id })) as never);
+  const organizationIdsForMember = vi.fn(async () => [...organizationsOfPerson]);
   for (const organizationId of new Set(placed.values())) {
     await milestones.recordOrganization({ organizationId, adminUserId: "admin-1", seeded: false });
   }
   const memberFacts = NurturingMemberFactsService.create({
     claims,
     milestones,
-    projects: MemoryNurturingProjectDirectoryRepository.create({ placed, traced }),
-    organizations: createApiFixture<OrganizationApi>({
-      getAllMembers: async () => members.map((id) => ({ id })) as never,
-      organizationIdsForMember: async () => [...organizationsOfPerson],
-    }),
+    projects,
+    organizations: createApiFixture<OrganizationApi>({ getAllMembers, organizationIdsForMember }),
   });
   const delivery = NurturingDeliveryService.create({
     claims,
@@ -111,8 +111,11 @@ async function organizationWithMembers({
   });
   const deliver = (signal: NurturingSignal) =>
     delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
-  return { claims, cio, deliver };
+  return { claims, cio, deliver, milestones, projects, getAllMembers, organizationIdsForMember };
 }
+
+const down = new Error("the database is down");
+type Organization = Awaited<ReturnType<typeof organizationWithMembers>>;
 
 const trace = (
   occurredAt: number,
@@ -444,6 +447,97 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(cio.identifies()).toHaveLength(4);
+    });
+  });
+
+  describe("when a read fails before the members are told", () => {
+    /** @scenario "A read that fails before the members are told loses nothing on the retry" */
+    it.each<[string, (organization: Organization) => void]>([
+      [
+        "getPlacement",
+        ({ projects }) => vi.spyOn(projects, "getPlacement").mockRejectedValueOnce(down),
+      ],
+      [
+        "recordLastTrace",
+        ({ milestones }) => vi.spyOn(milestones, "recordLastTrace").mockRejectedValueOnce(down),
+      ],
+      ["getAllMembers", ({ getAllMembers }) => getAllMembers.mockRejectedValueOnce(down)],
+    ])("sends the fact once on the retry after %s fails", async (_read, failOnce) => {
+      const organization = await organizationWithMembers();
+      const { cio, deliver } = organization;
+      failOnce(organization);
+
+      await expect(deliver(firstTrace)).rejects.toThrow(down);
+      await settle();
+      expect(cio.calls).toEqual([]);
+
+      await deliver(firstTrace);
+      await settle();
+
+      const fact = { has_traces: true, last_trace_at: seconds(T0) };
+      expect(traitsOf(cio.identifies(), "member-2")).toEqual([fact]);
+      expect(traitsOf(cio.identifies(), "admin-1")).toEqual([expect.anything(), fact]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual(["first_trace_integrated"]);
+    });
+
+    /** @scenario "A later trace whose member read fails gives back its windows" */
+    it("gives back the project's and the organization's windows", async () => {
+      const { cio, deliver, getAllMembers } = await organizationWithMembers();
+      getAllMembers.mockRejectedValueOnce(down);
+
+      await expect(deliver(trace(T0))).rejects.toThrow(down);
+      await deliver(trace(T0));
+      await deliver(trace(T0));
+      await settle();
+
+      expect(cio.identifies().map(({ userId }) => userId)).toEqual(["admin-1", "member-2"]);
+    });
+  });
+
+  describe("when a person's trace lookup fails", () => {
+    const expectNoTraceTraits = (traits: unknown) => {
+      expect(traits).not.toHaveProperty("has_traces");
+      expect(traits).not.toHaveProperty("last_trace_at");
+    };
+
+    /** @scenario "A person signing up whose trace lookup fails still gets their profile" */
+    it("identifies a person signing up with their email and no trace traits", async () => {
+      const { cio, deliver, organizationIdsForMember } = await organizationWithMembers();
+      organizationIdsForMember.mockRejectedValue(down);
+
+      await deliver(signedUp);
+      await settle();
+
+      const [traits] = traitsOf(cio.identifies(), "joiner-1");
+      expect(traits).toMatchObject({ email: "jane@example.com", has_evaluations: false });
+      expectNoTraceTraits(traits);
+      expect(cio.tracks().map(({ event }) => event)).toEqual(["signed_up"]);
+    });
+
+    /** @scenario "An invited person whose trace lookup fails still joins" */
+    it("tracks an invited person's join and says nothing of traces", async () => {
+      const { cio, deliver, organizationIdsForMember } = await organizationWithMembers();
+      organizationIdsForMember.mockRejectedValue(down);
+
+      await deliver(inviteAccepted);
+      await settle();
+
+      expect(cio.identifies()).toEqual([]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_invite"]);
+    });
+
+    /** @scenario "An SSO person whose trace lookup fails still starts their milestones" */
+    it("starts an SSO person's milestones with no trace traits", async () => {
+      const { cio, deliver, organizationIdsForMember } = await organizationWithMembers();
+      organizationIdsForMember.mockRejectedValue(down);
+
+      await deliver(ssoAutoAdded);
+      await settle();
+
+      const [traits] = traitsOf(cio.identifies(), "joiner-1");
+      expect(traits).toMatchObject({ has_evaluations: false });
+      expectNoTraceTraits(traits);
+      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_sso"]);
     });
   });
 

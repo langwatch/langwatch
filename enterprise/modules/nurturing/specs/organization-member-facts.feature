@@ -82,11 +82,56 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then each member is identified once
     And after 301 seconds each member is identified again with the later time
 
+  # Known limit: a trace the per-project window drops first is never recorded, so the stored time
+  # can lag by up to that window.
   @unit
   Scenario: A trace the organization's window drops still moves the stored time
     Given a trace of project-1 was just told to the members
     When a later trace of project-2 is delivered inside 300 seconds
     Then a person joining now gets the later last_trace_at
+
+  @unit
+  Scenario Outline: A read that fails before the members are told loses nothing on the retry
+    Given <read> fails once
+    When a first_trace_integrated signal of project-1 is delivered
+    Then the delivery fails and Customer.io is told nothing
+    When the signal is delivered again
+    Then Customer.io identifies admin-1 and member-2 with has_traces true and last_trace_at
+    And only admin-1 is tracked first_trace_integrated, once
+
+    Examples:
+      | read            |
+      | getPlacement    |
+      | recordLastTrace |
+      | getAllMembers   |
+
+  @unit
+  Scenario: A later trace whose member read fails gives back its windows
+    Given getAllMembers fails once
+    When a trace_received signal of project-1 is delivered, then delivered twice more
+    Then the first delivery fails
+    And each member is identified once
+
+  @unit
+  Scenario: A person signing up whose trace lookup fails still gets their profile
+    Given the person's trace lookup fails
+    When a signed_up signal is delivered
+    Then Customer.io identifies the person with their email and no has_traces or last_trace_at
+    And the person is tracked signed_up
+
+  @unit
+  Scenario: An invited person whose trace lookup fails still joins
+    Given the person's trace lookup fails
+    When an invite_accepted signal for org-1 is delivered
+    Then no has_traces trait is sent
+    And the person is tracked joined_via_invite
+
+  @unit
+  Scenario: An SSO person whose trace lookup fails still starts their milestones
+    Given the person's trace lookup fails
+    When an sso_auto_added signal for org-1 is delivered
+    Then Customer.io identifies the person with has_evaluations false and no has_traces or last_trace_at
+    And the person is tracked joined_via_sso
 
   @unit
   Scenario: A large organization's members go out in batches of one hundred

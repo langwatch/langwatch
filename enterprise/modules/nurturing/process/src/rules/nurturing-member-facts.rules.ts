@@ -56,14 +56,17 @@ export function firstSessionMemberTraits(
   };
 }
 
-/** A person's traces as traits: false only for someone nurturing knows has none anywhere. */
-export function knownTraceTraits({
-  hasTraces,
-  lastTraceAt,
-}: KnownTraces): Pick<CioPersonTraits, "has_traces" | "last_trace_at"> {
-  if (!hasTraces) return { has_traces: false };
+/**
+ * A person's traces as traits: false only for someone nurturing knows has none anywhere, and
+ * nothing at all where the read failed (null), as a guess could overwrite a true.
+ */
+export function knownTraceTraits(
+  traces: KnownTraces | null,
+): Partial<Pick<CioPersonTraits, "has_traces" | "last_trace_at">> {
+  if (!traces) return {};
+  if (!traces.hasTraces) return { has_traces: false };
   return {
     has_traces: true,
-    ...(lastTraceAt === null ? {} : { last_trace_at: unixSecondsOf(lastTraceAt) }),
+    ...(traces.lastTraceAt === null ? {} : { last_trace_at: unixSecondsOf(traces.lastTraceAt) }),
   };
 }

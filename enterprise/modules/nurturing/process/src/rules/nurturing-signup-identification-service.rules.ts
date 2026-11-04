@@ -52,8 +52,8 @@ export function fireSignup({
   signUpData?: SignUpData;
   /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
   primaryIntent?: string | null;
-  /** A person already in an organization with traces keeps has_traces true. */
-  traces: KnownTraces;
+  /** A person already in an organization with traces keeps has_traces true. Null: read failed. */
+  traces: KnownTraces | null;
 }): CioBatchCall[] {
   const traits: Partial<CioPersonTraits> = {
     ...pickDefined({

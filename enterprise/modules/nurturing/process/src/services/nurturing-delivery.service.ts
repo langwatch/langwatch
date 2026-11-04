@@ -11,7 +11,10 @@ import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
-import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
+import {
+  type NurturingClaimRepository,
+  rethrowAfterReleasing,
+} from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
@@ -64,6 +67,9 @@ function reportFailure(error: unknown): void {
   nurturingLogger.warn({ error }, "a lifecycle signal could not be delivered");
 }
 
+/** The same traits for each of these people. */
+type MemberBatch = Readonly<{ userIds: readonly string[]; traits: Partial<CioPersonTraits> }>;
+
 /** How long a delivered signal is remembered against a redelivered source event. */
 const DELIVERED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
@@ -98,29 +104,47 @@ export class NurturingDeliveryService {
   /** `key` names the signal: its kind and source event. A first session also tells its members. */
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
     if (!this.deps.customerIo && !this.deps.posthog) return;
-    if (!(await this.deps.claims.claim(`nurturing:${key}`, DELIVERED_WINDOW_SECONDS))) return;
+    const deliveredClaim = `nurturing:${key}`;
+    if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
+    const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
-    await this.tellMembers(signal);
+    if (memberBatch) this.identifyInBatches(memberBatch);
   }
 
-  /** An organization's fact reaches every active member's own profile, in bounded batches. */
-  private async tellMembers(signal: NurturingSignal): Promise<void> {
-    if (!isMemberFact(signal) || !this.deps.customerIo) return;
-    const recipients = await this.deps.memberFacts.recipientsOf(signal);
-    this.identifyInBatches({ userIds: recipients, traits: memberFactTraits(signal) });
+  /**
+   * An organization's fact reaches every active member's own profile, in bounded batches. Read
+   * before anything is sent: a failed read gives back this delivery's claims and fails it, so the
+   * queue's retry acts and no event goes out twice.
+   */
+  private async memberBatchOf({
+    signal,
+    deliveredClaim,
+  }: {
+    signal: NurturingSignal;
+    deliveredClaim: string;
+  }): Promise<MemberBatch | null> {
+    if (!isMemberFact(signal) || !this.deps.customerIo) return null;
+    try {
+      return {
+        userIds: await this.deps.memberFacts.recordFactAndClaimRecipients(signal),
+        traits: memberFactTraits(signal),
+      };
+    } catch (error) {
+      reportFailure(error);
+      const debounce = pickCustomerIoDebounce(signal);
+      return rethrowAfterReleasing({
+        error,
+        keys: debounce ? [deliveredClaim, debounce.claimKey] : [deliveredClaim],
+        claims: this.deps.claims,
+      });
+    }
   }
 
   /** One request per batch, one after the other, so a large organization never opens a burst. */
-  private identifyInBatches({
-    userIds,
-    traits,
-  }: {
-    userIds: readonly string[];
-    traits: Partial<CioPersonTraits>;
-  }): void {
+  private identifyInBatches({ userIds, traits }: MemberBatch): void {
     const nurturing = this.deps.customerIo;
     if (!nurturing) return;
     void (async () => {
@@ -309,20 +333,27 @@ export class NurturingDeliveryService {
   }: {
     userId: string;
     organizationId: string;
-    callsFor: (traces: KnownTraces) => CioBatchCall[];
+    callsFor: (traces: KnownTraces | null) => CioBatchCall[];
   }): void {
-    void this.deps.memberFacts
-      .tracesOfPerson({ userId, organizationId })
+    void this.tracesOrNull({ userId, organizationId })
       .then((traces) => this.sendCustomerIoCalls(callsFor(traces)))
       .catch(reportFailure);
   }
 
+  /** Null when the read fails: a person's join or email must not be lost to it. */
+  private tracesOrNull(person: {
+    userId: string;
+    organizationId: string;
+  }): Promise<KnownTraces | null> {
+    return this.deps.memberFacts.tracesOfPerson(person).catch((error: unknown) => {
+      reportFailure(error);
+      return null;
+    });
+  }
+
   /** The email has one home: read fresh from the user module at send time, never stored. */
   private sendSignup(signal: NurturingSignalOf<"signed_up">): void {
-    void Promise.all([
-      this.deps.users.findById({ id: signal.userId }),
-      this.deps.memberFacts.tracesOfPerson(signal),
-    ])
+    void Promise.all([this.deps.users.findById({ id: signal.userId }), this.tracesOrNull(signal)])
       .then(([user, traces]) =>
         this.sendCustomerIoCalls(
           fireSignup({ ...signal, email: user?.email, name: user?.name, traces }),

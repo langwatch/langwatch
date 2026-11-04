@@ -40,11 +40,11 @@ export function fireInviteAccepted({
   traces,
 }: {
   signal: NurturingSignalOf<"invite_accepted">;
-  traces: KnownTraces;
+  traces: KnownTraces | null;
 }): CioBatchCall[] {
   const { userId } = signal;
   return [
-    ...(traces.hasTraces
+    ...(traces?.hasTraces
       ? [{ type: "identify" as const, userId, traits: knownTraceTraits(traces) }]
       : []),
     ...joinedCalls({ joined: signal, event: "joined_via_invite" }),
@@ -60,7 +60,7 @@ export function fireSsoAutoAdded({
   traces,
 }: {
   signal: NurturingSignalOf<"sso_auto_added">;
-  traces: KnownTraces;
+  traces: KnownTraces | null;
 }): CioBatchCall[] {
   const { userId } = signal;
   return [
