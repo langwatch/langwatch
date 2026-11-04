@@ -1,5 +1,6 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
+import { isOwnDecisionModelId } from "./catalog/decision-models.ts";
 import { allLitellmModels } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
@@ -17,6 +18,35 @@ export type BuiltInModel = { value: string; label: string };
 
 /** The heading built-in models are listed under. */
 export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
+
+/**
+ * The built-in group's key. A constant, never a model id's prefix: an own-key decision model
+ * reads `openai/decisions:<name>`, and keying on that collided with the provider's own group.
+ */
+export const BUILT_IN_MODELS_GROUP_KEY = "langwatch-built-in";
+
+/**
+ * Whether only a built-in offer can serve this model: the catalogue's own-key decision models,
+ * whose ids carry a provider's prefix that would otherwise vouch for a model the judge can no
+ * longer run. A custom model its owner happened to name `decisions:…` is not one of them.
+ */
+export const isServedOnlyAsBuiltIn = (model: string): boolean => isOwnDecisionModelId(model);
+
+const PROVIDER_NOT_ENABLED_REMEDY =
+  "provider isn't enabled here. Re-add the provider or pick a different model to use it.";
+
+const DECISION_MODEL_WITHDRAWN_REMEDY =
+  "This decision model is no longer available to this project. Pick a different model.";
+
+/**
+ * Why the project cannot run the chosen model, with the remedy that works: re-adding a provider
+ * cannot bring back a decision model the catalogue no longer offers, and that provider may well
+ * be enabled already.
+ */
+export const unavailableModelReason = ({ model }: { model: string }): string =>
+  isServedOnlyAsBuiltIn(model)
+    ? DECISION_MODEL_WITHDRAWN_REMEDY
+    : `${model.split("/")[0] ?? ""} ${PROVIDER_NOT_ENABLED_REMEDY}`;
 
 export type GroupedModelOptions = ModelOptionGroup[];
 
@@ -235,25 +265,20 @@ export function modelSelectionFrom({
     value,
     isDisabled: false,
     mode,
+    isBuiltIn: true,
   }));
-  const builtInGroups: GroupedModelOptions = builtInOptions.map((option) => ({
-    provider: option.value.split("/")[0]!,
-    label: BUILT_IN_MODELS_GROUP_LABEL,
-    models: [option],
-  }));
+  const builtInGroups: GroupedModelOptions =
+    builtInOptions.length === 0
+      ? []
+      : [
+          {
+            provider: BUILT_IN_MODELS_GROUP_KEY,
+            label: BUILT_IN_MODELS_GROUP_LABEL,
+            models: builtInOptions,
+          },
+        ];
   return {
     selectOptions: [...builtInOptions, ...selectOptions],
-    groupedByProvider: [...mergeGroups(builtInGroups), ...groupOptionsByProvider(selectOptions)],
+    groupedByProvider: [...builtInGroups, ...groupOptionsByProvider(selectOptions)],
   };
-}
-
-/** Built-in models sharing a provider prefix read as one group. */
-function mergeGroups(groups: GroupedModelOptions): GroupedModelOptions {
-  const byProvider = new Map<string, ModelOptionGroup>();
-  for (const group of groups) {
-    const existing = byProvider.get(group.provider);
-    if (existing) existing.models.push(...group.models);
-    else byProvider.set(group.provider, { ...group, models: [...group.models] });
-  }
-  return [...byProvider.values()];
 }

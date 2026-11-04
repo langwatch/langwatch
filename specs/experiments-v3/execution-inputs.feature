@@ -33,6 +33,36 @@ Feature: An evaluation run accepts inline data, a dataset id, or parameters
     When I run the evaluation with parameters setting "model" to "gpt-5-mini"
     Then every evaluated row has "model" equal to "gpt-5-mini"
 
+  # A column left empty on purpose, so CI can fill it at run time, is still
+  # a column: it reaches the target as empty text. Only a column the dataset
+  # does not have is missing.
+  @unit
+  Scenario: A column empty in every row is sent as empty text
+    Given a dataset with the columns "input" and "environment"
+    And no row has a value in "environment"
+    When the run loads the dataset
+    Then every row carries "environment" as empty text
+
+  @unit
+  Scenario: A column the dataset does not have is not added to the rows
+    Given a dataset with only an "input" column
+    When the run loads the dataset
+    Then no row carries "environment"
+
+  @unit
+  Scenario: A column that is not text, empty in a row, is left out of that row
+    Given a dataset with a text column "input", a chat messages column "messages" and a number column "score"
+    And a row has no value in "messages" or "score"
+    When the run loads the dataset
+    Then that row carries neither "messages" nor "score"
+
+  @unit
+  Scenario: A parameter overrides a column that is empty in every row
+    Given a dataset with the columns "input" and "environment"
+    And no row has a value in "environment"
+    When I run the evaluation with parameters setting "environment" to "staging"
+    Then every evaluated row has "environment" equal to "staging"
+
   @unit
   Scenario: Parameters with no dataset evaluate a single synthetic row
     Given a target with no attached dataset and no inline data
@@ -90,6 +120,13 @@ Feature: An evaluation run accepts inline data, a dataset id, or parameters
     And the refusal names the limit and storing images as attachments
 
   @unit
+  Scenario: A saved dataset version larger than a run holds is refused before its rows are read
+    Given the dataset version a run reads is recorded as larger than the whole-dataset limit
+    When I run the evaluation against that saved dataset
+    Then the run is refused as "experiment_dataset_too_large_to_run"
+    And none of the version's rows are read
+
+  @unit
   Scenario: An organization with a raised file limit runs a dataset the default limit refuses
     Given an organization whose whole-dataset limit was raised
     And a saved dataset larger than the default limit and smaller than the raised one
@@ -98,7 +135,7 @@ Feature: An evaluation run accepts inline data, a dataset id, or parameters
 
   @unit
   Scenario: A saved dataset that changes while the run reads it is refused instead of run short
-    Given a saved dataset that loses rows after the run starts reading it
+    Given a saved dataset whose version answers fewer rows than it recorded
     When I run the evaluation against that saved dataset
     Then the run is refused as "experiment_dataset_changed_during_read"
 

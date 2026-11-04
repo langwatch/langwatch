@@ -23,7 +23,12 @@ const instantEvalJudgeSpendPricedEventDataSchemaDefinition = z.object({
   model: z.string().min(1),
   /** The two published numbers the price came from, so a replay is told from a re-rating. */
   rateVersion: z.string().min(1),
-  inputTokens: z.number().int().positive(),
+  /**
+   * Zero when a routed backend billed output alone: the cost is what is billed, so a fact with
+   * no input tokens and a cost above zero is still a priced call. An unrouted call with no input
+   * tokens records no fact at all (`isInstantEvalSpendBillable`).
+   */
+  inputTokens: z.number().int().nonnegative(),
   /** The customer price in integer nano-USD: what the spend row, the ledger and the meter carry. */
   priceNanoUsd: z.number().int().nonnegative(),
   /** What the classifier charged us, in integer nano-USD, kept beside the price. */

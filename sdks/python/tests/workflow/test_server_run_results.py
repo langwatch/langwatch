@@ -202,6 +202,37 @@ class TestWorkflowRunWithDatasetId:
         assert evaluate_post["json"] == {"dataset_id": "ds_xyz"}
 
 
+class TestWorkflowRunWithDatasetVersion:
+    """when running a workflow pinned to a version of its saved dataset"""
+
+    def test_posts_dataset_version(self):
+        _script_full_run()
+        with patch.object(platform_run, "create_client", _FakeClient), patch.object(
+            workflow_module, "create_client", _FakeClient
+        ):
+            workflow_run("workflow_abc", dataset_version=2, poll_interval=0)
+
+        evaluate_post = next(
+            p for p in _FakeClient.captured_posts if "/evaluate" in p["url"]
+        )
+        assert evaluate_post["json"] == {"dataset_version": 2}
+
+    @pytest.mark.parametrize("version", [0, -1, 1.5, True])
+    def test_refuses_a_version_that_is_not_a_whole_number_from_one(self, version):
+        with patch.object(workflow_module, "create_client", _FakeClient):
+            with pytest.raises(ValueError):
+                workflow_run("workflow_abc", dataset_version=version)
+
+        assert _FakeClient.captured_posts == []
+
+    def test_refuses_a_version_with_inline_data(self):
+        with patch.object(workflow_module, "create_client", _FakeClient):
+            with pytest.raises(ValueError):
+                workflow_run("workflow_abc", data=[{"q": "x"}], dataset_version=1)
+
+        assert _FakeClient.captured_posts == []
+
+
 class TestWorkflowRunWithParameters:
     """when running a workflow with parameters"""
 

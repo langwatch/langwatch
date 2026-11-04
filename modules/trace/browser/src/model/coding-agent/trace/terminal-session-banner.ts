@@ -15,6 +15,7 @@ type BannerAgent =
   | "codex"
   | "gemini_cli"
   | "copilot"
+  | "grok"
   | "unknown";
 
 export interface SessionBanner {
@@ -35,6 +36,7 @@ const SERVICE_NAME_AGENTS: { fragment: string; agent: BannerAgent }[] = [
   { fragment: "codex", agent: "codex" },
   { fragment: "gemini", agent: "gemini_cli" },
   { fragment: "copilot", agent: "copilot" },
+  { fragment: "grok", agent: "grok" },
 ];
 
 /** Span-name namespaces, tested in order; Copilot alone names its call span "chat <model>". */

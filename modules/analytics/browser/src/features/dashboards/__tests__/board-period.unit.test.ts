@@ -10,7 +10,7 @@ import {
   boardGrainFits,
   boardPeriodBounds,
   boardPeriodGranularity,
-  defaultBoardExcludedOrigins,
+  boardWindowEnd,
 } from "../model/board-period.ts";
 
 const NOW = Date.UTC(2026, 8, 28);
@@ -66,27 +66,54 @@ describe("given the Live range", () => {
   });
 });
 
+describe("boardWindowEnd", () => {
+  const MINUTE = 60_000;
+
+  describe("given a fixed range", () => {
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("ends at the minute the range was picked until the first refresh", () => {
+      const end = boardWindowEnd({ range: "24h", now: NOW + 5 * MINUTE, pickedAt: NOW + 10 });
+      expect(end).toBe(NOW + MINUTE);
+    });
+
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("moves its end to the minute after each refresh", () => {
+      const end = boardWindowEnd({
+        range: "24h",
+        now: NOW + 9 * MINUTE,
+        pickedAt: NOW,
+        refreshedAt: NOW + 3 * MINUTE + 1,
+      });
+      expect(end).toBe(NOW + 4 * MINUTE);
+    });
+
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("keeps the range's length when the end moves", () => {
+      const end = boardWindowEnd({
+        range: "7d",
+        now: NOW,
+        pickedAt: NOW,
+        refreshedAt: NOW + MINUTE,
+      });
+      const bounds = boardPeriodBounds({ range: "7d", now: end });
+      expect(bounds.periodEnd - bounds.periodStart).toBe(7 * 86_400_000);
+    });
+  });
+
+  describe("given the Live range", () => {
+    /** @scenario "AC19c Live is the last hour, rolling, refreshed every minute" */
+    it("rolls with the clock to the next minute", () => {
+      const end = boardWindowEnd({ range: "live", now: NOW + 5 * MINUTE + 1, pickedAt: NOW });
+      expect(end).toBe(NOW + 6 * MINUTE);
+    });
+  });
+});
+
 describe("fitGranularity", () => {
   it("widens to a week when days would exceed the bucket budget", () => {
     const thirtyYears = 30 * 365 * DAY_S * 1000;
     expect(boardPeriodGranularity({ grain: "1d", periodStart: 0, periodEnd: thirtyYears })).toBe(
       WEEK_S,
     );
-  });
-});
-
-describe("defaultBoardExcludedOrigins", () => {
-  describe("given a project that holds the member's agent", () => {
-    /** @scenario "AC193 Langy: the origins a board leaves out are a list a board parameter can set later" */
-    it("leaves out Langy's conversations", () => {
-      expect(defaultBoardExcludedOrigins({ isPersonalProject: false })).toEqual(["langy"]);
-    });
-  });
-
-  describe("given a personal project", () => {
-    /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
-    it("leaves out no origin", () => {
-      expect(defaultBoardExcludedOrigins({ isPersonalProject: true })).toEqual([]);
-    });
   });
 });
