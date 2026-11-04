@@ -18,7 +18,7 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
     @unit
     Scenario: The list says what it covers
       Given the generated list
-      Then its header states how many fixture versions it covers and from which commit
+      Then its header states how many stock statement versions it covers and from which oldest commit
 
     @unit
     Scenario: A statement edited by one character is user-written

@@ -61,16 +61,20 @@ describe("given the committed stock widget statements", () => {
 
 describe("given the generated list", () => {
   /** @scenario "The list says what it covers" */
-  it("states in its header the fixture versions it covers and the oldest commit", () => {
+  it("states in its header the stock statement versions it covers and the oldest commit", () => {
     const header = read("../lwql-builtin-statements.generated.ts")
       .split("\n")
       .slice(0, 4)
       .join("\n");
-    const { versions, oldestCommit } = LWQL_BUILTIN_STATEMENT_COVERAGE;
+    const { versions, oldestCommit, commits } = LWQL_BUILTIN_STATEMENT_COVERAGE;
 
     expect(versions).toBeGreaterThanOrEqual(1);
+    expect(commits).toHaveLength(versions);
+    expect(commits.at(-1)).toBe(oldestCommit);
     expect(oldestCommit).toMatch(/^[0-9a-f]{7,40}$/);
-    expect(header).toContain(`Covers ${versions} fixture versions, oldest commit ${oldestCommit}`);
+    expect(header).toContain(
+      `Covers ${versions} stock statement versions, oldest commit ${oldestCommit}`,
+    );
   });
 
   it("holds only distinct sha256 hex hashes", () => {

@@ -4,6 +4,7 @@
  * never takes an origin from the caller.
  * @see specs/lwql/query-origin.feature
  */
+import { LangWatchQLInvalidQueryError } from "@langwatch/analytics-contract";
 import { createTrpcRuntime, TrpcRootDefinition } from "@langwatch/api/trpc";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
@@ -16,9 +17,9 @@ type TestContext = { actor: { id: string } };
 const PROJECT = { projectId: "project-1" };
 const SQL = "SELECT  1   AS   spaced\n";
 
-/** The door over a fake app whose `executeLangWatchQL` is the test's. */
-function doorOver(execute: AnalyticsLwqlApi["executeLangWatchQL"]) {
-  const reportQueryFailure = vi.fn();
+/** The door over a fake app whose `executeWorkbenchQuery` is the test's. */
+function doorOver(execute: AnalyticsLwqlApi["executeWorkbenchQuery"]) {
+  const executeWorkbenchQuery = vi.fn(execute);
   const app = createApiFixture<AnalyticsLwqlApi>({
     isWorkbenchEnabled: async () => true,
     resolveRunCaller: async () =>
@@ -26,8 +27,7 @@ function doorOver(execute: AnalyticsLwqlApi["executeLangWatchQL"]) {
         project: { id: "project-1" },
         protections: {},
       }) as never,
-    executeLangWatchQL: execute,
-    reportQueryFailure,
+    executeWorkbenchQuery,
   });
   const trpc = TrpcRootDefinition.forContext<TestContext>().create();
   const caller = createTrpcRuntime<TestContext>({
@@ -38,49 +38,30 @@ function doorOver(execute: AnalyticsLwqlApi["executeLangWatchQL"]) {
     .mount(analyticsLwqlTrpcTransport, () => app)
     .createCaller({ actor: { id: "member-1" } });
 
-  return { caller, reportQueryFailure };
+  return { caller, executeWorkbenchQuery };
 }
 
 describe("given a member runs a statement on analytics.lwql.query", () => {
   /** @scenario "A failed query on the tRPC door is reported with the statement exactly as sent" */
-  it("reports the failure with the project and the statement as sent, and still fails the same way", async () => {
-    const failure = Object.assign(new Error("Code: 47"), { code: "47" });
-    const { caller, reportQueryFailure } = doorOver(async () => {
+  it("hands the statement as sent to the one workbench operation and surfaces its error as is", async () => {
+    const failure = new LangWatchQLInvalidQueryError();
+    const { caller, executeWorkbenchQuery } = doorOver(async () => {
       throw failure;
     });
 
-    await expect(caller.query({ ...PROJECT, sql: SQL })).rejects.toBeDefined();
+    const rejection = await caller.query({ ...PROJECT, sql: SQL }).catch((error: unknown) => error);
 
-    expect(reportQueryFailure).toHaveBeenCalledTimes(1);
-    expect(reportQueryFailure).toHaveBeenCalledWith({
-      projectId: "project-1",
-      sql: SQL,
-      error: failure,
-    });
-  });
-
-  /** @scenario "A successful query is not reported" */
-  it("reports nothing when the statement succeeds", async () => {
-    const { caller, reportQueryFailure } = doorOver(async () => ({ rows: [] }) as never);
-
-    await caller.query({ ...PROJECT, sql: SQL });
-
-    expect(reportQueryFailure).not.toHaveBeenCalled();
+    expect((rejection as { cause: unknown }).cause).toBe(failure);
+    expect(executeWorkbenchQuery).toHaveBeenCalledTimes(1);
+    expect(executeWorkbenchQuery.mock.calls[0]?.[0]).toMatchObject({ sql: SQL });
   });
 
   /** @scenario "The caller cannot name the origin" */
   it("passes on no origin even when the request names one", async () => {
-    const { caller, reportQueryFailure } = doorOver(async () => {
-      throw new Error("Code: 215");
-    });
+    const { caller, executeWorkbenchQuery } = doorOver(async () => ({ rows: [] }) as never);
 
-    await caller.query({ ...PROJECT, sql: SQL, origin: "built_in" } as never).catch(() => void 0);
+    await caller.query({ ...PROJECT, sql: SQL, origin: "built_in" } as never);
 
-    expect(reportQueryFailure.mock.calls[0]?.[0]).not.toHaveProperty("origin");
-    expect(Object.keys(reportQueryFailure.mock.calls[0]?.[0]).toSorted()).toEqual([
-      "error",
-      "projectId",
-      "sql",
-    ]);
+    expect(executeWorkbenchQuery.mock.calls[0]?.[0]).not.toHaveProperty("origin");
   });
 });

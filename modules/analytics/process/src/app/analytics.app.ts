@@ -58,6 +58,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
+import { counter } from "@langwatch/observability/metrics";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { isAggregateProjectKind, ProjectApi } from "@langwatch/project-contract";
@@ -111,6 +112,7 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
+import { LangWatchQLFailureReportService } from "../services/langwatch-ql-failure-report.service.ts";
 import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
 import {
   LangWatchQLQueryScopeService,
@@ -238,6 +240,8 @@ type LwqlProvisioningOperations = Readonly<{
 const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
 
 const lwqlLogger = createLogger("langwatch:analytics:lwql:provisioning");
+
+const LWQL_QUERY_FAILURE_METRIC_NAME = "lwql_query_failure_total";
 
 const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   probeOwner: () => Promise.resolve("none"),
@@ -540,6 +544,7 @@ export class AnalyticsModule
   #runScope: LangWatchQLRunScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
+  #failureReport: LangWatchQLFailureReportService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
@@ -561,6 +566,14 @@ export class AnalyticsModule
     this.#validationReport = LangWatchQLValidationReportService.create({
       langWatchQL: dependencies.langWatchQL,
       protections: this.#protections,
+    });
+    this.#failureReport = LangWatchQLFailureReportService.create({
+      logger: createLogger("langwatch:analytics:lwql:query-failure"),
+      failures: counter({
+        name: LWQL_QUERY_FAILURE_METRIC_NAME,
+        description:
+          "Failed LangWatchQL queries by who wrote the statement (built_in or user_written)",
+      }),
     });
     this.#publicBaseUrl = publicBaseUrl;
     this.#widgetAccess = DashboardWidgetAccessService.create(dependencies);
@@ -883,12 +896,18 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
   }
 
-  reportQueryFailure(_input: { projectId: string; sql: string; error: unknown }): void {
-    throw new Error("not implemented");
+  executeWorkbenchQuery(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLQueryResult> {
+    return this.#failureReport.reportingFailures({
+      projectId: input.project.id,
+      sql: input.sql,
+      run: () => this.executeLangWatchQL(input),
+    });
   }
 
-  reportBuiltInQueryFailure(_input: { projectId: string; error: unknown }): void {
-    throw new Error("not implemented");
+  reportBuiltInQueryFailure(input: { projectId: string; error: unknown }): void {
+    this.#failureReport.reportBuiltInFailure(input);
   }
 
   async assertProjectsReadable(input: {

@@ -72,6 +72,7 @@ export class SourcePresenceService {
       return result.rows.length > 0 ? "present" : "absent";
     } catch (error) {
       logger.warn({ error, source: input.source }, "dashboard source presence query failed");
+      this.#analytics.reportBuiltInQueryFailure({ projectId: input.caller.project.id, error });
       return "failed";
     }
   }
