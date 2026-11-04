@@ -84,6 +84,13 @@ Feature: An invited person without an account gets in by any method
       And no new confirmation link is asked for
 
     @integration
+    Scenario: A fresh visit to sign-up starts at the address step
+      Given a tab holding a confirmed address from an earlier sign-up
+      When the person opens the sign-up page again without reloading it
+      Then the address step shows
+      And the tab no longer holds the earlier address
+
+    @integration
     Scenario: A held proof the server refuses falls back to the address step
       Given a tab holding a confirmed address whose proof was spent or expired
       When the sign-up page loads
