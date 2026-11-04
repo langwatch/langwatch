@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(OccurredAt)
-ORDER BY (TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash, SourceId, JudgedAt)
+ORDER BY (TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash, JudgedColumn, SourceId, JudgedAt)
 TTL IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 ```
@@ -103,7 +103,7 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 Why this shape:
 
 - **The sort key leads with the trace.** `(TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash)` is the recall key, and its first three columns are the trace page's read. Both are prefix reads.
-- **`InputHash` is in the key.** `eval(input, 'q')` and `eval(output, 'q')` on one trace are two rows, and recall serves each its own verdict. `JudgedColumn` names the column, so a reader can tell the two apart after the text changes.
+- **`InputHash` is in the key.** `eval(input, 'q')` and `eval(output, 'q')` on one trace are two rows, and recall serves each its own verdict. `JudgedColumn` names the column and follows `InputHash` in the key, so a reader can tell the two apart after the text changes, and two rows never collapse even if a hash is wrong.
 - **`SourceId, JudgedAt` end the key.** Every judgment is kept: a rerun, a "judge again" or a monitor re-evaluating the same trace adds a row. An exact retry of one insert has the same `JudgedAt`, so the replacing merge collapses it. `Source` and `SourceId` are provenance only, and recall never reads them. A row is shared by every source that judges the same text with the same question and judge. A wrong or forged `SourceId` cannot change which verdict recall returns.
 - **`KeyVersion`** is the recall epoch. Recall reads only rows with the current version. Rows written before recall is on, or under a key bug, are never recalled; a version bump retires them.
 - **The partition and TTL anchor on `OccurredAt`**, the trace's time. `trace_summaries` uses the same anchor (`ttl.reconciler.ts:139-145`) and the same `toYearWeek` partition (00002 line 179). So a result expires with its trace.
@@ -121,13 +121,13 @@ Before judging, the service looks up the rows that match tenant, trace, span, qu
 
 - **Only judged rows are reused.** A failed or skipped row never blocks a retry.
 - **Recall splits a unit.** A text is judged only for its missed questions; a unit with no misses is dropped. The budget check runs on what is left.
-- **Trace and span keys only.** A thread-keyed or text-keyed `eval()` has no single trace, so it is judged as today and not stored.
+- **Trace and span keys only.** A thread-keyed or text-keyed `eval()` has no single trace, so it is judged as today and not stored. A run over threads writes only `instant_eval_judgments`, as today, and gets no recall.
 - **Every read filters `TenantId` first** and carries an `OccurredAt` window, so the cold-scan detector stays quiet.
 - **Flags.** Writes sit behind `release_instant_evals`. Recall and the drawer section, on every path including monitors, sit behind a new flag, `release_instant_eval_results`.
-- **A recall makes no judge call**, so it is free, and every viewer sees the same number.
+- **A recall makes no judge call**, so it is free, and every viewer of the same widget or ask gets the same row.
 - **The table is the cache.** There is no separate cache with its own expiry.
 - **A new row is added only when something changed:** a new judge model, an explicit "judge again", or changed judged text (`InputHash`). Both rows are kept with their times, because a judge is not deterministic.
-- **Readers show the latest verdict, labelled.** They take the latest judged row per trace, span, question and `JudgedColumn`, by `JudgedAt` (`argMax`), as `clickhouse.instant-eval-judgments.repository.ts:28-45` does today with `UpdatedAt`, and show its `JudgeModel` and `JudgedAt` with it. So `eval(input, 'q')` and `eval(output, 'q')` stay two results, a newer verdict replaces an older one, and a judge change hides no past result. `KeyVersion` and `JudgeModel` bind recall, not reads. A failed or skipped row shows only where no judged row exists. A reader that wants history reads every row.
+- **Readers show the latest verdict, labelled.** They read the current `KeyVersion` only, like recall: a bump is a key fix, and its old rows are not trusted. They take the latest judged row per trace, span, question and `JudgedColumn`, by (`JudgedAt`, `UpdatedAt`, `SourceId`) as recall does (`argMax`, as `clickhouse.instant-eval-judgments.repository.ts:28-45` does today with `UpdatedAt`), and show its `JudgeModel` and `JudgedAt` with it. So `eval(input, 'q')` and `eval(output, 'q')` stay two results, a newer verdict replaces an older one, and a judge change hides no past result. `JudgeModel` binds recall, not reads, so after a judge change the drawer and a recall can show different verdicts, each labelled with its judge. A failed or skipped row shows only where no judged row exists. A reader that wants history reads every row.
 - **The threshold is not in the hash.** A pass is `Probability >= threshold`, applied on read (`instant-eval-verdicts.rules.ts:49-54`). Two viewers with different thresholds share the same judge call.
 
 Each trigger uses the same path:
@@ -135,7 +135,7 @@ Each trigger uses the same path:
 | Trigger            | `Source`    | `SourceId`      | What recall gives                                         |
 | ------------------ | ----------- | --------------- | --------------------------------------------------------- |
 | Quick `eval()` ask | `ask`       | the query id    | A repeat question is free and stays the same answer.      |
-| Run                | `run`       | the run id      | A rerun pays only for traces it has not judged. A run writes both tables: `instant_eval_judgments` for its run page, `eval_results` for recall. |
+| Run                | `run`       | the run id      | A rerun pays only for traces it has not judged. A trace or span run writes both tables: `instant_eval_judgments` for its run page, `eval_results` for recall. |
 | Dashboard widget   | `dashboard` | the widget id   | A refresh pays only for new traces. All viewers agree.    |
 | Monitor, Instant Evals judge | `monitor` | the monitor id | A trace a monitor already judged with the same question is not judged again. A monitor hashes `{input, output, contexts}`, an ask hashes one column, so monitor rows and ask rows do not recall each other. |
 
@@ -221,12 +221,12 @@ Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
 
 - Langy gives one answer: "Every eval result is saved on its trace. Asking the same question again is free unless the judge changed."
 - The trace drawer shows instant eval results beside monitor results, labelled by source.
-- A dashboard widget with `eval()` pays only for new traces, and every viewer sees the same number.
+- A dashboard widget with `eval()` pays only for new traces, and every viewer of it sees the same number.
 - A quick `eval()` now writes rows. It costs one recall read and one bulk insert per query.
 - Instant eval results follow the trace's retention, not "never expire".
 - Monitors keep writing `evaluation_runs`. A monitor on the Instant Evals judge also writes `eval_results` and gets recall.
-- A run writes two tables: `instant_eval_judgments` for its run page, chip and view, and `eval_results` for recall.
-- The usage report (`usage-report.ts:394-396`) counts `instant_eval_judgments`; it must add `eval_results` rows whose `Source` is not `run`, so a run is not counted twice.
+- A trace or span run writes two tables: `instant_eval_judgments` for its run page, chip and view, and `eval_results` for recall.
+- The usage report (`usage-report.ts:394-396`) counts judge calls. Every `eval_results` row is one, and a recall adds none, so from the day writes start it counts `eval_results` rows, plus `instant_eval_judgments` rows of thread runs, which `eval_results` does not hold. Older judgments stay counted from `instant_eval_judgments`.
 
 ## References
 
