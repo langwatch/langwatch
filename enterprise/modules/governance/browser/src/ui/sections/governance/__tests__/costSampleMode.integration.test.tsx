@@ -26,6 +26,7 @@ const harness = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("@langwatch/auth-client", () => ({ useRecordPageOpened: () => undefined }));
 vi.mock("../../../../behavior/governance-api.ts", () => ({
   api: {
     governanceCost: {
