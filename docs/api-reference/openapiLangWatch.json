@@ -49289,7 +49289,7 @@
             }
           }
         },
-        "description": "Update a dataset by its slug or id",
+        "description": "Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to say which existing column each renamed column came from, so a save that deletes one column and renames another moves the right values.",
         "requestBody": {
           "required": false,
           "content": {
@@ -49332,6 +49332,28 @@
                         "name",
                         "type"
                       ]
+                    }
+                  },
+                  "columnRenames": {
+                    "description": "Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position.",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "to": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -53428,7 +53450,7 @@
             }
           },
           "400": {
-            "description": "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
+            "description": "The body was not valid JSON, failed input validation, the experiment has no dataset configured, or `dataset_version` was sent while the run reads no saved dataset (no `dataset_id` and an inline active dataset)",
             "content": {}
           },
           "401": {
@@ -53464,7 +53486,8 @@
                     }
                   },
                   "dataset_id": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "dataset_version": {
                     "type": "integer",

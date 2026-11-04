@@ -117,7 +117,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       },
       400: {
         description:
-          "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
+          "The body was not valid JSON, failed input validation, the experiment has no dataset configured, or `dataset_version` was sent while the run reads no saved dataset (no `dataset_id` and an inline active dataset)",
       },
       401: { description: "Missing or invalid API key, or the key lacks the permission" },
       404: {
