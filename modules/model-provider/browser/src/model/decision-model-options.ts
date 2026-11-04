@@ -18,8 +18,8 @@ export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Ob
 
 /** LangWatch Instant Preview's line when the judge router answers for it (ADR-190). */
 export const ROUTED_HOSTED_DECISION_MODEL_SUBTITLE =
-  "Routed by the LangWatch Judge: a decision model answers what it is sure of, an LLM the rest. " +
-  "Billed with your plan.";
+  "LLM-judge evaluations are routed by the LangWatch Judge: a decision model answers what it is sure of, " +
+  "an LLM the rest. Judged queries are not. Billed with your plan.";
 
 /** Whether the column can show a stored id; an id the catalogue dropped reads as unset. */
 export function isShownDecisionModel(id: string | null | undefined): id is string {

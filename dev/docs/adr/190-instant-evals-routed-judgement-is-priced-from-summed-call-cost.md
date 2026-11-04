@@ -42,7 +42,7 @@ It amends decision 13. The leaf now owns two pricing rules and four upstreams: t
 Both were answered with the first option.
 
 1. **Does the 1.3 markup apply to third-party LLM cost?** Yes: one published markup on the summed cost. The markup was set for Jev at its published rate. The router applies it to the summed cost, so the cost of an Anthropic or OpenAI leg is marked up at 1.3 too. The alternative is a separate markup per backend, which needs a field on the price table (it has none today).
-2. **Does the router ship dark, or with one caller behind the flag?** One caller behind the flag (decision 10). Today no non-test code sets a route, so the router, its flag and its event fields are unreachable in production. One option is to ship dark and add the caller in a later pull request. The other is to wire one caller, read the flag where the judged rows build their classify input, and ship it behind `release_instant_evals_judge_router`.
+2. **Does the router ship dark, or with one caller behind the flag?** One caller behind the flag (decision 10). Before this decision no non-test code set a route, so the router, its flag and its event fields were unreachable in production. The caller that now ships is `EvaluationJudgingService`: it sends the `llm_judge` route when `release_instant_evals_judge_router` is on. One option is to ship dark and add the caller in a later pull request. The other is to wire one caller, read the flag where the judged rows build their classify input, and ship it behind `release_instant_evals_judge_router`.
 
 ## Before queries route
 
