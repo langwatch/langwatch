@@ -53,9 +53,11 @@ Feature: A simulation blocked by the project's own configuration says so
   @unit @scenario-child
   Scenario: A child the processor released is logged at info, a child that dies by itself still at error
     Given a scenario child process the processor has released on purpose
-    When the child closes without an exit code
+    When the child closes because of the SIGTERM the release sent, or exits with a code after trapping it
     Then the close is logged at info level and not at error level
-    But a child that closes without an exit code and was not released is logged at error level
+    But a released child that any other signal killed is logged at error level
+    And a child that exited before the release could signal it is logged at error level
+    And a child that closes without an exit code and was not released is logged at error level
 
   @unit @scenario-prefetch
   Scenario: A failure we do not recognise stays ours

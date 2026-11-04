@@ -26,26 +26,37 @@ const pool: ScenarioChildRunPool = {
   wasCancelled: () => false,
 };
 
-function supervised() {
+function supervised({ killed }: { killed: boolean }) {
   const child = new ChildProcess();
-  const kill = vi.spyOn(child, "kill").mockImplementation(() => {
-    child.emit("close", null);
-    return true;
-  });
+  vi.spyOn(child, "kill").mockReturnValue(killed);
   const log = vi.fn();
   const session = superviseScenarioChild({ child, jobData, pool, log });
-  return { child, kill, log, session };
+  return { child, log, session };
 }
 
 const levelsLogged = (log: ReturnType<typeof vi.fn>) => log.mock.calls.map(([level]) => level);
 
+async function releaseThenClose({
+  killed,
+  code,
+  signal,
+}: {
+  killed: boolean;
+  code: number | null;
+  signal: NodeJS.Signals | null;
+}) {
+  const { child, log, session } = supervised({ killed });
+  const aborted = session.abort();
+  child.emit("close", code, signal);
+  await aborted;
+  return log;
+}
+
 describe("given a scenario child process", () => {
-  describe("when the processor releases it and it closes without an exit code", () => {
+  describe("when the processor releases it and SIGTERM ends it", () => {
     /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
     it("logs the close at info and never at error", async () => {
-      const { log, session } = supervised();
-
-      await session.abort();
+      const log = await releaseThenClose({ killed: true, code: null, signal: "SIGTERM" });
 
       expect(levelsLogged(log)).toContain("info");
       expect(levelsLogged(log)).not.toContain("error");
@@ -57,13 +68,45 @@ describe("given a scenario child process", () => {
     });
   });
 
-  describe("when it closes without an exit code and nobody released it", () => {
+  describe("when the processor releases a child that traps SIGTERM and exits with a code", () => {
     /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
-    it("still logs the close at error and fails the run", async () => {
-      const { child, kill, log } = supervised();
-      kill.mockImplementation(() => true);
+    it("logs the close at info, carrying the exit code and no signal", async () => {
+      const log = await releaseThenClose({ killed: true, code: 1, signal: null });
 
-      child.emit("close", null);
+      expect(levelsLogged(log)).not.toContain("error");
+      expect(log).toHaveBeenCalledWith(
+        "info",
+        "Child process stopped after its run was released",
+        expect.objectContaining({ exitCode: 1, signal: null }),
+      );
+    });
+  });
+
+  describe("when the processor releases it but something else ended it", () => {
+    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    it.each([
+      { name: "SIGKILL", killed: true, code: null, signal: "SIGKILL" as const },
+      { name: "a numeric exit before the abort", killed: false, code: 1, signal: null },
+      { name: "a kill that did not land", killed: false, code: null, signal: "SIGKILL" as const },
+    ])("still logs the close at error after $name", async ({ killed, code, signal }) => {
+      const log = await releaseThenClose({ killed, code, signal });
+
+      expect(levelsLogged(log)).toContain("error");
+      expect(levelsLogged(log)).not.toContain("info");
+      expect(log).toHaveBeenCalledWith(
+        "error",
+        expect.any(String),
+        expect.objectContaining({ signal }),
+      );
+    });
+  });
+
+  describe("when nobody released it and it is killed", () => {
+    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    it("still logs the close at error", () => {
+      const { child, log } = supervised({ killed: true });
+
+      child.emit("close", null, "SIGKILL");
 
       expect(log).toHaveBeenCalledWith(
         "error",

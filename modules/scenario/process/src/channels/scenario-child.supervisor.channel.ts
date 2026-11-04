@@ -99,7 +99,7 @@ function observeChild(input: {
       stderr += chunk;
       logChildChunk(chunk, "warn", log);
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       clearTimeout(timeout);
       pool.deregisterChild(input.jobData.scenarioRunId);
       if (settled) return;
@@ -112,7 +112,8 @@ function observeChild(input: {
           stderr,
           log,
           cancelled: pool.wasCancelled(input.jobData.scenarioRunId),
-          released: input.release.released,
+          signal,
+          released: input.release.released && endedByTheRelease(signal),
         }),
       );
     });
@@ -177,8 +178,7 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
   }
 
   async abort(): Promise<void> {
-    this.options.release.released = true;
-    this.options.child.kill("SIGTERM");
+    this.options.release.released = this.options.child.kill("SIGTERM");
     await this.options.completion;
   }
 }
@@ -212,6 +212,12 @@ function logChildChunk(chunk: string, level: "info" | "warn", log: ChildLog): vo
   }
 }
 
+// The Node child dies of SIGTERM; the Go runner traps it and exits with a
+// code, so its signal is null. Any other signal (SIGKILL, SIGSEGV) is no release.
+function endedByTheRelease(signal: NodeJS.Signals | null): boolean {
+  return signal === null || signal === "SIGTERM";
+}
+
 function childExitResult({
   code,
   stdout,
@@ -219,6 +225,7 @@ function childExitResult({
   log,
   cancelled,
   released,
+  signal,
 }: {
   code: number | null;
   stdout: string;
@@ -226,6 +233,7 @@ function childExitResult({
   log: ChildLog;
   cancelled: boolean;
   released: boolean;
+  signal: NodeJS.Signals | null;
 }): ScenarioExecutionResult {
   if (cancelled) {
     log("info", "Job cancelled via cancel broadcast");
@@ -241,7 +249,7 @@ function childExitResult({
       released
         ? "Child process stopped after its run was released"
         : `Child process exited with code ${code}`,
-      { exitCode: code, stderr },
+      { exitCode: code, signal, stderr },
     );
     // A failed run still ran its teardown, and its record matters most then.
     return { success: false, error, ...(childResult?.hooks ? { hooks: childResult.hooks } : {}) };
