@@ -80,9 +80,10 @@ async function placeCallThroughRelay(): Promise<string> {
   return callControl.placedCalls[0]!.streamUrl!;
 }
 
-/** Twilio dials the stream URL it was given, signing the upgrade, and sends `start`. */
-function twilioJoins({ streamUrl, signature }: { streamUrl: string; signature: string }) {
-  const twilio = new WebSocket(streamUrl, { headers: { "x-twilio-signature": signature } });
+/** Twilio dials the stream URL it was given, signing the upgrade (if given one), and sends `start`. */
+function twilioJoins({ streamUrl, signature }: { streamUrl: string; signature?: string }) {
+  const headers = signature === undefined ? {} : { "x-twilio-signature": signature };
+  const twilio = new WebSocket(streamUrl, { headers });
   clients.push(twilio);
   const firstMessage = new Promise<string>((resolve) =>
     twilio.once("message", (data) => resolve(frameText(data))),
@@ -182,6 +183,33 @@ describe("VoiceCallRelayService through the claim", () => {
             streamUrl,
             signature: sign({ authToken: "another-token", url: streamUrl }),
           });
+          await closed;
+
+          await expect(pending.peek(KEY)).resolves.toMatchObject({ found: true });
+        },
+        TEST_TIMEOUT_MS,
+      );
+    });
+
+    describe("when Twilio joins with no signature header", () => {
+      /** @scenario "An upgrade without a signature is refused and leaves the call pending" */
+      it(
+        "closes Twilio's socket and spawns no child",
+        async () => {
+          const streamUrl = await placeCallThroughRelay();
+          const { closed } = twilioJoins({ streamUrl });
+
+          expect(await closed).toBe(1008);
+          expect(children).toHaveLength(0);
+        },
+        TEST_TIMEOUT_MS,
+      );
+
+      it(
+        "leaves the call peekable for the claim deadline",
+        async () => {
+          const streamUrl = await placeCallThroughRelay();
+          const { closed } = twilioJoins({ streamUrl });
           await closed;
 
           await expect(pending.peek(KEY)).resolves.toMatchObject({ found: true });
