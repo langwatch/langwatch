@@ -35,6 +35,7 @@ constraint-dependencies = [
   "onnx>=1.22.0", # security: onnx advisory (#1560)
   "transformers>=5.10.0", # security: transformers advisory (#2196)
   "mistune>=3.3.3", # security: mistune advisory (#2216)
+  "tornado>=6.6; python_full_version >= '3.11'", # security: tornado advisories covering <6.6 (#3334-#3336); 6.6 needs Python 3.11
   "tornado>=6.5.9", # security: tornado advisories covering <=6.5.8 (#2803-#2805)
   "anyio>=4.14.2", # security: anyio advisories (#2434, #2435)
   "soupsieve>=2.9.0", # security: soupsieve advisories (#2422, #2423)
@@ -42,11 +43,18 @@ constraint-dependencies = [
   "pyjwt>=2.15.0", # security: PyJWT advisories covering <=2.14.0 (#2788-#2798, #2802, #2806, #2819)
   "urllib3>=2.8.0", # security: urllib3 advisories covering <2.8.0 (#2799-#2801)
   "fsspec>=2026.6.0", # security: fsspec advisory covering <2026.6.0 (#2751)
-  "langgraph-sdk>=0.4.4", # security: langgraph-sdk advisory covering <=0.4.3 (#2750)
+  "langgraph-sdk>=0.4.6", # security: langgraph-sdk advisories covering <=0.4.3 (#2750) and 0.4.0-0.4.5 (#3305)
+  "langgraph>=1.2.14", # security: LangGraph SDK v3 streaming identifiers advisory covering 1.2.3-1.2.13 (#3306)
   "notebook>=7.6.3", # security: notebook advisory covering 7.5.0-7.6.2 (#2815)
   "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2818)
   "aiohttp>=3.14.4", # security: aiohttp advisories covering <=3.14.3, two HIGH (#2854-#2856)
   "certifi>=2026.10.19", # security: certifi advisory covering <2026.10.19 (#2949)
   "pillow>=13.0.0", # security: Pillow advisories covering <13.0.0, three CRITICAL (#2955-#2963, #3038-#3075)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2829)
+  # filelock 4.2.1 fixes the ReadWriteLock and SoftFileLock advisories covering 3.20.4-4.2.0 but needs
+  # Python 3.11; on 3.10, 3.20.3 sits below all of them and above the older symlink fixes.
+  "filelock>=4.2.1; python_full_version >= '3.11'", # security: filelock advisories covering 3.20.4-4.2.0 (#3208-#3210)
+  "filelock>=3.20.3,<3.20.4; python_full_version < '3.11'", # security: same advisories, on 3.10 (#3208-#3210); two later ones cover every release <=4.2.0 and have no 3.10 fix
+  "pyasn1>=0.6.5", # security: pyasn1 quadratic decoding advisories, four HIGH (#3370-#3373)
+  "setuptools>=84.1.0", # security: setuptools advisory covering <84.1.0 (#3207)
 ]
