@@ -11,10 +11,7 @@ import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
-import {
-  type NurturingClaimRepository,
-  rethrowAfterReleasing,
-} from "../repositories/nurturing-claim.repository.ts";
+import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
@@ -49,6 +46,7 @@ import {
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
 import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
+import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import { NurturingPostHogDeliveryService } from "./nurturing-posthog-delivery.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
@@ -135,10 +133,9 @@ export class NurturingDeliveryService {
     } catch (error) {
       reportFailure(error);
       const debounce = pickCustomerIoDebounce(signal);
-      return rethrowAfterReleasing({
+      return NurturingClaimReleaseService.create(this.deps.claims).rethrowAfterReleasing({
         error,
         keys: debounce ? [deliveredClaim, debounce.claimKey] : [deliveredClaim],
-        claims: this.deps.claims,
       });
     }
   }

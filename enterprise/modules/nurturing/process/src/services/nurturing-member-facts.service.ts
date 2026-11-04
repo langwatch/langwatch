@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
-import {
-  type NurturingClaimRepository,
-  rethrowAfterReleasing,
-} from "../repositories/nurturing-claim.repository.ts";
+import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import type { NurturingTraceMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "../repositories/nurturing-project-directory.repository.ts";
 import { pickOrganizationDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
@@ -13,6 +10,7 @@ import {
   type KnownTraces,
   type MemberFactSignal,
 } from "../rules/nurturing-member-facts.rules.ts";
+import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 
 type MemberFactsDependencies = Readonly<{
   claims: NurturingClaimRepository;
@@ -58,10 +56,9 @@ export class NurturingMemberFactsService {
       const members = await this.dependencies.organizations.getAllMembers({ organizationId });
       return members.map(({ id }) => id);
     } catch (error) {
-      return rethrowAfterReleasing({
+      return NurturingClaimReleaseService.create(this.dependencies.claims).rethrowAfterReleasing({
         error,
         keys: debounce ? [debounce.claimKey] : [],
-        claims: this.dependencies.claims,
       });
     }
   }
