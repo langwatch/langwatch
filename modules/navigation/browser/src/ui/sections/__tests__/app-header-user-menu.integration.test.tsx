@@ -151,6 +151,7 @@ describe("the My Workspace entry's governance gate", () => {
 
       expect(rememberScopeMock).toHaveBeenCalledWith({
         organizationId: "org-1",
+        teamId: "",
         projectSlug: "",
       });
       expect(navigateMock).toHaveBeenCalledWith("/me");
@@ -193,6 +194,7 @@ describe("the My Workspace entry's governance gate", () => {
 
       expect(rememberScopeMock).toHaveBeenCalledWith({
         organizationId: "org-2",
+        teamId: "",
         projectSlug: "",
       });
     });

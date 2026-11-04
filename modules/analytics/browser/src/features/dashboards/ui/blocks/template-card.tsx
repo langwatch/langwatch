@@ -186,7 +186,7 @@ export function AddTemplateButton({
       <Button asChild size="sm" variant="outline" colorPalette="gray">
         <a
           href={addedHref}
-          aria-label={`${name} is added: open its board`}
+          aria-label={`${name} is added: open its dashboard`}
           onClick={(event) => {
             if (opensElsewhere(event)) return;
             event.preventDefault();

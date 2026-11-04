@@ -139,12 +139,15 @@ export class LangWatchQLPostgresViewsService {
   engineTableStatements({
     names,
     collection,
+    schema,
     views = LWQL_VIEW_CATALOG,
     credentialFingerprint,
   }: {
     names: LangWatchQLNames;
     /** Named collection holding the PostgreSQL credentials. */
     collection: string;
+    /** The app PostgreSQL schema the engine tables read from. */
+    schema: string;
     views?: readonly LangWatchQLViewDefinition[];
     /** The collection values' fingerprint, once ClickHouse is known to hold them. */
     credentialFingerprint?: string;
@@ -159,6 +162,7 @@ export class LangWatchQLPostgresViewsService {
         })),
         collection,
         postgresRelation: view.postgres.approvedView,
+        schema,
         ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
       }),
     );

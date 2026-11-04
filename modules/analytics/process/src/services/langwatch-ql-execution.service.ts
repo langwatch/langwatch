@@ -53,8 +53,6 @@ type LangWatchQLExecutionInput = {
   readonly validation: ValidatedLangWatchQL;
   readonly granularity: LangWatchQLGranularityResolution;
   readonly tenantCapability: string;
-  /** The origins the surface leaves out of every view the statement reads. */
-  readonly excludeOrigins: readonly string[];
   /** An aggregate's members and where each is read from; absent on a plain project. */
   readonly memberWindows?: readonly LangWatchQLMemberWindow[];
   /** The window the statement follows, which bounds the origin lookup; absent, none does. */
@@ -81,7 +79,7 @@ export class LangWatchQLExecutionService {
     ...run
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
     const { database, views } = this.deps;
-    const { validation, granularity, excludeOrigins, memberWindows } = run;
+    const { validation, granularity, memberWindows } = run;
     const execution = await this.runRestricted(run);
     const hydrationStartedMs = this.deps.stopwatch();
     const answer = await this.deps.extraction.hydrate({
@@ -119,7 +117,7 @@ export class LangWatchQLExecutionService {
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
-        excludeOrigins,
+        followsSources: validation.followsSources,
       },
       "LangWatchQL executed",
     );
@@ -148,7 +146,6 @@ export class LangWatchQLExecutionService {
     validation,
     granularity,
     tenantCapability,
-    excludeOrigins,
     memberWindows,
     timeWindow,
   }: Omit<
@@ -163,10 +160,9 @@ export class LangWatchQLExecutionService {
 
     const execution = await executor.execute({
       // The submitted statement with a default `LIMIT` when the caller named none, so an
-      // unbounded query is capped rather than streamed, and the origins the surface left out.
+      // unbounded query is capped rather than streamed.
       sql: scopeLangWatchQL({
         sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: limits.maxRows }),
-        excludeOrigins,
         database,
         views,
         ...(timeWindow ? { timeWindow } : {}),

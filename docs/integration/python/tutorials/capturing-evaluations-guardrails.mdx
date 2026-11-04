@@ -179,6 +179,8 @@ Guardrails are evaluations used to make decisions or enforce policies within you
 Set `as_guardrail=True` when calling `evaluate` or `async_evaluate`.
 
 ```python
+import langwatch
+
 # ... (inside a function with a current span)
 eval_data = BasicEvaluateData(output=llm_response)
 pii_check_result = langwatch.evaluate(

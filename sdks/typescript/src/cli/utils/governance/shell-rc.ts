@@ -48,6 +48,13 @@ export const SHELL_FUNCTION_TOOLS: readonly string[] = [
   // config-file env target for the auth header, so it uses the same
   // scoped-function tier. ADR-039 §Extension #2.
   "code",
+  // grok reads its exporter only from the environment, so a bare `grok` run
+  // reports only while the scoped function re-injects it. ADR-192.
+  "grok",
+  // pi's extension reads the endpoint and key from the environment alone,
+  // there being no pi config file carrying either, so a bare `pi` run reports
+  // only while the scoped function re-injects them. ADR-188 Constants.
+  "pi",
 ] as const;
 
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
@@ -614,6 +621,17 @@ function installRawSessionContextHooks(): void {
 }
 
 /**
+ * Agents whose `langwatch <tool>` launch writes their hook file itself: the rc
+ * prompt, its other writer, is skipped once an OTLP endpoint is set.
+ */
+const LAUNCH_WRITES_HOOK_FILE: ReadonlySet<string> = new Set(["grok"]);
+
+/** Writes the launched agent's own hook file, for the agents above. */
+export function assertLaunchHookFile({ tool }: { tool: string }): void {
+  if (LAUNCH_WRITES_HOOK_FILE.has(tool)) assertOwnedSessionHookFile({ tool });
+}
+
+/**
  * Writes the hook file the launched agent loads from a folder of ours alone
  * (Copilot), so its sessions report their repository and branch. Driven by the
  * per-agent table; idempotent, quiet unless it changed something, never fatal.
@@ -622,14 +640,14 @@ export function assertOwnedSessionHookFile({ tool }: { tool: string }): void {
   const hooks = assertOwnedHookFileFor({ command: tool });
   if (!hooks || hooks.action === "unchanged" || hooks.action === "user_file_runs_hook") return;
   if (hooks.action === "not_ours") {
-    console.log(
+    console.error(
       chalk.yellow(
-        `  ! ${hookFileNotOursNotice({ displayPath: hooks.displayPath, command: tool })}`,
+        `  ! ${hookFileNotOursNotice({ displayPath: hooks.displayPath, agentId: hooks.tool, command: tool })}`,
       ),
     );
     return;
   }
-  console.log(
+  console.error(
     chalk.green(
       `  ✓ Installed ${hooks.displayPath}, whose hooks report each session's repository and branch`,
     ),

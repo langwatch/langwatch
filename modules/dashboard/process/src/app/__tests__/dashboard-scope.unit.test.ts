@@ -304,7 +304,7 @@ describe("board scope on the server", () => {
       });
     });
 
-    /** @scenario "AC176 Scope: a narrower scope keeps other members' stars" */
+    /** @scenario "AC176 Scope: a narrower scope keeps other members' pins" */
     it("keeps a teammate's star through their unstar of a board they cannot see", async () => {
       const { app, target } = await boardAt("PRIVATE");
       const on = { projectId: HOME, dashboardId: target.dashboardId, viewer: AUTHOR };
@@ -625,7 +625,7 @@ describe("board scope on the server", () => {
   });
 
   describe("given a board other members starred", () => {
-    /** @scenario "AC176 Scope: a narrower scope keeps other members' stars" */
+    /** @scenario "AC176 Scope: a narrower scope keeps other members' pins" */
     it("leaves their starred lists at Only me and comes back when the scope widens", async () => {
       const { app, target } = await boardAt("PROJECT");
       const on = { projectId: HOME, dashboardId: target.dashboardId, viewer: AUTHOR };
@@ -644,7 +644,7 @@ describe("board scope on the server", () => {
       });
     });
 
-    /** @scenario "AC176 Scope: a narrower scope keeps other members' stars" */
+    /** @scenario "AC176 Scope: a narrower scope keeps other members' pins" */
     it("shows one star on an Organization board in every project that lists the board", async () => {
       const { app, target } = await boardAt("ORGANIZATION");
       const starredIn = async (projectId: string) =>
