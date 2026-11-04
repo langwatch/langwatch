@@ -7,13 +7,14 @@ import {
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 
+import { verifyDatasetRecords } from "../../rules/dataset-record-retry.rules.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord" | "$queryRaw">;
+type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord" | "$queryRaw" | "$transaction">;
 
 /**
  * Declared rather than inherited from `PrismaRepository.for`: the ordered reads
@@ -109,7 +110,35 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
     skipDuplicates?: boolean;
+    verifyExisting?: boolean;
   }): Promise<DatasetRecord[]> {
+    if (input.verifyExisting) {
+      return this.database.$transaction(
+        async (tx) => {
+          await tx.datasetRecord.createMany({
+            data: input.entries.map(({ id, ...entry }) => ({
+              id,
+              datasetId: input.datasetId,
+              projectId: input.projectId,
+              entry: entry as Prisma.InputJsonValue,
+            })),
+            skipDuplicates: input.skipDuplicates ?? false,
+          });
+          const rows = await tx.$queryRaw<unknown[]>`
+          SELECT "id", "datasetId", "projectId", "entry", "createdAt", "updatedAt"
+            FROM "DatasetRecord"
+           WHERE "datasetId" = ${input.datasetId}
+             AND "projectId" = ${input.projectId}
+             AND "id" = ANY(${input.entries.map((entry) => entry.id)}::text[])
+           ORDER BY "createdAt" ASC, "id" COLLATE "C" ASC
+        `;
+          const records = rows.map(toDatasetRecord);
+          verifyDatasetRecords(input.entries, records);
+          return records;
+        },
+        { isolationLevel: "Serializable" },
+      );
+    }
     await this.database.datasetRecord.createMany({
       data: input.entries.map(({ id, ...entry }) => ({
         id,

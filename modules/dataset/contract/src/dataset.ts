@@ -474,6 +474,8 @@ const createDatasetRecordsInputSchemaDefinition = datasetRecordLookupInputSchema
    * The inline Postgres layout honours it; object-storage layouts ignore it.
    */
   readBackExisting: z.boolean().optional(),
+  /** Reject conflicting ids/content atomically for inline retry-safe batches. */
+  verifyExisting: z.boolean().optional(),
 });
 export interface CreateDatasetRecordsInputSchema extends Named<
   typeof createDatasetRecordsInputSchemaDefinition

@@ -223,6 +223,59 @@ describe("DatasetService", () => {
         expect(retried.map((record) => record.entry)).toEqual([{ input: "first", output: null }]);
       });
 
+      describe("when retries verify existing rows", () => {
+        const retry = {
+          slugOrId: "feedback",
+          projectId: PROJECT_ID,
+          skipDuplicates: true,
+          verifyExisting: true,
+        };
+
+        it("does not append shifted expansion rows when an existing row conflicts", async () => {
+          const { service: subject, records } = service({ realRecords: true });
+          await subject.batchCreateRecords({ ...retry, entries: [{ id: "row-0", input: "old" }] });
+          await expect(
+            subject.batchCreateRecords({
+              ...retry,
+              entries: [
+                { id: "row-1", input: "old" },
+                { id: "row-0", input: "inserted" },
+              ],
+            }),
+          ).rejects.toMatchObject({ code: "dataset_record_conflict" });
+          const page = await records.listAll({
+            datasetId: "dataset-1",
+            projectId: PROJECT_ID,
+            page: 1,
+            limit: 10,
+          });
+          expect(page.records.map(({ id, entry }) => ({ id, entry }))).toEqual([
+            { id: "row-0", entry: { input: "old", output: null } },
+          ]);
+        });
+
+        it("rejects a removed mapping column rather than retaining its old value", async () => {
+          const { service: subject } = service({ realRecords: true });
+          await subject.batchCreateRecords({
+            ...retry,
+            entries: [{ id: "row-0", input: "same", output: "old" }],
+          });
+          await expect(
+            subject.batchCreateRecords({ ...retry, entries: [{ id: "row-0", input: "same" }] }),
+          ).rejects.toMatchObject({ code: "dataset_record_conflict" });
+        });
+
+        it("accepts identical retries after normalization fills missing columns", async () => {
+          const { service: subject } = service({ realRecords: true });
+          await subject.batchCreateRecords({ ...retry, entries: [{ id: "row-0", input: "same" }] });
+          const rows = await subject.batchCreateRecords({
+            ...retry,
+            entries: [{ id: "row-0", input: "same", output: null }],
+          });
+          expect(rows.map(({ entry }) => entry)).toEqual([{ input: "same", output: null }]);
+        });
+      });
+
       it("still rejects a duplicate id when skipDuplicates is false", async () => {
         const { service: subject, records } = service({ realRecords: true });
         const input = {

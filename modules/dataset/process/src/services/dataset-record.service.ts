@@ -424,14 +424,13 @@ export class DatasetRecordService {
         ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
       })),
       skipDuplicates: parsed.skipDuplicates ?? false,
+      verifyExisting: parsed.verifyExisting ?? false,
     });
     if (!parsed.readBackExisting) {
       return written;
     }
 
-    // The caller supplied deterministic ids so it can compare a row an earlier
-    // attempt stored with the row this attempt would write; skipDuplicates
-    // returns only the rows this batch created, so read the landed ones back.
+    // Preserve explicit readback for callers requesting their deterministic ids.
     const requestedIds = parsed.entries.flatMap((entry) =>
       entry.id === undefined ? [] : [entry.id],
     );
