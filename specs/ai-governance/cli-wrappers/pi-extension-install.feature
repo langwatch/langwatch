@@ -35,12 +35,14 @@
 # extension are met with signal aliases in pi's definition instead, which is
 # data, not an install.
 #
-# Both `langwatch ingest install pi_cli` and the `langwatch pi` wrapper write
-# the file. The install command is where every other agent's seam is written,
-# so pi takes the plugin arm of it, or it writes hook entries into a file pi
-# never reads. The wrapper writes it too because pi ships no exporter: a live
-# run proved `langwatch pi` alone sent nothing, as most users never run the
-# install command (ADR-188 Decision 4).
+# `langwatch ingest install pi_cli`, the `langwatch pi` wrapper and
+# `langwatch instrument pi` all write the file. The install command is where
+# every other agent's seam is written, so pi takes the plugin arm of it, or it
+# writes hook entries into a file pi never reads. The wrapper and instrument
+# write it too because pi ships no exporter: a live run proved `langwatch pi`
+# alone sent nothing, as most users never run the install command, and the
+# shell function instrument writes is only env that reaches nothing without
+# the file (ADR-188 Decision 4).
 #
 # Ownership is by a first-line marker and a contents comparison, as for the
 # opencode plugin, not by a version stamp. A single file written into a
@@ -108,6 +110,21 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       Then the LangWatch extension is written into pi's extension directory
       And one line names where it was written
       And a later launch with the same extension says nothing about it
+
+    @unit
+    Scenario: Instrumenting pi writes the extension beside the shell function
+      Given pi's extension directory holds no LangWatch extension
+      When the user runs `langwatch instrument pi`
+      Then the scoped pi function is written into the shell rc
+      And the LangWatch extension is written into pi's extension directory
+      And the closing notes name both files
+
+    @unit
+    Scenario: Instrumenting pi over a file of the user's says pi sends no telemetry
+      Given a file at pi's extension path that carries no LangWatch marker
+      When the user runs `langwatch instrument pi`
+      Then the file is left exactly as it is
+      And the install reports that pi sessions send no telemetry
 
     @unit
     Scenario: A failed extension write is reported and pi still starts
