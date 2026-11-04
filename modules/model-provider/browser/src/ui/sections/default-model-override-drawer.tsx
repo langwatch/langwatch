@@ -13,6 +13,8 @@ import {
 } from "@langwatch/design-system/provider-model-selector";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
@@ -28,8 +30,6 @@ import {
   type ModelPickerOption,
   type ModelRole,
 } from "@langwatch/model-provider-contract";
-import { useFeatureFlag } from "@langwatch/feature-flag-client";
-import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

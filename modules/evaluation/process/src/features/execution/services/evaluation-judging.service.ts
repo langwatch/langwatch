@@ -1,10 +1,9 @@
 /**
  * Answers one LLM judge whose model is Instant Evals through the judge leaf, before any provider
  * lookup (ADR-174 decisions 1, 7, 9, 16). A stream chunk is skipped before the judge is called,
- * and a refusal comes back as an error result, never thrown, so no caller reads it as a skip.
- * On LangWatch's model, an organization with the judge router flag is routed (ADR-190).
+ * and a refusal comes back as an error result, never thrown. LangWatch's model is routed for an
+ * organization with the judge router flag (ADR-190; instant-eval-judge-router.feature).
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
- * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";

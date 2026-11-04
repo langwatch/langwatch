@@ -27,10 +27,9 @@ export function isShownDecisionModel(id: string | null | undefined): id is strin
 }
 
 /**
- * The column's picker entries: exactly the decision models the server says would run for the
- * project, in catalogue order, LangWatch Instant Preview first. The server weighs the flag and
- * the keys, so a pick here always runs. `pickable` undefined means not loaded yet. With the
- * judge router flag, LangWatch Instant Preview says it routes.
+ * The column's picker entries: the decision models the server says would run, in catalogue
+ * order, LangWatch Instant Preview first, so a pick here always runs. `pickable` undefined means
+ * not loaded yet. With the judge router flag, Instant Preview says it routes.
  */
 export function decisionModelPickerOptions({
   pickable,

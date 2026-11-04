@@ -189,7 +189,8 @@ describe("instantEvalJudgeResult on a routed judgement", () => {
 
     expect(result).toMatchObject({
       status: "processed",
-      details: "Instant Evals: true, 92% confident. LangWatch Judge: answered by anthropic, 1 escalated",
+      details:
+        "Instant Evals: true, 92% confident. LangWatch Judge: answered by anthropic, 1 escalated",
     });
   });
 
