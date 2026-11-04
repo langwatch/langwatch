@@ -100,7 +100,7 @@ function describeToolEvent({
         case "redirected":
           return `Answered instead of approving ${tool}`;
         case "aborted":
-          return `Cancelled ${tool}${source}`;
+          return `Aborted ${tool}${source}`;
         case "denied":
           return `Denied ${tool}${source}`;
         case "unknown":

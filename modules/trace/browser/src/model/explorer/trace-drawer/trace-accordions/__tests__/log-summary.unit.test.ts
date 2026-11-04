@@ -53,8 +53,9 @@ describe("summarizeLogEvent", () => {
       ],
       [
         { decision: "cancelled", source: "user_abort", tool_name: "edit_file" },
-        "Cancelled edit_file (user_abort)",
+        "Aborted edit_file (user_abort)",
       ],
+      [{ decision: "timed_out", tool_name: "edit_file" }, "Aborted edit_file"],
       [{ decision: "deny", source: "config", tool_name: "edit_file" }, "Denied edit_file (config)"],
     ])("reads %o by its outcome", (attributes, expected) => {
       expect(summarizeLogEvent(log({ "event.name": "tool_decision", ...attributes }))).toBe(
